@@ -34,12 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. When the bot process receives SIGTERM, all monitoring loops stop, pending state is flushed, and the process exits cleanly within 5 seconds
   4. Flashbots bundle retries use incrementing nonces and target the correct network based on configuration
   5. Only messages from whitelisted Telegram sender IDs trigger alpha drop processing
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md — Exit manager: mutex, timer registry, shutdown, balance checks, sell simulation, resume (FIX-01, FIX-04, FIX-05, FIX-07, FIX-08)
+- [ ] 01-02-PLAN.md — Flashbots dynamic relay and nonce increment on retry (FIX-02, FIX-03)
+- [ ] 01-03-PLAN.md — Startup env var validation and Telegram sender whitelist (FIX-06, FIX-09)
 
 ### Phase 2: ethers v6 Migration
 **Goal**: The entire codebase runs on ethers v6 with native BigInt arithmetic, eliminating the EOL v5 dependency
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Bug Fixes & Hardening | 0/3 | Not started | - |
+| 1. Bug Fixes & Hardening | 0/3 | Planning complete | - |
 | 2. ethers v6 Migration | 0/2 | Not started | - |
 | 3. SQLite Storage & Code Quality | 0/3 | Not started | - |
 | 4. Multi-Chain Architecture | 0/3 | Not started | - |
