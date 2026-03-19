@@ -21,6 +21,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'FLASHBOTS_AUTH_KEY', required: true, description: 'Flashbots authentication signing key' },
     { name: 'TELEGRAM_ALLOWED_SENDERS', required: false, description: 'Comma-separated allowed Telegram sender IDs' },
     { name: 'TELEGRAM_ALLOWED_CHANNELS', required: false, description: 'Comma-separated allowed Telegram channel/group IDs' },
+    { name: 'NETWORK', required: false, description: 'Target network: sepolia (default), mainnet' },
 ];
 
 function validateEnvVars(): void {
@@ -42,13 +43,24 @@ validateEnvVars();
 
 export const rpc = {
     sepolia: process.env.ALCHEMY_URL!,
+    mainnet: process.env.ALCHEMY_URL!,
     bsc: "https://bsc-dataseed.binance.org/"
 };
 
 export type SupportedNetwork = keyof typeof rpc;
 
+// --- Network Validation ---
+const networkInput = (process.env.NETWORK || 'sepolia').toLowerCase();
+const validNetworks = Object.keys(rpc);
+if (!validNetworks.includes(networkInput)) {
+    console.error(`\n[STARTUP ERROR] Unsupported network: "${networkInput}"`);
+    console.error(`Valid networks: ${validNetworks.join(', ')}\n`);
+    process.exit(1);
+}
+// --- End Network Validation ---
+
 export const CONFIG = {
-    network: "sepolia" as SupportedNetwork,
+    network: networkInput as SupportedNetwork,
     rpc,
     walletPrivateKey: process.env.PRIVATE_KEY!,
 
