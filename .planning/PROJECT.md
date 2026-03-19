@@ -138,4 +138,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | — Pending |
 
 ---
-*Last updated: 2026-03-19 after Phase 01 completion*
+*Last updated: 2026-03-19 after Phase 01 gap closure (env-driven network config + .env.example)*
