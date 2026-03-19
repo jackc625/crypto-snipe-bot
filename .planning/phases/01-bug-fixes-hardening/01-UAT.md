@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 01-bug-fixes-hardening
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md]
 started: 2026-03-19T20:00:00Z
-updated: 2026-03-19T20:15:00Z
+updated: 2026-03-19T21:30:00Z
 ---
 
 ## Current Test
@@ -55,7 +55,7 @@ skipped: 2
 ## Gaps
 
 - truth: "Network should be configurable via env var, not hardcoded in source"
-  status: failed
+  status: resolved
   reason: "User reported: CONFIG.network is hardcoded to 'sepolia' in config.ts instead of being driven by a NETWORK env var. Cannot switch networks without editing source."
   severity: major
   test: 2
@@ -72,7 +72,7 @@ skipped: 2
   debug_session: ".planning/debug/config-network-hardcoded-no-env-example.md"
 
 - truth: "Project should have .env.example documenting all required and optional env vars"
-  status: failed
+  status: resolved
   reason: "User reported: No .env.example exists. New env vars added (TELEGRAM_ALLOWED_SENDERS, TELEGRAM_ALLOWED_CHANNELS) are undiscoverable without reading source code."
   severity: major
   test: 2
