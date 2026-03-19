@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 01-bug-fixes-hardening
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md]
 started: 2026-03-19T20:00:00Z
@@ -59,13 +59,30 @@ skipped: 2
   reason: "User reported: CONFIG.network is hardcoded to 'sepolia' in config.ts instead of being driven by a NETWORK env var. Cannot switch networks without editing source."
   severity: major
   test: 2
-  artifacts: []
-  missing: []
+  root_cause: "Multi-network plumbing partially built but never connected at input layer. FLASHBOTS_RELAYS supports both networks, but CONFIG.network is a string literal. Additionally, rpc map has no mainnet entry."
+  artifacts:
+    - path: "src/config.ts"
+      issue: "Line 51: hardcoded 'sepolia'. Lines 43-46: rpc map missing mainnet. Lines 13-24: REQUIRED_ENV_VARS missing NETWORK."
+    - path: "src/utils/flashbots.ts"
+      issue: "Lines 5-8: FLASHBOTS_RELAYS already supports both networks (downstream ready)"
+  missing:
+    - "Read process.env.NETWORK with default 'sepolia', validate against known keys"
+    - "Add NETWORK to REQUIRED_ENV_VARS as optional"
+    - "Add mainnet RPC entry (or reuse ALCHEMY_URL since user sets correct one per network)"
+  debug_session: ".planning/debug/config-network-hardcoded-no-env-example.md"
 
 - truth: "Project should have .env.example documenting all required and optional env vars"
   status: failed
   reason: "User reported: No .env.example exists. New env vars added (TELEGRAM_ALLOWED_SENDERS, TELEGRAM_ALLOWED_CHANNELS) are undiscoverable without reading source code."
   severity: major
   test: 2
-  artifacts: []
-  missing: []
+  root_cause: "Internal env var registry (REQUIRED_ENV_VARS array) was never externalized into a .env.example file. Phase 01 added 2 optional vars, making documentation gap worse."
+  artifacts:
+    - path: "src/config.ts"
+      issue: "Lines 13-24: REQUIRED_ENV_VARS array is source of truth but not externalized"
+    - path: "src/telegramListener.ts"
+      issue: "Lines 17-22: new optional vars consumed here"
+  missing:
+    - "Create .env.example at project root with all 8 required + 2 optional vars with placeholder values and comments"
+    - "Include NETWORK var from Gap 1 fix as optional"
+  debug_session: ".planning/debug/config-network-hardcoded-no-env-example.md"
