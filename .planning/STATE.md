@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-19T19:51:30.165Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-03-19T19:59:54.771Z"
 progress:
   total_phases: 9
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 3
 ---
 
 # Project State
@@ -23,16 +23,16 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 01 (bug-fixes-hardening) — EXECUTING
-Plan: 2 of 3
+Phase: 01 (bug-fixes-hardening) — COMPLETE
+Plan: 3 of 3
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 11min
+- Total execution time: 0.18 hours
 
 **By Phase:**
 
@@ -46,7 +46,10 @@ Plan: 2 of 3
 - Trend: -
 
 *Updated after each plan completion*
-| Phase 01 P02 | 5min | 1 tasks | 2 files |
+
+| Phase 01 P01 | 11min | 2 tasks | 3 files |
+| Phase 01 P03 | 13min | 2 tasks | 2 files |
+| Phase 01 P01 | 11min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -59,6 +62,10 @@ Recent decisions affecting current work:
 - [Roadmap]: ethers v6 migration is a standalone phase (Phase 2) because it touches every file and must complete atomically
 - [Roadmap]: SQLite + code quality bundled (Phase 3) because structured logging and singleton providers are preconditions for multi-chain
 - [Phase 01]: Used Record<string, {url, network}> map for Flashbots relay config rather than switch/case for easier network extension
+- [Phase 01]: Simple Map<string,boolean> mutex for per-token sell lock -- JS single-threaded, no async-mutex needed
+- [Phase 01]: Unified executeSell() function with mutex + balance check + timer cleanup instead of inline sell logic
+- [Phase 01]: Manual whitelist check inside handler instead of GramJS NewMessage({fromUsers, chats}) to enable debug logging of rejected messages
+- [Phase 01]: Empty Telegram whitelist env vars = allow all messages (backward compatible)
 
 ### Pending Todos
 
@@ -72,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T19:51:30.154Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-03-19T19:59:54.761Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None

@@ -9,15 +9,15 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Bug Fixes & Hardening
 
-- [ ] **FIX-01**: Stop-loss and take-profit cannot fire simultaneously on the same token — mutex-based exit mediation prevents double-sell
+- [x] **FIX-01**: Stop-loss and take-profit cannot fire simultaneously on the same token — mutex-based exit mediation prevents double-sell
 - [x] **FIX-02**: Flashbots relay network is selected dynamically based on configured chain, not hardcoded to mainnet
 - [x] **FIX-03**: Nonce increments on each Flashbots bundle retry so retries can actually succeed
-- [ ] **FIX-04**: Sell simulation safety check is re-enabled and runs before every buy transaction
-- [ ] **FIX-05**: Bot handles SIGTERM/SIGINT gracefully — clears all intervals, timeouts, and flushes state before exit
-- [ ] **FIX-06**: All required environment variables are validated on startup with clear error messages listing what's missing
-- [ ] **FIX-07**: Timed sell timeout is cancelled when position is already sold via stop-loss or take-profit
-- [ ] **FIX-08**: Monitoring loops exit when token balance reaches zero instead of polling indefinitely
-- [ ] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
+- [x] **FIX-04**: Sell simulation safety check is re-enabled and runs before every buy transaction
+- [x] **FIX-05**: Bot handles SIGTERM/SIGINT gracefully — clears all intervals, timeouts, and flushes state before exit
+- [x] **FIX-06**: All required environment variables are validated on startup with clear error messages listing what's missing
+- [x] **FIX-07**: Timed sell timeout is cancelled when position is already sold via stop-loss or take-profit
+- [x] **FIX-08**: Monitoring loops exit when token balance reaches zero instead of polling indefinitely
+- [x] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
 
 ### Infrastructure — ethers v6 Migration
 
@@ -120,15 +120,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 1 | Pending |
+| FIX-01 | Phase 1 | Complete |
 | FIX-02 | Phase 1 | Complete |
 | FIX-03 | Phase 1 | Complete |
-| FIX-04 | Phase 1 | Pending |
-| FIX-05 | Phase 1 | Pending |
-| FIX-06 | Phase 1 | Pending |
-| FIX-07 | Phase 1 | Pending |
-| FIX-08 | Phase 1 | Pending |
-| FIX-09 | Phase 1 | Pending |
+| FIX-04 | Phase 1 | Complete |
+| FIX-05 | Phase 1 | Complete |
+| FIX-06 | Phase 1 | Complete |
+| FIX-07 | Phase 1 | Complete |
+| FIX-08 | Phase 1 | Complete |
+| FIX-09 | Phase 1 | Complete |
 | ETH6-01 | Phase 2 | Pending |
 | ETH6-02 | Phase 2 | Pending |
 | ETH6-03 | Phase 2 | Pending |
