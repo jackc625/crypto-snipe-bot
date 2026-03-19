@@ -120,60 +120,60 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| FIX-05 | — | Pending |
-| FIX-06 | — | Pending |
-| FIX-07 | — | Pending |
-| FIX-08 | — | Pending |
-| FIX-09 | — | Pending |
-| ETH6-01 | — | Pending |
-| ETH6-02 | — | Pending |
-| ETH6-03 | — | Pending |
-| ETH6-04 | — | Pending |
-| DB-01 | — | Pending |
-| DB-02 | — | Pending |
-| DB-03 | — | Pending |
-| DB-04 | — | Pending |
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| CHAIN-01 | — | Pending |
-| CHAIN-02 | — | Pending |
-| CHAIN-03 | — | Pending |
-| CHAIN-04 | — | Pending |
-| CHAIN-05 | — | Pending |
-| V3-01 | — | Pending |
-| V3-02 | — | Pending |
-| V3-03 | — | Pending |
-| V3-04 | — | Pending |
-| RISK-01 | — | Pending |
-| RISK-02 | — | Pending |
-| RISK-03 | — | Pending |
-| RISK-04 | — | Pending |
-| RISK-05 | — | Pending |
-| EXIT-01 | — | Pending |
-| EXIT-02 | — | Pending |
-| EXIT-03 | — | Pending |
-| EXIT-04 | — | Pending |
-| MON-01 | — | Pending |
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| DASH-04 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
+| FIX-01 | Phase 1 | Pending |
+| FIX-02 | Phase 1 | Pending |
+| FIX-03 | Phase 1 | Pending |
+| FIX-04 | Phase 1 | Pending |
+| FIX-05 | Phase 1 | Pending |
+| FIX-06 | Phase 1 | Pending |
+| FIX-07 | Phase 1 | Pending |
+| FIX-08 | Phase 1 | Pending |
+| FIX-09 | Phase 1 | Pending |
+| ETH6-01 | Phase 2 | Pending |
+| ETH6-02 | Phase 2 | Pending |
+| ETH6-03 | Phase 2 | Pending |
+| ETH6-04 | Phase 2 | Pending |
+| DB-01 | Phase 3 | Pending |
+| DB-02 | Phase 3 | Pending |
+| DB-03 | Phase 3 | Pending |
+| DB-04 | Phase 3 | Pending |
+| INFRA-01 | Phase 3 | Pending |
+| INFRA-02 | Phase 3 | Pending |
+| INFRA-03 | Phase 3 | Pending |
+| CHAIN-01 | Phase 4 | Pending |
+| CHAIN-02 | Phase 4 | Pending |
+| CHAIN-03 | Phase 4 | Pending |
+| CHAIN-04 | Phase 4 | Pending |
+| CHAIN-05 | Phase 4 | Pending |
+| V3-01 | Phase 5 | Pending |
+| V3-02 | Phase 5 | Pending |
+| V3-03 | Phase 5 | Pending |
+| V3-04 | Phase 5 | Pending |
+| RISK-01 | Phase 6 | Pending |
+| RISK-02 | Phase 6 | Pending |
+| RISK-03 | Phase 6 | Pending |
+| RISK-04 | Phase 6 | Pending |
+| RISK-05 | Phase 6 | Pending |
+| EXIT-01 | Phase 7 | Pending |
+| EXIT-02 | Phase 7 | Pending |
+| EXIT-03 | Phase 7 | Pending |
+| EXIT-04 | Phase 7 | Pending |
+| MON-01 | Phase 8 | Pending |
+| DASH-01 | Phase 8 | Pending |
+| DASH-02 | Phase 8 | Pending |
+| DASH-03 | Phase 8 | Pending |
+| DASH-04 | Phase 8 | Pending |
+| TEST-01 | Phase 9 | Pending |
+| TEST-02 | Phase 9 | Pending |
+| TEST-03 | Phase 9 | Pending |
+| TEST-04 | Phase 9 | Pending |
+| TEST-05 | Phase 9 | Pending |
 
 **Coverage:**
-- v1 requirements: 47 total
-- Mapped to phases: 0
-- Unmapped: 47 ⚠️
+- v1 requirements: 48 total
+- Mapped to phases: 48
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after initial definition*
+*Last updated: 2026-03-19 after roadmap creation*
