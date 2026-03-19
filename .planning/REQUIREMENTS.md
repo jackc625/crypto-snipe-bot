@@ -1,0 +1,179 @@
+# Requirements: Crypto Snipe Bot
+
+**Defined:** 2026-03-19
+**Core Value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
+
+## v1 Requirements
+
+Requirements for production-ready multi-chain sniper bot. Each maps to roadmap phases.
+
+### Bug Fixes & Hardening
+
+- [ ] **FIX-01**: Stop-loss and take-profit cannot fire simultaneously on the same token — mutex-based exit mediation prevents double-sell
+- [ ] **FIX-02**: Flashbots relay network is selected dynamically based on configured chain, not hardcoded to mainnet
+- [ ] **FIX-03**: Nonce increments on each Flashbots bundle retry so retries can actually succeed
+- [ ] **FIX-04**: Sell simulation safety check is re-enabled and runs before every buy transaction
+- [ ] **FIX-05**: Bot handles SIGTERM/SIGINT gracefully — clears all intervals, timeouts, and flushes state before exit
+- [ ] **FIX-06**: All required environment variables are validated on startup with clear error messages listing what's missing
+- [ ] **FIX-07**: Timed sell timeout is cancelled when position is already sold via stop-loss or take-profit
+- [ ] **FIX-08**: Monitoring loops exit when token balance reaches zero instead of polling indefinitely
+- [ ] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
+
+### Infrastructure — ethers v6 Migration
+
+- [ ] **ETH6-01**: All ethers v5 imports and APIs migrated to ethers v6 (BigNumber → native BigInt, updated provider/signer API)
+- [ ] **ETH6-02**: All arithmetic operations use BigInt correctly — no Number() precision loss on wei values
+- [ ] **ETH6-03**: Flashbots provider upgraded to @flashbots/ethers-provider-bundle v1.0.0 (ethers v6 compatible)
+- [ ] **ETH6-04**: Hardhat toolbox upgraded to v6+ with hardhat-ethers v4+ for ethers v6 compatibility
+
+### Infrastructure — SQLite Storage
+
+- [ ] **DB-01**: JSON file storage replaced with SQLite database using WAL mode for concurrent access
+- [ ] **DB-02**: SQLite is the sole source of truth — no in-memory cache that can diverge from disk
+- [ ] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
+- [ ] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
+
+### Infrastructure — Code Quality
+
+- [ ] **INFRA-01**: Structured logging with severity levels (debug, info, warn, error) replaces all console.log/emoji logging
+- [ ] **INFRA-02**: Singleton provider instance per chain eliminates redundant provider creation across modules
+- [ ] **INFRA-03**: All ABI definitions centralized in a single module — no inline ABI arrays in business logic
+
+### Multi-Chain
+
+- [ ] **CHAIN-01**: Chain registry maps chainId to RPC endpoints, contract addresses, gas config, and MEV strategy
+- [ ] **CHAIN-02**: Per-chain configuration supports ETH mainnet, BSC, Base, and Arbitrum with chain-specific parameters
+- [ ] **CHAIN-03**: Bot runs concurrent event listeners on all configured chains simultaneously
+- [ ] **CHAIN-04**: MEV protection uses Flashbots on ETH, bloXroute/private RPCs on BSC, and appropriate strategies per chain
+- [ ] **CHAIN-05**: Dynamic capital allocation distributes funds across chains based on opportunity quality and activity levels
+
+### DEX Support — Uniswap V3
+
+- [ ] **V3-01**: Bot detects new V3 pool creation (PoolCreated events) across all configured chains and fee tiers
+- [ ] **V3-02**: Bot waits for Mint event (liquidity addition) after PoolCreated before sniping — does not snipe empty pools
+- [ ] **V3-03**: V3 swap execution uses the V3 SwapRouter with correct fee tier and sqrtPriceX96 parameters
+- [ ] **V3-04**: V3 price monitoring uses sqrtPriceX96 or oracle for accurate position valuation
+
+### Risk Management
+
+- [ ] **RISK-01**: Configurable max position size caps ETH/BNB per snipe trade
+- [ ] **RISK-02**: Daily loss limit halts sniping when realized losses exceed configured threshold in 24h
+- [ ] **RISK-03**: Max open positions limit prevents exceeding configured concurrent position count across all chains
+- [ ] **RISK-04**: Configurable cooldown period between snipes prevents overtrading during launch waves
+- [ ] **RISK-05**: Portfolio-level exposure tracking shows total capital at risk across all chains and positions
+
+### Smart Exit Strategies
+
+- [ ] **EXIT-01**: Trailing stop-loss tracks price high-water mark and sells on configured percentage pullback from peak
+- [ ] **EXIT-02**: Partial sells execute at configurable price targets (e.g., sell 50% at 2x, 25% at 5x, trail remainder)
+- [ ] **EXIT-03**: Stop-loss and take-profit thresholds adjust dynamically based on measured token price volatility
+- [ ] **EXIT-04**: Exit urgency escalates as position ages — tighter stops and lower targets over time
+
+### Monitoring & Web Dashboard
+
+- [ ] **MON-01**: HTTP health check endpoint exposes bot liveness, chain connectivity status, and open position count
+- [ ] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
+- [ ] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
+- [ ] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
+- [ ] **DASH-04**: Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
+
+### Testing
+
+- [ ] **TEST-01**: Unit tests cover all 9 token safety checks including API failure fallback paths
+- [ ] **TEST-02**: Unit tests verify SQLite storage concurrency — concurrent writes produce correct state
+- [ ] **TEST-03**: Integration tests verify Flashbots bundle submission, retry with nonce increment, and fallback to direct send
+- [ ] **TEST-04**: Integration tests verify stop-loss, take-profit, and trailing stop trigger correctly and do not double-sell
+- [ ] **TEST-05**: Mainnet fork tests simulate full snipe flow: detect pair → validate → buy → monitor → sell
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced Detection
+
+- **DETECT-01**: Mempool monitoring for pending liquidity transactions enables block-0 sniping (currently block-mode only)
+- **DETECT-02**: Anti-rug real-time monitoring detects liquidity removal events after purchase and frontrun exits
+
+### Advanced Risk
+
+- **ARISK-01**: ML-based token scoring using historical trade outcomes for buy/skip decisions
+- **ARISK-02**: Cross-chain correlation analysis to detect coordinated rug pulls across chains
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Copy trading / wallet tracking | Always behind the leader; sniping edge comes from speed not following |
+| Arbitrage between DEXes | Completely different architecture; competes with professional MEV searchers |
+| Limit orders / manual trading | Bot is fully automated; manual trading competes with DEX aggregators |
+| AI/ML token scoring (v1) | Noisy training data; rule-based heuristics are more reliable for v1 |
+| Mobile app | Web dashboard is mobile-responsive; Telegram provides mobile alerts |
+| CEX support | DEX-only architecture; CEX trading is a different product |
+| Multi-wallet support | Use separate bot instances; simpler key management and debugging |
+| Presale / fair-launch sniping | Every launchpad has different contract ABIs; maintenance nightmare |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FIX-01 | — | Pending |
+| FIX-02 | — | Pending |
+| FIX-03 | — | Pending |
+| FIX-04 | — | Pending |
+| FIX-05 | — | Pending |
+| FIX-06 | — | Pending |
+| FIX-07 | — | Pending |
+| FIX-08 | — | Pending |
+| FIX-09 | — | Pending |
+| ETH6-01 | — | Pending |
+| ETH6-02 | — | Pending |
+| ETH6-03 | — | Pending |
+| ETH6-04 | — | Pending |
+| DB-01 | — | Pending |
+| DB-02 | — | Pending |
+| DB-03 | — | Pending |
+| DB-04 | — | Pending |
+| INFRA-01 | — | Pending |
+| INFRA-02 | — | Pending |
+| INFRA-03 | — | Pending |
+| CHAIN-01 | — | Pending |
+| CHAIN-02 | — | Pending |
+| CHAIN-03 | — | Pending |
+| CHAIN-04 | — | Pending |
+| CHAIN-05 | — | Pending |
+| V3-01 | — | Pending |
+| V3-02 | — | Pending |
+| V3-03 | — | Pending |
+| V3-04 | — | Pending |
+| RISK-01 | — | Pending |
+| RISK-02 | — | Pending |
+| RISK-03 | — | Pending |
+| RISK-04 | — | Pending |
+| RISK-05 | — | Pending |
+| EXIT-01 | — | Pending |
+| EXIT-02 | — | Pending |
+| EXIT-03 | — | Pending |
+| EXIT-04 | — | Pending |
+| MON-01 | — | Pending |
+| DASH-01 | — | Pending |
+| DASH-02 | — | Pending |
+| DASH-03 | — | Pending |
+| DASH-04 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| TEST-04 | — | Pending |
+| TEST-05 | — | Pending |
+
+**Coverage:**
+- v1 requirements: 47 total
+- Mapped to phases: 0
+- Unmapped: 47 ⚠️
+
+---
+*Requirements defined: 2026-03-19*
+*Last updated: 2026-03-19 after initial definition*
