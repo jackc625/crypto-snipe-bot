@@ -29,20 +29,20 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 
 <!-- Current scope. Building toward these. -->
 
-**Bug Fixes & Hardening**
-- [ ] Fix race condition: stop-loss and take-profit can fire simultaneously on same token
-- [ ] Fix race condition: concurrent storage writes can overwrite each other
-- [ ] Fix Flashbots relay hardcoded to mainnet even when running on Sepolia/testnet
-- [ ] Fix nonce never incrementing on Flashbots retry — all retries fail after first
-- [ ] Add graceful shutdown with signal handlers (SIGTERM, SIGINT) to clear all intervals/timeouts
-- [ ] Fix timed sell timeout not cancelled when position already sold via stop-loss/take-profit
-- [ ] Fix monitoring loops continuing when wallet balance reaches zero
-- [ ] Re-enable disabled sell simulation safety check (currently marked TEMPORARY)
+**Bug Fixes & Hardening** — Validated in Phase 01: bug-fixes-hardening
+- [x] Fix race condition: stop-loss and take-profit can fire simultaneously on same token
+- [x] Fix race condition: concurrent storage writes can overwrite each other
+- [x] Fix Flashbots relay hardcoded to mainnet even when running on Sepolia/testnet
+- [x] Fix nonce never incrementing on Flashbots retry — all retries fail after first
+- [x] Add graceful shutdown with signal handlers (SIGTERM, SIGINT) to clear all intervals/timeouts
+- [x] Fix timed sell timeout not cancelled when position already sold via stop-loss/take-profit
+- [x] Fix monitoring loops continuing when wallet balance reaches zero
+- [x] Re-enable disabled sell simulation safety check (currently marked TEMPORARY)
 
 **Security**
-- [ ] Add startup validation for all required environment variables with helpful error messages
+- [x] Add startup validation for all required environment variables with helpful error messages — Validated in Phase 01
 - [ ] Validate RPC endpoint chain ID matches expected network on startup
-- [ ] Add Telegram sender whitelist to restrict who can trigger alpha drops
+- [x] Add Telegram sender whitelist to restrict who can trigger alpha drops — Validated in Phase 01
 - [ ] Sanitize API keys and private keys from error log output
 - [ ] Validate Flashbots auth key exists before attempting bundle submission
 
@@ -138,4 +138,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | — Pending |
 
 ---
-*Last updated: 2026-03-19 after initialization*
+*Last updated: 2026-03-19 after Phase 01 completion*
