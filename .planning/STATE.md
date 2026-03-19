@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-03-19T20:08:59.337Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-03-19T20:52:28.931Z"
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 4
+  completed_plans: 4
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 01 (bug-fixes-hardening) — COMPLETE
-Plan: 3 of 3
+Plan: 4 of 4
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: 3 of 3
 | Phase 01 P01 | 11min | 2 tasks | 3 files |
 | Phase 01 P03 | 13min | 2 tasks | 2 files |
 | Phase 01 P01 | 11min | 2 tasks | 3 files |
+| Phase 01 P04 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Unified executeSell() function with mutex + balance check + timer cleanup instead of inline sell logic
 - [Phase 01]: Manual whitelist check inside handler instead of GramJS NewMessage({fromUsers, chats}) to enable debug logging of rejected messages
 - [Phase 01]: Empty Telegram whitelist env vars = allow all messages (backward compatible)
+- [Phase 01]: Both sepolia and mainnet RPC entries use same ALCHEMY_URL -- user sets correct URL per network
 
 ### Pending Todos
 
@@ -79,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T19:59:54.761Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-03-19T20:52:28.923Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
