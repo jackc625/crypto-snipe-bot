@@ -51,11 +51,11 @@ Plans:
   2. All wei-level arithmetic uses native BigInt with zero Number() conversions on financial values
   3. Flashbots bundle submission works on Sepolia using @flashbots/ethers-provider-bundle v1.0.0
   4. Hardhat compile, deploy, and test commands work with hardhat-ethers v4+ and ethers v6
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Swap v5 packages for v6, update Hardhat/TS config, create ESLint BigInt safety rule, migrate light files (ETH6-04, ETH6-01, ETH6-02)
+- [ ] 02-02-PLAN.md — Migrate all remaining source files (BigNumber to BigInt, callStatic to staticCall, providers to flat imports), full compilation verification (ETH6-01, ETH6-02, ETH6-03)
 
 ### Phase 3: SQLite Storage & Code Quality
 **Goal**: All bot state is persisted in SQLite with full audit trail, and the codebase uses structured logging with centralized providers and ABIs
@@ -180,7 +180,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Bug Fixes & Hardening | 3/4 | Gap closure in progress | - |
-| 2. ethers v6 Migration | 0/2 | Not started | - |
+| 2. ethers v6 Migration | 0/2 | Planned | - |
 | 3. SQLite Storage & Code Quality | 0/3 | Not started | - |
 | 4. Multi-Chain Architecture | 0/3 | Not started | - |
 | 5. Uniswap V3 Integration | 0/2 | Not started | - |
