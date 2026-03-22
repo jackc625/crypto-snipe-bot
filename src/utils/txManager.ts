@@ -1,11 +1,11 @@
-import { providers, Wallet, BigNumber } from "ethers";
-import type { TransactionRequest } from "@ethersproject/abstract-provider";
+import { JsonRpcProvider, Wallet } from "ethers";
+import type { TransactionRequest } from "ethers";
 import { getFlashbotsProvider } from "./flashbots";
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 
 export async function sendTxWithRetry(
     txBuilder: () => Promise<TransactionRequest>,
-    provider: providers.JsonRpcProvider,
+    provider: JsonRpcProvider,
     wallet: Wallet,
     useFlashbots = true,
     maxRetries = 3
@@ -19,8 +19,8 @@ export async function sendTxWithRetry(
     while (retries <= maxRetries) {
         try {
             const txRequest = await txBuilder();
-            const gasLimit = txRequest.gasLimit || BigNumber.from(300000);
-            const gasPrice = await provider.getGasPrice();
+            const gasLimit = txRequest.gasLimit || 300_000n;
+            const gasPrice = (await provider.getFeeData()).gasPrice;
 
             const populatedTx: TransactionRequest = {
                 ...txRequest,
