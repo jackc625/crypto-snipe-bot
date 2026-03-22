@@ -2,6 +2,9 @@ import { JsonRpcProvider, Wallet } from "ethers";
 import type { TransactionRequest } from "ethers";
 import { getFlashbotsProvider } from "./flashbots";
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
+import { logger } from "./logger";
+
+const log = logger.child({ module: 'txManager' });
 
 export async function sendTxWithRetry(
     txBuilder: () => Promise<TransactionRequest>,
@@ -51,29 +54,29 @@ export async function sendTxWithRetry(
                 const waitResponse = await bundle.wait();
 
                 if (waitResponse === 0) {
-                    console.log(`✅ Flashbots bundle included in block ${targetBlock}`);
+                    log.info({ block: targetBlock }, 'Flashbots bundle included');
                     return;
                 } else {
-                    throw new Error(`❌ Flashbots bundle NOT included in block ${targetBlock}`);
+                    throw new Error(`Flashbots bundle not included in block ${targetBlock}`);
                 }
 
             } else {
                 const tx = await wallet.sendTransaction(populatedTx);
-                console.log(`🚀 TX sent (attempt ${retries + 1}): ${tx.hash}`);
+                log.info({ attempt: retries + 1, txHash: tx.hash }, 'TX sent');
 
                 const receipt = await tx.wait(3);
                 if (receipt && receipt.status === 1) {
-                    console.log(`✅ TX confirmed in block ${receipt.blockNumber}`);
+                    log.info({ block: receipt.blockNumber }, 'TX confirmed');
                     return;
                 } else {
-                    throw new Error("❌ TX failed or receipt is null.");
+                    throw new Error("TX failed or receipt is null");
                 }
             }
         } catch (err) {
-            console.warn(`⏱ Retry ${retries + 1}/${maxRetries} — ${err}`);
+            log.warn({ attempt: retries + 1, maxRetries, err }, 'TX retry');
             retries++;
         }
     }
 
-    throw new Error("🚨 Max retries reached. TX not mined.");
+    throw new Error("Max retries reached, TX not mined");
 }

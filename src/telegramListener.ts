@@ -3,7 +3,10 @@ import { StringSession } from "telegram/sessions";
 import { NewMessage, NewMessageEvent } from "telegram/events";
 import * as dotenv from "dotenv";
 import { handleAlphaDrop } from "./alphaDrop";
+import { logger } from "./utils/logger";
 dotenv.config();
+
+const log = logger.child({ module: 'telegramListener' });
 
 const apiId = parseInt(process.env.TELEGRAM_API_ID!);
 const apiHash = process.env.TELEGRAM_API_HASH!;
@@ -29,11 +32,11 @@ async function main() {
     if (process.env.TELEGRAM_SESSION) {
         await client.connect();
     } else {
-        console.error("❌ TELEGRAM_SESSION not set in .env. Run auth.ts to generate it.");
+        log.error('TELEGRAM_SESSION not set in .env, run auth.ts to generate it');
         return;
     }
 
-    console.log("🤖 Connected. Listening for messages in all joined Telegram channels...");
+    log.info('Connected, listening for messages in all joined Telegram channels');
 
     client.addEventHandler(
         async (event: NewMessageEvent) => {
@@ -45,42 +48,42 @@ async function main() {
             const channelAllowed = allowedChannels.size === 0 || (chatId !== undefined && allowedChannels.has(chatId));
 
             if (!senderAllowed && !channelAllowed) {
-                console.debug(`[TELEGRAM] Rejected message from sender=${senderId} chat=${chatId}: ${event.message.message?.substring(0, 50) || ''}...`);
+                log.debug({ senderId, chatId, messagePreview: event.message.message?.substring(0, 50) }, 'Rejected message from non-whitelisted source');
                 return;
             }
             // --- End Whitelist ---
 
             const messageText = event.message.message;
 
-            console.log("📥 Incoming message:", messageText); // Add this, remove later
+            log.debug({ messageLength: messageText?.length }, 'Incoming message');
 
             if (!messageText) return;
 
             const matches = messageText.match(/0x[a-fA-F0-9]{40}/g);
 
-            console.log("🔍 Matches:", matches); // And this, remove later
+            log.debug({ matchCount: matches?.length || 0 }, 'Address matches found');
 
             if (!matches) return;
 
             for (const raw of matches) {
                 const address = raw.toLowerCase();
 
-                // 🛑 Ignore duplicates
+                // Ignore duplicates
                 if (processedContracts.has(address)) {
-                    console.log("⏭ Already processed:", address);
+                    log.debug({ address }, 'Already processed, skipping');
                     continue;
                 }
 
-                // 🕒 Throttle rapid messages
+                // Throttle rapid messages
                 const now = Date.now();
                 if (now - lastProcessed < COOLDOWN_MS) {
-                    console.log("⏳ Throttling... Skipping", address);
+                    log.debug({ address }, 'Throttling, skipping');
                     continue;
                 }
                 lastProcessed = now;
 
                 processedContracts.add(address);
-                console.log(`📬 Found contract address: ${address}`);
+                log.info({ address }, 'Found contract address, processing alpha drop');
                 await handleAlphaDrop(address);
             }
         },

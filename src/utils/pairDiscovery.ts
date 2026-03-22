@@ -1,19 +1,20 @@
-import { Contract, ethers } from "ethers";
+import { Contract } from "ethers";
 import { CONFIG } from "../config";
+import { getProvider } from "./provider";
+import { FACTORY_ABI } from "./abis";
+import { logger } from "./logger";
+
+const log = logger.child({ module: 'pairDiscovery' });
 
 export async function getPairAddressFromToken(tokenAddress: string): Promise<string | null> {
-    const factoryAbi = [
-        "function getPair(address tokenA, address tokenB) external view returns (address pair)"
-    ];
-
-    const provider = new ethers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
-    const factory = new Contract(CONFIG.factoryAddress, factoryAbi, provider);
+    const provider = getProvider();
+    const factory = new Contract(CONFIG.factoryAddress, FACTORY_ABI, provider);
 
     try {
         const pair = await factory.getPair(CONFIG.wethAddress, tokenAddress);
         return pair !== "0x0000000000000000000000000000000000000000" ? pair : null;
     } catch (e) {
-        console.warn("🔍 Pair discovery failed:", e);
+        log.warn({ err: e, token: tokenAddress }, 'Pair discovery failed');
         return null;
     }
 }
