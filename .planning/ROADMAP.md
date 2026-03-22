@@ -85,12 +85,13 @@ Plans:
   3. Snipe transactions on ETH use Flashbots bundles; transactions on BSC/Base/Arbitrum use their respective private transaction mechanisms
   4. Capital allocation across chains adjusts based on configurable opportunity quality signals and chain activity levels
   5. Telegram notifications identify which chain each event originated from
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [ ] 04-01-PLAN.md — Chain registry types, ChainConfig interface, env vars, WebSocket provider support (CHAIN-01, CHAIN-02)
+- [ ] 04-02-PLAN.md — MEV strategy pattern: Flashbots, bloXroute, passthrough adapters and txManager dispatch (CHAIN-04)
+- [ ] 04-03-PLAN.md — Safety provider adapters (honeypot.is, GoPlus, Unicrypt, Mudra) and chain-prefixed notifications (CHAIN-02, CHAIN-03)
+- [ ] 04-04-PLAN.md — Multi-chain bot orchestrator: concurrent listeners, WebSocket reconnect, capital tracking (CHAIN-03, CHAIN-05)
 
 ### Phase 5: Uniswap V3 Integration
 **Goal**: The bot detects and snipes V3 pool launches across all supported chains, handling fee tiers and concentrated liquidity correctly
@@ -183,7 +184,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 1. Bug Fixes & Hardening | 3/4 | Gap closure in progress | - |
 | 2. ethers v6 Migration | 0/2 | Planned | - |
 | 3. SQLite Storage & Code Quality | 0/4 | Planned | - |
-| 4. Multi-Chain Architecture | 0/3 | Not started | - |
+| 4. Multi-Chain Architecture | 0/4 | Planned | - |
 | 5. Uniswap V3 Integration | 0/2 | Not started | - |
 | 6. Risk Management | 0/2 | Not started | - |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
