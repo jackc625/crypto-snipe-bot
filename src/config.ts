@@ -21,6 +21,8 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'FLASHBOTS_AUTH_KEY', required: true, description: 'Flashbots authentication signing key' },
     { name: 'TELEGRAM_ALLOWED_SENDERS', required: false, description: 'Comma-separated allowed Telegram sender IDs' },
     { name: 'TELEGRAM_ALLOWED_CHANNELS', required: false, description: 'Comma-separated allowed Telegram channel/group IDs' },
+    { name: 'LOG_LEVEL', required: false, description: 'Logging level: debug, info, warn, error (default: info)' },
+    { name: 'DB_PATH', required: false, description: 'SQLite database file path (default: ./data/bot.db)' },
     { name: 'NETWORK', required: false, description: 'Target network: sepolia (default), mainnet' },
 ];
 
