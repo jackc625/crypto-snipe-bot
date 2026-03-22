@@ -57,21 +57,23 @@ async function main() {
     console.log("✅ Router deployed to:", await router.getAddress());
 
     // 5. Create Pair (token <> WETH)
-    const tx = await factory.createPair(await weth.getAddress(), await token.getAddress());
+    const factoryContract = new ethers.Contract(await factory.getAddress(), UniswapV2FactoryJson.abi, deployer);
+    const tx = await factoryContract.createPair(await weth.getAddress(), await token.getAddress());
     const receipt = await tx.wait();
 
     const iface = new ethers.Interface(UniswapV2FactoryJson.abi);
     const pairCreatedLog = receipt.logs.find((log: { topics: string[]; data: string; address: string }) => {
         try {
             const parsed = iface.parseLog(log);
-            return parsed.name === "PairCreated";
+            return parsed !== null && parsed.name === "PairCreated";
         } catch {
             return false;
         }
     });
 
-    const pairAddress = pairCreatedLog
-        ? iface.parseLog(pairCreatedLog).args.pair
+    const parsedLog = pairCreatedLog ? iface.parseLog(pairCreatedLog) : null;
+    const pairAddress = parsedLog
+        ? parsedLog.args.pair
         : "UNKNOWN";
 
     console.log("🎯 Pair created:", pairAddress);
