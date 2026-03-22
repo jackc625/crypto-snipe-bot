@@ -70,9 +70,9 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Install better-sqlite3 + pino, create foundation modules: db.ts, logger.ts, provider.ts, abis.ts (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
-- [ ] 03-02-PLAN.md — Migrate core files (bot.ts, exitManager.ts, tokenSafety.ts) to foundation modules (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
-- [ ] 03-03-PLAN.md — Migrate supporting files (alphaDrop, telegramListener, pairDiscovery, txManager, notifier, retry) to foundation modules (INFRA-01, INFRA-02, INFRA-03)
+- [x] 03-01-PLAN.md — Install better-sqlite3 + pino, create foundation modules: db.ts, logger.ts, provider.ts, abis.ts (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
+- [x] 03-02-PLAN.md — Migrate core files (bot.ts, exitManager.ts, tokenSafety.ts) to foundation modules (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
+- [x] 03-03-PLAN.md — Migrate supporting files (alphaDrop, telegramListener, pairDiscovery, txManager, notifier, retry) to foundation modules (INFRA-01, INFRA-02, INFRA-03)
 - [ ] 03-04-PLAN.md — P&L query, .bot-state.json auto-migration, delete storage.ts (DB-01, DB-02, DB-03, DB-04)
 
 ### Phase 4: Multi-Chain Architecture
