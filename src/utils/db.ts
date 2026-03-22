@@ -79,14 +79,16 @@ function migrateJsonState(): void {
             VALUES (?, 'mainnet', 'buy', ?, ?, ?)
         `);
 
+        const validStatuses = new Set(['pending', 'sold', 'failed']);
         const importAll = db.transaction((sniped: Record<string, any>) => {
             for (const [token, info] of Object.entries(sniped)) {
                 const typedInfo = info as { txHash?: string; timestamp?: number; status?: string };
+                const status = validStatuses.has(typedInfo.status || '') ? typedInfo.status! : 'pending';
                 insert.run(
                     token.toLowerCase(),
                     typedInfo.txHash || null,
                     typedInfo.timestamp ? Math.floor(typedInfo.timestamp / 1000) : Math.floor(Date.now() / 1000),
-                    typedInfo.status || 'pending'
+                    status
                 );
             }
         });
