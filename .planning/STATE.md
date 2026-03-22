@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-22T14:56:29.353Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-22T15:11:58.635Z"
 progress:
   total_phases: 9
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -52,6 +52,7 @@ Plan: 2 of 2
 | Phase 01 P01 | 11min | 2 tasks | 3 files |
 | Phase 01 P04 | 4min | 2 tasks | 2 files |
 | Phase 02 P01 | 7min | 2 tasks | 7 files |
+| Phase 02 P02 | 10min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Both sepolia and mainnet RPC entries use same ALCHEMY_URL -- user sets correct URL per network
 - [Phase 02]: Used --legacy-peer-deps for flashbots bundle (pins ethers 6.7.1 peer but 6.16.0 is semver-compatible)
 - [Phase 02]: Pinned ethers@6.16.0 and flashbots@1.0.0 exact versions for reproducible builds
+- [Phase 02]: Used ethers.Contract wrapper for ContractFactory-deployed factory when calling custom methods (v6 BaseContract type lacks ABI methods)
+- [Phase 02]: BigInt wrapping for config values: BigInt(CONFIG.gasLimit || 300_000) to safely convert potentially-number config to bigint
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T14:56:29.348Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-03-22T15:11:58.629Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
