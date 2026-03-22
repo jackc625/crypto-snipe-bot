@@ -58,6 +58,52 @@ function migrateSchema(): void {
 
 migrateSchema();
 
+// --- JSON State Migration (D-07) ---
+// Runs once at startup. Imports .bot-state.json into SQLite, renames to .bak.
+// Idempotent: skips if DB already has trades data.
+
+function migrateJsonState(): void {
+    const jsonPath = path.join(process.cwd(), '.bot-state.json');
+    if (!fs.existsSync(jsonPath)) return;
+
+    // Skip if DB already has data (idempotent)
+    const count = db.prepare('SELECT COUNT(*) as c FROM trades').get() as { c: number };
+    if (count.c > 0) return;
+
+    try {
+        const raw = fs.readFileSync(jsonPath, 'utf-8');
+        const state = JSON.parse(raw);
+
+        const insert = db.prepare(`
+            INSERT INTO trades (token, chain, action, tx_hash, timestamp, status)
+            VALUES (?, 'mainnet', 'buy', ?, ?, ?)
+        `);
+
+        const importAll = db.transaction((sniped: Record<string, any>) => {
+            for (const [token, info] of Object.entries(sniped)) {
+                const typedInfo = info as { txHash?: string; timestamp?: number; status?: string };
+                insert.run(
+                    token.toLowerCase(),
+                    typedInfo.txHash || null,
+                    typedInfo.timestamp ? Math.floor(typedInfo.timestamp / 1000) : Math.floor(Date.now() / 1000),
+                    typedInfo.status || 'pending'
+                );
+            }
+        });
+
+        importAll(state.sniped || {});
+
+        // Rename original file to .bak
+        fs.renameSync(jsonPath, jsonPath + '.bak');
+        logger.info({ migrated: Object.keys(state.sniped || {}).length }, 'Migrated .bot-state.json to SQLite');
+    } catch (e) {
+        // Corrupted JSON: log warning, do not block startup
+        logger.warn({ err: e }, 'Failed to migrate .bot-state.json, file may be corrupted, skipping');
+    }
+}
+
+migrateJsonState();
+
 // --- Prepared Statements (cached for performance) ---
 
 const insertTrade = db.prepare(`
@@ -76,6 +122,56 @@ const updateTradeStatus = db.prepare(`
 const isTokenSniped = db.prepare(`
     SELECT 1 FROM trades WHERE token = ? LIMIT 1
 `);
+
+// --- P&L Query (DB-04: computed on query, not stored) ---
+
+const getPnLQuery = db.prepare(`
+    SELECT
+        b.token,
+        b.chain,
+        b.amount_in  AS buy_cost,
+        b.gas_cost    AS buy_gas,
+        s.amount_out  AS sell_revenue,
+        s.gas_cost    AS sell_gas,
+        CAST(COALESCE(s.amount_out, '0') AS REAL) - CAST(b.amount_in AS REAL)
+            - CAST(COALESCE(b.gas_cost, '0') AS REAL) - CAST(COALESCE(s.gas_cost, '0') AS REAL)
+            AS realized_pnl,
+        b.timestamp   AS buy_time,
+        s.timestamp   AS sell_time
+    FROM trades b
+    LEFT JOIN trades s ON b.token = s.token AND s.action = 'sell'
+    WHERE b.action = 'buy'
+      AND (? IS NULL OR b.token = ?)
+      AND (? IS NULL OR b.chain = ?)
+      AND (? IS NULL OR b.timestamp >= ?)
+      AND (? IS NULL OR b.timestamp <= ?)
+    ORDER BY b.timestamp DESC
+`);
+
+export interface PnLResult {
+    token: string;
+    chain: string;
+    buy_cost: string | null;
+    buy_gas: string | null;
+    sell_revenue: string | null;
+    sell_gas: string | null;
+    realized_pnl: number | null;
+    buy_time: number;
+    sell_time: number | null;
+}
+
+export function getPnL(filters?: {
+    token?: string;
+    chain?: string;
+    fromTimestamp?: number;
+    toTimestamp?: number;
+}): PnLResult[] {
+    const token = filters?.token?.toLowerCase() ?? null;
+    const chain = filters?.chain ?? null;
+    const from = filters?.fromTimestamp ?? null;
+    const to = filters?.toTimestamp ?? null;
+    return getPnLQuery.all(token, token, chain, chain, from, from, to, to) as PnLResult[];
+}
 
 // --- Exports ---
 
