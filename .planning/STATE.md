@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-03-19T21:00:06.025Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-22T14:56:29.353Z"
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 01 — bug-fixes-hardening
+**Current focus:** Phase 02 — ethers-v6-migration
 
 ## Current Position
 
-Phase: 01 (bug-fixes-hardening) — COMPLETE
-Plan: 4 of 4
+Phase: 02 (ethers-v6-migration) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: 4 of 4
 | Phase 01 P03 | 13min | 2 tasks | 2 files |
 | Phase 01 P01 | 11min | 2 tasks | 3 files |
 | Phase 01 P04 | 4min | 2 tasks | 2 files |
+| Phase 02 P01 | 7min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Manual whitelist check inside handler instead of GramJS NewMessage({fromUsers, chats}) to enable debug logging of rejected messages
 - [Phase 01]: Empty Telegram whitelist env vars = allow all messages (backward compatible)
 - [Phase 01]: Both sepolia and mainnet RPC entries use same ALCHEMY_URL -- user sets correct URL per network
+- [Phase 02]: Used --legacy-peer-deps for flashbots bundle (pins ethers 6.7.1 peer but 6.16.0 is semver-compatible)
+- [Phase 02]: Pinned ethers@6.16.0 and flashbots@1.0.0 exact versions for reproducible builds
 
 ### Pending Todos
 
@@ -81,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T20:52:28.923Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-03-22T14:56:29.348Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

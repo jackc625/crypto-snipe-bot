@@ -21,10 +21,10 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Infrastructure — ethers v6 Migration
 
-- [ ] **ETH6-01**: All ethers v5 imports and APIs migrated to ethers v6 (BigNumber → native BigInt, updated provider/signer API)
-- [ ] **ETH6-02**: All arithmetic operations use BigInt correctly — no Number() precision loss on wei values
+- [x] **ETH6-01**: All ethers v5 imports and APIs migrated to ethers v6 (BigNumber → native BigInt, updated provider/signer API)
+- [x] **ETH6-02**: All arithmetic operations use BigInt correctly — no Number() precision loss on wei values
 - [ ] **ETH6-03**: Flashbots provider upgraded to @flashbots/ethers-provider-bundle v1.0.0 (ethers v6 compatible)
-- [ ] **ETH6-04**: Hardhat toolbox upgraded to v6+ with hardhat-ethers v4+ for ethers v6 compatibility
+- [x] **ETH6-04**: Hardhat toolbox upgraded to v6+ with hardhat-ethers v4+ for ethers v6 compatibility
 
 ### Infrastructure — SQLite Storage
 
@@ -129,10 +129,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-07 | Phase 1 | Complete |
 | FIX-08 | Phase 1 | Complete |
 | FIX-09 | Phase 1 | Complete |
-| ETH6-01 | Phase 2 | Pending |
-| ETH6-02 | Phase 2 | Pending |
+| ETH6-01 | Phase 2 | Complete |
+| ETH6-02 | Phase 2 | Complete |
 | ETH6-03 | Phase 2 | Pending |
-| ETH6-04 | Phase 2 | Pending |
+| ETH6-04 | Phase 2 | Complete |
 | DB-01 | Phase 3 | Pending |
 | DB-02 | Phase 3 | Pending |
 | DB-03 | Phase 3 | Pending |

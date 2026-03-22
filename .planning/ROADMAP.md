@@ -54,7 +54,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Swap v5 packages for v6, update Hardhat/TS config, create ESLint BigInt safety rule, migrate light files (ETH6-04, ETH6-01, ETH6-02)
+- [x] 02-01-PLAN.md — Swap v5 packages for v6, update Hardhat/TS config, create ESLint BigInt safety rule, migrate light files (ETH6-04, ETH6-01, ETH6-02)
 - [ ] 02-02-PLAN.md — Migrate all remaining source files (BigNumber to BigInt, callStatic to staticCall, providers to flat imports), full compilation verification (ETH6-01, ETH6-02, ETH6-03)
 
 ### Phase 3: SQLite Storage & Code Quality
