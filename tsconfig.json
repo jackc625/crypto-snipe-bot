@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
-    "target": "es2016",
+    "target": "ES2022",
     "module": "commonjs",
     "esModuleInterop": true,
+    "moduleResolution": "node",
+    "outDir": "dist",
+    "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "resolveJsonModule": true,
+    "types": ["node", "hardhat", "chai"]
   },
-  "include": ["src"]
+  "include": ["src/**/*", "scripts/**/*", "hardhat.config.ts"]
 }

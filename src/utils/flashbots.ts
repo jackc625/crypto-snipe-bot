@@ -1,4 +1,4 @@
-import { providers, Wallet } from "ethers";
+import { JsonRpcProvider, Wallet } from "ethers";
 import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
 import { CONFIG, SupportedNetwork } from "../config";
 
@@ -8,7 +8,7 @@ const FLASHBOTS_RELAYS: Record<string, { url: string; network: string }> = {
 };
 
 export async function getFlashbotsProvider(
-    provider: providers.JsonRpcProvider,
+    provider: JsonRpcProvider,
     authSigner: Wallet
 ): Promise<FlashbotsBundleProvider> {
     const relay = FLASHBOTS_RELAYS[CONFIG.network];
