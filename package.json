@@ -1,14 +1,40 @@
 {
-  "name": "${PROJECT_NAME}",
+  "name": "crypto-snipe-bot",
   "version": "1.0.0",
-  "description": "",
   "main": "dist/index.js",
+  "private": true,
+  "type": "commonjs",
   "scripts": {
     "build": "tsc"
   },
-  "dependencies": {},
-  "devDependencies": {
-    "typescript": "^5.5.3"
+  "dependencies": {
+    "@flashbots/ethers-provider-bundle": "1.0.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "axios": "1.10.0",
+    "dotenv": "17.2.0",
+    "ethers": "6.16.0",
+    "telegram": "2.26.22"
   },
-  "private": true
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.2",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.14",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.19.15",
+    "chai": "4.3.10",
+    "eslint": "^9.39.4",
+    "hardhat": "2.26.0",
+    "hardhat-gas-reporter": "^2.3.0",
+    "solidity-coverage": "^0.8.17",
+    "ts-node": "10.9.2",
+    "typechain": "^8.3.2",
+    "typescript": "5.8.3",
+    "typescript-eslint": "^8.57.1"
+  }
 }
