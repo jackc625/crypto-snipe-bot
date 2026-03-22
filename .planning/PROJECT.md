@@ -49,9 +49,11 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 **Infrastructure — ethers v6 Migration** — Validated in Phase 02: ethers-v6-migration
 - [x] Migrate from ethers v5 to v6 (BigNumber → native BigInt, updated provider API)
 
-**Infrastructure — SQLite Storage**
-- [ ] Replace JSON file storage with SQLite for atomic writes, proper transactions, and concurrency
-- [ ] Implement transaction audit trail with full history (buys, sells, P&L per token)
+**Infrastructure — SQLite Storage** — Validated in Phase 03: sqlite-storage-code-quality
+- [x] Replace JSON file storage with SQLite for atomic writes, proper transactions, and concurrency
+- [x] Implement transaction audit trail with full history (buys, sells, P&L per token)
+- [x] Structured JSON logging with pino replacing all console.log/warn/error
+- [x] Singleton provider cache per chain, centralized ABI module
 
 **Infrastructure — Multi-Chain**
 - [ ] Build chain abstraction layer supporting ETH, BSC, Base, Arbitrum simultaneously
