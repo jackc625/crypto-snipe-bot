@@ -67,12 +67,13 @@ Plans:
   3. P&L for any token can be queried from the database showing buy price, sell price, gas costs, and realized gain/loss
   4. All log output is structured JSON with severity levels (debug/info/warn/error) -- no console.log or emoji logging remains
   5. A single provider instance per chain is shared across all modules -- no redundant provider creation
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Install better-sqlite3 + pino, create foundation modules: db.ts, logger.ts, provider.ts, abis.ts (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
+- [ ] 03-02-PLAN.md — Migrate core files (bot.ts, exitManager.ts, tokenSafety.ts) to foundation modules (DB-01, DB-02, DB-03, INFRA-01, INFRA-02, INFRA-03)
+- [ ] 03-03-PLAN.md — Migrate supporting files (alphaDrop, telegramListener, pairDiscovery, txManager, notifier, retry) to foundation modules (INFRA-01, INFRA-02, INFRA-03)
+- [ ] 03-04-PLAN.md — P&L query, .bot-state.json auto-migration, delete storage.ts (DB-01, DB-02, DB-03, DB-04)
 
 ### Phase 4: Multi-Chain Architecture
 **Goal**: The bot detects and snipes new V2 token listings concurrently across ETH, BSC, Base, and Arbitrum with per-chain MEV protection
@@ -181,7 +182,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 |-------|----------------|--------|-----------|
 | 1. Bug Fixes & Hardening | 3/4 | Gap closure in progress | - |
 | 2. ethers v6 Migration | 0/2 | Planned | - |
-| 3. SQLite Storage & Code Quality | 0/3 | Not started | - |
+| 3. SQLite Storage & Code Quality | 0/4 | Planned | - |
 | 4. Multi-Chain Architecture | 0/3 | Not started | - |
 | 5. Uniswap V3 Integration | 0/2 | Not started | - |
 | 6. Risk Management | 0/2 | Not started | - |
