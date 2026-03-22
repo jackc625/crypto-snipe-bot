@@ -1,5 +1,8 @@
 import { Contract } from "ethers";
-import { flushState } from "./storage";
+import { closeDb } from "./db";
+import { logger } from "./logger";
+
+const log = logger.child({ module: 'exitManager' });
 
 // ── Per-token selling mutex ──────────────────────────────────────────
 // JavaScript is single-threaded. The "race" occurs when two async interval
@@ -73,7 +76,7 @@ export function clearAllTimers(): void {
 
 // ── Shutdown handler ─────────────────────────────────────────────────
 // On SIGTERM/SIGINT: clear all timers, remove factory listeners,
-// flush state to disk, exit cleanly. Safety net forces exit after 5s.
+// close database, exit cleanly. Safety net forces exit after 5s.
 
 let isShuttingDown = false;
 
@@ -88,13 +91,13 @@ export function initShutdownHandler(factory: Contract): void {
         if (isShuttingDown) return;
         isShuttingDown = true;
 
-        console.log(`[SHUTDOWN] Received ${signal}. Cleaning up...`);
+        log.info({ signal }, 'Shutdown signal received, cleaning up');
 
         clearAllTimers();
         factory.removeAllListeners();
-        flushState();
+        closeDb();
 
-        console.log(`[SHUTDOWN] Cleanup complete. Exiting.`);
+        log.info('Shutdown cleanup complete, exiting');
         process.exit(0);
     }
 
@@ -104,14 +107,14 @@ export function initShutdownHandler(factory: Contract): void {
     // Safety net: force exit after 5 seconds if graceful shutdown hangs
     process.on('SIGTERM', () => {
         setTimeout(() => {
-            console.error('[SHUTDOWN] Force exit after 5s timeout');
+            log.error('Force exit after 5s timeout');
             process.exit(1);
         }, 5000).unref();
     });
 
     process.on('SIGINT', () => {
         setTimeout(() => {
-            console.error('[SHUTDOWN] Force exit after 5s timeout');
+            log.error('Force exit after 5s timeout');
             process.exit(1);
         }, 5000).unref();
     });

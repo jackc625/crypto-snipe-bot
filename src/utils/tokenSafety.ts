@@ -3,31 +3,16 @@ import { CONFIG } from "../config";
 import { JsonRpcProvider, Contract, Wallet, ethers } from "ethers";
 import { BLOCKLIST } from "./blocklist";
 import { retry } from "./retry";
+import { getProvider } from "./provider";
+import { logger } from "./logger";
+import { ERC20_ABI, ROUTER_ABI, PAIR_ABI, TOKEN_LIMITS_ABI } from "./abis";
 
-const provider = new JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
-
-const ERC20_METADATA_ABI = [
-    "function name() view returns (string)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "function tradingEnabled() view returns (bool)"
-];
+const log = logger.child({ module: 'tokenSafety' });
 
 const UNICRYPT_API = "https://api.unicrypt.network/api/v2/locker/pair/";
 
-const ROUTER_ABI = [
-    "function getAmountsOut(uint amountIn, address[] memory path) view returns (uint[] memory)",
-    "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) payable returns (uint[] memory)",
-    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)"
-];
-
-const PAIR_ABI = [
-    "function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast)",
-    "function token0() external view returns (address)",
-    "function token1() external view returns (address)"
-];
-
 export async function checkHoneypot(tokenAddress: string): Promise<boolean> {
+    const provider = getProvider();
     const router = new Contract(CONFIG.routerAddress, ROUTER_ABI, provider);
     const amountIn = ethers.parseEther(CONFIG.snipeAmountETH);
     const path = [CONFIG.wethAddress, tokenAddress];
@@ -41,8 +26,8 @@ export async function checkHoneypot(tokenAddress: string): Promise<boolean> {
         return data.isHoneypot;
     } catch (apiErr: unknown) {
         const message = (apiErr instanceof Error) ? apiErr.message : String(apiErr);
-        console.warn(`⚠️ Honeypot API failed: ${message}`);
-        console.log("🔁 Falling back to static call simulation...");
+        log.warn({ check: 'honeypot', error: message }, 'Honeypot API check failed');
+        log.info({ check: 'honeypot', fallback: 'staticCall' }, 'Falling back to static call simulation');
 
         try {
             await router.swapExactETHForTokens.staticCall(
@@ -55,7 +40,7 @@ export async function checkHoneypot(tokenAddress: string): Promise<boolean> {
             return false; // not a honeypot
         } catch (e: unknown) {
             const fallbackMessage = (e instanceof Error) ? e.message : String(e);
-            console.warn("🚨 Honeypot fallback failed — likely a honeypot:", fallbackMessage);
+            log.warn({ check: 'honeypot', error: fallbackMessage }, 'Honeypot fallback failed, likely honeypot');
             return true;
         }
     }
@@ -64,6 +49,7 @@ export async function checkHoneypot(tokenAddress: string): Promise<boolean> {
 
 
 export async function isBlacklistedToken(tokenAddress: string): Promise<boolean> {
+    const provider = getProvider();
     const antiBotSelectors = ["0xdd62ed3e", "0x4f7fb7c3", "0x60fe47b1"];
     const bytecode = await provider.getCode(tokenAddress);
     return antiBotSelectors.some(sig => bytecode.includes(sig));
@@ -77,7 +63,7 @@ export async function isLiquidityLocked(pairAddress: string): Promise<boolean> {
         const locks = data.locks;
 
         if (!locks || locks.length === 0) {
-            console.warn("❌ No liquidity lock found on Unicrypt.");
+            log.warn({ pair: pairAddress, check: 'liquidityLock' }, 'No liquidity lock found on Unicrypt');
             return false;
         }
 
@@ -86,15 +72,14 @@ export async function isLiquidityLocked(pairAddress: string): Promise<boolean> {
 
         return anyActiveLock;
     } catch (e) {
-        console.warn("⚠️ Unicrypt API failed, falling back to burn check.");
+        log.warn({ pair: pairAddress, check: 'liquidityLock', fallback: 'burnCheck' }, 'Unicrypt API failed, falling back to burn check');
         return await fallbackCheckBurned(pairAddress);
     }
 }
 
 async function fallbackCheckBurned(pairAddress: string): Promise<boolean> {
-    const pairABI = ["function balanceOf(address owner) view returns (uint256)", "function totalSupply() view returns (uint256)"];
-    const provider = new JsonRpcProvider(process.env[`ALCHEMY_URL`]);
-    const pair = new Contract(pairAddress, pairABI, provider);
+    const provider = getProvider();
+    const pair = new Contract(pairAddress, PAIR_ABI, provider);
 
     try {
         const burned = await pair.balanceOf("0x000000000000000000000000000000000000dEaD");
@@ -103,13 +88,13 @@ async function fallbackCheckBurned(pairAddress: string): Promise<boolean> {
         const percentBurned = Number(burned) / Number(total);
 
         if (percentBurned > 0.9) {
-            console.log("🔥 LP appears burned (90%+).");
+            log.info({ pair: pairAddress, percentBurned: (percentBurned * 100).toFixed(1) }, 'LP appears burned');
             return true;
         }
 
         return false;
     } catch (e) {
-        console.warn("⚠️ Burn fallback failed:", e);
+        log.warn({ err: e, check: 'burnFallback' }, 'Burn fallback failed');
         return false;
     }
 }
@@ -118,14 +103,14 @@ export async function checkTokenMetadata(
     tokenAddress: string,
     provider: JsonRpcProvider
 ): Promise<boolean> {
-    const token = new Contract(tokenAddress, ERC20_METADATA_ABI, provider);
+    const token = new Contract(tokenAddress, ERC20_ABI, provider);
 
     try {
         const [symbol, name, decimals, tradingEnabled] = await Promise.all([
             token.symbol(),
             token.name(),
             token.decimals(),
-            token.tradingEnabled?.().catch(() => true) // default to true if method doesn’t exist
+            token.tradingEnabled?.().catch(() => true) // default to true if method doesn't exist
         ]);
 
         // Basic checks
@@ -136,7 +121,7 @@ export async function checkTokenMetadata(
 
         return true;
     } catch (e) {
-        console.warn("❌ Metadata check failed:", e);
+        log.warn({ err: e, token: tokenAddress, check: 'metadata' }, 'Metadata check failed');
         return false;
     }
 }
@@ -165,14 +150,14 @@ export async function simulateSwap(
 
         return true;
     } catch (e: any) {
-        console.warn("❌ Swap simulation failed:", e.reason || e.message || e);
+        log.warn({ err: e, token: tokenAddress, check: 'swapSimulation' }, 'Swap simulation failed');
         return false;
     }
 }
 
 
 export async function isLiquiditySufficient(pairAddress: string): Promise<boolean> {
-    const provider = new JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
+    const provider = getProvider();
     const pair = new Contract(pairAddress, PAIR_ABI, provider);
 
     try {
@@ -189,36 +174,36 @@ export async function isLiquiditySufficient(pairAddress: string): Promise<boolea
 
         const minRequired = ethers.parseEther("1"); // Require at least 1 ETH in liquidity
         if (wethReserve < minRequired) {
-            console.warn(`💧 Not enough ETH liquidity: ${wethReserve.toString()} < 1 ETH`);
+            log.warn({ pair: pairAddress, wethReserve: wethReserve.toString(), check: 'liquidity' }, 'Insufficient ETH liquidity');
             return false;
         }
 
         return true;
     } catch (e) {
-        console.warn("⚠️ Error checking liquidity:", e);
+        log.warn({ err: e, pair: pairAddress, check: 'liquidity' }, 'Error checking liquidity');
         return false;
     }
 }
 
 export async function isKnownBadToken(tokenAddress: string): Promise<boolean> {
-    const provider = new JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
+    const provider = getProvider();
 
     try {
         const code = await provider.getCode(tokenAddress);
         if (!code || code === "0x") {
-            console.warn("⚠️ No contract found at token address.");
+            log.warn({ token: tokenAddress, check: 'knownBad' }, 'No contract found at token address');
             return true;
         }
 
         // skip creator check for free-tier Alchemy
         if (BLOCKLIST.tokens.has(tokenAddress.toLowerCase())) {
-            console.warn("🚫 Token is in blocklist.");
+            log.warn({ token: tokenAddress, check: 'blocklist' }, 'Token is in blocklist');
             return true;
         }
 
         return false;
     } catch (e) {
-        console.warn("⚠️ Blocklist check failed:", e);
+        log.warn({ err: e, token: tokenAddress, check: 'blocklist' }, 'Blocklist check failed');
         return false;
     }
 }
@@ -253,11 +238,11 @@ export async function hasHighTransferTax(
         const received = actualOutput[actualOutput.length - 1];
         const taxPercent = 1 - Number(received) / Number(expectedOutput);
 
-        console.log(`🔎 Estimated tax: ${(taxPercent * 100).toFixed(2)}%`);
+        log.info({ token: tokenAddress, taxPercent: (taxPercent * 100).toFixed(2), check: 'transferTax' }, 'Estimated transfer tax');
 
         return taxPercent > 0.25; // adjust this threshold as needed
     } catch (e) {
-        console.warn("⚠️ Tax detection failed:", e);
+        log.warn({ err: e, token: tokenAddress, check: 'transferTax' }, 'Tax detection failed');
         return true; // default to blocking
     }
 }
@@ -267,15 +252,7 @@ export async function hasMaxWalletOrTxLimits(
     provider: JsonRpcProvider,
     walletAddress: string
 ): Promise<boolean> {
-    const ABI = [
-        "function totalSupply() view returns (uint256)",
-        "function maxWalletAmount() view returns (uint256)",
-        "function maxWallet() view returns (uint256)",
-        "function maxTxAmount() view returns (uint256)",
-        "function maxTransactionAmount() view returns (uint256)"
-    ];
-
-    const token = new Contract(tokenAddress, ABI, provider);
+    const token = new Contract(tokenAddress, TOKEN_LIMITS_ABI, provider);
 
     try {
         const totalSupply: bigint = await token.totalSupply();
@@ -292,10 +269,10 @@ export async function hasMaxWalletOrTxLimits(
                 const limit = await token[fn]();
                 const percent = Number(limit) / Number(totalSupply);
 
-                console.log(`🔍 ${fn}: ${(percent * 100).toFixed(2)}% of total supply`);
+                log.debug({ token: tokenAddress, limitName: fn, percent: (percent * 100).toFixed(2), check: 'maxLimits' }, 'Token limit check');
 
                 if (percent < 0.01) {
-                    console.warn(`⚠️ ${fn} is less than 1% — possible anti-bot limit`);
+                    log.warn({ token: tokenAddress, limitName: fn, percent: (percent * 100).toFixed(2), check: 'maxLimits' }, 'Anti-bot limit detected');
                     return true;
                 }
             } catch {
@@ -305,7 +282,7 @@ export async function hasMaxWalletOrTxLimits(
 
         return false;
     } catch (e) {
-        console.warn("⚠️ Max wallet/tx check failed:", e);
+        log.warn({ err: e, token: tokenAddress, check: 'maxLimits' }, 'Max wallet/tx check failed');
         return true; // safest fallback
     }
 }
@@ -315,10 +292,7 @@ export async function simulateSell(
     wallet: Wallet
 ): Promise<boolean> {
     try {
-        const erc20 = new Contract(tokenAddress, [
-            "function approve(address spender, uint amount) public returns (bool)",
-            "function balanceOf(address) view returns (uint)"
-        ], wallet);
+        const erc20 = new Contract(tokenAddress, ERC20_ABI, wallet);
 
         const balance = await erc20.balanceOf(wallet.address);
         await erc20.approve(CONFIG.routerAddress, balance);
@@ -327,12 +301,8 @@ export async function simulateSell(
         const path = [tokenAddress, CONFIG.wethAddress];
         const deadline = Math.floor(Date.now() / 1000) + 60;
 
-        console.log("🧪 Simulating sell...");
-        console.log("Path:", path);
-        console.log("Balance:", balance.toString());
-        console.log("Deadline:", deadline); // Can remove all this later
-
-
+        log.debug({ token: tokenAddress, check: 'sellSimulation' }, 'Simulating sell');
+        log.debug({ token: tokenAddress, balance: balance.toString() }, 'Sell simulation balance');
 
         await router.swapExactTokensForETHSupportingFeeOnTransferTokens.staticCall(
             balance,
@@ -344,7 +314,7 @@ export async function simulateSell(
 
         return true;
     } catch (e) {
-        console.warn("❌ Sell simulation failed:", e);
+        log.warn({ err: e, token: tokenAddress, check: 'sellSimulation' }, 'Sell simulation failed');
         return false;
     }
 }
