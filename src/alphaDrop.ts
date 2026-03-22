@@ -1,39 +1,35 @@
-import { getPairAddressFromToken } from "./utils/pairDiscovery"; // You'll write this helper
+import { getPairAddressFromToken } from "./utils/pairDiscovery";
 import { handleNewPair } from "./bot";
-import { CONFIG } from "./config";
 import { sendTelegramAlert } from "./utils/notifier";
-import { ethers } from "ethers";
+import { Contract } from "ethers";
+import { getProvider } from "./utils/provider";
+import { PAIR_ABI } from "./utils/abis";
+import { logger } from "./utils/logger";
+
+const log = logger.child({ module: 'alphaDrop' });
 
 export async function handleAlphaDrop(tokenAddress: string) {
     try {
         const pairAddress = await getPairAddressFromToken(tokenAddress);
 
         if (!pairAddress) {
-            console.warn("❌ Could not find pair for token:", tokenAddress);
-            await sendTelegramAlert(`❌ *No pair found* for \`${tokenAddress}\``);
+            log.warn({ token: tokenAddress }, 'Could not find pair for token');
+            await sendTelegramAlert(`*No pair found* for \`${tokenAddress}\``);
             return;
         }
 
-        const token0 = await getToken0FromPair(pairAddress);
-        const token1 = await getToken1FromPair(pairAddress);
+        const token0 = await getTokenFromPair(pairAddress, 0);
+        const token1 = await getTokenFromPair(pairAddress, 1);
 
         await handleNewPair(token0, token1, pairAddress);
     } catch (e) {
-        console.error("🚨 Error in handleAlphaDrop:", e);
-        await sendTelegramAlert(`🚨 *Error handling drop for* \`${tokenAddress}\``);
+        log.error({ err: e, token: tokenAddress }, 'Error in handleAlphaDrop');
+        await sendTelegramAlert(`*Error handling drop for* \`${tokenAddress}\``);
     }
 }
 
-async function getToken0FromPair(pairAddress: string): Promise<string> {
-    const pairABI = ["function token0() view returns (address)"];
-    const provider = new ethers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
-    const pair = new ethers.Contract(pairAddress, pairABI, provider);
-    return pair.token0();
-}
-
-async function getToken1FromPair(pairAddress: string): Promise<string> {
-    const pairABI = ["function token1() view returns (address)"];
-    const provider = new ethers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
-    const pair = new ethers.Contract(pairAddress, pairABI, provider);
-    return pair.token1();
+async function getTokenFromPair(pairAddress: string, index: 0 | 1): Promise<string> {
+    const provider = getProvider();
+    const pair = new Contract(pairAddress, PAIR_ABI, provider);
+    return index === 0 ? pair.token0() : pair.token1();
 }
