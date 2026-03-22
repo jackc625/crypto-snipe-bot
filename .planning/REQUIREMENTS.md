@@ -28,16 +28,16 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Infrastructure — SQLite Storage
 
-- [ ] **DB-01**: JSON file storage replaced with SQLite database using WAL mode for concurrent access
-- [ ] **DB-02**: SQLite is the sole source of truth — no in-memory cache that can diverge from disk
-- [ ] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
+- [x] **DB-01**: JSON file storage replaced with SQLite database using WAL mode for concurrent access
+- [x] **DB-02**: SQLite is the sole source of truth — no in-memory cache that can diverge from disk
+- [x] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
 - [ ] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
 
 ### Infrastructure — Code Quality
 
-- [ ] **INFRA-01**: Structured logging with severity levels (debug, info, warn, error) replaces all console.log/emoji logging
-- [ ] **INFRA-02**: Singleton provider instance per chain eliminates redundant provider creation across modules
-- [ ] **INFRA-03**: All ABI definitions centralized in a single module — no inline ABI arrays in business logic
+- [x] **INFRA-01**: Structured logging with severity levels (debug, info, warn, error) replaces all console.log/emoji logging
+- [x] **INFRA-02**: Singleton provider instance per chain eliminates redundant provider creation across modules
+- [x] **INFRA-03**: All ABI definitions centralized in a single module — no inline ABI arrays in business logic
 
 ### Multi-Chain
 
@@ -133,13 +133,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ETH6-02 | Phase 2 | Complete |
 | ETH6-03 | Phase 2 | Complete |
 | ETH6-04 | Phase 2 | Complete |
-| DB-01 | Phase 3 | Pending |
-| DB-02 | Phase 3 | Pending |
-| DB-03 | Phase 3 | Pending |
+| DB-01 | Phase 3 | Complete |
+| DB-02 | Phase 3 | Complete |
+| DB-03 | Phase 3 | Complete |
 | DB-04 | Phase 3 | Pending |
-| INFRA-01 | Phase 3 | Pending |
-| INFRA-02 | Phase 3 | Pending |
-| INFRA-03 | Phase 3 | Pending |
+| INFRA-01 | Phase 3 | Complete |
+| INFRA-02 | Phase 3 | Complete |
+| INFRA-03 | Phase 3 | Complete |
 | CHAIN-01 | Phase 4 | Pending |
 | CHAIN-02 | Phase 4 | Pending |
 | CHAIN-03 | Phase 4 | Pending |
