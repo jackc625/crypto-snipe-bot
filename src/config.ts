@@ -1,6 +1,7 @@
 // src/config.ts
 import * as dotenv from "dotenv";
 import addresses from "./addresses.json";
+import { logger } from './utils/logger';
 dotenv.config();
 
 // --- Startup Environment Validation ---
@@ -34,8 +35,7 @@ function validateEnvVars(): void {
         }
     }
     if (missing.length > 0) {
-        console.error(`\n[STARTUP ERROR] Missing required environment variables:\n${missing.join('\n')}\n`);
-        console.error('Create a .env file with these variables or set them in your environment.\n');
+        logger.fatal({ missing: missing.map(m => m.trim().replace(/^- /, '')) }, 'Missing required environment variables');
         process.exit(1);
     }
 }
@@ -55,8 +55,7 @@ export type SupportedNetwork = keyof typeof rpc;
 const networkInput = (process.env.NETWORK || 'sepolia').toLowerCase();
 const validNetworks = Object.keys(rpc);
 if (!validNetworks.includes(networkInput)) {
-    console.error(`\n[STARTUP ERROR] Unsupported network: "${networkInput}"`);
-    console.error(`Valid networks: ${validNetworks.join(', ')}\n`);
+    logger.fatal({ network: networkInput, validNetworks }, 'Unsupported network');
     process.exit(1);
 }
 // --- End Network Validation ---
