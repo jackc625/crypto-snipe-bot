@@ -28,7 +28,7 @@ import {
     isShutdownInProgress
 } from "./utils/exitManager";
 
-const provider = new ethers.providers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
+const provider = new ethers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
 const wallet = new ethers.Wallet(CONFIG.walletPrivateKey, provider);
 
 const factoryAbi = [
@@ -54,9 +54,9 @@ function log(...args: any[]) {
     console.log("[BOT]", ...args);
 }
 
-async function maybeApprove(token: Contract, amount: ethers.BigNumber) {
+async function maybeApprove(token: Contract, amount: bigint) {
     const currentAllowance = await token.allowance(wallet.address, CONFIG.routerAddress);
-    if (currentAllowance.lt(amount)) {
+    if (currentAllowance < amount) {
         await token.approve(CONFIG.routerAddress, amount);
     }
 }
@@ -76,7 +76,7 @@ async function executeSell(
         const token = new Contract(tokenAddress, erc20Abi, wallet);
         const balance = await token.balanceOf(wallet.address);
 
-        if (balance.isZero()) {
+        if (balance === 0n) {
             log(`[${reason}] Zero balance for ${tokenAddress}. Cleaning up.`);
             updateTokenStatus(tokenAddress, "sold");
             clearAllTimersForToken(tokenAddress);
@@ -89,7 +89,7 @@ async function executeSell(
 
         const sellTx = await router.swapExactTokensForETH(
             balance, 0, path, wallet.address, deadline,
-            { gasLimit: CONFIG.gasLimit || 300000, gasPrice: await provider.getGasPrice() }
+            { gasLimit: BigInt(CONFIG.gasLimit || 300_000), gasPrice: (await provider.getFeeData()).gasPrice }
         );
 
         log(`[${reason}] Sell TX sent: ${sellTx.hash}`);
@@ -110,7 +110,7 @@ async function executeSell(
 
 async function monitorStopLoss(tokenAddress: string, buyAmountETH: string) {
     const path = [tokenAddress, CONFIG.wethAddress];
-    const buyAmount = ethers.utils.parseEther(buyAmountETH);
+    const buyAmount = ethers.parseEther(buyAmountETH);
     const initialOut = await router.getAmountsOut(buyAmount, path).catch(() => null);
 
     if (!initialOut) return;
@@ -126,7 +126,7 @@ async function monitorStopLoss(tokenAddress: string, buyAmountETH: string) {
             // Balance-zero check: if token balance is zero, stop monitoring (FIX-08)
             const token = new Contract(tokenAddress, erc20Abi, wallet);
             const balance = await token.balanceOf(wallet.address);
-            if (balance.isZero()) {
+            if (balance === 0n) {
                 log("[stop-loss] Zero balance detected. Stopping monitor.");
                 clearAllTimersForToken(tokenAddress);
                 updateTokenStatus(tokenAddress, "sold");
@@ -153,7 +153,7 @@ async function monitorStopLoss(tokenAddress: string, buyAmountETH: string) {
 
 async function monitorTakeProfit(tokenAddress: string, buyAmountETH: string) {
     const path = [tokenAddress, CONFIG.wethAddress];
-    const buyAmount = ethers.utils.parseEther(buyAmountETH);
+    const buyAmount = ethers.parseEther(buyAmountETH);
     const initialOut = await router.getAmountsOut(buyAmount, path).catch(() => null);
 
     if (!initialOut) return;
@@ -168,7 +168,7 @@ async function monitorTakeProfit(tokenAddress: string, buyAmountETH: string) {
             // Balance-zero check: if token balance is zero, stop monitoring (FIX-08)
             const token = new Contract(tokenAddress, erc20Abi, wallet);
             const balance = await token.balanceOf(wallet.address);
-            if (balance.isZero()) {
+            if (balance === 0n) {
                 log("[take-profit] Zero balance detected. Stopping monitor.");
                 clearAllTimersForToken(tokenAddress);
                 updateTokenStatus(tokenAddress, "sold");
@@ -279,7 +279,7 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
         ]);
 
         const wethReserve = token0.toLowerCase() === CONFIG.wethAddress.toLowerCase() ? reserve0 : reserve1;
-        ethLiquidity = ethers.utils.formatEther(wethReserve);
+        ethLiquidity = ethers.formatEther(wethReserve);
     } catch {}
 
     await sendTelegramAlert(`*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nWETH LP: \`${ethLiquidity} ETH\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](https://etherscan.io/token/${targetToken})\nPair: [\`${pairAddress}\`](https://etherscan.io/address/${pairAddress})`);
@@ -293,14 +293,14 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
 
     const path = [CONFIG.wethAddress, targetToken];
     const deadline = Math.floor(Date.now() / 1000) + 60;
-    const amountIn = ethers.utils.parseEther(CONFIG.snipeAmountETH);
+    const amountIn = ethers.parseEther(CONFIG.snipeAmountETH);
 
-    let minOut = 0;
+    let minOut: bigint = 0n;
     try {
         const slippage = CONFIG.slippagePercent || 5;
         const amountsOut = await router.getAmountsOut(amountIn, path);
         const expectedOut = amountsOut[1];
-        minOut = expectedOut.sub(expectedOut.mul(slippage).div(100));
+        minOut = expectedOut - (expectedOut * BigInt(slippage) / 100n);
     } catch {
         log("Failed to calculate slippage-adjusted minOut. Defaulting to 0.");
     }
@@ -346,8 +346,8 @@ function resumeMonitoring(): void {
         if (info.status === 'pending') {
             log(`[RESUME] Restarting monitoring for ${token}`);
             const tokenContract = new Contract(token, erc20Abi, wallet);
-            tokenContract.balanceOf(wallet.address).then((balance: ethers.BigNumber) => {
-                if (balance.isZero()) {
+            tokenContract.balanceOf(wallet.address).then((balance: bigint) => {
+                if (balance === 0n) {
                     log(`[RESUME] Zero balance for ${token}. Marking as failed.`);
                     updateTokenStatus(token, "failed");
                     return;
