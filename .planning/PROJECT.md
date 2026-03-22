@@ -46,8 +46,8 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [ ] Sanitize API keys and private keys from error log output
 - [ ] Validate Flashbots auth key exists before attempting bundle submission
 
-**Infrastructure — ethers v6 Migration**
-- [ ] Migrate from ethers v5 to v6 (BigNumber → native BigInt, updated provider API)
+**Infrastructure — ethers v6 Migration** — Validated in Phase 02: ethers-v6-migration
+- [x] Migrate from ethers v5 to v6 (BigNumber → native BigInt, updated provider API)
 
 **Infrastructure — SQLite Storage**
 - [ ] Replace JSON file storage with SQLite for atomic writes, proper transactions, and concurrency
@@ -117,7 +117,7 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 
 ## Constraints
 
-- **Tech stack**: TypeScript, Node.js 18+, ethers v6 (migrating from v5), Hardhat for contracts
+- **Tech stack**: TypeScript, Node.js 18+, ethers v6, Hardhat for contracts
 - **Storage**: SQLite (migrating from JSON file) — must remain local, no cloud database
 - **MEV Protection**: Must use Flashbots on ETH; support chain-specific private transaction mechanisms elsewhere
 - **Security**: Private keys via environment variables — no cloud secrets manager required but env validation is mandatory
@@ -129,7 +129,7 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | — Pending |
+| Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | ✓ Complete (Phase 02) |
 | SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | — Pending |
 | Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | — Pending |
 | Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | — Pending |
@@ -138,4 +138,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | — Pending |
 
 ---
-*Last updated: 2026-03-19 after Phase 01 gap closure (env-driven network config + .env.example)*
+*Last updated: 2026-03-22 after Phase 02 completion (ethers v6 migration — all source files migrated, zero v5 patterns remain)*
