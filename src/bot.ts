@@ -15,8 +15,10 @@ import {
 } from "./utils/tokenSafety";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
-import { markSniped, isAlreadySniped, updateTokenStatus } from "./utils/storage";
-import { getState } from "./utils/storage";
+import { db, insertTrade, isTokenSniped, updateTradeStatus } from "./utils/db";
+import { logger } from "./utils/logger";
+import { getProvider, getWallet } from "./utils/provider";
+import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI } from "./utils/abis";
 import { sendTxWithRetry } from "./utils/txManager";
 import {
     tryAcquireSellLock,
@@ -28,31 +30,13 @@ import {
     isShutdownInProgress
 } from "./utils/exitManager";
 
-const provider = new ethers.JsonRpcProvider(CONFIG.rpc[CONFIG.network]);
-const wallet = new ethers.Wallet(CONFIG.walletPrivateKey, provider);
+const provider = getProvider();
+const wallet = getWallet();
 
-const factoryAbi = [
-    "event PairCreated(address indexed token0, address indexed token1, address pair, uint)"
-];
-const routerAbi = [
-    "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) payable returns (uint[] memory)",
-    "function getAmountsOut(uint amountIn, address[] calldata path) view returns (uint[] memory)",
-    "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory)"
-];
+const factory = new Contract(CONFIG.factoryAddress, FACTORY_ABI, provider);
+const router = new Contract(CONFIG.routerAddress, ROUTER_ABI, wallet);
 
-const erc20Abi = [
-    "function approve(address spender, uint amount) public returns (bool)",
-    "function allowance(address owner, address spender) view returns (uint256)",
-    "function balanceOf(address) view returns (uint)"
-];
-
-
-const factory = new Contract(CONFIG.factoryAddress, factoryAbi, provider);
-const router = new Contract(CONFIG.routerAddress, routerAbi, wallet);
-
-function log(...args: any[]) {
-    console.log("[BOT]", ...args);
-}
+const log = logger.child({ module: 'bot' });
 
 async function maybeApprove(token: Contract, amount: bigint) {
     const currentAllowance = await token.allowance(wallet.address, CONFIG.routerAddress);
@@ -68,17 +52,17 @@ async function executeSell(
     reason: 'stop-loss' | 'take-profit' | 'timed-sell'
 ): Promise<void> {
     if (!tryAcquireSellLock(tokenAddress)) {
-        log(`[${reason}] Another exit already handling ${tokenAddress}. Skipping.`);
+        log.info({ token: tokenAddress, reason }, 'Another exit already handling token, skipping');
         return;
     }
 
     try {
-        const token = new Contract(tokenAddress, erc20Abi, wallet);
+        const token = new Contract(tokenAddress, ERC20_ABI, wallet);
         const balance = await token.balanceOf(wallet.address);
 
         if (balance === 0n) {
-            log(`[${reason}] Zero balance for ${tokenAddress}. Cleaning up.`);
-            updateTokenStatus(tokenAddress, "sold");
+            log.info({ token: tokenAddress, reason }, 'Zero balance, cleaning up');
+            updateTradeStatus.run('sold', tokenAddress.toLowerCase());
             clearAllTimersForToken(tokenAddress);
             return;
         }
@@ -92,17 +76,17 @@ async function executeSell(
             { gasLimit: BigInt(CONFIG.gasLimit || 300_000), gasPrice: (await provider.getFeeData()).gasPrice }
         );
 
-        log(`[${reason}] Sell TX sent: ${sellTx.hash}`);
+        log.info({ token: tokenAddress, reason, txHash: sellTx.hash }, 'Sell TX sent');
         await sendTelegramAlert(`*${reason} sell TX sent:* [View](https://etherscan.io/tx/${sellTx.hash})`);
         await sellTx.wait();
 
-        updateTokenStatus(tokenAddress, "sold");
+        updateTradeStatus.run('sold', tokenAddress.toLowerCase());
         clearAllTimersForToken(tokenAddress);
         await sendTelegramAlert(`*${reason} TX confirmed*`);
 
     } catch (e) {
-        log(`[${reason}] Sell failed for ${tokenAddress}:`, e);
-        updateTokenStatus(tokenAddress, "failed");
+        log.error({ err: e, token: tokenAddress, reason }, 'Sell failed');
+        updateTradeStatus.run('failed', tokenAddress.toLowerCase());
         clearAllTimersForToken(tokenAddress);
         await sendTelegramAlert(`*${reason} sell failed:* ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -119,17 +103,17 @@ async function monitorStopLoss(tokenAddress: string, buyAmountETH: string) {
     const stopLossPercent = CONFIG.stopLossPercent || 25;
     const stopLossPrice = initialPrice * (1 - stopLossPercent / 100);
 
-    log("Monitoring for stop-loss...");
+    log.info({ token: tokenAddress }, 'Monitoring for stop-loss');
 
     const interval = setInterval(async () => {
         try {
             // Balance-zero check: if token balance is zero, stop monitoring (FIX-08)
-            const token = new Contract(tokenAddress, erc20Abi, wallet);
+            const token = new Contract(tokenAddress, ERC20_ABI, wallet);
             const balance = await token.balanceOf(wallet.address);
             if (balance === 0n) {
-                log("[stop-loss] Zero balance detected. Stopping monitor.");
+                log.info({ token: tokenAddress }, 'Stop-loss: zero balance detected, stopping monitor');
                 clearAllTimersForToken(tokenAddress);
-                updateTokenStatus(tokenAddress, "sold");
+                updateTradeStatus.run('sold', tokenAddress.toLowerCase());
                 return;
             }
 
@@ -137,14 +121,14 @@ async function monitorStopLoss(tokenAddress: string, buyAmountETH: string) {
             const currentPrice = Number(currentOut[1]);
             const roi = ((currentPrice - initialPrice) / initialPrice) * 100;
 
-            log(`[stop-loss] Current ROI: ${roi.toFixed(2)}%`);
+            log.debug({ token: tokenAddress, roi: roi.toFixed(2) }, 'Stop-loss ROI check');
 
             if (currentPrice < stopLossPrice) {
-                log("[stop-loss] Stop-loss triggered. Selling token...");
+                log.info({ token: tokenAddress }, 'Stop-loss triggered, selling');
                 await executeSell(tokenAddress, 'stop-loss');
             }
         } catch (e) {
-            log("[stop-loss] Error monitoring:", e);
+            log.error({ err: e, token: tokenAddress }, 'Stop-loss monitoring error');
         }
     }, CONFIG.stopLossCheckInterval || 15000);
 
@@ -161,17 +145,17 @@ async function monitorTakeProfit(tokenAddress: string, buyAmountETH: string) {
     const initialPrice = Number(initialOut[1]);
     const takeProfitPrice = initialPrice * (1 + CONFIG.takeProfitPercent / 100);
 
-    log("Monitoring for take-profit...");
+    log.info({ token: tokenAddress }, 'Monitoring for take-profit');
 
     const interval = setInterval(async () => {
         try {
             // Balance-zero check: if token balance is zero, stop monitoring (FIX-08)
-            const token = new Contract(tokenAddress, erc20Abi, wallet);
+            const token = new Contract(tokenAddress, ERC20_ABI, wallet);
             const balance = await token.balanceOf(wallet.address);
             if (balance === 0n) {
-                log("[take-profit] Zero balance detected. Stopping monitor.");
+                log.info({ token: tokenAddress }, 'Take-profit: zero balance detected, stopping monitor');
                 clearAllTimersForToken(tokenAddress);
-                updateTokenStatus(tokenAddress, "sold");
+                updateTradeStatus.run('sold', tokenAddress.toLowerCase());
                 return;
             }
 
@@ -179,11 +163,11 @@ async function monitorTakeProfit(tokenAddress: string, buyAmountETH: string) {
             const currentPrice = Number(currentOut[1]);
 
             if (currentPrice >= takeProfitPrice) {
-                log("[take-profit] Take-profit triggered. Selling token...");
+                log.info({ token: tokenAddress }, 'Take-profit triggered, selling');
                 await executeSell(tokenAddress, 'take-profit');
             }
         } catch (e) {
-            log("[take-profit] Error monitoring:", e);
+            log.error({ err: e, token: tokenAddress }, 'Take-profit monitoring error');
         }
     }, CONFIG.takeProfitCheckInterval || 15000);
 
@@ -191,7 +175,7 @@ async function monitorTakeProfit(tokenAddress: string, buyAmountETH: string) {
 }
 
 async function scheduleTimedSell(tokenAddress: string) {
-    log(`Scheduled auto-sell in ${CONFIG.autoSellAfterMs / 60000} minutes...`);
+    log.info({ token: tokenAddress, delayMinutes: CONFIG.autoSellAfterMs / 60000 }, 'Scheduled auto-sell');
 
     const timeout = setTimeout(async () => {
         await executeSell(tokenAddress, 'timed-sell');
@@ -204,29 +188,29 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
     const targetToken =
         token0.toLowerCase() === CONFIG.wethAddress.toLowerCase() ? token1 : token0;
 
-    if (isAlreadySniped(targetToken)) {
-        log("Already sniped token. Skipping.");
+    if (isTokenSniped.get(targetToken.toLowerCase())) {
+        log.info({ token: targetToken }, 'Already sniped token, skipping');
         await sendTelegramAlert(`*Already sniped token:* \`${targetToken}\``);
         return;
     }
 
-    log("New pair detected:", pairAddress);
+    log.info({ pair: pairAddress }, 'New pair detected');
 
     if (BLOCKLIST.tokens.has(targetToken.toLowerCase())) {
-        log("Blocked token address detected. Skipping.");
+        log.info({ token: targetToken }, 'Blocked token address, skipping');
         await sendTelegramAlert(`*Blocked token* \`${targetToken}\``);
         return;
     }
 
     if (BLOCKLIST.pairs.has(pairAddress.toLowerCase())) {
-        log("Blocked LP pair address detected. Skipping.");
+        log.info({ pair: pairAddress }, 'Blocked LP pair, skipping');
         await sendTelegramAlert(`*Blocked LP pair* \`${pairAddress}\``);
         return;
     }
 
     const isBad = await isKnownBadToken(targetToken);
     if (isBad) {
-        log("Known bad token or creator. Skipping.");
+        log.info({ token: targetToken }, 'Known bad token or creator, skipping');
         await sendTelegramAlert(`*Known bad token or creator* \`${targetToken}\``);
         return;
     }
@@ -234,7 +218,7 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
     // Sell simulation: always-on, hard block on failure (FIX-04)
     const canSell = await simulateSell(targetToken, wallet);
     if (!canSell) {
-        log("[SAFETY] Sell simulation failed -- skipping buy.");
+        log.warn({ token: targetToken }, 'Sell simulation failed, skipping buy');
         await sendTelegramAlert(`*Sell simulation failed for* \`${targetToken}\` -- buy skipped`);
         return;
     }
@@ -250,46 +234,38 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
         hasMaxWalletOrTxLimits(targetToken, provider, wallet.address),
     ]);
 
-    const token = new Contract(targetToken, [
-        "function symbol() view returns (string)",
-        "function name() view returns (string)",
-        "function decimals() view returns (uint8)"
-    ], provider);
+    const tokenContract = new Contract(targetToken, ERC20_ABI, provider);
 
     let symbol = "?", name = "?", decimals = 18;
     try {
         [symbol, name, decimals] = await Promise.all([
-            token.symbol(),
-            token.name(),
-            token.decimals(),
+            tokenContract.symbol(),
+            tokenContract.name(),
+            tokenContract.decimals(),
         ]);
     } catch {}
 
-    const lp = new Contract(pairAddress, [
-        "function getReserves() view returns (uint112,uint112,uint32)",
-        "function token0() view returns (address)",
-        "function token1() view returns (address)"
-    ], provider);
+    const lp = new Contract(pairAddress, PAIR_ABI, provider);
 
     let ethLiquidity = "?";
     try {
-        const [token0, { reserve0, reserve1 }] = await Promise.all([
+        const [token0Addr, reserves] = await Promise.all([
             lp.token0(),
             lp.getReserves()
         ]);
 
-        const wethReserve = token0.toLowerCase() === CONFIG.wethAddress.toLowerCase() ? reserve0 : reserve1;
+        const wethReserve = token0Addr.toLowerCase() === CONFIG.wethAddress.toLowerCase() ? reserves.reserve0 : reserves.reserve1;
         ethLiquidity = ethers.formatEther(wethReserve);
     } catch {}
 
     await sendTelegramAlert(`*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nWETH LP: \`${ethLiquidity} ETH\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](https://etherscan.io/token/${targetToken})\nPair: [\`${pairAddress}\`](https://etherscan.io/address/${pairAddress})`);
 
     if (isHoneypot || isBlacklisted || !locked || !sufficientLiquidity || !validMetadata || !canSwap || hasTax || hasLimits) {
-        log("One or more safety checks failed. Skipping.");
+        log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits } }, 'Safety checks failed, skipping');
         return;
     }
 
-    log("All safety checks passed. Buying token...");
+    log.info({ token: targetToken, symbol }, 'All safety checks passed, buying');
 
     const path = [CONFIG.wethAddress, targetToken];
     const deadline = Math.floor(Date.now() / 1000) + 60;
@@ -302,7 +278,7 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
         const expectedOut = amountsOut[1];
         minOut = expectedOut - (expectedOut * BigInt(slippage) / 100n);
     } catch {
-        log("Failed to calculate slippage-adjusted minOut. Defaulting to 0.");
+        log.warn({ token: targetToken }, 'Failed to calculate slippage-adjusted minOut, defaulting to 0');
     }
 
     try {
@@ -322,18 +298,30 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
             true
         );
 
-        markSniped(targetToken, "flashbots_bundle");
+        insertTrade.run({
+            token: targetToken.toLowerCase(),
+            chain: CONFIG.network,
+            action: 'buy',
+            txHash: 'flashbots_bundle',
+            block: null,
+            timestamp: Math.floor(Date.now() / 1000),
+            amountIn: CONFIG.snipeAmountETH,
+            amountOut: null,
+            gasCost: null,
+            priceAtAction: null,
+            status: 'pending'
+        });
         await sendTelegramAlert(`*Buy TX sent via Flashbots* for \`${symbol}\``);
-        log("Flashbots bundle submitted");
-        log("TX confirmed");
+        log.info({ token: targetToken, symbol }, 'Flashbots bundle submitted');
+        log.info({ token: targetToken }, 'TX confirmed');
         await sendTelegramAlert(`*TX confirmed* for \`${symbol}\``);
 
         await monitorStopLoss(targetToken, CONFIG.snipeAmountETH);
         await monitorTakeProfit(targetToken, CONFIG.snipeAmountETH);
         await scheduleTimedSell(targetToken);
     } catch (e) {
-        log("TX failed:", e);
-        updateTokenStatus(targetToken, "failed");
+        log.error({ err: e, token: targetToken }, 'TX failed');
+        updateTradeStatus.run('failed', targetToken.toLowerCase());
         await sendTelegramAlert(`*TX failed* for \`${symbol}\``);
     }
 }
@@ -341,29 +329,27 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
 // Resume monitoring for tokens with 'pending' status after restart (FIX-05).
 // Checks balance before resuming -- token may have been rugged during downtime.
 function resumeMonitoring(): void {
-    const state = getState();
-    for (const [token, info] of Object.entries(state.sniped)) {
-        if (info.status === 'pending') {
-            log(`[RESUME] Restarting monitoring for ${token}`);
-            const tokenContract = new Contract(token, erc20Abi, wallet);
-            tokenContract.balanceOf(wallet.address).then((balance: bigint) => {
-                if (balance === 0n) {
-                    log(`[RESUME] Zero balance for ${token}. Marking as failed.`);
-                    updateTokenStatus(token, "failed");
-                    return;
-                }
-                monitorStopLoss(token, CONFIG.snipeAmountETH);
-                monitorTakeProfit(token, CONFIG.snipeAmountETH);
-                scheduleTimedSell(token);
-            }).catch((e: unknown) => {
-                log(`[RESUME] Error checking balance for ${token}:`, e);
-            });
-        }
+    const pendingTrades = db.prepare('SELECT DISTINCT token FROM trades WHERE status = ?').all('pending') as { token: string }[];
+    for (const { token } of pendingTrades) {
+        log.info({ token }, 'Restarting monitoring for pending token');
+        const tokenContract = new Contract(token, ERC20_ABI, wallet);
+        tokenContract.balanceOf(wallet.address).then((balance: bigint) => {
+            if (balance === 0n) {
+                log.info({ token }, 'Zero balance for pending token, marking as failed');
+                updateTradeStatus.run('failed', token);
+                return;
+            }
+            monitorStopLoss(token, CONFIG.snipeAmountETH);
+            monitorTakeProfit(token, CONFIG.snipeAmountETH);
+            scheduleTimedSell(token);
+        }).catch((e: unknown) => {
+            log.error({ err: e, token }, 'Error checking balance for pending token');
+        });
     }
 }
 
 function startBot() {
-    log("Listening for new pairs...");
+    log.info('Listening for new pairs');
     initShutdownHandler(factory);
     resumeMonitoring();
     factory.on("PairCreated", async (token0: string, token1: string, pair: string) => {
