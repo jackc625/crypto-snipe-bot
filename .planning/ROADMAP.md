@@ -90,8 +90,8 @@ Plans:
 Plans:
 - [x] 04-00-PLAN.md — Wave 0: Test fixtures and scaffold files for all behavioral tests (ALL)
 - [x] 04-01-PLAN.md — Chain registry types, ChainConfig interface, env vars, WebSocket provider support (CHAIN-01, CHAIN-02)
-- [ ] 04-02-PLAN.md — MEV strategy pattern: Flashbots, bloXroute, passthrough adapters and txManager dispatch (CHAIN-04)
-- [ ] 04-03-PLAN.md — Safety provider adapters (honeypot.is, GoPlus, Unicrypt, Mudra) and chain-prefixed notifications (CHAIN-02, CHAIN-03)
+- [x] 04-02-PLAN.md — MEV strategy pattern: Flashbots, bloXroute, passthrough adapters and txManager dispatch (CHAIN-04)
+- [x] 04-03-PLAN.md — Safety provider adapters (honeypot.is, GoPlus, Unicrypt, Mudra) and chain-prefixed notifications (CHAIN-02, CHAIN-03)
 - [ ] 04-04-PLAN.md — Multi-chain bot orchestrator: concurrent listeners, WebSocket reconnect, capital tracking (CHAIN-03, CHAIN-05)
 
 ### Phase 5: Uniswap V3 Integration
@@ -185,7 +185,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 1. Bug Fixes & Hardening | 3/4 | Gap closure in progress | - |
 | 2. ethers v6 Migration | 0/2 | Planned | - |
 | 3. SQLite Storage & Code Quality | 0/4 | Planned | - |
-| 4. Multi-Chain Architecture | 2/5 | In Progress|  |
+| 4. Multi-Chain Architecture | 4/5 | In Progress|  |
 | 5. Uniswap V3 Integration | 0/2 | Not started | - |
 | 6. Risk Management | 0/2 | Not started | - |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
