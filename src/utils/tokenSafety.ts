@@ -5,7 +5,7 @@ import { BLOCKLIST } from "./blocklist";
 import { retry } from "./retry";
 import { getProvider } from "./provider";
 import { logger } from "./logger";
-import { ERC20_ABI, ROUTER_ABI, PAIR_ABI, TOKEN_LIMITS_ABI } from "./abis";
+import { ERC20_ABI, ROUTER_ABI, PAIR_ABI, TOKEN_LIMITS_ABI, V3_QUOTER_V2_ABI } from "./abis";
 import type { ChainContext } from '../chainRegistry';
 import { honeypotIsCheck } from './safetyProviders/honeypotIs';
 import { goplusHoneypotCheck, goplusLiquidityLockCheck } from './safetyProviders/goplus';
@@ -581,6 +581,54 @@ export async function simulateSellForChain(
         return true;
     } catch (e) {
         ctx.log.warn({ err: e, token: tokenAddress, check: 'sellSimulation' }, 'Sell simulation failed');
+        return false;
+    }
+}
+
+/**
+ * Simulate V3 sell via QuoterV2 quoteExactInputSingle static call.
+ * Returns true if the quoter returns a non-zero amountOut, false otherwise.
+ * Per D-08: QuoterV2 accounts for tick, liquidity depth, and fee tier.
+ */
+export async function simulateSellV3ForChain(
+    ctx: ChainContext,
+    quoterAddress: string,
+    tokenAddress: string,
+    feeTier: number
+): Promise<boolean> {
+    try {
+        const erc20 = new Contract(tokenAddress, ERC20_ABI, ctx.httpProvider);
+        const balance = await erc20.balanceOf(ctx.wallet.address);
+
+        if (balance === 0n) {
+            ctx.log.debug({ token: tokenAddress, check: 'v3SellSimulation' }, 'Zero balance, sim passes vacuously');
+            return true;
+        }
+
+        const quoter = new Contract(quoterAddress, V3_QUOTER_V2_ABI, ctx.httpProvider);
+
+        const quoteParams = {
+            tokenIn: tokenAddress,
+            tokenOut: ctx.chain.wethAddress,
+            amountIn: balance,
+            fee: feeTier,
+            sqrtPriceLimitX96: 0n,
+        };
+
+        ctx.log.debug({ token: tokenAddress, check: 'v3SellSimulation', feeTier }, 'Simulating V3 sell via QuoterV2');
+
+        const [amountOut] = await quoter.quoteExactInputSingle.staticCall(quoteParams);
+
+        if (amountOut === 0n) {
+            ctx.log.warn({ token: tokenAddress }, 'V3 sell simulation returned 0 amountOut');
+            return false;
+        }
+
+        ctx.log.debug({ token: tokenAddress, amountOut: amountOut.toString() }, 'V3 sell simulation passed');
+        return true;
+    } catch (e) {
+        // QuoterV2 reverts instead of returning 0 when liquidity is insufficient (Pitfall 3 from research)
+        ctx.log.warn({ err: e, token: tokenAddress }, 'V3 sell simulation failed (QuoterV2 revert -- likely illiquid)');
         return false;
     }
 }
