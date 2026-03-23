@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-23T19:34:18.443Z"
+stopped_at: Phase 6 context gathered
+last_updated: "2026-03-23T20:06:02.419Z"
 progress:
   total_phases: 9
   completed_phases: 5
@@ -140,9 +140,9 @@ None yet.
 ## Session Continuity
 
 <<<<<<< Updated upstream
-Last session: 2026-03-23T15:10:18.075Z
-Stopped at: Completed 05-03-PLAN.md
-Resume file: None
+Last session: 2026-03-23T20:06:02.412Z
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-risk-management/06-CONTEXT.md
 =======
 Last session: 2026-03-23T00:18:08.157Z
 Stopped at: Completed 04-02-PLAN.md
