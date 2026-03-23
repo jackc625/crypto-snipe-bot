@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-03-23T00:17:19Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-03-23T00:35:00Z"
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 10
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 4
-Plan: 03 completed
+Plan: 04 completed
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Plan: 03 completed
 | Phase 03 P03 | 9min | 2 tasks | 6 files |
 | Phase 03 P04 | 6min | 2 tasks | 3 files |
 | Phase 04 P03 | 8min | 2 tasks | 7 files |
+| Phase 04 P04 | 10min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Backward-compatible overloads: all 10 original tokenSafety exports preserved alongside 10 new *ForChain variants
 - [Phase 04]: Mudra adapter includes GoPlus fallback via dynamic import for BSC resilience
 - [Phase 04]: ForChain functions accept dexRouter as parameter (not from CONFIG) to support multi-DEX per chain
+- [Phase 04]: Tasks 1+2 committed together since both modify src/bot.ts as a cohesive refactor
+- [Phase 04]: WebSocket close handler uses (wsProvider.websocket as any).on() due to ethers v6 WebSocketLike type limitation
+- [Phase 04]: Function overloads in exitManager use runtime typeof check to disambiguate chain+token from token-only calls
+- [Phase 04]: initMultiChainShutdownHandler in bot.ts handles WS teardown directly (owns ChainContext array)
 
 ### Pending Todos
 
@@ -104,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:17:19Z
-Stopped at: Completed 04-03-PLAN.md
-Resume file: .planning/phases/04-multi-chain-architecture/04-03-SUMMARY.md
+Last session: 2026-03-23T00:35:00Z
+Stopped at: Completed 04-04-PLAN.md
+Resume file: .planning/phases/04-multi-chain-architecture/04-04-SUMMARY.md
