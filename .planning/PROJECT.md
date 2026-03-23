@@ -55,12 +55,12 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [x] Structured JSON logging with pino replacing all console.log/warn/error
 - [x] Singleton provider cache per chain, centralized ABI module
 
-**Infrastructure — Multi-Chain**
-- [ ] Build chain abstraction layer supporting ETH, BSC, Base, Arbitrum simultaneously
-- [ ] Per-chain configuration (RPC endpoints, contract addresses, gas strategies)
-- [ ] Concurrent operation across all configured chains
-- [ ] Per-chain MEV protection (Flashbots on ETH, private RPCs, chain-specific relays)
-- [ ] Dynamic capital allocation across chains based on opportunity quality and activity
+**Infrastructure — Multi-Chain** — Validated in Phase 04: multi-chain-architecture
+- [x] Build chain abstraction layer supporting ETH, BSC, Base, Arbitrum simultaneously
+- [x] Per-chain configuration (RPC endpoints, contract addresses, gas strategies)
+- [x] Concurrent operation across all configured chains
+- [x] Per-chain MEV protection (Flashbots on ETH, bloXroute on BSC, passthrough on Base/Arbitrum)
+- [ ] Dynamic capital allocation across chains based on opportunity quality and activity (fixed budgets implemented; dynamic allocation deferred)
 
 **DEX Support — Uniswap V3**
 - [ ] Detect new V3 pool creation events across supported chains
@@ -132,12 +132,12 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | ✓ Complete (Phase 02) |
-| SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | — Pending |
-| Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | — Pending |
+| SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | ✓ Complete (Phase 03) |
+| Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Complete (Phase 04) |
 | Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | — Pending |
 | Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | — Pending |
-| Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | — Pending |
-| Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | — Pending |
+| Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
+| Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-22 after Phase 02 completion (ethers v6 migration — all source files migrated, zero v5 patterns remain)*
+*Last updated: 2026-03-23 after Phase 04 completion (multi-chain architecture — chain registry, MEV strategies, safety providers, concurrent listeners across ETH/BSC/Base/Arbitrum)*
