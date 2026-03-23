@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: In Progress
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-23T20:40:20.000Z"
+status: Ready to plan
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-03-23T21:02:21.855Z"
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -23,8 +23,8 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 6
-Plan: 2 of 2
+Phase: 7
+Plan: Not started
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Plan: 2 of 2
 | Phase 05 P04 | 1min | 1 tasks | 2 files |
 | Phase 05 P03 | 2min | 1 tasks | 2 files |
 | Phase 06 P01 | 4min | 2 tasks | 4 files |
+| Phase 06 P02 | 4min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -95,7 +96,6 @@ Recent decisions affecting current work:
 - [Phase 03]: P&L query uses LEFT JOIN for unsold position visibility with CAST(COALESCE(...) AS REAL) for TEXT amount arithmetic
 - [Phase 03]: config.ts imports logger.ts directly (no circular dependency) to replace console.error with logger.fatal
 
-
 - [Phase 04]: Strategy dispatch pattern for safety APIs: safetyApis config field drives provider selection at runtime
 - [Phase 04]: Backward-compatible overloads: all 10 original tokenSafety exports preserved alongside 10 new *ForChain variants
 - [Phase 04]: Mudra adapter includes GoPlus fallback via dynamic import for BSC resilience
@@ -107,7 +107,6 @@ Recent decisions affecting current work:
 - [Phase 04]: Auth keys read from mevConfig with process.env fallback for standalone strategy use
 - [Phase 04]: Duck-type check in sendTxWithRetry selects multi-chain vs legacy path without separate function names
 - [Phase 04]: Exhaustive switch with never type in createMevStrategy ensures compile-time safety for new strategy types
-
 
 - [Phase 05]: DexConfigBase + DexConfigV2/V3 discriminated union via dexType field for compile-time V2/V3 narrowing
 - [Phase 05]: SwapRouter02 used universally for V3 (deadline via multicall wrapper)
@@ -123,6 +122,9 @@ Recent decisions affecting current work:
 - [Phase 06]: In-memory Map for cooldowns (ephemeral, resets on restart safe per D-09)
 - [Phase 06]: Inline prepared statement for exposureByChain GROUP BY query consistent with Phase 3 pattern
 - [Phase 06]: Risk checks ordered cheapest-first: position_size -> daily_loss_limit -> max_positions -> cooldown -> exposure_cap
+- [Phase 06]: Risk gate positioned after cheap blocklist/dedup checks but before expensive safety API calls for fast-fail
+- [Phase 06]: Legacy handleNewPair uses 'eth' chain name and '1.0' maxCapital matching ETH chain template defaults
+- [Phase 06]: recordSnipe() placed after sendTxWithRetry, before insertTrade.run -- cooldown starts only on confirmed TX
 
 ### Pending Todos
 
@@ -136,6 +138,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T20:40:20.000Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-03-23T20:55:51.536Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None

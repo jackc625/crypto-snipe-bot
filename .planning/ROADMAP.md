@@ -189,7 +189,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 3. SQLite Storage & Code Quality | 3/4 | In Progress | - |
 | 4. Multi-Chain Architecture | 4/5 | In Progress | - |
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
-| 6. Risk Management | 0/2 | Planned | - |
+| 6. Risk Management | 1/2 | In Progress|  |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
 | 9. Testing Infrastructure | 0/3 | Not started | - |
