@@ -12,3 +12,6 @@ yarn-error.log*
 
 # SQLite database (runtime generated)
 data/
+
+# Hardhat cache (runtime generated)
+cache/
