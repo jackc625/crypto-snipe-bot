@@ -46,10 +46,14 @@ import {
 import {
     ChainConfig,
     DexConfig,
+    DexConfigV2,
+    DexConfigV3,
     ChainContext,
     buildChainRegistry,
     createChainContext,
-    getEnabledChains
+    getEnabledChains,
+    isDexV2,
+    isDexV3
 } from "./chainRegistry";
 
 // Legacy singleton instances -- kept for backward-compatible handleNewPair() and startBot()
@@ -151,6 +155,7 @@ async function executeSellForChain(
     tokenAddress: string,
     reason: 'stop-loss' | 'take-profit' | 'timed-sell'
 ): Promise<void> {
+    if (!isDexV2(dex)) return; // V3 sell handling added in Plan 02
     if (!tryAcquireSellLock(ctx.chain.name, tokenAddress)) {
         ctx.log.info({ token: tokenAddress, reason }, 'Another exit already handling token, skipping');
         return;
@@ -299,6 +304,7 @@ async function monitorStopLossForChain(
     tokenAddress: string,
     buyAmountNative: string
 ) {
+    if (!isDexV2(dex)) return; // V3 monitoring added in Plan 02
     const dexRouter = new Contract(dex.routerAddress, ROUTER_ABI, ctx.httpProvider);
     const path = [tokenAddress, ctx.chain.wethAddress];
     const buyAmount = ethers.parseEther(buyAmountNative);
@@ -347,6 +353,7 @@ async function monitorTakeProfitForChain(
     tokenAddress: string,
     buyAmountNative: string
 ) {
+    if (!isDexV2(dex)) return; // V3 monitoring added in Plan 02
     const dexRouter = new Contract(dex.routerAddress, ROUTER_ABI, ctx.httpProvider);
     const path = [tokenAddress, ctx.chain.wethAddress];
     const buyAmount = ethers.parseEther(buyAmountNative);
@@ -410,6 +417,8 @@ export async function handleNewPairForChain(
     token1: string,
     pairAddress: string
 ): Promise<void> {
+    if (isDexV3(dex)) return; // V3 pair handling added in Plan 02
+
     const targetToken = token0.toLowerCase() === ctx.chain.wethAddress.toLowerCase()
         ? token1 : token0;
 
@@ -716,6 +725,8 @@ async function startDexListener(
     dex: DexConfig,
     _registry: Map<string, ChainConfig>
 ): Promise<void> {
+    if (isDexV3(dex)) return; // V3 listeners added in Plan 02
+
     const wsProvider = ctx.wsProvider;
     if (!wsProvider) {
         ctx.log.warn({ dex: dex.name }, 'No WebSocket URL configured, using HTTP polling fallback');
@@ -882,8 +893,8 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
             continue;
         }
 
-        // Use first DEX for resume monitoring (best effort)
-        const dex = ctx.chain.dexes[0];
+        // Use first V2 DEX for resume monitoring (best effort, V3 added in Plan 02)
+        const dex = ctx.chain.dexes.find(d => isDexV2(d));
         if (!dex) {
             ctx.log.warn({ token }, 'No DEX configured for chain, skipping resume');
             continue;

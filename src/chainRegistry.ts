@@ -12,11 +12,23 @@ const log = logger.child({ module: 'chainRegistry' });
 // Types
 // ---------------------------------------------------------------------------
 
-export interface DexConfig {
-    name: string;           // 'uniswap-v2', 'sushiswap-v2', 'pancakeswap-v2', 'biswap-v2', 'aerodrome', 'camelot-v2'
+export interface DexConfigBase {
+    name: string;
     factoryAddress: string;
+}
+
+export interface DexConfigV2 extends DexConfigBase {
+    dexType: 'v2';
     routerAddress: string;
 }
+
+export interface DexConfigV3 extends DexConfigBase {
+    dexType: 'v3';
+    swapRouterAddress: string;
+    quoterAddress: string;
+}
+
+export type DexConfig = DexConfigV2 | DexConfigV3;
 
 export interface SafetyApiConfig {
     honeypot: 'honeypot.is' | 'goplus';
@@ -49,6 +61,7 @@ export interface ChainConfig {
     snipeAmount: string;
     maxCapital: string;
     explorerUrl: string;
+    minLiquidityThreshold: string;
 }
 
 export interface ChainContext {
@@ -78,6 +91,7 @@ interface ChainTemplate {
     envPrefix: string;
     defaultSnipeAmount: string;
     defaultMaxCapital: string;
+    defaultMinLiquidityThreshold: string;
     httpRpcEnv: string;
     wsRpcEnv: string;
 }
@@ -91,14 +105,23 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
         dexes: [
             {
+                dexType: 'v2',
                 name: 'uniswap-v2',
                 factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
                 routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
             },
             {
+                dexType: 'v2',
                 name: 'sushiswap-v2',
                 factoryAddress: '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
                 routerAddress: '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
+            },
+            {
+                dexType: 'v3',
+                name: 'uniswap-v3',
+                factoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+                swapRouterAddress: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+                quoterAddress: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             },
         ],
         mevStrategy: 'flashbots',
@@ -109,6 +132,7 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         envPrefix: 'ETH',
         defaultSnipeAmount: '0.01',
         defaultMaxCapital: '1.0',
+        defaultMinLiquidityThreshold: '0.5',
         httpRpcEnv: 'ETH_RPC_URL',
         wsRpcEnv: 'ETH_WS_URL',
     },
@@ -120,14 +144,30 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         wethAddress: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
         dexes: [
             {
+                dexType: 'v2',
                 name: 'pancakeswap-v2',
                 factoryAddress: '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73',
                 routerAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
             },
             {
+                dexType: 'v2',
                 name: 'biswap-v2',
                 factoryAddress: '0x858E3312ed3A876947EA49d572A7C42DE08af7EE',
                 routerAddress: '0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8',
+            },
+            {
+                dexType: 'v3',
+                name: 'uniswap-v3',
+                factoryAddress: '0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7',
+                swapRouterAddress: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
+                quoterAddress: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077',
+            },
+            {
+                dexType: 'v3',
+                name: 'pancakeswap-v3',
+                factoryAddress: '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865',
+                swapRouterAddress: '0x1b81D678ffb9C0263b24A97847620C99d213eB14',
+                quoterAddress: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997',
             },
         ],
         mevStrategy: 'bloxroute',
@@ -138,6 +178,7 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         envPrefix: 'BSC',
         defaultSnipeAmount: '0.05',
         defaultMaxCapital: '5.0',
+        defaultMinLiquidityThreshold: '1.0',
         httpRpcEnv: 'BSC_RPC_URL',
         wsRpcEnv: 'BSC_WS_URL',
     },
@@ -149,14 +190,23 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         wethAddress: '0x4200000000000000000000000000000000000006',
         dexes: [
             {
+                dexType: 'v2',
                 name: 'uniswap-v2',
                 factoryAddress: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
                 routerAddress: '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24',
             },
             {
+                dexType: 'v2',
                 name: 'aerodrome',
                 factoryAddress: '0x420DD381b31aEf6683db6B902084cB0FFECe40Da',
                 routerAddress: '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43',
+            },
+            {
+                dexType: 'v3',
+                name: 'uniswap-v3',
+                factoryAddress: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+                swapRouterAddress: '0x2626664c2603336E57B271c5C0b26F421741e481',
+                quoterAddress: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
             },
         ],
         mevStrategy: 'passthrough',
@@ -167,6 +217,7 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         envPrefix: 'BASE',
         defaultSnipeAmount: '0.005',
         defaultMaxCapital: '0.5',
+        defaultMinLiquidityThreshold: '0.1',
         httpRpcEnv: 'BASE_RPC_URL',
         wsRpcEnv: 'BASE_WS_URL',
     },
@@ -178,14 +229,23 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         wethAddress: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
         dexes: [
             {
+                dexType: 'v2',
                 name: 'uniswap-v2',
                 factoryAddress: '0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9',
                 routerAddress: '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24',
             },
             {
+                dexType: 'v2',
                 name: 'camelot-v2',
                 factoryAddress: '0x6EcCab422D763aC031210895C81787E87B43A652',
                 routerAddress: '0xc873fEcbd354f5A56E00E710B90EF4201db2448d',
+            },
+            {
+                dexType: 'v3',
+                name: 'uniswap-v3',
+                factoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+                swapRouterAddress: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+                quoterAddress: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             },
         ],
         mevStrategy: 'passthrough',
@@ -196,6 +256,7 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         envPrefix: 'ARB',
         defaultSnipeAmount: '0.005',
         defaultMaxCapital: '0.5',
+        defaultMinLiquidityThreshold: '0.1',
         httpRpcEnv: 'ARB_RPC_URL',
         wsRpcEnv: 'ARB_WS_URL',
     },
@@ -235,6 +296,7 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
         const wsRpcUrl = process.env[template.wsRpcEnv] || null;
         const snipeAmount = process.env[`${template.envPrefix}_SNIPE_AMOUNT`] || template.defaultSnipeAmount;
         const maxCapital = process.env[`${template.envPrefix}_MAX_CAPITAL`] || template.defaultMaxCapital;
+        const minLiquidityThreshold = process.env[`${template.envPrefix}_MIN_LIQUIDITY`] || template.defaultMinLiquidityThreshold;
 
         // For ETH, fall back to ALCHEMY_URL if ETH_RPC_URL is not set (backward compat)
         let resolvedHttpRpcUrl = httpRpcUrl;
@@ -286,6 +348,7 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
             snipeAmount,
             maxCapital,
             explorerUrl: template.explorerUrl,
+            minLiquidityThreshold,
         };
 
         registry.set(chainName, chainConfig);
@@ -328,4 +391,16 @@ export function createChainContext(chain: ChainConfig): ChainContext {
         wallet,
         log: chainLog,
     };
+}
+
+// ---------------------------------------------------------------------------
+// Type guards for DexConfig discriminated union
+// ---------------------------------------------------------------------------
+
+export function isDexV2(dex: DexConfig): dex is DexConfigV2 {
+    return dex.dexType === 'v2';
+}
+
+export function isDexV3(dex: DexConfig): dex is DexConfigV3 {
+    return dex.dexType === 'v3';
 }
