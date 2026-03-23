@@ -103,11 +103,11 @@ Plans:
   2. Bot waits for a Mint event (liquidity added) after PoolCreated before attempting a snipe -- empty pools are never traded
   3. V3 snipe transactions execute through the V3 SwapRouter with correct fee tier and price limit parameters
   4. Position price monitoring uses sqrtPriceX96 or the V3 Quoter contract for accurate valuation of V3 positions
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — V3 foundation: DexConfig discriminated union, V3 ABIs, chain registry V3 entries, DB schema migration (V3-01, V3-03, V3-04)
+- [ ] 05-02-PLAN.md — V3 pipeline: PoolCreated listener, liquidity wait, buy/sell/monitor via SwapRouter02 and QuoterV2 (V3-01, V3-02, V3-03, V3-04)
 
 ### Phase 6: Risk Management
 **Goal**: Portfolio-level risk controls prevent catastrophic losses and enforce disciplined position sizing across all chains
@@ -186,7 +186,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 2. ethers v6 Migration | 0/2 | Planned | - |
 | 3. SQLite Storage & Code Quality | 0/4 | Planned | - |
 | 4. Multi-Chain Architecture | 4/5 | In Progress|  |
-| 5. Uniswap V3 Integration | 0/2 | Not started | - |
+| 5. Uniswap V3 Integration | 0/2 | Planned | - |
 | 6. Risk Management | 0/2 | Not started | - |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
