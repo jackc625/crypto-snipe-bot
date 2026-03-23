@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-23T14:45:01.830Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-23T19:34:18.443Z"
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 19
 ---
 
 # Project State
@@ -65,6 +65,8 @@ Plan: Not started
 >>>>>>> Stashed changes
 | Phase 05 P01 | 8min | 2 tasks | 4 files |
 | Phase 05 P02 | 8min | 2 tasks | 2 files |
+| Phase 05 P04 | 1min | 1 tasks | 2 files |
+| Phase 05 P03 | 2min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -121,6 +123,9 @@ Recent decisions affecting current work:
 - [Phase 05]: QuoterV2 static call for V3 sell simulation -- reverts on illiquid pools, caught as false
 - [Phase 05]: V2 functions narrowed to DexConfigV2 param type for compile-time safety (removes runtime guards)
 - [Phase 05]: Same-block Mint check before subscribe+timeout for atomic launch detection
+- [Phase 05]: Hardcode ETH Uniswap V2 addresses in CONFIG rather than refactoring legacy consumers
+- [Phase 05]: Empty Sets for default BLOCKLIST -- no tokens blocked initially, correct safe default
+- [Phase 05]: Removed scripts/ from tsconfig include rather than adding exclude -- cleaner separation of Hardhat scripts from bot runtime
 
 ### Pending Todos
 
@@ -135,8 +140,8 @@ None yet.
 ## Session Continuity
 
 <<<<<<< Updated upstream
-Last session: 2026-03-23T14:38:19.760Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-03-23T15:10:18.075Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
 =======
 Last session: 2026-03-23T00:18:08.157Z
