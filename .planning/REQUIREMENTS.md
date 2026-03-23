@@ -56,11 +56,11 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Risk Management
 
-- [ ] **RISK-01**: Configurable max position size caps ETH/BNB per snipe trade
-- [ ] **RISK-02**: Daily loss limit halts sniping when realized losses exceed configured threshold in 24h
-- [ ] **RISK-03**: Max open positions limit prevents exceeding configured concurrent position count across all chains
-- [ ] **RISK-04**: Configurable cooldown period between snipes prevents overtrading during launch waves
-- [ ] **RISK-05**: Portfolio-level exposure tracking shows total capital at risk across all chains and positions
+- [x] **RISK-01**: Configurable max position size caps ETH/BNB per snipe trade
+- [x] **RISK-02**: Daily loss limit halts sniping when realized losses exceed configured threshold in 24h
+- [x] **RISK-03**: Max open positions limit prevents exceeding configured concurrent position count across all chains
+- [x] **RISK-04**: Configurable cooldown period between snipes prevents overtrading during launch waves
+- [x] **RISK-05**: Portfolio-level exposure tracking shows total capital at risk across all chains and positions
 
 ### Smart Exit Strategies
 
@@ -149,11 +149,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | V3-02 | Phase 5 | Pending |
 | V3-03 | Phase 5 | Pending |
 | V3-04 | Phase 5 | Pending |
-| RISK-01 | Phase 6 | Pending |
-| RISK-02 | Phase 6 | Pending |
-| RISK-03 | Phase 6 | Pending |
-| RISK-04 | Phase 6 | Pending |
-| RISK-05 | Phase 6 | Pending |
+| RISK-01 | Phase 6 | Complete |
+| RISK-02 | Phase 6 | Complete |
+| RISK-03 | Phase 6 | Complete |
+| RISK-04 | Phase 6 | Complete |
+| RISK-05 | Phase 6 | Complete |
 | EXIT-01 | Phase 7 | Pending |
 | EXIT-02 | Phase 7 | Pending |
 | EXIT-03 | Phase 7 | Pending |

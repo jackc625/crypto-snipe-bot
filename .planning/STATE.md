@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-23T20:06:02.419Z"
+status: In Progress
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-23T20:40:20.000Z"
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 21
+  completed_plans: 20
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 05 — uniswap-v3-integration
+**Current focus:** Phase 06 — risk-management
 
 ## Current Position
 
 Phase: 6
-Plan: Not started
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -57,16 +57,14 @@ Plan: Not started
 | Phase 03 P02 | 6min | 2 tasks | 3 files |
 | Phase 03 P03 | 9min | 2 tasks | 6 files |
 | Phase 03 P04 | 6min | 2 tasks | 3 files |
-<<<<<<< Updated upstream
+| Phase 04 P02 | 7min | 2 tasks | 5 files |
 | Phase 04 P03 | 8min | 2 tasks | 7 files |
 | Phase 04 P04 | 10min | 3 tasks | 3 files |
-=======
-| Phase 04 P02 | 7min | 2 tasks | 5 files |
->>>>>>> Stashed changes
 | Phase 05 P01 | 8min | 2 tasks | 4 files |
 | Phase 05 P02 | 8min | 2 tasks | 2 files |
 | Phase 05 P04 | 1min | 1 tasks | 2 files |
 | Phase 05 P03 | 2min | 1 tasks | 2 files |
+| Phase 06 P01 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -97,7 +95,6 @@ Recent decisions affecting current work:
 - [Phase 03]: P&L query uses LEFT JOIN for unsold position visibility with CAST(COALESCE(...) AS REAL) for TEXT amount arithmetic
 - [Phase 03]: config.ts imports logger.ts directly (no circular dependency) to replace console.error with logger.fatal
 
-<<<<<<< Updated upstream
 
 - [Phase 04]: Strategy dispatch pattern for safety APIs: safetyApis config field drives provider selection at runtime
 - [Phase 04]: Backward-compatible overloads: all 10 original tokenSafety exports preserved alongside 10 new *ForChain variants
@@ -107,14 +104,10 @@ Recent decisions affecting current work:
 - [Phase 04]: WebSocket close handler uses (wsProvider.websocket as any).on() due to ethers v6 WebSocketLike type limitation
 - [Phase 04]: Function overloads in exitManager use runtime typeof check to disambiguate chain+token from token-only calls
 - [Phase 04]: initMultiChainShutdownHandler in bot.ts handles WS teardown directly (owns ChainContext array)
-
-=======
-
 - [Phase 04]: Auth keys read from mevConfig with process.env fallback for standalone strategy use
 - [Phase 04]: Duck-type check in sendTxWithRetry selects multi-chain vs legacy path without separate function names
 - [Phase 04]: Exhaustive switch with never type in createMevStrategy ensures compile-time safety for new strategy types
 
->>>>>>> Stashed changes
 
 - [Phase 05]: DexConfigBase + DexConfigV2/V3 discriminated union via dexType field for compile-time V2/V3 narrowing
 - [Phase 05]: SwapRouter02 used universally for V3 (deadline via multicall wrapper)
@@ -126,6 +119,10 @@ Recent decisions affecting current work:
 - [Phase 05]: Hardcode ETH Uniswap V2 addresses in CONFIG rather than refactoring legacy consumers
 - [Phase 05]: Empty Sets for default BLOCKLIST -- no tokens blocked initially, correct safe default
 - [Phase 05]: Removed scripts/ from tsconfig include rather than adding exclude -- cleaner separation of Hardhat scripts from bot runtime
+- [Phase 06]: RiskCheckResult object with reason+details instead of boolean for actionable logging/alerting
+- [Phase 06]: In-memory Map for cooldowns (ephemeral, resets on restart safe per D-09)
+- [Phase 06]: Inline prepared statement for exposureByChain GROUP BY query consistent with Phase 3 pattern
+- [Phase 06]: Risk checks ordered cheapest-first: position_size -> daily_loss_limit -> max_positions -> cooldown -> exposure_cap
 
 ### Pending Todos
 
@@ -139,12 +136,6 @@ None yet.
 
 ## Session Continuity
 
-<<<<<<< Updated upstream
-Last session: 2026-03-23T20:06:02.412Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-risk-management/06-CONTEXT.md
-=======
-Last session: 2026-03-23T00:18:08.157Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-23T20:40:20.000Z
+Stopped at: Completed 06-01-PLAN.md
 Resume file: None
->>>>>>> Stashed changes

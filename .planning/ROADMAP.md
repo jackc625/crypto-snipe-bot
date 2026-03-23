@@ -124,7 +124,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Risk manager module: canSnipe gate, DB queries, exposure tracking, config validation (RISK-01, RISK-02, RISK-03, RISK-04, RISK-05)
+- [x] 06-01-PLAN.md — Risk manager module: canSnipe gate, DB queries, exposure tracking, config validation (RISK-01, RISK-02, RISK-03, RISK-04, RISK-05)
 - [ ] 06-02-PLAN.md — Wire risk gate into bot.ts: replace capital Map, insert canSnipe in all handlers (RISK-01, RISK-02, RISK-03, RISK-04, RISK-05)
 
 ### Phase 7: Smart Exit Strategies
