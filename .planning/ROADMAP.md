@@ -121,11 +121,11 @@ Plans:
   3. New snipes are rejected when open position count across all chains equals the configured maximum
   4. A configurable cooldown period is enforced between consecutive snipes, preventing overtrading during launch waves
   5. Total capital at risk across all chains and open positions is queryable at any time
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Risk manager module: canSnipe gate, DB queries, exposure tracking, config validation (RISK-01, RISK-02, RISK-03, RISK-04, RISK-05)
+- [ ] 06-02-PLAN.md — Wire risk gate into bot.ts: replace capital Map, insert canSnipe in all handlers (RISK-01, RISK-02, RISK-03, RISK-04, RISK-05)
 
 ### Phase 7: Smart Exit Strategies
 **Goal**: Positions are managed with intelligent exit strategies that lock in profits, scale out at targets, and adapt to market conditions
@@ -189,7 +189,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 3. SQLite Storage & Code Quality | 3/4 | In Progress | - |
 | 4. Multi-Chain Architecture | 4/5 | In Progress | - |
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
-| 6. Risk Management | 0/2 | Not started | - |
+| 6. Risk Management | 0/2 | Planned | - |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
 | 9. Testing Infrastructure | 0/3 | Not started | - |
