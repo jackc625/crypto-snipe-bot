@@ -103,11 +103,13 @@ Plans:
   2. Bot waits for a Mint event (liquidity added) after PoolCreated before attempting a snipe -- empty pools are never traded
   3. V3 snipe transactions execute through the V3 SwapRouter with correct fee tier and price limit parameters
   4. Position price monitoring uses sqrtPriceX96 or the V3 Quoter contract for accurate valuation of V3 positions
-**Plans**: 2 plans
+**Plans**: 4 plans
 
 Plans:
 - [x] 05-01-PLAN.md — V3 foundation: DexConfig discriminated union, V3 ABIs, chain registry V3 entries, DB schema migration (V3-01, V3-03, V3-04)
-- [ ] 05-02-PLAN.md — V3 pipeline: PoolCreated listener, liquidity wait, buy/sell/monitor via SwapRouter02 and QuoterV2 (V3-01, V3-02, V3-03, V3-04)
+- [x] 05-02-PLAN.md — V3 pipeline: PoolCreated listener, liquidity wait, buy/sell/monitor via SwapRouter02 and QuoterV2 (V3-01, V3-02, V3-03, V3-04)
+- [ ] 05-03-PLAN.md — [GAP CLOSURE] Blocklist export and tsconfig scripts exclusion (V3-01, V3-02, V3-03, V3-04)
+- [ ] 05-04-PLAN.md — [GAP CLOSURE] Add legacy ETH V2 addresses to CONFIG, remove empty addresses.json (V3-01, V3-02, V3-03, V3-04)
 
 ### Phase 6: Risk Management
 **Goal**: Portfolio-level risk controls prevent catastrophic losses and enforce disciplined position sizing across all chains
@@ -183,10 +185,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Bug Fixes & Hardening | 3/4 | Gap closure in progress | - |
-| 2. ethers v6 Migration | 0/2 | Planned | - |
-| 3. SQLite Storage & Code Quality | 0/4 | Planned | - |
-| 4. Multi-Chain Architecture | 4/5 | In Progress|  |
-| 5. Uniswap V3 Integration | 0/2 | Planned | - |
+| 2. ethers v6 Migration | 2/2 | Complete | - |
+| 3. SQLite Storage & Code Quality | 3/4 | In Progress | - |
+| 4. Multi-Chain Architecture | 4/5 | In Progress | - |
+| 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
 | 6. Risk Management | 0/2 | Not started | - |
 | 7. Smart Exit Strategies | 0/2 | Not started | - |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
