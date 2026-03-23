@@ -12,5 +12,5 @@
     "resolveJsonModule": true,
     "types": ["node", "hardhat", "chai"]
   },
-  "include": ["src/**/*", "scripts/**/*", "hardhat.config.ts"]
+  "include": ["src/**/*", "hardhat.config.ts"]
 }
