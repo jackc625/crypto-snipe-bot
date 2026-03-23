@@ -68,12 +68,12 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [x] V3-aware price monitoring for position management
 - [x] Support both V2 and V3 pool types in the same token safety pipeline
 
-**Risk Management**
-- [ ] Configurable max position size per snipe (cap ETH/BNB per trade)
-- [ ] Daily loss limit — halt sniping after X% portfolio loss in 24h
-- [ ] Max open positions limit across all chains
-- [ ] Cooldown periods between snipes to prevent overtrading
-- [ ] Portfolio-level exposure tracking
+**Risk Management** — Validated in Phase 06: risk-management
+- [x] Configurable max position size per snipe (cap ETH/BNB per trade)
+- [x] Daily loss limit — halt sniping after X% portfolio loss in 24h
+- [x] Max open positions limit across all chains
+- [x] Cooldown periods between snipes to prevent overtrading
+- [x] Portfolio-level exposure tracking
 
 **Smart Exit Strategies**
 - [ ] Trailing stop-loss: lock in profits as price rises, sell on pullback
@@ -135,9 +135,10 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | ✓ Complete (Phase 03) |
 | Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Complete (Phase 04) |
 | Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Complete (Phase 05) |
+| DB-backed risk management | 5-rule canSnipe() gate replaces in-memory capital tracking — position size, daily loss, max positions, cooldown, exposure cap | ✓ Complete (Phase 06) |
 | Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | — Pending |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-23 after Phase 05 gap closure (42 tsc compilation errors resolved — blocklist export, scripts/ exclusion, CONFIG legacy addresses; tsc --noEmit now produces 0 errors)*
+*Last updated: 2026-03-23 after Phase 06 completion (risk management — 5-rule canSnipe() gate, DB-backed exposure tracking, all 3 snipe handlers gated)*
