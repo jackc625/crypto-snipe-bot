@@ -23,7 +23,8 @@ import {
     hasHighTransferTaxForChain,
     hasMaxWalletOrTxLimitsForChain,
     simulateSellForChain,
-    isBlacklistedTokenForChain
+    isBlacklistedTokenForChain,
+    simulateSellV3ForChain
 } from "./utils/tokenSafety";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
@@ -31,7 +32,7 @@ import { sendCtxAlert } from "./utils/notifier";
 import { db, insertTrade, isTokenSniped, updateTradeStatus } from "./utils/db";
 import { logger } from "./utils/logger";
 import { getProvider, getWallet, removeWsProvider } from "./utils/provider";
-import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI } from "./utils/abis";
+import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
 import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
 import {
     tryAcquireSellLock,
@@ -80,6 +81,108 @@ function canDeployCapital(chain: ChainConfig, amount: bigint): boolean {
 function recordCapitalDeployed(chain: ChainConfig, amount: bigint): void {
     const deployed = capitalDeployed.get(chain.name) || 0n;
     capitalDeployed.set(chain.name, deployed + amount);
+}
+
+// ---------------------------------------------------------------------------
+// V3 helper functions (QuoterV2 pricing, liquidity wait, min liquidity check)
+// ---------------------------------------------------------------------------
+
+async function getV3Price(
+    ctx: ChainContext,
+    quoterAddress: string,
+    tokenAddress: string,
+    feeTier: number,
+    amount: bigint
+): Promise<bigint | null> {
+    const quoter = new Contract(quoterAddress, V3_QUOTER_V2_ABI, ctx.httpProvider);
+    try {
+        const quoteParams = {
+            tokenIn: tokenAddress,
+            tokenOut: ctx.chain.wethAddress,
+            amountIn: amount,
+            fee: feeTier,
+            sqrtPriceLimitX96: 0n,
+        };
+        const [amountOut] = await quoter.quoteExactInputSingle.staticCall(quoteParams);
+        return amountOut;
+    } catch {
+        return null; // Pool illiquid or quoter revert (Pitfall 3)
+    }
+}
+
+async function waitForLiquidity(
+    ctx: ChainContext,
+    poolAddress: string,
+    blockNumber: number
+): Promise<boolean> {
+    const pool = new Contract(poolAddress, V3_POOL_ABI, ctx.httpProvider);
+
+    // D-02: Same-block check first -- atomic launch scripts emit PoolCreated + Mint in one block
+    try {
+        const mintFilter = pool.filters.Mint();
+        const existingMints = await pool.queryFilter(mintFilter, blockNumber, blockNumber);
+        if (existingMints.length > 0) {
+            ctx.log.info({ pool: poolAddress, block: blockNumber }, 'Mint found in same block as PoolCreated');
+            return true;
+        }
+    } catch (e) {
+        ctx.log.warn({ err: e, pool: poolAddress }, 'Error querying same-block Mints, falling through to subscription');
+    }
+
+    // D-01: Subscribe + timeout for future Mints (30 seconds)
+    return new Promise<boolean>((resolve) => {
+        const wsPool = new Contract(poolAddress, V3_POOL_ABI, ctx.wsProvider || ctx.httpProvider);
+        const timeout = setTimeout(() => {
+            wsPool.removeAllListeners('Mint');  // Pitfall 7: prevent stale callbacks
+            ctx.log.info({ pool: poolAddress }, 'Mint timeout (30s), dropping opportunity');
+            resolve(false);
+        }, 30_000);
+
+        wsPool.on('Mint', () => {
+            clearTimeout(timeout);
+            wsPool.removeAllListeners('Mint');
+            ctx.log.info({ pool: poolAddress }, 'Mint event received, proceeding to snipe');
+            resolve(true);
+        });
+    });
+}
+
+async function checkMinLiquidity(
+    ctx: ChainContext,
+    quoterAddress: string,
+    tokenAddress: string,
+    feeTier: number
+): Promise<boolean> {
+    const threshold = ethers.parseEther(ctx.chain.minLiquidityThreshold);
+    // Use QuoterV2 to simulate a small reference swap (research recommendation)
+    // If the pool can convert 0.001 native to tokens, it has meaningful liquidity
+    const referenceAmount = ethers.parseEther('0.001');
+    const quoter = new Contract(quoterAddress, V3_QUOTER_V2_ABI, ctx.httpProvider);
+    try {
+        const quoteParams = {
+            tokenIn: ctx.chain.wethAddress,
+            tokenOut: tokenAddress,
+            amountIn: referenceAmount,
+            fee: feeTier,
+            sqrtPriceLimitX96: 0n,
+        };
+        await quoter.quoteExactInputSingle.staticCall(quoteParams);
+
+        // Also check pool liquidity is above threshold via a larger quote
+        const largeQuoteParams = {
+            tokenIn: ctx.chain.wethAddress,
+            tokenOut: tokenAddress,
+            amountIn: threshold,
+            fee: feeTier,
+            sqrtPriceLimitX96: 0n,
+        };
+        await quoter.quoteExactInputSingle.staticCall(largeQuoteParams);
+
+        return true;
+    } catch {
+        ctx.log.info({ token: tokenAddress, feeTier, threshold: ctx.chain.minLiquidityThreshold }, 'V3 pool below minimum liquidity threshold');
+        return false;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,14 +251,13 @@ async function executeSell(
     }
 }
 
-// Chain-aware executeSell for multi-chain path
+// Chain-aware executeSell for multi-chain path (V2 only -- V3 uses executeSellV3ForChain)
 async function executeSellForChain(
     ctx: ChainContext,
-    dex: DexConfig,
+    dex: DexConfigV2,
     tokenAddress: string,
     reason: 'stop-loss' | 'take-profit' | 'timed-sell'
 ): Promise<void> {
-    if (!isDexV2(dex)) return; // V3 sell handling added in Plan 02
     if (!tryAcquireSellLock(ctx.chain.name, tokenAddress)) {
         ctx.log.info({ token: tokenAddress, reason }, 'Another exit already handling token, skipping');
         return;
@@ -300,11 +402,10 @@ async function scheduleTimedSell(tokenAddress: string) {
 
 async function monitorStopLossForChain(
     ctx: ChainContext,
-    dex: DexConfig,
+    dex: DexConfigV2,
     tokenAddress: string,
     buyAmountNative: string
 ) {
-    if (!isDexV2(dex)) return; // V3 monitoring added in Plan 02
     const dexRouter = new Contract(dex.routerAddress, ROUTER_ABI, ctx.httpProvider);
     const path = [tokenAddress, ctx.chain.wethAddress];
     const buyAmount = ethers.parseEther(buyAmountNative);
@@ -349,11 +450,10 @@ async function monitorStopLossForChain(
 
 async function monitorTakeProfitForChain(
     ctx: ChainContext,
-    dex: DexConfig,
+    dex: DexConfigV2,
     tokenAddress: string,
     buyAmountNative: string
 ) {
-    if (!isDexV2(dex)) return; // V3 monitoring added in Plan 02
     const dexRouter = new Contract(dex.routerAddress, ROUTER_ABI, ctx.httpProvider);
     const path = [tokenAddress, ctx.chain.wethAddress];
     const buyAmount = ethers.parseEther(buyAmountNative);
@@ -394,7 +494,7 @@ async function monitorTakeProfitForChain(
 
 async function scheduleTimedSellForChain(
     ctx: ChainContext,
-    dex: DexConfig,
+    dex: DexConfigV2,
     tokenAddress: string
 ) {
     ctx.log.info({ token: tokenAddress, delayMinutes: CONFIG.autoSellAfterMs / 60000 }, 'Scheduled auto-sell');
@@ -412,12 +512,11 @@ async function scheduleTimedSellForChain(
 
 export async function handleNewPairForChain(
     ctx: ChainContext,
-    dex: DexConfig,
+    dex: DexConfigV2,
     token0: string,
     token1: string,
     pairAddress: string
 ): Promise<void> {
-    if (isDexV3(dex)) return; // V3 pair handling added in Plan 02
 
     const targetToken = token0.toLowerCase() === ctx.chain.wethAddress.toLowerCase()
         ? token1 : token0;
@@ -570,6 +669,370 @@ export async function handleNewPairForChain(
         updateTradeStatus.run('failed', targetToken.toLowerCase());
         await sendCtxAlert(ctx, `*TX failed* for \`${symbol}\``);
     }
+}
+
+// ---------------------------------------------------------------------------
+// V3 pool handler (parallel to handleNewPairForChain)
+// ---------------------------------------------------------------------------
+
+export async function handleNewV3PoolForChain(
+    ctx: ChainContext,
+    dex: DexConfigV3,
+    token0: string,
+    token1: string,
+    feeTier: number,
+    poolAddress: string,
+    blockNumber: number
+): Promise<void> {
+    const targetToken = token0.toLowerCase() === ctx.chain.wethAddress.toLowerCase()
+        ? token1 : token0;
+
+    // D-07: First pool wins dedup -- same isAlreadySniped check as V2, cross-DEX dedup
+    if (isTokenSniped.get(targetToken.toLowerCase())) {
+        ctx.log.info({ token: targetToken, feeTier }, 'Already sniped token (cross-DEX dedup), skipping V3 pool');
+        return;
+    }
+
+    ctx.log.info({ pool: poolAddress, dex: dex.name, feeTier }, 'New V3 pool detected');
+
+    if (BLOCKLIST.tokens.has(targetToken.toLowerCase())) {
+        ctx.log.info({ token: targetToken }, 'Blocked token address, skipping');
+        await sendCtxAlert(ctx, `*Blocked token* \`${targetToken}\``);
+        return;
+    }
+
+    // V3-02: Wait for liquidity (D-01 subscribe+timeout, D-02 same-block check)
+    const hasLiquidity = await waitForLiquidity(ctx, poolAddress, blockNumber);
+    if (!hasLiquidity) {
+        ctx.log.info({ token: targetToken, pool: poolAddress }, 'No Mint event within timeout, dropping V3 opportunity');
+        await sendCtxAlert(ctx, `*V3 pool no liquidity (30s timeout)* \`${targetToken}\``);
+        return;
+    }
+
+    // D-03: Minimum liquidity threshold check
+    const meetsMinLiquidity = await checkMinLiquidity(ctx, dex.quoterAddress, targetToken, feeTier);
+    if (!meetsMinLiquidity) {
+        ctx.log.info({ token: targetToken, feeTier }, 'V3 pool below min liquidity threshold, skipping');
+        await sendCtxAlert(ctx, `*V3 pool below min liquidity* \`${targetToken}\``);
+        return;
+    }
+
+    const isBad = await isKnownBadTokenForChain(ctx, targetToken);
+    if (isBad) {
+        ctx.log.info({ token: targetToken }, 'Known bad token or creator, skipping');
+        await sendCtxAlert(ctx, `*Known bad token or creator* \`${targetToken}\``);
+        return;
+    }
+
+    // V3 sell simulation using QuoterV2 (Pitfall 6: must use V3 quoter, not V2 router)
+    const canSell = await simulateSellV3ForChain(ctx, dex.quoterAddress, targetToken, feeTier);
+    if (!canSell) {
+        ctx.log.warn({ token: targetToken, feeTier }, 'V3 sell simulation failed, skipping buy');
+        await sendCtxAlert(ctx, `*V3 sell simulation failed for* \`${targetToken}\` -- buy skipped`);
+        return;
+    }
+
+    // Parallel safety checks (reuse existing ForChain functions -- same checks apply to V3 tokens)
+    // Note: V3 has no pair address for liquidity lock checks, so we skip isLiquidityLockedForChain
+    // and isLiquiditySufficientForChain (those are V2-pair-specific). V3 liquidity is checked above.
+    const [isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits] = await Promise.all([
+        checkHoneypotForChain(ctx, targetToken),
+        isBlacklistedTokenForChain(ctx, targetToken),
+        checkTokenMetadataForChain(ctx, targetToken),
+        hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, targetToken),
+        hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
+    ]);
+
+    const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
+    let symbol = "?", name = "?", decimals = 18;
+    try {
+        [symbol, name, decimals] = await Promise.all([
+            tokenContract.symbol(),
+            tokenContract.name(),
+            tokenContract.decimals(),
+        ]);
+    } catch {}
+
+    await sendCtxAlert(ctx, `*New V3 Token Detected!*\nSymbol: \`${symbol}\`\nFee Tier: \`${feeTier} bps\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPool: [\`${poolAddress}\`](${ctx.chain.explorerUrl}/address/${poolAddress})`);
+
+    if (isHoneypot || isBlacklisted || !validMetadata || hasTax || hasLimits) {
+        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits } }, 'Safety checks failed, skipping V3 snipe');
+        return;
+    }
+
+    ctx.log.info({ token: targetToken, symbol, feeTier }, 'All V3 safety checks passed, buying');
+
+    const amountIn = ethers.parseEther(ctx.chain.snipeAmount);
+
+    // Capital budget check
+    if (!canDeployCapital(ctx.chain, amountIn)) {
+        ctx.log.warn({ token: targetToken, chain: ctx.chain.name }, 'Capital budget exceeded, skipping V3 snipe');
+        await sendCtxAlert(ctx, `*Capital budget exceeded* -- skipping V3 \`${symbol}\``);
+        return;
+    }
+
+    // Calculate minOut via QuoterV2 with slippage (V3-03)
+    let minOut: bigint = 0n;
+    try {
+        const quoter = new Contract(dex.quoterAddress, V3_QUOTER_V2_ABI, ctx.httpProvider);
+        const quoteParams = {
+            tokenIn: ctx.chain.wethAddress,
+            tokenOut: targetToken,
+            amountIn: amountIn,
+            fee: feeTier,
+            sqrtPriceLimitX96: 0n,
+        };
+        const [expectedOut] = await quoter.quoteExactInputSingle.staticCall(quoteParams);
+        const slippage = CONFIG.slippagePercent || 5;
+        minOut = expectedOut - (expectedOut * BigInt(slippage) / 100n);
+    } catch {
+        ctx.log.warn({ token: targetToken }, 'Failed to get V3 quote for slippage calc, defaulting minOut to 0');
+    }
+
+    try {
+        // V3-03: Buy via SwapRouter02 exactInputSingle with multicall deadline wrapper
+        const v3Router = new Contract(dex.swapRouterAddress, V3_SWAP_ROUTER_ABI, ctx.wallet);
+        const deadline = Math.floor(Date.now() / 1000) + 60;
+
+        const swapParams = {
+            tokenIn: ctx.chain.wethAddress,
+            tokenOut: targetToken,
+            fee: feeTier,
+            recipient: ctx.wallet.address,
+            amountIn: amountIn,
+            amountOutMinimum: minOut,
+            sqrtPriceLimitX96: 0n,  // D-05: pass 0, rely on amountOutMinimum for slippage protection
+        };
+
+        // Use multicall for deadline enforcement on SwapRouter02 (Pitfall 1: no deadline in struct)
+        const swapData = v3Router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
+
+        await sendTxWithRetry(
+            () => ctx.wallet.populateTransaction({
+                to: dex.swapRouterAddress,
+                data: v3Router.interface.encodeFunctionData('multicall', [deadline, [swapData]]),
+                value: amountIn,  // Pitfall 5: send ETH value since tokenIn is WETH
+            }),
+            ctx
+        );
+
+        recordCapitalDeployed(ctx.chain, amountIn);
+
+        insertTrade.run({
+            token: targetToken.toLowerCase(),
+            chain: ctx.chain.name,
+            action: 'buy',
+            txHash: 'mev_bundle',
+            block: null,
+            timestamp: Math.floor(Date.now() / 1000),
+            amountIn: ctx.chain.snipeAmount,
+            amountOut: null,
+            gasCost: null,
+            priceAtAction: null,
+            status: 'pending',
+            poolType: 'v3',
+            feeTier: feeTier,
+        });
+
+        await sendCtxAlert(ctx, `*V3 Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\` (fee: ${feeTier}bps)`);
+        ctx.log.info({ token: targetToken, symbol, strategy: ctx.chain.mevStrategy, feeTier }, 'V3 MEV bundle submitted');
+        ctx.log.info({ token: targetToken }, 'V3 TX confirmed');
+        await sendCtxAlert(ctx, `*V3 TX confirmed* for \`${symbol}\``);
+
+        // D-09: Same 15s polling interval as V2. D-10: Sell through same pool/fee tier.
+        await monitorStopLossV3ForChain(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount);
+        await monitorTakeProfitV3ForChain(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount);
+        await scheduleTimedSellV3ForChain(ctx, dex, targetToken, feeTier);
+    } catch (e) {
+        ctx.log.error({ err: e, token: targetToken, feeTier }, 'V3 TX failed');
+        updateTradeStatus.run('failed', targetToken.toLowerCase());
+        await sendCtxAlert(ctx, `*V3 TX failed* for \`${symbol}\``);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// V3 sell function (parallel to executeSellForChain)
+// ---------------------------------------------------------------------------
+
+async function executeSellV3ForChain(
+    ctx: ChainContext,
+    dex: DexConfigV3,
+    tokenAddress: string,
+    feeTier: number,
+    reason: 'stop-loss' | 'take-profit' | 'timed-sell'
+): Promise<void> {
+    if (!tryAcquireSellLock(ctx.chain.name, tokenAddress)) {
+        ctx.log.info({ token: tokenAddress, reason }, 'Another exit already handling token, skipping');
+        return;
+    }
+
+    try {
+        const token = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
+        const balance = await token.balanceOf(ctx.wallet.address);
+
+        if (balance === 0n) {
+            ctx.log.info({ token: tokenAddress, reason }, 'Zero balance, cleaning up');
+            updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+            clearAllTimersForToken(ctx.chain.name, tokenAddress);
+            return;
+        }
+
+        // Approve SwapRouter02 to spend tokens
+        const currentAllowance = await token.allowance(ctx.wallet.address, dex.swapRouterAddress);
+        if (currentAllowance < balance) {
+            await token.approve(dex.swapRouterAddress, balance);
+        }
+
+        // D-10: Sell through same fee tier pool the bot bought from
+        const v3Router = new Contract(dex.swapRouterAddress, V3_SWAP_ROUTER_ABI, ctx.wallet);
+        const deadline = Math.floor(Date.now() / 1000) + 60;
+
+        const swapParams = {
+            tokenIn: tokenAddress,
+            tokenOut: ctx.chain.wethAddress,
+            fee: feeTier,
+            recipient: ctx.wallet.address,
+            amountIn: balance,
+            amountOutMinimum: 0n,  // Emergency sell -- accept any price
+            sqrtPriceLimitX96: 0n,
+        };
+
+        const swapData = v3Router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
+        const sellTx = await v3Router.multicall(deadline, [swapData], {
+            gasLimit: ctx.chain.gas.maxGasLimit,
+            gasPrice: (await ctx.httpProvider.getFeeData()).gasPrice,
+        });
+
+        ctx.log.info({ token: tokenAddress, reason, feeTier, txHash: sellTx.hash }, 'V3 Sell TX sent');
+        await sendCtxAlert(ctx, `*V3 ${reason} sell TX sent:* [View](${ctx.chain.explorerUrl}/tx/${sellTx.hash})`);
+        await sellTx.wait();
+
+        updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+        clearAllTimersForToken(ctx.chain.name, tokenAddress);
+        await sendCtxAlert(ctx, `*V3 ${reason} TX confirmed*`);
+    } catch (e) {
+        ctx.log.error({ err: e, token: tokenAddress, reason, feeTier }, 'V3 Sell failed');
+        updateTradeStatus.run('failed', tokenAddress.toLowerCase());
+        clearAllTimersForToken(ctx.chain.name, tokenAddress);
+        await sendCtxAlert(ctx, `*V3 ${reason} sell failed:* ${e instanceof Error ? e.message : String(e)}`);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// V3 monitor functions (QuoterV2-based pricing, same 15s interval as V2)
+// ---------------------------------------------------------------------------
+
+// V3-04: Price monitoring using QuoterV2 (D-08, D-09: same 15s interval as V2)
+async function monitorStopLossV3ForChain(
+    ctx: ChainContext,
+    dex: DexConfigV3,
+    tokenAddress: string,
+    feeTier: number,
+    buyAmountNative: string
+) {
+    const buyAmount = ethers.parseEther(buyAmountNative);
+    const initialPrice = await getV3Price(ctx, dex.quoterAddress, tokenAddress, feeTier, buyAmount);
+
+    if (!initialPrice) return;
+
+    const initialPriceNum = Number(initialPrice);
+    const stopLossPercent = CONFIG.stopLossPercent || 25;
+    const stopLossPrice = initialPriceNum * (1 - stopLossPercent / 100);
+
+    ctx.log.info({ token: tokenAddress, dex: dex.name, feeTier }, 'V3 Monitoring for stop-loss');
+
+    const interval = setInterval(async () => {
+        try {
+            const token = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
+            const balance = await token.balanceOf(ctx.wallet.address);
+            if (balance === 0n) {
+                ctx.log.info({ token: tokenAddress }, 'V3 Stop-loss: zero balance detected, stopping monitor');
+                clearAllTimersForToken(ctx.chain.name, tokenAddress);
+                updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+                return;
+            }
+
+            const currentPrice = await getV3Price(ctx, dex.quoterAddress, tokenAddress, feeTier, buyAmount);
+            if (!currentPrice) {
+                ctx.log.warn({ token: tokenAddress }, 'V3 Stop-loss: QuoterV2 returned null (illiquid), triggering emergency sell');
+                await executeSellV3ForChain(ctx, dex, tokenAddress, feeTier, 'stop-loss');
+                return;
+            }
+
+            const currentPriceNum = Number(currentPrice);
+            const roi = ((currentPriceNum - initialPriceNum) / initialPriceNum) * 100;
+            ctx.log.debug({ token: tokenAddress, roi: roi.toFixed(2) }, 'V3 Stop-loss ROI check');
+
+            if (currentPriceNum < stopLossPrice) {
+                ctx.log.info({ token: tokenAddress }, 'V3 Stop-loss triggered, selling');
+                await executeSellV3ForChain(ctx, dex, tokenAddress, feeTier, 'stop-loss');
+            }
+        } catch (e) {
+            ctx.log.error({ err: e, token: tokenAddress }, 'V3 Stop-loss monitoring error');
+        }
+    }, CONFIG.stopLossCheckInterval || 15000);
+
+    registerStopLoss(ctx.chain.name, tokenAddress, interval);
+}
+
+async function monitorTakeProfitV3ForChain(
+    ctx: ChainContext,
+    dex: DexConfigV3,
+    tokenAddress: string,
+    feeTier: number,
+    buyAmountNative: string
+) {
+    const buyAmount = ethers.parseEther(buyAmountNative);
+    const initialPrice = await getV3Price(ctx, dex.quoterAddress, tokenAddress, feeTier, buyAmount);
+
+    if (!initialPrice) return;
+
+    const initialPriceNum = Number(initialPrice);
+    const takeProfitPrice = initialPriceNum * (1 + CONFIG.takeProfitPercent / 100);
+
+    ctx.log.info({ token: tokenAddress, dex: dex.name, feeTier }, 'V3 Monitoring for take-profit');
+
+    const interval = setInterval(async () => {
+        try {
+            const token = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
+            const balance = await token.balanceOf(ctx.wallet.address);
+            if (balance === 0n) {
+                ctx.log.info({ token: tokenAddress }, 'V3 Take-profit: zero balance detected, stopping monitor');
+                clearAllTimersForToken(ctx.chain.name, tokenAddress);
+                updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+                return;
+            }
+
+            const currentPrice = await getV3Price(ctx, dex.quoterAddress, tokenAddress, feeTier, buyAmount);
+            if (!currentPrice) return;
+
+            const currentPriceNum = Number(currentPrice);
+
+            if (currentPriceNum >= takeProfitPrice) {
+                ctx.log.info({ token: tokenAddress }, 'V3 Take-profit triggered, selling');
+                await executeSellV3ForChain(ctx, dex, tokenAddress, feeTier, 'take-profit');
+            }
+        } catch (e) {
+            ctx.log.error({ err: e, token: tokenAddress }, 'V3 Take-profit monitoring error');
+        }
+    }, CONFIG.takeProfitCheckInterval || 15000);
+
+    registerTakeProfit(ctx.chain.name, tokenAddress, interval);
+}
+
+async function scheduleTimedSellV3ForChain(
+    ctx: ChainContext,
+    dex: DexConfigV3,
+    tokenAddress: string,
+    feeTier: number
+) {
+    ctx.log.info({ token: tokenAddress, feeTier, delayMinutes: CONFIG.autoSellAfterMs / 60000 }, 'Scheduled V3 auto-sell');
+
+    const timeout = setTimeout(async () => {
+        await executeSellV3ForChain(ctx, dex, tokenAddress, feeTier, 'timed-sell');
+    }, CONFIG.autoSellAfterMs);
+
+    registerTimedSell(ctx.chain.name, tokenAddress, timeout);
 }
 
 // ---------------------------------------------------------------------------
@@ -729,8 +1192,6 @@ async function startDexListener(
     dex: DexConfig,
     _registry: Map<string, ChainConfig>
 ): Promise<void> {
-    if (isDexV3(dex)) return; // V3 listeners added in Plan 02
-
     const wsProvider = ctx.wsProvider;
     if (!wsProvider) {
         ctx.log.warn({ dex: dex.name }, 'No WebSocket URL configured, using HTTP polling fallback');
@@ -738,9 +1199,55 @@ async function startDexListener(
         return;
     }
 
+    // Branch based on DEX type
+    if (isDexV3(dex)) {
+        // V3: Subscribe to PoolCreated events (V3-01, D-06: all fee tiers)
+        const v3Factory = new Contract(dex.factoryAddress, V3_FACTORY_ABI, wsProvider);
+        const v3Listener = (token0: string, token1: string, fee: bigint, _tickSpacing: bigint, pool: string, event: any) => {
+            const feeTier = Number(fee);
+            const blockNumber = event?.log?.blockNumber ?? 0;
+            handleNewV3PoolForChain(ctx, dex, token0, token1, feeTier, pool, blockNumber);
+        };
+
+        v3Factory.on('PoolCreated', v3Listener);
+        ctx.log.info({ dex: dex.name, factory: dex.factoryAddress }, 'Listening for V3 PoolCreated events via WebSocket');
+
+        // Reconnect handling for V3
+        let reconnectDelay = 1000;
+        const maxDelay = 60000;
+
+        async function handleWsCloseV3(): Promise<void> {
+            ctx.log.warn({ dex: dex.name, delay: reconnectDelay }, 'WebSocket disconnected (V3), reconnecting');
+            await sendCtxAlert(ctx, `WebSocket disconnected for ${dex.name}, reconnecting...`);
+            removeWsProvider(ctx.chain.name);
+
+            while (true) {
+                await new Promise(r => setTimeout(r, reconnectDelay));
+                reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
+                try {
+                    const newWsProvider = new WebSocketProvider(ctx.chain.wsRpcUrl!, ctx.chain.chainId);
+                    ctx.wsProvider = newWsProvider;
+                    const newV3Factory = new Contract(dex.factoryAddress, V3_FACTORY_ABI, newWsProvider);
+                    newV3Factory.on('PoolCreated', v3Listener);
+                    reconnectDelay = 1000;
+                    ctx.log.info({ dex: dex.name }, 'WebSocket reconnected, re-subscribed to V3 PoolCreated');
+                    await sendCtxAlert(ctx, `WebSocket reconnected for ${dex.name}`);
+                    (newWsProvider.websocket as any).on('close', handleWsCloseV3);
+                    break;
+                } catch (err) {
+                    ctx.log.error({ err, dex: dex.name, delay: reconnectDelay }, 'V3 reconnect failed, will retry');
+                }
+            }
+        }
+
+        (wsProvider.websocket as any).on('close', handleWsCloseV3);
+        return;
+    }
+
+    // V2: existing PairCreated logic
     const dexFactory = new Contract(dex.factoryAddress, FACTORY_ABI, wsProvider);
     const listener = (token0: string, token1: string, pair: string) => {
-        handleNewPairForChain(ctx, dex, token0, token1, pair);
+        handleNewPairForChain(ctx, dex as DexConfigV2, token0, token1, pair);
     };
 
     dexFactory.on('PairCreated', listener);
@@ -750,31 +1257,23 @@ async function startDexListener(
     let reconnectDelay = 1000;
     const maxDelay = 60000;
 
-    // Named function for close handler -- avoids arguments.callee (forbidden in strict mode)
     async function handleWsClose(): Promise<void> {
         ctx.log.warn({ dex: dex.name, delay: reconnectDelay }, 'WebSocket disconnected, reconnecting');
         await sendCtxAlert(ctx, `WebSocket disconnected for ${dex.name}, reconnecting...`);
-
-        // Remove old provider from cache
         removeWsProvider(ctx.chain.name);
 
-        // Exponential backoff reconnect loop
         while (true) {
             await new Promise(r => setTimeout(r, reconnectDelay));
             reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
 
             try {
                 const newWsProvider = new WebSocketProvider(ctx.chain.wsRpcUrl!, ctx.chain.chainId);
-                // Update context
                 ctx.wsProvider = newWsProvider;
-                // Re-register listener on new factory contract
                 const newFactory = new Contract(dex.factoryAddress, FACTORY_ABI, newWsProvider);
                 newFactory.on('PairCreated', listener);
-                reconnectDelay = 1000; // reset on success
+                reconnectDelay = 1000;
                 ctx.log.info({ dex: dex.name }, 'WebSocket reconnected, re-subscribed to PairCreated');
                 await sendCtxAlert(ctx, `WebSocket reconnected for ${dex.name}`);
-
-                // Re-attach close handler to new WebSocket using named function reference
                 (newWsProvider.websocket as any).on('close', handleWsClose);
                 break;
             } catch (err) {
@@ -791,6 +1290,11 @@ async function startDexListener(
 // ---------------------------------------------------------------------------
 
 async function startHttpPollingListener(ctx: ChainContext, dex: DexConfig): Promise<void> {
+    if (isDexV3(dex)) {
+        return startHttpPollingV3Listener(ctx, dex);
+    }
+
+    // V2 HTTP polling
     const dexFactory = new Contract(dex.factoryAddress, FACTORY_ABI, ctx.httpProvider);
     let lastBlock = await ctx.httpProvider.getBlockNumber();
 
@@ -804,7 +1308,7 @@ async function startHttpPollingListener(ctx: ChainContext, dex: DexConfig): Prom
             const events = await dexFactory.queryFilter('PairCreated', lastBlock + 1, currentBlock);
             for (const event of events) {
                 if (event instanceof EventLog && event.args) {
-                    handleNewPairForChain(ctx, dex, event.args[0], event.args[1], event.args[2]);
+                    handleNewPairForChain(ctx, dex as DexConfigV2, event.args[0], event.args[1], event.args[2]);
                 }
             }
             lastBlock = currentBlock;
@@ -812,6 +1316,31 @@ async function startHttpPollingListener(ctx: ChainContext, dex: DexConfig): Prom
             ctx.log.error({ err, dex: dex.name }, 'HTTP polling error');
         }
     }, 2000); // poll every 2 seconds
+}
+
+async function startHttpPollingV3Listener(ctx: ChainContext, dex: DexConfigV3): Promise<void> {
+    const v3Factory = new Contract(dex.factoryAddress, V3_FACTORY_ABI, ctx.httpProvider);
+    let lastBlock = await ctx.httpProvider.getBlockNumber();
+
+    ctx.log.info({ dex: dex.name, factory: dex.factoryAddress, startBlock: lastBlock }, 'Listening for V3 PoolCreated events via HTTP polling');
+
+    setInterval(async () => {
+        try {
+            const currentBlock = await ctx.httpProvider.getBlockNumber();
+            if (currentBlock <= lastBlock) return;
+
+            const events = await v3Factory.queryFilter('PoolCreated', lastBlock + 1, currentBlock);
+            for (const event of events) {
+                if (event instanceof EventLog && event.args) {
+                    const feeTier = Number(event.args[2]); // fee is the 3rd arg
+                    handleNewV3PoolForChain(ctx, dex, event.args[0], event.args[1], feeTier, event.args[4], event.blockNumber);
+                }
+            }
+            lastBlock = currentBlock;
+        } catch (err) {
+            ctx.log.error({ err, dex: dex.name }, 'V3 HTTP polling error');
+        }
+    }, 2000);
 }
 
 // ---------------------------------------------------------------------------
@@ -887,24 +1416,18 @@ export async function startMultiChainBot(): Promise<void> {
 
 function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
     const pendingTrades = db.prepare(
-        'SELECT DISTINCT token, chain FROM trades WHERE status = ?'
-    ).all('pending') as { token: string; chain: string }[];
+        'SELECT DISTINCT token, chain, pool_type, fee_tier FROM trades WHERE status = ?'
+    ).all('pending') as { token: string; chain: string; pool_type: string; fee_tier: number | null }[];
 
-    for (const { token, chain: chainName } of pendingTrades) {
+    for (const trade of pendingTrades) {
+        const { token, chain: chainName } = trade;
         const ctx = contexts.find(c => c.chain.name === chainName);
         if (!ctx) {
             log.warn({ token, chain: chainName }, 'No active context for chain, skipping resume');
             continue;
         }
 
-        // Use first V2 DEX for resume monitoring (best effort, V3 added in Plan 02)
-        const dex = ctx.chain.dexes.find(d => isDexV2(d));
-        if (!dex) {
-            ctx.log.warn({ token }, 'No DEX configured for chain, skipping resume');
-            continue;
-        }
-
-        ctx.log.info({ token }, 'Restarting monitoring for pending token');
+        ctx.log.info({ token, poolType: trade.pool_type }, 'Restarting monitoring for pending token');
         const tokenContract = new Contract(token, ERC20_ABI, ctx.wallet);
         tokenContract.balanceOf(ctx.wallet.address).then((balance: bigint) => {
             if (balance === 0n) {
@@ -912,9 +1435,28 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
                 updateTradeStatus.run('failed', token);
                 return;
             }
-            monitorStopLossForChain(ctx, dex, token, ctx.chain.snipeAmount);
-            monitorTakeProfitForChain(ctx, dex, token, ctx.chain.snipeAmount);
-            scheduleTimedSellForChain(ctx, dex, token);
+
+            if (trade.pool_type === 'v3' && trade.fee_tier != null) {
+                // Find a V3 DEX for this chain
+                const v3Dex = ctx.chain.dexes.find(d => isDexV3(d)) as DexConfigV3 | undefined;
+                if (!v3Dex) {
+                    ctx.log.warn({ token }, 'No V3 DEX configured for chain, skipping V3 resume');
+                    return;
+                }
+                monitorStopLossV3ForChain(ctx, v3Dex, token, trade.fee_tier, ctx.chain.snipeAmount);
+                monitorTakeProfitV3ForChain(ctx, v3Dex, token, trade.fee_tier, ctx.chain.snipeAmount);
+                scheduleTimedSellV3ForChain(ctx, v3Dex, token, trade.fee_tier);
+            } else {
+                // V2 resume logic
+                const dex = ctx.chain.dexes.find(d => isDexV2(d)) as DexConfigV2 | undefined;
+                if (!dex) {
+                    ctx.log.warn({ token }, 'No V2 DEX configured for chain, skipping resume');
+                    return;
+                }
+                monitorStopLossForChain(ctx, dex, token, ctx.chain.snipeAmount);
+                monitorTakeProfitForChain(ctx, dex, token, ctx.chain.snipeAmount);
+                scheduleTimedSellForChain(ctx, dex, token);
+            }
         }).catch((e: unknown) => {
             ctx.log.error({ err: e, token }, 'Error checking balance for pending token');
         });
