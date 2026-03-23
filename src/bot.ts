@@ -56,6 +56,7 @@ import {
     isDexV2,
     isDexV3
 } from "./chainRegistry";
+import { canSnipe, recordSnipe } from "./riskManager";
 
 // Legacy singleton instances -- kept for backward-compatible handleNewPair() and startBot()
 const provider = getProvider();
@@ -65,23 +66,6 @@ const factory = new Contract(CONFIG.factoryAddress, FACTORY_ABI, provider);
 const router = new Contract(CONFIG.routerAddress, ROUTER_ABI, wallet);
 
 const log = logger.child({ module: 'bot' });
-
-// ---------------------------------------------------------------------------
-// Capital tracking (per D-08/D-09 -- fixed budget per chain, CHAIN-05 structural)
-// ---------------------------------------------------------------------------
-
-const capitalDeployed = new Map<string, bigint>(); // chain name -> wei deployed
-
-function canDeployCapital(chain: ChainConfig, amount: bigint): boolean {
-    const deployed = capitalDeployed.get(chain.name) || 0n;
-    const max = ethers.parseEther(chain.maxCapital);
-    return deployed + amount <= max;
-}
-
-function recordCapitalDeployed(chain: ChainConfig, amount: bigint): void {
-    const deployed = capitalDeployed.get(chain.name) || 0n;
-    capitalDeployed.set(chain.name, deployed + amount);
-}
 
 // ---------------------------------------------------------------------------
 // V3 helper functions (QuoterV2 pricing, liquidity wait, min liquidity check)
@@ -548,6 +532,14 @@ export async function handleNewPairForChain(
         return;
     }
 
+    // Risk management gate (per D-13 -- all risk rules checked before safety pipeline)
+    const riskResult = canSnipe(ctx.chain.name, ctx.chain.snipeAmount, ctx.chain.maxCapital);
+    if (!riskResult.allowed) {
+        ctx.log.warn({ token: targetToken, reason: riskResult.reason, details: riskResult.details }, 'Risk check failed, skipping snipe');
+        await sendCtxAlert(ctx, `*Risk: ${riskResult.details}* -- skipping \`${targetToken}\``);
+        return;
+    }
+
     // Sell simulation: always-on, hard block on failure (FIX-04)
     const canSell = await simulateSellForChain(ctx, dex.routerAddress, targetToken);
     if (!canSell) {
@@ -605,13 +597,6 @@ export async function handleNewPairForChain(
     const deadline = Math.floor(Date.now() / 1000) + 60;
     const amountIn = ethers.parseEther(ctx.chain.snipeAmount);
 
-    // Capital budget check (per D-08/D-09)
-    if (!canDeployCapital(ctx.chain, amountIn)) {
-        ctx.log.warn({ token: targetToken, chain: ctx.chain.name }, 'Capital budget exceeded, skipping snipe');
-        await sendCtxAlert(ctx, `*Capital budget exceeded* -- skipping \`${symbol}\``);
-        return;
-    }
-
     const dexRouter = new Contract(dex.routerAddress, ROUTER_ABI, ctx.wallet);
 
     let minOut: bigint = 0n;
@@ -639,7 +624,7 @@ export async function handleNewPairForChain(
             ctx
         );
 
-        recordCapitalDeployed(ctx.chain, amountIn);
+        recordSnipe(ctx.chain.name);
 
         insertTrade.run({
             token: targetToken.toLowerCase(),
@@ -724,6 +709,14 @@ export async function handleNewV3PoolForChain(
         return;
     }
 
+    // Risk management gate (per D-13)
+    const riskResult = canSnipe(ctx.chain.name, ctx.chain.snipeAmount, ctx.chain.maxCapital);
+    if (!riskResult.allowed) {
+        ctx.log.warn({ token: targetToken, reason: riskResult.reason, details: riskResult.details }, 'Risk check failed, skipping V3 snipe');
+        await sendCtxAlert(ctx, `*Risk: ${riskResult.details}* -- skipping V3 \`${targetToken}\``);
+        return;
+    }
+
     // V3 sell simulation using QuoterV2 (Pitfall 6: must use V3 quoter, not V2 router)
     const canSell = await simulateSellV3ForChain(ctx, dex.quoterAddress, targetToken, feeTier);
     if (!canSell) {
@@ -763,13 +756,6 @@ export async function handleNewV3PoolForChain(
     ctx.log.info({ token: targetToken, symbol, feeTier }, 'All V3 safety checks passed, buying');
 
     const amountIn = ethers.parseEther(ctx.chain.snipeAmount);
-
-    // Capital budget check
-    if (!canDeployCapital(ctx.chain, amountIn)) {
-        ctx.log.warn({ token: targetToken, chain: ctx.chain.name }, 'Capital budget exceeded, skipping V3 snipe');
-        await sendCtxAlert(ctx, `*Capital budget exceeded* -- skipping V3 \`${symbol}\``);
-        return;
-    }
 
     // Calculate minOut via QuoterV2 with slippage (V3-03)
     let minOut: bigint = 0n;
@@ -816,7 +802,7 @@ export async function handleNewV3PoolForChain(
             ctx
         );
 
-        recordCapitalDeployed(ctx.chain, amountIn);
+        recordSnipe(ctx.chain.name);
 
         insertTrade.run({
             token: targetToken.toLowerCase(),
@@ -1070,6 +1056,14 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
         return;
     }
 
+    // Risk management gate for legacy path (uses 'eth' defaults per Pitfall 4)
+    const riskResult = canSnipe('eth', CONFIG.snipeAmountETH, '1.0');
+    if (!riskResult.allowed) {
+        log.warn({ token: targetToken, reason: riskResult.reason, details: riskResult.details }, 'Risk check failed, skipping snipe');
+        await sendTelegramAlert(`*Risk: ${riskResult.details}* -- skipping \`${targetToken}\``);
+        return;
+    }
+
     // Sell simulation: always-on, hard block on failure (FIX-04)
     const canSell = await simulateSell(targetToken, wallet);
     if (!canSell) {
@@ -1152,6 +1146,8 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
             wallet,
             true
         );
+
+        recordSnipe('eth');
 
         insertTrade.run({
             token: targetToken.toLowerCase(),
