@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -51,6 +51,14 @@ function migrateSchema(): void {
             CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
         `);
         logger.info('Created trades table (schema version 1)');
+    }
+
+    if (version < 2) {
+        db.exec(`
+            ALTER TABLE trades ADD COLUMN pool_type TEXT DEFAULT 'v2' CHECK(pool_type IN ('v2', 'v3'));
+            ALTER TABLE trades ADD COLUMN fee_tier INTEGER;
+        `);
+        logger.info('Added pool_type and fee_tier columns (schema version 2)');
     }
 
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -109,8 +117,8 @@ migrateJsonState();
 // --- Prepared Statements (cached for performance) ---
 
 const insertTrade = db.prepare(`
-    INSERT INTO trades (token, chain, action, tx_hash, block, timestamp, amount_in, amount_out, gas_cost, price_at_action, status)
-    VALUES (@token, @chain, @action, @txHash, @block, @timestamp, @amountIn, @amountOut, @gasCost, @priceAtAction, @status)
+    INSERT INTO trades (token, chain, action, tx_hash, block, timestamp, amount_in, amount_out, gas_cost, price_at_action, status, pool_type, fee_tier)
+    VALUES (@token, @chain, @action, @txHash, @block, @timestamp, @amountIn, @amountOut, @gasCost, @priceAtAction, @status, @poolType, @feeTier)
 `);
 
 const getTradesByToken = db.prepare(`
@@ -139,7 +147,9 @@ const getPnLQuery = db.prepare(`
             - CAST(COALESCE(b.gas_cost, '0') AS REAL) - CAST(COALESCE(s.gas_cost, '0') AS REAL)
             AS realized_pnl,
         b.timestamp   AS buy_time,
-        s.timestamp   AS sell_time
+        s.timestamp   AS sell_time,
+        b.pool_type,
+        b.fee_tier
     FROM trades b
     LEFT JOIN trades s ON b.token = s.token AND s.action = 'sell'
     WHERE b.action = 'buy'
@@ -160,6 +170,8 @@ export interface PnLResult {
     realized_pnl: number | null;
     buy_time: number;
     sell_time: number | null;
+    pool_type: string;
+    fee_tier: number | null;
 }
 
 export function getPnL(filters?: {

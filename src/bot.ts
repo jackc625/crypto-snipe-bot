@@ -553,7 +553,9 @@ export async function handleNewPairForChain(
             amountOut: null,
             gasCost: null,
             priceAtAction: null,
-            status: 'pending'
+            status: 'pending',
+            poolType: 'v2',
+            feeTier: null
         });
         await sendCtxAlert(ctx, `*Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\``);
         ctx.log.info({ token: targetToken, symbol, strategy: ctx.chain.mevStrategy }, 'MEV bundle submitted');
@@ -699,7 +701,9 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
             amountOut: null,
             gasCost: null,
             priceAtAction: null,
-            status: 'pending'
+            status: 'pending',
+            poolType: 'v2',
+            feeTier: null
         });
         await sendTelegramAlert(`*Buy TX sent via Flashbots* for \`${symbol}\``);
         log.info({ token: targetToken, symbol }, 'Flashbots bundle submitted');
