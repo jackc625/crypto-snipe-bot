@@ -106,7 +106,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — V3 foundation: DexConfig discriminated union, V3 ABIs, chain registry V3 entries, DB schema migration (V3-01, V3-03, V3-04)
+- [x] 05-01-PLAN.md — V3 foundation: DexConfig discriminated union, V3 ABIs, chain registry V3 entries, DB schema migration (V3-01, V3-03, V3-04)
 - [ ] 05-02-PLAN.md — V3 pipeline: PoolCreated listener, liquidity wait, buy/sell/monitor via SwapRouter02 and QuoterV2 (V3-01, V3-02, V3-03, V3-04)
 
 ### Phase 6: Risk Management

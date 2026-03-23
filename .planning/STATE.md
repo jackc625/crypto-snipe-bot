@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-23T13:35:49.515Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-23T14:45:01.830Z"
 progress:
   total_phases: 9
-  completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
+  completed_phases: 5
+  total_plans: 17
+  completed_plans: 17
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 04 — multi-chain-architecture
+**Current focus:** Phase 05 — uniswap-v3-integration
 
 ## Current Position
 
-Phase: 5
+Phase: 6
 Plan: Not started
 
 ## Performance Metrics
@@ -63,6 +63,8 @@ Plan: Not started
 =======
 | Phase 04 P02 | 7min | 2 tasks | 5 files |
 >>>>>>> Stashed changes
+| Phase 05 P01 | 8min | 2 tasks | 4 files |
+| Phase 05 P02 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -112,6 +114,14 @@ Recent decisions affecting current work:
 
 >>>>>>> Stashed changes
 
+- [Phase 05]: DexConfigBase + DexConfigV2/V3 discriminated union via dexType field for compile-time V2/V3 narrowing
+- [Phase 05]: SwapRouter02 used universally for V3 (deadline via multicall wrapper)
+- [Phase 05]: BSC gets both Uniswap V3 and PancakeSwap V3 entries for maximum DEX coverage
+- [Phase 05]: pool_type column defaults to v2 so existing trades auto-migrate without data backfill
+- [Phase 05]: QuoterV2 static call for V3 sell simulation -- reverts on illiquid pools, caught as false
+- [Phase 05]: V2 functions narrowed to DexConfigV2 param type for compile-time safety (removes runtime guards)
+- [Phase 05]: Same-block Mint check before subscribe+timeout for atomic launch detection
+
 ### Pending Todos
 
 None yet.
@@ -125,9 +135,9 @@ None yet.
 ## Session Continuity
 
 <<<<<<< Updated upstream
-Last session: 2026-03-23T13:35:49.507Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-uniswap-v3-integration/05-CONTEXT.md
+Last session: 2026-03-23T14:38:19.760Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: None
 =======
 Last session: 2026-03-23T00:18:08.157Z
 Stopped at: Completed 04-02-PLAN.md
