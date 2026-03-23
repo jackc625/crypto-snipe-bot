@@ -42,9 +42,9 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 ### Multi-Chain
 
 - [ ] **CHAIN-01**: Chain registry maps chainId to RPC endpoints, contract addresses, gas config, and MEV strategy
-- [ ] **CHAIN-02**: Per-chain configuration supports ETH mainnet, BSC, Base, and Arbitrum with chain-specific parameters
-- [ ] **CHAIN-03**: Bot runs concurrent event listeners on all configured chains simultaneously
-- [ ] **CHAIN-04**: MEV protection uses Flashbots on ETH, bloXroute/private RPCs on BSC, and appropriate strategies per chain
+- [x] **CHAIN-02**: Per-chain configuration supports ETH mainnet, BSC, Base, and Arbitrum with chain-specific parameters
+- [x] **CHAIN-03**: Bot runs concurrent event listeners on all configured chains simultaneously
+- [x] **CHAIN-04**: MEV protection uses Flashbots on ETH, bloXroute/private RPCs on BSC, and appropriate strategies per chain
 - [ ] **CHAIN-05**: Dynamic capital allocation distributes funds across chains based on opportunity quality and activity levels
 
 ### DEX Support — Uniswap V3
@@ -141,9 +141,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-02 | Phase 3 | Complete |
 | INFRA-03 | Phase 3 | Complete |
 | CHAIN-01 | Phase 4 | Pending |
-| CHAIN-02 | Phase 4 | Pending |
-| CHAIN-03 | Phase 4 | Pending |
-| CHAIN-04 | Phase 4 | Pending |
+| CHAIN-02 | Phase 4 | Complete |
+| CHAIN-03 | Phase 4 | Complete |
+| CHAIN-04 | Phase 4 | Complete |
 | CHAIN-05 | Phase 4 | Pending |
 | V3-01 | Phase 5 | Pending |
 | V3-02 | Phase 5 | Pending |
