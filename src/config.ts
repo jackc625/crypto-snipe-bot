@@ -1,6 +1,5 @@
 // src/config.ts
 import * as dotenv from "dotenv";
-import addresses from "./addresses.json";
 import { logger } from './utils/logger';
 dotenv.config();
 
@@ -94,7 +93,12 @@ export const CONFIG = {
     rpc,
     walletPrivateKey: process.env.PRIVATE_KEY!,
 
-    ...addresses,
+    // Legacy ETH mainnet Uniswap V2 addresses (matches chainRegistry eth template).
+    // Used by backward-compatible singleton functions (handleNewPair, executeSell, etc.).
+    // The multi-chain code path uses ChainConfig from chainRegistry.ts instead.
+    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+    routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+    wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
 
     snipeAmountETH: "0.01",
     slippage: 0.1,
