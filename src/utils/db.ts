@@ -187,6 +187,44 @@ export function getPnL(filters?: {
     return getPnLQuery.all(token, token, chain, chain, from, from, to, to) as PnLResult[];
 }
 
+// --- Risk Management Prepared Statements ---
+
+// RISK-03: Count open positions across all chains (D-10)
+const getOpenPositionCount = db.prepare(
+    `SELECT COUNT(*) AS count FROM trades WHERE status = 'pending' AND action = 'buy'`
+);
+
+// RISK-05: Total deployed capital across all chains (D-11)
+const getTotalExposure = db.prepare(
+    `SELECT COALESCE(SUM(CAST(amount_in AS REAL)), 0) AS total FROM trades WHERE status = 'pending' AND action = 'buy'`
+);
+
+// D-03: Deployed capital for a specific chain (replaces in-memory Map)
+const getDeployedCapitalByChain = db.prepare(
+    `SELECT COALESCE(SUM(CAST(amount_in AS REAL)), 0) AS deployed FROM trades WHERE status = 'pending' AND action = 'buy' AND chain = ?`
+);
+
+// RISK-02: Realized losses in rolling 24h window for a chain (D-04/D-05/D-06)
+const getDailyRealizedLoss = db.prepare(`
+    SELECT COALESCE(SUM(
+        CAST(COALESCE(s.amount_out, '0') AS REAL)
+        - CAST(b.amount_in AS REAL)
+        - CAST(COALESCE(b.gas_cost, '0') AS REAL)
+        - CAST(COALESCE(s.gas_cost, '0') AS REAL)
+    ), 0) AS total_loss
+    FROM trades b
+    INNER JOIN trades s ON b.token = s.token AND s.action = 'sell'
+    WHERE b.action = 'buy'
+      AND b.chain = ?
+      AND s.timestamp >= ?
+      AND (
+          CAST(COALESCE(s.amount_out, '0') AS REAL)
+          - CAST(b.amount_in AS REAL)
+          - CAST(COALESCE(b.gas_cost, '0') AS REAL)
+          - CAST(COALESCE(s.gas_cost, '0') AS REAL)
+      ) < 0
+`);
+
 // --- Exports ---
 
 export function closeDb(): void {
@@ -194,4 +232,4 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped };
+export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss };

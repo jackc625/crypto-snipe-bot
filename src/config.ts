@@ -49,6 +49,12 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'LOG_LEVEL', required: false, description: 'Logging level: debug, info, warn, error (default: info)' },
     { name: 'DB_PATH', required: false, description: 'SQLite database file path (default: ./data/bot.db)' },
     { name: 'NETWORK', required: false, description: 'Target network: sepolia (default), mainnet (legacy)' },
+    // --- Risk Management ---
+    { name: 'MAX_OPEN_POSITIONS', required: false, description: 'Max concurrent open positions across all chains (default: 10)' },
+    { name: 'MAX_TOTAL_EXPOSURE', required: false, description: 'Max total native currency deployed across all chains (default: 10.0)' },
+    { name: 'DAILY_LOSS_PCT', required: false, description: 'Daily loss limit as percentage of per-chain maxCapital (default: 10)' },
+    { name: 'SNIPE_COOLDOWN_MS', required: false, description: 'Cooldown between snipes per chain in milliseconds (default: 30000)' },
+    { name: 'MAX_POSITION_SIZE', required: false, description: 'Hard cap on native currency per snipe trade (default: uses chain snipeAmount)' },
 ];
 
 function validateEnvVars(): void {
