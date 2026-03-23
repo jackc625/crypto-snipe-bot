@@ -62,11 +62,11 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [x] Per-chain MEV protection (Flashbots on ETH, bloXroute on BSC, passthrough on Base/Arbitrum)
 - [ ] Dynamic capital allocation across chains based on opportunity quality and activity (fixed budgets implemented; dynamic allocation deferred)
 
-**DEX Support — Uniswap V3**
-- [ ] Detect new V3 pool creation events across supported chains
-- [ ] Handle concentrated liquidity positions, tick ranges, and fee tiers
-- [ ] V3-aware price monitoring for position management
-- [ ] Support both V2 and V3 pool types in the same token safety pipeline
+**DEX Support — Uniswap V3** — Validated in Phase 05: uniswap-v3-integration
+- [x] Detect new V3 pool creation events across supported chains
+- [x] Handle concentrated liquidity positions, tick ranges, and fee tiers
+- [x] V3-aware price monitoring for position management
+- [x] Support both V2 and V3 pool types in the same token safety pipeline
 
 **Risk Management**
 - [ ] Configurable max position size per snipe (cap ETH/BNB per trade)
@@ -134,10 +134,10 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | ✓ Complete (Phase 02) |
 | SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | ✓ Complete (Phase 03) |
 | Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Complete (Phase 04) |
-| Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | — Pending |
+| Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Complete (Phase 05) |
 | Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | — Pending |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-23 after Phase 04 completion (multi-chain architecture — chain registry, MEV strategies, safety providers, concurrent listeners across ETH/BSC/Base/Arbitrum)*
+*Last updated: 2026-03-23 after Phase 05 completion (Uniswap V3 integration — PoolCreated detection, Mint-gated liquidity wait, SwapRouter02 buy/sell, QuoterV2 price monitoring across all chains)*
