@@ -52,6 +52,7 @@ import {
     isDexV3
 } from "./chainRegistry";
 import { canSnipe, recordSnipe } from "./riskManager";
+import { startApiServer } from './api/server';
 
 // Legacy singleton instances -- kept for backward-compatible handleNewPair() and startBot()
 const provider = getProvider();
@@ -961,8 +962,12 @@ export async function startMultiChainBot(): Promise<void> {
     // 7. Resume monitoring for pending trades (chain-aware)
     resumeMultiChainMonitoring(contexts);
 
+    // 7.5. Start API/dashboard server (per D-03: same process)
+    const apiServer = startApiServer(contexts);
+    mainLog.info('API server started');
+
     // 8. Shutdown handler
-    initMultiChainShutdownHandler(contexts);
+    initMultiChainShutdownHandler(contexts, apiServer);
 
     mainLog.info({ chains: contexts.map(c => c.chain.name) }, 'Multi-chain bot fully started');
 }
@@ -1019,7 +1024,7 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
 // Multi-chain shutdown handler
 // ---------------------------------------------------------------------------
 
-function initMultiChainShutdownHandler(contexts: ChainContext[]): void {
+function initMultiChainShutdownHandler(contexts: ChainContext[], apiServer?: { close: () => void }): void {
     let shuttingDown = false;
 
     function gracefulShutdown(signal: string): void {
@@ -1027,6 +1032,12 @@ function initMultiChainShutdownHandler(contexts: ChainContext[]): void {
         shuttingDown = true;
 
         log.info({ signal }, 'Shutdown signal received, cleaning up all chains');
+
+        // Close API server first (stop accepting requests before providers go down)
+        if (apiServer) {
+            log.info('Closing API server...');
+            apiServer.close();
+        }
 
         // Clear all timers across all chains
         clearAllTimers();
