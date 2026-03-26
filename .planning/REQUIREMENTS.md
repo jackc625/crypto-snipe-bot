@@ -64,10 +64,10 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Smart Exit Strategies
 
-- [ ] **EXIT-01**: Trailing stop-loss tracks price high-water mark and sells on configured percentage pullback from peak
-- [ ] **EXIT-02**: Partial sells execute at configurable price targets (e.g., sell 50% at 2x, 25% at 5x, trail remainder)
-- [ ] **EXIT-03**: Stop-loss and take-profit thresholds adjust dynamically based on measured token price volatility
-- [ ] **EXIT-04**: Exit urgency escalates as position ages — tighter stops and lower targets over time
+- [x] **EXIT-01**: Trailing stop-loss tracks price high-water mark and sells on configured percentage pullback from peak
+- [x] **EXIT-02**: Partial sells execute at configurable price targets (e.g., sell 50% at 2x, 25% at 5x, trail remainder)
+- [x] **EXIT-03**: Stop-loss and take-profit thresholds adjust dynamically based on measured token price volatility
+- [x] **EXIT-04**: Exit urgency escalates as position ages — tighter stops and lower targets over time
 
 ### Monitoring & Web Dashboard
 
@@ -154,10 +154,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RISK-03 | Phase 6 | Complete |
 | RISK-04 | Phase 6 | Complete |
 | RISK-05 | Phase 6 | Complete |
-| EXIT-01 | Phase 7 | Pending |
-| EXIT-02 | Phase 7 | Pending |
-| EXIT-03 | Phase 7 | Pending |
-| EXIT-04 | Phase 7 | Pending |
+| EXIT-01 | Phase 7 | Complete |
+| EXIT-02 | Phase 7 | Complete |
+| EXIT-03 | Phase 7 | Complete |
+| EXIT-04 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Pending |
 | DASH-01 | Phase 8 | Pending |
 | DASH-02 | Phase 8 | Pending |
