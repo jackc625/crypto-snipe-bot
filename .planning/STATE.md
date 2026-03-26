@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-26T16:20:51.265Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-03-26T19:10:17.293Z"
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 25
-  completed_plans: 25
+  total_plans: 31
+  completed_plans: 26
 ---
 
 # Project State
@@ -70,6 +70,7 @@ Plan: Not started
 | Phase 07 P01 | 7min | 2 tasks | 4 files |
 | Phase 07 P02 | 6min | 2 tasks | 1 files |
 | Phase 07 P03 | 8min | 2 tasks | 1 files |
+| Phase 08 P02 | 14min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,9 @@ Recent decisions affecting current work:
 - [Phase 07]: Used CONFIG.network for legacy handleNewPair trade ID lookup matching existing insertTrade chain field
 - [Phase 07]: Legacy single-chain resumeMonitoring builds full ChainContext inline for resumeExitMonitor compatibility
 - [Phase 07]: Kept maybeApprove/maybeApproveForChain as dead code since TS compiler doesn't enforce noUnusedLocals
+- [Phase 08]: Inline asyncHandler in each route file for parallel plan execution independence
+- [Phase 08]: Risk config read from env vars at request time (not cached) matching riskManager.ts pattern
+- [Phase 08]: Cumulative P&L as running sum of realized_pnl sorted by sell_time for Lightweight Charts
 
 ### Pending Todos
 
@@ -155,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T16:20:51.256Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-monitoring-web-dashboard/08-CONTEXT.md
+Last session: 2026-03-26T19:10:17.287Z
+Stopped at: Completed 08-02-PLAN.md
+Resume file: None
