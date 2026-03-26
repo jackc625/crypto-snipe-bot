@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -59,6 +59,54 @@ function migrateSchema(): void {
             ALTER TABLE trades ADD COLUMN fee_tier INTEGER;
         `);
         logger.info('Added pool_type and fee_tier columns (schema version 2)');
+    }
+
+    if (version < 3) {
+        // Phase 7: exit_state table for smart exit strategy persistence (D-23, D-24)
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS exit_state (
+                trade_id INTEGER PRIMARY KEY,
+                entry_price REAL NOT NULL,
+                high_water_mark REAL NOT NULL,
+                trailing_activated INTEGER NOT NULL DEFAULT 0,
+                partial_tiers_completed TEXT NOT NULL DEFAULT '[]',
+                original_token_amount TEXT NOT NULL,
+                urgency_start_ts INTEGER NOT NULL,
+                volatility_samples TEXT NOT NULL DEFAULT '[]',
+                FOREIGN KEY (trade_id) REFERENCES trades(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_exit_state_trade ON exit_state(trade_id);
+        `);
+
+        // Expand trades action CHECK to allow 'partial_sell' (D-10)
+        // SQLite cannot ALTER CHECK constraints, so recreate table
+        db.exec(`
+            CREATE TABLE trades_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT NOT NULL COLLATE NOCASE,
+                chain TEXT NOT NULL DEFAULT 'mainnet',
+                action TEXT NOT NULL CHECK(action IN ('buy', 'sell', 'partial_sell', 'fail')),
+                tx_hash TEXT,
+                block INTEGER,
+                timestamp INTEGER NOT NULL DEFAULT (unixepoch()),
+                amount_in TEXT,
+                amount_out TEXT,
+                gas_cost TEXT,
+                price_at_action TEXT,
+                status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'sold', 'failed')),
+                pool_type TEXT DEFAULT 'v2' CHECK(pool_type IN ('v2', 'v3')),
+                fee_tier INTEGER
+            );
+            INSERT INTO trades_new SELECT * FROM trades;
+            DROP TABLE trades;
+            ALTER TABLE trades_new RENAME TO trades;
+            CREATE INDEX IF NOT EXISTS idx_trades_token ON trades(token);
+            CREATE INDEX IF NOT EXISTS idx_trades_chain ON trades(chain);
+            CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
+        `);
+
+        logger.info('Created exit_state table and expanded trades action CHECK (schema version 3)');
     }
 
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -225,6 +273,25 @@ const getDailyRealizedLoss = db.prepare(`
       ) < 0
 `);
 
+// --- Exit State Prepared Statements (Phase 7) ---
+const upsertExitState = db.prepare(`
+    INSERT INTO exit_state (trade_id, entry_price, high_water_mark, trailing_activated, partial_tiers_completed, original_token_amount, urgency_start_ts, volatility_samples)
+    VALUES (@tradeId, @entryPrice, @highWaterMark, @trailingActivated, @partialTiersCompleted, @originalTokenAmount, @urgencyStartTs, @volatilitySamples)
+    ON CONFLICT(trade_id) DO UPDATE SET
+        high_water_mark = @highWaterMark,
+        trailing_activated = @trailingActivated,
+        partial_tiers_completed = @partialTiersCompleted,
+        volatility_samples = @volatilitySamples
+`);
+
+const getExitState = db.prepare(`SELECT * FROM exit_state WHERE trade_id = ?`);
+
+const deleteExitState = db.prepare(`DELETE FROM exit_state WHERE trade_id = ?`);
+
+const getTradeIdForPendingToken = db.prepare(
+    `SELECT id FROM trades WHERE token = ? AND chain = ? AND status = 'pending' AND action = 'buy' ORDER BY timestamp DESC LIMIT 1`
+);
+
 // --- Exports ---
 
 export function closeDb(): void {
@@ -232,4 +299,4 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss };
+export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };

@@ -55,6 +55,12 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'DAILY_LOSS_PCT', required: false, description: 'Daily loss limit as percentage of per-chain maxCapital (default: 10)' },
     { name: 'SNIPE_COOLDOWN_MS', required: false, description: 'Cooldown between snipes per chain in milliseconds (default: 30000)' },
     { name: 'MAX_POSITION_SIZE', required: false, description: 'Hard cap on native currency per snipe trade (default: uses chain snipeAmount)' },
+    // --- Exit Strategy (Phase 7) ---
+    { name: 'TRAILING_STOP_PCT', required: false, description: 'Trailing stop pullback percentage from peak (default: 15)' },
+    { name: 'TRAILING_MIN_PCT', required: false, description: 'Minimum trailing stop percentage after volatility/urgency adjustment (default: 5)' },
+    { name: 'TRAILING_MAX_PCT', required: false, description: 'Maximum trailing stop percentage after volatility adjustment (default: 40)' },
+    { name: 'PARTIAL_SELL_TARGETS', required: false, description: 'Partial sell tiers, e.g. "2x:50,5x:25" (default: empty = no partial sells)' },
+    { name: 'STOP_LOSS_PCT', required: false, description: 'Fixed stop-loss percentage below entry, active before trailing activates (default: 25)' },
 ];
 
 function validateEnvVars(): void {
@@ -114,9 +120,22 @@ export const CONFIG = {
     slippageTolerance: 0.1,
 
     honeypotCheckURL: "https://api.honeypot.is/v1/TokenInfo/",
+
+    // @deprecated Phase 7 replaces these with exit engine
     stopLossPercent: 25,
     stopLossCheckInterval: 15000,
     autoSellAfterMs: 5 * 60 * 1000,
     takeProfitPercent: 50,
     takeProfitCheckInterval: 15000,
+
+    // --- Exit Strategy (Phase 7) ---
+    trailingStopPct: parseFloat(process.env.TRAILING_STOP_PCT || '15'),
+    trailingMinPct: parseFloat(process.env.TRAILING_MIN_PCT || '5'),
+    trailingMaxPct: parseFloat(process.env.TRAILING_MAX_PCT || '40'),
+    partialSellTargets: process.env.PARTIAL_SELL_TARGETS || '',
+    exitPollIntervalMs: 5000,       // D-04: hardcoded 5s
+    urgencyWindowMs: 30 * 60 * 1000, // D-17: hardcoded 30 min
+    volatilityBaselineCV: 0.03,
+    volatilityMaxSamples: 60,        // 5 minutes at 5s polls
+    volatilityMinSamples: 12,        // 1 minute minimum
 };
