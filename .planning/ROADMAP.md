@@ -161,11 +161,11 @@ Plans:
 - [x] 08-02-PLAN.md — Data API routes: positions, trades with CSV export, risk exposure/pnl/limits (DASH-01, DASH-02, DASH-04)
 - [x] 08-03-PLAN.md — Control API routes: chain start/stop, force sell, emergency sell-all (DASH-03)
 =======
-- [ ] 08-01-PLAN.md — Express server foundation, health endpoint, auth middleware, WebSocket infrastructure, test stubs (MON-01)
-- [ ] 08-02-PLAN.md — Data API routes: positions, trades with CSV export, risk exposure/pnl/limits (DASH-01, DASH-02, DASH-04)
+- [x] 08-01-PLAN.md — Express server foundation, health endpoint, auth middleware, WebSocket infrastructure, test stubs (MON-01)
+- [x] 08-02-PLAN.md — Data API routes: positions, trades with CSV export, risk exposure/pnl/limits (DASH-01, DASH-02, DASH-04)
 - [x] 08-03-PLAN.md — Control API routes: chain start/stop, force sell, emergency sell-all (DASH-03)
 >>>>>>> worktree-agent-ac297a91
-- [ ] 08-04-PLAN.md — React SPA scaffold: Vite + Tailwind, layout, login, Overview page with positions and events (DASH-01, DASH-04)
+- [x] 08-04-PLAN.md — React SPA scaffold: Vite + Tailwind, layout, login, Overview page with positions and events (DASH-01, DASH-04)
 - [ ] 08-05-PLAN.md — Remaining pages: Trade History, Risk & Exposure charts, Chain Controls with emergency sell (DASH-02, DASH-03, DASH-04)
 - [ ] 08-06-PLAN.md — Wire API server into bot.ts, notification broadcast, production build (MON-01, DASH-01, DASH-02, DASH-03, DASH-04)
 
