@@ -45,6 +45,7 @@ interface TokenTimers {
     stopLossInterval?: ReturnType<typeof setInterval>;
     takeProfitInterval?: ReturnType<typeof setInterval>;
     timedSellTimeout?: ReturnType<typeof setTimeout>;
+    exitMonitorInterval?: ReturnType<typeof setInterval>;
 }
 
 const timerRegistry = new Map<string, TokenTimers>();
@@ -102,6 +103,25 @@ export function registerTimedSell(chainOrToken: string, tokenOrTimeout: string |
     timerRegistry.set(key, entry);
 }
 
+// --- Phase 7: Unified exit monitor timer (single interval per position) ---
+
+export function registerExitMonitor(
+    chainName: string,
+    tokenAddress: string,
+    interval: ReturnType<typeof setInterval>
+): void {
+    const key = `${chainName}:${tokenAddress.toLowerCase()}`;
+    // Clear any existing timers for this token first (safety: prevents leak)
+    const existing = timerRegistry.get(key);
+    if (existing) {
+        if (existing.stopLossInterval) clearInterval(existing.stopLossInterval);
+        if (existing.takeProfitInterval) clearInterval(existing.takeProfitInterval);
+        if (existing.timedSellTimeout) clearTimeout(existing.timedSellTimeout);
+        if (existing.exitMonitorInterval) clearInterval(existing.exitMonitorInterval);
+    }
+    timerRegistry.set(key, { exitMonitorInterval: interval });
+}
+
 export function clearAllTimersForToken(token: string): void;
 export function clearAllTimersForToken(chainName: string, token: string): void;
 export function clearAllTimersForToken(chainOrToken: string, token?: string): void {
@@ -113,6 +133,7 @@ export function clearAllTimersForToken(chainOrToken: string, token?: string): vo
     if (entry.stopLossInterval) clearInterval(entry.stopLossInterval);
     if (entry.takeProfitInterval) clearInterval(entry.takeProfitInterval);
     if (entry.timedSellTimeout) clearTimeout(entry.timedSellTimeout);
+    if (entry.exitMonitorInterval) clearInterval(entry.exitMonitorInterval);
     timerRegistry.delete(key);
 }
 
@@ -124,6 +145,7 @@ export function clearAllTimers(): void {
         if (entry.stopLossInterval) clearInterval(entry.stopLossInterval);
         if (entry.takeProfitInterval) clearInterval(entry.takeProfitInterval);
         if (entry.timedSellTimeout) clearTimeout(entry.timedSellTimeout);
+        if (entry.exitMonitorInterval) clearInterval(entry.exitMonitorInterval);
         timerRegistry.delete(key);
     }
 }

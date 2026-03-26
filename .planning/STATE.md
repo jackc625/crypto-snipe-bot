@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 07-00-PLAN.md
-last_updated: "2026-03-26T03:20:50.249Z"
+status: Executing
+stopped_at: Completed Wave 1 (07-00, 07-01)
+last_updated: "2026-03-26T03:22:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 6
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 7
-Plan: 1 of 4
+Plan: 2 of 4 complete
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Plan: 1 of 4
 | Phase 06 P01 | 4min | 2 tasks | 4 files |
 | Phase 06 P02 | 4min | 1 tasks | 1 files |
 | Phase 07 P00 | 5min | 2 tasks | 4 files |
+| Phase 07 P01 | 7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,11 @@ Recent decisions affecting current work:
 - [Phase 07]: Used --legacy-peer-deps for vitest install due to flashbots ethers peer dep conflict (consistent with Phase 02)
 - [Phase 07]: it.todo markers for Wave 0 stubs -- Plans 01/02 fill in test bodies as features are built
 
+- [Phase 07]: CV (coefficient of variation = stddev/mean) chosen as volatility metric -- dimensionless, normalizes across price ranges
+- [Phase 07]: BigInt math for partial sell token amounts to avoid precision loss with ERC-20 token decimals
+- [Phase 07]: registerExitMonitor clears ALL existing timers for key before setting new one -- leak prevention during migration
+- [Phase 07]: exit_state table uses FOREIGN KEY to trades(id) for referential integrity
+
 ### Pending Todos
 
 None yet.
@@ -141,6 +147,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:20:50.244Z
-Stopped at: Completed 07-00-PLAN.md
-Resume file: None
+Last session: 2026-03-26T03:22:00Z
+Stopped at: Completed Wave 1 (07-00, 07-01)
+Resume file: .planning/phases/07-smart-exit-strategies/07-01-SUMMARY.md
