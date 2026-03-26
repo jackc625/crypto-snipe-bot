@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Multi-Chain Architecture** - Chain abstraction layer supporting ETH, BSC, Base, Arbitrum with per-chain MEV protection
 - [ ] **Phase 5: Uniswap V3 Integration** - Detect and snipe V3 pool launches across all chains and fee tiers
 - [ ] **Phase 6: Risk Management** - Portfolio-level risk controls including position sizing, daily loss limits, and exposure tracking
-- [ ] **Phase 7: Smart Exit Strategies** - Trailing stops, partial takes, dynamic thresholds, and time-weighted exit urgency
+- [x] **Phase 7: Smart Exit Strategies** - Trailing stops, partial takes, dynamic thresholds, and time-weighted exit urgency (completed 2026-03-26)
 - [ ] **Phase 8: Monitoring & Web Dashboard** - Real-time web interface for positions, P&L, chain status, and bot controls
 - [ ] **Phase 9: Testing Infrastructure** - Unit tests, integration tests, and mainnet fork tests validating the full system
 
@@ -141,7 +141,7 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — Exit strategy config, DB schema v3 (exit_state table + partial_sell), timer registry update, exitEngine.ts types and utilities (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
 - [x] 07-02-PLAN.md — Exit engine core: price query, sell execution, poll loop with trailing stop, partial sells, volatility, urgency (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
-- [ ] 07-03-PLAN.md — Wire exit engine into bot.ts, remove 12 legacy monitor/sell functions, update resume monitoring (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
+- [x] 07-03-PLAN.md — Wire exit engine into bot.ts, remove 12 legacy monitor/sell functions, update resume monitoring (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
 
 ### Phase 8: Monitoring & Web Dashboard
 **Goal**: A web interface provides real-time visibility into all bot operations, positions, risk metrics, and historical performance
@@ -191,6 +191,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 4. Multi-Chain Architecture | 4/5 | In Progress | - |
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
 | 6. Risk Management | 1/2 | In Progress|  |
-| 7. Smart Exit Strategies | 3/4 | In Progress|  |
+| 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
 | 9. Testing Infrastructure | 0/3 | Not started | - |
