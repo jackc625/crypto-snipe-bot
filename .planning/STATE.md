@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-03-26T19:05:00.000Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-03-26T19:15:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 8
-Plan: 1 of 6 complete
+Plan: 2 of 6 complete
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Plan: 1 of 6 complete
 | Phase 07 P02 | 6min | 2 tasks | 1 files |
 | Phase 07 P03 | 8min | 2 tasks | 1 files |
 | Phase 08 P01 | 11min | 2 tasks | 17 files |
+| Phase 08 P02 | 14min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,9 @@ Recent decisions affecting current work:
 - [Phase 07]: Used CONFIG.network for legacy handleNewPair trade ID lookup matching existing insertTrade chain field
 - [Phase 07]: Legacy single-chain resumeMonitoring builds full ChainContext inline for resumeExitMonitor compatibility
 - [Phase 07]: Kept maybeApprove/maybeApproveForChain as dead code since TS compiler doesn't enforce noUnusedLocals
+- [Phase 08]: Inline asyncHandler in each route file for parallel plan execution independence
+- [Phase 08]: Risk config read from env vars at request time (not cached) matching riskManager.ts pattern
+- [Phase 08]: Cumulative P&L as running sum of realized_pnl sorted by sell_time for Lightweight Charts
 
 - [Phase 08]: Express 5.x used (latest stable at install time) -- backward compatible with Express 4 patterns
 - [Phase 08]: In-memory Map for sessions with 24h TTL -- simple, fits single-process bot architecture; no Redis needed
@@ -162,6 +166,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T19:05:00.000Z
-Stopped at: Completed 08-01-PLAN.md
-Resume file: .planning/phases/08-monitoring-web-dashboard/08-02-PLAN.md
+Last session: 2026-03-26T19:15:00.000Z
+Stopped at: Completed 08-02-PLAN.md
+Resume file: .planning/phases/08-monitoring-web-dashboard/08-03-PLAN.md

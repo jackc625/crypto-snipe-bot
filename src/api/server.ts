@@ -2,7 +2,7 @@
 // Express + HTTP + WebSocket server factory.
 // Single entry point for the dashboard API layer.
 
-import express from 'express';
+import express, { Router } from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import cookieParser from 'cookie-parser';
@@ -12,6 +12,9 @@ import path from 'path';
 import type { ChainContext } from '../chainRegistry';
 import { healthRoutes } from './routes/health';
 import { authRoutes } from './routes/auth';
+import { positionRoutes } from './routes/positions';
+import { tradeRoutes } from './routes/trades';
+import { riskRoutes } from './routes/risk';
 import { authMiddleware, sessions } from './middleware/auth';
 import { errorMiddleware } from './middleware/errorHandler';
 import { handleUpgrade } from './ws/handler';
@@ -48,10 +51,12 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
     // 2. Auth routes -- unauthenticated (login endpoint)
     app.use('/api/auth', authRoutes());
 
-    // 3. Protected API routes -- placeholder for Plans 02/03
-    app.use('/api', authMiddleware, (_req, res) => {
-        res.status(404).json({ error: 'Not found' });
-    });
+    // 3. Protected data routes -- positions, trades, risk
+    const apiRouter = Router();
+    apiRouter.use('/positions', positionRoutes(contexts));
+    apiRouter.use('/trades', tradeRoutes());
+    apiRouter.use('/risk', riskRoutes(contexts));
+    app.use('/api', authMiddleware, apiRouter);
 
     // 4. Static file serving for SPA (D-07)
     const dashboardDir = path.join(process.cwd(), 'dashboard', 'dist');
