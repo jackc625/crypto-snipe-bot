@@ -3,7 +3,7 @@ status: complete
 phase: 07-smart-exit-strategies
 source: [07-00-SUMMARY.md, 07-01-SUMMARY.md, 07-02-SUMMARY.md, 07-03-SUMMARY.md]
 started: 2026-03-26T04:00:00Z
-updated: 2026-03-26T04:00:00Z
+updated: 2026-03-26T04:30:00Z
 ---
 
 ## Current Test
@@ -63,5 +63,11 @@ blocked: 0
   reason: "User reported: Fail. You never updated the .env.example in order for me to know that we needed these values, so they are missing from my .env"
   severity: major
   test: 2
-  artifacts: []
-  missing: []
+  root_cause: ".env.example was not updated when 5 new exit strategy env vars were added to src/config.ts (lines 59-63): TRAILING_STOP_PCT, TRAILING_MIN_PCT, TRAILING_MAX_PCT, PARTIAL_SELL_TARGETS, STOP_LOSS_PCT"
+  artifacts:
+    - path: ".env.example"
+      issue: "Missing 5 exit strategy env var entries"
+    - path: "src/config.ts"
+      issue: "Defines vars with defaults but .env.example not kept in sync"
+  missing:
+    - "Add TRAILING_STOP_PCT, TRAILING_MIN_PCT, TRAILING_MAX_PCT, PARTIAL_SELL_TARGETS, STOP_LOSS_PCT with descriptions and defaults to .env.example"
