@@ -74,7 +74,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 - [ ] **MON-01**: HTTP health check endpoint exposes bot liveness, chain connectivity status, and open position count
 - [ ] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
 - [ ] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
-- [ ] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
+- [x] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
 - [ ] **DASH-04**: Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
 
 ### Testing
@@ -161,7 +161,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MON-01 | Phase 8 | Pending |
 | DASH-01 | Phase 8 | Pending |
 | DASH-02 | Phase 8 | Pending |
-| DASH-03 | Phase 8 | Pending |
+| DASH-03 | Phase 8 | Complete |
 | DASH-04 | Phase 8 | Pending |
 | TEST-01 | Phase 9 | Pending |
 | TEST-02 | Phase 9 | Pending |
