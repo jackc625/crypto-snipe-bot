@@ -4,15 +4,9 @@ import { WebSocketProvider } from './hooks/WebSocketContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div>
-      <h1 className="text-xl font-bold mb-4">{title}</h1>
-      <p className="text-text-muted">This page will be implemented in a subsequent plan.</p>
-    </div>
-  );
-}
+import { TradeHistory } from './pages/TradeHistory';
+import { RiskExposure } from './pages/RiskExposure';
+import { ChainControls } from './pages/ChainControls';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
@@ -66,7 +60,7 @@ export function App() {
           element={
             <AuthGuard>
               <Layout>
-                <PlaceholderPage title="Trade History" />
+                <TradeHistory />
               </Layout>
             </AuthGuard>
           }
@@ -76,7 +70,7 @@ export function App() {
           element={
             <AuthGuard>
               <Layout>
-                <PlaceholderPage title="Risk & Exposure" />
+                <RiskExposure />
               </Layout>
             </AuthGuard>
           }
@@ -86,7 +80,7 @@ export function App() {
           element={
             <AuthGuard>
               <Layout>
-                <PlaceholderPage title="Chain Controls" />
+                <ChainControls />
               </Layout>
             </AuthGuard>
           }
