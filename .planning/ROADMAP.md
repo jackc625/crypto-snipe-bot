@@ -156,7 +156,7 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Express server foundation, health endpoint, auth middleware, WebSocket infrastructure, test stubs (MON-01)
+- [x] 08-01-PLAN.md — Express server foundation, health endpoint, auth middleware, WebSocket infrastructure, test stubs (MON-01)
 - [ ] 08-02-PLAN.md — Data API routes: positions, trades with CSV export, risk exposure/pnl/limits (DASH-01, DASH-02, DASH-04)
 - [ ] 08-03-PLAN.md — Control API routes: chain start/stop, force sell, emergency sell-all (DASH-03)
 - [ ] 08-04-PLAN.md — React SPA scaffold: Vite + Tailwind, layout, login, Overview page with positions and events (DASH-01, DASH-04)

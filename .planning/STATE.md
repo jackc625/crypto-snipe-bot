@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-26T16:20:51.265Z"
+status: Executing
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-26T19:05:00.000Z"
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 25
-  completed_plans: 25
+  total_plans: 31
+  completed_plans: 26
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 07 — smart-exit-strategies
+**Current focus:** Phase 08 — monitoring-web-dashboard
 
 ## Current Position
 
 Phase: 8
-Plan: Not started
+Plan: 1 of 6 complete
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Plan: Not started
 | Phase 07 P01 | 7min | 2 tasks | 4 files |
 | Phase 07 P02 | 6min | 2 tasks | 1 files |
 | Phase 07 P03 | 8min | 2 tasks | 1 files |
+| Phase 08 P01 | 11min | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,12 @@ Recent decisions affecting current work:
 - [Phase 07]: Legacy single-chain resumeMonitoring builds full ChainContext inline for resumeExitMonitor compatibility
 - [Phase 07]: Kept maybeApprove/maybeApproveForChain as dead code since TS compiler doesn't enforce noUnusedLocals
 
+- [Phase 08]: Express 5.x used (latest stable at install time) -- backward compatible with Express 4 patterns
+- [Phase 08]: In-memory Map for sessions with 24h TTL -- simple, fits single-process bot architecture; no Redis needed
+- [Phase 08]: Manual cookie parsing in WebSocket upgrade handler since cookie-parser doesn't run on HTTP upgrade events
+- [Phase 08]: noServer mode for WebSocketServer -- upgrade handled via HTTP server event for session validation
+- [Phase 08]: Tests use Node http module directly instead of supertest to avoid adding another dependency
+
 ### Pending Todos
 
 None yet.
@@ -155,6 +162,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T16:20:51.256Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-monitoring-web-dashboard/08-CONTEXT.md
+Last session: 2026-03-26T19:05:00.000Z
+Stopped at: Completed 08-01-PLAN.md
+Resume file: .planning/phases/08-monitoring-web-dashboard/08-02-PLAN.md
