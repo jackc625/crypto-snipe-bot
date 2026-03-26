@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: false
 preset: none
 created: 2026-03-26
+revised: 2026-03-26
 ---
 
 # Phase 8 — UI Design Contract
@@ -56,12 +57,12 @@ Exceptions:
 | Role | Size | Weight | Line Height | Font | Usage |
 |------|------|--------|-------------|------|-------|
 | Body | 14px | 400 (regular) | 1.5 | Inter | Table cells, descriptions, feed items, config values |
-| Label | 12px | 500 (medium) | 1.4 | Inter | Stat card labels, table headers, filter chip text, axis labels |
-| Heading | 20px | 600 (semibold) | 1.2 | Inter | Page titles, section headers, dialog titles |
+| Label | 12px | 400 (regular) | 1.4 | Inter | Stat card labels, table headers, filter chip text, axis labels |
+| Heading | 20px | 700 (bold) | 1.2 | Inter | Page titles, section headers, dialog titles |
 | Display | 28px | 700 (bold) | 1.1 | Inter | Stat card values (total P&L, position count, exposure) |
 | Mono | 14px | 400 (regular) | 1.5 | JetBrains Mono | Token addresses, transaction hashes, numeric P&L values, prices |
 
-**Note:** Font weights used are 400, 500, 600, and 700. The Display role uses 700 for visual hierarchy on dashboard stat cards. Label uses 500 for subtle emphasis over body text.
+**Note:** Font weights are strictly 400 and 700. The 4-level size scale (12px, 14px, 20px, 28px) provides visual hierarchy. Body, Label, and Mono use 400 (regular). Heading and Display use 700 (bold) -- the size difference between 20px headings and 28px display values distinguishes them without needing intermediate weights.
 
 ---
 
@@ -191,12 +192,12 @@ Exceptions:
 
 ### Destructive Action Confirmations
 
-| Action | Dialog Title | Dialog Body | Confirm Button | Cancel Button |
-|--------|-------------|-------------|----------------|---------------|
-| Stop chain | Stop {chainName}? | New pair and pool listeners will stop. Existing positions will continue being monitored by the exit engine. | Stop {chainName} | Cancel |
-| Start chain | Start {chainName}? | This will resume listening for new pairs and pools on {chainName}. | Start {chainName} | Cancel |
-| Force sell | Force Sell {tokenSymbol}? | This will immediately market sell your entire {tokenSymbol} position on {chainName}. This action cannot be undone. | Force Sell | Cancel |
-| Emergency sell-all | Emergency Sell All Positions | This will immediately market sell ALL open positions across ALL chains. This is irreversible. Type CONFIRM below to proceed. | Sell All Positions | Cancel |
+| Action | Dialog Title | Dialog Body | Confirm Button | Dismiss Button |
+|--------|-------------|-------------|----------------|----------------|
+| Stop chain | Stop {chainName}? | New pair and pool listeners will stop. Existing positions will continue being monitored by the exit engine. | Stop {chainName} | Keep Running |
+| Start chain | Start {chainName}? | This will resume listening for new pairs and pools on {chainName}. | Start {chainName} | Keep Stopped |
+| Force sell | Force Sell {tokenSymbol}? | This will immediately market sell your entire {tokenSymbol} position on {chainName}. This action cannot be undone. | Force Sell | Keep Position |
+| Emergency sell-all | Emergency Sell All Positions | This will immediately market sell ALL open positions across ALL chains. This is irreversible. Type CONFIRM below to proceed. | Sell All Positions | Abort |
 | Emergency input label | Type CONFIRM to proceed |
 | Emergency validation error | You must type CONFIRM exactly to proceed. |
 
@@ -222,7 +223,7 @@ Exceptions:
 |-----------|-------------|-----------|
 | `Layout` | App shell: sidebar + scrollable main content area | `children` |
 | `Sidebar` | Collapsible nav rail. Expanded: 240px with icon + label. Collapsed: 56px icon only. Toggle button at bottom. | `collapsed`, `onToggle` |
-| `SidebarItem` | Nav link with Lucide icon + label. Active state: accent left border (3px) + `surface-lighter` background | `icon`, `label`, `to`, `active` |
+| `SidebarItem` | Nav link with Lucide icon + label. Active state: accent left border (3px) + `surface-lighter` background. Collapsed state: icon only with `title` attribute for native browser tooltip on hover. | `icon`, `label`, `to`, `active`, `aria-label` |
 
 ### Data Display Components
 
@@ -242,7 +243,7 @@ Exceptions:
 
 | Component | Description | Key Behavior |
 |-----------|-------------|--------------|
-| `ConfirmDialog` | Modal overlay with semi-transparent backdrop (`#0f172a` at 70% opacity) | Title + body + confirm/cancel buttons. Confirm button uses semantic color (loss red for destructive, accent blue for neutral) |
+| `ConfirmDialog` | Modal overlay with semi-transparent backdrop (`#0f172a` at 70% opacity) | Title + body + confirm/dismiss buttons. Confirm button uses semantic color (loss red for destructive, accent blue for neutral) |
 | `EmergencyConfirmDialog` | Extended ConfirmDialog with text input requiring "CONFIRM" | Confirm button disabled until input matches exactly |
 | `LoginForm` | API key input + sign in button | Full-page centered card on `surface` background |
 | `TimeRangeSelector` | Button group: 24h / 7d / 30d / All | Active button: accent bg. Inactive: surface-lighter bg |
@@ -259,6 +260,7 @@ Exceptions:
 - Sidebar collapsed state persisted in `localStorage`
 - Active page indicated by accent-colored left border on sidebar item
 - Page transitions are instant (React Router client-side navigation)
+- Collapsed sidebar items display a native browser tooltip (via `title` attribute) showing the page label on hover. Each `SidebarItem` renders an `aria-label` prop matching the `label` text so screen readers announce the destination even when the label is visually hidden.
 
 ### WebSocket Connection
 
@@ -280,7 +282,8 @@ Exceptions:
 - Single confirmation: Stop Chain, Start Chain, Force Sell (standard ConfirmDialog)
 - Double confirmation: Emergency Sell All (EmergencyConfirmDialog with text input)
 - Confirm button in dialog matches the destructive color
-- Cancel is always available and always safe
+- Dismiss buttons use context-preserving labels: "Keep Running" (stop chain), "Keep Stopped" (start chain), "Keep Position" (force sell), "Abort" (emergency sell-all)
+- Dismiss is always available and always safe
 
 ### Loading States
 
