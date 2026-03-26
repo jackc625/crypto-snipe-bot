@@ -75,11 +75,11 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [x] Cooldown periods between snipes to prevent overtrading
 - [x] Portfolio-level exposure tracking
 
-**Smart Exit Strategies**
-- [ ] Trailing stop-loss: lock in profits as price rises, sell on pullback
-- [ ] Partial sells at configurable price targets (e.g., 50% at 2x, 25% at 5x, rest trails)
-- [ ] Dynamic take-profit/stop-loss adjusted based on token volatility and volume
-- [ ] Time-weighted exit urgency — escalate exit pressure as position ages
+**Smart Exit Strategies** — Validated in Phase 07: smart-exit-strategies
+- [x] Trailing stop-loss: lock in profits as price rises, sell on pullback
+- [x] Partial sells at configurable price targets (e.g., 50% at 2x, 25% at 5x, rest trails)
+- [x] Dynamic take-profit/stop-loss adjusted based on token volatility and volume
+- [x] Time-weighted exit urgency — escalate exit pressure as position ages
 
 **Monitoring & Observability**
 - [ ] Structured logging with log levels replacing console.log/emoji
@@ -136,6 +136,7 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Complete (Phase 04) |
 | Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Complete (Phase 05) |
 | DB-backed risk management | 5-rule canSnipe() gate replaces in-memory capital tracking — position size, daily loss, max positions, cooldown, exposure cap | ✓ Complete (Phase 06) |
+| Unified exit engine | Single 5s poll loop per position replaces 6 legacy monitors — trailing stop, partial sells, volatility adaptation, urgency in one function | ✓ Complete (Phase 07) |
 | Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | — Pending |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
