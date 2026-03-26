@@ -626,3 +626,286 @@ export function formatExitReason(
             return `Exit: ${reason} at ${ctx.priceMultiple.toFixed(2)}x`;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Unified Poll Loop & Entry Points
+// ---------------------------------------------------------------------------
+
+/**
+ * Single poll cycle for a position. Evaluates all 4 exit behaviors in deterministic order:
+ * 1. Query price
+ * 2. Update high-water mark + volatility tracker
+ * 3. Check partial sell tiers (D-06 through D-11)
+ * 4. Compute effective trailing stop % (volatility + urgency)
+ * 5. Check trailing stop trigger (D-01 through D-05)
+ * 6. Below 2x: fixed stop-loss check
+ * 7. Urgency hard exit at 30 minutes (D-16 through D-20)
+ * 8. Persist state to DB
+ *
+ * This is called every 5 seconds per position (D-04).
+ */
+async function pollExitStrategy(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    buyAmountWei: bigint,
+    state: ExitStateData,
+): Promise<'continue' | 'exited'> {
+    // Step 1: Query price
+    const currentPrice = await queryPrice(ctx, dex, tokenAddress, feeTier, buyAmountWei);
+    if (currentPrice === null) {
+        ctx.log.debug({ token: tokenAddress }, 'Price query returned null, skipping cycle');
+        return 'continue';
+    }
+
+    const priceMultiple = currentPrice / state.entryPrice;
+
+    // Step 2: Update high-water mark (D-02) and volatility tracker (D-15)
+    if (currentPrice > state.highWaterMark) {
+        state.highWaterMark = currentPrice;
+    }
+    state.volatilityTracker.addSample(currentPrice);
+
+    // Step 3: Check partial sell tiers (D-06 through D-11)
+    if (exitConfig.partialSellTiers.length > 0) {
+        const unfilledTiers = getUnfilledTiers(exitConfig.partialSellTiers, state.completedTierIndices, priceMultiple);
+        if (unfilledTiers.length > 0) {
+            // D-08: Combine all missed tiers into single transaction
+            const sellAmount = calculatePartialSellAmount(state.originalTokenAmount, unfilledTiers);
+            const success = await executePartialSell(
+                ctx, dex, tokenAddress, feeTier,
+                sellAmount, unfilledTiers, state, priceMultiple,
+            );
+            if (success) {
+                ctx.log.info({
+                    token: tokenAddress,
+                    tiers: unfilledTiers.map(t => `${t.tier.multiple}x`).join(','),
+                    priceMultiple: priceMultiple.toFixed(2),
+                }, 'Partial sell completed');
+            }
+            // Persist updated tier completions
+            upsertExitState.run(serializeExitState(state));
+        }
+    }
+
+    // Step 4: Compute effective trailing stop %
+    const volMultiplier = state.volatilityTracker.getMultiplier();
+    const urgencyMult = computeUrgencyMultiplier(state.urgencyStartTs, Date.now());
+    const effectivePct = computeEffectiveTrailingPct(
+        exitConfig.trailingStopPct, volMultiplier, urgencyMult,
+    );
+
+    // Step 5: Check trailing stop (only active at >= 2x per D-01)
+    if (state.trailingActivated) {
+        const triggerPrice = state.highWaterMark * (1 - effectivePct / 100);
+        if (currentPrice <= triggerPrice) {
+            const detail = formatExitReason('trailing-stop', {
+                entryPrice: state.entryPrice,
+                highWaterMark: state.highWaterMark,
+                currentPrice,
+                priceMultiple,
+                effectivePct,
+            });
+            ctx.log.info({ token: tokenAddress, detail }, 'Trailing stop triggered');
+            await executeFullSell(ctx, dex, tokenAddress, feeTier, 'trailing-stop', state.tradeId, detail);
+            return 'exited';
+        }
+    } else if (priceMultiple >= 2.0) {
+        // D-01: Activate trailing stop at 2x
+        state.trailingActivated = true;
+        ctx.log.info({ token: tokenAddress, priceMultiple: priceMultiple.toFixed(2) }, 'Trailing stop activated at 2x');
+    }
+
+    // Step 6: Below 2x: fixed stop-loss (D-01)
+    if (!state.trailingActivated) {
+        const fixedStopPrice = state.entryPrice * (1 - exitConfig.stopLossPct / 100);
+        if (currentPrice <= fixedStopPrice) {
+            const detail = formatExitReason('stop-loss', {
+                entryPrice: state.entryPrice,
+                highWaterMark: state.highWaterMark,
+                currentPrice,
+                priceMultiple,
+            });
+            ctx.log.info({ token: tokenAddress, detail }, 'Fixed stop-loss triggered');
+            await executeFullSell(ctx, dex, tokenAddress, feeTier, 'stop-loss', state.tradeId, detail);
+            return 'exited';
+        }
+    }
+
+    // Step 7: Urgency hard exit at 30 minutes (D-17, D-20)
+    if (urgencyMult <= 0.0) {
+        const detail = formatExitReason('urgency-market-sell', {
+            entryPrice: state.entryPrice,
+            highWaterMark: state.highWaterMark,
+            currentPrice,
+            priceMultiple,
+        });
+        ctx.log.info({ token: tokenAddress, detail }, 'Urgency hard exit at 30min deadline');
+        await executeFullSell(ctx, dex, tokenAddress, feeTier, 'urgency-market-sell', state.tradeId, detail);
+        return 'exited';
+    }
+
+    // Step 8: Persist state to DB for restart resilience (D-23)
+    upsertExitState.run(serializeExitState(state));
+
+    ctx.log.debug({
+        token: tokenAddress,
+        priceMultiple: priceMultiple.toFixed(3),
+        hwm: state.highWaterMark.toFixed(0),
+        trailing: state.trailingActivated,
+        effectivePct: effectivePct.toFixed(1),
+        volMult: volMultiplier.toFixed(2),
+        urgencyMult: urgencyMult.toFixed(3),
+    }, 'Exit engine tick');
+
+    return 'continue';
+}
+
+/**
+ * Start unified exit monitoring for a position. Creates a single 5s setInterval
+ * that handles all 4 exit behaviors (D-21). Replaces the 3 separate monitor calls
+ * (monitorStopLoss + monitorTakeProfit + scheduleTimedSell) and their V3 variants.
+ *
+ * @param ctx - Chain context (provider, wallet, chain config)
+ * @param dex - DEX config (V2 or V3 discriminated union)
+ * @param tokenAddress - Token contract address
+ * @param feeTier - V3 fee tier (null for V2)
+ * @param buyAmountNative - Amount spent to buy (native currency string, e.g. '0.01')
+ * @param tradeId - Trade row ID from DB for exit_state linkage
+ * @param originalTokenAmount - Token amount received from buy (BigInt)
+ */
+export async function startExitMonitor(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    buyAmountNative: string,
+    tradeId: number,
+    originalTokenAmount: bigint,
+): Promise<void> {
+    const buyAmountWei = ethers.parseEther(buyAmountNative);
+
+    // Query initial price for entry_price baseline
+    const entryPrice = await queryPrice(ctx, dex, tokenAddress, feeTier, buyAmountWei);
+    if (entryPrice === null) {
+        ctx.log.error({ token: tokenAddress }, 'Cannot query initial price, exit monitor not started');
+        return;
+    }
+
+    // Build initial state
+    const state: ExitStateData = {
+        tradeId,
+        entryPrice,
+        highWaterMark: entryPrice,
+        trailingActivated: false,
+        completedTierIndices: new Set(),
+        originalTokenAmount,
+        urgencyStartTs: Date.now(),
+        volatilityTracker: new VolatilityTracker(),
+    };
+
+    // Seed volatility tracker with first sample
+    state.volatilityTracker.addSample(entryPrice);
+
+    // Persist initial state (D-23)
+    upsertExitState.run(serializeExitState(state));
+
+    ctx.log.info({
+        token: tokenAddress,
+        tradeId,
+        entryPrice: entryPrice.toFixed(0),
+        dex: dex.name,
+        feeTier,
+        pollMs: exitConfig.pollIntervalMs,
+        trailingStopPct: exitConfig.trailingStopPct,
+        tiers: exitConfig.partialSellTiers.map(t => `${t.multiple}x:${t.percent}%`).join(',') || 'none',
+    }, 'Exit monitor started');
+
+    // Create the unified poll interval (D-04: 5s, D-21: single loop)
+    const interval = setInterval(async () => {
+        try {
+            const result = await pollExitStrategy(ctx, dex, tokenAddress, feeTier, buyAmountWei, state);
+            if (result === 'exited') {
+                clearInterval(interval);
+            }
+        } catch (e) {
+            ctx.log.error({ err: e, token: tokenAddress }, 'Exit engine poll error');
+        }
+    }, exitConfig.pollIntervalMs);
+
+    // Register in timer registry for cleanup on shutdown/external sell
+    registerExitMonitor(ctx.chain.name, tokenAddress, interval);
+}
+
+/**
+ * Resume exit monitoring for a pending trade after bot restart.
+ * Loads exit_state from DB (D-23, D-24) and resumes the poll loop.
+ * If no exit_state row exists (trade was bought before Phase 7),
+ * creates initial state as if the monitor just started.
+ */
+export async function resumeExitMonitor(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    buyAmountNative: string,
+    tradeId: number,
+): Promise<void> {
+    const buyAmountWei = ethers.parseEther(buyAmountNative);
+
+    // Try loading persisted state
+    const row = getExitState.get(tradeId) as ExitStateRow | undefined;
+
+    let state: ExitStateData;
+    if (row) {
+        state = deserializeExitState(row);
+        ctx.log.info({
+            token: tokenAddress,
+            tradeId,
+            highWaterMark: state.highWaterMark.toFixed(0),
+            trailing: state.trailingActivated,
+            completedTiers: Array.from(state.completedTierIndices),
+        }, 'Resumed exit monitor from DB state');
+    } else {
+        // No exit_state row -- trade predates Phase 7. Start fresh.
+        const entryPrice = await queryPrice(ctx, dex, tokenAddress, feeTier, buyAmountWei);
+        if (entryPrice === null) {
+            ctx.log.error({ token: tokenAddress }, 'Cannot query price for resume, skipping');
+            return;
+        }
+
+        // Get original token amount from balance (best available approximation)
+        const token = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
+        const balance: bigint = await token.balanceOf(ctx.wallet.address);
+
+        state = {
+            tradeId,
+            entryPrice,
+            highWaterMark: entryPrice,
+            trailingActivated: false,
+            completedTierIndices: new Set(),
+            originalTokenAmount: balance,
+            urgencyStartTs: Date.now(),
+            volatilityTracker: new VolatilityTracker(),
+        };
+        state.volatilityTracker.addSample(entryPrice);
+        upsertExitState.run(serializeExitState(state));
+
+        ctx.log.info({ token: tokenAddress, tradeId, entryPrice: entryPrice.toFixed(0) }, 'Created fresh exit state for pre-Phase7 trade');
+    }
+
+    // Start poll loop (same as startExitMonitor but using loaded/created state)
+    const interval = setInterval(async () => {
+        try {
+            const result = await pollExitStrategy(ctx, dex, tokenAddress, feeTier, buyAmountWei, state);
+            if (result === 'exited') {
+                clearInterval(interval);
+            }
+        } catch (e) {
+            ctx.log.error({ err: e, token: tokenAddress }, 'Exit engine poll error');
+        }
+    }, exitConfig.pollIntervalMs);
+
+    registerExitMonitor(ctx.chain.name, tokenAddress, interval);
+}
