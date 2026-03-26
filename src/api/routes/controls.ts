@@ -49,7 +49,7 @@ export function controlRoutes(contexts: ChainContext[]): Router {
 
     // ── POST /force-sell/:tradeId ── force sell a specific position (D-16) ──
     router.post('/force-sell/:tradeId', async (req: Request, res: Response) => {
-        const tradeId = parseInt(req.params.tradeId, 10);
+        const tradeId = parseInt(String(req.params.tradeId), 10);
         if (isNaN(tradeId)) {
             res.status(400).json({ error: 'Invalid trade ID' });
             return;

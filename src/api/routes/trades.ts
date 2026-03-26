@@ -8,7 +8,7 @@ import { getPnL } from '../../utils/db';
 
 // Inline async handler to avoid dependency on errorHandler middleware timing (parallel plan execution)
 function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
-    return (req: Request, res: Response, next: Function) => {
+    return (req: Request, res: Response, next: (err?: unknown) => void) => {
         fn(req, res).catch(next);
     };
 }

@@ -110,7 +110,7 @@ export function chainRoutes(
 
     // ── POST /:name/stop ── stop chain listeners (D-12, D-14, D-40) ────
     router.post('/:name/stop', (req: Request, res: Response) => {
-        const name = req.params.name.toLowerCase();
+        const name = String(req.params.name).toLowerCase();
         const ctx = contexts.find((c) => c.chain.name.toLowerCase() === name);
 
         if (!ctx) {
@@ -137,7 +137,7 @@ export function chainRoutes(
 
     // ── POST /:name/start ── restart chain listeners (D-12, D-40) ───────
     router.post('/:name/start', async (req: Request, res: Response) => {
-        const name = req.params.name.toLowerCase();
+        const name = String(req.params.name).toLowerCase();
         const ctx = contexts.find((c) => c.chain.name.toLowerCase() === name);
 
         if (!ctx) {

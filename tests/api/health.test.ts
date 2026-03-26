@@ -89,6 +89,6 @@ describe('GET /health', () => {
         expect(status).toBe(200);
         const chains = body.chains as Array<Record<string, unknown>>;
         expect(chains[0].name).toBe('eth');
-        expect(chains[0].latestBlock).toBe(12345);
+        expect(chains[0].latestBlock).toBe(12345678);
     });
 });
