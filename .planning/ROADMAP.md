@@ -136,11 +136,12 @@ Plans:
   2. Partial sell orders execute at configured price milestones (e.g., sell 50% at 2x, 25% at 5x) with the remainder trailing
   3. Stop-loss and take-profit thresholds widen or tighten based on measured token price volatility
   4. Exit parameters become more aggressive as a position ages -- tighter stops and lower profit targets over time
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 07-01-PLAN.md — Exit strategy config, DB schema v3 (exit_state table + partial_sell), timer registry update, exitEngine.ts types and utilities (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
+- [ ] 07-02-PLAN.md — Exit engine core: price query, sell execution, poll loop with trailing stop, partial sells, volatility, urgency (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
+- [ ] 07-03-PLAN.md — Wire exit engine into bot.ts, remove 12 legacy monitor/sell functions, update resume monitoring (EXIT-01, EXIT-02, EXIT-03, EXIT-04)
 
 ### Phase 8: Monitoring & Web Dashboard
 **Goal**: A web interface provides real-time visibility into all bot operations, positions, risk metrics, and historical performance
@@ -190,6 +191,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 4. Multi-Chain Architecture | 4/5 | In Progress | - |
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
 | 6. Risk Management | 1/2 | In Progress|  |
-| 7. Smart Exit Strategies | 0/2 | Not started | - |
+| 7. Smart Exit Strategies | 0/3 | Planned | - |
 | 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
 | 9. Testing Infrastructure | 0/3 | Not started | - |
