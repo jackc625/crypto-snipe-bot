@@ -161,7 +161,7 @@ Plans:
 - [x] 08-03-PLAN.md — Control API routes: chain start/stop, force sell, emergency sell-all (DASH-03)
 - [x] 08-04-PLAN.md — React SPA scaffold: Vite + Tailwind, layout, login, Overview page with positions and events (DASH-01, DASH-04)
 - [x] 08-05-PLAN.md — Remaining pages: Trade History, Risk & Exposure charts, Chain Controls with emergency sell (DASH-02, DASH-03, DASH-04)
-- [ ] 08-06-PLAN.md — Wire API server into bot.ts, notification broadcast, production build (MON-01, DASH-01, DASH-02, DASH-03, DASH-04)
+- [x] 08-06-PLAN.md — Wire API server into bot.ts, notification broadcast, production build (MON-01, DASH-01, DASH-02, DASH-03, DASH-04)
 
 ### Phase 9: Testing Infrastructure
 **Goal**: Comprehensive test suite validates the safety pipeline, storage layer, execution engine, and full snipe lifecycle
