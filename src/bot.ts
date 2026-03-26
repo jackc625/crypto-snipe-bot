@@ -29,21 +29,19 @@ import {
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
-import { db, insertTrade, isTokenSniped, updateTradeStatus } from "./utils/db";
+import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken } from "./utils/db";
 import { logger } from "./utils/logger";
 import { getProvider, getWallet, removeWsProvider } from "./utils/provider";
 import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
 import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
 import {
     tryAcquireSellLock,
-    registerStopLoss,
-    registerTakeProfit,
-    registerTimedSell,
     clearAllTimersForToken,
     clearAllTimers,
     initShutdownHandler,
     isShutdownInProgress
 } from "./utils/exitManager";
+import { startExitMonitor, resumeExitMonitor } from './exitEngine';
 import {
     ChainConfig,
     DexConfig,
@@ -646,9 +644,17 @@ export async function handleNewPairForChain(
         ctx.log.info({ token: targetToken }, 'TX confirmed');
         await sendCtxAlert(ctx, `*TX confirmed* for \`${symbol}\``);
 
-        await monitorStopLossForChain(ctx, dex, targetToken, ctx.chain.snipeAmount);
-        await monitorTakeProfitForChain(ctx, dex, targetToken, ctx.chain.snipeAmount);
-        await scheduleTimedSellForChain(ctx, dex, targetToken);
+        // Capture token balance for exit engine (D-07: original buy amount needed for partial sells)
+        const exitTokenContract = new Contract(targetToken, ERC20_ABI, ctx.wallet);
+        const originalTokenAmount: bigint = await exitTokenContract.balanceOf(ctx.wallet.address);
+
+        // Get trade ID for exit state linkage
+        const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
+        if (tradeRow) {
+            await startExitMonitor(ctx, dex, targetToken, null, ctx.chain.snipeAmount, tradeRow.id, originalTokenAmount);
+        } else {
+            ctx.log.error({ token: targetToken }, 'Could not find trade ID for exit monitor');
+        }
     } catch (e) {
         ctx.log.error({ err: e, token: targetToken }, 'TX failed');
         updateTradeStatus.run('failed', targetToken.toLowerCase());
@@ -825,10 +831,16 @@ export async function handleNewV3PoolForChain(
         ctx.log.info({ token: targetToken }, 'V3 TX confirmed');
         await sendCtxAlert(ctx, `*V3 TX confirmed* for \`${symbol}\``);
 
-        // D-09: Same 15s polling interval as V2. D-10: Sell through same pool/fee tier.
-        await monitorStopLossV3ForChain(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount);
-        await monitorTakeProfitV3ForChain(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount);
-        await scheduleTimedSellV3ForChain(ctx, dex, targetToken, feeTier);
+        // Capture token balance for exit engine (D-07)
+        const exitTokenContract = new Contract(targetToken, ERC20_ABI, ctx.wallet);
+        const originalTokenAmount: bigint = await exitTokenContract.balanceOf(ctx.wallet.address);
+
+        const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
+        if (tradeRow) {
+            await startExitMonitor(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount, tradeRow.id, originalTokenAmount);
+        } else {
+            ctx.log.error({ token: targetToken }, 'Could not find V3 trade ID for exit monitor');
+        }
     } catch (e) {
         ctx.log.error({ err: e, token: targetToken, feeTier }, 'V3 TX failed');
         updateTradeStatus.run('failed', targetToken.toLowerCase());
@@ -1169,9 +1181,46 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
         log.info({ token: targetToken }, 'TX confirmed');
         await sendTelegramAlert(`*TX confirmed* for \`${symbol}\``);
 
-        await monitorStopLoss(targetToken, CONFIG.snipeAmountETH);
-        await monitorTakeProfit(targetToken, CONFIG.snipeAmountETH);
-        await scheduleTimedSell(targetToken);
+        // Phase 7: unified exit engine
+        const exitTokenContract = new Contract(targetToken, ERC20_ABI, wallet);
+        const originalTokenAmount: bigint = await exitTokenContract.balanceOf(wallet.address);
+        const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), CONFIG.network) as { id: number } | undefined;
+        if (tradeRow) {
+            const legacyDex: DexConfigV2 = {
+                dexType: 'v2',
+                name: 'Uniswap V2',
+                factoryAddress: CONFIG.factoryAddress,
+                routerAddress: CONFIG.routerAddress,
+            };
+            const legacyCtx = {
+                chain: {
+                    name: 'eth',
+                    displayName: '[ETH]',
+                    chainId: 1,
+                    enabled: true,
+                    nativeCurrency: 'ETH',
+                    wethAddress: CONFIG.wethAddress,
+                    httpRpcUrl: '',
+                    wsRpcUrl: null,
+                    dexes: [legacyDex],
+                    mevStrategy: 'flashbots' as const,
+                    mevConfig: {},
+                    safetyApis: { honeypot: 'honeypot.is' as const, liquidityLock: 'unicrypt' as const, tokenSecurity: 'goplus' as const },
+                    gas: { type: 'eip1559' as const, multiplier: 1.2, maxGasLimit: BigInt(CONFIG.gasLimit || 300_000) },
+                    snipeAmount: CONFIG.snipeAmountETH,
+                    maxCapital: '1.0',
+                    explorerUrl: 'https://etherscan.io',
+                    minLiquidityThreshold: '1.0',
+                },
+                httpProvider: provider,
+                wsProvider: null,
+                wallet,
+                log: logger.child({ module: 'bot', chain: 'eth' }),
+            } as ChainContext;
+            await startExitMonitor(legacyCtx, legacyDex, targetToken, null, CONFIG.snipeAmountETH, tradeRow.id, originalTokenAmount);
+        } else {
+            log.error({ token: targetToken }, 'Could not find trade ID for legacy exit monitor');
+        }
     } catch (e) {
         log.error({ err: e, token: targetToken }, 'TX failed');
         updateTradeStatus.run('failed', targetToken.toLowerCase());
@@ -1412,8 +1461,8 @@ export async function startMultiChainBot(): Promise<void> {
 
 function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
     const pendingTrades = db.prepare(
-        'SELECT DISTINCT token, chain, pool_type, fee_tier FROM trades WHERE status = ?'
-    ).all('pending') as { token: string; chain: string; pool_type: string; fee_tier: number | null }[];
+        'SELECT DISTINCT token, chain, pool_type, fee_tier, id FROM trades WHERE status = ? AND action = ?'
+    ).all('pending', 'buy') as { token: string; chain: string; pool_type: string; fee_tier: number | null; id: number }[];
 
     for (const trade of pendingTrades) {
         const { token, chain: chainName } = trade;
@@ -1423,35 +1472,30 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
             continue;
         }
 
-        ctx.log.info({ token, poolType: trade.pool_type }, 'Restarting monitoring for pending token');
+        ctx.log.info({ token, poolType: trade.pool_type, tradeId: trade.id }, 'Resuming exit monitor for pending token');
         const tokenContract = new Contract(token, ERC20_ABI, ctx.wallet);
-        tokenContract.balanceOf(ctx.wallet.address).then((balance: bigint) => {
+        tokenContract.balanceOf(ctx.wallet.address).then(async (balance: bigint) => {
             if (balance === 0n) {
                 ctx.log.info({ token }, 'Zero balance for pending token, marking as failed');
                 updateTradeStatus.run('failed', token);
                 return;
             }
 
+            // Find appropriate DEX for this position
             if (trade.pool_type === 'v3' && trade.fee_tier != null) {
-                // Find a V3 DEX for this chain
                 const v3Dex = ctx.chain.dexes.find(d => isDexV3(d)) as DexConfigV3 | undefined;
                 if (!v3Dex) {
-                    ctx.log.warn({ token }, 'No V3 DEX configured for chain, skipping V3 resume');
+                    ctx.log.warn({ token }, 'No V3 DEX configured for chain, skipping resume');
                     return;
                 }
-                monitorStopLossV3ForChain(ctx, v3Dex, token, trade.fee_tier, ctx.chain.snipeAmount);
-                monitorTakeProfitV3ForChain(ctx, v3Dex, token, trade.fee_tier, ctx.chain.snipeAmount);
-                scheduleTimedSellV3ForChain(ctx, v3Dex, token, trade.fee_tier);
+                await resumeExitMonitor(ctx, v3Dex, token, trade.fee_tier, ctx.chain.snipeAmount, trade.id);
             } else {
-                // V2 resume logic
-                const dex = ctx.chain.dexes.find(d => isDexV2(d)) as DexConfigV2 | undefined;
-                if (!dex) {
+                const v2Dex = ctx.chain.dexes.find(d => isDexV2(d)) as DexConfigV2 | undefined;
+                if (!v2Dex) {
                     ctx.log.warn({ token }, 'No V2 DEX configured for chain, skipping resume');
                     return;
                 }
-                monitorStopLossForChain(ctx, dex, token, ctx.chain.snipeAmount);
-                monitorTakeProfitForChain(ctx, dex, token, ctx.chain.snipeAmount);
-                scheduleTimedSellForChain(ctx, dex, token);
+                await resumeExitMonitor(ctx, v2Dex, token, null, ctx.chain.snipeAmount, trade.id);
             }
         }).catch((e: unknown) => {
             ctx.log.error({ err: e, token }, 'Error checking balance for pending token');
@@ -1519,19 +1563,54 @@ function initMultiChainShutdownHandler(contexts: ChainContext[]): void {
 // ---------------------------------------------------------------------------
 
 function resumeMonitoring(): void {
-    const pendingTrades = db.prepare('SELECT DISTINCT token FROM trades WHERE status = ?').all('pending') as { token: string }[];
-    for (const { token } of pendingTrades) {
-        log.info({ token }, 'Restarting monitoring for pending token');
+    const pendingTrades = db.prepare(
+        'SELECT DISTINCT token, id FROM trades WHERE status = ? AND action = ?'
+    ).all('pending', 'buy') as { token: string; id: number }[];
+
+    for (const { token, id: tradeId } of pendingTrades) {
+        log.info({ token, tradeId }, 'Restarting exit monitor for pending token');
         const tokenContract = new Contract(token, ERC20_ABI, wallet);
-        tokenContract.balanceOf(wallet.address).then((balance: bigint) => {
+        tokenContract.balanceOf(wallet.address).then(async (balance: bigint) => {
             if (balance === 0n) {
                 log.info({ token }, 'Zero balance for pending token, marking as failed');
                 updateTradeStatus.run('failed', token);
                 return;
             }
-            monitorStopLoss(token, CONFIG.snipeAmountETH);
-            monitorTakeProfit(token, CONFIG.snipeAmountETH);
-            scheduleTimedSell(token);
+
+            // Legacy single-chain: use first V2 DEX from CONFIG (ETH mainnet)
+            const legacyDex: DexConfigV2 = {
+                dexType: 'v2',
+                name: 'Uniswap V2',
+                factoryAddress: CONFIG.factoryAddress,
+                routerAddress: CONFIG.routerAddress,
+            };
+            const legacyCtx = {
+                chain: {
+                    name: 'eth',
+                    displayName: '[ETH]',
+                    chainId: 1,
+                    enabled: true,
+                    nativeCurrency: 'ETH',
+                    wethAddress: CONFIG.wethAddress,
+                    httpRpcUrl: '',
+                    wsRpcUrl: null,
+                    dexes: [legacyDex],
+                    mevStrategy: 'flashbots' as const,
+                    mevConfig: {},
+                    safetyApis: { honeypot: 'honeypot.is' as const, liquidityLock: 'unicrypt' as const, tokenSecurity: 'goplus' as const },
+                    gas: { type: 'eip1559' as const, multiplier: 1.2, maxGasLimit: BigInt(CONFIG.gasLimit || 300_000) },
+                    snipeAmount: CONFIG.snipeAmountETH,
+                    maxCapital: '1.0',
+                    explorerUrl: 'https://etherscan.io',
+                    minLiquidityThreshold: '1.0',
+                },
+                httpProvider: provider,
+                wsProvider: null,
+                wallet,
+                log: logger.child({ module: 'bot', chain: 'eth' }),
+            } as ChainContext;
+
+            await resumeExitMonitor(legacyCtx, legacyDex, token, null, CONFIG.snipeAmountETH, tradeId);
         }).catch((e: unknown) => {
             log.error({ err: e, token }, 'Error checking balance for pending token');
         });
