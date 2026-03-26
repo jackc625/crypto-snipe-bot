@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
-import { useWebSocket } from '../hooks/useWebSocket';
+import { useWs } from '../hooks/WebSocketContext';
 
 const SIDEBAR_KEY = 'sidebar-collapsed';
 
@@ -12,7 +12,7 @@ export function Layout({ children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_KEY) === 'true';
   });
-  const { connected } = useWebSocket();
+  const { connected } = useWs();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, String(collapsed));

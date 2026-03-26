@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { WebSocketProvider } from './hooks/WebSocketContext';
 import { Layout } from './components/Layout';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
@@ -42,7 +43,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return <WebSocketProvider>{children}</WebSocketProvider>;
 }
 
 export function App() {
