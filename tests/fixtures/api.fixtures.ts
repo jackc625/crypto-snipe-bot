@@ -1,31 +1,31 @@
 // tests/fixtures/api.fixtures.ts
-// Shared test infrastructure for API tests.
-// Provides mock ChainContext objects and test constants.
+// Shared mock fixtures for API route tests.
+// Creates typed mock ChainContext objects without importing production modules
+// that require live DB/network connections.
 
-import type { ChainContext, ChainConfig } from '../../src/chainRegistry';
+import type { ChainContext, ChainConfig, DexConfigV2 } from '../../src/chainRegistry';
 
 export const MOCK_API_KEY = 'test-dashboard-api-key-12345';
 
-/**
- * Create a mock ChainContext with connected httpProvider.
- * Override any field via the overrides parameter.
- */
-export function createMockChainContext(overrides?: Partial<{
-    chain: Partial<ChainConfig>;
-    httpProvider: Record<string, unknown>;
-    wsProvider: unknown;
-    wallet: Record<string, unknown>;
-}>): ChainContext {
-    const chain: ChainConfig = {
+/** Create a minimal mock ChainConfig for testing */
+export function createMockChainConfig(overrides: Partial<ChainConfig> = {}): ChainConfig {
+    return {
         chainId: 1,
         name: 'eth',
         displayName: '[ETH]',
         enabled: true,
         nativeCurrency: 'ETH',
         wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-        httpRpcUrl: 'http://localhost:8545',
-        wsRpcUrl: null,
-        dexes: [],
+        httpRpcUrl: 'https://eth-mainnet.g.alchemy.com/v2/abc123',
+        wsRpcUrl: 'wss://eth-mainnet.g.alchemy.com/v2/abc123',
+        dexes: [
+            {
+                dexType: 'v2' as const,
+                name: 'uniswap-v2',
+                factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+                routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+            } as DexConfigV2,
+        ],
         mevStrategy: 'flashbots',
         mevConfig: {},
         safetyApis: { honeypot: 'honeypot.is', liquidityLock: 'unicrypt', tokenSecurity: 'goplus' },
@@ -34,50 +34,65 @@ export function createMockChainContext(overrides?: Partial<{
         maxCapital: '1.0',
         explorerUrl: 'https://etherscan.io',
         minLiquidityThreshold: '0.5',
-        ...(overrides?.chain || {}),
-    } as ChainConfig;
-
-    const httpProvider = {
-        getBlockNumber: () => Promise.resolve(12345),
-        ...(overrides?.httpProvider || {}),
+        ...overrides,
     };
-
-    const wsProvider = overrides?.wsProvider !== undefined ? overrides.wsProvider : null;
-
-    const wallet = {
-        address: '0x1234567890abcdef1234567890abcdef12345678',
-        ...(overrides?.wallet || {}),
-    };
-
-    const log = {
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        fatal: () => {},
-        debug: () => {},
-        child: () => log,
-    };
-
-    return {
-        chain,
-        httpProvider,
-        wsProvider,
-        wallet,
-        log,
-    } as unknown as ChainContext;
 }
 
-/**
- * Create a mock ChainContext with a disconnected httpProvider
- * (getBlockNumber rejects with an error).
- */
-export function createDisconnectedContext(overrides?: Partial<{
-    chain: Partial<ChainConfig>;
-}>): ChainContext {
-    return createMockChainContext({
-        ...overrides,
+/** Create a minimal mock ChainContext for testing */
+export function createMockChainContext(overrides: Partial<ChainConfig> = {}): ChainContext {
+    const chain = createMockChainConfig(overrides);
+    return {
+        chain,
         httpProvider: {
-            getBlockNumber: () => Promise.reject(new Error('could not detect network')),
+            getBlockNumber: async () => 12345678,
+        } as any,
+        wsProvider: {
+            removeAllListeners: () => {},
+        } as any,
+        wallet: {
+            address: '0x1234567890abcdef1234567890abcdef12345678',
+        } as any,
+        log: {
+            info: () => {},
+            warn: () => {},
+            error: () => {},
+            fatal: () => {},
+            debug: () => {},
+            child: () => ({
+                info: () => {},
+                warn: () => {},
+                error: () => {},
+                debug: () => {},
+            }),
+        } as any,
+    };
+}
+
+/** Create a mock ChainContext with a disconnected provider */
+export function createDisconnectedChainContext(overrides: Partial<ChainConfig> = {}): ChainContext {
+    const ctx = createMockChainContext(overrides);
+    ctx.httpProvider = {
+        getBlockNumber: async () => {
+            throw new Error('Provider disconnected');
         },
-    });
+    } as any;
+    return ctx;
+}
+
+// Alias for backward compatibility with health tests
+export const createDisconnectedContext = createDisconnectedChainContext;
+
+/** Create a mock trade row from the DB */
+export function createMockTradeRow(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 1,
+        token: '0xabcdef1234567890abcdef1234567890abcdef12',
+        chain: 'eth',
+        action: 'buy',
+        pool_type: 'v2',
+        fee_tier: null,
+        status: 'pending',
+        amount_in: '0.01',
+        ...overrides,
+    };
 }
