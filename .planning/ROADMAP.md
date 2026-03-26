@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Multi-Chain Architecture** - Chain abstraction layer supporting ETH, BSC, Base, Arbitrum with per-chain MEV protection
 - [ ] **Phase 5: Uniswap V3 Integration** - Detect and snipe V3 pool launches across all chains and fee tiers
 - [ ] **Phase 6: Risk Management** - Portfolio-level risk controls including position sizing, daily loss limits, and exposure tracking
-- [x] **Phase 7: Smart Exit Strategies** - Trailing stops, partial takes, dynamic thresholds, and time-weighted exit urgency (completed 2026-03-26)
+- [x] **Phase 7: Smart Exit Strategies** - Trailing stops, partial takes, dynamic thresholds, and time-weighted exit urgency (completed 2026-03-26)
 - [ ] **Phase 8: Monitoring & Web Dashboard** - Real-time web interface for positions, P&L, chain status, and bot controls
 - [ ] **Phase 9: Testing Infrastructure** - Unit tests, integration tests, and mainnet fork tests validating the full system
 
@@ -153,12 +153,15 @@ Plans:
   3. Historical trade log is filterable by chain, date range, and profit/loss outcome
   4. Bot can be started/stopped per chain and snipe parameters adjusted from the dashboard without restarting the process
   5. Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
-- [ ] 08-03: TBD
+- [ ] 08-01-PLAN.md — Express server foundation, health endpoint, auth middleware, WebSocket infrastructure, test stubs (MON-01)
+- [ ] 08-02-PLAN.md — Data API routes: positions, trades with CSV export, risk exposure/pnl/limits (DASH-01, DASH-02, DASH-04)
+- [ ] 08-03-PLAN.md — Control API routes: chain start/stop, force sell, emergency sell-all (DASH-03)
+- [ ] 08-04-PLAN.md — React SPA scaffold: Vite + Tailwind, layout, login, Overview page with positions and events (DASH-01, DASH-04)
+- [ ] 08-05-PLAN.md — Remaining pages: Trade History, Risk & Exposure charts, Chain Controls with emergency sell (DASH-02, DASH-03, DASH-04)
+- [ ] 08-06-PLAN.md — Wire API server into bot.ts, notification broadcast, production build (MON-01, DASH-01, DASH-02, DASH-03, DASH-04)
 
 ### Phase 9: Testing Infrastructure
 **Goal**: Comprehensive test suite validates the safety pipeline, storage layer, execution engine, and full snipe lifecycle
@@ -192,5 +195,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
 | 6. Risk Management | 1/2 | In Progress|  |
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
-| 8. Monitoring & Web Dashboard | 0/3 | Not started | - |
+| 8. Monitoring & Web Dashboard | 0/6 | Planned | - |
 | 9. Testing Infrastructure | 0/3 | Not started | - |
