@@ -22,8 +22,7 @@ import { authMiddleware, sessions } from './middleware/auth';
 import { errorMiddleware } from './middleware/errorHandler';
 import { handleUpgrade } from './ws/handler';
 import { broadcast, getClientCount } from './ws/broadcaster';
-import { getOpenPositionCount, getPnL } from '../utils/db';
-import { getPortfolioExposure } from '../riskManager';
+import { getPnL } from '../utils/db';
 import { logger } from '../utils/logger';
 
 const log = logger.child({ module: 'api' });
@@ -92,14 +91,24 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
         if (getClientCount() === 0) return;
 
         try {
-            const posResult = getOpenPositionCount.get() as { count: number };
-            const exposure = getPortfolioExposure();
-            const oneDayAgoSec = Math.floor((Date.now() - 86_400_000) / 1000);
-            const pnlRows = getPnL({ fromTimestamp: oneDayAgoSec });
-            const dailyPnL = pnlRows.reduce(
-                (sum, row) => sum + (row.realized_pnl ?? 0),
-                0,
-            );
+            // Build actual open positions array matching REST /api/positions shape
+            const allTrades = getPnL();
+            const openPositions = allTrades
+                .filter((t) => t.sell_time === null)
+                .map((t) => ({
+                    tradeId: null,
+                    token: t.token,
+                    chain: t.chain,
+                    entryPrice: null,
+                    currentPrice: null,
+                    pnl: t.realized_pnl,
+                    buyCost: t.buy_cost,
+                    buyGas: t.buy_gas,
+                    buyTime: t.buy_time,
+                    poolType: t.pool_type,
+                    feeTier: t.fee_tier,
+                    exitState: null,
+                }));
 
             // Chain status
             const chainStatuses = contexts.map((ctx) => ({
@@ -109,12 +118,7 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
             }));
 
             broadcast('positions_update', {
-                positions: {
-                    open: posResult.count,
-                    totalExposure: exposure.total,
-                    exposureByChain: exposure.byChain,
-                    dailyPnL,
-                },
+                positions: openPositions,
                 chains: chainStatuses,
             });
         } catch (err) {
