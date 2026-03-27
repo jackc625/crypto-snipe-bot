@@ -72,7 +72,7 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
 
     // 5. SPA catch-all -- serve index.html for client-side routing
     const indexPath = path.join(dashboardDir, 'index.html');
-    app.get('*', (_req, res) => {
+    app.get('/{*path}', (_req, res) => {
         if (fs.existsSync(indexPath)) {
             res.sendFile(indexPath);
         } else {
