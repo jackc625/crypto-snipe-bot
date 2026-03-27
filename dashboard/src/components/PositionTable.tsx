@@ -9,7 +9,7 @@ interface PositionTableProps {
 }
 
 export function PositionTable({ positions, onForceSell }: PositionTableProps) {
-  const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Sort by P&L by default (descending)
   const sorted = [...positions].sort((a, b) => {
@@ -29,8 +29,10 @@ export function PositionTable({ positions, onForceSell }: PositionTableProps) {
     );
   }
 
-  const toggleRow = (tradeId: number) => {
-    setExpandedRow((prev) => (prev === tradeId ? null : tradeId));
+  const rowKey = (pos: Position) => `${pos.token}-${pos.chain}`;
+
+  const toggleRow = (key: string) => {
+    setExpandedRow((prev) => (prev === key ? null : key));
   };
 
   const getExitMode = (pos: Position): string => {
@@ -63,10 +65,10 @@ export function PositionTable({ positions, onForceSell }: PositionTableProps) {
         <tbody>
           {sorted.map((pos) => (
             <PositionRow
-              key={pos.tradeId}
+              key={rowKey(pos)}
               position={pos}
-              expanded={expandedRow === pos.tradeId}
-              onToggle={() => toggleRow(pos.tradeId)}
+              expanded={expandedRow === rowKey(pos)}
+              onToggle={() => toggleRow(rowKey(pos))}
               onForceSell={() => onForceSell(pos.tradeId, pos.token, pos.chain)}
               exitMode={getExitMode(pos)}
               timeHeld={getTimeHeld(pos)}
