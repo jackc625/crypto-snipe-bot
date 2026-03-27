@@ -57,6 +57,7 @@ export function PositionTable({ positions, onForceSell }: PositionTableProps) {
             <th className="text-right text-xs text-text-muted px-4 py-3 font-normal">P&L</th>
             <th className="text-left text-xs text-text-muted px-4 py-3 font-normal">Exit Mode</th>
             <th className="text-right text-xs text-text-muted px-4 py-3 font-normal">Time Held</th>
+            <th className="w-8"></th>
           </tr>
         </thead>
         <tbody>
@@ -104,12 +105,20 @@ function PositionRow({ position, expanded, onToggle, onForceSell, exitMode, time
         </td>
         <td className="px-4 py-3 text-sm">{exitMode}</td>
         <td className="px-4 py-3 text-sm text-right text-text-muted">{timeHeld}</td>
+        <td className="px-2 py-3 text-text-muted">
+          <svg
+            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </td>
       </tr>
 
       {/* Expanded detail section -- accordion pattern, only one row at a time */}
       {expanded && (
-        <tr>
-          <td colSpan={7} className="bg-surface px-6 py-4 border-b border-border">
+        <tr className="cursor-pointer" onClick={onToggle}>
+          <td colSpan={8} className="bg-surface px-6 py-4 border-b border-border">
             <div
               className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm"
               style={{ animation: 'slideDown 150ms ease-out' }}
