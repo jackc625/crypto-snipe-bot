@@ -6,7 +6,12 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --reporter=verbose"
+    "test": "vitest run --reporter=verbose",
+    "test:unit": "vitest run --project unit --reporter=verbose",
+    "test:integration": "vitest run --project integration --reporter=verbose",
+    "test:fork": "vitest run --project fork --reporter=verbose",
+    "test:all": "vitest run --reporter=verbose",
+    "test:coverage": "vitest run --coverage --reporter=verbose"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",
@@ -45,6 +50,7 @@
     "@types/node": "^22.19.15",
     "@types/uuid": "^11.0.0",
     "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.2",
     "chai": "4.3.10",
     "eslint": "^9.39.4",
     "hardhat": "2.26.0",
