@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 09-03-PLAN.md
-last_updated: "2026-03-28T22:50:27.391Z"
+stopped_at: Completed 09-04-PLAN.md
+last_updated: "2026-03-28T22:58:15.315Z"
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 35
-  completed_plans: 33
+  completed_plans: 35
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 9
-Plan: 2 of 4 complete
+Plan: 3 of 4 complete
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Plan: 2 of 4 complete
 | Phase 08 P06 | 11min | 2 tasks | 4 files |
 | Phase 09 P01 | 9min | 2 tasks | 18 files |
 | Phase 09 P03 | 11min | 3 tasks | 4 files |
+| Phase 09 P04 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,9 @@ Recent decisions affecting current work:
 - [Phase 09]: vi.doUnmock required after vi.doMock to prevent mock leakage across describe blocks in same file
 - [Phase 09]: Exit trigger correctness tested via pure computation functions rather than mocking startExitMonitor
 - [Phase 09]: WebSocket reconnect tested via provider.ts utilities and backoff simulation since startDexListener not exported
+- [Phase 09]: Conditional sepolia network in hardhat config to avoid crash when ALCHEMY_URL not set
+- [Phase 09]: Fork test loads FakeToken artifact from compiled JSON for portability over typechain imports
+- [Phase 09]: CI runs test:unit and test:integration only -- fork tests excluded since they require RPC access
 
 ### Pending Todos
 
@@ -187,6 +191,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-28T22:50:27.386Z
-Stopped at: Completed 09-03-PLAN.md
+Last session: 2026-03-28T22:58:15.308Z
+Stopped at: Completed 09-04-PLAN.md
 Resume file: None
