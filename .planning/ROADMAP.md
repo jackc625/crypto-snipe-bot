@@ -178,7 +178,7 @@ Plans:
 Plans:
 - [x] 09-01-PLAN.md — Test infrastructure: vitest projects config, coverage, helpers, fixtures, migrate existing tests (TEST-01, TEST-02, TEST-03, TEST-04, TEST-05)
 - [x] 09-02-PLAN.md — Unit tests: token safety checks, SQLite concurrency, exit engine, risk manager, chain registry (TEST-01, TEST-02, TEST-04)
-- [ ] 09-03-PLAN.md — Integration tests: txManager/MEV strategies, exit monitor mutex, double-sell prevention (TEST-03, TEST-04)
+- [x] 09-03-PLAN.md — Integration tests: txManager/MEV strategies, exit monitor mutex, double-sell prevention (TEST-03, TEST-04)
 - [ ] 09-04-PLAN.md — Fork test: FakeToken contract, Hardhat forking, snipe lifecycle, GitHub Actions CI (TEST-05)
 
 ## Progress
@@ -197,4 +197,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. Risk Management | 1/2 | In Progress|  |
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
-| 9. Testing Infrastructure | 2/4 | In Progress|  |
+| 9. Testing Infrastructure | 0/4 | Planned | - |
