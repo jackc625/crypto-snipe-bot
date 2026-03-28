@@ -1,11 +1,11 @@
-// tests/api/health.test.ts
+// test/integration/api/health.test.ts
 // Health endpoint tests: 200 ok when connected, 503 degraded when disconnected.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
-import { createMockChainContext, createDisconnectedContext } from '../fixtures/api.fixtures';
+import { createMockChainContext, createDisconnectedContext } from '../../fixtures/api.fixtures';
 
 // Mock db module to avoid SQLite initialization in tests
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     getOpenPositionCount: { get: () => ({ count: 3 }) },
     getTotalExposure: { get: () => ({ total: 0.15 }) },
     getPnL: () => [
@@ -15,12 +15,12 @@ vi.mock('../../src/utils/db', () => ({
 }));
 
 // Mock riskManager
-vi.mock('../../src/riskManager', () => ({
+vi.mock('../../../src/riskManager', () => ({
     getPortfolioExposure: () => ({ total: 0.15, byChain: { eth: 0.15 } }),
 }));
 
 // Dynamic import after mocks
-const { healthRoutes } = await import('../../src/api/routes/health');
+const { healthRoutes } = await import('../../../src/api/routes/health');
 
 /**
  * Helper: create an Express app with healthRoutes mounted,

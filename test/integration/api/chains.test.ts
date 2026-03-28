@@ -1,13 +1,13 @@
-// tests/api/chains.test.ts
+// test/integration/api/chains.test.ts
 // Unit tests for chain status and control routes.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import express from 'express';
-import { chainRoutes, maskUrl } from '../../src/api/routes/chains';
-import { createMockChainContext, createDisconnectedChainContext } from '../fixtures/api.fixtures';
+import { chainRoutes, maskUrl } from '../../../src/api/routes/chains';
+import { createMockChainContext, createDisconnectedChainContext } from '../../fixtures/api.fixtures';
 
 // Mock exitEngine to avoid importing config/db dependencies
-vi.mock('../../src/exitEngine', () => ({
+vi.mock('../../../src/exitEngine', () => ({
     exitConfig: {
         trailingStopPct: 15,
         stopLossPct: 25,
@@ -17,7 +17,7 @@ vi.mock('../../src/exitEngine', () => ({
 }));
 
 // Mock logger to avoid pino side effects
-vi.mock('../../src/utils/logger', () => ({
+vi.mock('../../../src/utils/logger', () => ({
     logger: {
         child: () => ({
             info: () => {},

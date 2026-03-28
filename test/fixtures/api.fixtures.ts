@@ -1,4 +1,4 @@
-// tests/fixtures/api.fixtures.ts
+// test/fixtures/api.fixtures.ts
 // Shared mock fixtures for API route tests.
 // Creates typed mock ChainContext objects without importing production modules
 // that require live DB/network connections.

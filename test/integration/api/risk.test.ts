@@ -1,26 +1,26 @@
-// tests/api/risk.test.ts
+// test/integration/api/risk.test.ts
 // Tests for GET /api/risk/exposure, /pnl, /limits endpoints.
 // Verifies portfolio exposure, cumulative P&L, and risk limit utilization.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
-import { riskRoutes } from '../../src/api/routes/risk';
+import { riskRoutes } from '../../../src/api/routes/risk';
 
 // Mock riskManager
-vi.mock('../../src/riskManager', () => ({
+vi.mock('../../../src/riskManager', () => ({
     getPortfolioExposure: vi.fn(),
 }));
 
 // Mock db module
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     getPnL: vi.fn(),
     getOpenPositionCount: { get: vi.fn() },
     getTotalExposure: { get: vi.fn() },
     getDailyRealizedLoss: { get: vi.fn() },
 }));
 
-import { getPortfolioExposure } from '../../src/riskManager';
-import { getPnL, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../src/utils/db';
+import { getPortfolioExposure } from '../../../src/riskManager';
+import { getPnL, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../../src/utils/db';
 
 // Helper to create test app with risk routes
 function createTestApp() {

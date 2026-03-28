@@ -1,20 +1,20 @@
-// tests/api/positions.test.ts
+// test/integration/api/positions.test.ts
 // Tests for GET /api/positions endpoint.
 // Verifies open positions returned with exit state data.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
-import { positionRoutes } from '../../src/api/routes/positions';
+import { positionRoutes } from '../../../src/api/routes/positions';
 
 // Mock db module
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     getPnL: vi.fn(),
     getExitState: { get: vi.fn() },
     getTradeIdForPendingToken: { get: vi.fn() },
 }));
 
 // Mock exitEngine to avoid loading CONFIG
-vi.mock('../../src/exitEngine', () => ({
+vi.mock('../../../src/exitEngine', () => ({
     exitConfig: {
         urgencyWindowMs: 3600000, // 1 hour for test
         trailingStopPct: 10,
@@ -29,7 +29,7 @@ vi.mock('../../src/exitEngine', () => ({
     },
 }));
 
-import { getPnL, getExitState, getTradeIdForPendingToken } from '../../src/utils/db';
+import { getPnL, getExitState, getTradeIdForPendingToken } from '../../../src/utils/db';
 
 // Helper to make requests against the route
 function createTestApp() {

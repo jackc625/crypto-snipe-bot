@@ -1,17 +1,17 @@
-// tests/api/trades.test.ts
+// test/integration/api/trades.test.ts
 // Tests for GET /api/trades and GET /api/trades/export endpoints.
 // Verifies pagination, filtering, and CSV export.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
-import { tradeRoutes } from '../../src/api/routes/trades';
+import { tradeRoutes } from '../../../src/api/routes/trades';
 
 // Mock db module
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     getPnL: vi.fn(),
 }));
 
-import { getPnL } from '../../src/utils/db';
+import { getPnL } from '../../../src/utils/db';
 
 // Helper to make requests against the route
 function createTestApp() {

@@ -1,4 +1,4 @@
-// tests/fixtures/exitEngine.fixtures.ts
+// test/fixtures/exitEngine.fixtures.ts
 // Shared fixtures for exit engine unit tests.
 // These provide typed mock data without importing production modules that
 // require live DB/network connections.

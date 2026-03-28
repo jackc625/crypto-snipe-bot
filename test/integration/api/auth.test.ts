@@ -1,26 +1,26 @@
-// tests/api/auth.test.ts
+// test/integration/api/auth.test.ts
 // Auth login + middleware tests: valid/invalid key, session cookie flow.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { MOCK_API_KEY } from '../fixtures/api.fixtures';
+import { MOCK_API_KEY } from '../../fixtures/api.fixtures';
 import http from 'http';
 
 // Mock db module to avoid SQLite initialization in tests
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     getOpenPositionCount: { get: () => ({ count: 0 }) },
     getTotalExposure: { get: () => ({ total: 0 }) },
     getPnL: () => [],
 }));
 
 // Mock riskManager
-vi.mock('../../src/riskManager', () => ({
+vi.mock('../../../src/riskManager', () => ({
     getPortfolioExposure: () => ({ total: 0, byChain: {} }),
 }));
 
 // Dynamic imports after mocks
-const { loginHandler, authMiddleware, sessions } = await import('../../src/api/middleware/auth');
-const { authRoutes } = await import('../../src/api/routes/auth');
+const { loginHandler, authMiddleware, sessions } = await import('../../../src/api/middleware/auth');
+const { authRoutes } = await import('../../../src/api/routes/auth');
 
 /**
  * Helper: make an HTTP request to a test server.

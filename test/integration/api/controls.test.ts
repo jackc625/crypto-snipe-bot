@@ -1,9 +1,9 @@
-// tests/api/controls.test.ts
+// test/integration/api/controls.test.ts
 // Unit tests for force sell and emergency sell control routes.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import express from 'express';
-import { createMockChainContext, createMockTradeRow } from '../fixtures/api.fixtures';
+import { createMockChainContext, createMockTradeRow } from '../../fixtures/api.fixtures';
 
 // Track mock calls
 const mockGetPendingTrade = vi.fn();
@@ -12,7 +12,7 @@ const mockClearAllTimersForToken = vi.fn();
 const mockExecuteFullSell = vi.fn();
 
 // Mock db module -- must be before import
-vi.mock('../../src/utils/db', () => ({
+vi.mock('../../../src/utils/db', () => ({
     db: {
         prepare: (sql: string) => {
             if (sql.includes('WHERE id = ?')) {
@@ -27,12 +27,12 @@ vi.mock('../../src/utils/db', () => ({
 }));
 
 // Mock exitManager
-vi.mock('../../src/utils/exitManager', () => ({
+vi.mock('../../../src/utils/exitManager', () => ({
     clearAllTimersForToken: (...args: any[]) => mockClearAllTimersForToken(...args),
 }));
 
 // Mock exitEngine
-vi.mock('../../src/exitEngine', () => ({
+vi.mock('../../../src/exitEngine', () => ({
     executeFullSell: (...args: any[]) => mockExecuteFullSell(...args),
     exitConfig: {
         trailingStopPct: 15,
@@ -43,7 +43,7 @@ vi.mock('../../src/exitEngine', () => ({
 }));
 
 // Mock logger
-vi.mock('../../src/utils/logger', () => ({
+vi.mock('../../../src/utils/logger', () => ({
     logger: {
         child: () => ({
             info: () => {},
@@ -61,7 +61,7 @@ vi.mock('../../src/utils/logger', () => ({
 }));
 
 // Must import after mocks
-import { controlRoutes } from '../../src/api/routes/controls';
+import { controlRoutes } from '../../../src/api/routes/controls';
 
 // Helper: create supertest-like request function using raw http
 async function request(app: express.Express, method: 'GET' | 'POST', path: string) {

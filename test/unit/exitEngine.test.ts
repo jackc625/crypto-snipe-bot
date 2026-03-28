@@ -1,4 +1,4 @@
-// tests/exitEngine.test.ts
+// test/unit/exitEngine.test.ts
 // Test stubs for smart exit strategies (Phase 7).
 // Wave 0: stubs created before implementation.
 // Plans 01/02 fill in test bodies as features are built.
@@ -16,14 +16,14 @@ import { describe, it, expect } from 'vitest';
 //     VolatilityTracker,
 //     serializeExitState,
 //     deserializeExitState,
-// } from '../src/exitEngine';
+// } from '../../src/exitEngine';
 
 import {
     createMockExitState,
     createMockTiers,
     priceSequences,
     createMockExitStateRow,
-} from './fixtures/exitEngine.fixtures';
+} from '../fixtures/exitEngine.fixtures';
 
 // ============================================================
 // EXIT-01: Trailing stop-loss
