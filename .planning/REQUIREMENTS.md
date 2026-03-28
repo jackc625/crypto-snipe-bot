@@ -79,11 +79,11 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Testing
 
-- [ ] **TEST-01**: Unit tests cover all 9 token safety checks including API failure fallback paths
-- [ ] **TEST-02**: Unit tests verify SQLite storage concurrency — concurrent writes produce correct state
-- [ ] **TEST-03**: Integration tests verify Flashbots bundle submission, retry with nonce increment, and fallback to direct send
-- [ ] **TEST-04**: Integration tests verify stop-loss, take-profit, and trailing stop trigger correctly and do not double-sell
-- [ ] **TEST-05**: Mainnet fork tests simulate full snipe flow: detect pair → validate → buy → monitor → sell
+- [x] **TEST-01**: Unit tests cover all 9 token safety checks including API failure fallback paths
+- [x] **TEST-02**: Unit tests verify SQLite storage concurrency — concurrent writes produce correct state
+- [x] **TEST-03**: Integration tests verify Flashbots bundle submission, retry with nonce increment, and fallback to direct send
+- [x] **TEST-04**: Integration tests verify stop-loss, take-profit, and trailing stop trigger correctly and do not double-sell
+- [x] **TEST-05**: Mainnet fork tests simulate full snipe flow: detect pair → validate → buy → monitor → sell
 
 ## v2 Requirements
 
@@ -163,11 +163,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-02 | Phase 8 | Complete |
 | DASH-03 | Phase 8 | Complete |
 | DASH-04 | Phase 8 | Complete |
-| TEST-01 | Phase 9 | Pending |
-| TEST-02 | Phase 9 | Pending |
-| TEST-03 | Phase 9 | Pending |
-| TEST-04 | Phase 9 | Pending |
-| TEST-05 | Phase 9 | Pending |
+| TEST-01 | Phase 9 | Complete |
+| TEST-02 | Phase 9 | Complete |
+| TEST-03 | Phase 9 | Complete |
+| TEST-04 | Phase 9 | Complete |
+| TEST-05 | Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 48 total

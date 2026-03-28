@@ -176,7 +176,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Test infrastructure: vitest projects config, coverage, helpers, fixtures, migrate existing tests (TEST-01, TEST-02, TEST-03, TEST-04, TEST-05)
+- [x] 09-01-PLAN.md — Test infrastructure: vitest projects config, coverage, helpers, fixtures, migrate existing tests (TEST-01, TEST-02, TEST-03, TEST-04, TEST-05)
 - [ ] 09-02-PLAN.md — Unit tests: token safety checks, SQLite concurrency, exit engine, risk manager, chain registry (TEST-01, TEST-02, TEST-04)
 - [ ] 09-03-PLAN.md — Integration tests: txManager/MEV strategies, exit monitor mutex, double-sell prevention (TEST-03, TEST-04)
 - [ ] 09-04-PLAN.md — Fork test: FakeToken contract, Hardhat forking, snipe lifecycle, GitHub Actions CI (TEST-05)
