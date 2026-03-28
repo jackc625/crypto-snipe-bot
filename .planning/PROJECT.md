@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-23 after Phase 06 completion (risk management — 5-rule canSnipe() gate, DB-backed exposure tracking, all 3 snipe handlers gated)*
+*Last updated: 2026-03-28 after Phase 09 completion (testing infrastructure — 184 tests across unit/integration/fork tiers, vitest three-project config, GitHub Actions CI)*
