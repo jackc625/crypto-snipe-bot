@@ -173,12 +173,13 @@ Plans:
   3. Integration tests verify Flashbots bundle submission, nonce-incrementing retry, and fallback to direct send
   4. Integration tests confirm stop-loss, take-profit, and trailing stop trigger correctly without double-selling
   5. Mainnet fork test executes a complete snipe lifecycle: detect pair, validate token, buy, monitor price, sell at target
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
-- [ ] 09-03: TBD
+- [ ] 09-01-PLAN.md — Test infrastructure: vitest projects config, coverage, helpers, fixtures, migrate existing tests (TEST-01, TEST-02, TEST-03, TEST-04, TEST-05)
+- [ ] 09-02-PLAN.md — Unit tests: token safety checks, SQLite concurrency, exit engine, risk manager, chain registry (TEST-01, TEST-02, TEST-04)
+- [ ] 09-03-PLAN.md — Integration tests: txManager/MEV strategies, exit monitor mutex, double-sell prevention (TEST-03, TEST-04)
+- [ ] 09-04-PLAN.md — Fork test: FakeToken contract, Hardhat forking, snipe lifecycle, GitHub Actions CI (TEST-05)
 
 ## Progress
 
@@ -195,5 +196,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 5. Uniswap V3 Integration | 2/4 | Gap closure planned | - |
 | 6. Risk Management | 1/2 | In Progress|  |
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
-| 8. Monitoring & Web Dashboard | 0/6 | Planned | - |
-| 9. Testing Infrastructure | 0/3 | Not started | - |
+| 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
+| 9. Testing Infrastructure | 0/4 | Planned | - |
