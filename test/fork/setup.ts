@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 
 let hardhatProcess: ChildProcess;
 
@@ -7,6 +7,9 @@ export async function setup() {
     if (!rpcUrl) {
         throw new Error('ETH_FORK_RPC_URL or ALCHEMY_URL env var required for fork tests');
     }
+
+    // Compile contracts so artifacts exist for deployment
+    execSync('npx hardhat compile --quiet', { stdio: 'pipe' });
 
     hardhatProcess = spawn('npx', ['hardhat', 'node', '--fork', rpcUrl, '--port', '8545'], {
         stdio: 'pipe',
