@@ -108,3 +108,22 @@ describe('canSnipe risk gate', () => {
         expect(result.reason).toBe('exposure_cap');
     });
 });
+
+describe('getPortfolioExposure with partial sells (Phase 10)', () => {
+    it('returns exposure reduced by partial sell proceeds', async () => {
+        // Mock exposureByChain to return already-reduced values
+        // (the SQL does the subtraction, mock returns the result)
+        mockExposureByChain.all.mockReturnValue([
+            { chain: 'eth', deployed: 0.07 },
+            { chain: 'bsc', deployed: 0.15 },
+        ]);
+        mockGetTotalExposure.get.mockReturnValue({ total: 0.22 });
+
+        const { getPortfolioExposure } = await import('../../src/riskManager');
+        const result = getPortfolioExposure();
+
+        expect(result.total).toBe(0.22);
+        expect(result.byChain.eth).toBe(0.07);
+        expect(result.byChain.bsc).toBe(0.15);
+    });
+});
