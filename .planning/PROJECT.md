@@ -94,12 +94,12 @@ Reliably detect, validate, and profitably snipe new token listings across multip
 - [ ] Risk dashboard showing exposure, daily P&L, position limits
 - [ ] Live notifications feed
 
-**Testing**
-- [ ] Unit tests for token safety pipeline (all 9 checks + fallback paths)
-- [ ] Unit tests for storage concurrency and state management
-- [ ] Integration tests for Flashbots bundle submission and retry logic
-- [ ] Integration tests for stop-loss/take-profit/timed sell monitoring
-- [ ] Mainnet fork tests simulating realistic snipe scenarios end-to-end
+**Testing** — Validated in Phase 09: testing-infrastructure
+- [x] Unit tests for token safety pipeline (all 9 checks + fallback paths)
+- [x] Unit tests for storage concurrency and state management
+- [x] Integration tests for Flashbots bundle submission and retry logic
+- [x] Integration tests for stop-loss/take-profit/timed sell monitoring
+- [x] Mainnet fork tests simulating realistic snipe scenarios end-to-end
 
 ### Out of Scope
 
@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-28 after Phase 09 completion (testing infrastructure — 184 tests across unit/integration/fork tiers, vitest three-project config, GitHub Actions CI)*
+*Last updated: 2026-03-30 after Phase 09 gap closure (coverage-v8 install fix via .npmrc, all UAT gaps resolved, 184 tests across unit/integration/fork tiers)*
