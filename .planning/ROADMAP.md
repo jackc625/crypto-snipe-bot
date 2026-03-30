@@ -228,5 +228,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
-| 10. partial_sell Revenue Fix | 2/2 | Complete   | 2026-03-30 |
+| 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
 | 11. Dashboard Accuracy & Bot Wiring | 0/0 | Gap closure — not planned | - |
