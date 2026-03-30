@@ -185,41 +185,53 @@ const isTokenSniped = db.prepare(`
 
 const getPnLQuery = db.prepare(`
     SELECT
+        b.id          AS buy_id,
         b.token,
         b.chain,
-        b.amount_in  AS buy_cost,
+        b.amount_in   AS buy_cost,
         b.gas_cost    AS buy_gas,
-        s.amount_out  AS sell_revenue,
-        s.gas_cost    AS sell_gas,
-        CAST(COALESCE(s.amount_out, '0') AS REAL) - CAST(b.amount_in AS REAL)
-            - CAST(COALESCE(b.gas_cost, '0') AS REAL) - CAST(COALESCE(s.gas_cost, '0') AS REAL)
+        COALESCE(SUM(CAST(COALESCE(s.amount_out, '0') AS REAL)), 0) AS sell_revenue,
+        COALESCE(SUM(CAST(COALESCE(s.gas_cost, '0') AS REAL)), 0)   AS sell_gas,
+        COALESCE(SUM(CAST(COALESCE(s.amount_out, '0') AS REAL)), 0)
+            - CAST(b.amount_in AS REAL)
+            - CAST(COALESCE(b.gas_cost, '0') AS REAL)
+            - COALESCE(SUM(CAST(COALESCE(s.gas_cost, '0') AS REAL)), 0)
             AS realized_pnl,
         b.timestamp   AS buy_time,
-        s.timestamp   AS sell_time,
+        MAX(s.timestamp) AS sell_time,
+        COUNT(s.id)   AS sell_count,
         b.pool_type,
-        b.fee_tier
+        b.fee_tier,
+        b.status      AS buy_status
     FROM trades b
-    LEFT JOIN trades s ON b.token = s.token AND s.action = 'sell'
+    LEFT JOIN trades s ON b.token = s.token
+                       AND b.chain = s.chain
+                       AND s.action IN ('sell', 'partial_sell')
+                       AND s.timestamp >= b.timestamp
     WHERE b.action = 'buy'
       AND (? IS NULL OR b.token = ?)
       AND (? IS NULL OR b.chain = ?)
       AND (? IS NULL OR b.timestamp >= ?)
       AND (? IS NULL OR b.timestamp <= ?)
+    GROUP BY b.id
     ORDER BY b.timestamp DESC
 `);
 
 export interface PnLResult {
+    buy_id: number;
     token: string;
     chain: string;
     buy_cost: string | null;
     buy_gas: string | null;
-    sell_revenue: string | null;
-    sell_gas: string | null;
-    realized_pnl: number | null;
+    sell_revenue: number;       // Aggregated SUM, always a number (0 when no sells)
+    sell_gas: number;           // Aggregated SUM, always a number
+    realized_pnl: number;      // Always a number (negative when no sells = -(buy_cost + buy_gas))
     buy_time: number;
     sell_time: number | null;
+    sell_count: number;         // D-02: count of sell + partial_sell events
     pool_type: string;
     fee_tier: number | null;
+    buy_status: string;         // 'pending' | 'sold' | 'failed' -- for open/closed detection
 }
 
 export function getPnL(filters?: {
@@ -242,17 +254,39 @@ const getOpenPositionCount = db.prepare(
     `SELECT COUNT(*) AS count FROM trades WHERE status = 'pending' AND action = 'buy'`
 );
 
-// RISK-05: Total deployed capital across all chains (D-11)
-const getTotalExposure = db.prepare(
-    `SELECT COALESCE(SUM(CAST(amount_in AS REAL)), 0) AS total FROM trades WHERE status = 'pending' AND action = 'buy'`
-);
+// RISK-05: Total deployed capital across all chains (D-11) -- subtracts partial sell proceeds (Phase 10 D-04)
+const getTotalExposure = db.prepare(`
+    SELECT COALESCE(SUM(
+        CAST(b.amount_in AS REAL)
+        - COALESCE((
+            SELECT SUM(CAST(COALESCE(ps.amount_out, '0') AS REAL))
+            FROM trades ps
+            WHERE ps.token = b.token
+              AND ps.chain = b.chain
+              AND ps.action = 'partial_sell'
+        ), 0)
+    ), 0) AS total
+    FROM trades b
+    WHERE b.status = 'pending' AND b.action = 'buy'
+`);
 
-// D-03: Deployed capital for a specific chain (replaces in-memory Map)
-const getDeployedCapitalByChain = db.prepare(
-    `SELECT COALESCE(SUM(CAST(amount_in AS REAL)), 0) AS deployed FROM trades WHERE status = 'pending' AND action = 'buy' AND chain = ?`
-);
+// D-03: Deployed capital for a specific chain -- subtracts partial sell proceeds (Phase 10 D-04)
+const getDeployedCapitalByChain = db.prepare(`
+    SELECT COALESCE(SUM(
+        CAST(b.amount_in AS REAL)
+        - COALESCE((
+            SELECT SUM(CAST(COALESCE(ps.amount_out, '0') AS REAL))
+            FROM trades ps
+            WHERE ps.token = b.token
+              AND ps.chain = b.chain
+              AND ps.action = 'partial_sell'
+        ), 0)
+    ), 0) AS deployed
+    FROM trades b
+    WHERE b.status = 'pending' AND b.action = 'buy' AND b.chain = ?
+`);
 
-// RISK-02: Realized losses in rolling 24h window for a chain (D-04/D-05/D-06)
+// RISK-02: Realized losses in rolling 24h window for a chain -- includes partial_sell events (Phase 10 D-05)
 const getDailyRealizedLoss = db.prepare(`
     SELECT COALESCE(SUM(
         CAST(COALESCE(s.amount_out, '0') AS REAL)
@@ -261,7 +295,7 @@ const getDailyRealizedLoss = db.prepare(`
         - CAST(COALESCE(s.gas_cost, '0') AS REAL)
     ), 0) AS total_loss
     FROM trades b
-    INNER JOIN trades s ON b.token = s.token AND s.action = 'sell'
+    INNER JOIN trades s ON b.token = s.token AND b.chain = s.chain AND s.action IN ('sell', 'partial_sell') AND s.timestamp >= b.timestamp
     WHERE b.action = 'buy'
       AND b.chain = ?
       AND s.timestamp >= ?
@@ -272,6 +306,49 @@ const getDailyRealizedLoss = db.prepare(`
           - CAST(COALESCE(s.gas_cost, '0') AS REAL)
       ) < 0
 `);
+
+// --- Per-Event P&L Chart Data (Phase 10 D-07) ---
+
+const getPnLChartDataQuery = db.prepare(`
+    SELECT
+        s.timestamp   AS sell_time,
+        s.token,
+        s.chain,
+        s.action      AS sell_action,
+        CAST(COALESCE(s.amount_out, '0') AS REAL) AS sell_revenue,
+        CAST(COALESCE(s.gas_cost, '0') AS REAL)   AS sell_gas,
+        CAST(b.amount_in AS REAL)                  AS buy_cost,
+        CAST(COALESCE(b.gas_cost, '0') AS REAL)   AS buy_gas,
+        (SELECT COUNT(*) FROM trades t
+         WHERE t.token = b.token AND t.chain = b.chain
+           AND t.action IN ('sell', 'partial_sell')
+           AND t.timestamp >= b.timestamp) AS total_sells
+    FROM trades s
+    INNER JOIN trades b ON s.token = b.token
+                        AND s.chain = b.chain
+                        AND b.action = 'buy'
+                        AND s.timestamp >= b.timestamp
+    WHERE s.action IN ('sell', 'partial_sell')
+      AND (? IS NULL OR s.timestamp >= ?)
+    ORDER BY s.timestamp ASC
+`);
+
+export interface PnLChartDataRow {
+    sell_time: number;
+    token: string;
+    chain: string;
+    sell_action: string;
+    sell_revenue: number;
+    sell_gas: number;
+    buy_cost: number;
+    buy_gas: number;
+    total_sells: number;
+}
+
+export function getPnLChartData(fromTimestamp?: number): PnLChartDataRow[] {
+    const from = fromTimestamp ?? null;
+    return getPnLChartDataQuery.all(from, from) as PnLChartDataRow[];
+}
 
 // --- Exit State Prepared Statements (Phase 7) ---
 const upsertExitState = db.prepare(`
@@ -299,4 +376,4 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };
+export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken, getPnLChartData };
