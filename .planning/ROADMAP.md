@@ -180,7 +180,7 @@ Plans:
 - [x] 09-02-PLAN.md — Unit tests: token safety checks, SQLite concurrency, exit engine, risk manager, chain registry (TEST-01, TEST-02, TEST-04)
 - [x] 09-03-PLAN.md — Integration tests: txManager/MEV strategies, exit monitor mutex, double-sell prevention (TEST-03, TEST-04)
 - [x] 09-04-PLAN.md — Fork test: FakeToken contract, Hardhat forking, snipe lifecycle, GitHub Actions CI (TEST-05)
-- [ ] 09-05-PLAN.md — [GAP CLOSURE] Create .npmrc for legacy-peer-deps to fix coverage-v8 installation (TEST-03)
+- [x] 09-05-PLAN.md — [GAP CLOSURE] Create .npmrc for legacy-peer-deps to fix coverage-v8 installation (TEST-03)
 
 ## Progress
 
