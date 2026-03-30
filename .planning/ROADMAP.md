@@ -193,8 +193,11 @@ Plans:
   1. getPnL() includes partial_sell rows in its JOIN — partial sell proceeds appear in P&L calculations
   2. Trade history API and CSV export surface partial_sell rows alongside full sells
   3. Risk manager daily loss and exposure queries account for partial sell proceeds
+**Plans**: 2 plans
 
-Plans: TBD
+Plans:
+- [ ] 10-01-PLAN.md — Rewrite db.ts and riskManager.ts queries for partial_sell aggregation, exposure reduction, daily loss inclusion (DB-04, DASH-02)
+- [ ] 10-02-PLAN.md — Wire updated P&L data through API routes and dashboard with sell count indicator (DB-04, DASH-02)
 
 ### Phase 11: Dashboard Accuracy & Bot Integration Wiring
 **Goal**: Dashboard shows accurate live data and all bot subsystems are properly wired into the multi-chain orchestrator
@@ -225,5 +228,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
-| 10. partial_sell Revenue Fix | 0/0 | Gap closure — not planned | - |
+| 10. partial_sell Revenue Fix | 0/2 | Planned | - |
 | 11. Dashboard Accuracy & Bot Wiring | 0/0 | Gap closure — not planned | - |
