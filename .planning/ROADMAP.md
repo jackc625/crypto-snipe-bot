@@ -196,7 +196,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — Rewrite db.ts and riskManager.ts queries for partial_sell aggregation, exposure reduction, daily loss inclusion (DB-04, DASH-02)
+- [x] 10-01-PLAN.md — Rewrite db.ts and riskManager.ts queries for partial_sell aggregation, exposure reduction, daily loss inclusion (DB-04, DASH-02)
 - [ ] 10-02-PLAN.md — Wire updated P&L data through API routes and dashboard with sell count indicator (DB-04, DASH-02)
 
 ### Phase 11: Dashboard Accuracy & Bot Integration Wiring
@@ -228,5 +228,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 7. Smart Exit Strategies | 4/4 | Complete   | 2026-03-26 |
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
-| 10. partial_sell Revenue Fix | 0/2 | Planned | - |
+| 10. partial_sell Revenue Fix | 1/2 | In Progress|  |
 | 11. Dashboard Accuracy & Bot Wiring | 0/0 | Gap closure — not planned | - |

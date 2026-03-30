@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Milestone complete
-stopped_at: Phase 10 context gathered
-last_updated: "2026-03-30T17:30:19.243Z"
+stopped_at: Completed 10-01-PLAN.md
+last_updated: "2026-03-30T18:13:52.748Z"
 progress:
   total_phases: 11
   completed_phases: 9
-  total_plans: 36
-  completed_plans: 36
+  total_plans: 38
+  completed_plans: 37
 ---
 
 # Project State
@@ -79,6 +79,7 @@ Plan: Not started
 | Phase 09 P01 | 9min | 2 tasks | 18 files |
 | Phase 09 P03 | 11min | 3 tasks | 4 files |
 | Phase 09 P04 | 3min | 2 tasks | 6 files |
+| Phase 10 P01 | 7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -178,6 +179,9 @@ Recent decisions affecting current work:
 - [Phase 09]: Conditional sepolia network in hardhat config to avoid crash when ALCHEMY_URL not set
 - [Phase 09]: Fork test loads FakeToken artifact from compiled JSON for portability over typechain imports
 - [Phase 09]: CI runs test:unit and test:integration only -- fork tests excluded since they require RPC access
+- [Phase 10]: GROUP BY b.id for P&L aggregation: simpler than CTE, standard SQL, one-pass over sell rows
+- [Phase 10]: Correlated subquery for exposure reduction (partial_sell proceeds subtracted from buy amount_in)
+- [Phase 10]: Separate getPnLChartData query for per-event granularity vs getPnL per-position aggregation
 
 ### Pending Todos
 
@@ -191,6 +195,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T17:30:19.237Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-partial-sell-revenue-fix/10-CONTEXT.md
+Last session: 2026-03-30T18:13:52.737Z
+Stopped at: Completed 10-01-PLAN.md
+Resume file: None

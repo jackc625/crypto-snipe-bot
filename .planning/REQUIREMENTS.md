@@ -31,7 +31,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 - [x] **DB-01**: JSON file storage replaced with SQLite database using WAL mode for concurrent access
 - [x] **DB-02**: SQLite is the sole source of truth — no in-memory cache that can diverge from disk
 - [x] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
-- [ ] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
+- [x] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
 
 ### Infrastructure — Code Quality
 
@@ -73,7 +73,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 - [x] **MON-01**: HTTP health check endpoint exposes bot liveness, chain connectivity status, and open position count
 - [ ] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
-- [ ] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
+- [x] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
 - [ ] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
 - [x] **DASH-04**: Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
 
@@ -136,7 +136,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DB-01 | Phase 3 | Complete |
 | DB-02 | Phase 3 | Complete |
 | DB-03 | Phase 3 | Complete |
-| DB-04 | Phase 10 | Pending |
+| DB-04 | Phase 10 | Complete |
 | INFRA-01 | Phase 3 | Complete |
 | INFRA-02 | Phase 3 | Complete |
 | INFRA-03 | Phase 3 | Complete |
@@ -160,7 +160,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXIT-04 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Complete |
 | DASH-01 | Phase 11 | Pending |
-| DASH-02 | Phase 10 | Pending |
+| DASH-02 | Phase 10 | Complete |
 | DASH-03 | Phase 11 | Pending |
 | DASH-04 | Phase 8 | Complete |
 | TEST-01 | Phase 9 | Complete |
