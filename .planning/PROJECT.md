@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-03-30 after Phase 09 gap closure (coverage-v8 install fix via .npmrc, all UAT gaps resolved, 184 tests across unit/integration/fork tiers)*
+*Last updated: 2026-03-30 after Phase 10 completion (partial_sell revenue visible in P&L, trade history, risk calculations, and dashboard — 196 tests passing)*
