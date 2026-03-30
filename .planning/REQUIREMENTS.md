@@ -17,7 +17,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 - [x] **FIX-06**: All required environment variables are validated on startup with clear error messages listing what's missing
 - [x] **FIX-07**: Timed sell timeout is cancelled when position is already sold via stop-loss or take-profit
 - [x] **FIX-08**: Monitoring loops exit when token balance reaches zero instead of polling indefinitely
-- [x] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
+- [ ] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
 
 ### Infrastructure — ethers v6 Migration
 
@@ -41,7 +41,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### Multi-Chain
 
-- [ ] **CHAIN-01**: Chain registry maps chainId to RPC endpoints, contract addresses, gas config, and MEV strategy
+- [x] **CHAIN-01**: Chain registry maps chainId to RPC endpoints, contract addresses, gas config, and MEV strategy
 - [x] **CHAIN-02**: Per-chain configuration supports ETH mainnet, BSC, Base, and Arbitrum with chain-specific parameters
 - [x] **CHAIN-03**: Bot runs concurrent event listeners on all configured chains simultaneously
 - [x] **CHAIN-04**: MEV protection uses Flashbots on ETH, bloXroute/private RPCs on BSC, and appropriate strategies per chain
@@ -49,10 +49,10 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 ### DEX Support — Uniswap V3
 
-- [ ] **V3-01**: Bot detects new V3 pool creation (PoolCreated events) across all configured chains and fee tiers
-- [ ] **V3-02**: Bot waits for Mint event (liquidity addition) after PoolCreated before sniping — does not snipe empty pools
-- [ ] **V3-03**: V3 swap execution uses the V3 SwapRouter with correct fee tier and sqrtPriceX96 parameters
-- [ ] **V3-04**: V3 price monitoring uses sqrtPriceX96 or oracle for accurate position valuation
+- [x] **V3-01**: Bot detects new V3 pool creation (PoolCreated events) across all configured chains and fee tiers
+- [x] **V3-02**: Bot waits for Mint event (liquidity addition) after PoolCreated before sniping — does not snipe empty pools
+- [x] **V3-03**: V3 swap execution uses the V3 SwapRouter with correct fee tier and sqrtPriceX96 parameters
+- [x] **V3-04**: V3 price monitoring uses sqrtPriceX96 or oracle for accurate position valuation
 
 ### Risk Management
 
@@ -72,9 +72,9 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 ### Monitoring & Web Dashboard
 
 - [x] **MON-01**: HTTP health check endpoint exposes bot liveness, chain connectivity status, and open position count
-- [x] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
-- [x] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
-- [x] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
+- [ ] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
+- [ ] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
+- [ ] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
 - [x] **DASH-04**: Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
 
 ### Testing
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-06 | Phase 1 | Complete |
 | FIX-07 | Phase 1 | Complete |
 | FIX-08 | Phase 1 | Complete |
-| FIX-09 | Phase 1 | Complete |
+| FIX-09 | Phase 11 | Pending |
 | ETH6-01 | Phase 2 | Complete |
 | ETH6-02 | Phase 2 | Complete |
 | ETH6-03 | Phase 2 | Complete |
@@ -136,19 +136,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DB-01 | Phase 3 | Complete |
 | DB-02 | Phase 3 | Complete |
 | DB-03 | Phase 3 | Complete |
-| DB-04 | Phase 3 | Pending |
+| DB-04 | Phase 10 | Pending |
 | INFRA-01 | Phase 3 | Complete |
 | INFRA-02 | Phase 3 | Complete |
 | INFRA-03 | Phase 3 | Complete |
-| CHAIN-01 | Phase 4 | Pending |
+| CHAIN-01 | Phase 4 | Complete |
 | CHAIN-02 | Phase 4 | Complete |
 | CHAIN-03 | Phase 4 | Complete |
 | CHAIN-04 | Phase 4 | Complete |
 | CHAIN-05 | Phase 4 | Complete |
-| V3-01 | Phase 5 | Pending |
-| V3-02 | Phase 5 | Pending |
-| V3-03 | Phase 5 | Pending |
-| V3-04 | Phase 5 | Pending |
+| V3-01 | Phase 5 | Complete |
+| V3-02 | Phase 5 | Complete |
+| V3-03 | Phase 5 | Complete |
+| V3-04 | Phase 5 | Complete |
 | RISK-01 | Phase 6 | Complete |
 | RISK-02 | Phase 6 | Complete |
 | RISK-03 | Phase 6 | Complete |
@@ -159,9 +159,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXIT-03 | Phase 7 | Complete |
 | EXIT-04 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Complete |
-| DASH-01 | Phase 8 | Complete |
-| DASH-02 | Phase 8 | Complete |
-| DASH-03 | Phase 8 | Complete |
+| DASH-01 | Phase 11 | Pending |
+| DASH-02 | Phase 10 | Pending |
+| DASH-03 | Phase 11 | Pending |
 | DASH-04 | Phase 8 | Complete |
 | TEST-01 | Phase 9 | Complete |
 | TEST-02 | Phase 9 | Complete |
@@ -176,4 +176,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after roadmap creation*
+*Last updated: 2026-03-30 after gap closure phase creation*
