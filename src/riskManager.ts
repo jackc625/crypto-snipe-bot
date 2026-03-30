@@ -45,9 +45,22 @@ const log = logger.child({ module: 'riskManager' });
 
 // --- Exposure by Chain (inline prepared statement, consistent with resumeMonitoring pattern from Phase 3) ---
 
-const exposureByChain = db.prepare(
-    `SELECT chain, COALESCE(SUM(CAST(amount_in AS REAL)), 0) AS deployed FROM trades WHERE status = 'pending' AND action = 'buy' GROUP BY chain`
-);
+const exposureByChain = db.prepare(`
+    SELECT b.chain,
+           COALESCE(SUM(
+               CAST(b.amount_in AS REAL)
+               - COALESCE((
+                   SELECT SUM(CAST(COALESCE(ps.amount_out, '0') AS REAL))
+                   FROM trades ps
+                   WHERE ps.token = b.token
+                     AND ps.chain = b.chain
+                     AND ps.action = 'partial_sell'
+               ), 0)
+           ), 0) AS deployed
+    FROM trades b
+    WHERE b.status = 'pending' AND b.action = 'buy'
+    GROUP BY b.chain
+`);
 
 // --- Public API ---
 
