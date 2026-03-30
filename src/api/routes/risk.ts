@@ -8,7 +8,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { ChainContext } from '../../chainRegistry';
 import { getPortfolioExposure } from '../../riskManager';
-import { getPnL, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../utils/db';
+import { getPnL, getPnLChartData, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../utils/db';
 
 // Inline async handler to avoid dependency on errorHandler middleware timing (parallel plan execution)
 function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
@@ -42,7 +42,7 @@ export function riskRoutes(contexts: ChainContext[]): Router {
         });
     }));
 
-    // GET /pnl -- Cumulative P&L data points for line chart (D-31, D-32)
+    // GET /pnl -- Cumulative P&L data points for line chart (D-31, D-32, D-07)
     router.get('/pnl', asyncHandler(async (req: Request, res: Response) => {
         const range = (req.query.range as string) || '7d';
         const validRanges = ['24h', '7d', '30d', 'all'];
@@ -54,20 +54,19 @@ export function riskRoutes(contexts: ChainContext[]): Router {
             ? Math.floor((Date.now() - rangeMs) / 1000)
             : undefined;
 
-        // Fetch trades in range
-        const trades = getPnL({ fromTimestamp });
+        // D-07: Use per-event chart data query (includes partial_sell events)
+        const sellEvents = getPnLChartData(fromTimestamp);
 
-        // Build cumulative P&L data points
-        // Filter to completed trades (those with sell_time) and sort by sell_time ascending
-        const completedTrades = trades
-            .filter(t => t.sell_time !== null && t.realized_pnl !== null)
-            .sort((a, b) => a.sell_time! - b.sell_time!);
-
+        // Build cumulative P&L data points with pro-rated buy cost (D-07)
         let runningSum = 0;
-        const dataPoints = completedTrades.map(t => {
-            runningSum += t.realized_pnl!;
+        const dataPoints = sellEvents.map(e => {
+            // Pro-rate buy cost equally across all sell events for this position
+            const proRatedBuyCost = e.buy_cost / e.total_sells;
+            const proRatedBuyGas = e.buy_gas / e.total_sells;
+            const eventPnl = e.sell_revenue - proRatedBuyCost - proRatedBuyGas - e.sell_gas;
+            runningSum += eventPnl;
             return {
-                time: t.sell_time!,       // epoch seconds for Lightweight Charts
+                time: e.sell_time,       // epoch seconds for Lightweight Charts
                 value: Math.round(runningSum * 1e8) / 1e8, // avoid floating point drift
             };
         });

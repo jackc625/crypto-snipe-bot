@@ -65,8 +65,9 @@ export function tradeRoutes(): Router {
             // Core
             token: t.token,
             chain: t.chain,
-            action: t.sell_time !== null ? 'closed' : 'open',
+            action: t.buy_status === 'pending' ? 'open' : 'closed',  // D-06: use buy_status, not sell_time
             pnl: t.realized_pnl,
+            sellCount: t.sell_count,  // D-02: enables partial sell indicator in dashboard
             // Timing
             buyTime: t.buy_time,
             sellTime: t.sell_time,
@@ -74,8 +75,8 @@ export function tradeRoutes(): Router {
             // Amounts
             buyCost: t.buy_cost,
             buyGas: t.buy_gas,
-            sellRevenue: t.sell_revenue,
-            sellGas: t.sell_gas,
+            sellRevenue: t.sell_revenue,  // Now a number (aggregated SUM), not string|null
+            sellGas: t.sell_gas,          // Now a number (aggregated SUM), not string|null
             // Exit
             poolType: t.pool_type,
             feeTier: t.fee_tier,
@@ -118,7 +119,7 @@ export function tradeRoutes(): Router {
         }
 
         // CSV header
-        const header = 'Token,Chain,P&L,Buy Cost,Buy Gas,Sell Revenue,Sell Gas,Buy Time,Sell Time,Duration (s),Pool Type,Fee Tier';
+        const header = 'Token,Chain,P&L,Sell Count,Buy Cost,Buy Gas,Sell Revenue,Sell Gas,Buy Time,Sell Time,Duration (s),Pool Type,Fee Tier';
 
         // CSV rows
         const rows = filtered.map(t => {
@@ -129,10 +130,11 @@ export function tradeRoutes(): Router {
                 t.token,
                 t.chain,
                 t.realized_pnl !== null ? String(t.realized_pnl) : '',
+                String(t.sell_count),  // D-02: sell count column
                 t.buy_cost ?? '',
                 t.buy_gas ?? '',
-                t.sell_revenue ?? '',
-                t.sell_gas ?? '',
+                String(t.sell_revenue),  // Now always a number
+                String(t.sell_gas),      // Now always a number
                 buyTimeStr,
                 sellTimeStr,
                 duration,

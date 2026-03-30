@@ -29,8 +29,9 @@ export function positionRoutes(contexts: ChainContext[]): Router {
         // Get all trades (no filters)
         const allTrades = getPnL();
 
-        // Filter to only open/pending positions: rows where sell_time is null
-        const openTrades = allTrades.filter(t => t.sell_time === null);
+        // Filter to only open/pending positions using buy_status (not sell_time)
+        // sell_time can be non-null for open positions with partial sells (D-03, Pitfall 4)
+        const openTrades = allTrades.filter(t => t.buy_status === 'pending');
 
         // For each open position, look up exit state and trade ID
         const positions = openTrades.map(trade => {
