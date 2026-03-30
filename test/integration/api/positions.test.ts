@@ -73,20 +73,23 @@ describe('GET /api/positions', () => {
     });
 
     it('returns open positions with exit state', async () => {
-        // Mock a pending PnLResult (sell_time === null means open)
+        // Mock a pending PnLResult (buy_status === 'pending' means open)
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 1,
                 token: '0xabc',
                 chain: 'eth',
                 buy_cost: '0.05',
                 buy_gas: '0.001',
-                sell_revenue: null,
-                sell_gas: null,
-                realized_pnl: null,
+                sell_revenue: 0,
+                sell_gas: 0,
+                realized_pnl: -0.051,
                 buy_time: 1700000000,
                 sell_time: null,
+                sell_count: 0,
                 pool_type: 'v2',
                 fee_tier: null,
+                buy_status: 'pending',
             },
         ]);
 
@@ -141,20 +144,23 @@ describe('GET /api/positions', () => {
         expect(res.body.positions).toEqual([]);
     });
 
-    it('filters out closed positions (sell_time not null)', async () => {
+    it('filters out closed positions (buy_status sold)', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 1,
                 token: '0xabc',
                 chain: 'eth',
                 buy_cost: '0.05',
                 buy_gas: '0.001',
-                sell_revenue: '0.10',
-                sell_gas: '0.001',
+                sell_revenue: 0.10,
+                sell_gas: 0.001,
                 realized_pnl: 0.048,
                 buy_time: 1700000000,
-                sell_time: 1700001000, // Sold - not open
+                sell_time: 1700001000,
+                sell_count: 1,
                 pool_type: 'v2',
                 fee_tier: null,
+                buy_status: 'sold',  // Sold - not open
             },
         ]);
 
@@ -168,17 +174,20 @@ describe('GET /api/positions', () => {
     it('returns null exitState when no exit state row exists', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 2,
                 token: '0xdef',
                 chain: 'bsc',
                 buy_cost: '0.02',
                 buy_gas: '0.0005',
-                sell_revenue: null,
-                sell_gas: null,
-                realized_pnl: null,
+                sell_revenue: 0,
+                sell_gas: 0,
+                realized_pnl: -0.0205,
                 buy_time: 1700000000,
                 sell_time: null,
+                sell_count: 0,
                 pool_type: 'v3',
                 fee_tier: 3000,
+                buy_status: 'pending',
             },
         ]);
 

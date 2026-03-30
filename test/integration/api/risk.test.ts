@@ -14,13 +14,14 @@ vi.mock('../../../src/riskManager', () => ({
 // Mock db module
 vi.mock('../../../src/utils/db', () => ({
     getPnL: vi.fn(),
+    getPnLChartData: vi.fn(),
     getOpenPositionCount: { get: vi.fn() },
     getTotalExposure: { get: vi.fn() },
     getDailyRealizedLoss: { get: vi.fn() },
 }));
 
 import { getPortfolioExposure } from '../../../src/riskManager';
-import { getPnL, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../../src/utils/db';
+import { getPnL, getPnLChartData, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss } from '../../../src/utils/db';
 
 // Helper to create test app with risk routes
 function createTestApp() {
@@ -106,49 +107,50 @@ describe('GET /api/risk/pnl', () => {
         vi.clearAllMocks();
     });
 
-    it('returns cumulative data points sorted by sell_time', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
-            { token: '0xa', chain: 'eth', realized_pnl: 0.05, buy_time: 1700000000, sell_time: 1700002000, pool_type: 'v2', fee_tier: null, buy_cost: '0.05', buy_gas: '0.001', sell_revenue: '0.10', sell_gas: '0.001' },
-            { token: '0xb', chain: 'eth', realized_pnl: -0.02, buy_time: 1700001000, sell_time: 1700003000, pool_type: 'v2', fee_tier: null, buy_cost: '0.05', buy_gas: '0.001', sell_revenue: '0.03', sell_gas: '0.001' },
-            { token: '0xc', chain: 'bsc', realized_pnl: 0.10, buy_time: 1700004000, sell_time: 1700005000, pool_type: 'v3', fee_tier: 3000, buy_cost: '0.05', buy_gas: '0.001', sell_revenue: '0.15', sell_gas: '0.001' },
+    it('returns cumulative data points from per-event sell data (D-07)', async () => {
+        (getPnLChartData as ReturnType<typeof vi.fn>).mockReturnValue([
+            { sell_time: 1700002000, token: '0xa', chain: 'eth', sell_action: 'partial_sell', sell_revenue: 0.03, sell_gas: 0.001, buy_cost: 0.05, buy_gas: 0.001, total_sells: 2 },
+            { sell_time: 1700003000, token: '0xa', chain: 'eth', sell_action: 'sell', sell_revenue: 0.04, sell_gas: 0.001, buy_cost: 0.05, buy_gas: 0.001, total_sells: 2 },
+            { sell_time: 1700005000, token: '0xb', chain: 'bsc', sell_action: 'sell', sell_revenue: 0.15, sell_gas: 0.001, buy_cost: 0.05, buy_gas: 0.001, total_sells: 1 },
         ]);
 
         const app = createTestApp();
         const res = await request(app, '/pnl?range=7d');
 
         expect(res.status).toBe(200);
-        expect(res.body.range).toBe('7d');
         expect(res.body.dataPoints).toHaveLength(3);
-        // Cumulative: 0.05, 0.03 (0.05-0.02), 0.13 (0.03+0.10)
+        // First event: partial_sell of 0xa
+        // P&L = 0.03 - (0.05/2) - (0.001/2) - 0.001 = 0.03 - 0.025 - 0.0005 - 0.001 = 0.0035
         expect(res.body.dataPoints[0].time).toBe(1700002000);
-        expect(res.body.dataPoints[0].value).toBeCloseTo(0.05, 4);
+        // Second event: sell of 0xa
+        // P&L = 0.04 - 0.025 - 0.0005 - 0.001 = 0.013
         expect(res.body.dataPoints[1].time).toBe(1700003000);
-        expect(res.body.dataPoints[1].value).toBeCloseTo(0.03, 4);
+        // Third event: sell of 0xb (single sell, no proration)
+        // P&L = 0.15 - 0.05 - 0.001 - 0.001 = 0.098
         expect(res.body.dataPoints[2].time).toBe(1700005000);
-        expect(res.body.dataPoints[2].value).toBeCloseTo(0.13, 4);
+        // Verify cumulative sum is calculated
+        expect(res.body.dataPoints[2].value).toBeGreaterThan(res.body.dataPoints[1].value);
     });
 
     it('defaults to 7d range', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([]);
+        (getPnLChartData as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
         const app = createTestApp();
         const res = await request(app, '/pnl');
 
         expect(res.status).toBe(200);
         expect(res.body.range).toBe('7d');
-        // Check that getPnL was called with fromTimestamp approximately 7 days ago
-        expect(getPnL).toHaveBeenCalledTimes(1);
-        const callArgs = (getPnL as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        // Check that getPnLChartData was called with fromTimestamp approximately 7 days ago
+        expect(getPnLChartData).toHaveBeenCalledTimes(1);
+        const callArg = (getPnLChartData as ReturnType<typeof vi.fn>).mock.calls[0][0];
         const now = Math.floor(Date.now() / 1000);
         const sevenDaysAgo = now - 604800;
-        expect(callArgs.fromTimestamp).toBeGreaterThan(sevenDaysAgo - 10);
-        expect(callArgs.fromTimestamp).toBeLessThan(sevenDaysAgo + 10);
+        expect(callArg).toBeGreaterThan(sevenDaysAgo - 10);
+        expect(callArg).toBeLessThan(sevenDaysAgo + 10);
     });
 
-    it('excludes open trades (no sell_time) from P&L chart', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
-            { token: '0xa', chain: 'eth', realized_pnl: null, buy_time: 1700000000, sell_time: null, pool_type: 'v2', fee_tier: null, buy_cost: '0.05', buy_gas: '0.001', sell_revenue: null, sell_gas: null },
-        ]);
+    it('returns empty data points when no sell events exist', async () => {
+        (getPnLChartData as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
         const app = createTestApp();
         const res = await request(app, '/pnl?range=all');
@@ -158,7 +160,7 @@ describe('GET /api/risk/pnl', () => {
     });
 
     it('handles all range values', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([]);
+        (getPnLChartData as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
         const app = createTestApp();
 

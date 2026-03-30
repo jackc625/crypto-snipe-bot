@@ -48,17 +48,20 @@ async function request(app: express.Express, path: string) {
 // Generate mock trades for testing
 function createMockTrades(count: number) {
     return Array.from({ length: count }, (_, i) => ({
+        buy_id: i + 1,
         token: `0xtoken${i}`,
         chain: i % 2 === 0 ? 'eth' : 'bsc',
         buy_cost: '0.05',
         buy_gas: '0.001',
-        sell_revenue: '0.10',
-        sell_gas: '0.001',
+        sell_revenue: 0.10,      // Now a number, not string
+        sell_gas: 0.001,         // Now a number, not string
         realized_pnl: i % 3 === 0 ? -0.01 : 0.048,
         buy_time: 1700000000 + i * 1000,
         sell_time: 1700001000 + i * 1000,
+        sell_count: 1,
         pool_type: 'v2',
         fee_tier: null,
+        buy_status: 'sold',
     }));
 }
 
@@ -70,17 +73,20 @@ describe('GET /api/trades', () => {
     it('filters trades by chain', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 1,
                 token: '0xabc',
                 chain: 'eth',
                 buy_cost: '0.05',
                 buy_gas: '0.001',
-                sell_revenue: '0.10',
-                sell_gas: '0.001',
+                sell_revenue: 0.10,
+                sell_gas: 0.001,
                 realized_pnl: 0.048,
                 buy_time: 1700000000,
                 sell_time: 1700001000,
+                sell_count: 1,
                 pool_type: 'v2',
                 fee_tier: null,
+                buy_status: 'sold',
             },
         ]);
 
@@ -134,17 +140,20 @@ describe('GET /api/trades', () => {
     it('returns all column groups per D-27', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 1,
                 token: '0xabc',
                 chain: 'eth',
                 buy_cost: '0.05',
                 buy_gas: '0.001',
-                sell_revenue: '0.10',
-                sell_gas: '0.001',
+                sell_revenue: 0.10,
+                sell_gas: 0.001,
                 realized_pnl: 0.048,
                 buy_time: 1700000000,
                 sell_time: 1700001000,
+                sell_count: 1,
                 pool_type: 'v3',
                 fee_tier: 3000,
+                buy_status: 'sold',
             },
         ]);
 
@@ -157,6 +166,7 @@ describe('GET /api/trades', () => {
         expect(trade.chain).toBe('eth');
         expect(trade.action).toBe('closed');
         expect(trade.pnl).toBe(0.048);
+        expect(trade.sellCount).toBe(1);
         // Timing
         expect(trade.buyTime).toBe(1700000000);
         expect(trade.sellTime).toBe(1700001000);
@@ -164,17 +174,72 @@ describe('GET /api/trades', () => {
         // Amounts
         expect(trade.buyCost).toBe('0.05');
         expect(trade.buyGas).toBe('0.001');
-        expect(trade.sellRevenue).toBe('0.10');
-        expect(trade.sellGas).toBe('0.001');
+        expect(trade.sellRevenue).toBe(0.10);
+        expect(trade.sellGas).toBe(0.001);
         // Exit
         expect(trade.poolType).toBe('v3');
         expect(trade.feeTier).toBe(3000);
     });
 
+    it('includes sellCount in response per D-02', async () => {
+        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
+            {
+                buy_id: 1,
+                token: '0xabc',
+                chain: 'eth',
+                buy_cost: '0.05',
+                buy_gas: '0.001',
+                sell_revenue: 0.10,
+                sell_gas: 0.001,
+                realized_pnl: 0.048,
+                buy_time: 1700000000,
+                sell_time: 1700001000,
+                sell_count: 3,
+                pool_type: 'v2',
+                fee_tier: null,
+                buy_status: 'sold',
+            },
+        ]);
+
+        const app = createTestApp();
+        const res = await request(app, '/');
+
+        expect(res.body.trades[0].sellCount).toBe(3);
+        expect(res.body.trades[0].action).toBe('closed');
+    });
+
+    it('shows open status for pending buy with partial sells', async () => {
+        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
+            {
+                buy_id: 1,
+                token: '0xdef',
+                chain: 'eth',
+                buy_cost: '0.05',
+                buy_gas: '0.001',
+                sell_revenue: 0.02,
+                sell_gas: 0.0005,
+                realized_pnl: -0.0315,
+                buy_time: 1700000000,
+                sell_time: 1700000500,  // non-null from partial sell
+                sell_count: 1,
+                pool_type: 'v2',
+                fee_tier: null,
+                buy_status: 'pending',  // Still open!
+            },
+        ]);
+
+        const app = createTestApp();
+        const res = await request(app, '/');
+
+        // Should be 'open' despite sell_time being non-null (partial sell taken)
+        expect(res.body.trades[0].action).toBe('open');
+        expect(res.body.trades[0].sellCount).toBe(1);
+    });
+
     it('filters by outcome profit', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
-            { token: '0xa', chain: 'eth', buy_cost: '0.05', buy_gas: '0.001', sell_revenue: '0.10', sell_gas: '0.001', realized_pnl: 0.05, buy_time: 1700000000, sell_time: 1700001000, pool_type: 'v2', fee_tier: null },
-            { token: '0xb', chain: 'eth', buy_cost: '0.05', buy_gas: '0.001', sell_revenue: '0.01', sell_gas: '0.001', realized_pnl: -0.04, buy_time: 1700002000, sell_time: 1700003000, pool_type: 'v2', fee_tier: null },
+            { buy_id: 1, token: '0xa', chain: 'eth', buy_cost: '0.05', buy_gas: '0.001', sell_revenue: 0.10, sell_gas: 0.001, realized_pnl: 0.05, buy_time: 1700000000, sell_time: 1700001000, sell_count: 1, pool_type: 'v2', fee_tier: null, buy_status: 'sold' },
+            { buy_id: 2, token: '0xb', chain: 'eth', buy_cost: '0.05', buy_gas: '0.001', sell_revenue: 0.01, sell_gas: 0.001, realized_pnl: -0.04, buy_time: 1700002000, sell_time: 1700003000, sell_count: 1, pool_type: 'v2', fee_tier: null, buy_status: 'sold' },
         ]);
 
         const app = createTestApp();
@@ -193,17 +258,20 @@ describe('GET /api/trades/export', () => {
     it('exports CSV with correct headers', async () => {
         (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
             {
+                buy_id: 1,
                 token: '0xabc',
                 chain: 'eth',
                 buy_cost: '0.05',
                 buy_gas: '0.001',
-                sell_revenue: '0.10',
-                sell_gas: '0.001',
+                sell_revenue: 0.10,
+                sell_gas: 0.001,
                 realized_pnl: 0.048,
                 buy_time: 1700000000,
                 sell_time: 1700001000,
+                sell_count: 1,
                 pool_type: 'v2',
                 fee_tier: null,
+                buy_status: 'sold',
             },
         ]);
 
@@ -217,6 +285,7 @@ describe('GET /api/trades/export', () => {
         // Check CSV header row
         expect(res.text).toContain('Token,Chain');
         expect(res.text).toContain('P&L');
+        expect(res.text).toContain('Sell Count');
         // Check data row
         expect(res.text).toContain('0xabc');
         expect(res.text).toContain('eth');

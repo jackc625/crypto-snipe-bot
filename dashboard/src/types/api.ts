@@ -29,7 +29,7 @@ export interface Trade {
   id: number;
   token: string;
   chain: string;
-  action: 'buy' | 'sell';
+  action: 'open' | 'closed';     // Derived from buy_status, not buy/sell action
   amount: string | null;
   price: number | null;
   gasUsed: string | null;
@@ -42,6 +42,7 @@ export interface Trade {
   peakPrice: number | null;
   poolType: string;
   feeTier: number | null;
+  sellCount: number;              // D-02: count of sell + partial_sell events
 }
 
 export interface Pagination {

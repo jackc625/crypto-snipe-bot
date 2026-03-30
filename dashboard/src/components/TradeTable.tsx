@@ -170,7 +170,6 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
           </thead>
           <tbody>
             {sortedTrades.map((trade) => {
-              const hasExitRevenue = trade.sellTime !== null;
               return (
                 <tr
                   key={trade.id}
@@ -184,15 +183,22 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
                     <ChainBadge chain={trade.chain} />
                   </td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-                        hasExitRevenue
-                          ? 'bg-surface-lighter text-text-muted'
-                          : 'bg-profit/20 text-profit'
-                      }`}
-                    >
-                      {hasExitRevenue ? 'closed' : 'open'}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                          trade.action === 'closed'
+                            ? 'bg-surface-lighter text-text-muted'
+                            : 'bg-profit/20 text-profit'
+                        }`}
+                      >
+                        {trade.action === 'closed' ? 'closed' : 'open'}
+                      </span>
+                      {(trade.sellCount ?? 0) > 1 && (
+                        <span className="text-xs text-text-muted">
+                          ({trade.sellCount} sells)
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className={`px-3 py-2 font-mono ${pnlColor(trade.realizedPnl)}`}>
                     {formatPnL(trade.realizedPnl)}
@@ -204,13 +210,13 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
                   {/* Amounts */}
                   <td className="px-3 py-2 font-mono text-text">{formatEth(trade.amount)}</td>
                   <td className="px-3 py-2 font-mono text-text">
-                    {hasExitRevenue && trade.price !== null
+                    {trade.action === 'closed' && trade.price !== null
                       ? formatEth(trade.price)
                       : '--'}
                   </td>
                   <td className="px-3 py-2 font-mono text-text-muted">{formatEth(trade.gasUsed)}</td>
                   <td className="px-3 py-2 font-mono text-text-muted">
-                    {hasExitRevenue ? formatEth(trade.gasUsed) : '--'}
+                    {trade.action === 'closed' ? formatEth(trade.gasUsed) : '--'}
                   </td>
                   {/* Exit */}
                   <td className="px-3 py-2">
