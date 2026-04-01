@@ -1,14 +1,11 @@
 // src/api/routes/positions.ts
-// GET /api/positions -- returns all open positions with current P&L and exit strategy state.
-// Feeds the overview table (DASH-01) with expandable position rows (D-34, D-35).
+// GET /api/positions -- returns all open positions with live on-chain prices and P&L.
+// Uses the shared buildPositionsWithLivePrices helper (D-06, D-08).
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { ChainContext } from '../../chainRegistry';
-import { getPnL } from '../../utils/db';
-import { getExitState, getTradeIdForPendingToken } from '../../utils/db';
-import { exitConfig } from '../../exitEngine';
-import type { ExitStateRow } from '../../exitEngine';
+import { buildPositionsWithLivePrices } from '../helpers/positions';
 
 // Inline async handler to avoid dependency on errorHandler middleware timing (parallel plan execution)
 function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
@@ -24,76 +21,9 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
 export function positionRoutes(contexts: ChainContext[]): Router {
     const router = Router();
 
-    // GET / -- All open positions with exit strategy details
-    router.get('/', asyncHandler(async (req: Request, res: Response) => {
-        // Get all trades (no filters)
-        const allTrades = getPnL();
-
-        // Filter to only open/pending positions using buy_status (not sell_time)
-        // sell_time can be non-null for open positions with partial sells (D-03, Pitfall 4)
-        const openTrades = allTrades.filter(t => t.buy_status === 'pending');
-
-        // For each open position, look up exit state and trade ID
-        const positions = openTrades.map(trade => {
-            // Get the trade ID for this pending token+chain
-            const tradeIdRow = getTradeIdForPendingToken.get(trade.token, trade.chain) as { id: number } | undefined;
-            const tradeId = tradeIdRow?.id ?? null;
-
-            // Look up exit state if we have a trade ID
-            let exitState: {
-                highWaterMark: number;
-                trailingActivated: boolean;
-                partialTiersCompleted: number[];
-                urgencyStartTs: number;
-                urgencyPct: number;
-                originalTokenAmount: string;
-                volatilitySamples: number[];
-            } | null = null;
-
-            if (tradeId !== null) {
-                const row = getExitState.get(tradeId) as ExitStateRow | undefined;
-                if (row) {
-                    // Parse JSON strings from DB
-                    let partialTiersCompleted: number[] = [];
-                    try { partialTiersCompleted = JSON.parse(row.partial_tiers_completed); } catch { /* empty */ }
-
-                    let volatilitySamples: number[] = [];
-                    try { volatilitySamples = JSON.parse(row.volatility_samples); } catch { /* empty */ }
-
-                    // Compute urgency percentage: min(1, (now - urgencyStartTs) / urgencyWindowMs) * 100
-                    const elapsed = Date.now() - row.urgency_start_ts;
-                    const urgencyPct = Math.min(1, elapsed / exitConfig.urgencyWindowMs) * 100;
-
-                    exitState = {
-                        highWaterMark: row.high_water_mark,
-                        trailingActivated: row.trailing_activated === 1,
-                        partialTiersCompleted,
-                        urgencyStartTs: row.urgency_start_ts,
-                        urgencyPct: Math.round(urgencyPct * 100) / 100,
-                        originalTokenAmount: row.original_token_amount,
-                        volatilitySamples,
-                    };
-                }
-            }
-
-            return {
-                tradeId,
-                token: trade.token,
-                chain: trade.chain,
-                entryPrice: exitState?.highWaterMark !== undefined
-                    ? (getExitState.get(tradeId!) as ExitStateRow | undefined)?.entry_price ?? null
-                    : null,
-                currentPrice: exitState?.highWaterMark ?? null,
-                pnl: trade.realized_pnl,
-                buyCost: trade.buy_cost,
-                buyGas: trade.buy_gas,
-                buyTime: trade.buy_time,
-                poolType: trade.pool_type,
-                feeTier: trade.fee_tier,
-                exitState,
-            };
-        });
-
+    // GET / -- All open positions with live prices and exit strategy details
+    router.get('/', asyncHandler(async (_req: Request, res: Response) => {
+        const positions = await buildPositionsWithLivePrices(contexts);
         res.json({ positions });
     }));
 

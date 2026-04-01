@@ -25,8 +25,8 @@ export function maskUrl(url: string): string {
     }
 }
 
-/** Callback type for restarting chain listeners after a stop. */
-export type RestartChainListenersCallback = (ctx: ChainContext) => Promise<void>;
+/** Callback type for restarting chain listeners after a stop (D-12: returns warnings). */
+export type RestartChainListenersCallback = (ctx: ChainContext) => Promise<{ warnings: string[] }>;
 
 /**
  * Build chain control routes.
@@ -154,16 +154,22 @@ export function chainRoutes(
 
         if (onRestart) {
             try {
-                await onRestart(ctx);
-                ctx.log.info('Chain listeners restarted via dashboard');
-                res.json({ ok: true, chain: ctx.chain.name, status: 'running' });
-            } catch (err) {
-                ctx.log.error({ err }, 'Failed to restart chain listeners');
+                const result = await onRestart(ctx);
+                ctx.log.info({ warnings: result.warnings }, 'Chain listeners restarted via dashboard');
                 res.json({
                     ok: true,
                     chain: ctx.chain.name,
                     status: 'running',
-                    note: 'Removed from stopped set but listener restart failed. May need bot restart.',
+                    warnings: result.warnings,  // D-12: always include warnings array
+                });
+            } catch (err) {
+                ctx.log.error({ err }, 'Failed to restart chain listeners');
+                // Even on full failure, chain was removed from stopped set
+                res.json({
+                    ok: true,
+                    chain: ctx.chain.name,
+                    status: 'running',
+                    warnings: [`Full restart failed: ${err instanceof Error ? err.message : String(err)}`],
                 });
             }
         } else {
@@ -172,7 +178,7 @@ export function chainRoutes(
                 ok: true,
                 chain: ctx.chain.name,
                 status: 'running',
-                note: 'Listeners removed from stopped set. Full listener restart requires bot restart.',
+                warnings: ['No restart callback configured. Full listener restart requires bot restart.'],
             });
         }
     });

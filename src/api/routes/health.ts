@@ -15,7 +15,10 @@ const startTime = Date.now();
  * Create health route handler bound to the given chain contexts.
  * Response shape per D-29; status codes per D-30.
  */
-export function healthRoutes(contexts: ChainContext[]): Router {
+export function healthRoutes(
+    contexts: ChainContext[],
+    getTelegramStatus?: () => { connected: boolean; error: string | null },
+): Router {
     const router = Router();
 
     router.get(
@@ -64,6 +67,11 @@ export function healthRoutes(contexts: ChainContext[]): Router {
             const status = anyDisconnected ? 'degraded' : 'ok';
             const statusCode = anyDisconnected ? 503 : 200;
 
+            // D-19: Telegram connection status
+            const telegramStatus = getTelegramStatus
+                ? getTelegramStatus()
+                : { connected: false, error: 'Not configured' };
+
             res.status(statusCode).json({
                 status,
                 uptime: Math.floor((Date.now() - startTime) / 1000),
@@ -73,6 +81,8 @@ export function healthRoutes(contexts: ChainContext[]): Router {
                     totalExposure: exposure.total,
                     dailyPnL,
                 },
+                telegramConnected: telegramStatus.connected,    // D-19
+                telegramError: telegramStatus.error,             // D-19
             });
         }),
     );
