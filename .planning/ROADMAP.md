@@ -185,12 +185,12 @@ Plans:
 - [x] 09-05-PLAN.md — [GAP CLOSURE] Create .npmrc for legacy-peer-deps to fix coverage-v8 installation (TEST-03)
 
 ### Phase 10: Fix partial_sell Revenue Visibility
-**Goal**: Partial sell revenue is visible to all downstream consumers — P&L queries, trade history, risk calculations, and dashboard
+**Goal**: Partial sell revenue is visible to all downstream consumers -- P&L queries, trade history, risk calculations, and dashboard
 **Depends on**: Phase 7, Phase 3
 **Requirements**: DB-04, DASH-02
 **Gap Closure:** Closes gaps from v6.16 milestone audit
 **Success Criteria** (what must be TRUE):
-  1. getPnL() includes partial_sell rows in its JOIN — partial sell proceeds appear in P&L calculations
+  1. getPnL() includes partial_sell rows in its JOIN -- partial sell proceeds appear in P&L calculations
   2. Trade history API and CSV export surface partial_sell rows alongside full sells
   3. Risk manager daily loss and exposure queries account for partial sell proceeds
 **Plans**: 2 plans
@@ -209,13 +209,14 @@ Plans:
   2. POST /api/chains/:name/start re-attaches factory event listeners via onRestart callback
   3. telegramListener is imported and started within the multi-chain bot orchestrator
 
-**Plans**: 4 plans
+**Plans**: 5 plans
 
 Plans:
+- [ ] 11-00-PLAN.md — Wave 0: Test stub files with it.todo markers for Nyquist compliance (DASH-01, DASH-03, FIX-09)
 - [ ] 11-01-PLAN.md — Foundation modules: shared positions helper with live queryPrice, telegram listener refactor for multi-chain (DASH-01, FIX-09)
 - [ ] 11-02-PLAN.md — Backend wiring: positions route, chain restart, health status, bot.ts orchestrator, server.ts (DASH-01, DASH-03, FIX-09)
 - [ ] 11-03-PLAN.md — Dashboard UI: stale price indicator, telegram status in sidebar, chain restart warnings (DASH-01, DASH-03, FIX-09)
-- [ ] 11-04-PLAN.md — Tests: unit tests for helper/restart/telegram, integration test updates for endpoints (DASH-01, DASH-03, FIX-09)
+- [ ] 11-04-PLAN.md — Tests: unit tests for helper/restart/telegram, integration tests for endpoints, WS push test (DASH-01, DASH-03, FIX-09)
 
 ## Progress
 
@@ -235,4 +236,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
-| 11. Dashboard Accuracy & Bot Wiring | 0/4 | Planned | - |
+| 11. Dashboard Accuracy & Bot Wiring | 0/5 | Planned | - |
