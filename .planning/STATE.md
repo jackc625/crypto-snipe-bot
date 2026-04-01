@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 11-00-PLAN.md
-last_updated: "2026-04-01T18:35:32.565Z"
+status: Executing
+stopped_at: Wave 1 complete (11-00, 11-01)
+last_updated: "2026-04-01T18:40:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 10 — partial-sell-revenue-fix (complete)
+**Current focus:** Phase 11 — dashboard-accuracy-bot-wiring (in progress)
 
 ## Current Position
 
 Phase: 11
-Plan: Not started
+Plan: 1 of 5 complete
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Plan: Not started
 | Phase 10 P01 | 7min | 2 tasks | 4 files |
 | Phase 10 P02 | 9min | 2 tasks | 8 files |
 | Phase 11 P00 | 1min | 1 tasks | 3 files |
+| Phase 11 P01 | 4min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -185,6 +186,9 @@ Recent decisions affecting current work:
 - [Phase 10]: Correlated subquery for exposure reduction (partial_sell proceeds subtracted from buy amount_in)
 - [Phase 10]: Separate getPnLChartData query for per-event granularity vs getPnL per-position aggregation
 - [Phase 11]: Pure it.todo stubs with no source imports -- modules do not exist yet at Wave 0
+- [Phase 11]: Unrealized P&L formula: (currentPrice/1e18) + sell_revenue - buy_cost - sell_gas (approximation acceptable for v1)
+- [Phase 11]: Dynamic import('./bot') in alphaDrop.ts to avoid circular dependency with telegramListener
+- [Phase 11]: V3_FACTORY_ABI extended with getPool function for pool discovery in alpha drops
 
 ### Pending Todos
 
@@ -198,6 +202,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T18:35:32.558Z
-Stopped at: Completed 11-00-PLAN.md
-Resume file: None
+Last session: 2026-04-01T18:40:00.000Z
+Stopped at: Wave 1 complete (11-00, 11-01)
+Resume file: .planning/phases/11-dashboard-accuracy-bot-wiring/11-02-PLAN.md
