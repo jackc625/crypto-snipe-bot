@@ -17,7 +17,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 - [x] **FIX-06**: All required environment variables are validated on startup with clear error messages listing what's missing
 - [x] **FIX-07**: Timed sell timeout is cancelled when position is already sold via stop-loss or take-profit
 - [x] **FIX-08**: Monitoring loops exit when token balance reaches zero instead of polling indefinitely
-- [ ] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
+- [x] **FIX-09**: Telegram alpha listener only processes messages from whitelisted sender IDs
 
 ### Infrastructure — ethers v6 Migration
 
@@ -72,7 +72,7 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 ### Monitoring & Web Dashboard
 
 - [x] **MON-01**: HTTP health check endpoint exposes bot liveness, chain connectivity status, and open position count
-- [ ] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
+- [x] **DASH-01**: Web dashboard displays real-time open positions with current P&L per token and chain
 - [x] **DASH-02**: Historical trade log with filtering by chain, date range, and profit/loss
 - [ ] **DASH-03**: Bot controls accessible from dashboard (start/stop per chain, adjust snipe parameters)
 - [x] **DASH-04**: Risk dashboard shows portfolio exposure, daily P&L curve, and position limit utilization
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-06 | Phase 1 | Complete |
 | FIX-07 | Phase 1 | Complete |
 | FIX-08 | Phase 1 | Complete |
-| FIX-09 | Phase 11 | Pending |
+| FIX-09 | Phase 11 | Complete |
 | ETH6-01 | Phase 2 | Complete |
 | ETH6-02 | Phase 2 | Complete |
 | ETH6-03 | Phase 2 | Complete |
@@ -159,7 +159,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXIT-03 | Phase 7 | Complete |
 | EXIT-04 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Complete |
-| DASH-01 | Phase 11 | Pending |
+| DASH-01 | Phase 11 | Complete |
 | DASH-02 | Phase 10 | Complete |
 | DASH-03 | Phase 11 | Pending |
 | DASH-04 | Phase 8 | Complete |
