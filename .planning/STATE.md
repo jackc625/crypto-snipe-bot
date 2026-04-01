@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Executing
-stopped_at: Wave 1 complete (11-00, 11-01)
-last_updated: "2026-04-01T18:40:00.000Z"
+status: Ready to execute
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-04-01T18:53:25.330Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 43
-  completed_plans: 39
+  completed_plans: 41
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 11
-Plan: 1 of 5 complete
+Plan: 2 of 5 complete
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Plan: 1 of 5 complete
 | Phase 10 P02 | 9min | 2 tasks | 8 files |
 | Phase 11 P00 | 1min | 1 tasks | 3 files |
 | Phase 11 P01 | 4min | 2 tasks | 4 files |
+| Phase 11 P03 | 5min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -189,6 +190,9 @@ Recent decisions affecting current work:
 - [Phase 11]: Unrealized P&L formula: (currentPrice/1e18) + sell_revenue - buy_cost - sell_gas (approximation acceptable for v1)
 - [Phase 11]: Dynamic import('./bot') in alphaDrop.ts to avoid circular dependency with telegramListener
 - [Phase 11]: V3_FACTORY_ABI extended with getPool function for pool discovery in alpha drops
+- [Phase 11]: Layout.tsx fetches /health via useApi to derive telegramStatus -- avoids adding telegram state to WebSocket context
+- [Phase 11]: telegramStatus 'not-configured' uses StatusDot 'disconnected' (red) with distinct label text for user clarity
+- [Phase 11]: Per-chain warnings stored as Record<string, string[]> in ChainControls state, cleared on new start/stop action
 
 ### Pending Todos
 
@@ -202,6 +206,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T18:40:00.000Z
-Stopped at: Wave 1 complete (11-00, 11-01)
-Resume file: .planning/phases/11-dashboard-accuracy-bot-wiring/11-02-PLAN.md
+Last session: 2026-04-01T18:53:25.325Z
+Stopped at: Completed 11-03-PLAN.md
+Resume file: None
