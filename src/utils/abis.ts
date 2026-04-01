@@ -48,7 +48,8 @@ export const TOKEN_LIMITS_ABI = [
 
 // -- V3 Factory --
 export const V3_FACTORY_ABI = [
-    "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)"
+    "event PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
+    "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)"
 ];
 
 // -- V3 Pool --
