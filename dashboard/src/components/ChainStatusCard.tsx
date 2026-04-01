@@ -5,6 +5,8 @@ interface ChainStatusCardProps {
   chain: ChainStatus;
   onStop: () => void;
   onStart: () => void;
+  warnings?: string[];            // D-12: restart warnings from backend
+  onDismissWarnings?: () => void;  // Dismiss handler for warning banner
 }
 
 const statusLabels: Record<string, string> = {
@@ -22,7 +24,7 @@ function maskRpcUrl(url: string): string {
   }
 }
 
-export function ChainStatusCard({ chain, onStop, onStart }: ChainStatusCardProps) {
+export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWarnings }: ChainStatusCardProps) {
   const status = chain.status;
 
   return (
@@ -63,6 +65,28 @@ export function ChainStatusCard({ chain, onStop, onStart }: ChainStatusCardProps
           </button>
         )}
       </div>
+
+      {/* Restart warnings banner (D-12) */}
+      {warnings && warnings.length > 0 && (
+        <div className="border-l-2 border-warning bg-surface rounded-r-lg px-4 py-3 mb-4 relative">
+          {onDismissWarnings && (
+            <button
+              onClick={onDismissWarnings}
+              className="absolute top-2 right-2 text-text-muted hover:text-text transition-colors"
+              aria-label="Dismiss warnings"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+          {warnings.map((w, i) => (
+            <p key={i} className="text-sm text-warning">
+              {w}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Config sections */}
       <div className="space-y-3 text-sm">

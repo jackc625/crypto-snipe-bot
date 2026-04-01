@@ -1,6 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { useWs } from '../hooks/WebSocketContext';
+import { useApi } from '../hooks/useApi';
+import type { HealthResponse } from '../types/api';
 
 const SIDEBAR_KEY = 'sidebar-collapsed';
 
@@ -13,6 +15,13 @@ export function Layout({ children }: LayoutProps) {
     return localStorage.getItem(SIDEBAR_KEY) === 'true';
   });
   const { connected } = useWs();
+  const { data: healthData } = useApi<HealthResponse>('/health');
+
+  const telegramStatus: 'connected' | 'disconnected' | 'not-configured' = healthData?.telegramConnected
+    ? 'connected'
+    : healthData?.telegramError === 'Not configured' || !healthData
+    ? 'not-configured'
+    : 'disconnected';
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_KEY, String(collapsed));
@@ -24,6 +33,7 @@ export function Layout({ children }: LayoutProps) {
         collapsed={collapsed}
         onToggle={() => setCollapsed((prev) => !prev)}
         wsConnected={connected}
+        telegramStatus={telegramStatus}
       />
       <main className="flex-1 overflow-y-auto p-8">
         {children}

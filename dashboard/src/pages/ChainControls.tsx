@@ -20,12 +20,18 @@ export function ChainControls() {
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [emergencyError, setEmergencyError] = useState<string | null>(null);
+  const [chainWarnings, setChainWarnings] = useState<Record<string, string[]>>({});
 
   const handleStopConfirm = async () => {
     if (dialog.type !== 'stop') return;
     const chainName = dialog.chain.name;
     setDialog({ type: 'none' });
     setActionError(null);
+    setChainWarnings(prev => {
+      const next = { ...prev };
+      delete next[chainName];
+      return next;
+    });
 
     try {
       const res = await fetch(`/api/chains/${chainName}/stop`, {
@@ -48,6 +54,11 @@ export function ChainControls() {
     const chainName = dialog.chain.name;
     setDialog({ type: 'none' });
     setActionError(null);
+    setChainWarnings(prev => {
+      const next = { ...prev };
+      delete next[chainName];
+      return next;
+    });
 
     try {
       const res = await fetch(`/api/chains/${chainName}/start`, {
@@ -57,6 +68,10 @@ export function ChainControls() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(body.error || 'Unknown error');
+      }
+      const data = await res.json();
+      if (data.warnings?.length > 0) {
+        setChainWarnings(prev => ({ ...prev, [chainName]: data.warnings }));
       }
       refetch();
     } catch (err) {
@@ -132,6 +147,12 @@ export function ChainControls() {
             chain={chain}
             onStop={() => setDialog({ type: 'stop', chain })}
             onStart={() => setDialog({ type: 'start', chain })}
+            warnings={chainWarnings[chain.name]}
+            onDismissWarnings={() => setChainWarnings(prev => {
+              const next = { ...prev };
+              delete next[chain.name];
+              return next;
+            })}
           />
         ))}
       </div>

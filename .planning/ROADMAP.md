@@ -215,7 +215,7 @@ Plans:
 - [x] 11-00-PLAN.md — Wave 0: Test stub files with it.todo markers for Nyquist compliance (DASH-01, DASH-03, FIX-09)
 - [x] 11-01-PLAN.md — Foundation modules: shared positions helper with live queryPrice, telegram listener refactor for multi-chain (DASH-01, FIX-09)
 - [x] 11-02-PLAN.md — Backend wiring: positions route, chain restart, health status, bot.ts orchestrator, server.ts (DASH-01, DASH-03, FIX-09)
-- [ ] 11-03-PLAN.md — Dashboard UI: stale price indicator, telegram status in sidebar, chain restart warnings (DASH-01, DASH-03, FIX-09)
+- [x] 11-03-PLAN.md — Dashboard UI: stale price indicator, telegram status in sidebar, chain restart warnings (DASH-01, DASH-03, FIX-09)
 - [ ] 11-04-PLAN.md — Tests: unit tests for helper/restart/telegram, integration tests for endpoints, WS push test (DASH-01, DASH-03, FIX-09)
 
 ## Progress

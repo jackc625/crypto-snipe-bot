@@ -6,6 +6,7 @@ interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   wsConnected: boolean;
+  telegramStatus: 'connected' | 'disconnected' | 'not-configured';
 }
 
 const navItems = [
@@ -15,7 +16,7 @@ const navItems = [
   { to: '/chains', icon: Settings, label: 'Chain Controls' },
 ];
 
-export function Sidebar({ collapsed, onToggle, wsConnected }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, wsConnected, telegramStatus }: SidebarProps) {
   return (
     <nav
       className={`flex flex-col bg-surface-light border-r border-border h-screen shrink-0 transition-all duration-200 ${
@@ -47,11 +48,30 @@ export function Sidebar({ collapsed, onToggle, wsConnected }: SidebarProps) {
 
       {/* Footer: WebSocket status + toggle */}
       <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-1">
           <StatusDot status={wsConnected ? 'connected' : 'reconnecting'} />
           {!collapsed && (
             <span className="text-xs text-text-muted">
               {wsConnected ? 'Connected' : 'Reconnecting...'}
+            </span>
+          )}
+        </div>
+        {/* Telegram status */}
+        <div className="flex items-center gap-2 mt-1 mb-3">
+          <StatusDot
+            status={
+              telegramStatus === 'connected'
+                ? 'connected'
+                : 'disconnected'
+            }
+          />
+          {!collapsed && (
+            <span className="text-xs text-text-muted">
+              {telegramStatus === 'connected'
+                ? 'Telegram: Connected'
+                : telegramStatus === 'not-configured'
+                ? 'Telegram: Not configured'
+                : 'Telegram: Disconnected'}
             </span>
           )}
         </div>
