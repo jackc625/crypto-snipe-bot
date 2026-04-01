@@ -16,12 +16,15 @@ export interface Position {
   chain: string;
   entryPrice: number | null;
   currentPrice: number | null;
+  priceStale: boolean;              // D-03: true when live price unavailable, fell back to highWaterMark
+  unrealizedPnl: number | null;     // D-05: live unrealized P&L with net cost basis
   pnl: number | null;
   buyCost: string | null;
   buyGas: string | null;
   buyTime: number;
   poolType: string;
   feeTier: number | null;
+  sellRevenue: number;              // Aggregated sell revenue from partial sells
   exitState: ExitStateInfo | null;
 }
 
@@ -98,6 +101,8 @@ export interface HealthResponse {
     totalExposure: number;
     dailyPnL: number;
   };
+  telegramConnected: boolean;       // D-19: Telegram client connection status
+  telegramError: string | null;     // D-19: Error message when disconnected
   version: string;
 }
 

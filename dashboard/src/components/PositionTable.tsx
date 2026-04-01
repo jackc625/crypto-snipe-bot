@@ -11,10 +11,10 @@ interface PositionTableProps {
 export function PositionTable({ positions, onForceSell }: PositionTableProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  // Sort by P&L by default (descending)
+  // Sort by unrealized P&L by default (descending), fall back to realized pnl
   const sorted = [...positions].sort((a, b) => {
-    const aPnl = a.pnl ?? 0;
-    const bPnl = b.pnl ?? 0;
+    const aPnl = a.unrealizedPnl ?? a.pnl ?? 0;
+    const bPnl = b.unrealizedPnl ?? b.pnl ?? 0;
     return bPnl - aPnl;
   });
 
@@ -101,9 +101,17 @@ function PositionRow({ position, expanded, onToggle, onForceSell, exitMode, time
         <td className="px-4 py-3 text-sm font-mono">{formatAddress(pos.token)}</td>
         <td className="px-4 py-3"><ChainBadge chain={pos.chain} /></td>
         <td className="px-4 py-3 text-sm text-right font-mono">{formatEth(pos.entryPrice)}</td>
-        <td className="px-4 py-3 text-sm text-right font-mono">{formatEth(pos.currentPrice)}</td>
-        <td className={`px-4 py-3 text-sm text-right font-mono ${pnlColor(pos.pnl)}`}>
-          {formatPnL(pos.pnl)}
+        <td
+          className={`px-4 py-3 text-sm text-right font-mono ${pos.priceStale ? 'text-warning' : ''}`}
+          title={pos.priceStale ? 'Live price unavailable. Showing last known value.' : undefined}
+        >
+          {formatEth(pos.currentPrice)}
+          {pos.priceStale && (
+            <span className="text-xs text-text-muted ml-1">(stale)</span>
+          )}
+        </td>
+        <td className={`px-4 py-3 text-sm text-right font-mono ${pnlColor(pos.unrealizedPnl ?? pos.pnl)}`}>
+          {formatPnL(pos.unrealizedPnl ?? pos.pnl)}
         </td>
         <td className="px-4 py-3 text-sm">{exitMode}</td>
         <td className="px-4 py-3 text-sm text-right text-text-muted">{timeHeld}</td>
