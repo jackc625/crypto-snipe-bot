@@ -16,13 +16,13 @@ import { authRoutes } from './routes/auth';
 import { positionRoutes } from './routes/positions';
 import { tradeRoutes } from './routes/trades';
 import { riskRoutes } from './routes/risk';
-import { chainRoutes } from './routes/chains';
+import { chainRoutes, RestartChainListenersCallback } from './routes/chains';
 import { controlRoutes } from './routes/controls';
 import { authMiddleware, sessions } from './middleware/auth';
 import { errorMiddleware } from './middleware/errorHandler';
 import { handleUpgrade } from './ws/handler';
 import { broadcast, getClientCount } from './ws/broadcaster';
-import { getPnL } from '../utils/db';
+import { buildPositionsWithLivePrices } from './helpers/positions';
 import { logger } from '../utils/logger';
 
 const log = logger.child({ module: 'api' });
@@ -37,7 +37,11 @@ const stoppedChains = new Set<string>();
  * @param contexts - Active chain contexts for health and status queries
  * @returns Object with close() method for graceful shutdown
  */
-export function startApiServer(contexts: ChainContext[]): { close: () => void } {
+export function startApiServer(
+    contexts: ChainContext[],
+    onRestart?: RestartChainListenersCallback,
+    getTelegramStatus?: () => { connected: boolean; error: string | null },
+): { close: () => void } {
     const app = express();
     const server = createServer(app);
     const wss = new WebSocketServer({ noServer: true });
@@ -51,7 +55,7 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
     // --- Routes (order matters per Pitfall 8) ---
 
     // 1. Health check -- unauthenticated (D-20)
-    app.use('/health', healthRoutes(contexts));
+    app.use('/health', healthRoutes(contexts, getTelegramStatus));
 
     // 2. Auth routes -- unauthenticated (login endpoint)
     app.use('/api/auth', authRoutes());
@@ -61,7 +65,7 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
     apiRouter.use('/positions', positionRoutes(contexts));
     apiRouter.use('/trades', tradeRoutes());
     apiRouter.use('/risk', riskRoutes(contexts));
-    apiRouter.use('/chains', chainRoutes(contexts, stoppedChains));
+    apiRouter.use('/chains', chainRoutes(contexts, stoppedChains, onRestart));
     apiRouter.use('/controls', controlRoutes(contexts));
     app.use('/api', authMiddleware, apiRouter);
 
@@ -86,31 +90,13 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
     // --- WebSocket upgrade (Pitfall 1: use server 'upgrade' event) ---
     server.on('upgrade', handleUpgrade(wss, sessions));
 
-    // --- Position broadcast interval (D-09: every 5 seconds) ---
-    const broadcastInterval = setInterval(() => {
+    // --- Position broadcast interval (D-07, D-08: shared helper, every 5 seconds) ---
+    const broadcastInterval = setInterval(async () => {
         if (getClientCount() === 0) return;
 
         try {
-            // Build actual open positions array matching REST /api/positions shape
-            const allTrades = getPnL();
-            const openPositions = allTrades
-                .filter((t) => t.sell_time === null)
-                .map((t) => ({
-                    tradeId: null,
-                    token: t.token,
-                    chain: t.chain,
-                    entryPrice: null,
-                    currentPrice: null,
-                    pnl: t.realized_pnl,
-                    buyCost: t.buy_cost,
-                    buyGas: t.buy_gas,
-                    buyTime: t.buy_time,
-                    poolType: t.pool_type,
-                    feeTier: t.fee_tier,
-                    exitState: null,
-                }));
+            const positions = await buildPositionsWithLivePrices(contexts);
 
-            // Chain status
             const chainStatuses = contexts.map((ctx) => ({
                 name: ctx.chain.name,
                 displayName: ctx.chain.displayName,
@@ -118,7 +104,7 @@ export function startApiServer(contexts: ChainContext[]): { close: () => void } 
             }));
 
             broadcast('positions_update', {
-                positions: openPositions,
+                positions,
                 chains: chainStatuses,
             });
         } catch (err) {

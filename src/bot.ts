@@ -31,7 +31,7 @@ import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
 import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken } from "./utils/db";
 import { logger } from "./utils/logger";
-import { getProvider, getWallet, removeWsProvider } from "./utils/provider";
+import { getProvider, getWallet, getWsProvider, removeWsProvider } from "./utils/provider";
 import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
 import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
 import {
@@ -53,6 +53,7 @@ import {
 } from "./chainRegistry";
 import { canSnipe, recordSnipe } from "./riskManager";
 import { startApiServer } from './api/server';
+import { startTelegramListener, TelegramListenerHandle } from './telegramListener';
 
 // Legacy singleton instances -- kept for backward-compatible handleNewPair() and startBot()
 const provider = getProvider();
@@ -745,7 +746,7 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
 // WebSocket listener with auto-reconnect (per D-11)
 // ---------------------------------------------------------------------------
 
-async function startDexListener(
+export async function startDexListener(
     ctx: ChainContext,
     dex: DexConfig,
     _registry: Map<string, ChainConfig>
@@ -962,12 +963,77 @@ export async function startMultiChainBot(): Promise<void> {
     // 7. Resume monitoring for pending trades (chain-aware)
     resumeMultiChainMonitoring(contexts);
 
-    // 7.5. Start API/dashboard server (per D-03: same process)
-    const apiServer = startApiServer(contexts);
+    // 7.5. Build onRestart callback for chain restart via dashboard (revised D-09)
+    const onRestart = async (ctx: ChainContext): Promise<{ warnings: string[] }> => {
+        const warnings: string[] = [];
+
+        // D-11: Reconnect WebSocket provider if disconnected
+        if (!ctx.wsProvider || ctx.wsProvider.destroyed) {
+            if (ctx.chain.wsRpcUrl) {
+                removeWsProvider(ctx.chain.name);
+                const newWs = getWsProvider(ctx.chain.name, ctx.chain.wsRpcUrl, ctx.chain.chainId);
+                ctx.wsProvider = newWs;
+                ctx.log.info('WebSocket provider reconnected for chain restart');
+            } else {
+                warnings.push('No WebSocket URL configured, using HTTP polling');
+            }
+        }
+
+        // D-10: MEV health check (warn only, don't block)
+        try {
+            const strategy = createMevStrategy(ctx.chain);
+            const mevHealthy = await strategy.healthCheck();
+            if (!mevHealthy) {
+                warnings.push('MEV service unreachable');
+                ctx.log.warn('MEV service unreachable during chain restart');
+            }
+        } catch (err) {
+            warnings.push(`MEV health check failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        // Re-attach listeners per DEX (D-12: collect per-DEX results)
+        for (const dex of ctx.chain.dexes) {
+            try {
+                await startDexListener(ctx, dex, registry);
+                ctx.log.info({ dex: dex.name }, 'DEX listener restarted');
+            } catch (err) {
+                const msg = `Failed to restart ${dex.name}: ${err instanceof Error ? err.message : String(err)}`;
+                warnings.push(msg);
+                ctx.log.error({ err, dex: dex.name }, 'Failed to restart DEX listener');
+            }
+        }
+
+        if (warnings.length > 0) {
+            ctx.log.warn({ warnings }, 'Chain restarted with warnings');
+        }
+
+        return { warnings };
+    };
+
+    // 7.6. Declare telegram handle before starting API server (closure captures mutable reference)
+    let telegramHandle: TelegramListenerHandle = { client: null, connected: false };
+
+    // 7.7. Start API/dashboard server with onRestart and telegram status getter (per D-03, revised D-09)
+    const apiServer = startApiServer(contexts, onRestart, () => ({
+        connected: telegramHandle.connected,
+        error: !telegramHandle.connected ? 'Not connected' : null,
+    }));
     mainLog.info('API server started');
 
-    // 8. Shutdown handler
-    initMultiChainShutdownHandler(contexts, apiServer);
+    // 7.8. Start Telegram listener (D-13, D-14, D-15)
+    try {
+        telegramHandle = await startTelegramListener(contexts);
+        if (telegramHandle.connected) {
+            mainLog.info('Telegram listener integrated into orchestrator');
+        } else {
+            mainLog.info('Telegram listener skipped (not configured or failed to connect)');
+        }
+    } catch (err) {
+        mainLog.error({ err }, 'Unexpected error starting Telegram listener');
+    }
+
+    // 8. Shutdown handler (D-20: includes telegram disconnect)
+    initMultiChainShutdownHandler(contexts, apiServer, telegramHandle);
 
     mainLog.info({ chains: contexts.map(c => c.chain.name) }, 'Multi-chain bot fully started');
 }
@@ -1024,7 +1090,11 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
 // Multi-chain shutdown handler
 // ---------------------------------------------------------------------------
 
-function initMultiChainShutdownHandler(contexts: ChainContext[], apiServer?: { close: () => void }): void {
+function initMultiChainShutdownHandler(
+    contexts: ChainContext[],
+    apiServer?: { close: () => void },
+    telegramHandle?: TelegramListenerHandle,
+): void {
     let shuttingDown = false;
 
     function gracefulShutdown(signal: string): void {
@@ -1037,6 +1107,13 @@ function initMultiChainShutdownHandler(contexts: ChainContext[], apiServer?: { c
         if (apiServer) {
             log.info('Closing API server...');
             apiServer.close();
+        }
+
+        // Disconnect Telegram client (D-20)
+        if (telegramHandle?.client) {
+            telegramHandle.client.disconnect().catch(e => {
+                log.warn({ err: e }, 'Error disconnecting Telegram client');
+            });
         }
 
         // Clear all timers across all chains
