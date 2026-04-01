@@ -202,5 +202,50 @@ describe('Chain Routes', () => {
             expect(res.status).toBe(400);
             expect(res.body.error).toBe('Chain is already running');
         });
+
+        it('returns warnings array from onRestart callback (D-12)', async () => {
+            const ctx = createMockChainContext({ name: 'eth' });
+            stoppedChains.add('eth');
+
+            const onRestart = vi.fn().mockResolvedValue({
+                warnings: ['MEV unreachable', 'DEX uniswap-v3 failed to restart'],
+            });
+
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains, onRestart));
+
+            const res = await request(app, 'POST', '/api/chains/eth/start');
+            expect(res.status).toBe(200);
+            expect(res.body.ok).toBe(true);
+            expect(res.body.status).toBe('running');
+            expect(res.body.warnings).toEqual(['MEV unreachable', 'DEX uniswap-v3 failed to restart']);
+            expect(onRestart).toHaveBeenCalledOnce();
+        });
+
+        it('returns empty warnings array on successful restart', async () => {
+            const ctx = createMockChainContext({ name: 'eth' });
+            stoppedChains.add('eth');
+
+            const onRestart = vi.fn().mockResolvedValue({ warnings: [] });
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains, onRestart));
+
+            const res = await request(app, 'POST', '/api/chains/eth/start');
+            expect(res.status).toBe(200);
+            expect(res.body.warnings).toEqual([]);
+        });
+
+        it('returns warning about needing bot restart when no onRestart callback', async () => {
+            const ctx = createMockChainContext({ name: 'eth' });
+            stoppedChains.add('eth');
+
+            // No onRestart passed
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains));
+
+            const res = await request(app, 'POST', '/api/chains/eth/start');
+            expect(res.status).toBe(200);
+            expect(res.body.ok).toBe(true);
+            expect(res.body.warnings).toBeInstanceOf(Array);
+            expect(res.body.warnings.length).toBeGreaterThan(0);
+            expect(res.body.warnings[0]).toContain('restart');
+        });
     });
 });

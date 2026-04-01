@@ -91,4 +91,43 @@ describe('GET /health', () => {
         expect(chains[0].name).toBe('eth');
         expect(chains[0].latestBlock).toBe(12345678);
     });
+
+    // D-19: Telegram status tests
+    it('includes telegramConnected: true when getter reports connected', async () => {
+        const ctx = createMockChainContext();
+        const getTelegramStatus = () => ({ connected: true, error: null });
+        const app = express();
+        app.use('/health', healthRoutes([ctx], getTelegramStatus));
+
+        const { status, body } = await requestHealth(app);
+
+        expect(status).toBe(200);
+        expect(body.telegramConnected).toBe(true);
+        expect(body.telegramError).toBeNull();
+    });
+
+    it('includes telegramConnected: false when getter reports not configured', async () => {
+        const ctx = createMockChainContext();
+        const getTelegramStatus = () => ({ connected: false, error: 'Not configured' });
+        const app = express();
+        app.use('/health', healthRoutes([ctx], getTelegramStatus));
+
+        const { status, body } = await requestHealth(app);
+
+        expect(status).toBe(200);
+        expect(body.telegramConnected).toBe(false);
+        expect(body.telegramError).toBe('Not configured');
+    });
+
+    it('defaults telegramConnected to false when no getter provided', async () => {
+        const ctx = createMockChainContext();
+        const app = express();
+        // No getTelegramStatus parameter
+        app.use('/health', healthRoutes([ctx]));
+
+        const { status, body } = await requestHealth(app);
+
+        expect(status).toBe(200);
+        expect(body.telegramConnected).toBe(false);
+    });
 });

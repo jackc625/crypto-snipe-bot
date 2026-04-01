@@ -1,35 +1,17 @@
 // test/integration/api/positions.test.ts
 // Tests for GET /api/positions endpoint.
-// Verifies open positions returned with exit state data.
+// Verifies open positions returned with live prices, priceStale flag, and unrealizedPnl.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
+
+// Mock the shared positions helper (route delegates entirely to this)
+vi.mock('../../../src/api/helpers/positions', () => ({
+    buildPositionsWithLivePrices: vi.fn(),
+}));
+
 import { positionRoutes } from '../../../src/api/routes/positions';
-
-// Mock db module
-vi.mock('../../../src/utils/db', () => ({
-    getPnL: vi.fn(),
-    getExitState: { get: vi.fn() },
-    getTradeIdForPendingToken: { get: vi.fn() },
-}));
-
-// Mock exitEngine to avoid loading CONFIG
-vi.mock('../../../src/exitEngine', () => ({
-    exitConfig: {
-        urgencyWindowMs: 3600000, // 1 hour for test
-        trailingStopPct: 10,
-        trailingMinPct: 5,
-        trailingMaxPct: 25,
-        stopLossPct: 15,
-        partialSellTiers: [],
-        pollIntervalMs: 5000,
-        volatilityBaselineCV: 0.1,
-        volatilityMaxSamples: 100,
-        volatilityMinSamples: 5,
-    },
-}));
-
-import { getPnL, getExitState, getTradeIdForPendingToken } from '../../../src/utils/db';
+import { buildPositionsWithLivePrices } from '../../../src/api/helpers/positions';
 
 // Helper to make requests against the route
 function createTestApp() {
@@ -70,43 +52,38 @@ async function request(app: express.Express, path: string) {
 describe('GET /api/positions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        // Restore mock implementation after clearAllMocks
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     });
 
-    it('returns open positions with exit state', async () => {
-        // Mock a pending PnLResult (buy_status === 'pending' means open)
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
+    it('returns positions with live prices (priceStale: false)', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
             {
-                buy_id: 1,
+                tradeId: 42,
                 token: '0xabc',
                 chain: 'eth',
-                buy_cost: '0.05',
-                buy_gas: '0.001',
-                sell_revenue: 0,
-                sell_gas: 0,
-                realized_pnl: -0.051,
-                buy_time: 1700000000,
-                sell_time: null,
-                sell_count: 0,
-                pool_type: 'v2',
-                fee_tier: null,
-                buy_status: 'pending',
+                entryPrice: 0.0001,
+                currentPrice: 0.012,
+                priceStale: false,
+                unrealizedPnl: 0.049,
+                pnl: -0.051,
+                buyCost: '0.05',
+                buyGas: '0.001',
+                buyTime: 1700000000,
+                poolType: 'v2',
+                feeTier: null,
+                sellRevenue: 0.03,
+                exitState: {
+                    highWaterMark: 0.015,
+                    trailingActivated: true,
+                    partialTiersCompleted: [0, 1],
+                    urgencyStartTs: Date.now() - 1800000,
+                    urgencyPct: 50,
+                    originalTokenAmount: '1000000000000000000',
+                    volatilitySamples: [0.0001, 0.0002],
+                },
             },
         ]);
-
-        // Mock trade ID lookup
-        (getTradeIdForPendingToken.get as ReturnType<typeof vi.fn>).mockReturnValue({ id: 42 });
-
-        // Mock exit state row
-        (getExitState.get as ReturnType<typeof vi.fn>).mockReturnValue({
-            trade_id: 42,
-            entry_price: 0.0001,
-            high_water_mark: 0.0005,
-            trailing_activated: 1,
-            partial_tiers_completed: '[0,1]',
-            original_token_amount: '1000000000000000000',
-            urgency_start_ts: Date.now() - 1800000, // 30 min ago
-            volatility_samples: '[0.0001,0.0002,0.0005]',
-        });
 
         const app = createTestApp();
         const res = await request(app, '/');
@@ -121,85 +98,95 @@ describe('GET /api/positions', () => {
         expect(pos.buyCost).toBe('0.05');
         expect(pos.buyTime).toBe(1700000000);
         expect(pos.poolType).toBe('v2');
+        expect(pos.currentPrice).toBe(0.012);
+        expect(pos.priceStale).toBe(false);
+        expect(pos.unrealizedPnl).toBe(0.049);
+        expect(pos.sellRevenue).toBe(0.03);
 
         // Exit state should be populated
         expect(pos.exitState).not.toBeNull();
-        expect(pos.exitState.highWaterMark).toBe(0.0005);
+        expect(pos.exitState.highWaterMark).toBe(0.015);
         expect(pos.exitState.trailingActivated).toBe(true);
         expect(pos.exitState.partialTiersCompleted).toEqual([0, 1]);
-        expect(pos.exitState.originalTokenAmount).toBe('1000000000000000000');
-        expect(pos.exitState.volatilitySamples).toEqual([0.0001, 0.0002, 0.0005]);
-        // Urgency should be ~50% (30min of 60min window)
-        expect(pos.exitState.urgencyPct).toBeGreaterThan(40);
-        expect(pos.exitState.urgencyPct).toBeLessThan(60);
     });
 
-    it('returns empty array when no positions', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([]);
-
-        const app = createTestApp();
-        const res = await request(app, '/');
-
-        expect(res.status).toBe(200);
-        expect(res.body.positions).toEqual([]);
-    });
-
-    it('filters out closed positions (buy_status sold)', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
+    it('returns stale price when queryPrice fails', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
             {
-                buy_id: 1,
-                token: '0xabc',
-                chain: 'eth',
-                buy_cost: '0.05',
-                buy_gas: '0.001',
-                sell_revenue: 0.10,
-                sell_gas: 0.001,
-                realized_pnl: 0.048,
-                buy_time: 1700000000,
-                sell_time: 1700001000,
-                sell_count: 1,
-                pool_type: 'v2',
-                fee_tier: null,
-                buy_status: 'sold',  // Sold - not open
-            },
-        ]);
-
-        const app = createTestApp();
-        const res = await request(app, '/');
-
-        expect(res.status).toBe(200);
-        expect(res.body.positions).toEqual([]);
-    });
-
-    it('returns null exitState when no exit state row exists', async () => {
-        (getPnL as ReturnType<typeof vi.fn>).mockReturnValue([
-            {
-                buy_id: 2,
+                tradeId: 10,
                 token: '0xdef',
-                chain: 'bsc',
-                buy_cost: '0.02',
-                buy_gas: '0.0005',
-                sell_revenue: 0,
-                sell_gas: 0,
-                realized_pnl: -0.0205,
-                buy_time: 1700000000,
-                sell_time: null,
-                sell_count: 0,
-                pool_type: 'v3',
-                fee_tier: 3000,
-                buy_status: 'pending',
+                chain: 'eth',
+                entryPrice: 0.01,
+                currentPrice: 0.015,
+                priceStale: true,
+                unrealizedPnl: null,
+                pnl: -0.02,
+                buyCost: '0.02',
+                buyGas: '0.001',
+                buyTime: 1700000000,
+                poolType: 'v3',
+                feeTier: 3000,
+                sellRevenue: 0,
+                exitState: null,
             },
         ]);
-
-        (getTradeIdForPendingToken.get as ReturnType<typeof vi.fn>).mockReturnValue({ id: 99 });
-        (getExitState.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
 
         const app = createTestApp();
         const res = await request(app, '/');
 
         expect(res.status).toBe(200);
         expect(res.body.positions).toHaveLength(1);
-        expect(res.body.positions[0].exitState).toBeNull();
-        expect(res.body.positions[0].tradeId).toBe(99);
+        expect(res.body.positions[0].priceStale).toBe(true);
+        expect(res.body.positions[0].currentPrice).toBe(0.015);
+    });
+
+    it('returns unrealizedPnl field', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+            {
+                tradeId: 5,
+                token: '0xfoo',
+                chain: 'eth',
+                entryPrice: 0.01,
+                currentPrice: 0.02,
+                priceStale: false,
+                unrealizedPnl: 0.05,
+                pnl: -0.01,
+                buyCost: '0.01',
+                buyGas: '0.001',
+                buyTime: 1700000000,
+                poolType: 'v2',
+                feeTier: null,
+                sellRevenue: 0,
+                exitState: null,
+            },
+        ]);
+
+        const app = createTestApp();
+        const res = await request(app, '/');
+
+        expect(res.status).toBe(200);
+        expect(res.body.positions[0].unrealizedPnl).toBe(0.05);
+    });
+
+    it('returns empty array when no open positions', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+        const app = createTestApp();
+        const res = await request(app, '/');
+
+        expect(res.status).toBe(200);
+        expect(res.body.positions).toEqual([]);
+    });
+
+    it('calls buildPositionsWithLivePrices with contexts', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+        const app = createTestApp();
+        await request(app, '/');
+
+        expect(buildPositionsWithLivePrices).toHaveBeenCalledOnce();
+        expect(buildPositionsWithLivePrices).toHaveBeenCalledWith(
+            expect.arrayContaining([expect.objectContaining({ chain: expect.objectContaining({ name: 'eth' }) })]),
+        );
     });
 });
