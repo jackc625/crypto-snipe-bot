@@ -230,6 +230,12 @@ Plans:
   1. GET /api/positions returns correct live price for BSC PancakeSwap V3 positions (not the wrong quoter's price)
   2. Chain start/stop events are broadcast via WebSocket — all connected dashboard sessions update without page refresh
   3. No stale .js build artifacts remain in dashboard/src/components/ that contradict committed .tsx sources
+**Plans**: 3 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Multi-dex price resolution: schema migration v4 (dex_name column), positions.ts dex resolution fix, insertTrade call site updates, tests (DASH-01)
+- [ ] 12-02-PLAN.md — WebSocket chain status broadcast: buildChainStatus helper, broadcast after stop/start, client event type update, ChainControls WS wiring, tests (DASH-03)
+- [ ] 12-03-PLAN.md — Stale artifact cleanup: delete 28 .js build artifacts from dashboard/src/, add .gitignore pattern (DASH-01, DASH-03)
 
 ## Progress
 
@@ -250,4 +256,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
-| 12. Integration Gap Fixes | 0/0 | Not started | - |
+| 12. Integration Gap Fixes | 0/3 | Planned | - |
