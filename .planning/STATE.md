@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Milestone complete
-stopped_at: Phase 12 context gathered
-last_updated: "2026-04-05T02:28:58.008Z"
+stopped_at: Phase 12 UI-SPEC approved
+last_updated: "2026-04-05T02:54:47.349Z"
 progress:
   total_phases: 12
   completed_phases: 11
@@ -217,6 +217,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T02:28:57.999Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-integration-gap-fixes/12-CONTEXT.md
+Last session: 2026-04-05T02:54:47.339Z
+Stopped at: Phase 12 UI-SPEC approved
+Resume file: .planning/phases/12-integration-gap-fixes/12-UI-SPEC.md
