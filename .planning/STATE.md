@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 11-05-PLAN.md
-last_updated: "2026-04-05T00:27:56.367Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-04-05T00:31:19.292Z"
 progress:
   total_phases: 11
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 45
-  completed_plans: 44
-  percent: 98
+  completed_plans: 45
+  percent: 100
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 11 (dashboard-accuracy-bot-wiring) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Plan: 2 of 7
 | Phase 11 P03 | 5min | 2 tasks | 6 files |
 | Phase 11 P04 | 13min | 2 tasks | 7 files |
 | Phase 11 P05 | 3min | 2 tasks | 4 files |
+| Phase 11 P06 | 1min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,7 @@ Recent decisions affecting current work:
 - [Phase 11]: Per-chain warnings stored as Record<string, string[]> in ChainControls state, cleared on new start/stop action
 - [Phase 11]: Class-based TelegramClient mock for vitest mockReset compatibility; fake timers for cooldown bypass in telegram tests
 - [Phase 11]: Removed maskRpcUrl helper from ChainStatusCard -- backend already masks URLs via maskUrl()
+- [Phase 11]: cacheTimeout: -1 disables ethers v6 RPC response caching to prevent stale nonce in rapid sequential fork test transactions
 
 ### Pending Todos
 
@@ -215,6 +217,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T00:27:56.362Z
-Stopped at: Completed 11-05-PLAN.md
+Last session: 2026-04-05T00:31:19.285Z
+Stopped at: Completed 11-06-PLAN.md
 Resume file: None
