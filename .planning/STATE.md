@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 11-04-PLAN.md
-last_updated: "2026-04-01T19:21:26.354Z"
+status: Ready to execute
+stopped_at: Completed 11-05-PLAN.md
+last_updated: "2026-04-05T00:27:56.367Z"
 progress:
   total_phases: 11
-  completed_phases: 11
-  total_plans: 43
-  completed_plans: 43
+  completed_phases: 10
+  total_plans: 45
+  completed_plans: 44
+  percent: 98
 ---
 
 # Project State
@@ -19,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 11 — dashboard-accuracy-bot-wiring (in progress)
+**Current focus:** Phase 11 — dashboard-accuracy-bot-wiring
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (dashboard-accuracy-bot-wiring) — EXECUTING
+Plan: 2 of 7
 
 ## Performance Metrics
 
@@ -86,6 +87,7 @@ Plan: Not started
 | Phase 11 P02 | 5min | 2 tasks | 5 files |
 | Phase 11 P03 | 5min | 2 tasks | 6 files |
 | Phase 11 P04 | 13min | 2 tasks | 7 files |
+| Phase 11 P05 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -199,6 +201,7 @@ Recent decisions affecting current work:
 - [Phase 11]: telegramStatus 'not-configured' uses StatusDot 'disconnected' (red) with distinct label text for user clarity
 - [Phase 11]: Per-chain warnings stored as Record<string, string[]> in ChainControls state, cleared on new start/stop action
 - [Phase 11]: Class-based TelegramClient mock for vitest mockReset compatibility; fake timers for cooldown bypass in telegram tests
+- [Phase 11]: Removed maskRpcUrl helper from ChainStatusCard -- backend already masks URLs via maskUrl()
 
 ### Pending Todos
 
@@ -212,6 +215,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-01T19:14:08.322Z
-Stopped at: Completed 11-04-PLAN.md
+Last session: 2026-04-05T00:27:56.362Z
+Stopped at: Completed 11-05-PLAN.md
 Resume file: None

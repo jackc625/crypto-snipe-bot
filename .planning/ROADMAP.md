@@ -217,7 +217,7 @@ Plans:
 - [x] 11-02-PLAN.md — Backend wiring: positions route, chain restart, health status, bot.ts orchestrator, server.ts (DASH-01, DASH-03, FIX-09)
 - [x] 11-03-PLAN.md — Dashboard UI: stale price indicator, telegram status in sidebar, chain restart warnings (DASH-01, DASH-03, FIX-09)
 - [x] 11-04-PLAN.md — Tests: unit tests for helper/restart/telegram, integration tests for endpoints, WS push test (DASH-01, DASH-03, FIX-09)
-- [ ] 11-05-PLAN.md — [GAP CLOSURE] Fix chain controls API mismatch, add dexes to response, rebuild dashboard (DASH-03)
+- [x] 11-05-PLAN.md — [GAP CLOSURE] Fix chain controls API mismatch, add dexes to response, rebuild dashboard (DASH-03)
 - [ ] 11-06-PLAN.md — [GAP CLOSURE] Fix fork test nonce caching bug (cacheTimeout: -1) (DASH-01)
 
 ## Progress
@@ -238,4 +238,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 8. Monitoring & Web Dashboard | 6/6 | Complete | - |
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
-| 11. Dashboard Accuracy & Bot Wiring | 5/7 | UAT gap closure | 2026-04-01 |
+| 11. Dashboard Accuracy & Bot Wiring | 6/7 | In Progress|  |
