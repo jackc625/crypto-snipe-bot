@@ -110,6 +110,7 @@ describe('Chain Routes', () => {
             expect(ethChain.connection.lastBlock).toBe(12345678);
             expect(ethChain.exitStrategy.trailingStopPct).toBe(15);
             expect(ethChain.exitStrategy.stopLossPct).toBe(25);
+            expect(ethChain.dexes).toEqual(['uniswap-v2']);
 
             const bscChain = res.body.chains.find((c: any) => c.name === 'bsc');
             expect(bscChain).toBeDefined();

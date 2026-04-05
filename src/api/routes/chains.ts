@@ -97,6 +97,7 @@ export function chainRoutes(
                             chainId: ctx.chain.chainId,
                             lastBlock: blockNumber,
                         },
+                        dexes: ctx.chain.dexes.map((d) => d.name),
                     };
                 }),
             );

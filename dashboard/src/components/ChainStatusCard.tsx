@@ -15,15 +15,6 @@ const statusLabels: Record<string, string> = {
   disconnected: 'Disconnected',
 };
 
-function maskRpcUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `RPC: ${parsed.hostname}`;
-  } catch {
-    return 'RPC: --';
-  }
-}
-
 export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWarnings }: ChainStatusCardProps) {
   const status = chain.status;
 
@@ -94,8 +85,9 @@ export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWar
         <div>
           <h4 className="text-xs text-text-muted font-bold mb-1">Snipe Parameters</h4>
           <div className="space-y-0.5">
-            <ConfigRow label="Snipe Amount" value={chain.config.snipeAmount} />
-            <ConfigRow label="Max Capital" value={chain.config.maxCapital} />
+            <ConfigRow label="Snipe Amount" value={chain.snipeParams.snipeAmount} />
+            <ConfigRow label="Max Capital" value={chain.snipeParams.maxCapital} />
+            <ConfigRow label="Min Liquidity" value={chain.snipeParams.minLiquidity} />
           </div>
         </div>
 
@@ -103,7 +95,9 @@ export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWar
         <div>
           <h4 className="text-xs text-text-muted font-bold mb-1">Risk Limits</h4>
           <div className="space-y-0.5">
-            <ConfigRow label="DEXes" value={chain.config.dexes.join(', ')} />
+            <ConfigRow label="Max Open Positions" value={chain.riskLimits.maxOpenPositions} />
+            <ConfigRow label="Max Exposure" value={chain.riskLimits.maxTotalExposure} />
+            <ConfigRow label="Daily Loss %" value={chain.riskLimits.dailyLossPct} />
           </div>
         </div>
 
@@ -111,7 +105,8 @@ export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWar
         <div>
           <h4 className="text-xs text-text-muted font-bold mb-1">Exit Strategy</h4>
           <div className="space-y-0.5">
-            <ConfigRow label="Chain ID" value={String(chain.config.chainId)} />
+            <ConfigRow label="Trailing Stop" value={`${chain.exitStrategy.trailingStopPct}%`} />
+            <ConfigRow label="Stop Loss" value={`${chain.exitStrategy.stopLossPct}%`} />
           </div>
         </div>
 
@@ -119,16 +114,24 @@ export function ChainStatusCard({ chain, onStop, onStart, warnings, onDismissWar
         <div>
           <h4 className="text-xs text-text-muted font-bold mb-1">Connection Status</h4>
           <div className="space-y-0.5">
-            <ConfigRow label="RPC" value={maskRpcUrl(chain.config.rpcUrl)} />
+            <ConfigRow label="RPC" value={`RPC: ${chain.connection.rpcUrl}`} />
             <ConfigRow
               label="WebSocket"
-              value={chain.config.wsConnected ? 'Connected' : 'Disconnected'}
+              value={chain.wsConnected ? 'Connected' : 'Disconnected'}
             />
             <ConfigRow
               label="Latest Block"
-              value={chain.config.latestBlock !== null ? String(chain.config.latestBlock) : '--'}
+              value={chain.connection.lastBlock !== null ? String(chain.connection.lastBlock) : '--'}
             />
-            <ConfigRow label="Chain ID" value={String(chain.config.chainId)} />
+            <ConfigRow label="Chain ID" value={String(chain.connection.chainId)} />
+          </div>
+        </div>
+
+        {/* DEXes */}
+        <div>
+          <h4 className="text-xs text-text-muted font-bold mb-1">DEXes</h4>
+          <div className="space-y-0.5">
+            <ConfigRow label="Active" value={chain.dexes.join(', ') || '--'} />
           </div>
         </div>
       </div>

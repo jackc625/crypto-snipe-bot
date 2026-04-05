@@ -59,15 +59,30 @@ export interface ChainStatus {
   name: string;
   displayName: string;
   status: 'running' | 'stopped' | 'disconnected';
-  config: {
+  wsConnected: boolean;
+  snipeParams: {
     snipeAmount: string;
     maxCapital: string;
-    rpcUrl: string;
-    chainId: number;
-    wsConnected: boolean;
-    latestBlock: number | null;
-    dexes: string[];
+    minLiquidity: string;
   };
+  riskLimits: {
+    maxOpenPositions: string;
+    maxTotalExposure: string;
+    dailyLossPct: string;
+  };
+  exitStrategy: {
+    trailingStopPct: number;
+    stopLossPct: number;
+    partialSellTiers: Array<{ multiple: number; percent: number }>;
+    urgencyWindowMs: number;
+  };
+  connection: {
+    rpcUrl: string;
+    wsUrl: string | null;
+    chainId: number;
+    lastBlock: number | null;
+  };
+  dexes: string[];
 }
 
 export interface RiskExposure {
