@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-04-01 after Phase 11 completion (dashboard shows live on-chain prices via queryPrice, chain restart re-attaches listeners with warnings, Telegram listener integrated into orchestrator — 225 tests passing)*
+*Last updated: 2026-04-05 after Phase 11 gap closure (Chain Controls blank screen fixed — ChainStatus type aligned with backend API shape, dexes field added; fork test nonce caching bug resolved with cacheTimeout: -1; dashboard bundle rebuilt with Telegram status — 225 tests passing)*
