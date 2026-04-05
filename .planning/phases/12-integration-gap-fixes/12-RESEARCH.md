@@ -341,17 +341,19 @@ dashboard/src/utils/formatters.js
 | A2 | The `dex_name` column does not need an index since it's only used in application-level matching (not in SQL WHERE clauses) | Claude's Discretion | Minor -- if future queries filter by dex_name, an index would be needed, but current usage is post-query filtering in positions.ts |
 | A3 | ChainControls should switch from useApi to useWs for chain data to achieve D-09's "re-renders automatically" goal | Pitfall 2 | If useApi is kept, a separate mechanism to trigger refetch on WS events would be needed |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Event type: `'chain_status_change'` vs `'chain_status'`**
    - What we know: CONTEXT.md D-06 specifies `'chain_status_change'`. The client already has a handler for `'chain_status'` (from Phase 8 planning). Neither has been wired end-to-end.
    - What's unclear: Whether the user intended to reuse the existing client handler name or intentionally chose a different name.
    - Recommendation: Follow D-06 and use `'chain_status_change'` on both sides. Update the client from `'chain_status'` to `'chain_status_change'`. The existing handler was never functional, so changing its name has zero behavioral impact.
+   - RESOLVED: Per D-06, event type is `'chain_status_change'`. Plan 12-02 Task 1 broadcasts with this type, Task 2 updates the client handler from `'chain_status'` to `'chain_status_change'`.
 
 2. **ChainControls data source: useApi vs useWs**
    - What we know: D-09 says "ChainControls page re-renders automatically" on WS event. Currently it uses `useApi` (REST polling).
    - What's unclear: Whether to fully replace `useApi` with `useWs()` or add WS as supplementary.
    - Recommendation: Keep `useApi` for initial load and refetch on user actions (stop/start), but also consume `useWs().chainStatuses` and merge/prefer WS data when available. This matches the hybrid pattern -- REST for initial state (D-11), WS for real-time updates.
+   - RESOLVED: Per D-09 and D-11, hybrid approach adopted. Plan 12-02 Task 2 wires ChainControls to consume `useWebSocket().chainStatuses` for real-time updates while keeping `useApi` for initial REST load.
 
 ## Validation Architecture
 
