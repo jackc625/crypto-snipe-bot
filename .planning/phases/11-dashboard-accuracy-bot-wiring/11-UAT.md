@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 11-dashboard-accuracy-bot-wiring
 source: [11-00-SUMMARY.md, 11-01-SUMMARY.md, 11-02-SUMMARY.md, 11-03-SUMMARY.md, 11-04-SUMMARY.md]
 started: 2026-04-01T19:30:00Z
@@ -72,27 +72,41 @@ blocked: 0
   reason: "User reported: No. I don't know what you're talking about. There's one dot"
   severity: major
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Dashboard production bundle is stale (built 2026-03-27, Telegram feature added 2026-04-01). Bundle contains zero Telegram references. Need to rebuild dashboard."
+  artifacts:
+    - path: "dashboard/dist/assets/index-D6nHinxP.js"
+      issue: "Stale build artifact missing Telegram status code"
+  missing:
+    - "Rebuild dashboard (cd dashboard && npm run build)"
+  debug_session: ".planning/debug/telegram-status-missing.md"
 
 - truth: "Chain Controls page loads and allows chain restart with warning display"
   status: failed
   reason: "User reported: that entire endpoint isnt even loading. The chain controls page. It just brings up a blank blue screen."
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Backend chains API response shape mismatches frontend ChainStatus type. Backend sends snipeParams/riskLimits/connection nested objects, frontend expects config object with dexes/snipeAmount/etc. ChainStatusCard crashes on chain.config.dexes (undefined.dexes TypeError). No ErrorBoundary catches the crash."
+  artifacts:
+    - path: "src/api/routes/chains.ts"
+      issue: "Response shape uses snipeParams/connection instead of config"
+    - path: "dashboard/src/types/api.ts"
+      issue: "ChainStatus type expects config object not present in API response"
+    - path: "dashboard/src/components/ChainStatusCard.tsx"
+      issue: "Accesses chain.config.dexes which is undefined at runtime (line 108)"
+  missing:
+    - "Align backend response shape with frontend ChainStatus type, or update frontend to match backend"
+    - "Include dexes in chains API response"
+  debug_session: ".planning/debug/chain-controls-blank-screen.md"
 
 - truth: "Full test suite passes including fork tests"
   status: failed
   reason: "User reported: Fork tests fail with 6 failures — token balance not zeroed after sell in snipeLifecycle.test.ts"
   severity: major
   test: 9
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "ethers v6 JsonRpcProvider caches RPC responses including eth_getTransactionCount. Hardhat fork inherits high mainnet nonce (6158+) for default account. Cached stale nonce causes 'nonce too low' errors starting test 2, cascading into all subsequent tests. Pre-existing bug from phase 09, not a phase 11 regression."
+  artifacts:
+    - path: "test/fork/snipeLifecycle.test.ts"
+      issue: "Line 42: JsonRpcProvider created without disabling response cache"
+  missing:
+    - "Add cacheTimeout: -1 to JsonRpcProvider constructor options"
+  debug_session: ".planning/debug/fork-tests-sell-failure.md"
