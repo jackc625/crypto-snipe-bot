@@ -39,7 +39,7 @@ describe('Snipe Lifecycle on Forked Mainnet (TEST-05)', () => {
 
     beforeAll(async () => {
         // Connect to forked Hardhat node
-        provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+        provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545', undefined, { cacheTimeout: -1 });
         deployer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider);
 
         // Instantiate Uniswap V2 contracts
