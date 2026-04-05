@@ -23,6 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 9: Testing Infrastructure** - Unit tests, integration tests, and mainnet fork tests validating the full system (completed 2026-03-28)
 - [x] **Phase 10: Fix partial_sell Revenue Visibility** - [GAP CLOSURE] Make partial sell proceeds visible in P&L, trade history, and risk calculations (completed 2026-03-30)
 - [x] **Phase 11: Dashboard Accuracy & Bot Integration Wiring** - [GAP CLOSURE] Live prices in dashboard, chain restart listeners, Telegram listener wiring (completed 2026-04-01)
+- [ ] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact
 
 ## Phase Details
 
@@ -220,6 +221,16 @@ Plans:
 - [x] 11-05-PLAN.md — [GAP CLOSURE] Fix chain controls API mismatch, add dexes to response, rebuild dashboard (DASH-03)
 - [x] 11-06-PLAN.md — [GAP CLOSURE] Fix fork test nonce caching bug (cacheTimeout: -1) (DASH-01)
 
+### Phase 12: Integration Gap Fixes
+**Goal**: Close non-blocking integration gaps found in v6.16 milestone audit — accurate multi-dex price resolution, real-time chain status across all dashboard sessions, and stale artifact cleanup
+**Depends on**: Phase 11, Phase 8
+**Requirements**: DASH-01, DASH-03
+**Gap Closure:** Closes integration gaps INT-01, INT-02, INT-03 from v6.16 audit
+**Success Criteria** (what must be TRUE):
+  1. GET /api/positions returns correct live price for BSC PancakeSwap V3 positions (not the wrong quoter's price)
+  2. Chain start/stop events are broadcast via WebSocket — all connected dashboard sessions update without page refresh
+  3. No stale .js build artifacts remain in dashboard/src/components/ that contradict committed .tsx sources
+
 ## Progress
 
 **Execution Order:**
@@ -239,3 +250,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
+| 12. Integration Gap Fixes | 0/0 | Not started | - |
