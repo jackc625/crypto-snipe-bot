@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: Fix partial_sell Revenue Visibility** - [GAP CLOSURE] Make partial sell proceeds visible in P&L, trade history, and risk calculations (completed 2026-03-30)
 - [x] **Phase 11: Dashboard Accuracy & Bot Integration Wiring** - [GAP CLOSURE] Live prices in dashboard, chain restart listeners, Telegram listener wiring (completed 2026-04-01)
 - [x] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact (completed 2026-04-06)
-- [ ] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain
+- [x] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain (completed 2026-04-06)
 
 ## Phase Details
 
@@ -248,7 +248,7 @@ Plans:
   2. A deployment with `ENABLED_CHAINS=bsc` and no `FLASHBOTS_AUTH_KEY` starts successfully without validation error
 
 Plans:
-- [ ] 13-01-PLAN.md — Wire STOP_LOSS_PCT env var to config value, make FLASHBOTS_AUTH_KEY conditional on ETH chain, add tests (EXIT-01, EXIT-02, CHAIN-05)
+- [x] 13-01-PLAN.md — Wire STOP_LOSS_PCT env var to config value, make FLASHBOTS_AUTH_KEY conditional on ETH chain, add tests (EXIT-01, EXIT-02, CHAIN-05)
 
 ## Progress
 
@@ -270,4 +270,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
-| 13. Config Env-Var Correctness | 0/1 | Planned | - |
+| 13. Config Env-Var Correctness | 1/1 | Complete   | 2026-04-06 |

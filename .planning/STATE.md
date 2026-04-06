@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-04-06T04:17:36.351Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-04-06T16:31:58.096Z"
 progress:
-  total_phases: 12
-  completed_phases: 12
-  total_plans: 48
-  completed_plans: 48
+  total_phases: 13
+  completed_phases: 13
+  total_plans: 49
+  completed_plans: 49
   percent: 100
 ---
 
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 12 — integration-gap-fixes
+**Current focus:** Phase 13 — config-env-var-correctness
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
+Phase: 13 (config-env-var-correctness) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -93,6 +93,7 @@ Plan: Not started
 | Phase 12 P01 | 15min | 3 tasks | 10 files |
 | Phase 12 P02 | 8min | 3 tasks | 5 files |
 | Phase 12 P03 | 2min | 1 tasks | 1 files |
+| Phase 13 P01 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Hybrid WS/REST in ChainControls: wsChainStatuses.length > 0 selects WS data, empty array falls back to REST
 - [Phase 12]: Broadcast on ALL start paths including restart failure: chain IS removed from stopped set regardless
 - [Phase 12]: Verified all 28 .js files had matching .ts/.tsx counterparts before deletion (zero false positives)
+- [Phase 13]: IIFE pattern for stopLossPercent: parseFloat with isNaN fallback to 25, matching existing trailingStopPct pattern
+- [Phase 13]: FLASHBOTS_AUTH_KEY changed to required: false since chainRegistry.ts already validates conditionally per enabled chain
 
 ### Pending Todos
 
@@ -228,6 +231,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T04:08:42.380Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-04-06T16:31:58.090Z
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
