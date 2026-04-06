@@ -25,6 +25,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Dashboard Accuracy & Bot Integration Wiring** - [GAP CLOSURE] Live prices in dashboard, chain restart listeners, Telegram listener wiring (completed 2026-04-01)
 - [x] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact (completed 2026-04-06)
 - [x] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain (completed 2026-04-06)
+- [ ] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null
+- [ ] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup
 
 ## Phase Details
 
@@ -250,6 +252,31 @@ Plans:
 Plans:
 - [x] 13-01-PLAN.md — Wire STOP_LOSS_PCT env var to config value, make FLASHBOTS_AUTH_KEY conditional on ETH chain, add tests (EXIT-01, EXIT-02, CHAIN-05)
 
+### Phase 14: Sell Revenue Receipt Decoding
+**Goal**: Every sell and partial sell records the actual ETH/BNB received from the swap — amountOut is never null
+**Depends on**: Phase 7, Phase 3
+**Requirements**: DB-03, DB-04
+**Gap Closure:** Closes INT-AMOUNT-OUT-NULL from v6.16 audit; fixes Dashboard P&L, Risk monitoring, and Trade history flows
+**Success Criteria** (what must be TRUE):
+  1. After executeFullSell completes, the trades row has a non-null amount_out containing the ETH received from the swap
+  2. After executePartialSell completes, the partial_sell row has a non-null amount_out containing the ETH received
+  3. getPnL() returns correct realized P&L reflecting actual sell revenue, not zero
+
+Plans:
+- (to be planned)
+
+### Phase 15: Chain-Scoped Dedup & Dashboard Env Validation
+**Goal**: Token dedup is chain-scoped so multi-chain sniping works correctly, and DASHBOARD_API_KEY is validated at startup
+**Depends on**: Phase 4, Phase 8
+**Requirements**: CHAIN-02
+**Gap Closure:** Closes INT-DEDUP-NO-CHAIN and INT-DASHBOARD-API-KEY from v6.16 audit; fixes Multi-chain dedup and Dashboard login flows
+**Success Criteria** (what must be TRUE):
+  1. A token sniped on BSC does not block the same contract address from being sniped on ETH, Base, or Arbitrum
+  2. Bot startup with DASHBOARD_API_KEY unset produces a clear validation error instead of silently starting
+
+Plans:
+- (to be planned)
+
 ## Progress
 
 **Execution Order:**
@@ -271,3 +298,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
+| 14. Sell Revenue Receipt Decoding | 0/0 | Gap closure planned | - |
+| 15. Chain-Scoped Dedup & Dashboard Env | 0/0 | Gap closure planned | - |
