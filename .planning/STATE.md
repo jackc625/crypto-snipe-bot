@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-04-05T02:54:47.349Z"
+status: Ready to execute
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-04-06T03:48:57.875Z"
 progress:
   total_phases: 12
   completed_phases: 11
-  total_plans: 45
-  completed_plans: 45
-  percent: 100
+  total_plans: 48
+  completed_plans: 46
+  percent: 96
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 11 — dashboard-accuracy-bot-wiring
+**Current focus:** Phase 12 — integration-gap-fixes
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 12 (integration-gap-fixes) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Plan: Not started
 | Phase 11 P04 | 13min | 2 tasks | 7 files |
 | Phase 11 P05 | 3min | 2 tasks | 4 files |
 | Phase 11 P06 | 1min | 1 tasks | 1 files |
+| Phase 12 P01 | 15min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -204,6 +205,9 @@ Recent decisions affecting current work:
 - [Phase 11]: Class-based TelegramClient mock for vitest mockReset compatibility; fake timers for cooldown bypass in telegram tests
 - [Phase 11]: Removed maskRpcUrl helper from ChainStatusCard -- backend already masks URLs via maskUrl()
 - [Phase 11]: cacheTimeout: -1 disables ethers v6 RPC response caching to prevent stale nonce in rapid sequential fork test transactions
+- [Phase 12]: Belt-and-suspenders PRAGMA table_info guard for schema migration v4 dex_name column addition (D-14)
+- [Phase 12]: Multi-dex resolution: exact dex_name match for new trades, first-match fallback for legacy NULL trades
+- [Phase 12]: priceStale flag set when chain context exists but dex resolution fails (removed/renamed dex scenario)
 
 ### Pending Todos
 
@@ -217,6 +221,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T02:54:47.339Z
-Stopped at: Phase 12 UI-SPEC approved
-Resume file: .planning/phases/12-integration-gap-fixes/12-UI-SPEC.md
+Last session: 2026-04-06T03:48:57.863Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: None
