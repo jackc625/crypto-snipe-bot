@@ -137,9 +137,9 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Complete (Phase 05) |
 | DB-backed risk management | 5-rule canSnipe() gate replaces in-memory capital tracking — position size, daily loss, max positions, cooldown, exposure cap | ✓ Complete (Phase 06) |
 | Unified exit engine | Single 5s poll loop per position replaces 6 legacy monitors — trailing stop, partial sells, volatility adaptation, urgency in one function | ✓ Complete (Phase 07) |
-| Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | — Pending |
+| Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | ✓ Complete (Phase 08-12) |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-04-05 after Phase 11 gap closure (Chain Controls blank screen fixed — ChainStatus type aligned with backend API shape, dexes field added; fork test nonce caching bug resolved with cacheTimeout: -1; dashboard bundle rebuilt with Telegram status — 225 tests passing)*
+*Last updated: 2026-04-06 after Phase 12 integration-gap-fixes (Multi-dex price resolution fixed with dex_name column, WebSocket chain status broadcast on all stop/start paths, 28 stale .js artifacts cleaned up — 240 tests passing, v6.16 milestone complete)*
