@@ -144,7 +144,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAIN-02 | Phase 4 | Complete |
 | CHAIN-03 | Phase 4 | Complete |
 | CHAIN-04 | Phase 4 | Complete |
-| CHAIN-05 | Phase 4 | Complete |
+| CHAIN-05 | Phase 4, Phase 13 | Complete |
 | V3-01 | Phase 5 | Complete |
 | V3-02 | Phase 5 | Complete |
 | V3-03 | Phase 5 | Complete |
@@ -154,8 +154,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RISK-03 | Phase 6 | Complete |
 | RISK-04 | Phase 6 | Complete |
 | RISK-05 | Phase 6 | Complete |
-| EXIT-01 | Phase 7 | Complete |
-| EXIT-02 | Phase 7 | Complete |
+| EXIT-01 | Phase 7, Phase 13 | Complete |
+| EXIT-02 | Phase 7, Phase 13 | Complete |
 | EXIT-03 | Phase 7 | Complete |
 | EXIT-04 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Complete |
@@ -176,4 +176,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-30 after gap closure phase creation*
+*Last updated: 2026-04-06 after gap closure phase creation (Phase 13)*
