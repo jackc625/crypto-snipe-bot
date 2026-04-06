@@ -29,9 +29,9 @@ describe('helpers smoke test', () => {
         expect(columns).toContain('token');
         expect(columns).toContain('pool_type');
         expect(columns).toContain('fee_tier');
-        // Verify user_version is 3
+        // Verify user_version is 4
         const version = db.pragma('user_version', { simple: true });
-        expect(version).toBe(3);
+        expect(version).toBe(4);
         db.close();
     });
 });

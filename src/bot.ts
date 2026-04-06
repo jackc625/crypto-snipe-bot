@@ -335,7 +335,8 @@ export async function handleNewPairForChain(
             priceAtAction: null,
             status: 'pending',
             poolType: 'v2',
-            feeTier: null
+            feeTier: null,
+            dexName: dex.name,
         });
         await sendCtxAlert(ctx, `*Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\``);
         ctx.log.info({ token: targetToken, symbol, strategy: ctx.chain.mevStrategy }, 'MEV bundle submitted');
@@ -522,6 +523,7 @@ export async function handleNewV3PoolForChain(
             status: 'pending',
             poolType: 'v3',
             feeTier: feeTier,
+            dexName: dex.name,
         });
 
         await sendCtxAlert(ctx, `*V3 Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\` (fee: ${feeTier}bps)`);
@@ -688,7 +690,8 @@ export async function handleNewPair(token0: string, token1: string, pairAddress:
             priceAtAction: null,
             status: 'pending',
             poolType: 'v2',
-            feeTier: null
+            feeTier: null,
+            dexName: null,
         });
         await sendTelegramAlert(`*Buy TX sent via Flashbots* for \`${symbol}\``);
         log.info({ token: targetToken, symbol }, 'Flashbots bundle submitted');

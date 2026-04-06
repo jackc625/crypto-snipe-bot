@@ -483,6 +483,7 @@ export async function executeFullSell(
             status: 'sold',
             poolType: dex.dexType,
             feeTier: feeTier,
+            dexName: dex.name,
         });
         updateTradeStatus.run('sold', tokenAddress.toLowerCase());
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
@@ -578,6 +579,7 @@ export async function executePartialSell(
             status: 'sold',
             poolType: dex.dexType,
             feeTier: feeTier,
+            dexName: dex.name,
         });
 
         // Mark tiers as completed (D-11: high-water mark NOT reset)

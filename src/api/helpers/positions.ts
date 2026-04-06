@@ -27,6 +27,7 @@ export interface LivePosition {
     poolType: string;
     feeTier: number | null;
     sellRevenue: number;
+    dexName: string | null;
     exitState: {
         highWaterMark: number;
         trailingActivated: boolean;
@@ -59,8 +60,14 @@ export async function buildPositionsWithLivePrices(contexts: ChainContext[]): Pr
         // 3. Resolve ChainContext per trade (D-04)
         const ctx = contexts.find(c => c.chain.name === trade.chain);
 
-        // 4. Resolve DexConfig per trade (D-04)
-        const dex = ctx?.chain.dexes.find(d => d.dexType === trade.pool_type) ?? null;
+        // 4. Resolve DexConfig per trade using dex_name when available (D-02, D-03)
+        const dex = ctx?.chain.dexes.find(d => {
+            if (d.dexType !== trade.pool_type) return false;
+            // When dex_name is available (new trades), require exact match (D-02)
+            if (trade.dex_name) return d.name === trade.dex_name;
+            // Legacy trades (dex_name NULL): fall back to first-match (D-03)
+            return true;
+        }) ?? null;
 
         // 5. Look up trade ID and exit state
         const tradeIdRow = getTradeIdForPendingToken.get(trade.token, trade.chain) as { id: number } | undefined;
@@ -136,6 +143,7 @@ export async function buildPositionsWithLivePrices(contexts: ChainContext[]): Pr
             poolType: trade.pool_type,
             feeTier: trade.fee_tier,
             sellRevenue: trade.sell_revenue,
+            dexName: trade.dex_name ?? null,
             exitState,
         };
     }));
