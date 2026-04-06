@@ -20,7 +20,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'TELEGRAM_API_ID', required: true, description: 'Telegram API ID for listener' },
     { name: 'TELEGRAM_API_HASH', required: true, description: 'Telegram API hash for listener' },
     { name: 'TELEGRAM_SESSION', required: true, description: 'Telegram session string' },
-    { name: 'FLASHBOTS_AUTH_KEY', required: true, description: 'Flashbots authentication signing key' },
+    { name: 'FLASHBOTS_AUTH_KEY', required: false, description: 'Flashbots authentication signing key (required when eth chain enabled)' },
     { name: 'TELEGRAM_ALLOWED_SENDERS', required: false, description: 'Comma-separated allowed Telegram sender IDs' },
     { name: 'TELEGRAM_ALLOWED_CHANNELS', required: false, description: 'Comma-separated allowed Telegram channel/group IDs' },
     // --- Multi-Chain Configuration ---
@@ -122,7 +122,10 @@ export const CONFIG = {
     honeypotCheckURL: "https://api.honeypot.is/v1/TokenInfo/",
 
     // @deprecated Phase 7 replaces these with exit engine
-    stopLossPercent: 25,
+    stopLossPercent: (() => {
+        const val = parseFloat(process.env.STOP_LOSS_PCT || '25');
+        return isNaN(val) ? 25 : val;
+    })(),
     stopLossCheckInterval: 15000,
     autoSellAfterMs: 5 * 60 * 1000,
     takeProfitPercent: 50,
