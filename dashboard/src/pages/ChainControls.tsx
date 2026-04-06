@@ -4,6 +4,7 @@ import { ChainStatusCard } from '../components/ChainStatusCard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmergencyConfirmDialog } from '../components/EmergencyConfirmDialog';
 import { useApi } from '../hooks/useApi';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface ChainsResponse {
   chains: ChainStatus[];
@@ -17,6 +18,7 @@ type DialogState =
 
 export function ChainControls() {
   const { data, error, refetch } = useApi<ChainsResponse>('/api/chains');
+  const { chainStatuses: wsChainStatuses } = useWebSocket();
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [emergencyError, setEmergencyError] = useState<string | null>(null);
@@ -108,7 +110,9 @@ export function ChainControls() {
     }
   };
 
-  const chains = data?.chains || [];
+  // D-09: Prefer WS-pushed chain data for real-time updates.
+  // D-11: useApi provides initial REST load; WS provides real-time updates after hydration.
+  const chains = wsChainStatuses.length > 0 ? wsChainStatuses : (data?.chains || []);
 
   return (
     <div>

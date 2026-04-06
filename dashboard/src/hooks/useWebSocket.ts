@@ -14,7 +14,7 @@ interface UseWebSocketResult {
  * Connects to ws://{host}/ws and handles typed events:
  * - positions_update: updates positions state
  * - notification: prepends to notifications (capped at 100 per D-10)
- * - chain_status: updates chain status state
+ * - chain_status_change: updates chain status state
  *
  * Auto-reconnects with 3-second delay on disconnect.
  * On reconnect, triggers REST refresh of positions and chain status.
@@ -80,7 +80,7 @@ export function useWebSocket(): UseWebSocketResult {
             setNotifications((prev) => [enriched, ...prev].slice(0, 100));
             break;
           }
-          case 'chain_status': {
+          case 'chain_status_change': {
             const data = msg.data as { chains: ChainStatus[] };
             setChainStatuses(data.chains || []);
             break;
