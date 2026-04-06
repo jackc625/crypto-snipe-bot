@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-04-06T03:48:57.875Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-04-06T04:02:20.696Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 48
-  completed_plans: 46
-  percent: 96
+  completed_plans: 47
+  percent: 98
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 12 (integration-gap-fixes) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -90,6 +90,7 @@ Plan: 2 of 3
 | Phase 11 P05 | 3min | 2 tasks | 4 files |
 | Phase 11 P06 | 1min | 1 tasks | 1 files |
 | Phase 12 P01 | 15min | 3 tasks | 10 files |
+| Phase 12 P02 | 8min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -208,6 +209,9 @@ Recent decisions affecting current work:
 - [Phase 12]: Belt-and-suspenders PRAGMA table_info guard for schema migration v4 dex_name column addition (D-14)
 - [Phase 12]: Multi-dex resolution: exact dex_name match for new trades, first-match fallback for legacy NULL trades
 - [Phase 12]: priceStale flag set when chain context exists but dex resolution fails (removed/renamed dex scenario)
+- [Phase 12]: Fire-and-forget broadcast pattern: HTTP response sent before async broadcast to avoid delaying user feedback
+- [Phase 12]: Hybrid WS/REST in ChainControls: wsChainStatuses.length > 0 selects WS data, empty array falls back to REST
+- [Phase 12]: Broadcast on ALL start paths including restart failure: chain IS removed from stopped set regardless
 
 ### Pending Todos
 
@@ -221,6 +225,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T03:48:57.863Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-04-06T04:02:20.685Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
