@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express';
 import type { ChainContext } from '../../chainRegistry';
 import { exitConfig } from '../../exitEngine';
+import { broadcast } from '../ws/broadcaster';
 import { logger } from '../../utils/logger';
 
 const log = logger.child({ module: 'api:chains' });
@@ -42,66 +43,74 @@ export function chainRoutes(
 ): Router {
     const router = Router();
 
+    /** Build chain status array -- shared by GET handler and stop/start broadcast (D-08). */
+    async function buildChainStatus(): Promise<Array<{
+        name: string; displayName: string; status: string; wsConnected: boolean;
+        snipeParams: Record<string, string>; riskLimits: Record<string, string>;
+        exitStrategy: Record<string, unknown>; connection: Record<string, unknown>;
+        dexes: string[];
+    }>> {
+        return Promise.all(
+            contexts.map(async (ctx) => {
+                const name = ctx.chain.name;
+                let status: 'running' | 'stopped' | 'disconnected';
+                let blockNumber: number | null = null;
+
+                if (stoppedChains.has(name)) {
+                    status = 'stopped';
+                    try {
+                        blockNumber = await ctx.httpProvider.getBlockNumber();
+                    } catch {
+                        // ignore
+                    }
+                } else {
+                    try {
+                        blockNumber = await ctx.httpProvider.getBlockNumber();
+                        status = 'running';
+                    } catch {
+                        status = 'disconnected';
+                    }
+                }
+
+                const wsConnected = ctx.wsProvider !== null;
+
+                return {
+                    name,
+                    displayName: ctx.chain.displayName,
+                    status,
+                    wsConnected,
+                    snipeParams: {
+                        snipeAmount: ctx.chain.snipeAmount,
+                        maxCapital: ctx.chain.maxCapital,
+                        minLiquidity: ctx.chain.minLiquidityThreshold,
+                    },
+                    riskLimits: {
+                        maxOpenPositions: process.env.MAX_OPEN_POSITIONS || '10',
+                        maxTotalExposure: process.env.MAX_TOTAL_EXPOSURE || '10.0',
+                        dailyLossPct: process.env.DAILY_LOSS_PCT || '10',
+                    },
+                    exitStrategy: {
+                        trailingStopPct: exitConfig.trailingStopPct,
+                        stopLossPct: exitConfig.stopLossPct,
+                        partialSellTiers: exitConfig.partialSellTiers,
+                        urgencyWindowMs: exitConfig.urgencyWindowMs,
+                    },
+                    connection: {
+                        rpcUrl: maskUrl(ctx.chain.httpRpcUrl),
+                        wsUrl: ctx.chain.wsRpcUrl ? maskUrl(ctx.chain.wsRpcUrl) : null,
+                        chainId: ctx.chain.chainId,
+                        lastBlock: blockNumber,
+                    },
+                    dexes: ctx.chain.dexes.map((d) => d.name),
+                };
+            }),
+        );
+    }
+
     // ── GET / ── per-chain status with config display ────────────────────
     router.get('/', async (_req: Request, res: Response) => {
         try {
-            const chains = await Promise.all(
-                contexts.map(async (ctx) => {
-                    const name = ctx.chain.name;
-                    let status: 'running' | 'stopped' | 'disconnected';
-                    let blockNumber: number | null = null;
-
-                    if (stoppedChains.has(name)) {
-                        status = 'stopped';
-                        // Still try to get block number for display
-                        try {
-                            blockNumber = await ctx.httpProvider.getBlockNumber();
-                        } catch {
-                            // ignore
-                        }
-                    } else {
-                        try {
-                            blockNumber = await ctx.httpProvider.getBlockNumber();
-                            status = 'running';
-                        } catch {
-                            status = 'disconnected';
-                        }
-                    }
-
-                    const wsConnected = ctx.wsProvider !== null;
-
-                    return {
-                        name,
-                        displayName: ctx.chain.displayName,
-                        status,
-                        wsConnected,
-                        snipeParams: {
-                            snipeAmount: ctx.chain.snipeAmount,
-                            maxCapital: ctx.chain.maxCapital,
-                            minLiquidity: ctx.chain.minLiquidityThreshold,
-                        },
-                        riskLimits: {
-                            maxOpenPositions: process.env.MAX_OPEN_POSITIONS || '10',
-                            maxTotalExposure: process.env.MAX_TOTAL_EXPOSURE || '10.0',
-                            dailyLossPct: process.env.DAILY_LOSS_PCT || '10',
-                        },
-                        exitStrategy: {
-                            trailingStopPct: exitConfig.trailingStopPct,
-                            stopLossPct: exitConfig.stopLossPct,
-                            partialSellTiers: exitConfig.partialSellTiers,
-                            urgencyWindowMs: exitConfig.urgencyWindowMs,
-                        },
-                        connection: {
-                            rpcUrl: maskUrl(ctx.chain.httpRpcUrl),
-                            wsUrl: ctx.chain.wsRpcUrl ? maskUrl(ctx.chain.wsRpcUrl) : null,
-                            chainId: ctx.chain.chainId,
-                            lastBlock: blockNumber,
-                        },
-                        dexes: ctx.chain.dexes.map((d) => d.name),
-                    };
-                }),
-            );
-
+            const chains = await buildChainStatus();
             res.json({ chains });
         } catch (err) {
             log.error({ err }, 'Error fetching chain status');
@@ -110,7 +119,7 @@ export function chainRoutes(
     });
 
     // ── POST /:name/stop ── stop chain listeners (D-12, D-14, D-40) ────
-    router.post('/:name/stop', (req: Request, res: Response) => {
+    router.post('/:name/stop', async (req: Request, res: Response) => {
         const name = String(req.params.name).toLowerCase();
         const ctx = contexts.find((c) => c.chain.name.toLowerCase() === name);
 
@@ -134,6 +143,15 @@ export function chainRoutes(
 
         ctx.log.info('Chain listeners stopped via dashboard');
         res.json({ ok: true, chain: ctx.chain.name, status: 'stopped' });
+
+        // D-06, D-07: Broadcast full chain list to all connected sessions.
+        // Fire-and-forget so HTTP response is not delayed by async getBlockNumber() calls.
+        // Addresses review concern: broadcast failures logged as warnings (not swallowed).
+        buildChainStatus().then(chains => {
+            broadcast('chain_status_change', { chains });
+        }).catch(err => {
+            log.warn({ err }, 'Failed to broadcast chain status after stop');
+        });
     });
 
     // ── POST /:name/start ── restart chain listeners (D-12, D-40) ───────
@@ -163,6 +181,13 @@ export function chainRoutes(
                     status: 'running',
                     warnings: result.warnings,  // D-12: always include warnings array
                 });
+
+                // D-06, D-07: Broadcast updated chain status
+                buildChainStatus().then(chains => {
+                    broadcast('chain_status_change', { chains });
+                }).catch(err => {
+                    log.warn({ err }, 'Failed to broadcast chain status after start');
+                });
             } catch (err) {
                 ctx.log.error({ err }, 'Failed to restart chain listeners');
                 // Even on full failure, chain was removed from stopped set
@@ -172,6 +197,13 @@ export function chainRoutes(
                     status: 'running',
                     warnings: [`Full restart failed: ${err instanceof Error ? err.message : String(err)}`],
                 });
+
+                // Broadcast even on restart failure -- chain IS removed from stopped set
+                buildChainStatus().then(chains => {
+                    broadcast('chain_status_change', { chains });
+                }).catch(broadcastErr => {
+                    log.warn({ err: broadcastErr }, 'Failed to broadcast chain status after failed restart');
+                });
             }
         } else {
             ctx.log.info('Chain removed from stopped set via dashboard (no restart callback)');
@@ -180,6 +212,13 @@ export function chainRoutes(
                 chain: ctx.chain.name,
                 status: 'running',
                 warnings: ['No restart callback configured. Full listener restart requires bot restart.'],
+            });
+
+            // Broadcast updated status
+            buildChainStatus().then(chains => {
+                broadcast('chain_status_change', { chains });
+            }).catch(err => {
+                log.warn({ err }, 'Failed to broadcast chain status after start (no callback)');
             });
         }
     });
