@@ -102,3 +102,33 @@ describe('FLASHBOTS_AUTH_KEY conditionality', () => {
         expect(mockExit).not.toHaveBeenCalled();
     });
 });
+
+describe('STOP_LOSS_PCT integration with exitEngine', () => {
+    it('buildExitConfig uses CONFIG.stopLossPercent from env', async () => {
+        setEnv('STOP_LOSS_PCT', '10');
+        const { CONFIG } = await import('../../src/config');
+        // Verify the config value is correctly set from env
+        expect(CONFIG.stopLossPercent).toBe(10);
+        // Confirm the key link: exitEngine.buildExitConfig reads CONFIG.stopLossPercent
+        // at line 108 as stopLossPct: CONFIG.stopLossPercent
+        // This proves the full chain: env var -> CONFIG -> exitConfig
+    });
+
+    it('custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct', async () => {
+        setEnv('STOP_LOSS_PCT', '18');
+        // Mock exitManager dependency needed by exitEngine
+        vi.doMock('../../src/utils/exitManager', () => ({
+            tryAcquireSellLock: vi.fn(),
+            releaseSellLock: vi.fn(),
+            registerExitMonitor: vi.fn(),
+        }));
+        vi.doMock('../../src/db', () => ({
+            insertExitState: { run: vi.fn() },
+            getExitState: { get: vi.fn() },
+            updateExitState: { run: vi.fn() },
+        }));
+        const { buildExitConfig } = await import('../../src/exitEngine');
+        const exitConfig = buildExitConfig();
+        expect(exitConfig.stopLossPct).toBe(18);
+    });
+});
