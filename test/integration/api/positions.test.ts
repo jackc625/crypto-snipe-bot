@@ -12,6 +12,7 @@ vi.mock('../../../src/api/helpers/positions', () => ({
 
 import { positionRoutes } from '../../../src/api/routes/positions';
 import { buildPositionsWithLivePrices } from '../../../src/api/helpers/positions';
+import { createMockBscMultiDexContext } from '../../fixtures/api.fixtures';
 
 // Helper to make requests against the route
 function createTestApp() {
@@ -188,5 +189,116 @@ describe('GET /api/positions', () => {
         expect(buildPositionsWithLivePrices).toHaveBeenCalledWith(
             expect.arrayContaining([expect.objectContaining({ chain: expect.objectContaining({ name: 'eth' }) })]),
         );
+    });
+});
+
+function createBscTestApp() {
+    const app = express();
+    const bscCtx = createMockBscMultiDexContext();
+    app.use('/', positionRoutes([bscCtx]));
+    return app;
+}
+
+describe('BSC V3 multi-dex positions (D-15 integration)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    });
+
+    it('returns PancakeSwap V3 position with dexName in response', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+            {
+                tradeId: 100,
+                token: '0xbscPancakeToken',
+                chain: 'bsc',
+                entryPrice: 0.0005,
+                currentPrice: 0.0008,
+                priceStale: false,
+                unrealizedPnl: 0.15,
+                pnl: -0.35,
+                buyCost: '0.5',
+                buyGas: '0.002',
+                buyTime: 1700100000,
+                poolType: 'v3',
+                feeTier: 2500,
+                sellRevenue: 0,
+                dexName: 'pancakeswap-v3',
+                exitState: null,
+            },
+        ]);
+
+        const app = createBscTestApp();
+        const res = await request(app, '/');
+
+        expect(res.status).toBe(200);
+        expect(res.body.positions).toHaveLength(1);
+        expect(res.body.positions[0].token).toBe('0xbscPancakeToken');
+        expect(res.body.positions[0].chain).toBe('bsc');
+        expect(res.body.positions[0].poolType).toBe('v3');
+        expect(res.body.positions[0].priceStale).toBe(false);
+        expect(res.body.positions[0].dexName).toBe('pancakeswap-v3');
+    });
+
+    it('returns BSC V3 position with null dexName (legacy fallback)', async () => {
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+            {
+                tradeId: 103,
+                token: '0xlegacyBsc',
+                chain: 'bsc',
+                entryPrice: 0.005,
+                currentPrice: 0.006,
+                priceStale: false,
+                unrealizedPnl: 0.05,
+                pnl: -0.05,
+                buyCost: '0.1',
+                buyGas: '0.001',
+                buyTime: 1700300000,
+                poolType: 'v3',
+                feeTier: 3000,
+                sellRevenue: 0,
+                dexName: null,
+                exitState: null,
+            },
+        ]);
+
+        const app = createBscTestApp();
+        const res = await request(app, '/');
+
+        expect(res.status).toBe(200);
+        expect(res.body.positions).toHaveLength(1);
+        expect(res.body.positions[0].dexName).toBeNull();
+        expect(res.body.positions[0].priceStale).toBe(false);
+    });
+
+    it('returns priceStale for position with unmatched dex_name (removed dex)', async () => {
+        // Addresses Codex review concern: "renamed/removed dex" at API level
+        (buildPositionsWithLivePrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+            {
+                tradeId: 104,
+                token: '0xorphanBsc',
+                chain: 'bsc',
+                entryPrice: 0.01,
+                currentPrice: null,
+                priceStale: true,
+                unrealizedPnl: null,
+                pnl: -0.01,
+                buyCost: '0.01',
+                buyGas: '0.001',
+                buyTime: 1700400000,
+                poolType: 'v3',
+                feeTier: 500,
+                sellRevenue: 0,
+                dexName: 'removed-dex',
+                exitState: null,
+            },
+        ]);
+
+        const app = createBscTestApp();
+        const res = await request(app, '/');
+
+        expect(res.status).toBe(200);
+        expect(res.body.positions).toHaveLength(1);
+        expect(res.body.positions[0].priceStale).toBe(true);
+        expect(res.body.positions[0].dexName).toBe('removed-dex');
     });
 });

@@ -103,6 +103,11 @@ export async function buildPositionsWithLivePrices(contexts: ChainContext[]): Pr
         let currentPrice: number | null = null;
         let priceStale = false;
 
+        // If chain exists but dex resolution failed (removed/renamed dex), mark stale
+        if (ctx && !dex) {
+            priceStale = true;
+        }
+
         if (ctx && dex && trade.buy_cost) {
             try {
                 const buyAmountWei = ethers.parseEther(trade.buy_cost);

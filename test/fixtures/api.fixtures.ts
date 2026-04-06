@@ -3,7 +3,7 @@
 // Creates typed mock ChainContext objects without importing production modules
 // that require live DB/network connections.
 
-import type { ChainContext, ChainConfig, DexConfigV2 } from '../../src/chainRegistry';
+import type { ChainContext, ChainConfig, DexConfigV2, DexConfigV3 } from '../../src/chainRegistry';
 
 export const MOCK_API_KEY = 'test-dashboard-api-key-12345';
 
@@ -81,6 +81,33 @@ export function createDisconnectedChainContext(overrides: Partial<ChainConfig> =
 
 // Alias for backward compatibility with health tests
 export const createDisconnectedContext = createDisconnectedChainContext;
+
+/** Create a BSC mock context with both Uniswap V3 and PancakeSwap V3 dexes */
+export function createMockBscMultiDexContext(): ChainContext {
+    return createMockChainContext({
+        chainId: 56,
+        name: 'bsc',
+        displayName: '[BSC]',
+        nativeCurrency: 'BNB',
+        wethAddress: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+        dexes: [
+            {
+                dexType: 'v3' as const,
+                name: 'uniswap-v3',
+                factoryAddress: '0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7',
+                swapRouterAddress: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
+                quoterAddress: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077',
+            } as DexConfigV3,
+            {
+                dexType: 'v3' as const,
+                name: 'pancakeswap-v3',
+                factoryAddress: '0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865',
+                swapRouterAddress: '0x13f4EA83D0bd40E75C8222255bc855a974568Dd4',
+                quoterAddress: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997',
+            } as DexConfigV3,
+        ],
+    });
+}
 
 /** Create a mock trade row from the DB */
 export function createMockTradeRow(overrides: Record<string, unknown> = {}) {

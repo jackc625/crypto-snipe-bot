@@ -23,6 +23,7 @@ import { buildPositionsWithLivePrices } from '../../src/api/helpers/positions';
 import { getPnL, getExitState, getTradeIdForPendingToken } from '../../src/utils/db';
 import { queryPrice } from '../../src/exitEngine';
 import type { ChainContext } from '../../src/chainRegistry';
+import { createMockBscMultiDexContext } from '../fixtures/api.fixtures';
 
 // Helper to create a mock ChainContext
 function mockCtx(chainName: string): ChainContext {
@@ -181,5 +182,102 @@ describe('buildPositionsWithLivePrices', () => {
         // queryPrice should have been called once for each open position
         expect(queryPrice).toHaveBeenCalledTimes(2);
         expect(positions).toHaveLength(2);
+    });
+
+    describe('multi-dex resolution (D-02, D-03)', () => {
+        it('resolves PancakeSwap V3 dex when trade has dex_name pancakeswap-v3', async () => {
+            (getPnL as any).mockReturnValue([{
+                buy_id: 10, token: '0xbsctoken', chain: 'bsc', buy_cost: '0.5', buy_gas: '0.001',
+                sell_revenue: 0, sell_gas: 0, realized_pnl: -0.501, buy_time: 5000,
+                sell_time: null, sell_count: 0, pool_type: 'v3', fee_tier: 2500,
+                buy_status: 'pending', dex_name: 'pancakeswap-v3',
+            }]);
+            (getTradeIdForPendingToken as any).get.mockReturnValue({ id: 10 });
+            (getExitState as any).get.mockReturnValue(null);
+            (queryPrice as any).mockResolvedValue(500000000000000000); // 0.5 BNB in wei
+
+            const bscCtx = createMockBscMultiDexContext();
+            const positions = await buildPositionsWithLivePrices([bscCtx]);
+
+            expect(positions).toHaveLength(1);
+            expect(positions[0].priceStale).toBe(false);
+            // Verify queryPrice was called with the PancakeSwap V3 dex (2nd dex), not Uniswap V3
+            expect(queryPrice).toHaveBeenCalledWith(
+                bscCtx,
+                expect.objectContaining({ name: 'pancakeswap-v3', quoterAddress: '0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997' }),
+                '0xbsctoken',
+                2500,
+                expect.any(BigInt)
+            );
+        });
+
+        it('falls back to first V3 dex when trade has dex_name null (legacy)', async () => {
+            (getPnL as any).mockReturnValue([{
+                buy_id: 11, token: '0xlegacy', chain: 'bsc', buy_cost: '0.5', buy_gas: '0.001',
+                sell_revenue: 0, sell_gas: 0, realized_pnl: -0.501, buy_time: 5000,
+                sell_time: null, sell_count: 0, pool_type: 'v3', fee_tier: 500,
+                buy_status: 'pending', dex_name: null,
+            }]);
+            (getTradeIdForPendingToken as any).get.mockReturnValue(null);
+            (queryPrice as any).mockResolvedValue(500000000000000000);
+
+            const bscCtx = createMockBscMultiDexContext();
+            const positions = await buildPositionsWithLivePrices([bscCtx]);
+
+            expect(positions).toHaveLength(1);
+            // Legacy fallback: first V3 dex (uniswap-v3) should be used
+            expect(queryPrice).toHaveBeenCalledWith(
+                bscCtx,
+                expect.objectContaining({ name: 'uniswap-v3' }),
+                '0xlegacy',
+                500,
+                expect.any(BigInt)
+            );
+        });
+
+        it('returns priceStale when dex_name does not match any configured dex', async () => {
+            // Addresses review concern: "trade has dex_name, matching chain exists, but configured dex was removed/renamed"
+            (getPnL as any).mockReturnValue([{
+                buy_id: 12, token: '0xorphan', chain: 'bsc', buy_cost: '0.5', buy_gas: '0.001',
+                sell_revenue: 0, sell_gas: 0, realized_pnl: -0.501, buy_time: 5000,
+                sell_time: null, sell_count: 0, pool_type: 'v3', fee_tier: 500,
+                buy_status: 'pending', dex_name: 'removed-dex',
+            }]);
+            (getTradeIdForPendingToken as any).get.mockReturnValue(null);
+
+            const bscCtx = createMockBscMultiDexContext();
+            const positions = await buildPositionsWithLivePrices([bscCtx]);
+
+            expect(positions).toHaveLength(1);
+            // No matching dex, queryPrice should not be called, currentPrice null
+            expect(queryPrice).not.toHaveBeenCalled();
+            expect(positions[0].currentPrice).toBeNull();
+            // Position should be marked as priceStale since price could not be fetched
+            expect(positions[0].priceStale).toBe(true);
+        });
+
+        it('resolves uniswap-v3 dex when trade explicitly has dex_name uniswap-v3', async () => {
+            (getPnL as any).mockReturnValue([{
+                buy_id: 13, token: '0xunitoken', chain: 'bsc', buy_cost: '0.3', buy_gas: '0.001',
+                sell_revenue: 0, sell_gas: 0, realized_pnl: -0.301, buy_time: 5000,
+                sell_time: null, sell_count: 0, pool_type: 'v3', fee_tier: 3000,
+                buy_status: 'pending', dex_name: 'uniswap-v3',
+            }]);
+            (getTradeIdForPendingToken as any).get.mockReturnValue({ id: 13 });
+            (getExitState as any).get.mockReturnValue(null);
+            (queryPrice as any).mockResolvedValue(300000000000000000);
+
+            const bscCtx = createMockBscMultiDexContext();
+            const positions = await buildPositionsWithLivePrices([bscCtx]);
+
+            expect(positions).toHaveLength(1);
+            expect(queryPrice).toHaveBeenCalledWith(
+                bscCtx,
+                expect.objectContaining({ name: 'uniswap-v3', quoterAddress: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077' }),
+                '0xunitoken',
+                3000,
+                expect.any(BigInt)
+            );
+        });
     });
 });
