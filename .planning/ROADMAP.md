@@ -257,13 +257,15 @@ Plans:
 **Depends on**: Phase 7, Phase 3
 **Requirements**: DB-03, DB-04
 **Gap Closure:** Closes INT-AMOUNT-OUT-NULL from v6.16 audit; fixes Dashboard P&L, Risk monitoring, and Trade history flows
+**Plans**: 2 plans
 **Success Criteria** (what must be TRUE):
   1. After executeFullSell completes, the trades row has a non-null amount_out containing the ETH received from the swap
   2. After executePartialSell completes, the partial_sell row has a non-null amount_out containing the ETH received
   3. getPnL() returns correct realized P&L reflecting actual sell revenue, not zero
 
 Plans:
-- (to be planned)
+- [ ] 14-01-PLAN.md — Receipt decoder utility with WETH event parsing, unit tests, and test fixtures (DB-03)
+- [ ] 14-02-PLAN.md — Wire decodeReceipt into executeFullSell/executePartialSell, fix Flashbots tx hash (DB-03, DB-04)
 
 ### Phase 15: Chain-Scoped Dedup & Dashboard Env Validation
 **Goal**: Token dedup is chain-scoped so multi-chain sniping works correctly, and DASHBOARD_API_KEY is validated at startup
@@ -298,5 +300,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
-| 14. Sell Revenue Receipt Decoding | 0/0 | Gap closure planned | - |
+| 14. Sell Revenue Receipt Decoding | 0/2 | Planned | - |
 | 15. Chain-Scoped Dedup & Dashboard Env | 0/0 | Gap closure planned | - |
