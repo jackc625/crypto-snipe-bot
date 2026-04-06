@@ -15,3 +15,8 @@ data/
 
 # Hardhat cache (runtime generated)
 cache/
+
+# Dashboard source is TypeScript-only (.tsx/.ts).
+# .js files in this tree are Vite/TS transpilation artifacts, not hand-written source.
+# If a legitimate .js file is ever needed here, use !dashboard/src/path/to/file.js to un-ignore.
+dashboard/src/**/*.js
