@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-04-06 after Phase 12 integration-gap-fixes (Multi-dex price resolution fixed with dex_name column, WebSocket chain status broadcast on all stop/start paths, 28 stale .js artifacts cleaned up — 240 tests passing, v6.16 milestone complete)*
+*Last updated: 2026-04-06 after Phase 13 config-env-var-correctness (STOP_LOSS_PCT env var wired to CONFIG.stopLossPercent with NaN guard, FLASHBOTS_AUTH_KEY made conditional on ETH chain enablement — 247 tests passing, v6.16 milestone complete)*
