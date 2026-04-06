@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 9: Testing Infrastructure** - Unit tests, integration tests, and mainnet fork tests validating the full system (completed 2026-03-28)
 - [x] **Phase 10: Fix partial_sell Revenue Visibility** - [GAP CLOSURE] Make partial sell proceeds visible in P&L, trade history, and risk calculations (completed 2026-03-30)
 - [x] **Phase 11: Dashboard Accuracy & Bot Integration Wiring** - [GAP CLOSURE] Live prices in dashboard, chain restart listeners, Telegram listener wiring (completed 2026-04-01)
-- [ ] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact
+- [x] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact (completed 2026-04-06)
 
 ## Phase Details
 
@@ -235,7 +235,7 @@ Plans:
 Plans:
 - [x] 12-01-PLAN.md — Multi-dex price resolution: schema migration v4 (dex_name column), positions.ts dex resolution fix, insertTrade call site updates, tests (DASH-01)
 - [x] 12-02-PLAN.md — WebSocket chain status broadcast: buildChainStatus helper, broadcast after stop/start, client event type update, ChainControls WS wiring, tests (DASH-03)
-- [ ] 12-03-PLAN.md — Stale artifact cleanup: delete 28 .js build artifacts from dashboard/src/, add .gitignore pattern (DASH-01, DASH-03)
+- [x] 12-03-PLAN.md — Stale artifact cleanup: delete 28 .js build artifacts from dashboard/src/, add .gitignore pattern (DASH-01, DASH-03)
 
 ## Progress
 
@@ -256,4 +256,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 9. Testing Infrastructure | 4/5 | Gap closure planned   | - |
 | 10. partial_sell Revenue Fix | 2/2 | Complete    | 2026-03-30 |
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
-| 12. Integration Gap Fixes | 2/3 | In Progress|  |
+| 12. Integration Gap Fixes | 3/3 | Complete   | 2026-04-06 |
