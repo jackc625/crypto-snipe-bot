@@ -338,17 +338,19 @@ async function fetchReceiptWithRetry(
 
 **Note:** A1 is supported by Uniswap V3 documentation and code analysis (the `buildV3SellTx` function does not include `unwrapWETH9`), but is tagged ASSUMED because the on-chain behavior was not verified with a live transaction. A2 is supported by the bloXroute strategy returning `data.result` from the API response. A3 follows from single-hop swap mechanics.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the Flashbots strategy be fixed to return real tx hash?**
    - What we know: Current FlashbotsMevStrategy returns `flashbots_bundle_block_N`, not a real hash. The real hash is available in `bundleTransactions[0].hash`. Fixing this is an implementation change, not interface change (D-04 safe).
    - What's unclear: Whether this fix should be part of Phase 14 or a separate task.
    - Recommendation: Include it in Phase 14 as a prerequisite fix. Without it, all ETH mainnet sells via Flashbots will continue to have null amountOut, defeating the purpose.
+   - RESOLVED: Included in Plan 02 Task 1 Part A. Flashbots strategy changed to return `bundleTransactions[0].hash` instead of synthetic string.
 
 2. **Should V3 sells be modified to unwrap WETH?**
    - What we know: Adding `unwrapWETH9` to the V3 multicall and setting recipient to `address(2)` would make V3 emit Withdrawal events, making D-01 work as-is.
    - What's unclear: Whether modifying the V3 sell path is in scope for this phase (it changes swap behavior, not just receipt decoding).
    - Recommendation: Do NOT modify the V3 sell path. Use the Transfer fallback instead. Changing swap mechanics is risky and out of scope.
+   - RESOLVED: Do NOT modify V3 sell path. Plan 01 implements WETH Transfer(to=wallet) fallback in receiptDecoder.ts instead.
 
 ## Validation Architecture
 
