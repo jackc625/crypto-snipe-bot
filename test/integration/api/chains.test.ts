@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import express from 'express';
 import { chainRoutes, maskUrl } from '../../../src/api/routes/chains';
 import { createMockChainContext, createDisconnectedChainContext } from '../../fixtures/api.fixtures';
+import { broadcast } from '../../../src/api/ws/broadcaster';
 
 // Mock exitEngine to avoid importing config/db dependencies
 vi.mock('../../../src/exitEngine', () => ({
@@ -26,6 +27,14 @@ vi.mock('../../../src/utils/logger', () => ({
             debug: () => {},
         }),
     },
+}));
+
+// Mock broadcaster for chain status broadcast tests (D-06)
+vi.mock('../../../src/api/ws/broadcaster', () => ({
+    broadcast: vi.fn(),
+    addClient: vi.fn(),
+    getClientCount: vi.fn(() => 1),
+    removeClient: vi.fn(),
 }));
 
 // Helper: create supertest-like request function using raw http
@@ -67,6 +76,7 @@ describe('Chain Routes', () => {
     let stoppedChains: Set<string>;
 
     beforeEach(() => {
+        vi.clearAllMocks();
         stoppedChains = new Set<string>();
         app = express();
         app.use(express.json());
@@ -247,6 +257,93 @@ describe('Chain Routes', () => {
             expect(res.body.warnings).toBeInstanceOf(Array);
             expect(res.body.warnings.length).toBeGreaterThan(0);
             expect(res.body.warnings[0]).toContain('restart');
+        });
+    });
+
+    describe('chain status broadcast (D-06)', () => {
+        it('broadcasts chain_status_change after stop', async () => {
+            const ctx = createMockChainContext({ name: 'eth', displayName: '[ETH]' });
+            const removeAllListeners = vi.fn();
+            (ctx.wsProvider as any).removeAllListeners = removeAllListeners;
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains));
+
+            const res = await request(app, 'POST', '/api/chains/eth/stop');
+            expect(res.status).toBe(200);
+            expect(res.body.ok).toBe(true);
+
+            // Wait for async fire-and-forget broadcast (.then() pattern)
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            expect(broadcast).toHaveBeenCalledWith(
+                'chain_status_change',
+                expect.objectContaining({
+                    chains: expect.arrayContaining([
+                        expect.objectContaining({ name: 'eth', status: 'stopped' })
+                    ])
+                })
+            );
+        });
+
+        it('broadcasts chain_status_change after successful start', async () => {
+            const ctx = createMockChainContext({ name: 'eth', displayName: '[ETH]' });
+            stoppedChains.add('eth');
+            const onRestart = vi.fn().mockResolvedValue({ warnings: [] });
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains, onRestart));
+
+            const res = await request(app, 'POST', '/api/chains/eth/start');
+            expect(res.status).toBe(200);
+            expect(res.body.ok).toBe(true);
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            expect(broadcast).toHaveBeenCalledWith(
+                'chain_status_change',
+                expect.objectContaining({
+                    chains: expect.arrayContaining([
+                        expect.objectContaining({ name: 'eth', status: 'running' })
+                    ])
+                })
+            );
+        });
+
+        it('broadcasts chain_status_change even when onRestart fails (Codex review concern)', async () => {
+            const ctx = createMockChainContext({ name: 'eth', displayName: '[ETH]' });
+            stoppedChains.add('eth');
+            const onRestart = vi.fn().mockRejectedValue(new Error('Restart failed'));
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains, onRestart));
+
+            const res = await request(app, 'POST', '/api/chains/eth/start');
+            expect(res.status).toBe(200);
+            expect(res.body.ok).toBe(true);
+            // Chain should still show as running (removed from stopped set before onRestart)
+            expect(res.body.warnings[0]).toContain('Restart failed');
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Broadcast should still happen even on restart failure
+            expect(broadcast).toHaveBeenCalledWith(
+                'chain_status_change',
+                expect.objectContaining({
+                    chains: expect.arrayContaining([
+                        expect.objectContaining({ name: 'eth', status: 'running' })
+                    ])
+                })
+            );
+        });
+
+        it('uses event type string chain_status_change consistently (not chain_status)', async () => {
+            const ctx = createMockChainContext({ name: 'eth' });
+            app.use('/api/chains', chainRoutes([ctx], stoppedChains));
+
+            await request(app, 'POST', '/api/chains/eth/stop');
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Verify the EXACT event type string
+            const calls = (broadcast as ReturnType<typeof vi.fn>).mock.calls;
+            expect(calls.length).toBeGreaterThan(0);
+            for (const call of calls) {
+                expect(call[0]).toBe('chain_status_change');
+            }
         });
     });
 });
