@@ -72,10 +72,10 @@ describe('SQLite storage (TEST-02)', () => {
             db.close();
         });
 
-        it('Schema v3: user_version pragma returns 3', () => {
+        it('Schema v4: user_version pragma returns 4', () => {
             const db = createTestDb();
             const version = db.pragma('user_version', { simple: true });
-            expect(version).toBe(3);
+            expect(version).toBe(4);
             db.close();
         });
     });
@@ -113,6 +113,7 @@ describe('SQLite storage (TEST-02)', () => {
             expect(columnNames).toContain('tx_hash');
             expect(columnNames).toContain('block');
             expect(columnNames).toContain('timestamp');
+            expect(columnNames).toContain('dex_name');
             db.close();
         });
 
@@ -129,6 +130,36 @@ describe('SQLite storage (TEST-02)', () => {
             expect(columnNames).toContain('original_token_amount');
             expect(columnNames).toContain('urgency_start_ts');
             expect(columnNames).toContain('volatility_samples');
+            db.close();
+        });
+    });
+
+    describe('dex_name column (Phase 12)', () => {
+        it('dex_name column exists in fresh test DB', () => {
+            const db = createTestDb();
+            const columns = db.prepare("PRAGMA table_info('trades')").all() as Array<{ name: string }>;
+            const columnNames = columns.map(c => c.name);
+            expect(columnNames).toContain('dex_name');
+            db.close();
+        });
+
+        it('dex_name defaults to NULL for inserts that omit it', () => {
+            const db = createTestDb();
+            db.prepare(
+                `INSERT INTO trades (token, chain, action, status, amount_in) VALUES ('0xtest', 'eth', 'buy', 'pending', '0.01')`
+            ).run();
+            const row = db.prepare('SELECT dex_name FROM trades WHERE token = ?').get('0xtest') as { dex_name: string | null };
+            expect(row.dex_name).toBeNull();
+            db.close();
+        });
+
+        it('dex_name stores and retrieves non-NULL values', () => {
+            const db = createTestDb();
+            db.prepare(
+                `INSERT INTO trades (token, chain, action, status, amount_in, pool_type, dex_name) VALUES ('0xtest', 'bsc', 'buy', 'pending', '0.5', 'v3', 'pancakeswap-v3')`
+            ).run();
+            const row = db.prepare('SELECT dex_name FROM trades WHERE token = ?').get('0xtest') as { dex_name: string | null };
+            expect(row.dex_name).toBe('pancakeswap-v3');
             db.close();
         });
     });
@@ -154,6 +185,7 @@ describe('SQLite storage (TEST-02)', () => {
                 COUNT(s.id)   AS sell_count,
                 b.pool_type,
                 b.fee_tier,
+                b.dex_name,
                 b.status      AS buy_status
             FROM trades b
             LEFT JOIN trades s ON b.token = s.token
@@ -252,14 +284,16 @@ describe('SQLite storage (TEST-02)', () => {
             token: string; chain: string; action: string; timestamp: number;
             amount_in?: string; amount_out?: string; gas_cost?: string;
             status?: string; pool_type?: string; fee_tier?: number | null;
+            dex_name?: string | null;
         }) {
             db.prepare(`
-                INSERT INTO trades (token, chain, action, timestamp, amount_in, amount_out, gas_cost, status, pool_type, fee_tier)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO trades (token, chain, action, timestamp, amount_in, amount_out, gas_cost, status, pool_type, fee_tier, dex_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
                 data.token, data.chain, data.action, data.timestamp,
                 data.amount_in ?? null, data.amount_out ?? null, data.gas_cost ?? null,
-                data.status ?? 'pending', data.pool_type ?? 'v2', data.fee_tier ?? null
+                data.status ?? 'pending', data.pool_type ?? 'v2', data.fee_tier ?? null,
+                data.dex_name ?? null
             );
         }
 

@@ -1,6 +1,6 @@
 // test/helpers/testDb.ts
 // In-memory SQLite factory for test isolation.
-// Creates a fresh database with the full production schema (user_version=3).
+// Creates a fresh database with the full production schema (user_version=4).
 
 import Database from 'better-sqlite3';
 
@@ -11,10 +11,10 @@ import Database from 'better-sqlite3';
  * Schema matches src/utils/db.ts exactly:
  * - trades table with all columns (id, token, chain, action, tx_hash, block,
  *   timestamp, amount_in, amount_out, gas_cost, price_at_action, status,
- *   pool_type, fee_tier)
+ *   pool_type, fee_tier, dex_name)
  * - exit_state table with FOREIGN KEY to trades(id)
  * - All indexes
- * - user_version = 3
+ * - user_version = 4
  */
 export function createTestDb(): Database.Database {
     const db = new Database(':memory:');
@@ -40,7 +40,8 @@ export function createTestDb(): Database.Database {
             price_at_action TEXT,
             status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'sold', 'failed')),
             pool_type TEXT DEFAULT 'v2' CHECK(pool_type IN ('v2', 'v3')),
-            fee_tier INTEGER
+            fee_tier INTEGER,
+            dex_name TEXT DEFAULT NULL
         );
         CREATE INDEX idx_trades_token ON trades(token);
         CREATE INDEX idx_trades_chain ON trades(chain);
@@ -65,7 +66,7 @@ export function createTestDb(): Database.Database {
     `);
 
     // Set schema version to match production
-    db.pragma('user_version = 3');
+    db.pragma('user_version = 4');
 
     return db;
 }

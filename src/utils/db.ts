@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -109,6 +109,16 @@ function migrateSchema(): void {
         logger.info('Created exit_state table and expanded trades action CHECK (schema version 3)');
     }
 
+    if (version < 4) {
+        // D-14: Belt-and-suspenders column-existence guard
+        const columns = db.prepare("PRAGMA table_info('trades')").all() as Array<{ name: string }>;
+        const hasColumn = columns.some(c => c.name === 'dex_name');
+        if (!hasColumn) {
+            db.exec(`ALTER TABLE trades ADD COLUMN dex_name TEXT DEFAULT NULL`);
+        }
+        logger.info('Added dex_name column (schema version 4)');
+    }
+
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
 }
 
@@ -165,8 +175,8 @@ migrateJsonState();
 // --- Prepared Statements (cached for performance) ---
 
 const insertTrade = db.prepare(`
-    INSERT INTO trades (token, chain, action, tx_hash, block, timestamp, amount_in, amount_out, gas_cost, price_at_action, status, pool_type, fee_tier)
-    VALUES (@token, @chain, @action, @txHash, @block, @timestamp, @amountIn, @amountOut, @gasCost, @priceAtAction, @status, @poolType, @feeTier)
+    INSERT INTO trades (token, chain, action, tx_hash, block, timestamp, amount_in, amount_out, gas_cost, price_at_action, status, pool_type, fee_tier, dex_name)
+    VALUES (@token, @chain, @action, @txHash, @block, @timestamp, @amountIn, @amountOut, @gasCost, @priceAtAction, @status, @poolType, @feeTier, @dexName)
 `);
 
 const getTradesByToken = db.prepare(`
@@ -202,6 +212,7 @@ const getPnLQuery = db.prepare(`
         COUNT(s.id)   AS sell_count,
         b.pool_type,
         b.fee_tier,
+        b.dex_name,
         b.status      AS buy_status
     FROM trades b
     LEFT JOIN trades s ON b.token = s.token
@@ -231,6 +242,7 @@ export interface PnLResult {
     sell_count: number;         // D-02: count of sell + partial_sell events
     pool_type: string;
     fee_tier: number | null;
+    dex_name: string | null;    // DEX identity for multi-dex resolution (Phase 12)
     buy_status: string;         // 'pending' | 'sold' | 'failed' -- for open/closed detection
 }
 
@@ -376,4 +388,4 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken, getPnLChartData };
+export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };
