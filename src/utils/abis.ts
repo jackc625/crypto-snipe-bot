@@ -69,3 +69,9 @@ export const V3_SWAP_ROUTER_ABI = [
 export const V3_QUOTER_V2_ABI = [
     "function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)"
 ];
+
+// -- WETH (Withdrawal for V2 sells, Transfer for V3 sells) --
+export const WETH_ABI = [
+    'event Withdrawal(address indexed src, uint256 wad)',
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
+];
