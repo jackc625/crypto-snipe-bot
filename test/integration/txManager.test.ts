@@ -228,7 +228,11 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
                 if (sendBundleCalls.length <= 2) {
                     return { error: { message: `Bundle not included` } };
                 }
-                return { bundleHash: '0xbundle123', wait: vi.fn().mockResolvedValue(0) };
+                return {
+                    bundleHash: '0xbundle123',
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
+                    wait: vi.fn().mockResolvedValue(0),
+                };
             }),
         });
 
@@ -255,7 +259,11 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
         const FlashbotsMevStrategy = await importFlashbotsStrategy({
             sendBundle: vi.fn().mockImplementation(async (_b: any, targetBlock: number) => {
                 capturedTargetBlocks.push(targetBlock);
-                return { bundleHash: '0x', wait: vi.fn().mockResolvedValue(0) };
+                return {
+                    bundleHash: '0x',
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
+                    wait: vi.fn().mockResolvedValue(0),
+                };
             }),
         });
 

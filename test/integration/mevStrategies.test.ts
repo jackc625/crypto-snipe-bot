@@ -46,6 +46,7 @@ describe('FlashbotsMevStrategy', () => {
         const mockFbProvider = {
             sendBundle: vi.fn().mockResolvedValue({
                 bundleHash: '0xbundlehash',
+                bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
                 wait: vi.fn().mockResolvedValue(0),
             }),
         };
@@ -87,6 +88,7 @@ describe('FlashbotsMevStrategy', () => {
                 capturedBlocks.push(block);
                 return {
                     bundleHash: '0x',
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
                     wait: vi.fn().mockResolvedValue(0),
                 };
             }),
@@ -127,6 +129,68 @@ describe('FlashbotsMevStrategy', () => {
         });
 
         expect(await strategy.healthCheck()).toBe(true);
+    });
+
+    it('sendTransaction returns real tx hash from bundleTransactions[0].hash, not synthetic', async () => {
+        const REAL_HASH = '0xrealtxhash0000000000000000000000000000000000000000000000000000';
+        const mockFbProvider = {
+            sendBundle: vi.fn().mockResolvedValue({
+                bundleHash: '0xbundlehash',
+                bundleTransactions: [{ hash: REAL_HASH }],
+                wait: vi.fn().mockResolvedValue(0),
+            }),
+        };
+
+        vi.doMock('@flashbots/ethers-provider-bundle', () => ({
+            FlashbotsBundleProvider: {
+                create: vi.fn().mockResolvedValue(mockFbProvider),
+            },
+        }));
+
+        const { FlashbotsMevStrategy } = await import('../../src/utils/mevStrategies/flashbots');
+        const provider = createMockProvider();
+        const wallet = { address: '0x1234' } as any;
+
+        const strategy = new FlashbotsMevStrategy({
+            relayUrl: 'https://relay.flashbots.net',
+            network: 'mainnet',
+            authKey: '0x' + '1'.repeat(64),
+        });
+
+        const result = await strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 0);
+
+        expect(result).toBe(REAL_HASH);
+        expect(result).not.toMatch(/^flashbots_bundle_block_/);
+    });
+
+    it('sendTransaction throws descriptive error if bundleTransactions[0].hash is missing', async () => {
+        const mockFbProvider = {
+            sendBundle: vi.fn().mockResolvedValue({
+                bundleHash: '0xbundlehash',
+                bundleTransactions: [],
+                wait: vi.fn().mockResolvedValue(0),
+            }),
+        };
+
+        vi.doMock('@flashbots/ethers-provider-bundle', () => ({
+            FlashbotsBundleProvider: {
+                create: vi.fn().mockResolvedValue(mockFbProvider),
+            },
+        }));
+
+        const { FlashbotsMevStrategy } = await import('../../src/utils/mevStrategies/flashbots');
+        const provider = createMockProvider();
+        const wallet = { address: '0x1234' } as any;
+
+        const strategy = new FlashbotsMevStrategy({
+            relayUrl: 'https://relay.flashbots.net',
+            network: 'mainnet',
+            authKey: '0x' + '1'.repeat(64),
+        });
+
+        await expect(
+            strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 0),
+        ).rejects.toThrow(/missing bundleTransactions\[0\]\.hash/);
     });
 });
 
@@ -203,6 +267,41 @@ describe('BloxrouteMevStrategy', () => {
         expect(await strategy.healthCheck()).toBe(false);
 
         if (origEnv !== undefined) process.env.BLOXROUTE_AUTH_HEADER = origEnv;
+    });
+
+    it('returns the data.result hash unchanged — no synthetic-hash bug on BSC path (regression)', async () => {
+        // Regression coverage for REVIEWS.md action 11: document that bloxroute.ts:91
+        // returns data.result unchanged (a real tx hash from the JSON-RPC response).
+        // This test locks in the current correct behavior so any future refactor that
+        // introduces a synthetic-hash bug (like the Flashbots one fixed in Phase 14)
+        // will fail loudly.
+        const REAL_BSC_HASH = '0xbsc_real_tx_hash_000000000000000000000000000000000000000000000';
+        const axiosPostMock = vi.fn().mockResolvedValue({
+            data: { result: REAL_BSC_HASH, error: null },
+        });
+
+        vi.doMock('axios', () => ({
+            default: { post: axiosPostMock },
+            post: axiosPostMock,
+        }));
+
+        const { BloxrouteMevStrategy } = await import('../../src/utils/mevStrategies/bloxroute');
+        const provider = createMockProvider();
+        const wallet = {
+            address: '0x1234',
+            signTransaction: vi.fn().mockResolvedValue('0xsignedtx'),
+        } as any;
+
+        const strategy = new BloxrouteMevStrategy({
+            endpoint: 'https://api.blxrbdn.com',
+            authHeader: 'test-auth-header',
+        });
+
+        const result = await strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 0);
+
+        expect(result).toBe(REAL_BSC_HASH);
+        expect(result).not.toMatch(/^bloxroute_/);
+        expect(result).not.toMatch(/^flashbots_bundle_block_/);
     });
 });
 
