@@ -142,4 +142,4 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
 
 ---
-*Last updated: 2026-04-06 after Phase 13 config-env-var-correctness (STOP_LOSS_PCT env var wired to CONFIG.stopLossPercent with NaN guard, FLASHBOTS_AUTH_KEY made conditional on ETH chain enablement — 247 tests passing, v6.16 milestone complete)*
+*Last updated: 2026-04-07 after Phase 14 sell-revenue-receipt-decoding (decodeReceipt utility wired into executeFullSell/executePartialSell, Flashbots synthetic-hash bug fixed, sell rows now record non-null amount_out/gas_cost/block from real receipts — closes INT-AMOUNT-OUT-NULL gap; unit 142/142, integration 122/122 passing; 4 live-chain items routed to 14-HUMAN-UAT.md)*
