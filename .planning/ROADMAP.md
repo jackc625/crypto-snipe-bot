@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Dashboard Accuracy & Bot Integration Wiring** - [GAP CLOSURE] Live prices in dashboard, chain restart listeners, Telegram listener wiring (completed 2026-04-01)
 - [x] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact (completed 2026-04-06)
 - [x] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain (completed 2026-04-06)
-- [ ] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null
+- [x] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null (completed 2026-04-07)
 - [ ] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup
 
 ## Phase Details
@@ -264,8 +264,8 @@ Plans:
   3. getPnL() returns correct realized P&L reflecting actual sell revenue, not zero
 
 Plans:
-- [ ] 14-01-PLAN.md — Receipt decoder utility with WETH event parsing, unit tests, and test fixtures (DB-03)
-- [ ] 14-02-PLAN.md — Wire decodeReceipt into executeFullSell/executePartialSell, fix Flashbots tx hash (DB-03, DB-04)
+- [x] 14-01-PLAN.md — Receipt decoder utility with WETH event parsing, unit tests, and test fixtures (DB-03)
+- [x] 14-02-PLAN.md — Wire decodeReceipt into executeFullSell/executePartialSell, fix Flashbots tx hash (DB-03, DB-04)
 
 ### Phase 15: Chain-Scoped Dedup & Dashboard Env Validation
 **Goal**: Token dedup is chain-scoped so multi-chain sniping works correctly, and DASHBOARD_API_KEY is validated at startup
@@ -300,5 +300,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 11. Dashboard Accuracy & Bot Wiring | 7/7 | Complete    | 2026-04-05 |
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
-| 14. Sell Revenue Receipt Decoding | 0/2 | Planned | - |
+| 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
 | 15. Chain-Scoped Dedup & Dashboard Env | 0/0 | Gap closure planned | - |
