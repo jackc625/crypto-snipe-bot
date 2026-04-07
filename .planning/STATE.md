@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-04-07T01:12:26.991Z"
+stopped_at: Phase 15 context gathered
+last_updated: "2026-04-07T16:38:09.798Z"
 progress:
   total_phases: 15
   completed_phases: 14
@@ -233,6 +233,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T20:01:37.895Z
-Stopped at: Phase 14 UI-SPEC approved
-Resume file: .planning/phases/14-sell-revenue-receipt-decoding/14-UI-SPEC.md
+Last session: 2026-04-07T16:38:09.790Z
+Stopped at: Phase 15 context gathered
+Resume file: .planning/phases/15-chain-scoped-dedup-dashboard-env/15-CONTEXT.md
