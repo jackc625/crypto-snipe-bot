@@ -73,7 +73,15 @@ export class FlashbotsMevStrategy implements MevStrategy {
         const waitResponse = await bundle.wait();
         if (waitResponse === 0) {
           log.info({ block: targetBlock, attempt: attempt + 1 }, 'Flashbots bundle included');
-          return `flashbots_bundle_block_${targetBlock}`;
+          // Phase 14: return the REAL tx hash from the bundle response so receiptDecoder
+          // can fetch the receipt downstream. Defensive guard throws loudly if the library
+          // response shape is malformed (missing hash field) rather than silently casting
+          // undefined to string.
+          const realHash = bundle.bundleTransactions?.[0]?.hash;
+          if (!realHash) {
+            throw new Error(`Flashbots bundle response missing bundleTransactions[0].hash for block ${targetBlock}`);
+          }
+          return realHash;
         }
         throw new Error(`Bundle not included in block ${targetBlock}`);
       } catch (err) {

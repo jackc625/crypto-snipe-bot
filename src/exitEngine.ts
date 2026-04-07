@@ -12,6 +12,7 @@ import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimer
 import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState } from './utils/db';
 import { sendCtxAlert } from './utils/notifier';
 import { sendTxWithRetry } from './utils/txManager';
+import { decodeReceipt } from './utils/receiptDecoder';
 
 const log = logger.child({ module: 'exitEngine' });
 
@@ -468,17 +469,30 @@ export async function executeFullSell(
 
         ctx.log.info({ token: tokenAddress, reason, txHash }, 'Exit sell TX confirmed');
 
+        // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
+        // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
+        // Legacy path at src/utils/txManager.ts:132 and :144 is intentionally unaffected by Phase 14;
+        // exitEngine uses the multi-chain ChainContext path which always returns a real hash.
+        let receiptData: { amountOut: string | null; gasCost: string | null; blockNumber: number | null } = {
+            amountOut: null,
+            gasCost: null,
+            blockNumber: null,
+        };
+        if (txHash) {
+            receiptData = await decodeReceipt(txHash, ctx.httpProvider, ctx.chain.wethAddress, ctx.wallet.address);
+        }
+
         // Record sell trade
         insertTrade.run({
             token: tokenAddress.toLowerCase(),
             chain: ctx.chain.name,
             action: 'sell',
             txHash: txHash || null,
-            block: null,
+            block: receiptData.blockNumber,
             timestamp: Math.floor(Date.now() / 1000),
             amountIn: balance.toString(),
-            amountOut: null,
-            gasCost: null,
+            amountOut: receiptData.amountOut,
+            gasCost: receiptData.gasCost,
             priceAtAction: null,
             status: 'sold',
             poolType: dex.dexType,
@@ -564,17 +578,28 @@ export async function executePartialSell(
 
         ctx.log.info({ token: tokenAddress, tiers: tierLabels, txHash }, 'Partial sell TX confirmed');
 
+        // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
+        // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
+        let receiptData: { amountOut: string | null; gasCost: string | null; blockNumber: number | null } = {
+            amountOut: null,
+            gasCost: null,
+            blockNumber: null,
+        };
+        if (txHash) {
+            receiptData = await decodeReceipt(txHash, ctx.httpProvider, ctx.chain.wethAddress, ctx.wallet.address);
+        }
+
         // D-10: Record each partial sell as separate trade row
         insertTrade.run({
             token: tokenAddress.toLowerCase(),
             chain: ctx.chain.name,
             action: 'partial_sell',
             txHash: txHash || null,
-            block: null,
+            block: receiptData.blockNumber,
             timestamp: Math.floor(Date.now() / 1000),
             amountIn: actualSellAmount.toString(),
-            amountOut: null,
-            gasCost: null,
+            amountOut: receiptData.amountOut,
+            gasCost: receiptData.gasCost,
             priceAtAction: currentMultiple.toString(),
             status: 'sold',
             poolType: dex.dexType,
