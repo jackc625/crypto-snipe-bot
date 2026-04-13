@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: risk-management
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-23
+validated: 2026-04-13
 ---
 
 # Phase 6 — Validation Strategy
@@ -19,9 +20,9 @@ created: 2026-03-23
 |----------|-------|
 | **Framework** | vitest |
 | **Config file** | vitest.config.ts |
-| **Quick run command** | `npx vitest run --reporter=verbose` |
+| **Quick run command** | `npx vitest run test/unit/riskManager.test.ts --reporter=verbose` |
 | **Full suite command** | `npx vitest run --reporter=verbose` |
-| **Estimated runtime** | ~10 seconds |
+| **Estimated runtime** | ~1 second |
 
 ---
 
@@ -38,22 +39,25 @@ created: 2026-03-23
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 06-01-01 | 01 | 1 | RISK-01 | unit | `npx vitest run src/__tests__/riskManager.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-02 | 01 | 1 | RISK-02 | unit | `npx vitest run src/__tests__/riskManager.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-03 | 01 | 1 | RISK-03 | unit | `npx vitest run src/__tests__/riskManager.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-04 | 01 | 1 | RISK-04 | unit | `npx vitest run src/__tests__/riskManager.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-05 | 01 | 1 | RISK-05 | unit | `npx vitest run src/__tests__/riskManager.test.ts` | ❌ W0 | ⬜ pending |
+| 06-01-01 | 01 | 1 | RISK-01 | unit | `npx vitest run test/unit/riskManager.test.ts` | ✅ | ✅ green |
+| 06-01-02 | 01 | 1 | RISK-02 | unit | `npx vitest run test/unit/riskManager.test.ts` | ✅ | ✅ green |
+| 06-01-03 | 01 | 1 | RISK-03 | unit | `npx vitest run test/unit/riskManager.test.ts` | ✅ | ✅ green |
+| 06-01-04 | 01 | 1 | RISK-04 | unit | `npx vitest run test/unit/riskManager.test.ts` | ✅ | ✅ green |
+| 06-01-05 | 01 | 1 | RISK-05 | unit | `npx vitest run test/unit/riskManager.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
----
+### Test Coverage Detail
 
-## Wave 0 Requirements
-
-- [ ] `src/__tests__/riskManager.test.ts` — test stubs for RISK-01 through RISK-05
-- [ ] Test fixtures for mock DB state (trades table with various statuses)
-
-*Existing vitest infrastructure covers framework needs.*
+| Requirement | Test Description | File:Line |
+|-------------|-----------------|-----------|
+| RISK-01 | returns {allowed:false, reason:"position_size"} when amount exceeds max | test/unit/riskManager.test.ts:73 |
+| RISK-02 | returns {allowed:false, reason:"daily_loss_limit"} when daily loss exceeded | test/unit/riskManager.test.ts:79 |
+| RISK-03 | returns {allowed:false, reason:"max_positions"} when max positions reached | test/unit/riskManager.test.ts:88 |
+| RISK-04 | returns {allowed:false, reason:"cooldown"} when cooldown active | test/unit/riskManager.test.ts:95 |
+| RISK-05 | returns {allowed:false, reason:"exposure_cap"} when total exposure exceeded | test/unit/riskManager.test.ts:103 |
+| RISK-05 | getPortfolioExposure returns exposure reduced by partial sell proceeds | test/unit/riskManager.test.ts:113 |
+| ALL | returns {allowed:true} when all limits OK (happy path) | test/unit/riskManager.test.ts:67 |
 
 ---
 
@@ -67,11 +71,22 @@ created: 2026-03-23
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 10s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 10s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete
+
+## Validation Audit 2026-04-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All 5 RISK requirements covered by existing tests in `test/unit/riskManager.test.ts` (7 tests, all green).
+Additional integration coverage in `test/integration/api/risk.test.ts` for API endpoint exposure.
