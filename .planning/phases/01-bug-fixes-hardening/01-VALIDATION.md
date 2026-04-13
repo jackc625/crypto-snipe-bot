@@ -1,10 +1,11 @@
 ---
 phase: 1
 slug: bug-fixes-hardening
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-19
+audited: 2026-04-13
 ---
 
 # Phase 1 — Validation Strategy
@@ -17,19 +18,19 @@ created: 2026-03-19
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Mocha + Chai (via Hardhat test runner, already in devDependencies) |
-| **Config file** | `hardhat.config.ts` (exists) |
-| **Quick run command** | `npx hardhat test` |
-| **Full suite command** | `npx hardhat test` |
+| **Framework** | Vitest 4.x |
+| **Config file** | `vitest.config.ts` (projects: unit, integration, fork) |
+| **Quick run command** | `npx vitest run --project unit` |
+| **Full suite command** | `npx vitest run` |
 | **Estimated runtime** | ~5 seconds |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `npx hardhat test`
-- **After every plan wave:** Run `npx hardhat test`
-- **Before `/gsd:verify-work`:** Full suite must be green
+- **After every task commit:** Run `npx vitest run --project unit`
+- **After every plan wave:** Run `npx vitest run`
+- **Before `/gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** 5 seconds
 
 ---
@@ -38,15 +39,15 @@ created: 2026-03-19
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 01-01-01 | 01 | 1 | FIX-01 | unit | `npx hardhat test test/exitManager.test.ts --grep "mutex"` | ❌ W0 | ⬜ pending |
-| 01-02-01 | 02 | 1 | FIX-02 | unit | `npx hardhat test test/flashbots.test.ts --grep "relay"` | ❌ W0 | ⬜ pending |
-| 01-02-02 | 02 | 1 | FIX-03 | unit | `npx hardhat test test/txManager.test.ts --grep "nonce"` | ❌ W0 | ⬜ pending |
-| 01-03-01 | 03 | 1 | FIX-04 | unit | `npx hardhat test test/bot.test.ts --grep "simulation"` | ❌ W0 | ⬜ pending |
-| 01-01-02 | 01 | 1 | FIX-05 | unit | `npx hardhat test test/exitManager.test.ts --grep "shutdown"` | ❌ W0 | ⬜ pending |
-| 01-03-02 | 03 | 1 | FIX-06 | unit | `npx hardhat test test/config.test.ts --grep "validation"` | ❌ W0 | ⬜ pending |
-| 01-01-03 | 01 | 1 | FIX-07 | unit | `npx hardhat test test/exitManager.test.ts --grep "timed"` | ❌ W0 | ⬜ pending |
-| 01-03-03 | 03 | 1 | FIX-08 | unit | `npx hardhat test test/bot.test.ts --grep "balance"` | ❌ W0 | ⬜ pending |
-| 01-03-04 | 03 | 2 | FIX-09 | unit | `npx hardhat test test/telegramListener.test.ts --grep "whitelist"` | ❌ W0 | ⬜ pending |
+| 01-01-01 | 01 | 1 | FIX-01 | integration | `npx vitest run test/integration/exitMonitor.test.ts` | ✅ | ✅ green |
+| 01-02-01 | 02 | 1 | FIX-02 | integration | `npx vitest run test/integration/txManager.test.ts` | ✅ | ✅ green |
+| 01-02-02 | 02 | 1 | FIX-03 | integration | `npx vitest run test/integration/txManager.test.ts` | ✅ | ✅ green |
+| 01-03-01 | 03 | 1 | FIX-04 | unit | `npx vitest run test/unit/tokenSafety.test.ts` | ✅ | ✅ green |
+| 01-01-02 | 01 | 1 | FIX-05 | unit | `npx vitest run test/unit/exitManager.shutdown.test.ts` | ✅ | ✅ green |
+| 01-03-02 | 03 | 1 | FIX-06 | unit | `npx vitest run test/unit/configEnvVar.test.ts` | ✅ | ✅ green |
+| 01-01-03 | 01 | 1 | FIX-07 | integration | `npx vitest run test/integration/exitMonitor.test.ts` | ✅ | ✅ green |
+| 01-03-03 | 03 | 1 | FIX-08 | unit | `npx vitest run test/unit/exitEngineZeroBalance.test.ts` | ✅ | ✅ green |
+| 01-03-04 | 03 | 2 | FIX-09 | unit | `npx vitest run test/unit/telegramListener.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,15 +55,7 @@ created: 2026-03-19
 
 ## Wave 0 Requirements
 
-- [ ] `test/` directory — create it
-- [ ] `test/exitManager.test.ts` — stubs for FIX-01, FIX-05, FIX-07
-- [ ] `test/flashbots.test.ts` — stubs for FIX-02
-- [ ] `test/txManager.test.ts` — stubs for FIX-03
-- [ ] `test/bot.test.ts` — stubs for FIX-04, FIX-08
-- [ ] `test/config.test.ts` — stubs for FIX-06
-- [ ] `test/telegramListener.test.ts` — stubs for FIX-09
-
-*Mocha + Chai already in devDependencies via Hardhat. No additional framework installation needed.*
+Existing infrastructure covers all phase requirements.
 
 ---
 
@@ -70,18 +63,38 @@ created: 2026-03-19
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| SIGTERM exits within 5s | FIX-05 | Requires process signal delivery | Start bot, send `kill -SIGTERM <pid>`, verify exit within 5s |
+| SIGTERM exits within 5s | FIX-05 | Requires real process signal timing | Start bot, send `kill -SIGTERM <pid>`, verify exit within 5s |
 | Resume monitoring on restart | FIX-05 | Requires process restart cycle | Write state with pending positions, restart bot, verify monitoring resumes |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-13
+
+---
+
+## Validation Audit 2026-04-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 2 |
+| Resolved | 2 |
+| Escalated | 0 |
+
+### Audit Details
+
+**Test infrastructure updated:** Hardhat/Mocha → Vitest (project evolved since original VALIDATION.md)
+
+**Gaps resolved:**
+- **FIX-05 (PARTIAL → COVERED):** Created `test/unit/exitManager.shutdown.test.ts` — 8 tests covering SIGTERM/SIGINT shutdown handler, isShutdownInProgress flag, re-entrant guard, timer registry cleanup
+- **FIX-08 (MISSING → COVERED):** Created `test/unit/exitEngineZeroBalance.test.ts` — 7 tests covering zero-balance detection, status update to 'sold', timer cleanup, exit state deletion, no spurious TX
+
+**Coverage summary:** 9/9 requirements have automated verification. 2 behaviors remain manual-only (real process signal timing, full restart cycle).
