@@ -331,22 +331,6 @@ const getTotalExposure = db.prepare(`
     WHERE b.status = 'pending' AND b.action = 'buy'
 `);
 
-// D-03: Deployed capital for a specific chain -- subtracts partial sell proceeds (Phase 10 D-04)
-const getDeployedCapitalByChain = db.prepare(`
-    SELECT COALESCE(SUM(
-        CAST(b.amount_in AS REAL)
-        - COALESCE((
-            SELECT SUM(CAST(COALESCE(ps.amount_out, '0') AS REAL))
-            FROM trades ps
-            WHERE ps.token = b.token
-              AND ps.chain = b.chain
-              AND ps.action = 'partial_sell'
-        ), 0)
-    ), 0) AS deployed
-    FROM trades b
-    WHERE b.status = 'pending' AND b.action = 'buy' AND b.chain = ?
-`);
-
 // RISK-02: Realized losses in rolling 24h window for a chain -- includes partial_sell events (Phase 10 D-05)
 const getDailyRealizedLoss = db.prepare(`
     SELECT COALESCE(SUM(
