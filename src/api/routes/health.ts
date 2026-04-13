@@ -3,6 +3,8 @@
 // Unauthenticated endpoint (per D-20) returning chain connectivity,
 // position summary, and bot liveness data.
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { Router } from 'express';
 import type { ChainContext } from '../../chainRegistry';
 import { getOpenPositionCount, getPnL } from '../../utils/db';
@@ -10,6 +12,7 @@ import { getPortfolioExposure } from '../../riskManager';
 import { asyncHandler } from '../middleware/errorHandler';
 
 const startTime = Date.now();
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf-8'));
 
 /**
  * Create health route handler bound to the given chain contexts.
@@ -74,6 +77,7 @@ export function healthRoutes(
 
             res.status(statusCode).json({
                 status,
+                version: pkg.version,
                 uptime: Math.floor((Date.now() - startTime) / 1000),
                 chains,
                 positions: {

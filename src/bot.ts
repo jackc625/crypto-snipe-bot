@@ -36,7 +36,6 @@ import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_A
 import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
 import {
     clearAllTimers,
-    initShutdownHandler,
 } from "./utils/exitManager";
 import { startExitMonitor, resumeExitMonitor } from './exitEngine';
 import {

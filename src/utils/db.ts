@@ -437,4 +437,4 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, getTradesByToken, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };
+export { db, insertTrade, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };
