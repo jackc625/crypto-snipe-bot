@@ -338,7 +338,7 @@ export async function handleNewPairForChain(
         }
     } catch (e) {
         ctx.log.error({ err: e, token: targetToken }, 'TX failed');
-        updateTradeStatus.run('failed', targetToken.toLowerCase());
+        updateTradeStatus.run('failed', targetToken.toLowerCase(), ctx.chain.name);
         await sendCtxAlert(ctx, `*TX failed* for \`${symbol}\``);
     }
 }
@@ -525,7 +525,7 @@ export async function handleNewV3PoolForChain(
         }
     } catch (e) {
         ctx.log.error({ err: e, token: targetToken, feeTier }, 'V3 TX failed');
-        updateTradeStatus.run('failed', targetToken.toLowerCase());
+        updateTradeStatus.run('failed', targetToken.toLowerCase(), ctx.chain.name);
         await sendCtxAlert(ctx, `*V3 TX failed* for \`${symbol}\``);
     }
 }
@@ -848,7 +848,7 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
         tokenContract.balanceOf(ctx.wallet.address).then(async (balance: bigint) => {
             if (balance === 0n) {
                 ctx.log.info({ token }, 'Zero balance for pending token, marking as failed');
-                updateTradeStatus.run('failed', token);
+                updateTradeStatus.run('failed', token, chainName);
                 return;
             }
 

@@ -441,7 +441,7 @@ export async function executeFullSell(
 
         if (balance === 0n) {
             ctx.log.info({ token: tokenAddress, reason }, 'Zero balance, cleaning up');
-            updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+            updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
             clearAllTimersForToken(ctx.chain.name, tokenAddress);
             deleteExitState.run(tradeId);
             return true;
@@ -499,7 +499,7 @@ export async function executeFullSell(
             feeTier: feeTier,
             dexName: dex.name,
         });
-        updateTradeStatus.run('sold', tokenAddress.toLowerCase());
+        updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
         deleteExitState.run(tradeId);
 
@@ -508,7 +508,7 @@ export async function executeFullSell(
     } catch (e) {
         ctx.log.error({ err: e, token: tokenAddress, reason }, 'Exit sell failed');
         // Full exit failure: mark failed and clean up (Pitfall 6)
-        updateTradeStatus.run('failed', tokenAddress.toLowerCase());
+        updateTradeStatus.run('failed', tokenAddress.toLowerCase(), ctx.chain.name);
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
         deleteExitState.run(tradeId);
         await sendCtxAlert(ctx, `*${reason} sell failed:* ${e instanceof Error ? e.message : String(e)}`);
