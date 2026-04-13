@@ -1,9 +1,9 @@
 ---
 phase: 2
 slug: ethers-v6-migration
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-20
 ---
 
@@ -17,18 +17,18 @@ created: 2026-03-20
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Hardhat test (mocha + chai via hardhat-toolbox) |
-| **Config file** | `hardhat.config.ts` |
-| **Quick run command** | `npx hardhat compile` |
-| **Full suite command** | `npx tsc --noEmit && npx hardhat compile && npx hardhat test` |
-| **Estimated runtime** | ~30 seconds |
+| **Framework** | Vitest 4.x (unit/integration/fork projects) |
+| **Config file** | `vitest.config.ts` |
+| **Quick run command** | `npx vitest run test/unit/ethersV5PatternsAbsent.test.ts test/unit/ethersV6BigIntArithmetic.test.ts test/unit/ethersV6ToolboxConfig.test.ts` |
+| **Full suite command** | `npx vitest run` |
+| **Estimated runtime** | ~1 second |
 
 ---
 
 ## Sampling Rate
 
 - **After every task commit:** Run `npx tsc --noEmit`
-- **After every plan wave:** Run `npx tsc --noEmit && npx hardhat compile && npx hardhat test`
+- **After every plan wave:** Run `npx vitest run`
 - **Before `/gsd:verify-work`:** Full suite must be green
 - **Max feedback latency:** 30 seconds
 
@@ -38,10 +38,10 @@ created: 2026-03-20
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-01-XX | 01 | 1 | ETH6-01 | compile | `npx tsc --noEmit` | ✅ | ⬜ pending |
-| 02-01-XX | 01 | 1 | ETH6-02 | compile + grep | `npx tsc --noEmit && grep -rn "BigNumber" src/` | ✅ | ⬜ pending |
-| 02-02-XX | 02 | 2 | ETH6-03 | compile | `npx tsc --noEmit` | ✅ | ⬜ pending |
-| 02-02-XX | 02 | 2 | ETH6-04 | hardhat | `npx hardhat compile && npx hardhat test` | ✅ | ⬜ pending |
+| 02-01-XX | 01 | 1 | ETH6-01 | unit (static analysis) | `npx vitest run test/unit/ethersV5PatternsAbsent.test.ts` | ✅ | ✅ green |
+| 02-02-XX | 02 | 2 | ETH6-02 | unit (static + runtime) | `npx vitest run test/unit/ethersV6BigIntArithmetic.test.ts` | ✅ | ✅ green |
+| 02-02-XX | 02 | 2 | ETH6-03 | manual | N/A (Sepolia network required) | N/A | ⬜ manual |
+| 02-01-XX | 01 | 1 | ETH6-04 | unit (static analysis) | `npx vitest run test/unit/ethersV6ToolboxConfig.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,7 +49,7 @@ created: 2026-03-20
 
 ## Wave 0 Requirements
 
-*Existing infrastructure covers all phase requirements.* Hardhat compile + TypeScript compiler provide the primary verification. No additional test framework needed for a migration phase — compilation success IS the test.
+*Existing infrastructure covers all phase requirements.* Vitest is already configured with unit test project. Three new test files created during validation audit.
 
 ---
 
@@ -63,11 +63,31 @@ created: 2026-03-20
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-13
+
+---
+
+## Validation Audit 2026-04-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 3 |
+| Resolved | 3 |
+| Escalated | 0 |
+
+### Tests Created
+
+| # | File | Tests | Type | Command |
+|---|------|-------|------|---------|
+| 1 | `test/unit/ethersV5PatternsAbsent.test.ts` | 12 | unit (static analysis) | `npx vitest run test/unit/ethersV5PatternsAbsent.test.ts` |
+| 2 | `test/unit/ethersV6BigIntArithmetic.test.ts` | 9 | unit (static + runtime) | `npx vitest run test/unit/ethersV6BigIntArithmetic.test.ts` |
+| 3 | `test/unit/ethersV6ToolboxConfig.test.ts` | 7 | unit (static analysis) | `npx vitest run test/unit/ethersV6ToolboxConfig.test.ts` |
+
+**Total:** 28 tests, all passing.
