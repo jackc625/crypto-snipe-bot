@@ -35,6 +35,8 @@ function escapeCsv(field: string | number | null | undefined): string {
     return str;
 }
 
+const VALID_OUTCOMES = ['all', 'profit', 'loss'] as const;
+
 /**
  * Factory function for trades routes.
  * Mounts at /api/trades (parent handles prefix).
@@ -48,6 +50,10 @@ export function tradeRoutes(): Router {
         const fromStr = req.query.from as string | undefined;
         const toStr = req.query.to as string | undefined;
         const outcome = (req.query.outcome as string | undefined) || 'all';
+        if (!VALID_OUTCOMES.includes(outcome as typeof VALID_OUTCOMES[number])) {
+            res.status(400).json({ error: `Invalid outcome value. Must be one of: ${VALID_OUTCOMES.join(', ')}` });
+            return;
+        }
         const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 25));
 
@@ -123,6 +129,10 @@ export function tradeRoutes(): Router {
         const fromStr = req.query.from as string | undefined;
         const toStr = req.query.to as string | undefined;
         const outcome = (req.query.outcome as string | undefined) || 'all';
+        if (!VALID_OUTCOMES.includes(outcome as typeof VALID_OUTCOMES[number])) {
+            res.status(400).json({ error: `Invalid outcome value. Must be one of: ${VALID_OUTCOMES.join(', ')}` });
+            return;
+        }
 
         // Same filtering as GET /, but no pagination
         const now = Date.now();
