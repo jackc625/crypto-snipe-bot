@@ -259,15 +259,17 @@ No authentication, input validation, or cryptographic changes. All changes are i
 | A1 | `require('../../../package.json')` works from health.ts location | Issue 2 | LOW -- path may need adjustment if build output layout differs, but dev mode uses ts-node from src/ |
 | A2 | Removing dead shutdown exports will not break any test outside exitManager.shutdown.test.ts | Issue 3 | LOW -- grep confirmed zero imports; but test files might use dynamic imports not caught by grep |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `id` (buy_id) be added to the API trade response?**
    - What we know: The API currently does NOT include `buy_id`. The dashboard uses `trade.id` as React key. The DB query produces `buy_id`.
    - Recommendation: Yes, add `id: t.buy_id` to the API response mapping. This provides a stable, unique key for React without changing existing TradeTable key logic. Low risk, high benefit.
+   - RESOLVED: Yes, add `id: t.buy_id` to the API response. Implemented in Plan 16-01, Task 1 (adds `id: t.buy_id` as the first field in the `tradeResponse` mapping object in `src/api/routes/trades.ts`).
 
 2. **Should the exitManager.ts `initMultiChainShutdownHandler` export be removed entirely or refactored?**
    - What we know: bot.ts has its own more complete local version. The exitManager version is simpler/incomplete.
    - Recommendation: Remove the exitManager version. The bot.ts local version correctly handles API server, Telegram, and per-chain WS teardown.
+   - RESOLVED: Remove entirely (Option A). All three dead shutdown exports (`isShutdownInProgress`, `initShutdownHandler`, `initMultiChainShutdownHandler`) are deleted from exitManager.ts. Implemented in Plan 16-02, Task 1 (dead shutdown code removal section B).
 
 ## Sources
 
