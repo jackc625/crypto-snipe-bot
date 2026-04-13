@@ -26,7 +26,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 12: Integration Gap Fixes** - [GAP CLOSURE] Fix multi-dex price resolution, WebSocket chain status broadcast, verify stale TradeTable.js artifact (completed 2026-04-06)
 - [x] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain (completed 2026-04-06)
 - [x] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null (completed 2026-04-07)
-- [ ] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup
+- [x] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup (completed 2026-04-13)
 
 ## Phase Details
 
@@ -279,7 +279,7 @@ Plans:
 
 Plans:
 - [x] 15-01-PLAN.md — Chain-scoped dedup query + call sites + legacy wrapper deletion + cross-chain dedup test (CHAIN-02)
-- [ ] 15-02-PLAN.md — DASHBOARD_API_KEY required env var + startup validation tests (CHAIN-02)
+- [x] 15-02-PLAN.md — DASHBOARD_API_KEY required env var + startup validation tests (CHAIN-02)
 
 ## Progress
 
@@ -303,4 +303,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
 | 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
-| 15. Chain-Scoped Dedup & Dashboard Env | 1/2 | In Progress|  |
+| 15. Chain-Scoped Dedup & Dashboard Env | 2/2 | Complete   | 2026-04-13 |

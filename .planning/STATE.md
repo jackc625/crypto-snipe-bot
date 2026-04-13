@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-04-13T02:10:42.648Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-04-13T02:22:33.518Z"
 progress:
   total_phases: 15
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 53
-  completed_plans: 52
-  percent: 98
+  completed_plans: 53
+  percent: 100
 ---
 
 # Project State
@@ -97,6 +97,7 @@ Plan: 2 of 2
 | Phase 12 P03 | 2min | 1 tasks | 1 files |
 | Phase 13 P01 | 5min | 2 tasks | 3 files |
 | Phase 15 P01 | 19min | 4 tasks | 8 files |
+| Phase 15 P02 | 7min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -225,6 +226,9 @@ Recent decisions affecting current work:
 - [Phase 15]: makeIsTokenSnipedStmt factory exported for test access to production SQL literal (REVIEWS.md HIGH #2)
 - [Phase 15]: tsc --noEmit driven import cleanup was no-op (noUnusedLocals not enabled in tsconfig)
 - [Phase 15]: updateTradeStatus cross-chain collision deferred to Phase 16+ (flagged by Codex REVIEWS.md MEDIUM #4)
+- [Phase 15]: Mock dotenv in configEnvVar tests to prevent .env file from re-injecting deleted env vars during missing-var tests
+- [Phase 15]: Re-apply mockExit implementation in beforeEach to counter vitest mockReset: true config stripping spy implementations
+- [Phase 15]: Use vi.mocked(logger).fatal handle instead of vi.spyOn to avoid second spy layer on existing mock in configEnvVar tests
 
 ### Pending Todos
 
@@ -238,6 +242,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T02:10:42.641Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-04-13T02:22:33.510Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None
