@@ -23,7 +23,6 @@ vi.mock('../../src/utils/db', () => ({
     getOpenPositionCount: mockGetOpenPositionCount,
     getTotalExposure: mockGetTotalExposure,
     getDailyRealizedLoss: mockGetDailyRealizedLoss,
-    getDeployedCapitalByChain: { get: vi.fn() },
 }));
 
 vi.mock('../../src/utils/logger', () => ({

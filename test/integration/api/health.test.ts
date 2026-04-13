@@ -63,6 +63,9 @@ describe('GET /health', () => {
 
         expect(status).toBe(200);
         expect(body.status).toBe('ok');
+        expect(body).toHaveProperty('version');
+        expect(typeof body.version).toBe('string');
+        expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
         expect((body.chains as Array<Record<string, unknown>>)[0].connected).toBe(true);
         expect((body.positions as Record<string, unknown>).open).toBeTypeOf('number');
         expect(body.uptime).toBeTypeOf('number');
