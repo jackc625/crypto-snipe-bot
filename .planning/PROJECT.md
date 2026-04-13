@@ -140,6 +140,7 @@ The Telegram integration serves dual purposes: listening for alpha signals (cont
 | Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | ✓ Complete (Phase 08-12) |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
+| Retire legacy single-chain wrappers | Phase 4 preserved handleNewPair/startBot/handleAlphaDrop for backward compat; Phase 15 formally retires them because all live entry points are now `*ForChain` / startMultiChainBot. Keeping dead wrappers that cannot be made chain-aware is a correctness hazard (e.g. the pre-fix single-chain dedup gap). | ✓ Complete (Phase 15 — legacy wrappers retired, INT-DEDUP-NO-CHAIN closed) |
 
 ---
-*Last updated: 2026-04-07 after Phase 14 sell-revenue-receipt-decoding (decodeReceipt utility wired into executeFullSell/executePartialSell, Flashbots synthetic-hash bug fixed, sell rows now record non-null amount_out/gas_cost/block from real receipts — closes INT-AMOUNT-OUT-NULL gap; unit 142/142, integration 122/122 passing; 4 live-chain items routed to 14-HUMAN-UAT.md)*
+*Last updated: 2026-04-07 after Phase 15 chain-scoped-dedup-dashboard-env (isTokenSniped now chain-scoped via AND chain = ? built by makeIsTokenSnipedStmt factory; legacy mainnet → eth rows normalized at module load; legacy single-chain wrappers handleNewPair/startBot/resumeMonitoring/maybeApprove/handleAlphaDrop/getTokenFromPair retired; DASHBOARD_API_KEY added to REQUIRED_ENV_VARS — closes INT-DEDUP-NO-CHAIN and INT-DASHBOARD-API-KEY from v6.16 audit)*
