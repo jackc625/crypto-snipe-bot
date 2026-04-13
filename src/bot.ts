@@ -246,7 +246,9 @@ export async function handleNewPairForChain(
             tokenContract.name(),
             tokenContract.decimals(),
         ]);
-    } catch {}
+    } catch (e) {
+        ctx.log.debug({ err: e, token: targetToken }, 'Failed to fetch token metadata, using defaults');
+    }
 
     const lp = new Contract(pairAddress, PAIR_ABI, ctx.httpProvider);
 
@@ -259,7 +261,9 @@ export async function handleNewPairForChain(
 
         const wethReserve = token0Addr.toLowerCase() === ctx.chain.wethAddress.toLowerCase() ? reserves.reserve0 : reserves.reserve1;
         nativeLiquidity = ethers.formatEther(wethReserve);
-    } catch {}
+    } catch (e) {
+        ctx.log.debug({ err: e, token: targetToken, pair: pairAddress }, 'Failed to fetch LP reserve data');
+    }
 
     await sendCtxAlert(ctx, `*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nW${ctx.chain.nativeCurrency} LP: \`${nativeLiquidity} ${ctx.chain.nativeCurrency}\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPair: [\`${pairAddress}\`](${ctx.chain.explorerUrl}/address/${pairAddress})`);
 
@@ -430,7 +434,9 @@ export async function handleNewV3PoolForChain(
             tokenContract.name(),
             tokenContract.decimals(),
         ]);
-    } catch {}
+    } catch (e) {
+        ctx.log.debug({ err: e, token: targetToken }, 'Failed to fetch token metadata, using defaults');
+    }
 
     await sendCtxAlert(ctx, `*New V3 Token Detected!*\nSymbol: \`${symbol}\`\nFee Tier: \`${feeTier} bps\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPool: [\`${poolAddress}\`](${ctx.chain.explorerUrl}/address/${poolAddress})`);
 
