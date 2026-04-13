@@ -29,7 +29,7 @@ export function createTestDb(): Database.Database {
         CREATE TABLE trades (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             token TEXT NOT NULL COLLATE NOCASE,
-            chain TEXT NOT NULL DEFAULT 'mainnet',
+            chain TEXT NOT NULL DEFAULT 'eth', -- Phase 15 / CHAIN-02: canonical chainRegistry identifier is 'eth', not 'mainnet'
             action TEXT NOT NULL CHECK(action IN ('buy', 'sell', 'partial_sell', 'fail')),
             tx_hash TEXT,
             block INTEGER,

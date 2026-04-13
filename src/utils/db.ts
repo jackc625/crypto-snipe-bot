@@ -34,7 +34,7 @@ function migrateSchema(): void {
             CREATE TABLE IF NOT EXISTS trades (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 token TEXT NOT NULL COLLATE NOCASE,
-                chain TEXT NOT NULL DEFAULT 'mainnet',
+                chain TEXT NOT NULL DEFAULT 'eth',
                 action TEXT NOT NULL CHECK(action IN ('buy', 'sell', 'fail')),
                 tx_hash TEXT,
                 block INTEGER,
@@ -84,7 +84,7 @@ function migrateSchema(): void {
             CREATE TABLE trades_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 token TEXT NOT NULL COLLATE NOCASE,
-                chain TEXT NOT NULL DEFAULT 'mainnet',
+                chain TEXT NOT NULL DEFAULT 'eth',
                 action TEXT NOT NULL CHECK(action IN ('buy', 'sell', 'partial_sell', 'fail')),
                 tx_hash TEXT,
                 block INTEGER,
@@ -140,6 +140,11 @@ function migrateJsonState(): void {
         const raw = fs.readFileSync(jsonPath, 'utf-8');
         const state = JSON.parse(raw);
 
+        // Historical: the pre-Phase-4 JSON state file had no chain field because
+        // the bot was single-chain ETH. Rows imported here are stamped 'mainnet'
+        // for historical fidelity; normalizeLegacyMainnetRows() immediately
+        // rewrites them to 'eth' (the canonical runtime identifier from
+        // chainRegistry.ts) on the next line below migrateJsonState().
         const insert = db.prepare(`
             INSERT INTO trades (token, chain, action, tx_hash, timestamp, status)
             VALUES (?, 'mainnet', 'buy', ?, ?, ?)
@@ -170,7 +175,35 @@ function migrateJsonState(): void {
     }
 }
 
+// --- Legacy Chain Identifier Normalization (Phase 15, CHAIN-02, D-A1) ---
+//
+// Pre-Phase-4 ETH trades were stored with chain='mainnet' (the old default
+// and the hardcoded literal in migrateJsonState). The runtime identifier
+// from chainRegistry.ts is 'eth' for the Ethereum chain. After Phase 15
+// adds `WHERE chain = ?` to isTokenSniped, a WHERE clause that binds 'eth'
+// would silently miss legacy rows stamped 'mainnet' — causing the bot to
+// re-snipe already-sniped ETH tokens.
+//
+// This helper is idempotent: once all rows are 'eth', subsequent runs
+// update zero rows. Safe to call on every module load.
+//
+// Scope is deliberately narrow: only the exact literal 'mainnet' is
+// rewritten to 'eth'. Other chain identifiers ('bsc', 'base', 'arb') are
+// untouched.
+export function normalizeLegacyMainnetRows(database: Database.Database = db): void {
+    const result = database.prepare(
+        `UPDATE trades SET chain = 'eth' WHERE chain = 'mainnet'`
+    ).run();
+    if (result.changes > 0) {
+        logger.info(
+            { rowsNormalized: result.changes },
+            'Normalized legacy mainnet → eth chain identifiers in trades table'
+        );
+    }
+}
+
 migrateJsonState();
+normalizeLegacyMainnetRows();
 
 // --- Prepared Statements (cached for performance) ---
 

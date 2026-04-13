@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from '../helpers/testDb';
+import { normalizeLegacyMainnetRows } from '../../src/utils/db';
 
 describe('SQLite storage (TEST-02)', () => {
     describe('concurrent writes', () => {
@@ -498,5 +499,64 @@ describe('SQLite storage (TEST-02)', () => {
             expect(buy1.sell_revenue).toBeCloseTo(0.33, 6); // 0.15 + 0.18
             db.close();
         });
+    });
+});
+
+describe('legacy chain identifier normalization (Phase 15, CHAIN-02, mainnet → eth)', () => {
+    it("rewrites chain='mainnet' rows to chain='eth'", () => {
+        const db = createTestDb();
+        db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in, timestamp) VALUES (?, 'mainnet', 'buy', 'pending', '0.01', ?)`
+        ).run('0xaaa0000000000000000000000000000000000001', Math.floor(Date.now() / 1000));
+
+        normalizeLegacyMainnetRows(db);
+
+        const row = db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xaaa0000000000000000000000000000000000001') as { chain: string } | undefined;
+        expect(row).toBeDefined();
+        expect(row!.chain).toBe('eth');
+        db.close();
+    });
+
+    it('is idempotent: a second call is a no-op and does not throw', () => {
+        const db = createTestDb();
+        db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in, timestamp) VALUES (?, 'mainnet', 'buy', 'pending', '0.01', ?)`
+        ).run('0xaaa0000000000000000000000000000000000002', Math.floor(Date.now() / 1000));
+
+        normalizeLegacyMainnetRows(db);
+        expect(() => normalizeLegacyMainnetRows(db)).not.toThrow();
+
+        const row = db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xaaa0000000000000000000000000000000000002') as { chain: string } | undefined;
+        expect(row!.chain).toBe('eth');
+        db.close();
+    });
+
+    it("leaves non-'mainnet' rows unchanged (bsc, base, arb, eth)", () => {
+        const db = createTestDb();
+        const now = Math.floor(Date.now() / 1000);
+        const insert = db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in, timestamp) VALUES (?, ?, 'buy', 'pending', '0.01', ?)`
+        );
+        insert.run('0xbbb0000000000000000000000000000000000001', 'bsc', now);
+        insert.run('0xbbb0000000000000000000000000000000000002', 'base', now);
+        insert.run('0xbbb0000000000000000000000000000000000003', 'arb', now);
+        insert.run('0xbbb0000000000000000000000000000000000004', 'eth', now);
+
+        normalizeLegacyMainnetRows(db);
+
+        expect((db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xbbb0000000000000000000000000000000000001') as { chain: string }).chain).toBe('bsc');
+        expect((db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xbbb0000000000000000000000000000000000002') as { chain: string }).chain).toBe('base');
+        expect((db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xbbb0000000000000000000000000000000000003') as { chain: string }).chain).toBe('arb');
+        expect((db.prepare(`SELECT chain FROM trades WHERE token = ?`).get('0xbbb0000000000000000000000000000000000004') as { chain: string }).chain).toBe('eth');
+        db.close();
+    });
+
+    it("createTestDb() applies schema default 'eth' for the chain column", () => {
+        const db = createTestDb();
+        const columns = db.prepare(`PRAGMA table_info('trades')`).all() as Array<{ name: string; dflt_value: string | null }>;
+        const chainCol = columns.find(c => c.name === 'chain');
+        expect(chainCol).toBeDefined();
+        expect(chainCol!.dflt_value).toBe("'eth'");
+        db.close();
     });
 });
