@@ -201,7 +201,7 @@ export async function handleNewPairForChain(
     const targetToken = token0.toLowerCase() === ctx.chain.wethAddress.toLowerCase()
         ? token1 : token0;
 
-    if (isTokenSniped.get(targetToken.toLowerCase())) {
+    if (isTokenSniped.get(targetToken.toLowerCase(), ctx.chain.name)) {
         ctx.log.info({ token: targetToken }, 'Already sniped token, skipping');
         await sendCtxAlert(ctx, `*Already sniped token:* \`${targetToken}\``);
         return;
@@ -378,7 +378,7 @@ export async function handleNewV3PoolForChain(
         ? token1 : token0;
 
     // D-07: First pool wins dedup -- same isAlreadySniped check as V2, cross-DEX dedup
-    if (isTokenSniped.get(targetToken.toLowerCase())) {
+    if (isTokenSniped.get(targetToken.toLowerCase(), ctx.chain.name)) {
         ctx.log.info({ token: targetToken, feeTier }, 'Already sniped token (cross-DEX dedup), skipping V3 pool');
         return;
     }

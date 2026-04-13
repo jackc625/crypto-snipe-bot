@@ -220,9 +220,25 @@ const updateTradeStatus = db.prepare(`
     UPDATE trades SET status = ? WHERE token = ? AND status = 'pending'
 `);
 
-const isTokenSniped = db.prepare(`
-    SELECT 1 FROM trades WHERE token = ? LIMIT 1
-`);
+/**
+ * Factory for the chain-scoped `isTokenSniped` prepared statement.
+ *
+ * Exported so unit tests can build an equivalent statement against a fresh
+ * in-memory DB and exercise the EXACT same SQL literal as production. Without
+ * this factory, tests would have to either (a) import the production singleton
+ * (which is bound to the real DB file via DB_PATH) or (b) copy the SQL into
+ * the test file — the latter being what Gemini/Codex flagged in Phase 15
+ * review as "testing the map, not the territory".
+ *
+ * Phase 15 / CHAIN-02 / INT-DEDUP-NO-CHAIN.
+ */
+export function makeIsTokenSnipedStmt(database: Database.Database): Database.Statement {
+    return database.prepare(`
+        SELECT 1 FROM trades WHERE token = ? AND chain = ? LIMIT 1
+    `);
+}
+
+const isTokenSniped = makeIsTokenSnipedStmt(db);
 
 // --- P&L Query (DB-04: computed on query, not stored) ---
 
