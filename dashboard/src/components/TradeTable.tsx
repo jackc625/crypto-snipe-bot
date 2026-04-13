@@ -9,7 +9,7 @@ interface TradeTableProps {
   onPageChange: (page: number) => void;
 }
 
-type SortField = 'token' | 'chain' | 'pnl' | 'buyTime' | 'sellTime' | 'durationHeld' | 'amount' | 'poolType';
+type SortField = 'token' | 'chain' | 'pnl' | 'buyTime' | 'sellTime' | 'durationHeld' | 'buyCost' | 'poolType';
 type SortDir = 'asc' | 'desc';
 
 export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps) {
@@ -41,8 +41,8 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
           bVal = b.chain;
           break;
         case 'pnl':
-          aVal = a.realizedPnl;
-          bVal = b.realizedPnl;
+          aVal = a.pnl;
+          bVal = b.pnl;
           break;
         case 'buyTime':
           aVal = a.buyTime;
@@ -56,9 +56,9 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
           aVal = a.durationHeld;
           bVal = b.durationHeld;
           break;
-        case 'amount':
-          aVal = a.amount ? parseFloat(a.amount) : null;
-          bVal = b.amount ? parseFloat(b.amount) : null;
+        case 'buyCost':
+          aVal = a.buyCost ? parseFloat(a.buyCost) : null;
+          bVal = b.buyCost ? parseFloat(b.buyCost) : null;
           break;
         case 'poolType':
           aVal = a.poolType;
@@ -151,9 +151,9 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
               {/* Amounts columns */}
               <th
                 className="px-3 py-2 text-xs text-text-muted cursor-pointer select-none"
-                onClick={() => handleSort('amount')}
+                onClick={() => handleSort('buyCost')}
               >
-                Entry Cost{sortIndicator('amount')}
+                Entry Cost{sortIndicator('buyCost')}
               </th>
               <th className="px-3 py-2 text-xs text-text-muted">Exit Revenue</th>
               <th className="px-3 py-2 text-xs text-text-muted">Buy Gas</th>
@@ -200,23 +200,23 @@ export function TradeTable({ trades, pagination, onPageChange }: TradeTableProps
                       )}
                     </div>
                   </td>
-                  <td className={`px-3 py-2 font-mono ${pnlColor(trade.realizedPnl)}`}>
-                    {formatPnL(trade.realizedPnl)}
+                  <td className={`px-3 py-2 font-mono ${pnlColor(trade.pnl)}`}>
+                    {formatPnL(trade.pnl)}
                   </td>
                   {/* Timing */}
                   <td className="px-3 py-2 text-text-muted">{formatDate(trade.buyTime)}</td>
                   <td className="px-3 py-2 text-text-muted">{formatDate(trade.sellTime)}</td>
                   <td className="px-3 py-2 text-text-muted">{formatDuration(trade.durationHeld)}</td>
                   {/* Amounts */}
-                  <td className="px-3 py-2 font-mono text-text">{formatEth(trade.amount)}</td>
+                  <td className="px-3 py-2 font-mono text-text">{formatEth(trade.buyCost)}</td>
                   <td className="px-3 py-2 font-mono text-text">
-                    {trade.action === 'closed' && trade.price !== null
-                      ? formatEth(trade.price)
+                    {trade.action === 'closed' && trade.sellRevenue !== null
+                      ? formatEth(trade.sellRevenue)
                       : '--'}
                   </td>
-                  <td className="px-3 py-2 font-mono text-text-muted">{formatEth(trade.gasUsed)}</td>
+                  <td className="px-3 py-2 font-mono text-text-muted">{formatEth(trade.buyGas)}</td>
                   <td className="px-3 py-2 font-mono text-text-muted">
-                    {trade.action === 'closed' ? formatEth(trade.gasUsed) : '--'}
+                    {trade.action === 'closed' ? formatEth(trade.sellGas) : '--'}
                   </td>
                   {/* Exit */}
                   <td className="px-3 py-2">
