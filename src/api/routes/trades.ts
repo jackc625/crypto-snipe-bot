@@ -14,6 +14,16 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
 }
 
 /**
+ * Parse a date string query parameter to a Unix timestamp (seconds).
+ * Returns null if the string is an invalid date.
+ */
+function parseDateParam(dateStr: string): number | null {
+    const ms = new Date(dateStr).getTime();
+    if (isNaN(ms)) return null;
+    return Math.floor(ms / 1000);
+}
+
+/**
  * Escape a field for safe CSV output.
  * Prevents spreadsheet formula injection (=, +, -, @, tab, CR characters)
  * and properly quotes fields containing commas, double quotes, or newlines.
@@ -51,11 +61,16 @@ export function tradeRoutes(): Router {
         const now = Date.now();
         const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
         const fromTimestamp = fromStr
-            ? Math.floor(new Date(fromStr).getTime() / 1000)
+            ? parseDateParam(fromStr)
             : Math.floor((now - sevenDaysMs) / 1000);
         const toTimestamp = toStr
-            ? Math.floor(new Date(toStr).getTime() / 1000)
+            ? parseDateParam(toStr)
             : undefined;
+
+        if (fromTimestamp === null || toTimestamp === null) {
+            res.status(400).json({ error: 'Invalid date format for from/to parameter' });
+            return;
+        }
 
         // Fetch trades from DB via existing getPnL
         const trades = getPnL({
@@ -119,11 +134,16 @@ export function tradeRoutes(): Router {
         const now = Date.now();
         const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
         const fromTimestamp = fromStr
-            ? Math.floor(new Date(fromStr).getTime() / 1000)
+            ? parseDateParam(fromStr)
             : Math.floor((now - sevenDaysMs) / 1000);
         const toTimestamp = toStr
-            ? Math.floor(new Date(toStr).getTime() / 1000)
+            ? parseDateParam(toStr)
             : undefined;
+
+        if (fromTimestamp === null || toTimestamp === null) {
+            res.status(400).json({ error: 'Invalid date format for from/to parameter' });
+            return;
+        }
 
         const trades = getPnL({
             chain: chain || undefined,
