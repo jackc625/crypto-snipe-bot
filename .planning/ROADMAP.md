@@ -275,9 +275,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A token sniped on BSC does not block the same contract address from being sniped on ETH, Base, or Arbitrum
   2. Bot startup with DASHBOARD_API_KEY unset produces a clear validation error instead of silently starting
+**Plans**: 2 plans
 
 Plans:
-- (to be planned)
+- [x] 15-01-PLAN.md — Chain-scoped dedup query + call sites + legacy wrapper deletion + cross-chain dedup test (CHAIN-02)
+- [ ] 15-02-PLAN.md — DASHBOARD_API_KEY required env var + startup validation tests (CHAIN-02)
 
 ## Progress
 
@@ -301,4 +303,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 12. Integration Gap Fixes | 3/3 | Complete    | 2026-04-06 |
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
 | 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
-| 15. Chain-Scoped Dedup & Dashboard Env | 0/0 | Gap closure planned | - |
+| 15. Chain-Scoped Dedup & Dashboard Env | 1/2 | In Progress|  |

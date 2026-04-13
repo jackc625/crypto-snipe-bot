@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 15 context gathered
-last_updated: "2026-04-07T18:35:25.631Z"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-04-13T02:10:42.648Z"
 progress:
   total_phases: 15
   completed_phases: 14
   total_plans: 53
-  completed_plans: 51
-  percent: 96
+  completed_plans: 52
+  percent: 98
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 14 — sell-revenue-receipt-decoding
+**Current focus:** Phase 15 — chain-scoped-dedup-dashboard-env
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
+Phase: 15 (chain-scoped-dedup-dashboard-env) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Plan: Not started
 | Phase 12 P02 | 8min | 3 tasks | 5 files |
 | Phase 12 P03 | 2min | 1 tasks | 1 files |
 | Phase 13 P01 | 5min | 2 tasks | 3 files |
+| Phase 15 P01 | 19min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -220,6 +221,10 @@ Recent decisions affecting current work:
 - [Phase 12]: Verified all 28 .js files had matching .ts/.tsx counterparts before deletion (zero false positives)
 - [Phase 13]: IIFE pattern for stopLossPercent: parseFloat with isNaN fallback to 25, matching existing trailingStopPct pattern
 - [Phase 13]: FLASHBOTS_AUTH_KEY changed to required: false since chainRegistry.ts already validates conditionally per enabled chain
+- [Phase 15]: normalizeLegacyMainnetRows() runs after migrateJsonState() at module load to bridge mainnet->eth identifier mismatch
+- [Phase 15]: makeIsTokenSnipedStmt factory exported for test access to production SQL literal (REVIEWS.md HIGH #2)
+- [Phase 15]: tsc --noEmit driven import cleanup was no-op (noUnusedLocals not enabled in tsconfig)
+- [Phase 15]: updateTradeStatus cross-chain collision deferred to Phase 16+ (flagged by Codex REVIEWS.md MEDIUM #4)
 
 ### Pending Todos
 
@@ -233,6 +238,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T16:38:09.790Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-chain-scoped-dedup-dashboard-env/15-CONTEXT.md
+Last session: 2026-04-13T02:10:42.641Z
+Stopped at: Completed 15-01-PLAN.md
+Resume file: None
