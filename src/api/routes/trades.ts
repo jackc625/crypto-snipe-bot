@@ -14,6 +14,24 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
 }
 
 /**
+ * Escape a field for safe CSV output.
+ * Prevents spreadsheet formula injection (=, +, -, @, tab, CR characters)
+ * and properly quotes fields containing commas, double quotes, or newlines.
+ */
+function escapeCsv(field: string | number | null | undefined): string {
+    if (field === null || field === undefined) return '';
+    const str = String(field);
+    // Prefix formula-trigger characters to prevent spreadsheet injection
+    if (/^[=+\-@\t\r]/.test(str)) {
+        return `"'${str.replace(/"/g, '""')}"`;
+    }
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
+
+/**
  * Factory function for trades routes.
  * Mounts at /api/trades (parent handles prefix).
  */
@@ -129,19 +147,19 @@ export function tradeRoutes(): Router {
             const sellTimeStr = t.sell_time ? new Date(t.sell_time * 1000).toISOString() : '';
             const duration = t.sell_time !== null ? String(t.sell_time - t.buy_time) : '';
             return [
-                t.token,
-                t.chain,
-                t.realized_pnl !== null ? String(t.realized_pnl) : '',
-                String(t.sell_count),  // D-02: sell count column
-                t.buy_cost ?? '',
-                t.buy_gas ?? '',
-                String(t.sell_revenue),  // Now always a number
-                String(t.sell_gas),      // Now always a number
-                buyTimeStr,
-                sellTimeStr,
-                duration,
-                t.pool_type,
-                t.fee_tier !== null ? String(t.fee_tier) : '',
+                escapeCsv(t.token),
+                escapeCsv(t.chain),
+                escapeCsv(t.realized_pnl !== null ? t.realized_pnl : ''),
+                escapeCsv(t.sell_count),  // D-02: sell count column
+                escapeCsv(t.buy_cost ?? ''),
+                escapeCsv(t.buy_gas ?? ''),
+                escapeCsv(t.sell_revenue),  // Now always a number
+                escapeCsv(t.sell_gas),      // Now always a number
+                escapeCsv(buyTimeStr),
+                escapeCsv(sellTimeStr),
+                escapeCsv(duration),
+                escapeCsv(t.pool_type),
+                escapeCsv(t.fee_tier !== null ? t.fee_tier : ''),
             ].join(',');
         });
 
