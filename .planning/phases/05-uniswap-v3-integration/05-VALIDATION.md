@@ -1,10 +1,11 @@
 ---
 phase: 5
 slug: uniswap-v3-integration
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-23
+updated: 2026-04-13
 ---
 
 # Phase 5 — Validation Strategy
@@ -17,20 +18,20 @@ created: 2026-03-23
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Hardhat + chai (existing devDependencies) |
-| **Config file** | hardhat.config.ts (exists, Sepolia only) |
-| **Quick run command** | `npx tsc --noEmit` |
-| **Full suite command** | `npx tsc --noEmit` |
-| **Estimated runtime** | ~10 seconds |
+| **Framework** | Vitest 4.x (unit project) |
+| **Config file** | vitest.config.ts |
+| **Quick run command** | `npx vitest run test/unit/v3Abis.test.ts` |
+| **Full suite command** | `npx vitest run --project unit` |
+| **Estimated runtime** | ~1 second |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `npx tsc --noEmit`
-- **After every plan wave:** Run `npx tsc --noEmit` + manual smoke test
-- **Before `/gsd:verify-work`:** Full compilation green + manual UAT on all 4 requirements
-- **Max feedback latency:** 10 seconds
+- **After every task commit:** Run `npx vitest run --project unit`
+- **After every plan wave:** Run `npx vitest run --project unit`
+- **Before `/gsd-verify-work`:** Full unit suite green
+- **Max feedback latency:** 2 seconds
 
 ---
 
@@ -38,11 +39,11 @@ created: 2026-03-23
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | V3-01 | compilation | `npx tsc --noEmit` | N/A | ⬜ pending |
-| 05-01-02 | 01 | 1 | V3-01 | compilation | `npx tsc --noEmit` | N/A | ⬜ pending |
-| 05-02-01 | 02 | 1 | V3-02 | compilation | `npx tsc --noEmit` | N/A | ⬜ pending |
-| 05-02-02 | 02 | 1 | V3-03 | compilation | `npx tsc --noEmit` | N/A | ⬜ pending |
-| 05-02-03 | 02 | 1 | V3-04 | compilation | `npx tsc --noEmit` | N/A | ⬜ pending |
+| 05-01-01 | 01 | 1 | V3-01 | unit | `npx vitest run test/unit/v3Abis.test.ts` | ✅ | ✅ green |
+| 05-01-02 | 01 | 1 | V3-01 | unit | `npx vitest run test/unit/chainRegistry.test.ts` | ✅ | ✅ green |
+| 05-02-01 | 02 | 1 | V3-02 | unit | `npx vitest run test/unit/v3Abis.test.ts` | ✅ | ✅ green |
+| 05-02-02 | 02 | 1 | V3-03 | unit | `npx vitest run test/unit/v3Abis.test.ts` | ✅ | ✅ green |
+| 05-02-03 | 02 | 1 | V3-04 | unit | `npx vitest run test/unit/v3Abis.test.ts` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -50,7 +51,7 @@ created: 2026-03-23
 
 ## Wave 0 Requirements
 
-Existing infrastructure covers all phase requirements. No new test framework setup needed — Phase 9 (Testing) is dedicated to building the test suite. Validation for this phase relies on TypeScript compilation and manual UAT, consistent with Phases 1-4 approach.
+Existing infrastructure covers all phase requirements. Vitest unit project was already configured. No new test framework setup needed.
 
 ---
 
@@ -58,8 +59,8 @@ Existing infrastructure covers all phase requirements. No new test framework set
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| PoolCreated event detection across all chains and fee tiers | V3-01 | Requires live V3 factory or fork | Deploy test token on forked chain, verify event logs |
-| Mint event wait before sniping | V3-02 | Requires event sequencing | Create pool without liquidity, verify bot waits; add liquidity, verify bot proceeds |
+| PoolCreated event detection on live V3 factory | V3-01 | Requires live/forked chain | Deploy test token on forked chain, verify event logs |
+| Mint event wait before sniping | V3-02 | Requires event sequencing on live chain | Create pool without liquidity, verify bot waits; add liquidity, verify bot proceeds |
 | V3 swap execution with correct params | V3-03 | Requires live/forked pool with liquidity | Execute buy on forked mainnet pool, verify tx succeeds with correct fee tier |
 | QuoterV2 price monitoring accuracy | V3-04 | Requires live pool state | Compare QuoterV2 output to known pool price, verify within tolerance |
 
@@ -67,11 +68,32 @@ Existing infrastructure covers all phase requirements. No new test framework set
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 10s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 2s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-04-13
+
+---
+
+## Validation Audit 2026-04-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 4 |
+| Resolved | 4 |
+| Escalated | 0 |
+
+### Tests Created
+| File | Tests | Requirement Coverage |
+|------|-------|---------------------|
+| `test/unit/v3Abis.test.ts` | 22 | V3-01 (5), V3-02 (5), V3-03 (7), V3-04 (5) |
+
+### Pre-existing Coverage
+| File | Requirement Coverage |
+|------|---------------------|
+| `test/unit/chainRegistry.test.ts` | V3-01 (DexConfigV3 type guards, V3 entries) |
+| `test/unit/db.test.ts` | V3-03 (pool_type, fee_tier columns) |
