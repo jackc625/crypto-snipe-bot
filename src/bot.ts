@@ -889,6 +889,12 @@ function initMultiChainShutdownHandler(
         if (shuttingDown) return;
         shuttingDown = true;
 
+        // Safety net: force exit after 5 seconds if graceful shutdown hangs
+        setTimeout(() => {
+            log.error('Force exit after 5s timeout');
+            process.exit(1);
+        }, 5000).unref();
+
         log.info({ signal }, 'Shutdown signal received, cleaning up all chains');
 
         // Close API server first (stop accepting requests before providers go down)
@@ -929,21 +935,6 @@ function initMultiChainShutdownHandler(
 
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-    // Safety net: force exit after 5 seconds if graceful shutdown hangs
-    process.on('SIGTERM', () => {
-        setTimeout(() => {
-            log.error('Force exit after 5s timeout');
-            process.exit(1);
-        }, 5000).unref();
-    });
-
-    process.on('SIGINT', () => {
-        setTimeout(() => {
-            log.error('Force exit after 5s timeout');
-            process.exit(1);
-        }, 5000).unref();
-    });
 }
 
 // ---------------------------------------------------------------------------
