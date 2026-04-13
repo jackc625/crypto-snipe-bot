@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from '../helpers/testDb';
-import { normalizeLegacyMainnetRows } from '../../src/utils/db';
+import { normalizeLegacyMainnetRows, makeIsTokenSnipedStmt } from '../../src/utils/db';
 
 describe('SQLite storage (TEST-02)', () => {
     describe('concurrent writes', () => {
@@ -557,6 +557,75 @@ describe('legacy chain identifier normalization (Phase 15, CHAIN-02, mainnet →
         const chainCol = columns.find(c => c.name === 'chain');
         expect(chainCol).toBeDefined();
         expect(chainCol!.dflt_value).toBe("'eth'");
+        db.close();
+    });
+});
+
+describe('chain-scoped dedup (INT-DEDUP-NO-CHAIN, CHAIN-02)', () => {
+    // This block proves that the chain-scoped `isTokenSniped` prepared statement
+    // introduced in Phase 15 correctly isolates per-chain dedup. A token sniped
+    // on BSC must NOT block the same contract address from being sniped on
+    // ETH/Base/Arb.
+    //
+    // Exercises PRODUCTION code: calls makeIsTokenSnipedStmt(db) — the exact
+    // factory function src/utils/db.ts uses to build its module-level
+    // isTokenSniped statement. A typo or regression in the factory's SQL
+    // literal causes these tests to fail. (Phase 15 REVIEWS.md HIGH #2:
+    // "testing the map, not the territory".)
+
+    const TEST_TOKEN = '0xabc0000000000000000000000000000000000001';
+
+    function insertSnipeRow(db: ReturnType<typeof createTestDb>, token: string, chain: string): void {
+        db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in, timestamp) VALUES (?, ?, 'buy', 'pending', '0.01', ?)`
+        ).run(token.toLowerCase(), chain, Math.floor(Date.now() / 1000));
+    }
+
+    it('token sniped on bsc returns truthy for bsc bind (production factory)', () => {
+        const db = createTestDb();
+        insertSnipeRow(db, TEST_TOKEN, 'bsc');
+        const stmt = makeIsTokenSnipedStmt(db);
+        const row = stmt.get(TEST_TOKEN.toLowerCase(), 'bsc');
+        expect(row).toBeTruthy();
+        db.close();
+    });
+
+    it('token sniped on bsc returns undefined for eth bind (production factory)', () => {
+        const db = createTestDb();
+        insertSnipeRow(db, TEST_TOKEN, 'bsc');
+        const stmt = makeIsTokenSnipedStmt(db);
+        const row = stmt.get(TEST_TOKEN.toLowerCase(), 'eth');
+        expect(row).toBeUndefined();
+        db.close();
+    });
+
+    it('token sniped on bsc returns undefined for base bind (production factory)', () => {
+        const db = createTestDb();
+        insertSnipeRow(db, TEST_TOKEN, 'bsc');
+        const stmt = makeIsTokenSnipedStmt(db);
+        const row = stmt.get(TEST_TOKEN.toLowerCase(), 'base');
+        expect(row).toBeUndefined();
+        db.close();
+    });
+
+    it('token sniped on bsc returns undefined for arb bind (production factory)', () => {
+        const db = createTestDb();
+        insertSnipeRow(db, TEST_TOKEN, 'bsc');
+        const stmt = makeIsTokenSnipedStmt(db);
+        const row = stmt.get(TEST_TOKEN.toLowerCase(), 'arb');
+        expect(row).toBeUndefined();
+        db.close();
+    });
+
+    it('same token sniped on both bsc and eth: both binds return truthy (production factory)', () => {
+        const db = createTestDb();
+        insertSnipeRow(db, TEST_TOKEN, 'bsc');
+        insertSnipeRow(db, TEST_TOKEN, 'eth');
+        const stmt = makeIsTokenSnipedStmt(db);
+        const bscRow = stmt.get(TEST_TOKEN.toLowerCase(), 'bsc');
+        const ethRow = stmt.get(TEST_TOKEN.toLowerCase(), 'eth');
+        expect(bscRow).toBeTruthy();
+        expect(ethRow).toBeTruthy();
         db.close();
     });
 });
