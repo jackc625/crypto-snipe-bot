@@ -28,7 +28,6 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null (completed 2026-04-07)
 - [x] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup (completed 2026-04-13)
 - [ ] **Phase 16: Dashboard Type Alignment & Dead Code Cleanup** - [GAP CLOSURE] Fix Trade interface/API field mismatch, add health version, remove dead shutdown/export code
-- [ ] **Phase 16: Dashboard Type Alignment & Dead Code Cleanup** - [GAP CLOSURE] Fix Trade interface/API field mismatch, add health version, remove dead shutdown/export code
 
 ## Phase Details
 
@@ -293,8 +292,11 @@ Plans:
   2. GET /health response includes a `version` field matching package.json version
   3. isShutdownInProgress dead code path removed or correctly wired in multi-chain mode
   4. getDeployedCapitalByChain and getTradesByToken exports removed from db.ts (zero callers)
+**Plans**: 2 plans
 
-Plans: TBD
+Plans:
+- [ ] 16-01-PLAN.md — Align Trade interface to API response shape, update TradeTable field references, add buy_id to API (DASH-02)
+- [ ] 16-02-PLAN.md — Add version to health endpoint, remove dead shutdown exports from exitManager, remove dead DB exports (MON-01, FIX-05)
 
 ## Progress
 
@@ -319,4 +321,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
 | 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
 | 15. Chain-Scoped Dedup & Dashboard Env | 2/2 | Complete    | 2026-04-13 |
-| 16. Dashboard Type Alignment & Dead Code Cleanup | 0/0 | Gap closure planned | - |
+| 16. Dashboard Type Alignment & Dead Code Cleanup | 0/2 | Planned | - |
