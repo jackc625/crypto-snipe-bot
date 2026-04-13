@@ -629,3 +629,49 @@ describe('chain-scoped dedup (INT-DEDUP-NO-CHAIN, CHAIN-02)', () => {
         db.close();
     });
 });
+
+// --------------------------------------------------------------------------
+// DB-02: storage.ts deleted — all reads go through db.ts
+// --------------------------------------------------------------------------
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { readdirSync } from 'fs';
+import { readFileSync } from 'fs';
+
+describe('DB-02: storage.ts deleted, all reads go through db.ts', () => {
+    it('src/utils/storage.ts does not exist on disk', () => {
+        const storagePath = join(process.cwd(), 'src', 'utils', 'storage.ts');
+        expect(existsSync(storagePath)).toBe(false);
+    });
+
+    it('no src/**/*.ts file imports from storage', () => {
+        const srcDir = join(process.cwd(), 'src');
+
+        function collectTsFiles(dir: string): string[] {
+            const entries = readdirSync(dir, { withFileTypes: true });
+            const files: string[] = [];
+            for (const entry of entries) {
+                const fullPath = join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    files.push(...collectTsFiles(fullPath));
+                } else if (entry.isFile() && entry.name.endsWith('.ts')) {
+                    files.push(fullPath);
+                }
+            }
+            return files;
+        }
+
+        const tsFiles = collectTsFiles(srcDir);
+        const storageImportPattern = /from\s+['"][^'"]*storage['"]/;
+
+        const matches: string[] = [];
+        for (const file of tsFiles) {
+            const content = readFileSync(file, 'utf-8');
+            if (storageImportPattern.test(content)) {
+                matches.push(file);
+            }
+        }
+
+        expect(matches).toHaveLength(0);
+    });
+});
