@@ -1,10 +1,11 @@
 ---
 phase: 16
 slug: dashboard-type-alignment-dead-code-cleanup
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-13
+audited: 2026-04-13
 ---
 
 # Phase 16 — Validation Strategy
@@ -38,9 +39,9 @@ created: 2026-04-13
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 16-01-01 | 01 | 1 | DASH-02 | — | N/A | integration | `npx vitest run test/integration/api/trades.test.ts -x` | Exists (update needed) | ⬜ pending |
-| 16-01-02 | 01 | 1 | MON-01 | — | N/A | integration | `npx vitest run test/integration/api/health.test.ts -x` | Exists (add test) | ⬜ pending |
-| 16-01-03 | 01 | 1 | FIX-05 | — | N/A | unit | `npx vitest run test/unit/exitManager.shutdown.test.ts -x` | Exists (update: remove dead code tests) | ⬜ pending |
+| 16-01-01 | 01 | 1 | DASH-02 | — | N/A | integration | `npx vitest run test/integration/api/trades.test.ts -x` | Yes — asserts pnl, buyCost, buyGas, sellRevenue, sellGas, buy_id | ✅ green |
+| 16-01-02 | 02 | 1 | MON-01 | — | N/A | integration | `npx vitest run test/integration/api/health.test.ts -x` | Yes — asserts version string + semver format | ✅ green |
+| 16-01-03 | 02 | 1 | FIX-05 | — | N/A | compilation | `npx tsc --noEmit` | Deleted dead test file; clean compilation verifies no broken refs | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -60,11 +61,27 @@ All phase behaviors have automated verification.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete
+
+---
+
+## Validation Audit 2026-04-13
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+**Details:**
+- DASH-02: `test/integration/api/trades.test.ts` — 9 tests verify corrected field names (pnl, buyCost, buyGas, sellRevenue, sellGas, buy_id)
+- MON-01: `test/integration/api/health.test.ts` — version field assertions (string type + semver format)
+- FIX-05: Dead `exitManager.shutdown.test.ts` deleted; dead exports absent from `exitManager.ts`/`db.ts`; `tsc --noEmit` clean; `riskManager.test.ts` mock cleaned
+- Full suite: 343/343 tests passing across 31 test files
