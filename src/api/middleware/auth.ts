@@ -3,6 +3,7 @@
 // In-memory session store with TTL-based expiry.
 
 import type { Request, Response, NextFunction } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../../utils/logger';
 
@@ -34,7 +35,11 @@ export function loginHandler(req: Request, res: Response): void {
         return;
     }
 
-    if (!apiKey || apiKey !== expected) {
+    if (
+        !apiKey ||
+        apiKey.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(apiKey), Buffer.from(expected))
+    ) {
         log.warn('Failed login attempt');
         res.status(401).json({ error: 'Invalid API key. Check DASHBOARD_API_KEY in your .env file.' });
         return;
