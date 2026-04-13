@@ -2,8 +2,16 @@
 // Tests proving env vars control runtime behavior for STOP_LOSS_PCT and FLASHBOTS_AUTH_KEY.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// NOTE: resolves to the mocked logger object (see vi.mock at lines 8-23 below).
+import { logger } from '../../src/utils/logger';
 
 // ---- Mock dependencies ----
+
+// Mock dotenv to prevent .env file from re-injecting env vars we deliberately
+// delete or set to empty string in tests. Tests control env vars via setEnv/delete.
+vi.mock('dotenv', () => ({
+    config: vi.fn(),
+}));
 
 // Mock logger to prevent real logging and capture process.exit calls
 vi.mock('../../src/utils/logger', () => ({
@@ -31,6 +39,7 @@ const REQUIRED_ENV = {
     TELEGRAM_API_ID: 'test-api-id',
     TELEGRAM_API_HASH: 'test-api-hash',
     TELEGRAM_SESSION: 'test-session-string',
+    DASHBOARD_API_KEY: 'test-dashboard-key',
 };
 
 // Track env vars we set so we can clean them up
@@ -46,6 +55,12 @@ const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {
     throw new Error('process.exit called');
 }) as never);
 
+// Handle on the vi.fn() declared inside the top-level vi.mock block above.
+// We use vi.mocked(logger).fatal to ENSURE we are asserting on the SAME
+// fn the mock exposes, not a new spy layered on top. Do NOT replace this with
+// a separate spyOn for logger.fatal — that would create a second layer over the mock.
+const mockFatal = vi.mocked(logger).fatal as ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
     vi.resetModules();
     // Set all required env vars
@@ -53,6 +68,12 @@ beforeEach(() => {
         setEnv(key, value);
     }
     mockExit.mockClear();
+    // Re-apply the throwing implementation after vitest's mockReset: true (config)
+    // which strips spy implementations before each test.
+    mockExit.mockImplementation((() => {
+        throw new Error('process.exit called');
+    }) as never);
+    mockFatal.mockClear();
 });
 
 afterEach(() => {
@@ -130,5 +151,53 @@ describe('STOP_LOSS_PCT integration with exitEngine', () => {
         const { buildExitConfig } = await import('../../src/exitEngine');
         const exitConfig = buildExitConfig();
         expect(exitConfig.stopLossPct).toBe(18);
+    });
+});
+
+describe('DASHBOARD_API_KEY env var (INT-DASHBOARD-API-KEY, D-07/D-11, Codex MEDIUM payload assertion)', () => {
+    it('calls process.exit AND logs a fatal payload naming DASHBOARD_API_KEY when the var is unset', async () => {
+        // beforeEach has set DASHBOARD_API_KEY from the REQUIRED_ENV fixture.
+        // Explicitly remove it to simulate a deployment where the operator forgot it.
+        delete process.env.DASHBOARD_API_KEY;
+
+        await expect(import('../../src/config')).rejects.toThrow('process.exit called');
+        expect(mockExit).toHaveBeenCalledWith(1);
+
+        // Codex MEDIUM review assertion: the fatal log must name the missing var,
+        // not just signal that SOMETHING exited. Operators rely on this message
+        // to diagnose config problems. The shape matches src/config.ts:70-73:
+        //     logger.fatal({ missing: [...] }, 'Missing required environment variables')
+        expect(mockFatal).toHaveBeenCalled();
+        expect(mockFatal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                missing: expect.arrayContaining([expect.stringContaining('DASHBOARD_API_KEY')])
+            }),
+            expect.any(String)
+        );
+    });
+
+    it('does not exit and does not log fatal when DASHBOARD_API_KEY is set to a non-empty string', async () => {
+        setEnv('DASHBOARD_API_KEY', 'any-valid-key-value');
+        const { CONFIG } = await import('../../src/config');
+        expect(CONFIG).toBeDefined();
+        expect(mockExit).not.toHaveBeenCalled();
+        expect(mockFatal).not.toHaveBeenCalled();
+    });
+
+    it('calls process.exit AND logs a fatal payload naming DASHBOARD_API_KEY when the var is an empty string', async () => {
+        setEnv('DASHBOARD_API_KEY', '');
+
+        await expect(import('../../src/config')).rejects.toThrow('process.exit called');
+        expect(mockExit).toHaveBeenCalledWith(1);
+
+        // Same payload-shape assertion as the "unset" case — matches
+        // src/config.ts validateEnvVars() call shape exactly.
+        expect(mockFatal).toHaveBeenCalled();
+        expect(mockFatal).toHaveBeenCalledWith(
+            expect.objectContaining({
+                missing: expect.arrayContaining([expect.stringContaining('DASHBOARD_API_KEY')])
+            }),
+            expect.any(String)
+        );
     });
 });

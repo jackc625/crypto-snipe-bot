@@ -23,6 +23,8 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'FLASHBOTS_AUTH_KEY', required: false, description: 'Flashbots authentication signing key (required when eth chain enabled)' },
     { name: 'TELEGRAM_ALLOWED_SENDERS', required: false, description: 'Comma-separated allowed Telegram sender IDs' },
     { name: 'TELEGRAM_ALLOWED_CHANNELS', required: false, description: 'Comma-separated allowed Telegram channel/group IDs' },
+    // --- Dashboard ---
+    { name: 'DASHBOARD_API_KEY', required: true, description: 'Dashboard login API key (required; dashboard server starts unconditionally)' },
     // --- Multi-Chain Configuration ---
     { name: 'ENABLED_CHAINS', required: false, description: 'Comma-separated enabled chains: eth,bsc,base,arb (default: eth)' },
     // --- Per-Chain RPC URLs ---

@@ -27,6 +27,7 @@ export function loginHandler(req: Request, res: Response): void {
     const { apiKey } = req.body as { apiKey?: string };
     const expected = process.env.DASHBOARD_API_KEY;
 
+    // Defense-in-depth: startup validation (REQUIRED_ENV_VARS in config.ts) makes this branch unreachable in normal lifecycle, but it protects against test harnesses, hot-reload, and direct module imports where process.env.DASHBOARD_API_KEY can be mutated post-startup. See Phase 15 D-09.
     if (!expected) {
         log.error('DASHBOARD_API_KEY not set -- login will always fail');
         res.status(500).json({ error: 'Server misconfigured: DASHBOARD_API_KEY not set' });
