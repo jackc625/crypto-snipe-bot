@@ -295,7 +295,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — Align Trade interface to API response shape, update TradeTable field references, add buy_id to API (DASH-02)
+- [x] 16-01-PLAN.md — Align Trade interface to API response shape, update TradeTable field references, add buy_id to API (DASH-02)
 - [ ] 16-02-PLAN.md — Add version to health endpoint, remove dead shutdown exports from exitManager, remove dead DB exports (MON-01, FIX-05)
 
 ## Progress
@@ -321,4 +321,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
 | 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
 | 15. Chain-Scoped Dedup & Dashboard Env | 2/2 | Complete    | 2026-04-13 |
-| 16. Dashboard Type Alignment & Dead Code Cleanup | 0/2 | Planned | - |
+| 16. Dashboard Type Alignment & Dead Code Cleanup | 1/2 | In Progress|  |

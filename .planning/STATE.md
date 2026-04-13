@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.16
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-04-13T02:36:13.801Z"
+status: Ready to execute
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-13T19:45:05.204Z"
 progress:
-  total_phases: 15
+  total_phases: 16
   completed_phases: 15
-  total_plans: 53
-  completed_plans: 53
-  percent: 100
+  total_plans: 55
+  completed_plans: 54
+  percent: 98
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 15 — chain-scoped-dedup-dashboard-env
+**Current focus:** Phase 16 — dashboard-type-alignment-dead-code-cleanup
 
 ## Current Position
 
-Phase: 15
-Plan: Not started
+Phase: 16 (dashboard-type-alignment-dead-code-cleanup) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -99,6 +99,7 @@ Plan: Not started
 | Phase 13 P01 | 5min | 2 tasks | 3 files |
 | Phase 15 P01 | 19min | 4 tasks | 8 files |
 | Phase 15 P02 | 7min | 1 tasks | 3 files |
+| Phase 16 P01 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -230,6 +231,8 @@ Recent decisions affecting current work:
 - [Phase 15]: Mock dotenv in configEnvVar tests to prevent .env file from re-injecting deleted env vars during missing-var tests
 - [Phase 15]: Re-apply mockExit implementation in beforeEach to counter vitest mockReset: true config stripping spy implementations
 - [Phase 15]: Use vi.mocked(logger).fatal handle instead of vi.spyOn to avoid second spy layer on existing mock in configEnvVar tests
+- [Phase 16]: API response is source of truth -- dashboard Trade interface aligned to match, not the reverse
+- [Phase 16]: Added id: t.buy_id to API response for stable React key rather than composite key
 
 ### Pending Todos
 
@@ -243,6 +246,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T02:22:33.510Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-04-13T19:45:05.190Z
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
