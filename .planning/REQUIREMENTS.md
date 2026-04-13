@@ -30,8 +30,8 @@ Requirements for production-ready multi-chain sniper bot. Each maps to roadmap p
 
 - [x] **DB-01**: JSON file storage replaced with SQLite database using WAL mode for concurrent access
 - [x] **DB-02**: SQLite is the sole source of truth — no in-memory cache that can diverge from disk
-- [ ] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
-- [ ] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
+- [x] **DB-03**: Full transaction audit trail: every buy, sell, and status change recorded with timestamps
+- [x] **DB-04**: P&L calculated per trade with realized gains/losses queryable by token, chain, and date range
 
 ### Infrastructure — Code Quality
 
@@ -135,8 +135,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ETH6-04 | Phase 2 | Complete |
 | DB-01 | Phase 3 | Complete |
 | DB-02 | Phase 3 | Complete |
-| DB-03 | Phase 3, Phase 14 | Pending |
-| DB-04 | Phase 10, Phase 14 | Pending |
+| DB-03 | Phase 3, Phase 14 | Complete |
+| DB-04 | Phase 10, Phase 14 | Complete |
 | INFRA-01 | Phase 3 | Complete |
 | INFRA-02 | Phase 3 | Complete |
 | INFRA-03 | Phase 3 | Complete |
@@ -171,11 +171,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 - v1 requirements: 48 total
-- Satisfied: 45
-- Pending (gap closure): 3 (DB-03, DB-04, CHAIN-02)
+- Satisfied: 48
+- Pending: 0
 - Mapped to phases: 48
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-04-06 after gap closure phase creation (Phases 14-15)*
+*Last updated: 2026-04-13 after gap closure phase creation (Phase 16) and stale checkbox fix (DB-03, DB-04)*

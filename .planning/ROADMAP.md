@@ -27,6 +27,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 13: Config Env-Var Correctness** - [GAP CLOSURE] Wire STOP_LOSS_PCT env var to config, make FLASHBOTS_AUTH_KEY conditional on ETH chain (completed 2026-04-06)
 - [x] **Phase 14: Sell Revenue Receipt Decoding** - [GAP CLOSURE] Decode ETH received from swap tx receipt so amountOut is recorded instead of null (completed 2026-04-07)
 - [x] **Phase 15: Chain-Scoped Dedup & Dashboard Env Validation** - [GAP CLOSURE] Add chain filter to isTokenSniped query, validate DASHBOARD_API_KEY at startup (completed 2026-04-13)
+- [ ] **Phase 16: Dashboard Type Alignment & Dead Code Cleanup** - [GAP CLOSURE] Fix Trade interface/API field mismatch, add health version, remove dead shutdown/export code
+- [ ] **Phase 16: Dashboard Type Alignment & Dead Code Cleanup** - [GAP CLOSURE] Fix Trade interface/API field mismatch, add health version, remove dead shutdown/export code
 
 ## Phase Details
 
@@ -281,6 +283,19 @@ Plans:
 - [x] 15-01-PLAN.md — Chain-scoped dedup query + call sites + legacy wrapper deletion + cross-chain dedup test (CHAIN-02)
 - [x] 15-02-PLAN.md — DASHBOARD_API_KEY required env var + startup validation tests (CHAIN-02)
 
+### Phase 16: Dashboard Type Alignment & Dead Code Cleanup
+**Goal**: Dashboard Trade interface matches actual API response shape, health endpoint includes version, and dead code paths are removed
+**Depends on**: Phase 15
+**Requirements**: DASH-02, MON-01, FIX-05
+**Gap Closure:** Closes INT-TRADE-TYPE, INT-HEALTH-VERSION, INT-SHUTDOWN-FLAG, INT-DEAD-EXPORTS from v6.16 audit; fixes Dashboard Trade History flow
+**Success Criteria** (what must be TRUE):
+  1. Dashboard Trade interface field names exactly match the /api/trades JSON response — no undefined field rendering
+  2. GET /health response includes a `version` field matching package.json version
+  3. isShutdownInProgress dead code path removed or correctly wired in multi-chain mode
+  4. getDeployedCapitalByChain and getTradesByToken exports removed from db.ts (zero callers)
+
+Plans: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -304,3 +319,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 13. Config Env-Var Correctness | 1/1 | Complete    | 2026-04-06 |
 | 14. Sell Revenue Receipt Decoding | 2/2 | Complete    | 2026-04-07 |
 | 15. Chain-Scoped Dedup & Dashboard Env | 2/2 | Complete    | 2026-04-13 |
+| 16. Dashboard Type Alignment & Dead Code Cleanup | 0/0 | Gap closure planned | - |
