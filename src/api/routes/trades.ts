@@ -62,6 +62,8 @@ export function tradeRoutes(): Router {
 
         // Map to response format per D-27 (all four column groups)
         const tradeResponse = paged.map(t => ({
+            // Identity
+            id: t.buy_id,                // Stable unique key for React rendering
             // Core
             token: t.token,
             chain: t.chain,

@@ -29,23 +29,21 @@ export interface Position {
 }
 
 export interface Trade {
-  id: number;
+  id: number;                      // buy_id from API (React key)
   token: string;
   chain: string;
-  action: 'open' | 'closed';     // Derived from buy_status, not buy/sell action
-  amount: string | null;
-  price: number | null;
-  gasUsed: string | null;
-  txHash: string | null;
-  buyTime: number | null;
+  action: 'open' | 'closed';      // Derived from buy_status, not buy/sell action
+  pnl: number | null;             // Realized P&L (was: realizedPnl)
+  sellCount: number;              // D-02: count of sell + partial_sell events
+  buyTime: number;                // Always present (was: number | null)
   sellTime: number | null;
   durationHeld: number | null;
-  realizedPnl: number | null;
-  exitReason: string | null;
-  peakPrice: number | null;
+  buyCost: string | null;         // Buy cost in ETH/BNB (was: amount)
+  buyGas: string | null;          // Buy gas cost (was: gasUsed)
+  sellRevenue: number;            // Aggregated sell revenue
+  sellGas: number;                // Aggregated sell gas
   poolType: string;
   feeTier: number | null;
-  sellCount: number;              // D-02: count of sell + partial_sell events
 }
 
 export interface Pagination {
