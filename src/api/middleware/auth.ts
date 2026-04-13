@@ -16,6 +16,19 @@ export const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 /** In-memory session store: token -> metadata */
 export const sessions = new Map<string, { createdAt: number }>();
 
+// Periodic cleanup of expired sessions to prevent unbounded memory growth.
+// Runs every hour; removes sessions older than SESSION_TTL_MS.
+const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+export const _sessionCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [token, session] of sessions) {
+        if (now - session.createdAt > SESSION_TTL_MS) {
+            sessions.delete(token);
+        }
+    }
+}, SESSION_CLEANUP_INTERVAL_MS);
+_sessionCleanupTimer.unref(); // Do not block process exit
+
 // --- Login Handler ---
 
 /**
