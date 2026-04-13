@@ -5,13 +5,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getPnL } from '../../utils/db';
-
-// Inline async handler to avoid dependency on errorHandler middleware timing (parallel plan execution)
-function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
-    return (req: Request, res: Response, next: (err?: unknown) => void) => {
-        fn(req, res).catch(next);
-    };
-}
+import { asyncHandler } from '../middleware/errorHandler';
 
 /**
  * Parse a date string query parameter to a Unix timestamp (seconds).
