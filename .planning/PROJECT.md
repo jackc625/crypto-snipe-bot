@@ -2,145 +2,134 @@
 
 ## What This Is
 
-A multi-chain MEV sniper bot that detects new token listings on decentralized exchanges (Uniswap V2/V3 and forks like PancakeSwap, SushiSwap), validates token safety through a multi-stage pipeline, executes snipes with MEV protection, and manages positions with intelligent exit strategies. Includes a web dashboard for real-time monitoring and control.
+A production-ready multi-chain MEV sniper bot that detects new token listings
+on decentralized exchanges (Uniswap V2/V3 and forks like PancakeSwap,
+SushiSwap) across ETH, BSC, Base, and Arbitrum. It validates token safety
+through a multi-stage pipeline, executes snipes with per-chain MEV protection
+(Flashbots / bloXroute / passthrough), manages positions through a unified
+exit engine with trailing stops, partial sells, and age-weighted urgency, and
+surfaces everything through a real-time web dashboard with chain controls and
+emergency sell.
 
 ## Core Value
 
-Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management — the bot must never lose money to preventable bugs, race conditions, or security flaws.
+Reliably detect, validate, and profitably snipe new token listings across
+multiple EVM chains with proper risk management — the bot must never lose
+money to preventable bugs, race conditions, or security flaws.
+
+## Current State (v6.16 — shipped 2026-04-14)
+
+- 16 phases, 55 plans, 48/48 v1 requirements satisfied
+- SQLite-backed state with WAL and full trade audit trail
+- ethers v6 with native BigInt arithmetic throughout
+- Multi-chain orchestrator with per-chain MEV strategies and concurrent listeners
+- Unified exit engine (single 5s poll loop per position) with trailing stops, partial sells, volatility adaptation, age-weighted urgency
+- 5-rule portfolio risk gate (position size, daily loss, max open, cooldown, exposure cap)
+- Express + React dashboard with real-time positions, P&L charts, trade history, chain controls, emergency sell, WebSocket push
+- 343/343 tests passing across unit, integration, and mainnet fork suites
+- GitHub Actions CI
+
+## Next Milestone Goals
+
+Candidate themes for the next milestone (not yet scoped — run
+`/gsd-new-milestone` to formalize):
+
+- **Live-runtime validation** — resolve human-verification items from v6.16 (bot startup with live chains, live price display, receipt decoding on real sells, Flashbots bundle verification)
+- **Dynamic capital allocation** — upgrade fixed per-chain budgets to opportunity-quality-weighted allocation (completes CHAIN-05)
+- **Mempool / block-0 sniping** (DETECT-01) — upgrade from block-mode to mempool pending-liquidity monitoring
+- **Anti-rug runtime monitoring** (DETECT-02) — detect liquidity removal events after purchase and frontrun exits
+- **Tech debt cleanup** — retroactive Nyquist validation on 9 partial phases, finish 37 exit engine test stubs, fix remaining TS annotation errors in dashboard API routes
 
 ## Requirements
 
-### Validated
+### Validated (v6.16)
 
-<!-- Shipped and confirmed valuable. Inferred from existing codebase. -->
+All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md](milestones/v6.16-REQUIREMENTS.md).
 
-- ✓ Factory event listener detects PairCreated events on Uniswap V2 — existing
-- ✓ 9-stage token safety validation pipeline (honeypot, blacklist, liquidity, tax, metadata, etc.) — existing
-- ✓ Flashbots MEV-protected transaction submission with retry — existing
-- ✓ Telegram alpha signal listener parses contract addresses from channel messages — existing
-- ✓ Position monitoring with stop-loss, take-profit, and timed sell — existing
-- ✓ Telegram bot notifications for snipe events, sells, and errors — existing
-- ✓ File-based state persistence for sniped token tracking — existing
-- ✓ Blocklist registry for known bad tokens, pairs, and creators — existing
-- ✓ Gas fee calculation with configurable multiplier — existing
-- ✓ Exponential backoff retry utility for API calls — existing
+- ✓ FIX-01..09 — bug fixes & hardening (race conditions, graceful shutdown, env validation, Telegram whitelist, Flashbots retry correctness) — v6.16
+- ✓ ETH6-01..04 — ethers v6 migration with BigInt arithmetic — v6.16
+- ✓ DB-01..04 — SQLite WAL storage with full audit trail and per-trade P&L (receipt-decoded amount_out) — v6.16
+- ✓ INFRA-01..03 — structured pino logging, singleton providers, centralized ABIs — v6.16
+- ✓ CHAIN-01..05 — multi-chain registry across ETH/BSC/Base/Arbitrum with per-chain MEV (CHAIN-05 shipped as fixed budgets; fully-dynamic deferred) — v6.16
+- ✓ V3-01..04 — Uniswap V3 detection, liquidity wait, SwapRouter02/QuoterV2 — v6.16
+- ✓ RISK-01..05 — portfolio risk gate (position size, daily loss, max open, cooldown, exposure) — v6.16
+- ✓ EXIT-01..04 — unified exit engine with trailing stops, partial sells, volatility adaptation, age-weighted urgency — v6.16
+- ✓ MON-01, DASH-01..04 — health endpoint, dashboard positions / trades / risk / controls — v6.16
+- ✓ TEST-01..05 — unit, integration, and mainnet-fork test coverage — v6.16
 
 ### Active
 
-<!-- Current scope. Building toward these. -->
+<!-- Current scope for next milestone. Populate via /gsd-new-milestone. -->
 
-**Bug Fixes & Hardening** — Validated in Phase 01: bug-fixes-hardening
-- [x] Fix race condition: stop-loss and take-profit can fire simultaneously on same token
-- [x] Fix race condition: concurrent storage writes can overwrite each other
-- [x] Fix Flashbots relay hardcoded to mainnet even when running on Sepolia/testnet
-- [x] Fix nonce never incrementing on Flashbots retry — all retries fail after first
-- [x] Add graceful shutdown with signal handlers (SIGTERM, SIGINT) to clear all intervals/timeouts
-- [x] Fix timed sell timeout not cancelled when position already sold via stop-loss/take-profit
-- [x] Fix monitoring loops continuing when wallet balance reaches zero
-- [x] Re-enable disabled sell simulation safety check (currently marked TEMPORARY)
-
-**Security**
-- [x] Add startup validation for all required environment variables with helpful error messages — Validated in Phase 01
-- [ ] Validate RPC endpoint chain ID matches expected network on startup
-- [x] Add Telegram sender whitelist to restrict who can trigger alpha drops — Validated in Phase 01
-- [ ] Sanitize API keys and private keys from error log output
-- [ ] Validate Flashbots auth key exists before attempting bundle submission
-
-**Infrastructure — ethers v6 Migration** — Validated in Phase 02: ethers-v6-migration
-- [x] Migrate from ethers v5 to v6 (BigNumber → native BigInt, updated provider API)
-
-**Infrastructure — SQLite Storage** — Validated in Phase 03: sqlite-storage-code-quality
-- [x] Replace JSON file storage with SQLite for atomic writes, proper transactions, and concurrency
-- [x] Implement transaction audit trail with full history (buys, sells, P&L per token)
-- [x] Structured JSON logging with pino replacing all console.log/warn/error
-- [x] Singleton provider cache per chain, centralized ABI module
-
-**Infrastructure — Multi-Chain** — Validated in Phase 04: multi-chain-architecture
-- [x] Build chain abstraction layer supporting ETH, BSC, Base, Arbitrum simultaneously
-- [x] Per-chain configuration (RPC endpoints, contract addresses, gas strategies)
-- [x] Concurrent operation across all configured chains
-- [x] Per-chain MEV protection (Flashbots on ETH, bloXroute on BSC, passthrough on Base/Arbitrum)
-- [ ] Dynamic capital allocation across chains based on opportunity quality and activity (fixed budgets implemented; dynamic allocation deferred)
-
-**DEX Support — Uniswap V3** — Validated in Phase 05: uniswap-v3-integration
-- [x] Detect new V3 pool creation events across supported chains
-- [x] Handle concentrated liquidity positions, tick ranges, and fee tiers
-- [x] V3-aware price monitoring for position management
-- [x] Support both V2 and V3 pool types in the same token safety pipeline
-
-**Risk Management** — Validated in Phase 06: risk-management
-- [x] Configurable max position size per snipe (cap ETH/BNB per trade)
-- [x] Daily loss limit — halt sniping after X% portfolio loss in 24h
-- [x] Max open positions limit across all chains
-- [x] Cooldown periods between snipes to prevent overtrading
-- [x] Portfolio-level exposure tracking
-
-**Smart Exit Strategies** — Validated in Phase 07: smart-exit-strategies
-- [x] Trailing stop-loss: lock in profits as price rises, sell on pullback
-- [x] Partial sells at configurable price targets (e.g., 50% at 2x, 25% at 5x, rest trails)
-- [x] Dynamic take-profit/stop-loss adjusted based on token volatility and volume
-- [x] Time-weighted exit urgency — escalate exit pressure as position ages
-
-**Monitoring & Observability**
-- [ ] Structured logging with log levels replacing console.log/emoji
-- [ ] HTTP health check endpoint exposing bot liveness, chain status, positions
-- [ ] Centralize ABI definitions (remove inline duplication)
-- [ ] Singleton provider pattern (eliminate redundant provider instantiation)
-
-**Web Dashboard**
-- [ ] Real-time display of open positions, P&L, and chain status
-- [ ] Historical trade log with filtering and search
-- [ ] Bot controls (start/stop per chain, adjust parameters)
-- [ ] Risk dashboard showing exposure, daily P&L, position limits
-- [ ] Live notifications feed
-
-**Testing** — Validated in Phase 09: testing-infrastructure
-- [x] Unit tests for token safety pipeline (all 9 checks + fallback paths)
-- [x] Unit tests for storage concurrency and state management
-- [x] Integration tests for Flashbots bundle submission and retry logic
-- [x] Integration tests for stop-loss/take-profit/timed sell monitoring
-- [x] Mainnet fork tests simulating realistic snipe scenarios end-to-end
+(None yet — ship v6.16 validated, then scope next milestone.)
 
 ### Out of Scope
 
-<!-- Explicit boundaries. Includes reasoning to prevent re-adding. -->
+<!-- Explicit boundaries. Reasoning retained to prevent re-adding. -->
 
-- Mobile app — web dashboard is sufficient; mobile adds complexity without core value
-- Centralized exchange integration — this is a DEX sniper, CEX is a different product
-- Copy trading / social trading — not relevant to automated sniping
-- Arbitrage strategies — focus is on new token sniping, not cross-DEX arb
-- Limit orders / manual trading — the bot is fully automated; manual trading is out of scope
+- Mobile app — web dashboard is mobile-responsive; Telegram provides mobile alerts
+- Centralized exchange integration — DEX-only sniper; CEX is a different product
+- Copy trading / social trading — always behind the leader; sniping edge is speed
+- Arbitrage between DEXes — different architecture; competes with professional MEV searchers
+- Limit orders / manual trading — bot is fully automated; competes with DEX aggregators
+- AI/ML token scoring (v1) — noisy training data; rule-based heuristics more reliable at this stage
+- Multi-wallet support — use separate bot instances; simpler key management
+- Presale / fair-launch sniping — every launchpad has different contract ABIs; maintenance nightmare
 
 ## Context
 
-The bot currently runs on Ethereum Sepolia testnet with deployed test contracts (FakeToken, UniswapV2Factory, UniswapV2Router02). It has two entry points: the blockchain event listener (`src/bot.ts`) and the Telegram listener (`src/telegramListener.ts`). The codebase uses ethers v5 (EOL), has no tests, and several known bugs documented in `.planning/codebase/CONCERNS.md`. The architecture is modular with a utility layer but lacks abstractions for multi-chain support. Flashbots integration exists but has bugs (hardcoded network, broken nonce management).
+v6.16 shipped 2026-04-14 after 26 days of development (2026-03-19 → 2026-04-13).
+379 files changed, +87,015 / -71 lines across 395 conventional commits.
+Test suite: 343/343 passing across 31 files covering unit, integration, and
+mainnet-fork scenarios. GitHub Actions CI runs test:unit and test:integration;
+fork tests excluded since they require RPC access.
 
-The Telegram integration serves dual purposes: listening for alpha signals (contract addresses mentioned in channels) and sending notifications via bot API. Authentication uses MTProto session strings generated via a setup script.
+The bot currently runs against configured mainnets (ETH, BSC, Base, Arbitrum)
+and Sepolia testnet with deployed test contracts (FakeToken, UniswapV2Factory,
+UniswapV2Router02). Entry points: blockchain event listeners (`src/bot.ts`
+via `startMultiChainBot`) and the Telegram alpha listener
+(`src/telegramListener.ts`). Storage is SQLite-based; the .bot-state.json
+auto-migration runs on first startup of Phase 3+ code. Dashboard is served
+from the same process as the bot via Express on the configured port.
+
+### Known Tech Debt (v6.16 close)
+
+- 9 phases need retroactive Nyquist validation via `/gsd-validate-phase {N}`
+- Phase 7: 37 `.todo` exit engine test stubs remain unfilled
+- Phase 8: 6 TypeScript annotation errors in API route files (runtime correct)
+- Phase 1: diagnostic console.log lines in telegramListener.ts (55, 61)
+- Phase 16: `getTradesByToken` unused local const in db.ts:215
+- See `milestones/v6.16-MILESTONE-AUDIT.md` for full list
 
 ## Constraints
 
-- **Tech stack**: TypeScript, Node.js 18+, ethers v6, Hardhat for contracts
-- **Storage**: SQLite (migrating from JSON file) — must remain local, no cloud database
-- **MEV Protection**: Must use Flashbots on ETH; support chain-specific private transaction mechanisms elsewhere
-- **Security**: Private keys via environment variables — no cloud secrets manager required but env validation is mandatory
-- **Backwards compatibility**: None required — this is a breaking overhaul of the existing bot
+- **Tech stack**: TypeScript, Node.js 18+, ethers v6.16, Hardhat for contracts, Express + React (Vite + Tailwind) for dashboard
+- **Storage**: SQLite with WAL mode — local only, no cloud database
+- **MEV Protection**: Flashbots on ETH; bloXroute / private RPCs on BSC; passthrough on Base/Arbitrum
+- **Security**: Private keys via environment variables; all required env vars validated at startup with clear error messages
+- **Backwards compatibility**: v6.16 is a from-scratch replacement of the pre-existing single-chain bot — no legacy compatibility required
 
 ## Key Decisions
 
-<!-- Decisions that constrain future work. Add throughout project lifecycle. -->
-
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | ✓ Complete (Phase 02) |
-| SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | ✓ Complete (Phase 03) |
-| Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Complete (Phase 04) |
-| Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Complete (Phase 05) |
-| DB-backed risk management | 5-rule canSnipe() gate replaces in-memory capital tracking — position size, daily loss, max positions, cooldown, exposure cap | ✓ Complete (Phase 06) |
-| Unified exit engine | Single 5s poll loop per position replaces 6 legacy monitors — trailing stop, partial sells, volatility adaptation, urgency in one function | ✓ Complete (Phase 07) |
-| Web dashboard over CLI | Need real-time position visibility and control beyond Telegram alerts | ✓ Complete (Phase 08-12) |
-| Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate based on opportunity quality | Partial (fixed budgets in Phase 04, dynamic deferred) |
-| Both Flashbots + private RPCs | Different chains have different MEV protection options — support both | ✓ Complete (Phase 04) |
-| Retire legacy single-chain wrappers | Phase 4 preserved handleNewPair/startBot/handleAlphaDrop for backward compat; Phase 15 formally retires them because all live entry points are now `*ForChain` / startMultiChainBot. Keeping dead wrappers that cannot be made chain-aware is a correctness hazard (e.g. the pre-fix single-chain dedup gap). | ✓ Complete (Phase 15 — legacy wrappers retired, INT-DEDUP-NO-CHAIN closed) |
+| Migrate ethers v5 → v6 | v5 is EOL, v6 uses native BigInt, ecosystem moving forward | ✓ Good (Phase 02) |
+| SQLite over JSON storage | Need atomic writes, concurrency control, and query capability | ✓ Good (Phase 03) |
+| Multi-chain from day one | ETH, BSC, Base, Arbitrum all targeted — build the abstraction early | ✓ Good (Phase 04) |
+| Full Uniswap V3 support | Concentrated liquidity is where volume is going — not just detection | ✓ Good (Phase 05) |
+| DB-backed risk management | 5-rule canSnipe gate replaces in-memory capital tracking | ✓ Good (Phase 06) |
+| Unified exit engine | Single 5s poll loop per position replaces 6 legacy monitors | ✓ Good (Phase 07) |
+| Web dashboard over CLI | Need real-time position visibility beyond Telegram alerts | ✓ Good (Phase 08-12) |
+| Fix bugs before extending | Don't build multi-chain on broken foundations | ✓ Good (Phase 01) |
+| ethers v6 as standalone atomic phase | Touches every file; must complete in one wave | ✓ Good (Phase 02) |
+| SQLite + code quality bundled | Structured logging / singleton providers are preconditions for multi-chain | ✓ Good (Phase 03) |
+| Discriminated-union DexConfig (V2/V3) | Compile-time narrowing removes runtime guards | ✓ Good (Phase 05) |
+| Receipt decoder wired into every sell path | Eliminates `amount_out: null` that broke P&L visibility | ✓ Good (Phase 14) |
+| Chain-scoped dedup (AND chain = ?) | Per-chain isolation; legacy single-chain wrappers retired as hazards | ✓ Good (Phase 15) |
+| API response as source of truth for dashboard types | Align interface to server, not the reverse | ✓ Good (Phase 16) |
+| Gap-closure phases (10-16) over milestone-delay | Ship the audit fixes atomically rather than pushing v6.16 | ✓ Good |
+| Both Flashbots + private RPCs | Different chains have different MEV protection options | ✓ Good (Phase 04) |
+| Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate on opportunity quality | ⚠️ Revisit (fixed budgets shipped; dynamic deferred to next milestone) |
 
 ---
-*Last updated: 2026-04-12 after Phase 15 chain-scoped-dedup-dashboard-env (isTokenSniped now chain-scoped via AND chain = ? built by makeIsTokenSnipedStmt factory; legacy mainnet → eth rows normalized at module load; legacy single-chain wrappers handleNewPair/startBot/resumeMonitoring/maybeApprove/handleAlphaDrop/getTokenFromPair retired; DASHBOARD_API_KEY added to REQUIRED_ENV_VARS — closes INT-DEDUP-NO-CHAIN and INT-DASHBOARD-API-KEY from v6.16 audit)*
+*Last updated: 2026-04-14 after v6.16 milestone completion*
