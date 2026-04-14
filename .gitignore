@@ -1,20 +1,56 @@
 /tmp
 /out-tsc
 
+# Dependencies
 /node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 /.pnp
 .pnp.js
 
+# IDE
 .vscode/*
+.idea/
+*.swp
 
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+cookies.txt
+*.pem
+*.key
+
+# Runtime state
 # SQLite database (runtime generated)
 data/
+.bot-state.json
+.bot-state.json.bak
+*.bak
 
+# Hardhat
 # Hardhat cache (runtime generated)
 cache/
+artifacts/
+typechain-types/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Agent / tooling local state
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Dashboard source is TypeScript-only (.tsx/.ts).
 # .js files in this tree are Vite/TS transpilation artifacts, not hand-written source.
