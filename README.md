@@ -1,259 +1,273 @@
 # Crypto Snipe Bot
 
-A multi-chain, MEV-protected DEX sniping and automated trading bot written in TypeScript. It listens for newly deployed liquidity on major EVM chains, runs tokens through an eight-stage safety pipeline, executes buys through chain-appropriate private-mempool relays, and manages exits with volatility-aware trailing stops, tiered partial sells, and time-based urgency rules. State is persisted in SQLite so open positions survive restarts, and a hardened Express + WebSocket dashboard exposes live positions, trade history, risk exposure, and runtime controls.
+A production-grade, multi-chain DEX sniping and automated trading engine written in TypeScript. The bot listens to factory events on four EVM networks, validates newly deployed tokens through an eight-stage safety pipeline, submits buys through chain-appropriate private-mempool relays, and then manages exits with a volatility-adaptive trailing stop, tiered partial sells, and an age-based urgency escalator. Positions, partial-sell progress, high-water marks, and volatility samples are persisted to SQLite so the bot survives crashes without losing exit state.
 
-The project is not a wrapper around a third-party sniping service. It talks directly to factory and router contracts, builds and signs its own swap calldata, and dispatches transactions through Flashbots, bloXroute, or public RPC depending on the chain.
-
----
-
-## Overview
-
-The bot exists to automate the end-to-end lifecycle of a speculative on-chain trade:
-
-1. **Discover** newly created pools the moment they appear on a DEX factory, or ingest contract addresses posted to a whitelisted Telegram channel.
-2. **Validate** each candidate token against honeypot APIs, static-call simulations, liquidity-lock registries, bytecode heuristics, and transfer-tax probes.
-3. **Gate** the trade against portfolio-level risk controls — position count, total exposure, per-chain cooldowns, rolling 24h realized loss, and max position size.
-4. **Execute** the buy via the chain's preferred MEV path, record it in SQLite, and spin up an exit monitor.
-5. **Exit** based on a combination of stop-loss, take-profit tiers, trailing stop (activated after 2x and adjusted by recent price volatility), and an age-based urgency escalator.
-6. **Surface** every event through a local dashboard API, a WebSocket feed, and Telegram alerts.
-
-It runs as a single long-lived Node.js process started with `npx ts-node src/bot.ts`.
+Rather than wrapping an external sniping service, the bot constructs and signs its own router calldata and dispatches transactions through Flashbots, bloXroute, or public RPC depending on the chain. A hardened Express + WebSocket control plane and a React/Vite dashboard (bundled in `dashboard/`) expose live positions, trade history, per-chain risk exposure, and runtime kill-switches.
 
 ---
 
-## Key Features
+## What The Bot Actually Does
 
-### Multi-chain sniping
-- Ethereum, BSC, Base, and Arbitrum, enabled independently via `ENABLED_CHAINS`.
-- Each chain carries its own RPC endpoints, WebSocket provider, wallet funding cap, snipe size, DEX registry, MEV strategy, and safety provider stack.
-- Chain configuration is a typed registry (`src/chainRegistry.ts`) of hardcoded templates overlaid with environment overrides — no YAML, no external config service.
+The end-to-end lifecycle of a single trade:
 
-### Multi-DEX coverage (V2 and V3)
-- Uniswap V2, SushiSwap, PancakeSwap V2, BiSwap, Aerodrome, Camelot V2.
-- Uniswap V3 and PancakeSwap V3 with fee-tier aware pool discovery (500 / 3000 / 10000 bps) and QuoterV2-based pricing.
-- V3 swaps are wrapped in `multicall(deadline, ...)` to enforce deadlines that the V3 router does not accept natively.
+1. **Discover** — A `PairCreated` (Uniswap V2-style) or `PoolCreated` (Uniswap V3) event fires on one of the configured DEX factories. Alternatively, a contract address is posted in a whitelisted Telegram channel and auto-routed into the same pipeline.
+2. **Validate** — Honeypot APIs, liquidity-lock registries, static-call swap and sell simulations, reserve floors, transfer-tax probes, metadata sanity, and bytecode heuristics for anti-bot / max-wallet patterns.
+3. **Gate** — Five portfolio-level risk checks: per-snipe size cap, global open-position count, per-chain cooldown, global deployed-capital cap, and a rolling 24-hour realized-loss circuit breaker per chain.
+4. **Execute** — Build V2 or V3 swap calldata (V3 wrapped in `multicall(deadline, …)` to preserve deadline semantics), then hand the signed transaction to the chain's MEV strategy (Flashbots bundle on Ethereum, bloXroute private tx on BSC, direct submission on Base/Arbitrum).
+5. **Monitor** — A 5-second polling loop per open position maintains a high-water mark, a circular buffer of price samples, and an effective trailing-stop percentage adjusted by recent volatility and position age.
+6. **Exit** — Fixed stop-loss, partial sell tiers (coalesced when multiple tiers fire in the same tick), volatility-adaptive trailing stop (activated once the position doubles), and an urgency escalator that hard-exits stale unprofitable positions.
+7. **Observe** — Every event fans out to Telegram (Markdown alerts) and the local dashboard (WebSocket broadcasts every 5 seconds).
 
-### Pool discovery
-- Primary: WebSocket subscriptions to each factory's `PairCreated` (V2) and `PoolCreated` (V3) events.
-- Fallback: HTTP polling via `queryFilter` on the latest block when no WebSocket URL is configured or the socket drops.
-- Exponential-backoff reconnect (1s -> 60s cap) that strips stale listeners before re-subscribing.
-- Chain-scoped deduplication so the same token hitting multiple DEXs on different chains is evaluated per chain.
-
-### Eight-stage token safety pipeline
-Tokens are rejected unless they pass all of:
-1. Honeypot check — `honeypot.is` and/or GoPlus, with a static-call swap simulation as a last-resort fallback.
-2. Anti-bot / blacklist-function detection via bytecode selector scanning.
-3. Liquidity lock status — Unicrypt (Ethereum), Mudra (BSC), GoPlus (all chains), with burn-address fallback.
-4. Liquidity sufficiency — `getReserves` (V2) or zero-liquidity quoter probe (V3) against a per-chain minimum.
-5. Metadata sanity — name, symbol, decimals.
-6. Swap simulation — `getAmountsOut` (V2) or `quoteExactInputSingle` (V3).
-7. Transfer-tax detection — simulated buy followed by a simulated sell, comparing expected vs. observed balance deltas.
-8. Max-wallet / max-tx limit detection via bytecode heuristics.
-
-Failures are hard rejects, logged and routed to Telegram.
-
-### MEV-protected execution
-- **Ethereum:** Flashbots bundle relay (`@flashbots/ethers-provider-bundle`) signed by a dedicated auth key, two-block target window.
-- **BSC:** bloXroute `bsc_private_tx` JSON-RPC, authenticated with a header secret.
-- **Base / Arbitrum:** Passthrough direct submission (these chains have no mainstream private relay).
-- Chosen at runtime via a small `MevStrategy` interface (`healthCheck`, `sendTransaction`) in `src/utils/mevStrategies/`. Each chain's bot startup verifies the relay is reachable and re-checks every five minutes.
-
-### Exit engine
-All exit logic lives in `src/exitEngine.ts` (~940 lines) and is driven by a single 5-second polling loop per position:
-- **Stop-loss** at a configurable percentage below entry (default 25%).
-- **Partial sell tiers** like `2x:50,5x:25` — sell 50% at 2x entry, 25% at 5x, with simultaneous tiers coalesced into one transaction.
-- **Trailing stop** activated once the position doubles. The pullback percentage adapts to recent price volatility (coefficient of variation over a circular sample buffer), bounded by `TRAILING_MIN_PCT` / `TRAILING_MAX_PCT`.
-- **Urgency escalator** — positions older than 30 minutes without a 1.5x move tighten their trailing stop progressively.
-- **Sell-lock mutex** per `(chain, token)` prevents double-sells when multiple triggers fire in the same tick.
-- Full exit state (entry price, high-water mark, completed tiers, volatility samples) is persisted to the `exit_state` table and re-hydrated on startup via `resumeExitMonitor`.
-
-### Risk manager
-Five gates, evaluated before a snipe is even simulated, in `src/riskManager.ts`:
-- `MAX_POSITION_SIZE` — hard cap per snipe.
-- `DAILY_LOSS_PCT` — rolling 24-hour realized loss circuit breaker, per chain.
-- `MAX_OPEN_POSITIONS` — global concurrent-position cap.
-- `SNIPE_COOLDOWN_MS` — per-chain debounce between snipes.
-- `MAX_TOTAL_EXPOSURE` — global deployed-capital cap computed from pending buys net of partial sell proceeds.
-
-### Dashboard API and WebSocket feed
-`src/api/server.ts` spins up an Express 5 server (Helmet, CORS, cookie-parser) bound by default to `127.0.0.1:8080`:
-- `GET /health` — unauthenticated liveness probe.
-- `POST /api/auth/login` — API-key session, cookie-based.
-- `GET /api/positions` — live positions with prices fetched on-demand from the chain.
-- `GET /api/trades` — paginated trade history with CSV export.
-- `GET /api/risk/summary`, `GET /api/risk/exposure` — aggregated risk state.
-- `GET /api/chains/*` — introspection plus listener restart controls.
-- `POST /api/controls/pause-snipes` — runtime kill-switch for new entries.
-- WebSocket at `/ws` — 5-second position broadcasts plus severity-tagged notifications.
-
-### Telegram integration
-- **Outbound notifier** (`src/utils/notifier.ts`) — Markdown alerts for snipes, rejections, exits, risk events, and WebSocket/RPC health.
-- **Inbound listener** (`src/telegramListener.ts` + `src/alphaDrop.ts`) — a full Telegram client (via the `telegram` MTProto library) that watches whitelisted senders and channels, extracts contract addresses from messages, detects which chain each address lives on by checking for deployed bytecode, and routes the candidate into the same snipe pipeline used by factory events.
-
-### Persistence
-SQLite via `better-sqlite3` with WAL mode and an automatic schema migrator (`src/utils/db.ts`). Two core tables:
-- `trades` — every buy, sell, partial sell, and failure, including `pool_type` (v2/v3), `fee_tier`, `dex_name`, gas cost, price at action, and status.
-- `exit_state` — full serialized state of the exit engine per open position, enabling lossless restart recovery.
-
-All queries are prepared at load time. Schema migrations run on startup and advance incrementally from v1 through v4.
+Single long-lived Node.js process. Entry point: `npx ts-node src/bot.ts`.
 
 ---
 
-## Technical Highlights
+## Highlights Worth Calling Out
 
-These are the parts of the codebase that are most worth looking at:
+These are the parts most worth reading during code review or an interview:
 
-- **Pluggable MEV strategy interface.** Three implementations behind one type — Flashbots, bloXroute, passthrough — selected by chain with no conditional sprawl in `txManager`.
-- **Safety provider adapters.** `HoneypotCheckFn` and `LiquidityLockCheckFn` signatures let each chain assemble its own stack (honeypot.is -> GoPlus -> static-call) without the caller knowing which provider answered.
-- **Volatility-adaptive trailing stops.** A circular buffer of price samples feeds a coefficient-of-variation calculation that widens or tightens the trailing pullback inside configured bounds. The same engine handles partial-sell tiers and age-based urgency, and they all respect a single sell-lock.
-- **V3 multicall deadline wrapping.** V3's `SwapRouter` has no deadline parameter on `exactInputSingle`; the bot wraps the call in `multicall(deadline, data)` to preserve V2-equivalent deadline semantics.
-- **Exit state resume.** On crash or restart, `resumeExitMonitor` rebuilds every open position's monitor from `exit_state` without losing high-water marks, completed partial tiers, or volatility history.
-- **Chain-scoped dedup and cooldowns.** The same token launched on multiple chains is treated as distinct snipe candidates; the same chain can't fire two snipes inside a cooldown window.
-- **WebSocket auto-recovery.** Factory listeners detect socket closure, destroy stale providers, back off exponentially to a 60-second cap, and re-attach without event-duplication bugs.
-- **Dual config surface.** A legacy single-chain `CONFIG` in `src/config.ts` still works, but the real source of truth is `src/chainRegistry.ts`, which builds a `ChainContext` (provider pair, wallet, scoped logger, typed DEX list) per enabled chain.
+- **Pluggable MEV strategy layer (`src/utils/mevStrategies/`).** Three implementations (Flashbots bundle relay, bloXroute `bsc_private_tx` JSON-RPC, passthrough) sit behind a two-method `MevStrategy` interface. Selection is declarative on the chain config; the caller in `txManager` branches on nothing. Each strategy runs a liveness check at startup and every five minutes.
+- **Volatility-adaptive exit engine (`src/exitEngine.ts`, ~938 lines).** A circular price-sample buffer feeds a coefficient-of-variation calculation that scales the trailing pullback inside configured bounds (`TRAILING_MIN_PCT` / `TRAILING_MAX_PCT`). The same engine handles tiered partial sells, age-based urgency, and fixed stop-losses, all coordinated through a single `(chain, token)` sell-lock mutex so concurrent triggers never double-sell.
+- **Restart-safe exit state.** The `exit_state` table persists entry price, high-water mark, completed tier indices, volatility samples, and urgency anchor. On startup, `resumeExitMonitor` rebuilds the live monitor for every pending position without re-executing partial sells that already settled.
+- **V3 multicall deadline wrapping.** Uniswap V3's `SwapRouter02.exactInputSingle` has no deadline field on its parameter struct. The bot wraps the encoded call in `multicall(deadline, [data])` so deadline enforcement matches V2 semantics.
+- **Chain-aware safety dispatch.** `tokenSafety.ts` exposes `…ForChain()` variants that resolve each safety adapter from `chainRegistry.ts` — Ethereum routes honeypot checks through `honeypot.is` first and GoPlus second, BSC flips to GoPlus + Mudra, and so on. Simulation-based checks (sell-after-buy balance delta) function as a last-resort fallback when every external API is unreachable.
+- **WebSocket listener with exponential-backoff reconnect.** On socket close the bot strips stale listeners, destroys the provider, backs off from 1 s to a 60 s cap, and re-attaches. Every reconnect surfaces to Telegram and logs.
+- **Typed multi-chain registry.** `chainRegistry.ts` holds the full per-chain template — RPC env keys, DEX list, MEV strategy, safety provider stack, gas strategy, explorer URL, default capital. `ENABLED_CHAINS=eth,bsc` is enough to turn on two chains with independent wallets, listeners, and child loggers.
+- **Ethers v6, asserted.** A dedicated unit test (`ethersV5PatternsAbsent.test.ts`) fails the build if any v5-era pattern resurfaces. Another test pins the toolbox version. Upgrades aren't left to convention.
 
 ---
 
 ## Architecture
 
-Layers:
-
-- **Orchestration** — `src/bot.ts` owns startup, graceful shutdown (SIGINT/SIGTERM), signal handlers, provider health checks, listener restart logic, and resumption of in-flight positions.
-- **Chain abstraction** — `ChainConfig` + `ChainContext` hold a chain's RPC/WS providers, wallet, gas strategy, DEX registry, MEV strategy, and a child logger with a `chain` label.
-- **Discovery** — native event subscriptions on V2/V3 factories plus a Telegram-driven alpha path.
-- **Validation** — pipeline in `tokenSafety.ts` with pluggable providers.
-- **Trading** — `txManager.ts` builds and dispatches swaps; `mevStrategies/` hides the per-chain relay detail.
-- **Exits** — `exitEngine.ts` and `utils/exitManager.ts` (timer registry + sell mutex).
-- **State** — `utils/db.ts` — SQLite (WAL, prepared statements, auto-migrations).
-- **Surfaces** — `api/` (Express + WS) and `utils/notifier.ts` (Telegram).
-- **Infra utilities** — `utils/provider.ts` (provider singletons + recovery), `utils/gasManager.ts`, `utils/retry.ts`, `utils/receiptDecoder.ts` (WETH Withdrawal/Transfer log parsing for sell revenue).
-
-Data flow for a single snipe:
-
 ```
-Factory event / Telegram message
-        |
-        v
-Token safety pipeline  ----- reject -----> Telegram alert + log
-        |                                        (no state change)
-        | pass
-        v
-Risk manager gates  -------- reject -----> log + cooldown record
-        |
-        | pass
-        v
-Swap calldata (V2/V3)
-        |
-        v
-MEV strategy (Flashbots / bloXroute / passthrough)
-        |
-        v
-trades row (status=pending) + exit_state row
-        |
-        v
-Exit monitor loop (5s)
-        |
-        v
-Trigger: stop-loss / partial / trailing / urgency
-        |
-        v
-Sell tx + trades row (status=sold) + exit_state update
-        |
-        v
-Dashboard broadcast + Telegram alert
+                    +----------------------+
+                    |  ENABLED_CHAINS      |
+                    |  eth | bsc | base | arb
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | chainRegistry        |  per-chain ChainContext
+                    |  providers (HTTP/WS) |  (wallet, logger, DEXes)
+                    +----------+-----------+
+                               |
+          +--------------------+---------------------+
+          |                                          |
+          v                                          v
++-------------------+                     +------------------------+
+| Factory listeners |                     | Telegram MTProto       |
+|  V2 PairCreated   |                     |  sender/channel ACL    |
+|  V3 PoolCreated   |                     |  0x[40hex] extractor   |
+|  WS + HTTP poll   |                     |  chain detection via   |
+|  auto-reconnect   |                     |  provider.getCode      |
++---------+---------+                     +------------+-----------+
+          |                                            |
+          +---------------+   +------------------------+
+                          |   |
+                          v   v
+                +--------------------------+
+                | Eight-stage safety       |
+                |  honeypot / lock /        |
+                |  liquidity / metadata /   |
+                |  swap+sell simulation /   |
+                |  tax probe / anti-bot     |
+                +------------+-------------+
+                             |
+                             v
+                +--------------------------+
+                | Risk gates (5 rules)     |
+                |  size / daily-loss /     |
+                |  count / cooldown /      |
+                |  total exposure          |
+                +------------+-------------+
+                             |
+                             v
+                +--------------------------+
+                | Swap builder (V2 / V3)   |
+                |  multicall(deadline,...) |
+                +------------+-------------+
+                             |
+                             v
+                +--------------------------+
+                | MEV strategy dispatch    |
+                |  Flashbots | bloXroute | |
+                |  passthrough             |
+                +------------+-------------+
+                             |
+                             v
+                +--------------------------+
+                | SQLite (WAL)             |
+                |  trades + exit_state     |
+                +------------+-------------+
+                             |
+                             v
+                +--------------------------+
+                | Exit engine (5s tick)    |
+                |  stop / partial /        |
+                |  trailing / urgency      |
+                |  sell-lock mutex         |
+                +------------+-------------+
+                             |
+          +------------------+------------------+
+          v                                     v
++--------------------+               +--------------------+
+| Express + WS       |               | Telegram Bot API   |
+|  /health, /api,    |               |  Markdown alerts   |
+|  /ws @ 127.0.0.1   |               +--------------------+
++--------------------+
 ```
 
 ---
 
-## Tech Stack
+## Key Features
 
-- **Language:** TypeScript 5.8 (strict mode, ES2022 target).
-- **Runtime:** Node.js via `ts-node`; compiles cleanly to `dist/` with `npm run build`.
-- **Blockchain:** `ethers` v6.16 — the codebase is fully on the v6 API, with dedicated tests asserting no v5 patterns remain.
-- **Database:** `better-sqlite3` 12.8 (synchronous, WAL mode, prepared statements).
-- **MEV:** `@flashbots/ethers-provider-bundle`, plus a hand-rolled bloXroute JSON-RPC client.
-- **HTTP / realtime:** Express 5, `ws` 8, Helmet, CORS, cookie-parser.
-- **Telegram:** `telegram` (MTProto client) for inbound signals; Bot API over HTTP for outbound alerts.
-- **Logging:** `pino` structured JSON, per-module child loggers, `pino-pretty` available for dev.
-- **HTTP client:** `axios` for external safety/security APIs.
-- **Testing:** `vitest` 4 with three project profiles (unit, integration, fork) and a 70% coverage threshold via `@vitest/coverage-v8`.
-- **Solidity tooling (installed, not required at runtime):** Hardhat toolbox, TypeChain — available for contract-side work against forked networks.
+### Multi-chain discovery
+- **Ethereum, BSC, Base, Arbitrum** — each toggled independently via `ENABLED_CHAINS`.
+- Chain IDs are verified at startup via `provider.getNetwork()` and a mismatch causes the chain to be dropped, not silently wrong.
+- Each chain carries its own RPC/WS endpoints, wallet funding cap, snipe size, DEX list, MEV strategy, safety provider stack, gas strategy (EIP-1559 on ETH/Base/Arb, legacy on BSC), and a `pino` child logger with `chain` set.
 
----
+### Multi-DEX support (V2 and V3)
+Current registry (`src/chainRegistry.ts`):
 
-## Feature Deep Dive
+| Chain | V2 DEXes | V3 DEXes |
+|-------|----------|----------|
+| Ethereum | Uniswap V2, SushiSwap | Uniswap V3 |
+| BSC | PancakeSwap V2, BiSwap | Uniswap V3, PancakeSwap V3 |
+| Base | Uniswap V2, Aerodrome | Uniswap V3 |
+| Arbitrum | Uniswap V2, Camelot V2 | Uniswap V3 |
 
-### DEX factory discovery
-`startDexListener` in `src/bot.ts` opens a contract instance on each configured factory using the chain's WebSocket provider if one exists, otherwise a 2-second HTTP polling loop driven by `queryFilter`. For V2 it subscribes to `PairCreated(token0, token1, pair)`; for V3 to `PoolCreated(token0, token1, fee, tickSpacing, pool)`. Target-token selection is "the one that isn't WETH." A per-chain in-memory `Set<string>` suppresses duplicate work for the same token within a run.
+V3 pool discovery probes the three standard fee tiers (500, 3000, 10000 bps). V3 pricing uses `QuoterV2.quoteExactInputSingle` with `staticCall`; V3 swaps use `SwapRouter02.exactInputSingle` wrapped in a `multicall(deadline, …)` so deadline semantics survive.
 
-On WebSocket disconnect the bot tears down all listeners, destroys the provider, backs off exponentially up to 60 seconds, and re-establishes the subscription. Every reconnect cycle is surfaced to Telegram.
+### Pool discovery
+- **Primary:** WebSocket subscription on every factory (`PairCreated` for V2, `PoolCreated` for V3). On disconnect, the provider is destroyed via `removeWsProvider`, a fresh `WebSocketProvider` is created with the expected chainId, and subscriptions are re-attached.
+- **Fallback:** 2-second HTTP polling via `queryFilter` against the latest block when `*_WS_URL` is unset.
+- **V3 "wait for liquidity":** After `PoolCreated`, the bot scans the same block for a `Mint` event (atomic-launch case) and otherwise subscribes to the pool for up to 30 seconds, dropping the opportunity if liquidity never arrives.
+- **Dedup:** Per-chain `isTokenSniped` check against the `trades` table prevents the same token from being sniped twice even when a second DEX on the same chain emits a later event.
 
-### Safety pipeline
-`src/utils/tokenSafety.ts` (~630 lines) exposes both a legacy single-chain API and a `...ForChain` variant that accepts a `ChainContext`. The per-chain variants look up which safety adapters (`honeypot.is`, `goplus`, `unicrypt`, `mudra`) are wired for that chain in `chainRegistry.ts` and call them in order, short-circuiting on a definite verdict and falling through on API failures.
+### Eight-stage token safety pipeline
+Every candidate, from either a factory event or a Telegram message, is rejected unless it passes all of:
 
-Simulation-based checks bypass external APIs entirely — a buy is simulated with `getAmountsOut` or `quoteExactInputSingle`, then a sell is simulated against the resulting balance. Divergence between expected and observed output flags transfer tax or honeypot behavior even when no safety API is reachable.
+1. `checkHoneypotForChain` — honeypot.is or GoPlus, chain-dependent.
+2. `isBlacklistedTokenForChain` — bytecode selector scan.
+3. `isLiquidityLockedForChain` — Unicrypt (ETH), Mudra (BSC), GoPlus (all), burn-address fallback.
+4. `isLiquiditySufficientForChain` — `getReserves()` on V2, QuoterV2 reference-amount probe on V3, against a per-chain native threshold.
+5. `checkTokenMetadataForChain` — name, symbol, decimals.
+6. `simulateSwapForChain` — V2 `getAmountsOut` or V3 `quoteExactInputSingle`.
+7. `hasHighTransferTaxForChain` — simulated buy then simulated sell, comparing expected vs observed balance delta.
+8. `hasMaxWalletOrTxLimitsForChain` — bytecode heuristics for max-tx / max-wallet revert patterns.
 
-### Swap construction
-V2 snipes call `swapExactETHForTokens(minOut, [WETH, token], recipient, deadline)` on the chain's router. Slippage is applied to the quoter output before it becomes `minOut`. V3 snipes populate `ExactInputSingleParams` and wrap the call in `multicall(deadline, encodedExactInputSingle)` so the deadline is honored on a router that otherwise ignores it. Gas is computed by `utils/gasManager.ts` — EIP-1559 fee data where supported, legacy `gasPrice` for BSC — and multiplied by the chain's configured multiplier.
+A `simulateSellForChain` (or `simulateSellV3ForChain` for V3) also runs before the parallel bank as a hard gate — if the sell path doesn't work in simulation, the buy is aborted regardless of the other checks.
 
-### Exit monitor
-Each open position gets a single `setInterval` at 5-second cadence (see `utils/exitManager.ts` for the timer registry). On each tick the engine re-prices the position, updates the high-water mark and volatility samples, and evaluates triggers in precedence order: stop-loss -> partial tiers -> trailing stop -> age-urgency. A `(chain, token)` mutex prevents two triggers from firing their sells concurrently. Completed partial tiers are persisted so a restart does not re-sell tiers that already executed.
+### MEV-protected execution
+- **Ethereum:** `FlashbotsBundleProvider` signs the bundle with a dedicated `FLASHBOTS_AUTH_KEY` and targets the next two blocks.
+- **BSC:** Hand-rolled JSON-RPC client posting to bloXroute's `bsc_private_tx` method with an `Authorization` header from `BLOXROUTE_AUTH_HEADER`.
+- **Base / Arbitrum:** Direct `wallet.sendTransaction()` with chain-appropriate fee data. Neither chain has a mainstream private relay, so this is a deliberate passthrough.
 
-Sell revenue is parsed from the transaction receipt by `utils/receiptDecoder.ts`, which understands both direct WETH `Transfer` patterns and the WETH `Withdrawal` -> native-value path some routers use.
+Each strategy implements a two-method `MevStrategy` interface (`healthCheck`, `sendTransaction`). Health is checked once at startup and then every five minutes.
 
-### Dashboard
-The API layer (`src/api/`) has `routes/`, `middleware/` (auth + error handler), `ws/` (upgrade handler + broadcaster), and `helpers/` (most notably `positions.ts`, which fetches live prices on-demand when the dashboard asks for open positions). Authentication uses a single `DASHBOARD_API_KEY` exchanged for a signed cookie on `/api/auth/login`; everything under `/api` except the login endpoint requires that cookie. Health is exposed unauthenticated at `/health`.
+### Exit engine (`src/exitEngine.ts`)
+A single 5-second polling interval per open position runs through this order:
 
-### Telegram alpha drop
-`alphaDrop.ts` extracts Ethereum-format addresses from inbound Telegram messages via regex, then probes each candidate by calling `provider.getCode()` on every enabled chain. The first chain with deployed bytecode wins, and the candidate is injected into the same pipeline used for factory-detected pairs — same safety checks, same risk gates, same execution path. Per-chain cooldowns and an in-memory dedup set prevent a viral message from triggering a flood.
+1. **Stop-loss** at `STOP_LOSS_PCT` below entry (default 25%). Active only before trailing activates.
+2. **Partial tiers** configured via `PARTIAL_SELL_TARGETS="2x:50,5x:25"` — sell 50% at 2x and 25% at 5x. Simultaneous tiers are coalesced into one transaction. Executed indices persist so restarts don't re-sell.
+3. **Trailing stop** activates at 2x. Pullback is base `TRAILING_STOP_PCT` (default 15%) multiplied by a volatility factor (CoV over the last 60 samples, baseline 0.03) and tightened by an urgency factor. Bounded by `TRAILING_MIN_PCT` / `TRAILING_MAX_PCT`.
+4. **Urgency escalator** — linear decay over 30 minutes that first tightens the trailing stop, then hard-exits the position at market.
+
+A `(chainName, tokenAddress)` mutex in `exitManager.ts` guarantees that when two triggers fire in the same tick, only one sell leaves the process. Sell revenue is decoded from receipts by `receiptDecoder.ts`, which understands both the WETH `Withdrawal` pattern (V2 routers that unwrap) and the direct WETH `Transfer` pattern.
+
+### Risk manager (`src/riskManager.ts`)
+Five gates evaluated in `canSnipe` before any safety API is even called:
+
+- **Position size** — hard reject if `snipeAmount > MAX_POSITION_SIZE`.
+- **Daily realized loss** — rolling 24-hour loss per chain, compared against `-(chain.maxCapital × DAILY_LOSS_PCT / 100)`. Blocks new entries without disturbing open exits.
+- **Open positions** — global count vs `MAX_OPEN_POSITIONS`.
+- **Per-chain cooldown** — in-memory `Map<chainName, lastSnipeTs>` debounces successive snipes per chain by `SNIPE_COOLDOWN_MS`; different chains stay independent.
+- **Total exposure** — `getTotalExposure` sums pending buys net of partial-sell proceeds; rejects when adding the new snipe would exceed `MAX_TOTAL_EXPOSURE`.
+
+### Dashboard control plane
+`src/api/server.ts` wires Express 5 + `ws`:
+
+- `GET /health` — unauthenticated liveness, reports chain statuses and Telegram status.
+- `POST /api/auth/login` — exchange `DASHBOARD_API_KEY` for a signed session cookie.
+- `GET /api/positions` — live positions with on-demand price fetches from the chain.
+- `GET /api/trades` — paginated history with CSV export.
+- `GET /api/risk/summary`, `GET /api/risk/exposure` — aggregated risk state.
+- `GET /api/chains/*` — per-chain status; `POST` variants to pause/restart listeners.
+- `POST /api/controls/pause-snipes` — runtime kill-switch for new entries. Does not tear down exit monitors.
+- `GET /ws` — WebSocket stream; broadcasts `positions_update` every 5 seconds when clients are connected, plus severity-tagged notifications pushed by the notifier.
+- A built SPA served from `dashboard/dist/` (if present) with an `index.html` catch-all for client-side routing. Missing build falls back to a 404 JSON rather than crashing.
+
+Middleware stack (in order): `express.json`, `cookie-parser`, `helmet` (CSP disabled for the SPA), `cors` (credentials on). Default bind `127.0.0.1:8080`.
+
+### Telegram integration
+- **Outbound:** `src/utils/notifier.ts` sends Markdown alerts via the Bot API for snipes, rejections, buys, sells, risk blocks, and WS/MEV health events.
+- **Inbound:** `src/telegramListener.ts` runs a full MTProto client (`telegram` package) authenticated with a session string. Whitelists from `TELEGRAM_ALLOWED_SENDERS` and `TELEGRAM_ALLOWED_CHANNELS` gate every incoming message.
+- **Alpha routing:** `src/alphaDrop.ts` extracts `0x[a-fA-F0-9]{40}` addresses from the message body and, for each enabled chain, calls `provider.getCode()` to figure out which chain the contract actually lives on before routing the candidate into the same pipeline the factory listener uses.
 
 ---
 
 ## Data Model
 
-Two tables, both in SQLite (`./data/bot.db` by default):
+Two SQLite tables in `./data/bot.db` (WAL mode, `better-sqlite3`, prepared statements, synchronous NORMAL):
 
-**`trades`** (schema v4)
-
+### `trades` (schema v4)
 | Column | Notes |
 |---|---|
-| `id` | Primary key. |
-| `token` | Token contract address (`COLLATE NOCASE`). |
-| `chain` | `eth`, `bsc`, `base`, or `arb`. |
-| `action` | `buy`, `sell`, `partial_sell`, or `fail`. |
-| `tx_hash`, `block`, `timestamp` | On-chain provenance. |
-| `amount_in`, `amount_out` | Native / token amounts as strings to preserve precision. |
-| `gas_cost`, `price_at_action` | Cost and unit price at the moment of execution. |
-| `status` | `pending`, `sold`, or `failed`. |
-| `pool_type`, `fee_tier`, `dex_name` | V2/V3 discriminator, V3 fee tier, DEX identity. |
+| `id` | PK |
+| `token` | `COLLATE NOCASE` |
+| `chain` | `eth` / `bsc` / `base` / `arb` |
+| `action` | `buy` / `sell` / `partial_sell` / `fail` |
+| `tx_hash`, `block`, `timestamp` | on-chain provenance |
+| `amount_in`, `amount_out` | native and token amounts as strings to preserve BigInt precision |
+| `gas_cost`, `price_at_action` | decoded from the receipt |
+| `status` | `pending` / `sold` / `failed` |
+| `pool_type`, `fee_tier`, `dex_name` | V2/V3 discriminator, V3 fee tier (bps), DEX identity |
 
-**`exit_state`** (schema v3)
+Hot-path indices cover `token`, `chain`, `timestamp`, and `status`.
 
+### `exit_state` (schema v3)
 | Column | Purpose |
 |---|---|
-| `trade_id` | FK into `trades`. |
-| `entry_price` | Starting price reference. |
-| `high_water_mark` | Peak observed; drives trailing stop. |
-| `trailing_activated` | Whether the position has ever hit 2x. |
-| `partial_tiers_completed` | JSON array of already-executed tier indices. |
-| `original_token_amount` | Snapshot for tier-relative sizing. |
-| `urgency_start_ts` | Anchor for the age-based escalator. |
-| `volatility_samples` | JSON circular buffer of recent prices. |
+| `trade_id` | FK into `trades` |
+| `entry_price` | reference for stop-loss |
+| `high_water_mark` | drives trailing stop, never reset across partial sells |
+| `trailing_activated` | boolean (integer) — latches at 2x |
+| `partial_tiers_completed` | JSON array of tier indices already executed |
+| `original_token_amount` | BigInt-as-string snapshot for tier sizing |
+| `urgency_start_ts` | anchor for the age escalator |
+| `volatility_samples` | JSON circular buffer of recent prices |
 
-Indices cover the hot read paths (`token`, `chain`, `timestamp`, `status`, `trade_id`). WAL mode allows exit-monitor reads to proceed while the main loop writes new trades.
+Migrations are additive and run on every startup, advancing from v1 → v4.
+
+---
+
+## Tech Stack
+
+- **Language:** TypeScript 5.8, strict mode, ES2022 target.
+- **Runtime:** Node.js via `ts-node`; compiles cleanly to `dist/` with `npm run build`.
+- **Chain I/O:** `ethers` v6.16 — fully on the v6 API, with a negative test that fails the build on v5 patterns.
+- **State:** `better-sqlite3` 12.8 with WAL and prepared statements.
+- **MEV:** `@flashbots/ethers-provider-bundle`; a hand-rolled bloXroute client.
+- **HTTP / realtime:** Express 5, `ws` 8, Helmet, CORS, cookie-parser.
+- **Telegram:** `telegram` (MTProto) for inbound; Bot API over HTTPS for outbound.
+- **Logging:** `pino` structured JSON with per-module child loggers; `pino-pretty` for dev.
+- **External APIs:** `axios` for honeypot.is, GoPlus, Unicrypt, Mudra.
+- **Testing:** `vitest` 4 with three project profiles (unit, integration, fork) and a 70% coverage floor enforced by `@vitest/coverage-v8`.
+- **Solidity (optional, dev only):** Hardhat toolbox + TypeChain for fork-based contract tests.
 
 ---
 
 ## Security and Production Considerations
 
-- **Key handling.** Private keys live only in environment variables and never touch disk through the bot. The Flashbots auth key is separate from the trading key so rotation is independent.
-- **Dashboard auth.** Helmet is applied globally, CORS is locked down, and `/api/*` requires a signed cookie obtained by posting `DASHBOARD_API_KEY` to `/api/auth/login`. The server binds to `127.0.0.1` by default.
-- **Runtime kill-switch.** `POST /api/controls/pause-snipes` stops new entries without tearing down exit monitors for already-open positions.
-- **Risk gates short-circuit early.** The five risk checks run before any safety API call, keeping per-opportunity cost bounded when the bot is already at capacity.
-- **Restart safety.** Exit state is persisted on every meaningful transition and re-hydrated at startup; partial sells that already completed are not re-executed.
-- **Graceful shutdown.** Signal handlers stop accepting new pairs, disconnect Telegram, clear timers, destroy WebSocket providers, close the SQLite handle, and enforce a 5-second force-exit ceiling.
-- **Validation.** Required env vars are validated at startup; RPC endpoints have their chain IDs checked against the expected value before the bot starts listening.
-- **Observability.** Every subsystem logs JSON through a named child logger, which plugs directly into container log shipping without additional instrumentation.
+- **Key handling.** Trading private key and Flashbots auth key are separate env vars; neither is ever written to disk by the bot.
+- **Dashboard auth.** Everything under `/api` except `/api/auth/login` requires a signed session cookie. Default bind is `127.0.0.1:8080` — exposing remotely requires deliberately setting `DASHBOARD_HOST`. Helmet and CORS (credentials on) are applied globally.
+- **Chain-ID verification.** Every chain's provider is checked against its expected chainId at startup; mismatched chains are dropped with a fatal log rather than used.
+- **Startup health checks.** MEV relay health is probed per chain at boot and every 5 minutes thereafter. An unreachable relay surfaces a Telegram alert but does not crash the process.
+- **Runtime kill-switch.** `POST /api/controls/pause-snipes` stops new entries without touching in-flight exit monitors.
+- **Restart safety.** The exit engine's state is persisted after every meaningful transition. On reboot, `resumeMultiChainMonitoring` reads pending positions from `trades`, reconstructs DEX context from `pool_type` + `fee_tier`, and re-arms the monitor without re-selling completed tiers.
+- **Graceful shutdown.** `SIGINT` / `SIGTERM` close the API server, disconnect Telegram, clear all timers, destroy WebSocket providers, and close the DB handle. A 5-second force-exit timer (`setTimeout … .unref()`) prevents a hung shutdown.
+- **Observability.** Every module logs structured JSON through a named pino child — `{module, chain, dex, token}` fields make log shipping and chain-scoped filtering trivial.
+- **Input validation.** Required env vars are enforced at startup. Per-chain RPC URLs fall back to the legacy `ALCHEMY_URL` when unset but never to a wrong chainId.
 
 ---
 
@@ -261,47 +275,65 @@ Indices cover the hot read paths (`token`, `chain`, `timestamp`, `status`, `trad
 
 ```
 src/
-  bot.ts               Orchestrator: lifecycle, listeners, per-chain startup
-  chainRegistry.ts     Typed multi-chain configuration + ChainContext factory
-  config.ts            Env loading and legacy single-chain CONFIG object
-  exitEngine.ts        Exit orchestrator: stops, trailing, partials, urgency
-  riskManager.ts       Five risk gates + exposure accounting
-  alphaDrop.ts         Telegram-sourced candidate router
-  telegramListener.ts  MTProto client + whitelist enforcement
-  api/                 Express + WebSocket dashboard
-    server.ts, routes/, middleware/, ws/, helpers/
+  bot.ts                Orchestrator: startup, per-chain WS/HTTP listeners,
+                        reconnect, resume, graceful shutdown, V2 + V3 handlers
+  chainRegistry.ts      Chain templates (eth/bsc/base/arb), DEX list,
+                        ChainContext factory, buildChainRegistry
+  config.ts             Env parsing, required-var validation, legacy CONFIG
+  exitEngine.ts         Stop-loss, partial tiers, trailing stop, urgency,
+                        volatility calc, resume, sell-lock coordination
+  riskManager.ts        Five risk gates, cooldown map, exposure accounting
+  alphaDrop.ts          Telegram-sourced candidate router with chain detection
+  telegramListener.ts   MTProto client, sender/channel ACL, address extraction
+  api/
+    server.ts           Express + HTTP + WS factory, middleware order, 5s broadcast
+    routes/             health, auth, positions, trades, risk, chains, controls
+    middleware/         authMiddleware (cookie), errorMiddleware
+    ws/                 upgrade handler, broadcaster + client registry
+    helpers/positions.ts  on-demand price fetch for dashboard rows
   utils/
-    db.ts              SQLite (WAL, prepared statements, migrations)
-    tokenSafety.ts     Eight-stage safety pipeline
-    txManager.ts       Swap dispatch + retries
-    exitManager.ts     Timer registry and sell-lock mutex
-    mevStrategies/     Flashbots, bloXroute, passthrough
-    safetyProviders/   honeypot.is, GoPlus, Unicrypt, Mudra adapters
-    provider.ts        HTTP/WS provider singletons + recovery
-    pairDiscovery.ts, gasManager.ts, receiptDecoder.ts,
-    notifier.ts, retry.ts, abis.ts, blocklist.ts, logger.ts
+    db.ts               SQLite (WAL, prepared stmts, v1→v4 migrations)
+    tokenSafety.ts      Eight-stage pipeline (legacy + per-chain variants)
+    txManager.ts        Swap dispatch, retries, MEV strategy factory
+    exitManager.ts      Timer registry, sell-lock mutex
+    mevStrategies/      flashbots.ts, bloxroute.ts, passthrough.ts, types.ts
+    safetyProviders/    goplus.ts, honeypotIs.ts, unicrypt.ts, mudra.ts, types.ts
+    provider.ts         JsonRpcProvider / WebSocketProvider singletons + recovery
+    gasManager.ts       EIP-1559 vs legacy fee data, per-chain multiplier
+    receiptDecoder.ts   WETH Withdrawal / Transfer log parsing for sell revenue
+    pairDiscovery.ts    Legacy single-chain pair lookup helper
+    notifier.ts         Telegram outbound + WS-bridged severity alerts
+    retry.ts            Exponential-backoff wrapper for HTTP calls
+    abis.ts             ERC20, V2 Factory/Router/Pair, V3 Factory/Router/Quoter/Pool
+    blocklist.ts        Hardcoded token + pair blocklist Sets
+    logger.ts           pino factory + child-logger helper
+  scripts/              e.g. genAuthWallet.ts for Flashbots auth keys
 
+dashboard/              React/Vite SPA source and build output (served from dist/)
+contracts/              Solidity (Hardhat) — optional dev surface
 test/
-  unit/          Schema, risk, exit engine, safety, ethers v6 invariants (19 files)
-  integration/   Exit monitor, MEV strategies, txManager, WS reconnect, API
-  fork/          Hardhat fork scaffolding
-  helpers/, fixtures/
+  unit/                 19 files: schema, risk, exit-engine branches, safety,
+                        ethers v6 invariants, chain registry, config, v3 ABIs
+  integration/          exit monitor, MEV strategies, txManager retries,
+                        WS reconnect, full API suite under api/
+  fork/                 Hardhat mainnet-fork scaffolding
+  fixtures/, helpers/
 ```
 
 ---
 
 ## Configuration
 
-All configuration is environment-driven. A template with every supported variable lives at `.env.example`. The most important groups:
+All configuration is environment-driven. `.env.example` lists every supported variable. Main groups:
 
-- **Wallet:** `PRIVATE_KEY`.
-- **Chains:** `ENABLED_CHAINS`, plus `ETH_RPC_URL` / `ETH_WS_URL` / `ETH_SNIPE_AMOUNT` / `ETH_MAX_CAPITAL` (and BSC, BASE, ARB equivalents).
-- **MEV:** `FLASHBOTS_AUTH_KEY`, `BLOXROUTE_AUTH_HEADER`.
-- **Risk:** `MAX_OPEN_POSITIONS`, `MAX_TOTAL_EXPOSURE`, `DAILY_LOSS_PCT`, `SNIPE_COOLDOWN_MS`, `MAX_POSITION_SIZE`.
+- **Wallet:** `PRIVATE_KEY` (required).
+- **Chains:** `ENABLED_CHAINS` (default `eth`) plus per-chain `*_RPC_URL`, `*_WS_URL`, `*_SNIPE_AMOUNT`, `*_MAX_CAPITAL` for `ETH`, `BSC`, `BASE`, `ARB`.
+- **MEV:** `FLASHBOTS_AUTH_KEY` (ETH), `BLOXROUTE_AUTH_HEADER` (BSC).
+- **Risk:** `MAX_POSITION_SIZE`, `MAX_OPEN_POSITIONS`, `MAX_TOTAL_EXPOSURE`, `DAILY_LOSS_PCT`, `SNIPE_COOLDOWN_MS`.
 - **Exits:** `STOP_LOSS_PCT`, `TRAILING_STOP_PCT`, `TRAILING_MIN_PCT`, `TRAILING_MAX_PCT`, `PARTIAL_SELL_TARGETS`.
 - **Telegram outbound:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-- **Telegram inbound:** `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_ALLOWED_SENDERS`, `TELEGRAM_ALLOWED_CHANNELS`.
-- **Dashboard:** `DASHBOARD_API_KEY`, `DASHBOARD_PORT`, `DASHBOARD_HOST`.
+- **Telegram inbound:** `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, optional `TELEGRAM_ALLOWED_SENDERS` / `TELEGRAM_ALLOWED_CHANNELS`.
+- **Dashboard:** `DASHBOARD_API_KEY`, `DASHBOARD_PORT` (8080), `DASHBOARD_HOST` (127.0.0.1).
 - **Infra:** `LOG_LEVEL`, `DB_PATH`.
 
 ---
@@ -313,7 +345,7 @@ All configuration is environment-driven. A template with every supported variabl
 npm install
 
 # configure
-cp .env.example .env     # then fill in values
+cp .env.example .env    # fill in PRIVATE_KEY, RPC URLs, API keys
 
 # run (development)
 npx ts-node src/bot.ts
@@ -326,7 +358,7 @@ node dist/bot.js
 Tests:
 
 ```bash
-npm test                 # all projects
+npm test                 # all three projects
 npm run test:unit
 npm run test:integration
 npm run test:fork
@@ -337,28 +369,30 @@ npm run test:coverage    # HTML report in coverage/
 
 ## Testing
 
-`vitest.config.ts` defines three project profiles:
+`vitest.config.ts` defines three profiles:
 
-- **unit** — schema, migrations, risk gates, exit-engine branches, safety check dispatch, ethers v6 invariants, chain registry validation, config parsing, receipt decoding, V3 ABI shapes (19 files).
-- **integration** — the full exit monitor loop with mocked prices, MEV strategy health/submit behavior, txManager retry paths, WebSocket reconnect scenarios, and Express endpoint suites under `test/integration/api/`.
-- **fork** — Hardhat mainnet-fork scaffolding for contract-level tests.
+- **unit (19 files)** — schema + migration, risk gates, exit-engine branches (including zero-balance recovery and the dedicated sell path), safety-check dispatch, receipt decoding, chain registry validation, config parsing, V3 ABI shape invariants, and ethers v6 surface assertions (negative test against v5 patterns, toolbox config pin).
+- **integration** — the full exit monitor loop driven by mocked prices, MEV strategy health-check + submit behavior, `txManager` retry and nonce-increment paths, WebSocket reconnect scenarios, and a complete Express endpoint suite under `test/integration/api/`.
+- **fork** — Hardhat mainnet-fork scaffolding for contract-level verification.
 
-Coverage thresholds are set to 70% for lines, functions, branches, and statements. There are dedicated negative tests that fail the build if v5-era ethers patterns reappear (`ethersV5PatternsAbsent.test.ts`).
+Coverage thresholds are set to 70% lines / functions / branches / statements. The test suite asserts structural invariants (ethers version, required env enforcement, schema migration ordering) alongside business logic, which is uncommon for a bot project.
 
 ---
 
 ## Extensibility
 
-The boundaries where the bot is deliberately easy to extend:
+The seams where adding new functionality does not require touching unrelated code:
 
-- **New chain.** Add a `ChainConfig` template to `chainRegistry.ts`, wire a `createMevStrategy` branch if the chain needs something other than passthrough, optionally register safety providers.
-- **New DEX.** Add a `DexConfigV2` or `DexConfigV3` to the chain's `dexes` list. Discovery and execution already branch on the `isDexV2` / `isDexV3` type guards.
-- **New MEV relay.** Implement the `MevStrategy` interface (`healthCheck`, `sendTransaction`) and register it.
-- **New safety provider.** Implement the `HoneypotCheckFn` / `LiquidityLockCheckFn` signature and plug it into a chain's `safetyApis`.
-- **New exit rule.** The exit engine's trigger evaluation is ordered and idempotent; adding a new predicate alongside the existing four is localized to `exitEngine.ts` and the exit-state schema if new persistence is required.
+- **New chain.** Add a template to `CHAIN_TEMPLATES` in `chainRegistry.ts`, wire a `createMevStrategy` branch if the chain needs something other than passthrough, and optionally register safety providers. Everything downstream reads from `ChainContext`.
+- **New DEX.** Append a `DexConfigV2` or `DexConfigV3` to the chain's `dexes`. Discovery, safety, swap construction, and the exit engine already branch on the `isDexV2` / `isDexV3` type guards.
+- **New MEV relay.** Implement `MevStrategy` (`healthCheck`, `sendTransaction`) and slot it into the `createMevStrategy` factory.
+- **New safety provider.** Implement `HoneypotCheckFn` or `LiquidityLockCheckFn` and reference it by name in a chain's `safetyApis`.
+- **New exit rule.** The exit engine's trigger evaluation is ordered and idempotent; an additional predicate sits alongside the existing four and, if it needs persistence, adds a column to `exit_state` with a new migration.
 
 ---
 
 ## Summary
 
-This project treats algorithmic DEX trading as a full systems problem rather than a single script: pluggable per-chain transport, layered safety, a real risk manager, persistent exit state with volatility-aware logic, a secured local control plane, and a test suite that asserts structural invariants (ethers version, schema migrations, MEV strategy behavior) alongside business logic. Every claim in this README is grounded in code currently in `src/` — there are no roadmap features dressed up as shipped ones.
+This project treats algorithmic DEX trading as a systems problem rather than a single script: a typed multi-chain registry, pluggable per-chain MEV transport, a layered safety pipeline with per-chain adapters and simulation fallbacks, a real risk manager with rolling-window loss accounting and portfolio-level exposure, persistent exit state with volatility-adaptive trailing logic, a secured local control plane with a SPA and WebSocket feed, and a test suite that asserts structural invariants — ethers version, schema migrations, MEV strategy contracts — alongside business behavior.
+
+Every claim in this README is grounded in code that currently lives in `src/`. No feature is described that isn't implemented.
