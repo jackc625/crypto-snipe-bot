@@ -147,10 +147,8 @@
 - Triggers: `main()` called when run as main module
 - Responsibilities: Connect to Telegram client, parse incoming messages, extract addresses, throttle with cooldown, route to handleAlphaDrop
 
-**Auth Script:**
-- Location: `auth.ts`
-- Triggers: `npx ts-node auth.ts` before first run
-- Responsibilities: Interactive Telegram authentication, session string generation, output for .env
+**Auth Bootstrap:**
+- Bootstrap: generate TELEGRAM_SESSION manually via telegram package's StringSession (no helper script — placeholder auth.ts removed in cleanup task 260429).
 
 **Deployment Scripts:**
 - Location: `scripts/deploySepoliaTest.ts`, `scripts/addLiquidity.ts`, `scripts/manualTrigger.ts`

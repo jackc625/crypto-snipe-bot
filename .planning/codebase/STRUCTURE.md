@@ -22,10 +22,7 @@ crypto-snipe-bot/
 │   │   ├── gasManager.ts        # Gas fee calculation with multiplier
 │   │   ├── retry.ts             # Exponential backoff retry utility
 │   │   ├── logger.ts            # Timestamped logging
-│   │   ├── blocklist.ts         # Known bad tokens/creators/pairs registry
-│   │   ├── testAlert.ts         # Telegram message testing utility
-│   └── scripts/
-│       └── genAuthWallet.ts     # Wallet generation helper
+│   │   └── blocklist.ts         # Known bad tokens/creators/pairs registry
 ├── scripts/                     # Deployment & operational scripts
 │   ├── deploySepoliaTest.ts     # Deploy test contracts to Sepolia
 │   ├── addLiquidity.ts          # Create initial LP for testing
@@ -47,8 +44,7 @@ crypto-snipe-bot/
 ├── package.json                 # Dependencies & build scripts
 ├── tsconfig.json                # TypeScript compiler configuration
 ├── tsconfig.bot.json            # Alternative TS config variant
-├── hardhat.config.ts            # Hardhat configuration (contracts, testing)
-└── auth.ts                      # Telegram session generation (run once at setup)
+└── hardhat.config.ts            # Hardhat configuration (contracts, testing)
 ```
 
 ## Directory Purposes
@@ -109,9 +105,6 @@ crypto-snipe-bot/
 - `src/telegramListener.ts`: Secondary bot (Telegram listener)
   - Exports: `main()` function
   - Runs: `ts-node src/telegramListener.ts`
-
-- `auth.ts`: One-time setup for Telegram authentication
-  - Runs: `npx ts-node auth.ts`
 
 **Configuration:**
 - `src/config.ts`: Centralized CONFIG object
@@ -223,7 +216,7 @@ crypto-snipe-bot/
 - Add to `.env` template with documentation comment
 
 **New Entry Point/Script:**
-- Location: `scripts/myScript.ts` for operational tasks, or `auth.ts` pattern for setup
+- Location: `scripts/myScript.ts` for operational tasks (the historical `auth.ts` pattern at repo root is no longer used)
 - Pattern: Export `main()` function, call on module check: `if (require.main === module) { main(); }`
 - Build: Run via `ts-node scripts/myScript.ts` or add npm script to package.json
 

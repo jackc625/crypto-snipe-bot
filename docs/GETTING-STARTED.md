@@ -110,10 +110,11 @@ These are the same two commands CI runs on every push to `main` or `master`.
   pulls in deeply pinned peers. Use `npm install --legacy-peer-deps` (matching
   CI). Do not switch to `yarn` or `pnpm` — only `package-lock.json` is committed.
 
-- **`TELEGRAM_SESSION` is missing and no helper exists** — `.env.example` instructs
-  "run `auth.ts` to generate" a session string, and a top-level `auth.ts` file is
-  present, but it is currently empty (`0` bytes). Generate the session string
-  manually using the `telegram` package's `StringSession` workflow.
+- **`TELEGRAM_SESSION` is missing and no helper exists** — there is no automated
+  helper to generate a Telegram session string. Generate it manually using the
+  `telegram` package's `StringSession` workflow. (Historical note: a placeholder
+  `auth.ts` once existed at the repo root but was never implemented; it was
+  removed in cleanup task 260429-cleanup-empty-files.)
   <!-- VERIFY: intended location and contents of the Telegram session-generation helper -->
 
 - **Port 8080 already in use** — The dashboard API server defaults to
