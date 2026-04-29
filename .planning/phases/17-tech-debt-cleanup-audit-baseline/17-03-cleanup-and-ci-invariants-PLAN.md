@@ -9,6 +9,8 @@ depends_on:
 files_modified:
   - src/utils/db.ts
   - .github/workflows/test.yml
+  - .planning/milestones/v6.17-debt-baseline.md  # Task 2 updates the per-claim ledger row for `getTradesByToken` to `acted-on (deleted in Plan 17-03)`. Wave-1-safe: Plan 17-01 (wave 0) writes this file; this plan only modifies one ledger cell after 17-01 commits, no parallel-write conflict because 17-01 is in an earlier wave.
+  - src/telegramListener.ts  # CONDITIONAL: only modified if Task 1 Check 5 finds console.log/warn/error matches at execution time (per DEBT-06 wording: replace console.* with log.debug). Pre-scout (CONTEXT.md `<domain>` lines 19-20) confirmed the file is already clean (env-parse expressions, NOT console calls), so the expected execution-time path is verified-resolved with NO edit. Listed here so frontmatter is honest about the act-path that EXISTS in Task 1's decision tree even if it does not fire.
 autonomous: true
 requirements:
   - DEBT-06
@@ -45,6 +47,8 @@ Cleanup + invariant-lock plan for Phase 17. Closes DEBT-06 — diagnostic-log / 
 
 **Verify-then-act protocol (per D-11 — Pitfall #22 mitigation):** This plan does NOT blindly act on every v6.16-MILESTONE-AUDIT.md `tech_debt:` claim. The pre-scout (CONTEXT.md `<domain>` line 14-29) verified 10 of 11 audit items as already resolved; the only confirmed-still-valid item is the `getTradesByToken` deletion at `src/utils/db.ts:215`. Two un-scouted items (working-tree regressions in logger.ts/notifier.ts/retry.ts; health fixture latestBlock 12345 vs 12345678) MUST be verified at execution time BEFORE any act-step runs. Per D-12 strict scope: items verified-resolved by Plan 17-01's baseline doc do NOT get acted on here (no scope creep).
 
+**Conditional file modifications (frontmatter scope note):** `files_modified` lists `src/telegramListener.ts` because Task 1 Check 5's decision tree (per DEBT-06 wording) explicitly contemplates a `console.log → log.debug` replacement act-path IF execution-time grep returns matches. Pre-scout (2026-04-29) confirmed the file is already clean, so the expected outcome is verified-resolved (no edit). Listed in frontmatter for honesty about the act-path the plan structurally permits — NOT because the edit is expected to fire. `.planning/milestones/v6.17-debt-baseline.md` is also listed because Task 2 updates one ledger cell (the `getTradesByToken` row's Disposition) after deletion.
+
 **CI invariant lock structure (per D-10 planner discretion → smallest-diff append):** Append two new `run` steps to the existing `test` job in `.github/workflows/test.yml`. NOT a new parallel job, NOT a new `lint.yml` workflow. Sequential append matches the existing 5-step shape (checkout, setup-node, npm ci, test:unit, test:integration → +todo-ban + tsc × 3).
 
 **Strict `.todo` ban (per D-09):** No allowlist-with-reason. Future contributors who want a placeholder use `it.skip('reason: ...', () => {...})` — same effect with explicit reason.
@@ -53,6 +57,7 @@ Output:
 - `src/utils/db.ts` modified (3-line deletion)
 - `.github/workflows/test.yml` modified (5 new step-lines: 1 todo-ban + 3 tsc + the named YAML keys)
 - `.planning/milestones/v6.17-debt-baseline.md` modified (one ledger row updated to mark `getTradesByToken` as `acted-on`)
+- `src/telegramListener.ts` MAYBE modified (only if Task 1 Check 5 surfaces a regression; pre-scout says no)
 </objective>
 
 <execution_context>
@@ -153,7 +158,7 @@ Indentation: 6 spaces matches the existing `- run:` line indentation (per the ex
 
 <task type="auto">
   <name>Task 1: Verify-then-act precursor — confirm un-scouted v6.16 audit items at execution time</name>
-  <files>(verification only — no file modifications)</files>
+  <files>(verification only — no file modifications IF all checks pass; src/telegramListener.ts MAY be modified if Check 5 surfaces console.log/warn/error matches per DEBT-06 wording)</files>
   <read_first>
     - .planning/milestones/v6.16-MILESTONE-AUDIT.md (lines 14-37 `tech_debt:` items — the verify-then-act target list)
     - .planning/milestones/v6.17-debt-baseline.md (Plan 17-01's per-claim ledger — most items already verified there; this task confirms the un-scouted ones)
@@ -201,9 +206,9 @@ grep -n 'console\.log\|console\.warn\|console\.error' src/telegramListener.ts
 | 2 (health latestBlock) | grep matches `12345678` | STOP if grep returns `latestBlock: 12345`; this is a regression after Plan 17-01 baseline; surface to user. |
 | 3 (Pitfall #22 dependency guard) | only 1 match in `src/utils/db.ts:215` | STOP if any match in dashboard/, test/, or scripts/; investigate caller before deleting |
 | 4 (baseline ledger row) | row contains `acted-on by Plan 17-03` or `still-valid` | STOP if row is missing or marked `verified-resolved` (Plan 17-01 took a different path; reconcile with user) |
-| 5 (telegramListener console.log) | grep returns no matches | If grep returns matches: replace each `console.log` call with `log.debug` per DEBT-06 wording (NOT a STOP — this is the act path for diagnostic-log replacement); record the replacement in Plan 17-03 SUMMARY.md |
+| 5 (telegramListener console.log) | grep returns no matches | If grep returns matches: replace each `console.log`/`console.warn`/`console.error` call with `log.debug` per DEBT-06 wording (NOT a STOP — this is the act path for diagnostic-log replacement). This is the act-path that justifies `src/telegramListener.ts` appearing in `files_modified` frontmatter; record the replacement diff in Plan 17-03 SUMMARY.md. |
 
-**Output:** record the verbatim stdout of all 5 checks in a comment block at the top of the SUMMARY draft. This task makes NO file modifications — it gates Task 2 (deletion) and Task 3 (CI guards) on the verification outcome.
+**Output:** record the verbatim stdout of all 5 checks in a comment block at the top of the SUMMARY draft. This task makes NO file modifications IF all checks pass per pre-scout expectations. Check 5 MAY trigger a `console.log → log.debug` edit in `src/telegramListener.ts` if (and only if) execution-time grep finds matches; this is the conditional act-path the frontmatter declares.
 
 If all 5 checks pass: proceed to Task 2.
 If any STOP fires: surface to user with exact command output and decision required.
@@ -227,7 +232,7 @@ All 5 verify-then-act checks have run. Tasks 2 and 3 are unblocked. Pre-scout's 
 
 <task type="auto">
   <name>Task 2: Delete `getTradesByToken` const from src/utils/db.ts (DEBT-06 dead-code removal)</name>
-  <files>src/utils/db.ts</files>
+  <files>src/utils/db.ts, .planning/milestones/v6.17-debt-baseline.md</files>
   <read_first>
     - src/utils/db.ts (CURRENT FILE — focus on lines 210-221 to confirm `getTradesByToken` is at line 215; line numbers may shift if file edits have happened since pre-scout — re-verify)
     - .planning/phases/17-tech-debt-cleanup-audit-baseline/17-PATTERNS.md (lines 27-52 — getTradesByToken deletion analog and the surrounding-context-must-remain blocks)
@@ -430,5 +435,6 @@ After completion, create `.planning/phases/17-tech-debt-cleanup-audit-baseline/1
 - Confirmation that `npx vitest run --project unit --project integration` exits 0 post-changes
 - Confirmation that `npx tsc --noEmit -p tsconfig.json && npx tsc --noEmit -p tsconfig.bot.json && npx tsc --noEmit -p dashboard/tsconfig.json` exits 0 post-changes
 - The updated row in `.planning/milestones/v6.17-debt-baseline.md` with disposition `acted-on (deleted in Plan 17-03)`
+- If Check 5 fired (telegramListener console.log replaced with log.debug): pre/post diff for `src/telegramListener.ts`. If Check 5 found no matches (expected per pre-scout): explicit confirmation `src/telegramListener.ts NOT modified — verified-resolved at execution time`.
 - Note: if Phase 17 close requires Plan 17-02's stop-the-line clearance, surface that here
 </output>

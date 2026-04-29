@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: planning
-stopped_at: "Phase 17 context gathered"
-last_updated: "2026-04-29T18:00:00.000Z"
+status: executing
+stopped_at: Phase 17 context gathered; ready for `/gsd-plan-phase 17`
+last_updated: "2026-04-29T20:21:40.251Z"
+last_activity: 2026-04-29 -- Phase 17 planning complete
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -31,12 +32,13 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 Phase: 17 — Tech Debt Cleanup & Audit Baseline (context gathered)
 Plan: —
-Status: Phase 17 CONTEXT.md committed; awaiting `/gsd-plan-phase 17`
-Last activity: 2026-04-29 — Phase 17 discuss-phase complete: hybrid 7+2 retroactive Nyquist; baseline-first wave 0; 3-plan split; verify-then-act sweep on v6.16 audit; evergreen .todo + tsc CI guards. Pre-scout confirmed 0/0 baseline (10 of 11 v6.16 audit tech_debt items already resolved).
+Status: Ready to execute
+Last activity: 2026-04-29 -- Phase 17 planning complete
 
 ## Performance Metrics
 
 **v6.16 velocity (reference):**
+
 - Total plans completed: 55
 - Timeline: 26 days (2026-03-19 → 2026-04-13)
 - Git: 395 conventional commits, 379 files changed, +87,015 / -71 lines
@@ -78,9 +80,11 @@ None — Phase 17 ready for `/gsd-plan-phase 17`.
 - Phase 14: real sell records non-null amount_out + real Flashbots tx hash → EXIT-LIVE-03, EXIT-LIVE-04
 
 **Active production blocker (Phase 18 lead):**
+
 - `simulateSellForChain` (V2) hard-blocks every snipe via `INSUFFICIENT_INPUT_AMOUNT` (balance=0 footgun). `simulateSellV3ForChain` silently returns true — zero honeypot detection. Bot is funded on mainnet but cannot trade. Lead requirement for v6.17.
 
 **Tech debt status disputed (Phase 17 will resolve via CI):**
+
 - 37 `.todo` exit-engine test stubs and 6 TS annotation errors are listed in v6.16 close audit but research SUMMARY.md notes the actual status is contested — `find test/ -name '*.todo*'` and `npx tsc --noEmit` may already be clean. DEBT-01 and DEBT-02 verify-via-CI as the first task of Phase 17.
 
 ### Nyquist Validation Debt

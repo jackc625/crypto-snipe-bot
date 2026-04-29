@@ -85,20 +85,21 @@ nyquist:
 ---
 ```
 
-From .planning/milestones/v6.16-MILESTONE-AUDIT.md (`tech_debt:` items, lines 14-37 — the verify-then-act target list per D-11):
-- 01: "Diagnostic console.log in telegramListener.ts (lines 55, 61) marked for removal"
-- 01: "releaseSellLock exported but never called (safe due to clearAllTimersForToken)"
-- 03: "Working tree regressions: logger.ts, notifier.ts, retry.ts reverted to pre-migration versions (committed HEAD correct)"
-- 03: "testAlert.ts has 3 pre-existing console calls (not in plan scope)"
-- 03: "pino and better-sqlite3 not installed in node_modules (npm install needed)"
-- 07: "Exit engine test import block commented out; 37 .todo test stubs remain unfilled"
-- 08: "6 TypeScript errors in API route files (type narrowing: req.params, Function type)"
-- 08: "1 test fixture mismatch (health test latestBlock 12345 vs 12345678)"
-- 11: "Pre-existing getPnLChartData redeclare TS error in db.ts"
-- 16: "VERIFICATION.md never generated"
-- 16: "getTradesByToken remains as unused local const in db.ts:215 after export removal (dead code)"
+From .planning/milestones/v6.16-MILESTONE-AUDIT.md (`tech_debt:` items, lines 14-37 — VERBATIM TEXT, the verify-then-act target list per D-11). The strings below are extracted verbatim from the source file's `tech_debt:` YAML block; executor MUST copy them into the ledger's "Claim" column without paraphrase or truncation:
 
-11 total items across 6 phases.
+- Phase `01-bug-fixes-hardening` (line 17): `Diagnostic console.log in telegramListener.ts (lines 55, 61) marked for removal`
+- Phase `01-bug-fixes-hardening` (line 18): `releaseSellLock exported but never called (safe due to clearAllTimersForToken)`
+- Phase `03-sqlite-storage-code-quality` (line 21): `Working tree regressions: logger.ts, notifier.ts, retry.ts reverted to pre-migration versions (committed HEAD correct)`
+- Phase `03-sqlite-storage-code-quality` (line 22): `testAlert.ts has 3 pre-existing console calls (not in plan scope)`
+- Phase `03-sqlite-storage-code-quality` (line 23): `pino and better-sqlite3 not installed in node_modules (npm install needed)`
+- Phase `07-smart-exit-strategies` (line 26): `Exit engine test import block commented out; 37 .todo test stubs remain unfilled`
+- Phase `08-monitoring-web-dashboard` (line 29): `6 TypeScript errors in API route files (type narrowing: req.params, Function type)`
+- Phase `08-monitoring-web-dashboard` (line 30): `1 test fixture mismatch (health test latestBlock 12345 vs 12345678)`
+- Phase `11-dashboard-accuracy-bot-wiring` (line 33): `Pre-existing getPnLChartData redeclare TS error in db.ts`
+- Phase `16-dashboard-type-alignment-dead-code-cleanup` (line 36): `VERIFICATION.md never generated (SUMMARY, VALIDATION, UAT, REVIEW, SECURITY present; verification inferred from those artifacts)`
+- Phase `16-dashboard-type-alignment-dead-code-cleanup` (line 37): `getTradesByToken remains as unused local const in db.ts:215 after export removal (dead code)`
+
+11 total items across 6 phases. The Task 1 ledger MUST quote these verbatim in the "Claim" column (no paraphrasing).
 </interfaces>
 </context>
 
@@ -110,7 +111,7 @@ From .planning/milestones/v6.16-MILESTONE-AUDIT.md (`tech_debt:` items, lines 14
   <read_first>
     - .planning/phases/17-tech-debt-cleanup-audit-baseline/17-CONTEXT.md (`<domain>` lines 14-29 for pre-scout result; D-05 wave-0 protocol)
     - .planning/phases/17-tech-debt-cleanup-audit-baseline/17-PATTERNS.md (lines 117-167 — `v6.17-debt-baseline.md` analog and frontmatter shape)
-    - .planning/milestones/v6.16-MILESTONE-AUDIT.md (lines 1-43 frontmatter — analog; lines 14-37 `tech_debt:` items — verify targets)
+    - .planning/milestones/v6.16-MILESTONE-AUDIT.md (lines 1-43 frontmatter — analog; lines 14-37 `tech_debt:` items — verify targets; copy these verbatim into the ledger's Claim column)
   </read_first>
   <action>
 Run the four CI commands below from the repo root, capture stdout/stderr/exit-code from each, and assemble the draft of `.planning/milestones/v6.17-debt-baseline.md`. Do NOT short-circuit based on pre-scout — pre-scout (2026-04-29) is informational; execution-time output is the committed artifact (per D-05).
@@ -160,38 +161,41 @@ After running all four, assemble the draft of the baseline doc with:
 
 **Tabular preferred** for the per-claim ledger per CONTEXT.md `<decisions>` Claude's-Discretion line 136. Narrative ONLY for context the table can't carry.
 
+**VERBATIM-CLAIM RULE for the ledger's "Claim" column** (per D-11): Each row's Claim cell MUST be the verbatim string from v6.16-MILESTONE-AUDIT.md `tech_debt:` block (lines 14-37). The 11 verbatim strings are listed in `<interfaces>` above — copy each into a row without paraphrasing, truncating, or summarizing. The Verification table below shows the verification command and expected disposition; the Claim cell itself is the unchanged source string.
+
 **Verify-then-act handling for the 11 v6.16-MILESTONE-AUDIT.md `tech_debt:` items** (per D-11):
 
-| Item (verbatim from v6.16 audit) | Verification command | Expected disposition |
+| Item (verbatim from v6.16 audit — see `<interfaces>` for the canonical strings) | Verification command | Expected disposition |
 |---|---|---|
-| 01: console.log in telegramListener.ts (55, 61) | `grep -n 'console\.log\|console\.warn\|console\.error' src/telegramListener.ts` | verified-resolved (pre-scout shows env-parse expressions, not console.log) — confirm at execution |
-| 01: releaseSellLock never called | `grep -n 'releaseSellLock' src/exitEngine.ts src/utils/exitManager.ts` | verified-resolved (pre-scout: called at exitEngine.ts:517,628) — confirm at execution |
-| 03: logger.ts/notifier.ts/retry.ts reverted in working tree | `git status src/utils/logger.ts src/utils/notifier.ts src/utils/retry.ts` | verify at execution: if `nothing to commit` or no diff → verified-resolved; else flag |
-| 03: testAlert.ts pre-existing console calls | `ls src/testAlert.ts 2>&1` | verified-resolved (pre-scout: file does not exist) — confirm at execution |
-| 03: pino/better-sqlite3 not installed | `node -e "require('pino'); require('better-sqlite3'); console.log('OK')"` | verified-resolved — confirm |
-| 07: 37 .todo test stubs | covered by command 1+2 above | verified-resolved if 0 matches |
-| 08: 6 TS errors in API routes | covered by command 3 (tsc) above | verified-resolved if exit 0 |
-| 08: health test fixture latestBlock 12345 vs 12345678 | `grep -n 'latestBlock' test/integration/api/health.test.ts test/fixtures/api.fixtures.ts` | verify: if `latestBlock: 12345678` (pre-scout suggests yes via test/integration/api/health.test.ts:95) → verified-resolved |
-| 11: getPnLChartData redeclare TS error | covered by command 3 (tsc) above | verified-resolved if exit 0 |
-| 16: VERIFICATION.md never generated | `ls .planning/phases/16-dashboard-type-alignment-dead-code-cleanup/16-VERIFICATION.md 2>&1` | record as `still-valid → audit-grade documentation gap; not addressable in v6.17 (Phase 17 is forward-looking)` OR mark deferred to Phase 21 EXIT-LIVE if the user prefers |
-| 16: getTradesByToken unused local const | `grep -n 'getTradesByToken' src/utils/db.ts` | still-valid (pre-scout confirmed: line 215 STILL PRESENT) → mark `acted-on by Plan 17-03` (deferred to that plan per D-06 split) |
+| 01: "Diagnostic console.log in telegramListener.ts (lines 55, 61) marked for removal" | `grep -n 'console\.log\|console\.warn\|console\.error' src/telegramListener.ts` | verified-resolved (pre-scout shows env-parse expressions, not console.log) — confirm at execution |
+| 01: "releaseSellLock exported but never called (safe due to clearAllTimersForToken)" | `grep -n 'releaseSellLock' src/exitEngine.ts src/utils/exitManager.ts` | verified-resolved (pre-scout: called at exitEngine.ts:517,628) — confirm at execution |
+| 03: "Working tree regressions: logger.ts, notifier.ts, retry.ts reverted to pre-migration versions (committed HEAD correct)" | `git status src/utils/logger.ts src/utils/notifier.ts src/utils/retry.ts` | verify at execution: if `nothing to commit` or no diff → verified-resolved; else flag |
+| 03: "testAlert.ts has 3 pre-existing console calls (not in plan scope)" | `ls src/testAlert.ts 2>&1` | verified-resolved (pre-scout: file does not exist) — confirm at execution |
+| 03: "pino and better-sqlite3 not installed in node_modules (npm install needed)" | `node -e "require('pino'); require('better-sqlite3'); console.log('OK')"` | verified-resolved — confirm |
+| 07: "Exit engine test import block commented out; 37 .todo test stubs remain unfilled" | covered by command 1+2 above | verified-resolved if 0 matches |
+| 08: "6 TypeScript errors in API route files (type narrowing: req.params, Function type)" | covered by command 3 (tsc) above | verified-resolved if exit 0 |
+| 08: "1 test fixture mismatch (health test latestBlock 12345 vs 12345678)" | `grep -n 'latestBlock' test/integration/api/health.test.ts test/fixtures/api.fixtures.ts` | verify: if `latestBlock: 12345678` (pre-scout suggests yes via test/integration/api/health.test.ts:95) → verified-resolved |
+| 11: "Pre-existing getPnLChartData redeclare TS error in db.ts" | covered by command 3 (tsc) above | verified-resolved if exit 0 |
+| 16: "VERIFICATION.md never generated (SUMMARY, VALIDATION, UAT, REVIEW, SECURITY present; verification inferred from those artifacts)" | `ls .planning/phases/16-dashboard-type-alignment-dead-code-cleanup/16-VERIFICATION.md 2>&1` | record as `still-valid → audit-grade documentation gap; not addressable in v6.17 (Phase 17 is forward-looking)` OR mark deferred to Phase 21 EXIT-LIVE if the user prefers |
+| 16: "getTradesByToken remains as unused local const in db.ts:215 after export removal (dead code)" | `grep -n 'getTradesByToken' src/utils/db.ts` | still-valid (pre-scout confirmed: line 215 STILL PRESENT) → mark `acted-on by Plan 17-03` (deferred to that plan per D-06 split) |
 
-Record the EXACT verification stdout (including exit codes where applicable) in the ledger row's "Output" column. Do not paraphrase.
+In the actual ledger table written to the doc, the leading `01:` / `03:` / etc. is the Phase column; the quoted string is the Claim column (verbatim from v6.16-MILESTONE-AUDIT.md). Record the EXACT verification stdout (including exit codes where applicable) in the row's "Output" column. Do not paraphrase.
   </action>
   <verify>
-    <automated>test -f .planning/milestones/v6.17-debt-baseline.md &amp;&amp; grep -c '^| Phase ' .planning/milestones/v6.17-debt-baseline.md | grep -v '^0$'</automated>
+    <automated>test -f .planning/milestones/v6.17-debt-baseline.md &amp;&amp; [ $(grep -v '^#' .planning/milestones/v6.17-debt-baseline.md | grep -c '^| .* | .* | .* |') -ge 12 ]</automated>
   </verify>
   <acceptance_criteria>
     - File `.planning/milestones/v6.17-debt-baseline.md` exists.
     - File contains a YAML frontmatter block (between two `---` lines starting at line 1) with at minimum the keys `milestone: v6.17`, `scoped: <date>`, `status: <baseline|tech_debt>`, `tsc_clean: N/3`, `todo_count: <integer>`.
     - File contains the literal H2 heading `## Wave 0 CI Output` followed by 4 fenced ```bash blocks with the verbatim stdout of the 4 commands listed in `<action>` (verifiable via `grep -c '^## Wave 0 CI Output' .planning/milestones/v6.17-debt-baseline.md == 1`).
-    - File contains a tabular per-claim ledger with at minimum 11 rows corresponding to the 11 items from v6.16-MILESTONE-AUDIT.md `tech_debt:` (lines 14-37). Verifiable via: `grep -c '^| .* | .* | .* | .* |' .planning/milestones/v6.17-debt-baseline.md >= 12` (1 header row + 11 data rows + header divider line).
+    - File contains a tabular per-claim ledger with at minimum 11 rows corresponding to the 11 items from v6.16-MILESTONE-AUDIT.md `tech_debt:` (lines 14-37). Verifiable via: `grep -v '^#' .planning/milestones/v6.17-debt-baseline.md | grep -c '^| .* | .* | .* |'` returns ≥ 12 (1 header row + 11 data rows; header divider line `|---|---|---|` counts separately).
+    - Each ledger row's Claim column contains a verbatim quote from v6.16-MILESTONE-AUDIT.md `tech_debt:` items (lines 14-37). NO paraphrasing or truncation. Verifiable via spot-check: `grep -c "Diagnostic console.log in telegramListener.ts (lines 55, 61) marked for removal" .planning/milestones/v6.17-debt-baseline.md >= 1` AND `grep -c "getTradesByToken remains as unused local const in db.ts:215" .planning/milestones/v6.17-debt-baseline.md >= 1`.
     - File contains the literal H2 heading `## Per-Claim Verify-Then-Act Ledger`.
     - For the Phase 16 `getTradesByToken` row, the Disposition cell contains either `still-valid` or `acted-on by Plan 17-03`.
     - File contains a Disposition column where each of the 11 rows is one of: `verified-resolved`, `acted-on`, `still-valid`, `deferred-to-Plan-17-03`, or `acted-on by Plan 17-03`. No row has empty Disposition.
   </acceptance_criteria>
   <done>
-The baseline doc exists with literal CI output captured, the 11-claim ledger is filled per-row with verbatim verification stdout and explicit dispositions, and the doc is ready for the Task 2 close-out section to be appended. The doc is NOT yet committed (Task 3 commits).
+The baseline doc exists with literal CI output captured, the 11-claim ledger is filled per-row with verbatim claim quotes, verbatim verification stdout, and explicit dispositions. The doc is ready for the Task 2 close-out section to be appended. The doc is NOT yet committed (Task 3 commits).
   </done>
 </task>
 

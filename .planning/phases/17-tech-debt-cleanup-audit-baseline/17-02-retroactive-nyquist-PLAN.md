@@ -213,15 +213,84 @@ WebSocketProvider: class MockWebSocketProvider {
 },
 ```
 
-From src/bot.ts:379-393 (production code under Phase 5 V3-02 harm scenario):
+From src/bot.ts:86-121 (production code under Phase 5 V3-02 harm scenario — VERBATIM SIGNATURE; the function is module-internal, NOT exported):
 ```typescript
-// V3-02: Wait for liquidity (D-01 subscribe+timeout, D-02 same-block check)
+async function waitForLiquidity(
+    ctx: ChainContext,
+    poolAddress: string,
+    blockNumber: number
+): Promise<boolean> {
+    const pool = new Contract(poolAddress, V3_POOL_ABI, ctx.httpProvider);
+
+    // D-02: Same-block check first -- atomic launch scripts emit PoolCreated + Mint in one block
+    try {
+        const mintFilter = pool.filters.Mint();
+        const existingMints = await pool.queryFilter(mintFilter, blockNumber, blockNumber);
+        if (existingMints.length > 0) {
+            ctx.log.info({ pool: poolAddress, block: blockNumber }, 'Mint found in same block as PoolCreated');
+            return true;
+        }
+    } catch (e) {
+        ctx.log.warn({ err: e, pool: poolAddress }, 'Error querying same-block Mints, falling through to subscription');
+    }
+
+    // D-01: Subscribe + timeout for future Mints (30 seconds)
+    return new Promise<boolean>((resolve) => {
+        const wsPool = new Contract(poolAddress, V3_POOL_ABI, ctx.wsProvider || ctx.httpProvider);
+        const timeout = setTimeout(() => {
+            wsPool.removeAllListeners('Mint');  // Pitfall 7: prevent stale callbacks
+            ctx.log.info({ pool: poolAddress }, 'Mint timeout (30s), dropping opportunity');
+            resolve(false);
+        }, 30_000);
+
+        wsPool.on('Mint', () => {
+            clearTimeout(timeout);
+            wsPool.removeAllListeners('Mint');
+            ctx.log.info({ pool: poolAddress }, 'Mint event received, proceeding to snipe');
+            resolve(true);
+        });
+    });
+}
+```
+
+**Critical observations for Task 4 planner-discretion:**
+- `waitForLiquidity` at src/bot.ts:86 is **NOT exported** (no `export` keyword). It is module-internal to `src/bot.ts`.
+- The call site is src/bot.ts:380 (`const hasLiquidity = await waitForLiquidity(ctx, poolAddress, blockNumber);`) inside `handleNewPairForChain`.
+- The 30s timeout's "drop opportunity" log message at line 110 is `'Mint timeout (30s), dropping opportunity'` — NOT the bot.ts:382 message `'No Mint event within timeout, dropping V3 opportunity'`. The line 382 message is in the call-site's *minLiquidity* fallback, not in `waitForLiquidity` itself. Task 4 must assert against the line 110 message.
+- Because `waitForLiquidity` is not exported, Task 4 must either (a) export it temporarily for testability (treat as a test-driven design improvement), (b) drive `handleNewPairForChain` from a higher level (heavier mock matrix), or (c) re-implement the timeout/subscribe logic in a new exported helper. Task 4's action documents (a) as the recommended path — surface to user via D-07 if option (a) is rejected.
+
+From src/bot.ts:379-385 (the call-site that exercises waitForLiquidity in production):
+```typescript
 const hasLiquidity = await waitForLiquidity(ctx, poolAddress, blockNumber);
 if (!hasLiquidity) {
     ctx.log.info({ token: targetToken, pool: poolAddress }, 'No Mint event within timeout, dropping V3 opportunity');
     await sendCtxAlert(ctx, `*V3 pool no liquidity (30s timeout)* \`${targetToken}\``);
     return;
 }
+```
+
+From src/exitEngine.ts:531-540 (production code under Phase 10 partial-sell harm scenario — VERBATIM `executePartialSell` SIGNATURE):
+```typescript
+export async function executePartialSell(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    sellAmount: bigint,
+    tiers: { tier: PartialTier; index: number }[],
+    state: ExitStateData,
+    currentMultiple: number,
+): Promise<boolean>
+```
+
+8 parameters in this exact order: `ctx, dex, tokenAddress, feeTier, sellAmount, tiers, state, currentMultiple`. NOTE the differences from the Phase 7 `executeFullSell(ctx, dex, tokenAddress, feeTier, reason, tradeId, detail)` signature — `executePartialSell` has NO `reason` and NO `tradeId` parameter; instead it takes `sellAmount` (bigint), `tiers` (PartialTier[]), `state` (ExitStateData), and `currentMultiple` (number). The Task 9 action body MUST use this 8-parameter order verbatim.
+
+The internal call shape at src/exitEngine.ts:703-706 (inside `pollExitStrategy`):
+```typescript
+const success = await executePartialSell(
+    ctx, dex, tokenAddress, feeTier,
+    sellAmount, unfilledTiers, state, priceMultiple,
+);
 ```
 
 From src/exitEngine.ts:747-760 (production code under Phase 7 EXIT-01 harm scenario):
@@ -494,7 +563,8 @@ Phase 3 harm-prevention test is committed and passing; Phase 03's VALIDATION.md 
   <name>Task 4: Phase 5 V3-02 liquidity-wait harm-prevention test (Mint timeout drops the snipe; EXCLUDES V3-03)</name>
   <files>test/integration/v3LiquidityWait.test.ts (NEW FILE)</files>
   <read_first>
-    - src/bot.ts lines 370-410 (V3 path including the `waitForLiquidity` call site at line 380; the harm scenario is the early-return at lines 381-385 when `hasLiquidity === false`)
+    - src/bot.ts lines 86-121 (the `waitForLiquidity` function definition — VERBATIM signature already extracted into `<interfaces>` above; CRITICAL: the function is module-internal at line 86, NOT exported)
+    - src/bot.ts lines 379-385 (the call-site that invokes `waitForLiquidity` inside `handleNewPairForChain`)
     - test/integration/exitMonitor.test.ts lines 374-422 (canonical `vi.doMock` + log-assertion pattern)
     - test/integration/wsReconnect.test.ts lines 17-72 (MockWebSocketProvider event-subscription pattern — reuse if planner picks fork-mock approach; integration recommended per PATTERNS.md line 431)
     - .planning/phases/17-tech-debt-cleanup-audit-baseline/17-PATTERNS.md (lines 366-431 — Phase 5 V3-02 analog; V3-03 EXCLUSION; integration vs fork recommendation)
@@ -502,74 +572,137 @@ Phase 3 harm-prevention test is committed and passing; Phase 03's VALIDATION.md 
     - .planning/phases/05-uniswap-v3-integration/05-VALIDATION.md (existing per-task map)
   </read_first>
   <behavior>
-    - Test 1 (timeout drops the snipe): mock the V3 pool's WebSocket subscription to never emit `Mint`. Drive `waitForLiquidity(...)` (or its dispatcher in bot.ts), advance fake timers past 30s, and assert: (a) the V3 handler returns early with no buy-tx submitted, AND (b) `ctx.log.info` is called with the structured payload `{token, pool}` and message string containing `'No Mint event within timeout'`.
+    - Test 1 (timeout drops the snipe): mock the V3 pool's WebSocket subscription to never emit `Mint`. Drive `waitForLiquidity(...)` directly, advance fake timers past 30s, and assert: (a) the function resolves to `false` AND (b) the structured pino `info` log message `'Mint timeout (30s), dropping opportunity'` was emitted with `{pool: poolAddress}` payload (per src/bot.ts:110).
   </behavior>
   <action>
-Create the NEW file `test/integration/v3LiquidityWait.test.ts`. Use the integration project (per `vitest.config.ts` lines 18-26 — `test/integration/**/*.test.ts` pattern). The file MUST start with the header comment block matching the project convention:
+Create the NEW file `test/integration/v3LiquidityWait.test.ts`. Use the integration project (per `vitest.config.ts` lines 18-26 — `test/integration/**/*.test.ts` pattern).
+
+**Planner-discretion decision (resolved at planning time, executor must honor):**
+
+`waitForLiquidity` is module-internal at `src/bot.ts:86` — it has no `export` keyword. There are three feasible test-paths and the planner has selected option (a) below:
+
+- **(a) Export `waitForLiquidity` from src/bot.ts (recommended; treat as test-driven design improvement).** Add `export` to line 86 of `src/bot.ts`. This is the smallest-diff, smallest-mock approach, and the export is internally-consumed only (no consumer outside src/bot.ts changes). It's the test-induced design improvement that retroactive Nyquist is meant to surface.
+- **(b) Drive `handleNewPairForChain` from a higher level** — heavier mock matrix (Contract, ChainContext, sendCtxAlert, db, riskManager). Higher integration value but heavier setup; not the "smallest test that closes the harm" path.
+- **(c) Re-implement the timeout/subscribe logic in a new exported helper** — this would be a refactor disguised as a test, NOT what retroactive Nyquist is for.
+
+**Executor MUST take option (a):** Add `export` keyword to `src/bot.ts:86` (`export async function waitForLiquidity(...)`). Document the change in the SUMMARY.md as "test-induced export of `waitForLiquidity` — internal-only consumer surface unchanged". If option (a) is somehow infeasible at execution time (e.g., the function has been refactored or removed), surface to user via D-07 stop-the-line BEFORE picking option (b) or (c). Do NOT silently pick a fallback option.
+
+**Note on log message specificity:** The 30s timeout's log line at `src/bot.ts:110` is `'Mint timeout (30s), dropping opportunity'` (the `info` log inside `waitForLiquidity` itself). The line at `src/bot.ts:382` (`'No Mint event within timeout, dropping V3 opportunity'`) is in the *call-site*, AFTER `waitForLiquidity` returns false. Since this test exercises `waitForLiquidity` directly, assert against the line 110 message.
+
+**Concrete file content** (planner-supplied skeleton; no `// ...` placeholders):
 
 ```typescript
 // test/integration/v3LiquidityWait.test.ts
 // Phase 17 / DEBT-05 retroactive harm-prevention: V3-02 liquidity wait drops snipe on Mint timeout.
 // EXCLUDES V3-03 (V3 sell-sim) — addressed in HONEY-08 fresh implementation per Pitfall #19.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-```
 
-Implementation approach: the simplest path is to test `waitForLiquidity` (or `checkMinLiquidity`) directly with a mock WebSocket provider that never emits `Mint`, NOT to drive the full `handleNewPairForChain`. Per PATTERNS.md line 431: "integration with mocked WebSocket — the mock pattern already exists and the harm scenario is event-timing, not chain-state."
+// Capture the logger.info mock so we can assert on the structured payload + message.
+const loggerInfoMock = vi.fn();
+const loggerWarnMock = vi.fn();
 
-Concrete plan (planner discretion within D-04 rigor):
+// Capture WebSocketProvider/Contract calls for the never-emit-Mint scenario.
+// We mock ethers' Contract: pool.queryFilter resolves to [] (no same-block Mint),
+// and the wsPool subscription's `.on('Mint', cb)` is registered but the cb is NEVER fired
+// — vi.useFakeTimers() will advance past the 30s timeout to trigger the resolve(false) path.
+const queryFilterMock = vi.fn().mockResolvedValue([]); // no same-block mint
+const onMock = vi.fn(); // subscription registered but never invoked
+const removeAllListenersMock = vi.fn();
+const filtersMintMock = vi.fn().mockReturnValue({});
 
-1. Mock `ethers` to provide a `MockWebSocketProvider` that never fires events (use the pattern from `test/integration/wsReconnect.test.ts:50-67` as a starting point). Use `vi.doMock` (NOT top-level `vi.mock`) to allow `vi.resetModules()` between tests if needed.
+class MockContract {
+    filters = { Mint: filtersMintMock };
+    queryFilter = queryFilterMock;
+    on = onMock;
+    removeAllListeners = removeAllListenersMock;
+}
 
-2. Mock the logger (per PATTERNS.md "Pino Structured Logging" canonical mock pattern):
-```typescript
+vi.doMock('ethers', () => ({
+    Contract: MockContract,
+}));
+
 vi.doMock('../../src/utils/logger', () => ({
     logger: {
         child: () => ({
-            info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(),
+            info: loggerInfoMock,
+            warn: loggerWarnMock,
+            debug: vi.fn(),
+            error: vi.fn(),
+            fatal: vi.fn(),
         }),
+        info: loggerInfoMock,
+        warn: loggerWarnMock,
     },
 }));
-```
 
-3. Use vitest fake timers (`vi.useFakeTimers()`) to advance past the 30s `waitForLiquidity` timeout without real wall time.
-
-4. Import `waitForLiquidity` (or whichever V3-02 entry point is exported from `src/bot.ts` or `src/utils/poolLiquidity.ts` — verify by reading `src/bot.ts` first; if the function is internal-only, import the closest exported wrapper).
-
-5. Invoke it with a mock pool that never emits Mint, advance timers, then assert:
-   - Function returns `false` (the harm-prevention observable: no liquidity detected).
-   - Logger's `info` was called with `expect.objectContaining({ token: expect.any(String), pool: expect.any(String) })` and the literal message string `'No Mint event within timeout, dropping V3 opportunity'` (matches src/bot.ts:382).
-
-```typescript
 describe('Phase 5 harm-prevention: V3-02 liquidity wait drops snipe on Mint timeout (V3-03 EXCLUDED)', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         vi.resetModules();
+        loggerInfoMock.mockReset();
+        loggerWarnMock.mockReset();
+        queryFilterMock.mockReset().mockResolvedValue([]);
+        onMock.mockReset();
+        removeAllListenersMock.mockReset();
     });
 
     afterEach(() => {
         vi.useRealTimers();
     });
 
-    it('waitForLiquidity returns false (or equivalent) when no Mint event arrives within the 30s window', async () => {
-        // ... mock WebSocketProvider that never emits Mint
-        // ... mock logger
-        // ... import waitForLiquidity
-        // ... invoke; advance timers past 30s
-        // ... assert observable effects:
-        //     1. function returned false
-        //     2. logger.info called with the expected structured payload and message
+    it('waitForLiquidity resolves to false AND logs "Mint timeout (30s), dropping opportunity" when no Mint event arrives within 30s', async () => {
+        // Re-import bot.ts AFTER mocks are registered (option (a) — waitForLiquidity must be export-marked at src/bot.ts:86).
+        const bot = await import('../../src/bot');
 
-        // expect(loggerInfoMock).toHaveBeenCalledWith(
-        //     expect.objectContaining({ token: expect.any(String), pool: expect.any(String) }),
-        //     'No Mint event within timeout, dropping V3 opportunity',
-        // );
+        // Construct a minimal mock ChainContext for the function under test.
+        // The real type from src/types is loose enough at module boundary for an `as any` cast
+        // — D-04 rigor is preserved by the observable effects asserted below, NOT the type strictness.
+        const mockCtx = {
+            chain: { name: 'eth' },
+            httpProvider: {} as unknown,
+            wsProvider: {} as unknown,
+            log: {
+                info: loggerInfoMock,
+                warn: loggerWarnMock,
+                debug: vi.fn(),
+                error: vi.fn(),
+            },
+        } as unknown as Parameters<typeof bot.waitForLiquidity>[0];
+
+        const poolAddress = '0xpool0000000000000000000000000000000000000000';
+        const blockNumber = 12_345_678;
+
+        // Call waitForLiquidity; it returns a Promise<boolean> that resolves AFTER the 30s timeout fires.
+        const resultPromise = bot.waitForLiquidity(mockCtx, poolAddress, blockNumber);
+
+        // Allow microtask queue to drain so the same-block queryFilter resolves and the subscription is set up.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Advance fake timers past 30s — fires the setTimeout callback inside waitForLiquidity, resolving false.
+        await vi.advanceTimersByTimeAsync(31_000);
+
+        const result = await resultPromise;
+
+        // D-04 observable effect 1: function returned false (no Mint received in window).
+        expect(result).toBe(false);
+
+        // D-04 observable effect 2: structured pino info emitted with the timeout drop message (src/bot.ts:110).
+        expect(loggerInfoMock).toHaveBeenCalledWith(
+            expect.objectContaining({ pool: poolAddress }),
+            'Mint timeout (30s), dropping opportunity',
+        );
+
+        // D-04 observable effect 3: pool subscription was registered for 'Mint' (proves the subscribe-and-wait path was exercised).
+        expect(onMock).toHaveBeenCalledWith('Mint', expect.any(Function));
     });
 });
 ```
 
 **V3-03 EXCLUSION (per D-02 line 47-49):** This file covers V3-02 (liquidity wait) ONLY. Do NOT add a sell-sim test here — V3-03 is addressed via fresh implementation in HONEY-08 and validated at fresh-implementation time. If you find yourself writing a `simulateSellV3ForChain` or V3 sell-sim mock, STOP — that's HONEY-08 territory.
 
-**Implementation contingency:** If `waitForLiquidity` is genuinely difficult to invoke in isolation (deep entanglement with `handleNewPairForChain`), surface to user via D-07 stop-the-line — the difficulty itself is a Phase 17 finding worth recording, not a reason to ship a hollow test. (Per Pitfall #20 — no `expect(true).toBe(true)` fills.)
+**Implementation contingency:** If the planner-selected option (a) — adding `export` to src/bot.ts:86 — has been preempted by a refactor at execution time (e.g., the function moved to a helper module, or its signature changed), surface to user via D-07 stop-the-line. The difficulty itself is a Phase 17 finding worth recording, not a reason to ship a hollow test. (Per Pitfall #20 — no `expect(true).toBe(true)` fills.) The frontmatter does NOT list `src/bot.ts` as a modified file because the export-keyword addition is a single-token diff scoped to making the function testable; if larger changes are needed, they exceed this plan's scope and require a stop-the-line.
 
 After writing, run `npx vitest run test/integration/v3LiquidityWait.test.ts` and confirm the test passes. Update `.planning/phases/05-uniswap-v3-integration/05-VALIDATION.md` with the standard `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` section pointing to this file. Note explicitly in the augmentation that **V3-03 (V3 sell-sim) is EXCLUDED — addressed in HONEY-08**.
   </action>
@@ -580,13 +713,16 @@ After writing, run `npx vitest run test/integration/v3LiquidityWait.test.ts` and
     - `test/integration/v3LiquidityWait.test.ts` exists.
     - File contains the literal string `Phase 5 harm-prevention: V3-02 liquidity wait drops snipe on Mint timeout (V3-03 EXCLUDED)`.
     - File contains a comment line containing `EXCLUDES V3-03` (per D-02).
-    - File does NOT contain the strings `simulateSellV3ForChain`, `simulateSell`, `sellSimulation`, or `V3-03` outside the EXCLUDES comment (verifiable: `grep -E 'simulateSell(V3)?ForChain|sellSimulation' test/integration/v3LiquidityWait.test.ts` returns 0 matches).
-    - The test asserts `loggerInfoMock` (or equivalent) was called with `expect.objectContaining(...)` and the literal message string `'No Mint event within timeout, dropping V3 opportunity'`.
+    - File does NOT contain the strings `simulateSellV3ForChain`, `simulateSell`, `sellSimulation`, or `V3-03` outside the EXCLUDES comment. Verifiable: `grep -E 'simulateSellV3ForChain|V3-03' test/integration/v3LiquidityWait.test.ts | grep -v 'EXCLUDES'` returns 0 matches (i.e., every V3-03 mention is paired with an `EXCLUDES` annotation).
+    - Additional V3-03 sell-sim symbol guard: `grep -E 'simulateSell(V3)?ForChain|sellSimulation' test/integration/v3LiquidityWait.test.ts` returns 0 matches.
+    - The test asserts `loggerInfoMock` was called with `expect.objectContaining({ pool: poolAddress })` and the literal message string `'Mint timeout (30s), dropping opportunity'` (matches src/bot.ts:110).
+    - The test asserts the function under test (`waitForLiquidity`) returns `false` after the 30s timeout fires.
     - `.planning/phases/05-uniswap-v3-integration/05-VALIDATION.md` contains the H2 `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` AND the literal exclusion note `V3-03 (V3 sell-sim) is EXCLUDED — addressed in HONEY-08`.
     - `npx vitest run test/integration/v3LiquidityWait.test.ts` reports passing.
+    - If executor took option (a) and added `export` to `src/bot.ts:86`, that single-token edit is recorded in the SUMMARY.md "test-induced changes" section.
   </acceptance_criteria>
   <done>
-Phase 5 V3-02 harm-prevention test exists, passes, and the V3-03 exclusion is verifiable in the test file and in the VALIDATION.md augmentation.
+Phase 5 V3-02 harm-prevention test exists, passes, and the V3-03 exclusion is verifiable in the test file and in the VALIDATION.md augmentation. The planner-chosen testability path (option a — exporting `waitForLiquidity`) is documented in SUMMARY.md.
   </done>
 </task>
 
@@ -609,6 +745,7 @@ Append a new describe block to the END of `test/unit/riskManager.test.ts` (after
 ```typescript
 describe('Phase 6 harm-prevention: RISK daily-loss gate blocks the snipe with structured pino warn', () => {
     let warnMock: ReturnType<typeof vi.fn>;
+    let canSnipe: typeof import('../../src/riskManager').canSnipe;
 
     beforeEach(async () => {
         // The canonical logger mock at lines 28-37 above creates a fresh `child()` per call.
@@ -658,6 +795,8 @@ describe('Phase 6 harm-prevention: RISK daily-loss gate blocks the snipe with st
 });
 ```
 
+**Note on the `let canSnipe` declaration:** The closure-scoped `let canSnipe: typeof import('../../src/riskManager').canSnipe;` MUST be declared inside the describe block (alongside `warnMock`) BEFORE the `beforeEach`. This is the standard pattern for dynamic-import-after-mock-reset (mirrors `test/unit/exitEngineSell.test.ts:121-134`'s `executeFullSell` re-binding). If executor accidentally writes `canSnipe = mod.canSnipe;` without the prior declaration, TypeScript will reject (no implicit globals); the explicit `let` declaration above resolves this.
+
 **Note on existing test reuse:** Lines 78-85 already cover the function-return half of the harm scenario. The new describe adds the structured-log-emission half (D-04 multi-observable rigor) AND wraps under the discoverable `Phase 6 harm-prevention:` prefix.
 
 **Note on logger mocking:** if the existing top-level `vi.mock('../../src/utils/logger', ...)` at lines 28-37 makes the warn-capture impossible (because `mockReset: true` resets call history but the closure-captured `vi.fn()` is gone), use the `vi.doMock` + `vi.resetModules()` + dynamic re-import pattern shown above. This is the same pattern `test/integration/exitMonitor.test.ts` uses at lines 12-29.
@@ -671,6 +810,7 @@ If the test FAILS because the production code's `log.warn` shape diverges from t
   </verify>
   <acceptance_criteria>
     - `grep -c "Phase 6 harm-prevention: RISK daily-loss gate" test/unit/riskManager.test.ts == 1`.
+    - The new describe contains the literal declaration `let canSnipe: typeof import('../../src/riskManager').canSnipe;` (verifiable: `grep -c "let canSnipe: typeof import" test/unit/riskManager.test.ts >= 1`).
     - The new describe contains an `it` asserting BOTH `expect(result.allowed).toBe(false)` AND `expect(warnMock).toHaveBeenCalledWith(expect.objectContaining({chain: 'eth', reason: 'daily_loss_limit'}), expect.any(String))`.
     - Combined D-04 rigor: function-return + structured-log-emission both asserted.
     - `.planning/phases/06-risk-management/06-VALIDATION.md` contains the H2 `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` with `test/unit/riskManager.test.ts` pointer.
@@ -776,7 +916,14 @@ Phase 7 harm-prevention test commits the stop-loss → executeFullSell wiring cl
     - Test 1 (health emits version from pkg.json): GET /health returns 200 AND `body.version` is a string equal to the value of `JSON.parse(readFileSync('package.json')).version` AND matches semver `/^\d+\.\d+\.\d+/`.
   </behavior>
   <action>
-Append a new describe block to the END of `test/integration/api/health.test.ts`. The existing `GET /health` describe (line 52) already covers the version assertion at lines 57-72; this new describe is the harm-prevention discoverability wrapper per D-03 with a dynamic pkg.version comparison (stronger than the existing `body.version` semver-only check).
+Append a new describe block to the END of `test/integration/api/health.test.ts`. The existing `GET /health` describe (line 52) already covers a semver-pattern assertion at lines 57-72; this new describe is the harm-prevention discoverability wrapper per D-03 with a **dynamic equality** comparison `expect(body.version).toBe(pkg.version)` that is **materially stronger** than the existing semver-only check.
+
+**Materially-stronger harm-prevention rigor** (preempts Pitfall #19 rubber-stamp risk):
+
+The existing test at lines 57-72 asserts `expect(body.version).toMatch(/^\d+\.\d+\.\d+/)` — a semver-shape regex. That regex passes against ANY semver string (e.g., a stale hardcoded `'1.0.0'` would match even after package.json changes). The new harm-prevention assertion `expect(body.version).toBe(pkg.version)` is a **dynamic equality check** that compares the runtime-emitted `body.version` to the actual `package.json` version field read at test time. This means:
+- If a future refactor breaks the `pkg.version → body.version` flow (silent regression — body emits a stale string that still matches semver), THIS test fails where the existing semver-only test would still pass.
+- The new assertion is materially-stronger Nyquist rigor over the existing test, NOT a relabel of equivalent rigor — it closes a falsification gap that the existing test leaves open. This is the structural anti-rubber-stamp guard per Pitfall #19.
+- Both assertions remain in the new describe block: dynamic equality (the harm-prevention claim) AND the semver-shape regex (a regression guard against any non-semver value sneaking in).
 
 Use the EXACT name (D-03):
 
@@ -798,15 +945,16 @@ describe('Phase 8 harm-prevention: DASH/MON /health emits version from package.j
         expect(status).toBe(200);
         // D-04 observable effect 2: version field present and string-typed
         expect(typeof body.version).toBe('string');
-        // D-04 observable effect 3: dynamic equality with package.json (stronger than the existing semver-only check)
+        // D-04 observable effect 3: dynamic equality with package.json (MATERIALLY STRONGER than the existing semver-only check at lines 57-72;
+        // semver regex passes against any '1.0.0'-shaped string, but `.toBe(pkg.version)` falsifies if pkg.version → body.version flow breaks).
         expect(body.version).toBe(pkg.version);
-        // D-04 observable effect 4: still semver-shaped (regression guard)
+        // D-04 observable effect 4: still semver-shaped (regression guard against non-semver string sneaking in)
         expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
     });
 });
 ```
 
-**Note on harm scenario specificity:** The v6.16 audit's INT-HEALTH-VERSION concern was that "HealthResponse.version was declared but never emitted" (Phase 16-02 closed this by reading `pkg.version` from `readFileSync` at module load — see v6.16-MILESTONE-AUDIT.md line 167). The harm-prevention claim here is "the wiring stays correct" — if a future refactor breaks the pkg.version → body.version flow (silent regression), this test fails. The dynamic equality assertion `expect(body.version).toBe(pkg.version)` is materially stronger than the existing semver-only check and is the harm-prevention rigor.
+**Note on harm scenario specificity:** The v6.16 audit's INT-HEALTH-VERSION concern was that "HealthResponse.version was declared but never emitted" (Phase 16-02 closed this by reading `pkg.version` from `readFileSync` at module load — see v6.16-MILESTONE-AUDIT.md line 167). The harm-prevention claim here is "the wiring stays correct" — if a future refactor breaks the pkg.version → body.version flow (silent regression), this test fails. The dynamic equality assertion `expect(body.version).toBe(pkg.version)` is materially stronger than the existing semver-only check and is the harm-prevention rigor. **The materially-stronger rigor (dynamic equality vs static regex) is the explicit anti-rubber-stamp guard a fast-skimming reviewer might mis-classify as a "relabel" — it is NOT.**
 
 **Reuse `requestHealth` and `createMockChainContext`** — both already in scope at the top of the file.
 
@@ -820,13 +968,13 @@ If the test FAILS (e.g., body.version is not exactly pkg.version), STOP per D-07
   <acceptance_criteria>
     - `grep -c 'Phase 8 harm-prevention: DASH/MON /health' test/integration/api/health.test.ts == 1`.
     - The new describe contains the literal string `INT-HEALTH-VERSION closure` (cross-references v6.16-MILESTONE-AUDIT.md INT-HEALTH-VERSION at line 167).
-    - The new describe asserts `expect(body.version).toBe(pkg.version)` (dynamic equality, stronger than the existing semver-only check).
+    - The new describe asserts `expect(body.version).toBe(pkg.version)` (dynamic equality, materially stronger than the existing semver-only check).
     - The new describe also retains the semver shape assertion `expect(body.version).toMatch(/^\d+\.\d+\.\d+/)`.
     - `.planning/phases/08-monitoring-web-dashboard/08-VALIDATION.md` contains the H2 `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` with `test/integration/api/health.test.ts` pointer.
     - `npx vitest run test/integration/api/health.test.ts -t "Phase 8 harm-prevention"` reports passing.
   </acceptance_criteria>
   <done>
-Phase 8 harm-prevention test asserts dynamic pkg.version equality; passes; cross-referenced from VALIDATION.md.
+Phase 8 harm-prevention test asserts dynamic pkg.version equality (materially stronger than existing semver-only check); passes; cross-referenced from VALIDATION.md.
   </done>
 </task>
 
@@ -891,12 +1039,29 @@ Phase 09's VALIDATION.md has the inline harm-prevention augmentation; frontmatte
     - test/unit/exitEngineSell.test.ts (CURRENT FILE — note existing `executePartialSell — receipt decoding integration` describe at line 206+; new describe wraps with harm-prevention prefix and adds explicit non-null amount_out assertion)
     - .planning/phases/17-tech-debt-cleanup-audit-baseline/17-PATTERNS.md (lines 708-746 — Phase 10 partial-sell analog; mock matrix from Phase 7 already in scope)
     - .planning/phases/10-partial-sell-revenue-fix/10-VALIDATION.md (existing per-task map; per PATTERNS.md line 746 Phase 10 already has 13 unit + integration tests covering amount_out)
+    - src/exitEngine.ts lines 531-540 (the verbatim `executePartialSell` 8-parameter signature — already extracted into `<interfaces>` above)
   </read_first>
   <behavior>
     - Test 1 (partial-sell decoded amount_out is non-null): given `decodeReceiptMock` returns `{amountOut: '500000000000000000', gasCost: '150000000000000', blockNumber: 67890}`, `executePartialSell(...)` invokes `insertTrade.run` with `action='partial_sell'` and `amountOut='500000000000000000'` — non-null.
   </behavior>
   <action>
 Append a new describe block to the END of `test/unit/exitEngineSell.test.ts` (after Task 6's Phase 7 describe). REUSE the same mock matrix at the top of the file. Use the EXACT name (D-03):
+
+**`executePartialSell` exact signature** (verbatim from `src/exitEngine.ts:531-540`, also in `<interfaces>` block above):
+```typescript
+export async function executePartialSell(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    sellAmount: bigint,
+    tiers: { tier: PartialTier; index: number }[],
+    state: ExitStateData,
+    currentMultiple: number,
+): Promise<boolean>
+```
+
+8 parameters in this order: `ctx, dex, tokenAddress, feeTier, sellAmount, tiers, state, currentMultiple`. **NOTE the differences from `executeFullSell(ctx, dex, tokenAddress, feeTier, reason, tradeId, detail)`** — `executePartialSell` has NO `reason` and NO `tradeId`; instead it takes `sellAmount` (bigint), `tiers` (array of `{tier: PartialTier, index: number}`), `state` (ExitStateData), and `currentMultiple` (number).
 
 ```typescript
 describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on receipt-decoded sell', () => {
@@ -908,6 +1073,8 @@ describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on recei
             blockNumber: 67890,
         });
 
+        // ExitStateData shape per src/types — reuse the same loose-cast pattern as the existing
+        // `executePartialSell — receipt decoding integration` describe at line 206+.
         const state = {
             tradeId: 7,
             entryPrice: 1000,
@@ -919,16 +1086,24 @@ describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on recei
             volatilitySamples: [],
         } as any;
 
-        // executePartialSell signature per src/exitEngine.ts (verify by reading the file before invoking).
-        // Pattern matches existing describe block lines 206-241 — use the same call shape.
+        // Construct a minimal `tiers: { tier: PartialTier, index: number }[]` argument.
+        // The PartialTier shape is `{ multiple: number, percent: number }` per exitConfig.partialSellTiers.
+        // For this test we use a single-tier 50% sell at the 2x multiple ('tier-2x').
+        const tiers = [
+            { tier: { multiple: 2, percent: 50 }, index: 0 },
+        ];
+
+        // Invoke executePartialSell with the EXACT 8-parameter signature from src/exitEngine.ts:531-540.
+        // Order: ctx, dex, tokenAddress, feeTier, sellAmount (bigint), tiers, state, currentMultiple.
         const result = await executePartialSell(
             mockCtx,
             mockDex,
             '0xpartialharmprevtoken00000000000000000000',
-            null,                 // feeTier
-            state,                // exit state
-            0.5,                  // sell fraction (50%)
-            'tier-2x',            // partial-sell trigger reason
+            null,                                  // feeTier (number | null)
+            500_000_000_000_000_000n,              // sellAmount (bigint) — 0.5 ETH worth, matches mock amountOut
+            tiers,                                 // tiers array (per PartialTier shape)
+            state,                                 // ExitStateData (loose cast)
+            2.0,                                   // currentMultiple (number) — at 2x trigger
         );
 
         // D-04 observable effect 1: insertTrade called with action='partial_sell' AND non-null amountOut
@@ -946,9 +1121,9 @@ describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on recei
 });
 ```
 
-**Important:** The signature of `executePartialSell` may differ from the example above — read `src/exitEngine.ts` to confirm the exact arguments. The existing test at lines 206+ should be the source of truth; copy its call shape verbatim. Do NOT invent argument names.
-
 **Why this test exists despite Phase 10's strong existing coverage** (per PATTERNS.md line 746): Phase 10 has 13 existing tests in `test/unit/db.test.ts` and `test/unit/exitEngineSell.test.ts`, but none are wrapped under the `Phase N harm-prevention:` discoverability prefix. Per D-03 the prefix IS the audit query that closes DEBT-05. The new describe is the explicit "amount_out non-null on a receipt-decoded sell" claim under the discoverable prefix.
+
+**Cross-check at execution time:** Confirm `src/exitEngine.ts:531-540` still shows the 8-parameter signature above (it has been verified at planning time — 2026-04-29). If the function signature has been refactored at execution time, surface to user via D-07 before adapting the call.
 
 After writing, run `npx vitest run test/unit/exitEngineSell.test.ts -t "Phase 10 harm-prevention"` and confirm passing. Update `.planning/phases/10-partial-sell-revenue-fix/10-VALIDATION.md` with the standard augmentation.
 
@@ -961,11 +1136,12 @@ If the test FAILS, STOP per D-07.
     - `grep -c 'Phase 10 harm-prevention: partial-sell amount_out' test/unit/exitEngineSell.test.ts == 1`.
     - The new describe asserts `expect(insertTradeRun).toHaveBeenCalledWith(expect.objectContaining({action: 'partial_sell', amountOut: '500000000000000000'}))` (non-null amountOut observable per D-04).
     - The new describe asserts `expect(decodeReceiptMock).toHaveBeenCalledTimes(1)` (receipt-decoder path actually exercised, not the legacy null path).
+    - `executePartialSell` is invoked with EXACTLY 8 arguments in the order `(ctx, dex, tokenAddress, feeTier, sellAmount, tiers, state, currentMultiple)` matching the signature at src/exitEngine.ts:531-540.
     - `.planning/phases/10-partial-sell-revenue-fix/10-VALIDATION.md` contains the H2 `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` with `test/unit/exitEngineSell.test.ts` pointer.
     - `npx vitest run test/unit/exitEngineSell.test.ts -t "Phase 10 harm-prevention"` reports passing.
   </acceptance_criteria>
   <done>
-Phase 10 harm-prevention test asserts non-null amount_out via decodeReceipt path; passes; cross-referenced from VALIDATION.md.
+Phase 10 harm-prevention test asserts non-null amount_out via decodeReceipt path; uses the exact 8-parameter signature; passes; cross-referenced from VALIDATION.md.
   </done>
 </task>
 
@@ -1092,4 +1268,5 @@ After completion, create `.planning/phases/17-tech-debt-cleanup-audit-baseline/1
 - The result of `npx vitest run --project unit --project integration` (last 5 lines including the summary-of-tests line)
 - Per-phase disposition table: Phase | Form (NEW TEST / INLINE DOC) | File:line | Observable effect asserted
 - D-07 stop-the-line status: `not_triggered` OR `triggered_at_phase_N_blocking_close`
+- For Task 4 (Phase 5): if executor took option (a) and added `export` to `src/bot.ts:86`, record this single-token edit under "test-induced changes"
 </output>
