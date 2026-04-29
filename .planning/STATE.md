@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: none
-milestone_name: (planning next milestone)
-status: v6.16 shipped — awaiting next milestone scope
-stopped_at: v6.16 milestone close
+milestone: v6.17
+milestone_name: Defensive Hardening for Live Mainnet
+status: planning
+stopped_at: ""
 last_updated: "2026-04-29T00:00:00.000Z"
 progress:
   total_phases: 0
@@ -17,19 +17,21 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-14 after v6.16 milestone)
+See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Planning next milestone — run `/gsd-new-milestone`
+**Current focus:** v6.17 Defensive Hardening for Live Mainnet — defining requirements
 
 ## Current Position
 
-v6.16 shipped 2026-04-14. 16 phases, 55 plans, 48/48 v1 requirements satisfied.
-Archives in `.planning/milestones/`. Ready to scope next milestone.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-29 — Milestone v6.17 started
 
 ## Performance Metrics
 
-**v6.16 velocity:**
+**v6.16 velocity (reference):**
 - Total plans completed: 55
 - Timeline: 26 days (2026-03-19 → 2026-04-13)
 - Git: 395 conventional commits, 379 files changed, +87,015 / -71 lines
@@ -41,19 +43,19 @@ Per-plan breakdown preserved in `.planning/milestones/v6.16-ROADMAP.md`.
 ### Recent Decisions
 
 Full Key Decisions log in PROJECT.md and archived in `milestones/v6.16-ROADMAP.md`.
-Open/pending decisions for next milestone:
+Open/pending decisions for v6.17:
 
-- Dynamic capital allocation strategy (CHAIN-05 partial ship — fully-dynamic deferred)
-- Mempool block-0 sniping (DETECT-01) — architecture TBD
-- Anti-rug runtime monitoring (DETECT-02) — architecture TBD
+- Honeypot sell-sim architecture — pick from HONEYPOT-SIM-BRIEFING.md options C (eth_simulateV1 state overrides) or D (deploy on-chain checker contract). Owner rejected A (vacuous pass) and B (getAmountsOut). Decision deferred to research/discuss-phase.
+- Anti-rug detection trigger model — event-driven (subscribe to LP transfer / Pair.Burn events) vs poll-based (periodic reserve check). TBD.
+- Going-live runbook destination — keep as `GOING-LIVE.md` at root, or move to `docs/operations/going-live.md`. TBD.
 
 ### Pending Todos
 
-None — run `/gsd-new-milestone` to scope next milestone requirements.
+None — defining v6.17 requirements next.
 
 ### Blockers / Concerns
 
-**Live-runtime validation items from v6.16** (deferred for next milestone's smoke-test phase):
+**Live-runtime validation items deferred from v6.16** (now folded into v6.17 Exit engine live-runtime hardening category):
 
 - Phase 3: bot startup with SQLite + `.bot-state.json` auto-migration
 - Phase 4: `startMultiChainBot` live ETH RPC smoke test
@@ -62,9 +64,12 @@ None — run `/gsd-new-milestone` to scope next milestone requirements.
 - Phase 11: live price display, Telegram status, chain restart warnings
 - Phase 14: real sell records non-null amount_out + real Flashbots tx hash
 
+**Active production blocker:**
+- `simulateSellForChain` (V2) hard-blocks every snipe via `INSUFFICIENT_INPUT_AMOUNT` (balance=0 footgun). `simulateSellV3ForChain` silently returns true — zero honeypot detection. Bot is funded on mainnet but cannot trade. Lead requirement for v6.17.
+
 ### Nyquist Validation Debt
 
-Retroactive `/gsd-validate-phase {N}` needed for phases: 01, 02, 03, 05, 06, 07, 08, 09, 10.
+Retroactive `/gsd-validate-phase {N}` needed for phases: 01, 02, 03, 05, 06, 07, 08, 09, 10. Folded into v6.17 Tech debt cleanup category.
 
 ### Quick Tasks Completed
 
@@ -74,7 +79,7 @@ Retroactive `/gsd-validate-phase {N}` needed for phases: 01, 02, 03, 05, 06, 07,
 
 ## Session Continuity
 
-Last session: 2026-04-29 (quick task: cleanup empty files)
-Last activity: 2026-04-29 - Completed quick task 260429: Cleanup empty files and folders (4 atomic commits, 19 stale worktrees removed, pre-commit guard installed)
-Stopped at: Quick task complete; v6.16 milestone still last shipped milestone — next milestone not yet scoped
-Resume file: None — start fresh with `/gsd-new-milestone`
+Last session: 2026-04-29 (milestone scoping)
+Last activity: 2026-04-29 — v6.17 Defensive Hardening for Live Mainnet milestone started; PROJECT.md updated with milestone scope; STATE.md reset.
+Stopped at: v6.17 scope locked; pending research decision and requirements definition
+Resume file: None — continue with research decision then requirements gathering

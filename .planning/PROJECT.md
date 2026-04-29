@@ -29,16 +29,24 @@ money to preventable bugs, race conditions, or security flaws.
 - 343/343 tests passing across unit, integration, and mainnet fork suites
 - GitHub Actions CI
 
-## Next Milestone Goals
+## Current Milestone: v6.17 Defensive Hardening for Live Mainnet
 
-Candidate themes for the next milestone (not yet scoped — run
-`/gsd-new-milestone` to formalize):
+**Goal:** Make the bot safe to run with real money on live mainnet by rebuilding the broken pre-buy safety stack, adding anti-rug runtime monitoring, validating exit-engine behavior on live data, hardening the going-live path, and closing v6.16 tech debt.
 
-- **Live-runtime validation** — resolve human-verification items from v6.16 (bot startup with live chains, live price display, receipt decoding on real sells, Flashbots bundle verification)
-- **Dynamic capital allocation** — upgrade fixed per-chain budgets to opportunity-quality-weighted allocation (completes CHAIN-05)
-- **Mempool / block-0 sniping** (DETECT-01) — upgrade from block-mode to mempool pending-liquidity monitoring
-- **Anti-rug runtime monitoring** (DETECT-02) — detect liquidity removal events after purchase and frontrun exits
-- **Tech debt cleanup** — retroactive Nyquist validation on 9 partial phases, finish 37 exit engine test stubs, fix remaining TS annotation errors in dashboard API routes
+**Target features:**
+
+- **Pre-buy safety stack rebuild** — Fix V2 sell-sim (currently passes `balance=0` to router; hard-blocks every snipe) and V3 sell-sim (silent vacuous pass: zero honeypot detection while reporting success). Audit all 8+ gates in `tokenSafety.ts` for similar `amountIn=0` / vacuous-pass bugs. Architecture decision (on-chain checker contract / `eth_simulateV1` with state overrides / hosted simulation) deferred to research phase.
+- **Anti-rug runtime monitoring (DETECT-02)** — Detect liquidity-removal events on open positions post-buy and trigger frontrun-exits.
+- **Exit engine live-runtime hardening** — Resolve the 6 deferred human-verification items from v6.16 close as real code/test work: live exit poll cycle + state persistence across restart, real sell `amount_out` non-null, real Flashbots tx hash on mainnet, dashboard WebSocket position updates in browser, live price/Telegram/chain restart warnings, bot-startup SQLite + `.bot-state.json` migration on real boot.
+- **Going-live ops hardening** — Wallet balance pre-flight check at startup, stale-data warnings, env-validation messaging upgrades. Formalize `GOING-LIVE.md` runbook into versioned docs.
+- **Tech debt cleanup** — Retroactive Nyquist validation on 9 phases (01, 02, 03, 05, 06, 07, 08, 09, 10), 37 unfinished exit-engine `.todo` test stubs, 6 TS annotation errors in dashboard API routes, dead-code/diagnostic-log cleanup from v6.16 close audit.
+
+**Key context:**
+
+- Bot is live on mainnet today with ~0.0124 ETH funded; cannot snipe any V2 token currently due to broken sell-sim. Real money at stake.
+- Owner explicitly rejected vacuous-pass / "trust third-party APIs alone" shortcuts.
+- See `HONEYPOT-SIM-BRIEFING.md` for the bug write-up and four candidate fix architectures (A: vacuous pass — rejected; B: getAmountsOut — no honeypot detection; C: `eth_call` state overrides; D: deploy on-chain checker contract). Final pick during research/discuss-phase.
+- Phase numbering continues from 17 (v6.16 ended at 16). Defensive only — CHAIN-05 dynamic capital and DETECT-01 mempool sniping deferred to a future offensive milestone.
 
 ## Requirements
 
@@ -59,9 +67,16 @@ All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md
 
 ### Active
 
-<!-- Current scope for next milestone. Populate via /gsd-new-milestone. -->
+<!-- v6.17 scope — full requirements with REQ-IDs in REQUIREMENTS.md once defined. -->
 
-(None yet — ship v6.16 validated, then scope next milestone.)
+v6.17 Defensive Hardening for Live Mainnet — categories: Pre-buy safety (HONEY/SAFETY), Anti-rug (ANTIRUG), Exit live-runtime (EXIT-LIVE), Going-live ops (OPS-LIVE), Tech debt (DEBT). See `.planning/REQUIREMENTS.md`.
+
+### Future
+
+<!-- Deferred to a future offensive milestone, not abandoned. -->
+
+- **CHAIN-05 dynamic capital allocation** — fully-dynamic opportunity-quality-weighted allocation (fixed per-chain budgets shipped in v6.16; completes CHAIN-05)
+- **DETECT-01 mempool / block-0 sniping** — upgrade from block-mode to mempool pending-liquidity monitoring
 
 ### Out of Scope
 
@@ -131,5 +146,22 @@ from the same process as the bot via Express on the configured port.
 | Both Flashbots + private RPCs | Different chains have different MEV protection options | ✓ Good (Phase 04) |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate on opportunity quality | ⚠️ Revisit (fixed budgets shipped; dynamic deferred to next milestone) |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-04-14 after v6.16 milestone completion*
+*Last updated: 2026-04-29 — v6.17 milestone scoped*
