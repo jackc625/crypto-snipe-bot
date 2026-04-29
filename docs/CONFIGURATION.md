@@ -90,7 +90,7 @@ Base and Arbitrum use MEV strategy `passthrough` and require no auth credentials
 |----------|----------|---------|-------------|
 | `TELEGRAM_API_ID` | Required | (none) | Telegram API ID from my.telegram.org. |
 | `TELEGRAM_API_HASH` | Required | (none) | Telegram API hash from my.telegram.org. |
-| `TELEGRAM_SESSION` | Required | (none) | Telegram session string (generate with `auth.ts`). |
+| `TELEGRAM_SESSION` | Required | (none) | Telegram session string. Generate manually using the `telegram` package's `StringSession` workflow — see `docs/GETTING-STARTED.md` troubleshooting section. |
 
 ### Telegram Whitelist (access control)
 

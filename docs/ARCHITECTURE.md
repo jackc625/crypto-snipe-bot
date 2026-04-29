@@ -104,7 +104,7 @@ src/
 │                         standard snipe handler.
 ├── api/                  Express + WebSocket dashboard API (server, routes,
 │                         middleware, ws handler/broadcaster, helpers).
-├── scripts/              Operator utilities (e.g., genAuthWallet.ts).
+├── scripts/              Operator utilities (e.g., addLiquidity.ts, deploySepoliaTest.ts).
 └── utils/                Reusable infrastructure:
     ├── abis.ts                 Centralized ABI constants (V2/V3 factory, router, ERC20…)
     ├── blocklist.ts            Static known-bad token / pair registry.

@@ -307,7 +307,7 @@ src/
     abis.ts             ERC20, V2 Factory/Router/Pair, V3 Factory/Router/Quoter/Pool
     blocklist.ts        Hardcoded token + pair blocklist Sets
     logger.ts           pino factory + child-logger helper
-  scripts/              e.g. genAuthWallet.ts for Flashbots auth keys
+  scripts/              e.g. addLiquidity.ts, deploySepoliaTest.ts (Hardhat ops)
 
 dashboard/              React/Vite SPA source and build output (served from dist/)
 contracts/              Solidity (Hardhat) — optional dev surface
