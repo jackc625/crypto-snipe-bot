@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: planning
-stopped_at: ""
-last_updated: "2026-04-29T00:00:00.000Z"
+stopped_at: "Phase 17 context gathered"
+last_updated: "2026-04-29T18:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** v6.17 Defensive Hardening for Live Mainnet — roadmap created, ready for `/gsd-plan-phase 17`
+**Current focus:** v6.17 Defensive Hardening for Live Mainnet — Phase 17 context captured, ready for `/gsd-plan-phase 17`
 
 ## Current Position
 
-Phase: Not started (roadmap created; ready to plan Phase 17)
+Phase: 17 — Tech Debt Cleanup & Audit Baseline (context gathered)
 Plan: —
-Status: Roadmap complete; awaiting `/gsd-plan-phase 17`
-Last activity: 2026-04-29 — v6.17 ROADMAP.md created with Phases 17-21; all 53 v1 requirements mapped
+Status: Phase 17 CONTEXT.md committed; awaiting `/gsd-plan-phase 17`
+Last activity: 2026-04-29 — Phase 17 discuss-phase complete: hybrid 7+2 retroactive Nyquist; baseline-first wave 0; 3-plan split; verify-then-act sweep on v6.16 audit; evergreen .todo + tsc CI guards. Pre-scout confirmed 0/0 baseline (10 of 11 v6.16 audit tech_debt items already resolved).
 
 ## Performance Metrics
 
@@ -95,7 +95,7 @@ Retroactive `/gsd-validate-phase {N}` for phases 01, 02, 03, 05, 06, 07, 08, 09,
 
 ## Session Continuity
 
-Last session: 2026-04-29 (milestone roadmap creation)
-Last activity: 2026-04-29 — v6.17 ROADMAP.md created with Phases 17-21; all 53 v1 requirements mapped; STATE.md updated with phase count.
-Stopped at: Roadmap complete; ready for `/gsd-plan-phase 17`
-Resume file: None — continue with `/gsd-plan-phase 17` to decompose Phase 17 (Tech Debt Cleanup & Audit Baseline)
+Last session: 2026-04-29 (Phase 17 context gathering)
+Last activity: 2026-04-29 — Phase 17 discuss-phase complete; CONTEXT.md and DISCUSSION-LOG.md committed (f540481).
+Stopped at: Phase 17 context gathered; ready for `/gsd-plan-phase 17`
+Resume file: `.planning/phases/17-tech-debt-cleanup-audit-baseline/17-CONTEXT.md`
