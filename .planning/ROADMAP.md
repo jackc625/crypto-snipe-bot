@@ -56,7 +56,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   2. After Phase 17 completes, `npx tsc --noEmit` exits clean across all tsconfig projects with zero `as any` suppressions added in this phase, and `find test/ -name '*.todo*'` either returns empty or each remaining hit has been converted to `.skip` with an explicit reason
   3. Each of the 9 retroactively-validated phases (01, 02, 03, 05, 06, 07, 08, 09, 10) produces one production-relevant assertion documented in its `VALIDATION.md` — answering "does this prevent the harm we said it would?" — explicitly excluding FIX-04 and V3-03 which are addressed via fresh implementation in Phase 18 and validated there
   4. The diagnostic `console.log` lines at `src/telegramListener.ts:55,61` and the `getTradesByToken` unused const at `src/utils/db.ts:215` no longer appear in the codebase as called out; logs preserved as `log.debug` where appropriate, deleted where not
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 17-01-baseline-and-close-evidence-PLAN.md — Wave-0 CI-output baseline doc + DEBT-03/04 conditional close-out (Branch A verified-empty / Branch B remaining work) [DEBT-01, DEBT-02, DEBT-03 cond, DEBT-04 cond]
+  - [ ] 17-02-retroactive-nyquist-PLAN.md — Hybrid 7+2 retroactive Nyquist: 7 new harm-prevention tests across phases 01/03/05/06/07/08/10 + 2 inline VALIDATION.md augmentations (phases 02/09); D-07 stop-the-line applies [DEBT-05]
+  - [ ] 17-03-cleanup-and-ci-invariants-PLAN.md — Verify-then-act sweep: delete getTradesByToken from src/utils/db.ts; append .todo ban + tsc x 3 tsconfigs as evergreen CI guards [DEBT-06 + DEBT-01..04 invariant lock]
 
 ### Phase 18: Honeypot Detection Rebuild
 **Goal**: The bot can again snipe new tokens — V2 and V3 — on live mainnet without the broken sell-sim hard-blocking every attempt; honeypots that the v6.16 vacuous-pass let through are now caught locally (not just by third-party APIs); and the architecture (discriminated-union `HoneypotResult`, fail-closed `unknown` verdict) makes a vacuous-pass regression unrepresentable in the type system
