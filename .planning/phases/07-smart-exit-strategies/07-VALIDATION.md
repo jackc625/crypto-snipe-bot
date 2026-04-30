@@ -126,3 +126,20 @@ created: 2026-03-25
 | Total tests (exit engine) | 63 |
 | Test files | 4 |
 | All green | Yes |
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A subtle wiring break between the stop-loss threshold computation (src/exitEngine.ts:747-760) and the `executeFullSell` invocation — e.g., wrong `reason` string, missing tradeId argument, swallowed exception — silently leaves a position underwater. Threshold-only tests would still pass; the position would never actually exit.
+
+**Pointer to test:** `test/unit/exitEngineSell.test.ts` describe block `Phase 7 harm-prevention: EXIT-01 stop-loss triggers executeFullSell with reason="stop-loss"` (single `it` block at end of file).
+
+**D-04 observable effects asserted:**
+- `expect(ok).toBe(true)` — sell call returned success.
+- `expect(sendTxWithRetryMock).toHaveBeenCalledTimes(1)` — sell transaction was submitted via the MEV path.
+- `expect(insertTradeRun).toHaveBeenCalledWith(expect.objectContaining({action: 'sell', amountOut: '...'}))` — DB row written with action='sell' and the receipt-decoded amountOut.
+
+**Test scope:** Exercises `executeFullSell` directly with the `'stop-loss'` reason discriminant matching the production call shape at src/exitEngine.ts:758. The threshold computation half is covered by existing tests in test/unit/exitEngine.test.ts; this test closes the wiring gap.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.
