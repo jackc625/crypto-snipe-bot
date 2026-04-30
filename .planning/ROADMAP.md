@@ -39,7 +39,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
 ### 🚧 v6.17 Defensive Hardening for Live Mainnet (Phases 17-21) — PLANNING
 
-- [ ] **Phase 17: Tech Debt Cleanup & Audit Baseline** — CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup
+- [x] **Phase 17: Tech Debt Cleanup & Audit Baseline** — CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup *(completed 2026-04-30)*
 - [ ] **Phase 18: Honeypot Detection Rebuild** — Deploy `HoneypotChecker.sol` (Option D) on 4 chains; replace broken V2/V3 sell-sim gates; discriminated-union `HoneypotResult`; multi-amount tax probe; safety-bank audit
 - [ ] **Phase 19: Anti-Rug Runtime Monitoring** — Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode
 - [ ] **Phase 20: Going-Live Ops Hardening** — Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
@@ -59,11 +59,11 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 3 plans
 
   **Wave 0** *(no dependencies; produces ground-truth baseline doc)*
-  - [ ] 17-01-baseline-and-close-evidence-PLAN.md — Wave-0 CI-output baseline doc + DEBT-03/04 conditional close-out (Branch A verified-empty / Branch B remaining work) [DEBT-01, DEBT-02, DEBT-03 cond, DEBT-04 cond]
+  - [x] 17-01-baseline-and-close-evidence-PLAN.md — Wave-0 CI-output baseline doc + DEBT-03/04 conditional close-out (Branch A verified-empty / Branch B remaining work) [DEBT-01, DEBT-02, DEBT-03 cond, DEBT-04 cond]
 
   **Wave 1** *(blocked on Wave 0; both plans run in parallel after 17-01 commits)*
-  - [ ] 17-02-retroactive-nyquist-PLAN.md — Hybrid 7+2 retroactive Nyquist: 7 new harm-prevention tests across phases 01/03/05/06/07/08/10 + 2 inline VALIDATION.md augmentations (phases 02/09); D-07 stop-the-line applies [DEBT-05]
-  - [ ] 17-03-cleanup-and-ci-invariants-PLAN.md — Verify-then-act sweep: delete getTradesByToken from src/utils/db.ts; append .todo ban + tsc x 3 tsconfigs as evergreen CI guards [DEBT-06 + DEBT-01..04 invariant lock]
+  - [x] 17-02-retroactive-nyquist-PLAN.md — Hybrid 7+2 retroactive Nyquist: 7 new harm-prevention tests across phases 01/03/05/06/07/08/10 + 2 inline VALIDATION.md augmentations (phases 02/09); D-07 stop-the-line applies [DEBT-05]
+  - [x] 17-03-cleanup-and-ci-invariants-PLAN.md — Verify-then-act sweep: delete getTradesByToken from src/utils/db.ts; append .todo ban + tsc x 3 tsconfigs as evergreen CI guards [DEBT-06 + DEBT-01..04 invariant lock]
 
   **Cross-cutting constraints** *(invariants spanning multiple plans):*
   - **D-07 stop-the-line:** any retroactive harm-prevention test (Plan 17-02) revealing a real production bug BLOCKS Phase 17 close — surface to user, treat as DEBT-07 / decimal phase 17.1; NOT fix-in-flight, NOT file-and-defer
@@ -137,11 +137,11 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 14. Sell Revenue Receipt Decoding | v6.16 | 2/2 | Complete | 2026-04-07 |
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
-| 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 0/? | Not started | - |
+| 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 0/? | Not started | - |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-04-29 — v6.17 roadmap created (Phases 17-21)*
+*Last updated: 2026-04-30 — Phase 17 complete (DEBT-01..06 closed; baseline doc + 7+2 retroactive Nyquist + getTradesByToken deletion + CI invariant lock)*

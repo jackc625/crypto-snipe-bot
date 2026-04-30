@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 17 context gathered; ready for `/gsd-plan-phase 17`
-last_updated: "2026-04-29T20:21:40.251Z"
-last_activity: 2026-04-29 -- Phase 17 planning complete
+stopped_at: Phase 17 complete; ready for `/gsd-discuss-phase 18` or `/gsd-plan-phase 18`
+last_updated: "2026-04-30T00:00:00.000Z"
+last_activity: 2026-04-30 -- Phase 17 verified passed (4/4 must-haves); DEBT-01..06 closed
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 3
+  percent: 20
 ---
 
 # Project State
@@ -26,14 +26,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** v6.17 Defensive Hardening for Live Mainnet — Phase 17 context captured, ready for `/gsd-plan-phase 17`
+**Current focus:** v6.17 Defensive Hardening for Live Mainnet — Phase 17 complete (DEBT-01..06 closed); next is Phase 18 Honeypot Detection Rebuild
 
 ## Current Position
 
-Phase: 17 — Tech Debt Cleanup & Audit Baseline (context gathered)
+Phase: 18 — Honeypot Detection Rebuild (next; not yet started)
 Plan: —
-Status: Ready to execute
-Last activity: 2026-04-29 -- Phase 17 planning complete
+Status: Phase 17 verified passed (4/4 must-haves). Awaiting `/gsd-discuss-phase 18` or `/gsd-plan-phase 18`.
+Last activity: 2026-04-30 -- Phase 17 execution complete and verified
 
 ## Performance Metrics
 
@@ -66,7 +66,7 @@ Full Key Decisions log in PROJECT.md and archived in `milestones/v6.16-ROADMAP.m
 
 ### Pending Todos
 
-None — Phase 17 ready for `/gsd-plan-phase 17`.
+None — Phase 17 complete; ready for `/gsd-discuss-phase 18` or `/gsd-plan-phase 18`.
 
 ### Blockers / Concerns
 
@@ -83,13 +83,13 @@ None — Phase 17 ready for `/gsd-plan-phase 17`.
 
 - `simulateSellForChain` (V2) hard-blocks every snipe via `INSUFFICIENT_INPUT_AMOUNT` (balance=0 footgun). `simulateSellV3ForChain` silently returns true — zero honeypot detection. Bot is funded on mainnet but cannot trade. Lead requirement for v6.17.
 
-**Tech debt status disputed (Phase 17 will resolve via CI):**
+**Tech debt status RESOLVED (Phase 17 wave-0 baseline):**
 
-- 37 `.todo` exit-engine test stubs and 6 TS annotation errors are listed in v6.16 close audit but research SUMMARY.md notes the actual status is contested — `find test/ -name '*.todo*'` and `npx tsc --noEmit` may already be clean. DEBT-01 and DEBT-02 verify-via-CI as the first task of Phase 17.
+- The disputed v6.16 close audit numbers (37 `.todo` stubs / 6 TS errors) were both stale. Wave-0 CI run on 2026-04-30 confirmed: 0 `.todo` matches, 3/3 tsconfigs exit clean. Branch A (verified-empty) close-out committed in `.planning/milestones/v6.17-debt-baseline.md`. The wave-0 baseline is now locked as evergreen via `.github/workflows/test.yml` invariant guards (`.todo` ban + tsc × 3).
 
 ### Nyquist Validation Debt
 
-Retroactive `/gsd-validate-phase {N}` for phases 01, 02, 03, 05, 06, 07, 08, 09, 10 — folded into Phase 17 as DEBT-05. Excludes FIX-04 (Phase 1) and V3-03 (Phase 5) — those are addressed via fresh implementation in Phase 18 (HONEY-07, HONEY-08) and validated at fresh-implementation time per PITFALLS.md #19.
+Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each have a harm-prevention assertion: 7 phases got new `Phase N harm-prevention:` describe blocks in existing test files (1 new file `test/integration/v3LiquidityWait.test.ts`); Phases 02 (ethers v6) and 09 (testing infra) got inline `## Harm-Prevention Assertion (Phase 17 / DEBT-05)` sections in their VALIDATION.md. FIX-04 (Phase 1 V2 sell-sim) and V3-03 (Phase 5 V3 sell-sim) deferred to Phase 18 fresh-implementation per Pitfall #19 (HONEY-07, HONEY-08).
 
 ### Quick Tasks Completed
 
@@ -99,7 +99,7 @@ Retroactive `/gsd-validate-phase {N}` for phases 01, 02, 03, 05, 06, 07, 08, 09,
 
 ## Session Continuity
 
-Last session: 2026-04-29 (Phase 17 context gathering)
-Last activity: 2026-04-29 — Phase 17 discuss-phase complete; CONTEXT.md and DISCUSSION-LOG.md committed (f540481).
-Stopped at: Phase 17 context gathered; ready for `/gsd-plan-phase 17`
-Resume file: `.planning/phases/17-tech-debt-cleanup-audit-baseline/17-CONTEXT.md`
+Last session: 2026-04-30 (Phase 17 execution + verification)
+Last activity: 2026-04-30 — Phase 17 verified passed (4/4 must-haves); 358-pass test suite; CI invariant guards locked; DEBT-01..06 closed.
+Stopped at: Phase 17 complete; ready for `/gsd-discuss-phase 18` or `/gsd-plan-phase 18`
+Resume file: `.planning/phases/17-tech-debt-cleanup-audit-baseline/17-VERIFICATION.md`

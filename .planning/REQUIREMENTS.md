@@ -13,12 +13,12 @@ REQ-IDs continue from v6.16 categories where appropriate (DEBT extends prior tec
 
 Pre-substantive-work cleanup of v6.16 close debt. Phase 17 first verifies status via CI before pre-budgeting fix work — research disputed whether `.todo` stubs and TS errors remain.
 
-- [ ] **DEBT-01**: CI verification produces an artifact recording the actual count of `.todo` test stubs (`find test/ -name '*.todo*' -print` plus equivalent for `*.test.ts` `.todo()` blocks). Artifact committed in `.planning/milestones/v6.17-debt-baseline.md`.
-- [ ] **DEBT-02**: CI verification produces an artifact recording the actual count of TypeScript annotation errors in dashboard API routes (`npx tsc --noEmit --project tsconfig.dashboard.json` or equivalent). Artifact committed in the same baseline doc as DEBT-01.
-- [ ] **DEBT-03**: Any remaining `.todo` exit-engine test stubs (count from DEBT-01) are filled with real behavioral assertions, OR converted to `.skip` with explicit reason. No `expect(true).toBe(true)` style hollow fills.
-- [ ] **DEBT-04**: Any remaining TS annotation errors (count from DEBT-02) are fixed via real type definitions — not `as any` suppression. `tsc --noEmit` exits clean across all tsconfig projects after DEBT-04 lands.
-- [ ] **DEBT-05**: Retroactive Nyquist validation completed on phases 01, 02, 03, 05, 06, 07, 08, 09, 10. Excludes FIX-04 (V2 sell-sim) and V3-03 (V3 sell-sim) — these are addressed via fresh implementation in HONEY-07/HONEY-08 and validated at fresh-implementation time, not retroactively. Each validated phase produces one production-relevant assertion (not just "tests pass").
-- [ ] **DEBT-06**: Diagnostic `console.log` lines and dead local variables removed: `src/telegramListener.ts:55,61`, `src/utils/db.ts:215` (`getTradesByToken` unused const). Replaced with structured `log.debug` where retention is appropriate; deleted otherwise.
+- [x] **DEBT-01**: CI verification produces an artifact recording the actual count of `.todo` test stubs (`find test/ -name '*.todo*' -print` plus equivalent for `*.test.ts` `.todo()` blocks). Artifact committed in `.planning/milestones/v6.17-debt-baseline.md`. *(verified 2026-04-30: count = 0)*
+- [x] **DEBT-02**: CI verification produces an artifact recording the actual count of TypeScript annotation errors in dashboard API routes (`npx tsc --noEmit --project tsconfig.dashboard.json` or equivalent). Artifact committed in the same baseline doc as DEBT-01. *(verified 2026-04-30: tsc clean 3/3)*
+- [x] **DEBT-03**: Any remaining `.todo` exit-engine test stubs (count from DEBT-01) are filled with real behavioral assertions, OR converted to `.skip` with explicit reason. No `expect(true).toBe(true)` style hollow fills. *(closed Branch A — verified-empty)*
+- [x] **DEBT-04**: Any remaining TS annotation errors (count from DEBT-02) are fixed via real type definitions — not `as any` suppression. `tsc --noEmit` exits clean across all tsconfig projects after DEBT-04 lands. *(closed Branch A — verified-empty)*
+- [x] **DEBT-05**: Retroactive Nyquist validation completed on phases 01, 02, 03, 05, 06, 07, 08, 09, 10. Excludes FIX-04 (V2 sell-sim) and V3-03 (V3 sell-sim) — these are addressed via fresh implementation in HONEY-07/HONEY-08 and validated at fresh-implementation time, not retroactively. Each validated phase produces one production-relevant assertion (not just "tests pass"). *(7 new harm-prevention describe blocks + 2 inline VALIDATION.md augmentations committed)*
+- [x] **DEBT-06**: Diagnostic `console.log` lines and dead local variables removed: `src/telegramListener.ts:55,61`, `src/utils/db.ts:215` (`getTradesByToken` unused const). Replaced with structured `log.debug` where retention is appropriate; deleted otherwise. *(getTradesByToken deleted; telegramListener verified-already-clean — env-parse expressions, not console.log)*
 
 ### Honeypot Detection Rebuild (HONEY)
 
@@ -136,12 +136,12 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEBT-01 | Phase 17 | Pending |
-| DEBT-02 | Phase 17 | Pending |
-| DEBT-03 | Phase 17 | Pending |
-| DEBT-04 | Phase 17 | Pending |
-| DEBT-05 | Phase 17 | Pending |
-| DEBT-06 | Phase 17 | Pending |
+| DEBT-01 | Phase 17 | Complete (2026-04-30) |
+| DEBT-02 | Phase 17 | Complete (2026-04-30) |
+| DEBT-03 | Phase 17 | Complete (2026-04-30; Branch A verified-empty) |
+| DEBT-04 | Phase 17 | Complete (2026-04-30; Branch A verified-empty) |
+| DEBT-05 | Phase 17 | Complete (2026-04-30) |
+| DEBT-06 | Phase 17 | Complete (2026-04-30) |
 | HONEY-01 | Phase 18 | Pending |
 | HONEY-02 | Phase 18 | Pending |
 | HONEY-03 | Phase 18 | Pending |
