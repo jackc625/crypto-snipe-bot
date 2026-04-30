@@ -675,3 +675,38 @@ describe('DB-02: storage.ts deleted, all reads go through db.ts', () => {
         expect(matches).toHaveLength(0);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 / DEBT-05 retroactive harm-prevention block.
+// Phase 3 SQLite atomicity: transaction failure must roll back ALL rows in the
+// transaction, not leave partial commits visible to subsequent reads.
+// ---------------------------------------------------------------------------
+
+describe('Phase 3 harm-prevention: SQLite atomicity prevents partial-row commits on transaction failure', () => {
+    it('multi-row transaction with one CHECK violation rolls back ALL rows (post-failure count = 0)', () => {
+        const db = createTestDb();
+        const insertValid = db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in) VALUES (?, 'eth', 'buy', 'pending', '0.01')`
+        );
+        const insertInvalid = db.prepare(
+            `INSERT INTO trades (token, chain, action, status, amount_in) VALUES (?, 'eth', 'INVALID_ACTION', 'pending', '0.01')`
+        );
+
+        const insertBoth = db.transaction(() => {
+            insertValid.run('0xharm-prev-A');   // would succeed in isolation
+            insertInvalid.run('0xharm-prev-B'); // CHECK constraint violation
+        });
+
+        expect(() => insertBoth()).toThrow();
+
+        // D-04 observable effect: zero rows committed (NOT one — proves atomicity)
+        const count = db.prepare('SELECT COUNT(*) as c FROM trades').get() as { c: number };
+        expect(count.c).toBe(0);
+
+        // Targeted: confirm specifically the would-have-been-valid row is also absent
+        const validRowAbsent = db.prepare(`SELECT COUNT(*) as c FROM trades WHERE token = '0xharm-prev-A'`).get() as { c: number };
+        expect(validRowAbsent.c).toBe(0);
+
+        db.close();
+    });
+});

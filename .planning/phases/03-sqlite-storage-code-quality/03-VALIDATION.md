@@ -89,3 +89,18 @@ Existing infrastructure covers all phase requirements.
 - `test/unit/db.test.ts` — added DB-02 structural test (storage.ts deleted, no storage imports)
 - `test/unit/codeQuality.test.ts` — new file for INFRA-01 (zero console calls) and INFRA-03 (ABIs centralized)
 - `test/unit/provider.test.ts` — new file for INFRA-02 (singleton provider caching)
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A multi-row SQLite transaction encounters a CHECK constraint violation mid-transaction. Without atomic rollback the bot would observe partial-row commits — corrupting trade ledger consistency (e.g., a buy row written without its matching sell row state, or vice versa).
+
+**Pointer to test:** `test/unit/db.test.ts` describe block `Phase 3 harm-prevention: SQLite atomicity prevents partial-row commits on transaction failure` (single `it` block at end of file).
+
+**D-04 observable effects asserted:**
+- `expect(() => insertBoth()).toThrow()` — the throwing transaction signals the failure path executed.
+- `expect(count.c).toBe(0)` — post-failure `SELECT COUNT(*) FROM trades` returns 0 (NOT 1), proving atomicity.
+- Targeted check: the would-have-been-valid row is also absent (`expect(validRowAbsent.c).toBe(0)`), distinguishing this from the existing `transactions` describe at lines 27-65.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.
