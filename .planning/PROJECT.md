@@ -67,9 +67,11 @@ All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md
 
 ### Active
 
-<!-- v6.17 scope — full requirements with REQ-IDs in REQUIREMENTS.md once defined. -->
+<!-- v6.17 scope — full requirements with REQ-IDs in REQUIREMENTS.md. -->
 
 v6.17 Defensive Hardening for Live Mainnet — categories: Pre-buy safety (HONEY/SAFETY), Anti-rug (ANTIRUG), Exit live-runtime (EXIT-LIVE), Going-live ops (OPS-LIVE), Tech debt (DEBT). See `.planning/REQUIREMENTS.md`.
+
+**Phase 17 (DEBT) closed 2026-04-30** — DEBT-01..06 all satisfied. Wave-0 CI baseline confirmed the v6.16 close audit's 37/.todo and 6/TS-error claims were stale (actual: 0/0). 7 retroactive harm-prevention tests + 2 inline VALIDATION.md augmentations close DEBT-05. `getTradesByToken` deleted from `src/utils/db.ts`. `.github/workflows/test.yml` locks the verified-empty baseline as evergreen via `.todo` ban + `tsc --noEmit` × 3 invariant guards.
 
 ### Future
 
@@ -164,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-29 — v6.17 milestone scoped*
+*Last updated: 2026-04-30 — Phase 17 (DEBT) complete: DEBT-01..06 closed; CI invariant baseline locked*
