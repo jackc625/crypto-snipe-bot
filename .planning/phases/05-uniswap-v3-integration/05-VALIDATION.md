@@ -97,3 +97,22 @@ Existing infrastructure covers all phase requirements. Vitest unit project was a
 |------|---------------------|
 | `test/unit/chainRegistry.test.ts` | V3-01 (DexConfigV3 type guards, V3 entries) |
 | `test/unit/db.test.ts` | V3-03 (pool_type, fee_tier columns) |
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A V3 pool is detected via `PoolCreated` but no `Mint` event ever arrives (rugged pool, deployer-failed atomic launch, or stalled liquidity provision). Without the 30-second `Mint` wait, the bot would attempt to snipe an empty pool, paying gas + slippage on a 0-liquidity swap.
+
+**Pointer to test:** `test/integration/v3LiquidityWait.test.ts` describe block `Phase 5 harm-prevention: V3-02 liquidity wait drops snipe on Mint timeout (V3-03 EXCLUDED)` (single `it` block; new file).
+
+**D-04 observable effects asserted:**
+- `expect(result).toBe(false)` — `waitForLiquidity` resolves false after 30s of no Mint events.
+- `expect(loggerInfoMock).toHaveBeenCalledWith(expect.objectContaining({ pool: poolAddress }), 'Mint timeout (30s), dropping opportunity')` — structured pino info log line emitted at src/bot.ts:110.
+- `expect(onMock).toHaveBeenCalledWith('Mint', expect.any(Function))` — pool subscription was registered (proves the subscribe-and-wait path was exercised).
+
+**Test-induced design improvement:** `waitForLiquidity` was previously module-internal at `src/bot.ts:86`. To support direct testing, an `export` keyword was added to its declaration (single-token edit). Internal-only consumer surface unchanged.
+
+**Excluded:** V3-03 (V3 sell-sim) is EXCLUDED — addressed in HONEY-08 fresh implementation per PITFALLS.md #19. The new test contains zero `simulateSellV3ForChain`, `simulateSell`, or `sellSimulation` references outside the `EXCLUDES` annotation.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.

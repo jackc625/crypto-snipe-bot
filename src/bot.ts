@@ -83,7 +83,7 @@ async function getV3Price(
     }
 }
 
-async function waitForLiquidity(
+export async function waitForLiquidity(
     ctx: ChainContext,
     poolAddress: string,
     blockNumber: number
