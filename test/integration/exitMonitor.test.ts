@@ -626,6 +626,13 @@ describe('Connection failure in exit monitor', () => {
 describe('Phase 1 harm-prevention: FIX-01 exit-monitor sell-lock prevents double-sell race', () => {
     beforeEach(() => {
         vi.resetModules();
+        // Earlier describe blocks (Describe 2 "Exit trigger correctness", Describe 3
+        // "Connection failure in exit monitor") register `vi.doMock('../../src/utils/exitManager', ...)`
+        // with stub vi.fn() implementations that return undefined. Those mock registrations
+        // persist across describes — vi.resetModules() clears the module cache but NOT the
+        // doMock registry. Without doUnmock, importing exitManager here yields the prior
+        // describe's stub, not the real production module — causing undefined returns.
+        vi.doUnmock('../../src/utils/exitManager');
     });
 
     async function importExitManager() {
