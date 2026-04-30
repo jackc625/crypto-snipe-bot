@@ -108,3 +108,19 @@ Existing infrastructure covers all phase requirements.
 | Failing | 0 |
 
 **Notes:** Original VALIDATION.md referenced `tests/api/` paths (from initial planning). Actual test files are at `test/integration/api/` matching the vitest.config.ts project structure. All test stubs from Wave 0 were replaced with full test implementations during execution. Test paths and counts updated to reflect current codebase state.
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A future refactor breaks the `pkg.version → body.version` flow in `src/api/routes/health.ts` — body emits a stale hardcoded string that still matches semver shape. Operators relying on the `/health` endpoint as a deployment-version anchor see "1.0.0" forever, even after dozens of releases.
+
+**Pointer to test:** `test/integration/api/health.test.ts` describe block `Phase 8 harm-prevention: DASH/MON /health emits version from package.json (INT-HEALTH-VERSION closure)` (single `it` block at end of file).
+
+**D-04 observable effects asserted:**
+- `expect(status).toBe(200)` — endpoint returns 200 OK in the connected case.
+- `expect(typeof body.version).toBe('string')` — version field present and string-typed.
+- `expect(body.version).toBe(pkg.version)` — **dynamic equality** with `package.json` read at test time. **Materially stronger** than the existing semver-only check at lines 57-72: the regex `^\d+\.\d+\.\d+` passes against any semver-shaped string (e.g., a stale `'1.0.0'`), but `.toBe(pkg.version)` falsifies the moment the production flow breaks.
+- `expect(body.version).toMatch(/^\d+\.\d+\.\d+/)` — regression guard against any non-semver value sneaking in.
+
+**Cross-reference:** v6.16-MILESTONE-AUDIT.md line 167 (INT-HEALTH-VERSION concern: "HealthResponse.version was declared but never emitted" — closed by Phase 16-02). The Phase 17 harm-prevention test ensures the wiring stays correct against future regressions. `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.

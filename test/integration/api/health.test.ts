@@ -134,3 +134,34 @@ describe('GET /health', () => {
         expect(body.telegramConnected).toBe(false);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 / DEBT-05 retroactive harm-prevention block.
+// Phase 8 DASH/MON: /health body.version emits the package.json version field
+// (INT-HEALTH-VERSION closure from v6.16-MILESTONE-AUDIT.md line 167).
+// ---------------------------------------------------------------------------
+
+describe('Phase 8 harm-prevention: DASH/MON /health emits version from package.json (INT-HEALTH-VERSION closure)', () => {
+    it('GET /health response body.version equals package.json version field exactly', async () => {
+        const fs = await import('fs');
+        const path = await import('path');
+        const pkgPath = path.resolve(process.cwd(), 'package.json');
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { version: string };
+
+        const ctx = createMockChainContext();
+        const app = express();
+        app.use('/health', healthRoutes([ctx]));
+
+        const { status, body } = await requestHealth(app);
+
+        // D-04 observable effect 1: 200 OK
+        expect(status).toBe(200);
+        // D-04 observable effect 2: version field present and string-typed
+        expect(typeof body.version).toBe('string');
+        // D-04 observable effect 3: dynamic equality with package.json (MATERIALLY STRONGER than the existing semver-only check at lines 57-72;
+        // semver regex passes against any '1.0.0'-shaped string, but `.toBe(pkg.version)` falsifies if pkg.version → body.version flow breaks).
+        expect(body.version).toBe(pkg.version);
+        // D-04 observable effect 4: still semver-shaped (regression guard against non-semver string sneaking in)
+        expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+    });
+});
