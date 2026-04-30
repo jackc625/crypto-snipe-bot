@@ -6,6 +6,7 @@ nyquist_compliant: true
 wave_0_complete: true
 created: 2026-03-28
 audited: 2026-04-13
+harm_prevention: inline
 ---
 
 # Phase 9 — Validation Strategy
@@ -92,3 +93,22 @@ audited: 2026-04-13
 | Escalated | 0 |
 
 All 5 requirements (TEST-01 through TEST-05) have automated verification. Unit suite: 229 tests across 20 files. Integration suite: 122 tests across 12 files. Fork suite: 7 tests (manual, requires RPC). Total: 351 automated tests + 7 manual fork tests.
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Form:** INLINE DOC (per Phase 17 CONTEXT.md D-02). The testing-infrastructure phase's harm scenario is meta — "does CI actually fail when a test fails, i.e., is the testing infrastructure itself honest?" There is no single test that captures this; the harm scenario IS the property of the CI configuration plus the test suite as a whole.
+
+**Harm scenario:** A failing test in `test/unit/` or `test/integration/` returns exit-zero (or is silently skipped at the runner level), and `.github/workflows/test.yml` reports green despite a real test failure. Operator merges broken code under false confidence.
+
+**Evidence (CI structure):**
+- `.github/workflows/test.yml` — `npm run test:unit` and `npm run test:integration` exit-non-zero on any vitest failure (vitest's default behavior); GitHub Actions `run` step propagates non-zero to the job, blocking merge.
+- After Plan 17-03 lands, `.github/workflows/test.yml` ALSO runs the `.todo` ban guard and `tsc --noEmit -p ...` × 3 — those are the v6.17 invariant locks. See `.planning/milestones/v6.17-debt-baseline.md`.
+
+**Evidence (test suite size and green status):**
+- Pre-existing 343/343 automated tests + 7 manual fork tests passing as of v6.16 close (per `09-VALIDATION.md` line 94 / per audit). Green status is reproducible: `npm run test:unit && npm run test:integration` exits 0.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` `## Wave 0 CI Output` confirms tsc-clean × 3 tsconfigs + `.todo`-zero count as the v6.17 baseline anchors. CI guards in Plan 17-03 turn those baselines into evergreen invariants.
+
+**Why not a new test:** the harm scenario is "a failing test fails CI" — the only way to test this property end-to-end is to commit a deliberately-failing test, watch CI fail, then revert. That's not a `vitest`-runnable assertion; it's a property of the `vitest run` exit code + GitHub Actions step contract. Per D-01: "doc augmentation does NOT count as rubber-stamp because the harm scenario for those two phases is irreducibly architectural, not a single-test surface."
