@@ -212,10 +212,6 @@ const insertTrade = db.prepare(`
     VALUES (@token, @chain, @action, @txHash, @block, @timestamp, @amountIn, @amountOut, @gasCost, @priceAtAction, @status, @poolType, @feeTier, @dexName)
 `);
 
-const getTradesByToken = db.prepare(`
-    SELECT * FROM trades WHERE token = ? AND chain = ? ORDER BY timestamp ASC
-`);
-
 const updateTradeStatus = db.prepare(`
     UPDATE trades SET status = ? WHERE token = ? AND chain = ? AND status = 'pending'
 `);
