@@ -110,3 +110,22 @@ created: 2026-03-30
 | Automated coverage | 13 |
 | Manual-only | 1 |
 | Test suite status | 358 passed / 0 failed |
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A regression in the receipt-decoder integration leaves `partial_sell` rows with `amount_out: null` (the legacy P&L-blind state Phase 10 explicitly fixed). Without an explicit harm-prevention guard, future refactors to `executePartialSell` could silently drop the `decodeReceipt` call and return to null-amount-out rows.
+
+**Pointer to test:** `test/unit/exitEngineSell.test.ts` describe block `Phase 10 harm-prevention: partial-sell amount_out is non-null on receipt-decoded sell` (single `it` block at end of file).
+
+**D-04 observable effects asserted:**
+- `expect(insertTradeRun).toHaveBeenCalledWith(expect.objectContaining({action: 'partial_sell', amountOut: '500000000000000000', gasCost: expect.any(String), block: expect.any(Number)}))` — DB row written with `action='partial_sell'`, non-null `amountOut`, non-null `gasCost`, and non-null `block`.
+- `expect(decodeReceiptMock).toHaveBeenCalledTimes(1)` — receipt-decoder path was actually exercised (not the legacy null path that fires only on void txHash).
+- `expect(result).toBe(true)` — function-return success.
+
+**Test scope:** Invokes `executePartialSell` with the exact 8-parameter signature `(ctx, dex, tokenAddress, feeTier, sellAmount, tiers, state, currentMultiple)` per src/exitEngine.ts:531-540 verbatim.
+
+**Why this test exists despite Phase 10's strong existing coverage:** Phase 10 has 13 existing tests in `test/unit/db.test.ts` and `test/unit/exitEngineSell.test.ts`, but none are wrapped under the `Phase N harm-prevention:` discoverability prefix. Per D-03 the prefix IS the audit query that closes DEBT-05.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.

@@ -294,3 +294,68 @@ describe('Phase 7 harm-prevention: EXIT-01 stop-loss triggers executeFullSell wi
         );
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 / DEBT-05 retroactive harm-prevention block.
+// Phase 10 partial-sell: amount_out must be non-null when the receipt-decoder path
+// is exercised (legacy path returns null on void txHash, exercised by separate test).
+// ---------------------------------------------------------------------------
+
+describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on receipt-decoded sell', () => {
+    it('insertTrade is called with action="partial_sell" and non-null amountOut from decodeReceipt', async () => {
+        sendTxWithRetryMock.mockResolvedValue('0xpartialsellharmprevhash000000000000000000000000000000000000000000');
+        decodeReceiptMock.mockResolvedValue({
+            amountOut: '500000000000000000',
+            gasCost: '150000000000000',
+            blockNumber: 67890,
+        });
+
+        // ExitStateData shape per src/types — reuse the same loose-cast pattern as the existing
+        // `executePartialSell — receipt decoding integration` describe at line 206+.
+        const state = {
+            tradeId: 7,
+            entryPrice: 1000,
+            highWaterMark: 2500,
+            trailingActivated: true,
+            completedTierIndices: new Set<number>(),
+            originalTokenAmount: '1000000000000000000',
+            urgencyStartTs: Date.now(),
+            volatilitySamples: [],
+        } as any;
+
+        // Construct a minimal `tiers: { tier: PartialTier, index: number }[]` argument.
+        // The PartialTier shape is `{ multiple: number, percent: number }` per exitConfig.partialSellTiers.
+        // For this test we use a single-tier 50% sell at the 2x multiple ('tier-2x').
+        const tiers = [
+            { tier: { multiple: 2, percent: 50 }, index: 0 },
+        ];
+
+        // Invoke executePartialSell with the EXACT 8-parameter signature from src/exitEngine.ts:531-540.
+        // Order: ctx, dex, tokenAddress, feeTier, sellAmount (bigint), tiers, state, currentMultiple.
+        const result = await executePartialSell(
+            mockCtx,
+            mockDex,
+            '0xpartialharmprevtoken00000000000000000000',
+            null,                                  // feeTier (number | null)
+            500_000_000_000_000_000n,              // sellAmount (bigint) — 0.5 ETH worth, matches mock amountOut
+            tiers,                                 // tiers array (per PartialTier shape)
+            state,                                 // ExitStateData (loose cast)
+            2.0,                                   // currentMultiple (number) — at 2x trigger
+        );
+
+        // D-04 observable effect 1: insertTrade called with action='partial_sell' AND non-null amountOut
+        expect(insertTradeRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: 'partial_sell',
+                amountOut: '500000000000000000',  // non-null, matches mock
+                gasCost: expect.any(String),
+                block: expect.any(Number),
+            }),
+        );
+        // D-04 observable effect 2: decodeReceipt was actually used (not the legacy null path)
+        expect(decodeReceiptMock).toHaveBeenCalledTimes(1);
+
+        // result is a return-status sentinel; the harm-prevention claim is on the DB-row side
+        expect(result).toBe(true);
+    });
+});
