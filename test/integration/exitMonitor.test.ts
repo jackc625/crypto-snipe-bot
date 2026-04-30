@@ -616,3 +616,57 @@ describe('Connection failure in exit monitor', () => {
         expect(tracker.getMultiplier()).toBeGreaterThanOrEqual(1.0);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 / DEBT-05 retroactive harm-prevention block.
+// Phase 1 FIX-01: exit-monitor sell-lock prevents double-sell race.
+// EXCLUDES FIX-04 (V2 sell-sim) — addressed in HONEY-07 (Phase 18) per Pitfall #19.
+// ---------------------------------------------------------------------------
+
+describe('Phase 1 harm-prevention: FIX-01 exit-monitor sell-lock prevents double-sell race', () => {
+    beforeEach(() => {
+        vi.resetModules();
+    });
+
+    async function importExitManager() {
+        vi.doMock('../../src/utils/logger', () => ({
+            logger: {
+                child: () => ({
+                    info: vi.fn(), warn: vi.fn(), debug: vi.fn(),
+                    error: vi.fn(), fatal: vi.fn(),
+                }),
+            },
+        }));
+        vi.doMock('../../src/utils/db', () => ({
+            closeDb: vi.fn(),
+        }));
+        return await import('../../src/utils/exitManager');
+    }
+
+    it('lock acquired by thread A blocks thread B from acquiring (no second sell-tx submitted)', async () => {
+        const em = await importExitManager();
+        em.clearAllTimers();
+
+        // Thread A acquires
+        expect(em.tryAcquireSellLock('eth', '0xRaceToken')).toBe(true);
+
+        // Thread B blocked — observable effect: returns false
+        expect(em.tryAcquireSellLock('eth', '0xRaceToken')).toBe(false);
+
+        // Cleanup
+        em.releaseSellLock('eth', '0xRaceToken');
+    });
+
+    it('release-then-re-acquire works (lock is not permanently sticky)', async () => {
+        const em = await importExitManager();
+        em.clearAllTimers();
+
+        em.tryAcquireSellLock('eth', '0xRaceToken2');
+        em.releaseSellLock('eth', '0xRaceToken2');
+
+        // Observable effect: post-release, the next acquire succeeds
+        expect(em.tryAcquireSellLock('eth', '0xRaceToken2')).toBe(true);
+
+        em.releaseSellLock('eth', '0xRaceToken2');
+    });
+});

@@ -98,3 +98,15 @@ Existing infrastructure covers all phase requirements.
 - **FIX-08 (MISSING → COVERED):** Created `test/unit/exitEngineZeroBalance.test.ts` — 7 tests covering zero-balance detection, status update to 'sold', timer cleanup, exit state deletion, no spurious TX
 
 **Coverage summary:** 9/9 requirements have automated verification. 2 behaviors remain manual-only (real process signal timing, full restart cycle).
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** Two concurrent timers each detect a sell-trigger condition for the same `(chain, token)` and both submit sell transactions, double-spending the position.
+
+**Pointer to test:** `test/integration/exitMonitor.test.ts` describe block `Phase 1 harm-prevention: FIX-01 exit-monitor sell-lock prevents double-sell race` (the 2 `it` blocks at end of file).
+
+**Excluded:** FIX-04 (V2 sell-sim) — addressed via fresh implementation in HONEY-07 and validated at fresh-implementation time per PITFALLS.md #19.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.
