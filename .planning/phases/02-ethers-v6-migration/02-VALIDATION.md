@@ -5,6 +5,7 @@ status: approved
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-03-20
+harm_prevention: inline
 ---
 
 # Phase 2 — Validation Strategy
@@ -91,3 +92,23 @@ created: 2026-03-20
 | 3 | `test/unit/ethersV6ToolboxConfig.test.ts` | 7 | unit (static analysis) | `npx vitest run test/unit/ethersV6ToolboxConfig.test.ts` |
 
 **Total:** 28 tests, all passing.
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Form:** INLINE DOC (per Phase 17 CONTEXT.md D-02). The ethers v5→v6 migration's harm scenario is irreducibly architectural: did the migration preserve correct numerical behavior across every BigInt arithmetic path the v5 codebase used? This is a cross-cutting type-system property, not a single-test surface — single-test fabrication would be the rubber-stamp pattern Pitfall #19 warns against.
+
+**Harm scenario:** A v5→v6 incomplete migration leaves residual `BigNumber` objects, `.callStatic` calls, or `@ethersproject/*` imports — runtime errors at first hit, or worse, silent numerical-precision corruption when v5/v6 BigInt semantics differ.
+
+**Evidence (existing tests):**
+- `test/unit/ethersV5PatternsAbsent.test.ts` — 12 tests; structural ban regex enforces zero v5 surface (`/@ethersproject\//`, `/BigNumber/`, `/\.callStatic\./`, etc.).
+- `test/unit/ethersV6BigIntArithmetic.test.ts` — 9 tests; static + runtime numerical correctness across the BigInt paths the v5 codebase used.
+- `test/unit/ethersV6ToolboxConfig.test.ts` — 7 tests; static analysis of compiler/toolchain configuration.
+
+**Evidence (CI-baseline anchor):**
+- `.planning/milestones/v6.17-debt-baseline.md` `## Wave 0 CI Output` confirms `npx tsc --noEmit -p tsconfig.bot.json` exits clean — the type-system half of the migration is provably complete.
+
+**Cross-reference:** `test/unit/ethersV5PatternsAbsent.test.ts` is the primary harm-prevention surface; the ban regex would FAIL if any v5 pattern reappeared in production code, blocking CI per Phase 9 testing infrastructure (`npm run test:unit` non-zero exit).
+
+**Why not a new test:** the harm scenario is "no v5 pattern present" — that's structural and already tested by the 12-test ban regex above. Adding a new test would duplicate or fabricate. Per D-01: "doc augmentation does NOT count as rubber-stamp because the harm scenario for those two phases is irreducibly architectural, not a single-test surface."
