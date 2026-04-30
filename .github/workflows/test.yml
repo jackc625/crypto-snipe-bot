@@ -17,3 +17,21 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run test:unit
       - run: npm run test:integration
+      - name: Ban .todo test stubs
+        run: |
+          # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.
+          if find test/ -name '*.todo*' -print | grep -q .; then
+            echo "ERROR: .todo file(s) found in test/"
+            find test/ -name '*.todo*' -print
+            exit 1
+          fi
+          if grep -rEn '\.todo\s*\(|it\.todo\s*\(|test\.todo\s*\(|describe\.todo\s*\(' test/; then
+            echo "ERROR: .todo() invocation(s) found in test/"
+            exit 1
+          fi
+      - name: TypeScript check (root tsconfig.json)
+        run: npx tsc --noEmit -p tsconfig.json
+      - name: TypeScript check (tsconfig.bot.json)
+        run: npx tsc --noEmit -p tsconfig.bot.json
+      - name: TypeScript check (dashboard/tsconfig.json)
+        run: npx tsc --noEmit -p dashboard/tsconfig.json
