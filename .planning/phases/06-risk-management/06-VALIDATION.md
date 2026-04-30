@@ -90,3 +90,17 @@ validated: 2026-04-13
 
 All 5 RISK requirements covered by existing tests in `test/unit/riskManager.test.ts` (7 tests, all green).
 Additional integration coverage in `test/integration/api/risk.test.ts` for API endpoint exposure.
+
+---
+
+## Harm-Prevention Assertion (Phase 17 / DEBT-05)
+
+**Harm scenario:** A failure mode in the daily-loss circuit breaker (RISK-02) blocks the snipe but silently returns without emitting a structured warn — operator-side observability is lost. Without the structured pino warn line, dashboards / log queries that key on `reason: 'daily_loss_limit'` see nothing, even though the gate is firing.
+
+**Pointer to test:** `test/unit/riskManager.test.ts` describe block `Phase 6 harm-prevention: RISK daily-loss gate blocks the snipe with structured pino warn` (single `it` block at end of file).
+
+**D-04 observable effects asserted (combined rigor):**
+- Function-return: `expect(result.allowed).toBe(false)` and `expect(result.reason).toBe('daily_loss_limit')`.
+- Structured-log-emission: `expect(warnMock).toHaveBeenCalledWith(expect.objectContaining({ chain: 'eth', reason: 'daily_loss_limit' }), expect.any(String))` — matches the canonical `expect.objectContaining` payload + `expect.any(String)` message pattern from configEnvVar.test.ts:170-176.
+
+**Cross-reference:** `.planning/milestones/v6.17-debt-baseline.md` for the v6.17 baseline anchor.

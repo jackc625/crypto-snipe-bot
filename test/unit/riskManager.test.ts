@@ -126,3 +126,71 @@ describe('getPortfolioExposure with partial sells (Phase 10)', () => {
         expect(result.byChain.bsc).toBe(0.15);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 17 / DEBT-05 retroactive harm-prevention block.
+// Phase 6 RISK: daily-loss gate must (a) block the snipe AND (b) emit a structured
+// pino warn line so operator-side observability is preserved.
+// ---------------------------------------------------------------------------
+
+describe('Phase 6 harm-prevention: RISK daily-loss gate blocks the snipe with structured pino warn', () => {
+    let warnMock: ReturnType<typeof vi.fn>;
+    let canSnipeLocal: typeof import('../../src/riskManager').canSnipe;
+
+    beforeEach(async () => {
+        // The canonical logger mock at the top of this file creates a fresh `child()` per call
+        // returning fresh `vi.fn()`s — meaning we cannot capture warn calls from the outside.
+        // Override the mock for THIS describe block via vi.doMock + vi.resetModules + dynamic re-import.
+        // (See test/unit/configEnvVar.test.ts:170-176 for the canonical `expect.objectContaining` +
+        // `expect.any(String)` shape; mirrors test/integration/exitMonitor.test.ts:12-29 pattern.)
+
+        warnMock = vi.fn();
+        vi.doMock('../../src/utils/logger', () => ({
+            logger: {
+                child: () => ({
+                    info: vi.fn(),
+                    warn: warnMock,
+                    debug: vi.fn(),
+                    error: vi.fn(),
+                }),
+            },
+        }));
+        vi.resetModules();
+
+        // Re-establish DB mock implementations (mockReset: true wipes them between tests).
+        mockGetOpenPositionCount.get.mockReturnValue({ count: 0 });
+        mockGetTotalExposure.get.mockReturnValue({ total: 0 });
+        mockGetDailyRealizedLoss.get.mockReturnValue({ total_loss: 0 });
+
+        // Re-set env vars for risk config (Map of imported module needs fresh canSnipe binding).
+        process.env.MAX_OPEN_POSITIONS = '5';
+        process.env.MAX_TOTAL_EXPOSURE = '10.0';
+        process.env.DAILY_LOSS_PCT = '10';
+        process.env.SNIPE_COOLDOWN_MS = '60000';
+        process.env.MAX_POSITION_SIZE = '0.1';
+
+        // Re-import canSnipe so the new logger mock takes effect.
+        const mod = await import('../../src/riskManager');
+        canSnipeLocal = mod.canSnipe;
+    });
+
+    it('returns {allowed: false, reason: "daily_loss_limit"} AND emits log.warn with structured payload when daily loss exceeded', () => {
+        // Setup: daily realized loss exceeds 10% of maxCapital (threshold = -0.1)
+        mockGetDailyRealizedLoss.get.mockReturnValue({ total_loss: -0.15 });
+
+        const result = canSnipeLocal('eth', '0.05', '1.0');
+
+        // D-04 observable effect 1: function-return state
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toBe('daily_loss_limit');
+
+        // D-04 observable effect 2: structured pino warn emission (per src/riskManager.ts log.warn shape)
+        expect(warnMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                chain: 'eth',
+                reason: 'daily_loss_limit',
+            }),
+            expect.any(String),
+        );
+    });
+});
