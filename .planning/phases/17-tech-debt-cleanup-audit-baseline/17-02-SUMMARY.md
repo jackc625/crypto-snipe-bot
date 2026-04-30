@@ -258,3 +258,14 @@ Test Files  32 passed (32)
 ---
 *Phase: 17-tech-debt-cleanup-audit-baseline*
 *Completed: 2026-04-30*
+
+## Self-Check: PASSED
+
+- All 7 `Phase N harm-prevention:` describe blocks present (D-03 audit query returns 7 matches).
+- All 9 phase VALIDATION.md files contain `## Harm-Prevention Assertion (Phase 17 / DEBT-05)`.
+- Phases 02 and 09 frontmatter contain `harm_prevention: inline`.
+- FIX-04 (Phase 1) and V3-03 (Phase 5) verifiably excluded from new tests.
+- Full unit + integration suite green: 351/351 passing.
+- Created file `test/integration/v3LiquidityWait.test.ts` exists.
+- All 10 commit hashes (`2854618`, `e47e417`, `f746fa9`, `347072f`, `14fe230`, `76e2ecc`, `7ebe07a`, `dc7b7c9`, `66027d5`, `491d546`) found in git log.
+- D-07 stop-the-line not triggered.
