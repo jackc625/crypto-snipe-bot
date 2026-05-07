@@ -46,6 +46,39 @@ vi.doMock('../../src/utils/logger', () => ({
     },
 }));
 
+// WR-03: Mock src/utils/db so that importing bot.ts does NOT open the
+// production SQLite database (data/bot.db) as a side effect. Without this,
+// the dynamic `import('../../src/bot')` below transitively triggers
+// `new Database(DB_PATH)` plus migrateSchema/migrateJsonState/
+// normalizeLegacyMainnetRows at module-load time, generating WAL/SHM
+// I/O for every test run. waitForLiquidity is a pure-function test —
+// no DB interaction is required or desired. Other transitive db importers
+// (exitEngine, riskManager) also pick up this mock because vi.doMock
+// applies module-wide before the dynamic import resolves.
+vi.doMock('../../src/utils/db', () => {
+    // db.prepare(...) is invoked at module-load time by transitively imported
+    // modules (e.g., src/riskManager.ts:48). Return a Statement-shaped stub.
+    const stmt = { run: vi.fn(), get: vi.fn(), all: vi.fn().mockReturnValue([]) };
+    return {
+        db: {
+            prepare: vi.fn().mockReturnValue(stmt),
+            pragma: vi.fn(),
+            exec: vi.fn(),
+            transaction: vi.fn().mockImplementation((fn: any) => fn),
+        },
+        insertTrade: { run: vi.fn() },
+        updateTradeStatus: { run: vi.fn() },
+        isTokenSniped: { get: vi.fn().mockReturnValue(undefined) },
+        getTradeIdForPendingToken: { get: vi.fn() },
+        upsertExitState: { run: vi.fn() },
+        getExitState: { get: vi.fn() },
+        deleteExitState: { run: vi.fn() },
+        getOpenPositionCount: vi.fn().mockReturnValue(0),
+        getTotalExposure: vi.fn().mockReturnValue(0),
+        getDailyRealizedLoss: vi.fn().mockReturnValue(0),
+    };
+});
+
 describe('Phase 5 harm-prevention: V3-02 liquidity wait drops snipe on Mint timeout (V3-03 EXCLUDED)', () => {
     beforeEach(() => {
         vi.useFakeTimers();
