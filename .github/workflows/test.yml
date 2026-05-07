@@ -20,16 +20,15 @@ jobs:
       - name: Ban .todo test stubs
         run: |
           # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.
-          if find test/ -name '*.todo*' -print | grep -q .; then
-            echo "ERROR: .todo file(s) found in test/"
-            find test/ -name '*.todo*' -print
-            exit 1
-          fi
+          # WR-05: Removed `find test/ -name '*.todo*'` — Vitest's .todo test-stub form is
+          # invoked via it.todo/test.todo/describe.todo method calls, NOT via filenames.
+          # The find pattern would have flagged any documentation-style filename containing
+          # `.todo` (e.g., `test/ROADMAP.todo.md`) which is not the intent of this guard.
           # WR-04: Bare `\.todo\s*\(` removed — it would match any property named `todo`
           # invoked as a function (e.g., `myObject.todo()` on unrelated code). The three
           # specific Vitest patterns below are sufficient and precise.
           if grep -rEn 'it\.todo\s*\(|test\.todo\s*\(|describe\.todo\s*\(' test/; then
-            echo "ERROR: .todo() invocation(s) found in test/"
+            echo "ERROR: .todo() test-stub invocation found in test/. Use it.skip('reason: ...') instead."
             exit 1
           fi
       - name: TypeScript check (root tsconfig.json)
