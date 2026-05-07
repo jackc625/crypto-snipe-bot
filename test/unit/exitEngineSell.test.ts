@@ -308,11 +308,22 @@ describe('Phase 7 EXIT-01: executeFullSell accepts reason="stop-loss" discrimina
 
 // ---------------------------------------------------------------------------
 // Phase 17 / DEBT-05 retroactive harm-prevention block.
-// Phase 10 partial-sell: amount_out must be non-null when the receipt-decoder path
-// is exercised (legacy path returns null on void txHash, exercised by separate test).
+// Phase 10 partial-sell: partial_sell row insertion records non-null amountOut
+// from decodeReceipt (legacy path returns null on void txHash, exercised by
+// separate test).
+//
+// SCOPE NOTE (WR-02 follow-up): This describe verifies the row-insertion contract
+// for executePartialSell — i.e. that when decodeReceipt returns data, insertTrade
+// is called with action='partial_sell' and a non-null amountOut. It does NOT
+// drive pollExitStrategy end-to-end; the wiring at src/exitEngine.ts:697-717
+// (getUnfilledTiers → executePartialSell call) is covered by integration tests
+// elsewhere. A regression that broke getUnfilledTiers or removed the
+// executePartialSell call from the poll loop would NOT be caught by this
+// describe — the describe-block claim has been downgraded to match the actual
+// coverage.
 // ---------------------------------------------------------------------------
 
-describe('Phase 10 harm-prevention: partial-sell amount_out is non-null on receipt-decoded sell', () => {
+describe('Phase 10 partial-sell: row insertion records non-null amountOut from decodeReceipt', () => {
     it('insertTrade is called with action="partial_sell" and non-null amountOut from decodeReceipt', async () => {
         sendTxWithRetryMock.mockResolvedValue('0xpartialsellharmprevhash000000000000000000000000000000000000000000');
         decodeReceiptMock.mockResolvedValue({
