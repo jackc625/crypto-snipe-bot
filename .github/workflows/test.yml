@@ -25,7 +25,10 @@ jobs:
             find test/ -name '*.todo*' -print
             exit 1
           fi
-          if grep -rEn '\.todo\s*\(|it\.todo\s*\(|test\.todo\s*\(|describe\.todo\s*\(' test/; then
+          # WR-04: Bare `\.todo\s*\(` removed — it would match any property named `todo`
+          # invoked as a function (e.g., `myObject.todo()` on unrelated code). The three
+          # specific Vitest patterns below are sufficient and precise.
+          if grep -rEn 'it\.todo\s*\(|test\.todo\s*\(|describe\.todo\s*\(' test/; then
             echo "ERROR: .todo() invocation(s) found in test/"
             exit 1
           fi
