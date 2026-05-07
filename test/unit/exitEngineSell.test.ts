@@ -251,15 +251,26 @@ describe('executePartialSell — receipt decoding integration', () => {
 
 // ---------------------------------------------------------------------------
 // Phase 17 / DEBT-05 retroactive harm-prevention block.
-// Phase 7 EXIT-01: stop-loss must trigger executeFullSell with reason='stop-loss'
-// — wired-through-to-executeFullSell invocation, not just threshold computation.
+// Phase 7 EXIT-01: executeFullSell accepts reason='stop-loss' as the discriminant
+// and inserts an action='sell' row.
+//
+// SCOPE NOTE (WR-01 follow-up): This describe verifies the call-shape contract for
+// reason='stop-loss' — i.e. that executeFullSell, when invoked with that exact
+// reason string, submits a sell tx and writes a 'sell' DB row. It does NOT
+// drive pollExitStrategy end-to-end; the wiring at src/exitEngine.ts:747-760
+// (currentPrice <= entryPrice*(1-stopLossPct/100) → executeFullSell call) is
+// covered by integration tests elsewhere. A regression that swapped the
+// literal 'stop-loss' to 'trailing-stop' at exitEngine.ts:758 would NOT be
+// caught by this describe — the describe-block claim has been downgraded to
+// match the actual coverage. See test/integration/exitMonitor.test.ts for the
+// polling-path tests.
 // ---------------------------------------------------------------------------
 
-describe('Phase 7 harm-prevention: EXIT-01 stop-loss triggers executeFullSell with reason="stop-loss"', () => {
-    it('drives executeFullSell when current price <= entryPrice * (1 - stopLossPct/100), submits sell tx and inserts sell row', async () => {
+describe('Phase 7 EXIT-01: executeFullSell accepts reason="stop-loss" discriminant and inserts action="sell" row', () => {
+    it('submits sell tx and inserts a sell row when invoked with reason="stop-loss"', async () => {
         // Mock matrix already in scope from top of file.
         // The existing receipt-decoding tests cover executeFullSell call shape;
-        // this test covers the wired-through path: stop-loss condition → executeFullSell invocation.
+        // this test reinforces that the reason='stop-loss' discriminant is accepted and round-trips.
 
         sendTxWithRetryMock.mockResolvedValue('0xstoplossharmprevhash00000000000000000000000000000000000000000000');
         decodeReceiptMock.mockResolvedValue({
@@ -269,8 +280,8 @@ describe('Phase 7 harm-prevention: EXIT-01 stop-loss triggers executeFullSell wi
         });
 
         // Drive executeFullSell directly with reason='stop-loss' (matches src/exitEngine.ts:758 call shape).
-        // This validates the call is wired correctly; the upstream polling logic (src/exitEngine.ts:747-760)
-        // computes the threshold and dispatches with that exact reason string.
+        // This validates the call shape; the upstream polling logic that computes the threshold
+        // and dispatches with that exact reason string is intentionally NOT exercised here.
         const ok = await executeFullSell(
             mockCtx,
             mockDex,
