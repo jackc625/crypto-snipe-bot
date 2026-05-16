@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Completed 18-06-PLAN.md (HONEY-05 chainRegistry honeypotChecker required field + per-chain env overlay + hardhat networks + deploy CLI; ready for plans 18-05 audit / 18-07 ETH deploy)
-last_updated: "2026-05-16T02:17:50.012Z"
-last_activity: 2026-05-16
+stopped_at: Wave 2 complete — 7/11 plans done (18-00..18-06); audit gate CLEARED for HONEY-03; paused before plan 18-07 ETH mainnet deploy (autonomous:false — operator funds deploy wallet, runs deploy + Etherscan verify)
+last_updated: "2026-05-16T02:30:00.000Z"
+last_activity: 2026-05-16 — Phase 18 Wave 0+1+2 complete; paused before Wave 3 (18-07 ETH mainnet deploy)
 progress:
   total_phases: 5
   completed_phases: 1
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 ## Current Position
 
-Phase: 18 (honeypot-detection-rebuild) — EXECUTING
-Plan: 8 of 11
-Status: Ready to execute
-Last activity: 2026-05-15
+Phase: 18 (honeypot-detection-rebuild) — EXECUTING (paused mid-phase)
+Plan: 8 of 11 — next up is 18-07 (Wave 3, ETH mainnet deploy, autonomous:false)
+Status: Ready to resume — run `/gsd-execute-phase 18`; orchestrator picks up at Wave 3 because plans 18-00..18-06 have committed SUMMARY.md files
+Last activity: 2026-05-16
 
 ## Performance Metrics
 
