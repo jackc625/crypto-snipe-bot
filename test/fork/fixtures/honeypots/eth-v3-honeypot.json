@@ -1,0 +1,16 @@
+{
+  "chain": "eth",
+  "dexType": "v3",
+  "tokenAddress": null,
+  "pairAddress": null,
+  "routerAddress": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+  "quoterAddress": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+  "feeTier": 3000,
+  "forkBlockNumber": null,
+  "expectedVerdict": "unsafe",
+  "expectedRevertContains": "SELL_ETH_ZERO",
+  "bugPattern": "v3-sell-tax-spike",
+  "notes": "Block-pin pending Wave-1 follow-up; honeypot.is/Etherscan candidates explored at planner time, live verification deferred to executor with operator review. V3 candidate to be resolved via honeypot.is /api/v2/ethereum?filter=v3. Plan 18-09 V3 Integration Test 4 has a Honeypot.sol V3-mode contrived fallback so the fork suite is not blocked on this fixture's resolution.",
+  "discoveredVia": "honeypot.is",
+  "discoveredOn": "2026-05-15"
+}

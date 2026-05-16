@@ -1,0 +1,16 @@
+{
+  "chain": "eth",
+  "dexType": "v2",
+  "tokenAddress": "0x80e4f014c98320eab524ae16b0aaf1603f4dc01d",
+  "pairAddress": null,
+  "routerAddress": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  "quoterAddress": null,
+  "feeTier": null,
+  "forkBlockNumber": null,
+  "expectedVerdict": "unsafe",
+  "expectedRevertContains": "BUY_BAL_ZERO",
+  "bugPattern": "sell-revert",
+  "notes": "Block-pin pending Wave-1 follow-up; honeypot.is/Etherscan candidates explored at planner time, live verification deferred to executor with operator review. Etherscan candidate sourced from 18-RESEARCH.md §3 line 628-630.",
+  "discoveredVia": "etherscan",
+  "discoveredOn": "2026-05-15"
+}
