@@ -6,34 +6,17 @@
 //
 // CRITICAL: NEVER throws on unknown method (D-UNKNOWN-POLICY one-shot
 // skip — caller handles uniformly). All branches return HoneypotResult.
+//
+// Plan 18-06 promoted `honeypotChecker` to a required field on the
+// source-of-truth `ChainConfig` interface (src/chainRegistry.ts), so
+// the declaration-merge augmentation that plan 18-02 used as a bridge
+// is removed. Reading the field directly off `ctx.chain` is now
+// type-safe and does not need a NULL_CFG fallback.
 
 import type { ChainContext, DexConfig } from '../../chainRegistry';
 import type { HoneypotCheckerConfig, HoneypotResult } from './types';
 import { simulateViaContractV2, simulateViaContractV3 } from './checkerContract';
 import { simulateViaSimulator } from './simulator';
-
-// ---------------------------------------------------------------------------
-// Module augmentation: extend ChainConfig with the `honeypotChecker` field.
-//
-// Plan 18-02 ships the types and dispatch wiring; plan 18-06 lands the
-// chainRegistry.ts source-of-truth extension that promotes this field
-// onto the real `ChainConfig` interface (with templates populating it
-// per chain). Until then, declaration-merging the field here keeps tsc
-// clean while preserving runtime correctness (any chain not yet wired
-// up flows through the `bad-method` branch and returns `unknown`).
-// ---------------------------------------------------------------------------
-declare module '../../chainRegistry' {
-    interface ChainConfig {
-        honeypotChecker?: HoneypotCheckerConfig;
-    }
-}
-
-const NULL_CFG: HoneypotCheckerConfig = {
-    deployedAddress: null,
-    method: 'on-chain-contract',
-    maxBuyTaxBps: 0,
-    maxSellTaxBps: 0,
-};
 
 /**
  * Pre-buy honeypot roundtrip dispatch. Routes on:
@@ -49,7 +32,7 @@ export async function simulateHoneypotRoundtrip(
     dex: DexConfig,
     token: string,
 ): Promise<HoneypotResult> {
-    const cfg: HoneypotCheckerConfig = ctx.chain.honeypotChecker ?? NULL_CFG;
+    const cfg: HoneypotCheckerConfig = ctx.chain.honeypotChecker;
 
     if (cfg.method === 'on-chain-contract') {
         if (!cfg.deployedAddress) {

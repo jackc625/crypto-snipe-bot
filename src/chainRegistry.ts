@@ -5,6 +5,13 @@ import { ethers, JsonRpcProvider, WebSocketProvider, Wallet } from 'ethers';
 import type pino from 'pino';
 import { logger } from './utils/logger';
 import { getProvider, getWsProvider } from './utils/provider';
+import type { HoneypotCheckerConfig } from './utils/honeypot/types';
+
+// Plan 18-06 Task 1: re-export so other modules can import HoneypotCheckerConfig
+// from the chain-registry source of truth (matching the SafetyApiConfig /
+// GasConfig pattern). Plan 18-02 ships the canonical declaration in
+// src/utils/honeypot/types.ts; this re-export keeps a single import target.
+export type { HoneypotCheckerConfig };
 
 const log = logger.child({ module: 'chainRegistry' });
 
@@ -57,6 +64,14 @@ export interface ChainConfig {
     mevStrategy: MevStrategyType;
     mevConfig: Record<string, string>;
     safetyApis: SafetyApiConfig;
+    // Plan 18-06 HONEY-05: per-chain HoneypotChecker contract config
+    // (deployedAddress + dispatch method + tax-threshold bps).
+    // Plan 18-02 introduced this as an optional declaration-merge augmentation
+    // in src/utils/honeypot/index.ts; plan 18-06 promotes the field to a
+    // required member on the source-of-truth interface so downstream code
+    // can read ctx.chain.honeypotChecker.{deployedAddress, method,
+    // maxBuyTaxBps, maxSellTaxBps} without optional chaining.
+    honeypotChecker: HoneypotCheckerConfig;
     gas: GasConfig;
     snipeAmount: string;
     maxCapital: string;
@@ -94,6 +109,13 @@ interface ChainTemplate {
     defaultMinLiquidityThreshold: string;
     httpRpcEnv: string;
     wsRpcEnv: string;
+    // Plan 18-06: per-chain HoneypotChecker defaults. The deployed contract
+    // address is supplied at runtime via <PREFIX>_HONEYPOT_CHECKER_ADDRESS;
+    // the template captures only the dispatch method + tax-threshold
+    // defaults (10% buy / 10% sell per D-TAX-THRESHOLDS).
+    honeypotMethod: 'on-chain-contract' | 'eth_simulateV1';
+    defaultMaxBuyTaxBps: number;
+    defaultMaxSellTaxBps: number;
 }
 
 const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
@@ -135,6 +157,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultMinLiquidityThreshold: '0.5',
         httpRpcEnv: 'ETH_RPC_URL',
         wsRpcEnv: 'ETH_WS_URL',
+        honeypotMethod: 'on-chain-contract',
+        defaultMaxBuyTaxBps: 1000,
+        defaultMaxSellTaxBps: 1000,
     },
     bsc: {
         chainId: 56,
@@ -181,6 +206,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultMinLiquidityThreshold: '1.0',
         httpRpcEnv: 'BSC_RPC_URL',
         wsRpcEnv: 'BSC_WS_URL',
+        honeypotMethod: 'on-chain-contract',
+        defaultMaxBuyTaxBps: 1000,
+        defaultMaxSellTaxBps: 1000,
     },
     base: {
         chainId: 8453,
@@ -220,6 +248,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultMinLiquidityThreshold: '0.1',
         httpRpcEnv: 'BASE_RPC_URL',
         wsRpcEnv: 'BASE_WS_URL',
+        honeypotMethod: 'on-chain-contract',
+        defaultMaxBuyTaxBps: 1000,
+        defaultMaxSellTaxBps: 1000,
     },
     arb: {
         chainId: 42161,
@@ -259,6 +290,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultMinLiquidityThreshold: '0.1',
         httpRpcEnv: 'ARB_RPC_URL',
         wsRpcEnv: 'ARB_WS_URL',
+        honeypotMethod: 'on-chain-contract',
+        defaultMaxBuyTaxBps: 1000,
+        defaultMaxSellTaxBps: 1000,
     },
 };
 
@@ -297,6 +331,35 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
         const snipeAmount = process.env[`${template.envPrefix}_SNIPE_AMOUNT`] || template.defaultSnipeAmount;
         const maxCapital = process.env[`${template.envPrefix}_MAX_CAPITAL`] || template.defaultMaxCapital;
         const minLiquidityThreshold = process.env[`${template.envPrefix}_MIN_LIQUIDITY`] || template.defaultMinLiquidityThreshold;
+
+        // Plan 18-06 HONEY-05: per-chain HoneypotChecker overlay.
+        //   <PREFIX>_HONEYPOT_CHECKER_ADDRESS — deployed contract address;
+        //     null when not yet deployed (dispatch layer returns
+        //     verdict='unknown' per D-UNKNOWN-POLICY).
+        //   <PREFIX>_MAX_BUY_TAX_BPS, <PREFIX>_MAX_SELL_TAX_BPS — fail-loud
+        //     validated in [0, 10000] bps. Default 1000 (10%) per
+        //     D-TAX-THRESHOLDS.
+        const honeypotCheckerAddress = process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`] || null;
+        const maxBuyTaxBpsRaw = process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`] || String(template.defaultMaxBuyTaxBps);
+        const maxSellTaxBpsRaw = process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`] || String(template.defaultMaxSellTaxBps);
+        const maxBuyTaxBps = parseInt(maxBuyTaxBpsRaw, 10);
+        const maxSellTaxBps = parseInt(maxSellTaxBpsRaw, 10);
+        // Fail-loud (T-18-21 mitigation): a malformed bps env value silently
+        // parsing as NaN would disable the threshold gate downstream.
+        if (Number.isNaN(maxBuyTaxBps) || maxBuyTaxBps < 0 || maxBuyTaxBps > 10000) {
+            log.fatal(
+                { chain: chainName, key: `${template.envPrefix}_MAX_BUY_TAX_BPS`, value: maxBuyTaxBpsRaw },
+                'Tax threshold env var must be a valid bps integer in [0, 10000]'
+            );
+            process.exit(1);
+        }
+        if (Number.isNaN(maxSellTaxBps) || maxSellTaxBps < 0 || maxSellTaxBps > 10000) {
+            log.fatal(
+                { chain: chainName, key: `${template.envPrefix}_MAX_SELL_TAX_BPS`, value: maxSellTaxBpsRaw },
+                'Tax threshold env var must be a valid bps integer in [0, 10000]'
+            );
+            process.exit(1);
+        }
 
         // For ETH, fall back to ALCHEMY_URL if ETH_RPC_URL is not set (backward compat)
         let resolvedHttpRpcUrl = httpRpcUrl;
@@ -344,6 +407,12 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
             mevStrategy: template.mevStrategy,
             mevConfig,
             safetyApis: template.safetyApis,
+            honeypotChecker: {
+                deployedAddress: honeypotCheckerAddress,
+                method: template.honeypotMethod,
+                maxBuyTaxBps,
+                maxSellTaxBps,
+            },
             gas: template.gas,
             snipeAmount,
             maxCapital,

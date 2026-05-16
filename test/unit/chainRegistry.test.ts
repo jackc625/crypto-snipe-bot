@@ -2,7 +2,7 @@
 // Unit tests for chain registry building and validation.
 // Tests ChainConfig construction from env vars and DexConfig discriminated union.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ---- Mock dependencies ----
 
@@ -31,6 +31,24 @@ let getEnabledChains: typeof import('../../src/chainRegistry')['getEnabledChains
 let isDexV2: typeof import('../../src/chainRegistry')['isDexV2'];
 let isDexV3: typeof import('../../src/chainRegistry')['isDexV3'];
 
+// Plan 18-06 Task 1: env keys this suite mutates per-test for honeypotChecker
+// overlay coverage. Listed here so the afterEach can restore the baseline
+// without leaking across tests.
+const HONEYPOT_ENV_KEYS = [
+    'ETH_HONEYPOT_CHECKER_ADDRESS',
+    'BSC_HONEYPOT_CHECKER_ADDRESS',
+    'BASE_HONEYPOT_CHECKER_ADDRESS',
+    'ARB_HONEYPOT_CHECKER_ADDRESS',
+    'ETH_MAX_BUY_TAX_BPS',
+    'ETH_MAX_SELL_TAX_BPS',
+    'BSC_MAX_BUY_TAX_BPS',
+    'BSC_MAX_SELL_TAX_BPS',
+    'BASE_MAX_BUY_TAX_BPS',
+    'BASE_MAX_SELL_TAX_BPS',
+    'ARB_MAX_BUY_TAX_BPS',
+    'ARB_MAX_SELL_TAX_BPS',
+] as const;
+
 beforeEach(async () => {
     // Set required env vars for enabled chains
     process.env.ENABLED_CHAINS = 'eth';
@@ -38,11 +56,25 @@ beforeEach(async () => {
     process.env.FLASHBOTS_AUTH_KEY = 'test-flashbots-key';
     process.env.PRIVATE_KEY = '0x' + '1'.repeat(64);
 
+    // Clear plan 18-06 honeypot overlay env vars so per-test setup is explicit.
+    for (const key of HONEYPOT_ENV_KEYS) {
+        delete process.env[key];
+    }
+
+    // Reset module cache so each test re-reads process.env fresh.
+    vi.resetModules();
+
     const mod = await import('../../src/chainRegistry');
     buildChainRegistry = mod.buildChainRegistry;
     getEnabledChains = mod.getEnabledChains;
     isDexV2 = mod.isDexV2;
     isDexV3 = mod.isDexV3;
+});
+
+afterEach(() => {
+    for (const key of HONEYPOT_ENV_KEYS) {
+        delete process.env[key];
+    }
 });
 
 describe('buildChainRegistry', () => {
@@ -121,6 +153,120 @@ describe('DexConfig discriminated union', () => {
                 expect(isDexV3(dex)).toBe(true);
                 expect(isDexV2(dex)).toBe(false);
             }
+        }
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 18-06 Task 1: HoneypotChecker field + per-chain env overlay
+// ---------------------------------------------------------------------------
+
+describe('ChainConfig.honeypotChecker (plan 18-06)', () => {
+    it('Test 1: with no env vars, deployedAddress is null for every chain', () => {
+        const registry = buildChainRegistry();
+        for (const chainName of ['eth', 'bsc', 'base', 'arb']) {
+            const cfg = registry.get(chainName)!;
+            expect(cfg.honeypotChecker).toBeDefined();
+            expect(cfg.honeypotChecker.deployedAddress).toBeNull();
+        }
+    });
+
+    it('Test 2: ETH_HONEYPOT_CHECKER_ADDRESS overrides ETH chain deployedAddress', async () => {
+        process.env.ETH_HONEYPOT_CHECKER_ADDRESS =
+            '0x1234567890123456789012345678901234567890';
+        vi.resetModules();
+        const mod = await import('../../src/chainRegistry');
+        const registry = mod.buildChainRegistry();
+        expect(registry.get('eth')!.honeypotChecker.deployedAddress).toBe(
+            '0x1234567890123456789012345678901234567890'
+        );
+        // Other chains remain null (per-prefix isolation).
+        expect(registry.get('bsc')!.honeypotChecker.deployedAddress).toBeNull();
+        expect(registry.get('base')!.honeypotChecker.deployedAddress).toBeNull();
+        expect(registry.get('arb')!.honeypotChecker.deployedAddress).toBeNull();
+    });
+
+    it('Test 3: maxBuyTaxBps defaults to 1000 (per D-TAX-THRESHOLDS) when env unset', () => {
+        const registry = buildChainRegistry();
+        for (const chainName of ['eth', 'bsc', 'base', 'arb']) {
+            const cfg = registry.get(chainName)!;
+            expect(cfg.honeypotChecker.maxBuyTaxBps).toBe(1000);
+            expect(cfg.honeypotChecker.maxSellTaxBps).toBe(1000);
+        }
+    });
+
+    it('Test 4: ETH_MAX_BUY_TAX_BPS=500 overrides ETH maxBuyTaxBps', async () => {
+        process.env.ETH_MAX_BUY_TAX_BPS = '500';
+        process.env.ETH_MAX_SELL_TAX_BPS = '750';
+        vi.resetModules();
+        const mod = await import('../../src/chainRegistry');
+        const registry = mod.buildChainRegistry();
+        expect(registry.get('eth')!.honeypotChecker.maxBuyTaxBps).toBe(500);
+        expect(registry.get('eth')!.honeypotChecker.maxSellTaxBps).toBe(750);
+        // BSC remains default — independent per-prefix overlay.
+        expect(registry.get('bsc')!.honeypotChecker.maxBuyTaxBps).toBe(1000);
+        expect(registry.get('bsc')!.honeypotChecker.maxSellTaxBps).toBe(1000);
+    });
+
+    it('Test 5: method defaults to "on-chain-contract" for every chain', () => {
+        const registry = buildChainRegistry();
+        for (const chainName of ['eth', 'bsc', 'base', 'arb']) {
+            const cfg = registry.get(chainName)!;
+            expect(cfg.honeypotChecker.method).toBe('on-chain-contract');
+        }
+    });
+
+    it('Test 6: out-of-range tax threshold env triggers FATAL exit (process.exit(1))', async () => {
+        process.env.ETH_MAX_BUY_TAX_BPS = '12345'; // > 10000 — invalid bps
+        vi.resetModules();
+        const mod = await import('../../src/chainRegistry');
+        // Stub process.exit to capture the call instead of killing the test runner.
+        const exitSpy = vi
+            .spyOn(process, 'exit')
+            .mockImplementation(((_code?: number) => {
+                throw new Error('process.exit-called');
+            }) as never);
+        try {
+            // buildChainRegistry should call process.exit(1) via the stubbed spy,
+            // which throws. We catch and assert the spy was invoked with 1.
+            expect(() => mod.buildChainRegistry()).toThrow('process.exit-called');
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            exitSpy.mockRestore();
+        }
+    });
+
+    it('Test 7: negative tax threshold env triggers FATAL exit (process.exit(1))', async () => {
+        process.env.ETH_MAX_SELL_TAX_BPS = '-50';
+        vi.resetModules();
+        const mod = await import('../../src/chainRegistry');
+        const exitSpy = vi
+            .spyOn(process, 'exit')
+            .mockImplementation(((_code?: number) => {
+                throw new Error('process.exit-called');
+            }) as never);
+        try {
+            expect(() => mod.buildChainRegistry()).toThrow('process.exit-called');
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            exitSpy.mockRestore();
+        }
+    });
+
+    it('Test 8: NaN tax threshold env triggers FATAL exit (process.exit(1))', async () => {
+        process.env.ETH_MAX_BUY_TAX_BPS = 'not-a-number';
+        vi.resetModules();
+        const mod = await import('../../src/chainRegistry');
+        const exitSpy = vi
+            .spyOn(process, 'exit')
+            .mockImplementation(((_code?: number) => {
+                throw new Error('process.exit-called');
+            }) as never);
+        try {
+            expect(() => mod.buildChainRegistry()).toThrow('process.exit-called');
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            exitSpy.mockRestore();
         }
     });
 });
