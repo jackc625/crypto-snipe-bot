@@ -25,7 +25,7 @@ Pre-substantive-work cleanup of v6.16 close debt. Phase 17 first verifies status
 The current pre-buy safety-stack rebuild — fixes the broken V2 sell-sim (`amountIn=0` hard-block) and silent-pass V3 sell-sim. Architecture: Option D (deploy `HoneypotChecker.sol`) primary; Option C (`eth_simulateV1`) opt-in fallback only. Decision closed by research convergence (STACK + ARCHITECTURE + PITFALLS).
 
 - [x] **HONEY-01**: `contracts/honeypot/HoneypotChecker.sol` authored — ~80 LOC Solidity round-trip checker; reverts at end of buy→sell to roll back; uses OZ `IERC20`; storage-agnostic (exercises token's own `_transfer` hook); compiled under existing solc 0.8.28 toolchain.
-- [ ] **HONEY-02**: Slither + Mythril static analysis runs clean (or all flagged issues triaged with documented disposition) on `HoneypotChecker.sol` before any mainnet deploy. Audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md`.
+- [x] **HONEY-02**: Slither + Mythril static analysis runs clean (or all flagged issues triaged with documented disposition) on `HoneypotChecker.sol` before any mainnet deploy. Audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md`.
 - [ ] **HONEY-03**: `HoneypotChecker.sol` deployed on Ethereum mainnet via Hardhat Ignition. Deployed address recorded in `chainRegistry.ts` `CHAIN_TEMPLATES['eth'].honeypotChecker.deployedAddress`. Etherscan-verified.
 - [ ] **HONEY-04**: `HoneypotChecker.sol` deployed on BSC, Base, and Arbitrum mainnets. Deployed addresses recorded in respective `CHAIN_TEMPLATES` entries. Each block-explorer-verified.
 - [x] **HONEY-05**: `src/utils/honeypot/` module created with: dispatch layer (`index.ts`), Option-D wrapper (`checkerContract.ts`), Option-C fallback skeleton (`simulator.ts`), shared `types.ts`. Per-chain dispatch via new `ChainConfig.honeypotChecker.method` field.
@@ -144,7 +144,7 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | DEBT-05 | Phase 17 | Complete (2026-04-30) |
 | DEBT-06 | Phase 17 | Complete (2026-04-30) |
 | HONEY-01 | Phase 18 | Complete |
-| HONEY-02 | Phase 18 | Pending |
+| HONEY-02 | Phase 18 | Complete (2026-05-15; plan 18-05; 13/13 Slither medium+ false-positive; Mythril 0 issues; deploy gate cleared for HONEY-03) |
 | HONEY-03 | Phase 18 | Pending |
 | HONEY-04 | Phase 18 | Pending |
 | HONEY-05 | Phase 18 | Complete |
