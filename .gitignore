@@ -45,6 +45,16 @@ build/
 coverage/
 .nyc_output/
 
+# Audit tool outputs (Slither / Mythril JSON + raw text)
+# Plan 18-05 (HONEY-02): reports/ holds dynamic Slither + Mythril JSON
+# plus the local-run solc binary cache used by Mythril on Windows hosts
+# (the official mythril/myth Docker image's solc-bin host is dead, so
+# operators bind-mount a pre-downloaded solc-vX into /home/mythril/.solcx).
+# The directory itself is preserved via the !reports/.gitkeep rule so the
+# CI audit jobs always have a place to write to without race-creating it.
+reports/*
+!reports/.gitkeep
+
 # Agent / tooling local state
 .claude/
 
