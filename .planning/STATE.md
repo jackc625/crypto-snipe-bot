@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: "Completed 18-03-PLAN.md (HONEY-12 isMutableTokenForChain + HONEY-02 Mythril severity-gate CLI shipped; HONEY-12 row kept Pending — closes when plan 18-09 wires the function into the parallel safety bank at src/bot.ts:229-238)"
-last_updated: "2026-05-16T01:30:00.000Z"
+stopped_at: "Completed 18-06-PLAN.md (HONEY-05 multi-chain config wiring: ChainConfig.honeypotChecker promoted to required field; per-chain env overlay + bps validation; hardhat.config mainnet/bsc/base/arbitrum networks gated on DEPLOY_PRIVATE_KEY per D-DEPLOY-KEY; scripts/deploy-honeypot-checker.ts CLI shipped)"
+last_updated: "2026-05-16T01:47:19.155Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 9
+  completed_plans: 10
   percent: 21
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 18 (honeypot-detection-rebuild) — EXECUTING
-Plan: 6 of 11
+Plan: 7 of 11
 Status: Ready to execute
 Last activity: 2026-05-16
 
@@ -53,6 +53,10 @@ Full Key Decisions log in PROJECT.md and archived in `milestones/v6.16-ROADMAP.m
 
 **v6.17 decisions closed by research convergence (2026-04-29):**
 
+- **Plan 18-06 (2026-05-15):** `ChainConfig.honeypotChecker` promoted from optional declaration-merge bridge (plan 18-02) to a **required** field on the source-of-truth interface; `NULL_CFG` fallback removed from `src/utils/honeypot/index.ts`. Downstream reads `ctx.chain.honeypotChecker.{deployedAddress, method, maxBuyTaxBps, maxSellTaxBps}` as type-safe required fields; no-deployed-address case still flows through the `'unknown'` verdict via explicit `cfg.deployedAddress` check (no optional chaining). `HoneypotCheckerConfig` re-exported from `chainRegistry.ts` for import locality alongside `ChainConfig`.
+- **Plan 18-06 (2026-05-15):** `hardhat.config.ts` mainnet/bsc/base/arbitrum network entries use `DEPLOY_PRIVATE_KEY` exclusively per **D-DEPLOY-KEY** capability split; existing `sepolia` entry retains `PRIVATE_KEY` for test-only deploys. Bot wallet has no deploy authority on any production chain — T-18-20 mitigation enforced at the config layer with grep-assertion in the plan's verify gate. Conditional-spread pattern used (`...(cond ? { name: {...} } : {})`) over `name: cond ? {} : undefined` for cleaner `HardhatUserConfig` typing. `etherscan.apiKey` block uses `arbitrumOne` (canonical hardhat-verify name for Arbitrum One).
+- **Plan 18-06 (2026-05-15):** `scripts/deploy-honeypot-checker.ts` deliberately does **NOT** auto-update `src/chainRegistry.ts` — T-18-23 audit-trail mitigation. Operator manually pastes deployed address into `<CHAIN>_HONEYPOT_CHECKER_ADDRESS` env, preserving git-history record of which contract address became canonical at which commit. Uses `spawnSync` with `shell: true` for Windows `npx.cmd` resolution (no-op on POSIX). `DEPLOY_PRIVATE_KEY` is inherited via `process.env` without `HARDHAT_PRIVATE_KEY` rename — plan 18-07 will smoke-test on a real chain and add the shim back if Ignition 0.15.x requires it.
+- **Plan 18-06 (2026-05-15):** Tax-threshold env validation (`<PREFIX>_MAX_{BUY,SELL}_TAX_BPS`) implements `Number.isNaN || > 10000 || < 0` guard with `log.fatal + process.exit(1)` per the existing chainRegistry FATAL pattern (T-18-21 mitigation). Three dedicated unit tests cover the three invalid-shape paths.
 - **Plan 18-03 (2026-05-16):** HONEY-12 `isMutableTokenForChain` function + 7 unit tests shipped, but the HONEY-12 row in REQUIREMENTS.md stays **Pending** — the row text requires the parallel-safety-bank wire-up at `src/bot.ts:229-238`, which is plan 18-09's responsibility. Function is import-ready for that plan; row closes there.
 - **Plan 18-03 (2026-05-16):** Mythril severity-gate CLI (`scripts/check-mythril-report.ts`) ships with zero new npm deps (Node `fs` + `process` only) per T-18-SC `accept` disposition. Consumed by plan 18-05's audit job as `npx ts-node scripts/check-mythril-report.ts <report.json>`; exits 1 on any `Medium` or `High` Mythril issue.
 - Honeypot sell-sim architecture: **Option D primary, Option C opt-in fallback.** Closed by STACK.md + ARCHITECTURE.md + PITFALLS.md convergence on storage-layout robustness, multi-chain coverage, and integration ergonomics.
@@ -108,10 +112,11 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | 18-04 (HONEY-11 safetyBank audit + isBlacklistedTokenForChain fix-in-flight) | ~30min | 3/3 | 10 | 53df941 |
 | 18-01 (Wave-1 honeypot fixtures: Honeypot.sol 5-mode + 3 ETH JSON fixtures) | ~8min | 2/2 | 6 | d33f32f |
 | 18-03 (HONEY-12 bytecodeScan + HONEY-02 Mythril severity gate) | ~5min | 2/2 | 5 | b503572, aa77a00, 7178b61 |
+| 18-06 (HONEY-05 chainRegistry honeypotChecker required field + hardhat networks + deploy CLI) | ~12min | 3/3 | 5 | fdeeefa, c00de8e, 511aa96 |
 
 ## Session Continuity
 
-Last session: 2026-05-16T01:30:00.000Z
-Last activity: 2026-05-16 — Phase 18 plan 18-03 complete. HONEY-12 `isMutableTokenForChain` function shipped at `src/utils/honeypot/bytecodeScan.ts` (19 selectors, fail-closed catch, case-safe match) + 7 unit tests passing. HONEY-02 Mythril severity-gate CLI shipped at `scripts/check-mythril-report.ts`; exits 1 on Medium/High issues, 0 on clean reports. HONEY-12 row kept **Pending** in REQUIREMENTS.md — closes when plan 18-09 wires the function into the parallel safety bank at `src/bot.ts:229-238`. 261/261 unit tests pass; `tsc --noEmit` clean.
-Stopped at: Completed 18-03-PLAN.md (HONEY-12 bytecodeScan + HONEY-02 Mythril severity gate; both independent of contract deploy)
+Last session: 2026-05-16T01:46:08.167Z
+Last activity: 2026-05-16 — Phase 18 plan 18-06 complete. HONEY-05 multi-chain config wiring closed: `ChainConfig.honeypotChecker` promoted from optional declaration-merge bridge (plan 18-02) to a **required** field on the source-of-truth interface; `NULL_CFG` fallback removed from `src/utils/honeypot/index.ts`. Per-chain env overlay (`<PREFIX>_HONEYPOT_CHECKER_ADDRESS` + `<PREFIX>_MAX_{BUY,SELL}_TAX_BPS`) with fail-loud bps validation (`Number.isNaN || > 10000 || < 0` → `log.fatal + process.exit(1)`, T-18-21 mitigation). `hardhat.config.ts` extended with conditional mainnet/bsc/base/arbitrum networks gated on `DEPLOY_PRIVATE_KEY` per D-DEPLOY-KEY (T-18-20 mitigation — bot wallet has no deploy authority) + `etherscan.apiKey` block for `@nomicfoundation/hardhat-verify`. `scripts/deploy-honeypot-checker.ts` per-chain CLI shipped (T-18-23 mitigation — does NOT auto-update chainRegistry, preserves git audit trail). 269/269 unit tests pass (was 261; +8 new); `tsc --noEmit` clean; `hardhat compile` clean. HONEY-05 row in REQUIREMENTS.md already at Complete.
+Stopped at: Completed 18-06-PLAN.md (HONEY-05 chainRegistry honeypotChecker required field + per-chain env overlay + hardhat networks + deploy CLI; ready for plans 18-05 audit / 18-07 ETH deploy)
 Resume file: None
