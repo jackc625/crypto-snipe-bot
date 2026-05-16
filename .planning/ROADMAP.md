@@ -88,7 +88,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   **Wave 1** *(after 18-00; parallel):*
   - [x] 18-01-PLAN.md — contrived Honeypot.sol 5-mode fixture (4 standard + amount-tiered per Warning #6) + 3 real-mainnet honeypot fixtures (2 V2 + 1 V3 per Blocker #1) [HONEY-12]
   - [x] 18-02-PLAN.md — HoneypotChecker.sol with checkV2 + checkV3 (~160-190 LOC per Blocker #1) + Ignition module + types.ts + abi.ts + dispatch index.ts + simulator.ts stub + checkerContract.ts placeholder with Warning #9 sentinel [HONEY-01, HONEY-05, HONEY-06]
-  - [ ] 18-03-PLAN.md — bytecodeScan.ts HONEY-12 + scripts/check-mythril-report.ts severity gate [HONEY-12, HONEY-02 tooling]
+  - [x] 18-03-PLAN.md — bytecodeScan.ts HONEY-12 + scripts/check-mythril-report.ts severity gate [HONEY-12, HONEY-02 tooling]
   - [x] 18-04-PLAN.md — HONEY-11 safetyBank audit: 8 per-gate regression tests + isBlacklistedTokenForChain fail-closed retrofit + audit milestone doc [HONEY-11]
 
   **Wave 2** *(after Wave 1):*
@@ -166,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 4/11 | In Progress|  |
+| 18. Honeypot Detection Rebuild | v6.17 | 5/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |

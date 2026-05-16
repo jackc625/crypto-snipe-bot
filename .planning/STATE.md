@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Completed 18-01-PLAN.md (HONEY-12 fixtures shipped; Warning #6 + Blocker #1 V3 + Warning #5 resolved)
+stopped_at: "Completed 18-03-PLAN.md (HONEY-12 isMutableTokenForChain + HONEY-02 Mythril severity-gate CLI shipped; HONEY-12 row kept Pending — closes when plan 18-09 wires the function into the parallel safety bank at src/bot.ts:229-238)"
 last_updated: "2026-05-16T01:30:00.000Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 7
-  percent: 23
+  completed_plans: 9
+  percent: 21
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 18 (honeypot-detection-rebuild) — EXECUTING
-Plan: 5 of 11
+Plan: 6 of 11
 Status: Ready to execute
 Last activity: 2026-05-16
 
@@ -53,6 +53,8 @@ Full Key Decisions log in PROJECT.md and archived in `milestones/v6.16-ROADMAP.m
 
 **v6.17 decisions closed by research convergence (2026-04-29):**
 
+- **Plan 18-03 (2026-05-16):** HONEY-12 `isMutableTokenForChain` function + 7 unit tests shipped, but the HONEY-12 row in REQUIREMENTS.md stays **Pending** — the row text requires the parallel-safety-bank wire-up at `src/bot.ts:229-238`, which is plan 18-09's responsibility. Function is import-ready for that plan; row closes there.
+- **Plan 18-03 (2026-05-16):** Mythril severity-gate CLI (`scripts/check-mythril-report.ts`) ships with zero new npm deps (Node `fs` + `process` only) per T-18-SC `accept` disposition. Consumed by plan 18-05's audit job as `npx ts-node scripts/check-mythril-report.ts <report.json>`; exits 1 on any `Medium` or `High` Mythril issue.
 - Honeypot sell-sim architecture: **Option D primary, Option C opt-in fallback.** Closed by STACK.md + ARCHITECTURE.md + PITFALLS.md convergence on storage-layout robustness, multi-chain coverage, and integration ergonomics.
 - Anti-rug detection trigger model: **event-driven WebSocket subscription with single-listener-per-chain pattern + HTTP poll fallback.** Closed; per-position subscriptions explicitly rejected (Pitfall #10 subscription-cap leaks).
 - Going-live runbook destination: **move to `docs/operations/going-live.md`** atomic with root-file delete + CI guard against re-creation. Closed.
@@ -96,7 +98,6 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 260429-cleanup-empty-files | Find and clean up empty files/folders (root cause: 532b563 codebase mapping commit). Removed 8 empty placeholders + ignition/, cleaned 19 stale agent worktrees, patched 9 doc references, added pre-commit guard against future 0-byte commits | 2026-04-29 | 8bfab90 | Verified | [260429-cleanup-empty-files](./quick/260429-cleanup-empty-files/) |
-| Phase 18 P02 | 17min | 3 tasks | 9 files |
 
 ## Phase 18 Plan Execution Log
 
@@ -106,10 +107,11 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | 18-02 (HoneypotChecker.sol + TS skeleton) | 17min | 3/3 | 9 | 4571393 |
 | 18-04 (HONEY-11 safetyBank audit + isBlacklistedTokenForChain fix-in-flight) | ~30min | 3/3 | 10 | 53df941 |
 | 18-01 (Wave-1 honeypot fixtures: Honeypot.sol 5-mode + 3 ETH JSON fixtures) | ~8min | 2/2 | 6 | d33f32f |
+| 18-03 (HONEY-12 bytecodeScan + HONEY-02 Mythril severity gate) | ~5min | 2/2 | 5 | b503572, aa77a00, 7178b61 |
 
 ## Session Continuity
 
 Last session: 2026-05-16T01:30:00.000Z
-Last activity: 2026-05-16 — Phase 18 plan 18-01 complete (Wave-1 fixtures shipped; iter-2 Warning #6 mode-4 authored at 18-01, Blocker #1 V3 fixture in scope, Warning #5 block-pin debt tracked with @jackcutrara owner). HONEY-12 NOT yet complete — fixture work supports HONEY-12 testing but `isMutableTokenForChain` implementation lands in plan 18-03.
-Stopped at: Completed 18-01-PLAN.md (HONEY-12 fixtures shipped; Warning #6 + Blocker #1 V3 + Warning #5 resolved)
+Last activity: 2026-05-16 — Phase 18 plan 18-03 complete. HONEY-12 `isMutableTokenForChain` function shipped at `src/utils/honeypot/bytecodeScan.ts` (19 selectors, fail-closed catch, case-safe match) + 7 unit tests passing. HONEY-02 Mythril severity-gate CLI shipped at `scripts/check-mythril-report.ts`; exits 1 on Medium/High issues, 0 on clean reports. HONEY-12 row kept **Pending** in REQUIREMENTS.md — closes when plan 18-09 wires the function into the parallel safety bank at `src/bot.ts:229-238`. 261/261 unit tests pass; `tsc --noEmit` clean.
+Stopped at: Completed 18-03-PLAN.md (HONEY-12 bytecodeScan + HONEY-02 Mythril severity gate; both independent of contract deploy)
 Resume file: None
