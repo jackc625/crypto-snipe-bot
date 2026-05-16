@@ -356,8 +356,13 @@ export async function isLiquidityLockedForChain(ctx: ChainContext, pairAddress: 
  */
 export async function isBlacklistedTokenForChain(ctx: ChainContext, tokenAddress: string): Promise<boolean> {
     const antiBotSelectors = ["0xdd62ed3e", "0x4f7fb7c3", "0x60fe47b1"];
-    const bytecode = await ctx.httpProvider.getCode(tokenAddress);
-    return antiBotSelectors.some(sig => bytecode.includes(sig));
+    try {
+        const bytecode = await ctx.httpProvider.getCode(tokenAddress);
+        return antiBotSelectors.some(sig => bytecode.includes(sig));
+    } catch (e) {
+        ctx.log.warn({ err: e, token: tokenAddress, check: 'blacklist' }, 'Blacklist scan failed');
+        return true;
+    }
 }
 
 /**
