@@ -73,14 +73,42 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 ### Phase 18: Honeypot Detection Rebuild
 **Goal**: The bot can again snipe new tokens — V2 and V3 — on live mainnet without the broken sell-sim hard-blocking every attempt; honeypots that the v6.16 vacuous-pass let through are now caught locally (not just by third-party APIs); and the architecture (discriminated-union `HoneypotResult`, fail-closed `unknown` verdict) makes a vacuous-pass regression unrepresentable in the type system
 **Depends on**: Phase 17 (clean audit baseline; FIX-04/V3-03 validated at fresh implementation here, not retroactively)
-**Requirements**: HONEY-01, HONEY-02, HONEY-03, HONEY-04, HONEY-05, HONEY-06, HONEY-07, HONEY-08, HONEY-09, HONEY-10, HONEY-11
+**Requirements**: HONEY-01, HONEY-02, HONEY-03, HONEY-04, HONEY-05, HONEY-06, HONEY-07, HONEY-08, HONEY-09, HONEY-10, HONEY-11, HONEY-12
 **Success Criteria** (what must be TRUE):
   1. The bot snipes a real V2 token on Ethereum mainnet — the new `simulateHoneypotRoundtrip(...)` call at `bot.ts:220-226` returns `verdict: 'safe'` with `evidence.buyTaxBps` and `evidence.sellTaxBps` populated as numerical bps, the buy lands, and an Etherscan tx hash is captured. The "balance=0 hard-block" footgun no longer fires on legitimate launches
   2. A known honeypot token (committed as test fixture) gets `verdict: 'unsafe'` from the new dispatch — both for V2 (replacing the broken sell-sim) and V3 (replacing the silent vacuous-pass) — and the bot skips the buy with a structured pino log line containing the revert reason and a Telegram alert pointing at the token address
   3. `HoneypotChecker.sol` is deployed and Etherscan/BscScan-verified at the addresses recorded in `chainRegistry.ts` `CHAIN_TEMPLATES['eth'|'bsc'|'base'|'arb'].honeypotChecker.deployedAddress` for all 4 enabled chains, with the Slither + Mythril audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md` (any flagged issues triaged with documented disposition)
   4. The multi-amount tax probe (1% / 50% / 100% of `snipeAmount`) catches an amount-varying-tax fixture token in the test suite — a token that returns 0% tax on small probes and >25% tax on production-sized swaps no longer passes the gate
   5. The `safetyBank` audit (HONEY-11) findings are committed in `.planning/milestones/v6.17-safety-bank-audit.md` — every gate in `tokenSafety.ts` (buy-sim, tax check, max-wallet, blacklist, liquidity-sufficiency, metadata, transfer-tax, blocklist) has a documented "exercised the underlying behavior" assertion or has been fixed to add one; no other `amountIn=0` family bugs remain undocumented
-**Plans**: TBD
+**Plans**: 11 plans (iter-2 plan-checker revision: +18-00 wave-0 + 18-10 wiring split)
+
+  **Wave 0** *(pre-wave; closes Blocker #2 chicken-and-egg):*
+  - [ ] 18-00-PLAN.md — REQUIREMENTS.md HONEY-12 row [HONEY-12]
+
+  **Wave 1** *(after 18-00; parallel):*
+  - [ ] 18-01-PLAN.md — contrived Honeypot.sol 5-mode fixture (4 standard + amount-tiered per Warning #6) + 3 real-mainnet honeypot fixtures (2 V2 + 1 V3 per Blocker #1) [HONEY-12]
+  - [ ] 18-02-PLAN.md — HoneypotChecker.sol with checkV2 + checkV3 (~160-190 LOC per Blocker #1) + Ignition module + types.ts + abi.ts + dispatch index.ts + simulator.ts stub + checkerContract.ts placeholder with Warning #9 sentinel [HONEY-01, HONEY-05, HONEY-06]
+  - [ ] 18-03-PLAN.md — bytecodeScan.ts HONEY-12 + scripts/check-mythril-report.ts severity gate [HONEY-12, HONEY-02 tooling]
+  - [ ] 18-04-PLAN.md — HONEY-11 safetyBank audit: 8 per-gate regression tests + isBlacklistedTokenForChain fail-closed retrofit + audit milestone doc [HONEY-11]
+
+  **Wave 2** *(after Wave 1):*
+  - [ ] 18-05-PLAN.md — Slither + Mythril audit covering BOTH checkV2 + checkV3 (Blocker #1) + audit milestone doc + CI gates on contracts/** [HONEY-02] (autonomous: false)
+  - [ ] 18-06-PLAN.md — chainRegistry.ts honeypotChecker field + tax thresholds + hardhat.config.ts deploy networks + scripts/deploy-honeypot-checker.ts CLI [HONEY-05]
+
+  **Wave 3** *(after audit clean + chainRegistry wired):*
+  - [ ] 18-07-PLAN.md — ETH mainnet deploy + Etherscan verify (V2 + V3) + integration test + COMMIT ETH LITERAL INTO src/chainRegistry.ts (Blocker #3) + auto-grep audit precheck (Blocker #4) + 2-3 day observation window [HONEY-03] (autonomous: false)
+
+  **Wave 5** *(parallel after observation window closes):*
+  - [ ] 18-08-PLAN.md — BSC + Base + Arbitrum batch deploy + verify + 3 integration tests + 3 chainRegistry.ts per-chain literal commits (Blocker #3) [HONEY-04] (autonomous: false)
+  - [ ] 18-09-PLAN.md — checkerContract.ts V2 + V3 wrappers (Blocker #1) + multi-amount probe + tax thresholds + DELETE broken sell-sims (D-ROLLBACK) + fork/integration/unit tests + Warning #9 sentinel removal [HONEY-07, HONEY-08, HONEY-09, HONEY-10]
+
+  **Wave 6** *(after 18-09 wrapper layer; Warning #8 density split):*
+  - [ ] 18-10-PLAN.md — bot.ts V2 + V3 in-place gate replacement (V3 feeTier passthrough per Blocker #1) + parallel-bank HONEY-12 on both paths + D-ALERTS tiered alert format + V2/V3 integration tests asserting active V3 unsafe + V3 safe paths [HONEY-07, HONEY-08, HONEY-12]
+
+  **Cross-cutting constraints:**
+  - **D-STOP-THE-LINE:** any audit finding revealing a bug worse than V2/V3 sell-sims BLOCKS Phase 18 close; escalates to HONEY-13+ / decimal phase 18.1
+  - **D-AUDIT-TIMING:** wave 5/6 closes only after (a) 18-07 ETH deploy live + (b) 18-04 + 18-05 audit-discovered fixes merged; depends_on in 18-09 STRUCTURALLY enforces dep on [18-04, 18-05, 18-07] per iter-2 Blocker #4
+  - **D-ROLLBACK:** plan 18-09 DELETES broken simulateSellForChain + simulateSellV3ForChain entirely; no legacy fallback flag retained
 
 ### Phase 19: Anti-Rug Runtime Monitoring
 **Goal**: When liquidity is removed from a pool the bot has an open position in, the bot fires a frontrun-exit through the existing `executeFullSell` path with elevated gas — within 1-2 confirmation blocks of the LP-removal event, with multi-signal logic (>50% LP removed AND destination not in allowlist AND reserves below sell-threshold) that does not cascade into panic-sells on legitimate V2→V3 migrations, lock-contract transfers, or normal multisig rebalances
@@ -138,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 0/? | Not started | - |
+| 18. Honeypot Detection Rebuild | v6.17 | 0/11 | Planning complete (iter-2 revised) | - |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
