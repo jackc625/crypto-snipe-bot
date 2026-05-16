@@ -83,7 +83,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 11 plans (iter-2 plan-checker revision: +18-00 wave-0 + 18-10 wiring split)
 
   **Wave 0** *(pre-wave; closes Blocker #2 chicken-and-egg):*
-  - [ ] 18-00-PLAN.md — REQUIREMENTS.md HONEY-12 row [HONEY-12]
+  - [x] 18-00-PLAN.md — REQUIREMENTS.md HONEY-12 row [HONEY-12]
 
   **Wave 1** *(after 18-00; parallel):*
   - [ ] 18-01-PLAN.md — contrived Honeypot.sol 5-mode fixture (4 standard + amount-tiered per Warning #6) + 3 real-mainnet honeypot fixtures (2 V2 + 1 V3 per Blocker #1) [HONEY-12]
@@ -166,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 0/11 | Planning complete (iter-2 revised) | - |
+| 18. Honeypot Detection Rebuild | v6.17 | 1/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
