@@ -34,7 +34,7 @@ The current pre-buy safety-stack rebuild — fixes the broken V2 sell-sim (`amou
 - [ ] **HONEY-08**: V3 honeypot gate at `bot.ts:411-416` replaced in-place with new `simulateHoneypotRoundtrip(...)` dispatch call. Eliminates the silent vacuous-pass — `unknown` verdict now fails closed instead of returning `true`.
 - [ ] **HONEY-09**: Numerical buy-tax + sell-tax extraction in basis points returned in `HoneypotResult.evidence`. Per-chain configurable max-tax thresholds (`ETH_MAX_BUY_TAX_BPS`, etc.) enforced at gate; logged in structured pino output on every safety check.
 - [ ] **HONEY-10**: Multi-amount tax probe at 1%, 50%, and 100% of intended position size. Catches amount-varying taxes that single-amount probes miss. Implemented as N=3 calls into the deployed checker; aggregated into the `HoneypotResult`.
-- [ ] **HONEY-11**: Audit pass on the other 8+ gates in `tokenSafety.ts` (buy-sim, tax check, max-wallet, blacklist, liquidity-sufficiency, metadata, transfer-tax, blocklist) for `amountIn=0` / vacuous-pass family bugs. Findings documented in `.planning/milestones/v6.17-safety-bank-audit.md`; fixes shipped atomically with HONEY-07/08 if any are found.
+- [x] **HONEY-11**: Audit pass on the other 8+ gates in `tokenSafety.ts` (buy-sim, tax check, max-wallet, blacklist, liquidity-sufficiency, metadata, transfer-tax, blocklist) for `amountIn=0` / vacuous-pass family bugs. Findings documented in `.planning/milestones/v6.17-safety-bank-audit.md`; fixes shipped atomically with HONEY-07/08 if any are found.
 - [ ] **HONEY-12**: New function `isMutableTokenForChain(ctx, token)` performs a bytecode selector-presence scan via `provider.getCode` matching the 19-selector table in `.planning/phases/18-honeypot-detection-rebuild/18-RESEARCH.md` §"Bytecode Selector Scan (HONEY-12) — Verified Selector Table". Returns `{ isMutable: boolean; hits: string[] }`; positive hit blocks the buy in the parallel safety bank at `src/bot.ts:229-238` per D-BYTECODE. Fails closed on `getCode` throw (treats as mutable rather than buying unknown) per `.planning/phases/18-honeypot-detection-rebuild/18-RESEARCH.md` §7 lines 1026-1030. ~50 LOC; no contract deploy.
 
 ### Anti-Rug Runtime Monitoring (ANTIRUG)
@@ -153,7 +153,7 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | HONEY-08 | Phase 18 | Pending |
 | HONEY-09 | Phase 18 | Pending |
 | HONEY-10 | Phase 18 | Pending |
-| HONEY-11 | Phase 18 | Pending |
+| HONEY-11 | Phase 18 | Complete |
 | HONEY-12 | Phase 18 | Pending |
 | ANTIRUG-01 | Phase 19 | Pending |
 | ANTIRUG-02 | Phase 19 | Pending |

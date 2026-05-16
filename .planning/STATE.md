@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Completed 18-00-PLAN.md (HONEY-12 row added)
-last_updated: "2026-05-16T00:39:02.146Z"
+stopped_at: Completed 18-04-PLAN.md (HONEY-11 audit closed; D-STOP-THE-LINE NOT triggered)
+last_updated: "2026-05-16T00:59:30.438Z"
 last_activity: 2026-05-16
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 5
+  completed_plans: 6
   percent: 20
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 18 (honeypot-detection-rebuild) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
 Status: Ready to execute
 Last activity: 2026-05-16
 
@@ -103,10 +103,12 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
 | 18-00 (HONEY-12 row) | <5min | 1/1 | 1 | 85fcd2b |
+| 18-02 (HoneypotChecker.sol + TS skeleton) | 17min | 3/3 | 9 | 4571393 |
+| 18-04 (HONEY-11 safetyBank audit + isBlacklistedTokenForChain fix-in-flight) | ~30min | 3/3 | 10 | 53df941 |
 
 ## Session Continuity
 
-Last session: 2026-05-16T00:38:31.431Z
-Last activity: 2026-04-30 — Phase 17 verified passed (4/4 must-haves); 358-pass test suite; CI invariant guards locked; DEBT-01..06 closed.
-Stopped at: Completed 18-00-PLAN.md (HONEY-12 row added)
+Last session: 2026-05-16T00:59:30.428Z
+Last activity: 2026-05-15 — Phase 18 plan 18-04 complete (HONEY-11 closed; 8 per-gate regression contracts + audit milestone + isBlacklistedTokenForChain fail-closed retrofit). D-STOP-THE-LINE NOT triggered (audit-found bug severity LOW; bot fails CLOSED at call-site).
+Stopped at: Completed 18-04-PLAN.md (HONEY-11 audit closed; D-STOP-THE-LINE NOT triggered)
 Resume file: None
