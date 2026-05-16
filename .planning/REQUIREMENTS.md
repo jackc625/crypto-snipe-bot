@@ -24,12 +24,12 @@ Pre-substantive-work cleanup of v6.16 close debt. Phase 17 first verifies status
 
 The current pre-buy safety-stack rebuild — fixes the broken V2 sell-sim (`amountIn=0` hard-block) and silent-pass V3 sell-sim. Architecture: Option D (deploy `HoneypotChecker.sol`) primary; Option C (`eth_simulateV1`) opt-in fallback only. Decision closed by research convergence (STACK + ARCHITECTURE + PITFALLS).
 
-- [ ] **HONEY-01**: `contracts/honeypot/HoneypotChecker.sol` authored — ~80 LOC Solidity round-trip checker; reverts at end of buy→sell to roll back; uses OZ `IERC20`; storage-agnostic (exercises token's own `_transfer` hook); compiled under existing solc 0.8.28 toolchain.
+- [x] **HONEY-01**: `contracts/honeypot/HoneypotChecker.sol` authored — ~80 LOC Solidity round-trip checker; reverts at end of buy→sell to roll back; uses OZ `IERC20`; storage-agnostic (exercises token's own `_transfer` hook); compiled under existing solc 0.8.28 toolchain.
 - [ ] **HONEY-02**: Slither + Mythril static analysis runs clean (or all flagged issues triaged with documented disposition) on `HoneypotChecker.sol` before any mainnet deploy. Audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md`.
 - [ ] **HONEY-03**: `HoneypotChecker.sol` deployed on Ethereum mainnet via Hardhat Ignition. Deployed address recorded in `chainRegistry.ts` `CHAIN_TEMPLATES['eth'].honeypotChecker.deployedAddress`. Etherscan-verified.
 - [ ] **HONEY-04**: `HoneypotChecker.sol` deployed on BSC, Base, and Arbitrum mainnets. Deployed addresses recorded in respective `CHAIN_TEMPLATES` entries. Each block-explorer-verified.
-- [ ] **HONEY-05**: `src/utils/honeypot/` module created with: dispatch layer (`index.ts`), Option-D wrapper (`checkerContract.ts`), Option-C fallback skeleton (`simulator.ts`), shared `types.ts`. Per-chain dispatch via new `ChainConfig.honeypotChecker.method` field.
-- [ ] **HONEY-06**: `HoneypotResult` type defined as discriminated union: `{ verdict: 'safe' | 'unsafe' | 'unknown', evidence: { buyTaxBps?, sellTaxBps?, revertReason?, ... } }`. Vacuous pass is unrepresentable in the type system. `unknown` verdict fails closed at every caller.
+- [x] **HONEY-05**: `src/utils/honeypot/` module created with: dispatch layer (`index.ts`), Option-D wrapper (`checkerContract.ts`), Option-C fallback skeleton (`simulator.ts`), shared `types.ts`. Per-chain dispatch via new `ChainConfig.honeypotChecker.method` field.
+- [x] **HONEY-06**: `HoneypotResult` type defined as discriminated union: `{ verdict: 'safe' | 'unsafe' | 'unknown', evidence: { buyTaxBps?, sellTaxBps?, revertReason?, ... } }`. Vacuous pass is unrepresentable in the type system. `unknown` verdict fails closed at every caller.
 - [ ] **HONEY-07**: V2 honeypot gate at `bot.ts:220-226` replaced in-place with new `simulateHoneypotRoundtrip(...)` dispatch call. The hard-block-before-parallel-bank semantic of FIX-04 preserved. Existing parallel safety bank at `bot.ts:229-238` unchanged.
 - [ ] **HONEY-08**: V3 honeypot gate at `bot.ts:411-416` replaced in-place with new `simulateHoneypotRoundtrip(...)` dispatch call. Eliminates the silent vacuous-pass — `unknown` verdict now fails closed instead of returning `true`.
 - [ ] **HONEY-09**: Numerical buy-tax + sell-tax extraction in basis points returned in `HoneypotResult.evidence`. Per-chain configurable max-tax thresholds (`ETH_MAX_BUY_TAX_BPS`, etc.) enforced at gate; logged in structured pino output on every safety check.
@@ -143,12 +143,12 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | DEBT-04 | Phase 17 | Complete (2026-04-30; Branch A verified-empty) |
 | DEBT-05 | Phase 17 | Complete (2026-04-30) |
 | DEBT-06 | Phase 17 | Complete (2026-04-30) |
-| HONEY-01 | Phase 18 | Pending |
+| HONEY-01 | Phase 18 | Complete |
 | HONEY-02 | Phase 18 | Pending |
 | HONEY-03 | Phase 18 | Pending |
 | HONEY-04 | Phase 18 | Pending |
-| HONEY-05 | Phase 18 | Pending |
-| HONEY-06 | Phase 18 | Pending |
+| HONEY-05 | Phase 18 | Complete |
+| HONEY-06 | Phase 18 | Complete |
 | HONEY-07 | Phase 18 | Pending |
 | HONEY-08 | Phase 18 | Pending |
 | HONEY-09 | Phase 18 | Pending |
