@@ -4,7 +4,7 @@ milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
 stopped_at: Wave 2 complete — 7/11 plans done (18-00..18-06); audit gate CLEARED for HONEY-03; paused before plan 18-07 ETH mainnet deploy (autonomous:false — operator funds deploy wallet, runs deploy + Etherscan verify)
-last_updated: "2026-05-16T02:30:00.000Z"
+last_updated: "2026-05-18T18:55:00.000Z"
 last_activity: 2026-05-16 — Phase 18 Wave 0+1+2 complete; paused before Wave 3 (18-07 ETH mainnet deploy)
 progress:
   total_phases: 5
@@ -33,7 +33,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 Phase: 18 (honeypot-detection-rebuild) — EXECUTING (paused mid-phase)
 Plan: 8 of 11 — next up is 18-07 (Wave 3, ETH mainnet deploy, autonomous:false)
 Status: Ready to resume — run `/gsd-execute-phase 18`; orchestrator picks up at Wave 3 because plans 18-00..18-06 have committed SUMMARY.md files
-Last activity: 2026-05-16
+Last activity: 2026-05-18 — Completed quick task 260518-jsr: README.md rewrite (main work still paused at Phase 18 Wave 2)
 
 ## Performance Metrics
 
@@ -104,6 +104,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 260429-cleanup-empty-files | Find and clean up empty files/folders (root cause: 532b563 codebase mapping commit). Removed 8 empty placeholders + ignition/, cleaned 19 stale agent worktrees, patched 9 doc references, added pre-commit guard against future 0-byte commits | 2026-04-29 | 8bfab90 | Verified | [260429-cleanup-empty-files](./quick/260429-cleanup-empty-files/) |
+| 260518-jsr | Inspect entire codebase and write a brand-new, fully-updated README.md at the project root (engineer-first deep-dive, 502 lines, prose+bullets, WIP marked inline; grounded in 727-line research inventory) | 2026-05-18 | 847b369 | Verified | [260518-jsr-inspect-entire-codebase-and-write-a-bran](./quick/260518-jsr-inspect-entire-codebase-and-write-a-bran/) |
 | Phase 18 P05 | ~45min | 3 tasks | 4 files |
 
 ## Phase 18 Plan Execution Log
