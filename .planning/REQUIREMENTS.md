@@ -26,7 +26,7 @@ The current pre-buy safety-stack rebuild — fixes the broken V2 sell-sim (`amou
 
 - [x] **HONEY-01**: `contracts/honeypot/HoneypotChecker.sol` authored — ~80 LOC Solidity round-trip checker; reverts at end of buy→sell to roll back; uses OZ `IERC20`; storage-agnostic (exercises token's own `_transfer` hook); compiled under existing solc 0.8.28 toolchain.
 - [x] **HONEY-02**: Slither + Mythril static analysis runs clean (or all flagged issues triaged with documented disposition) on `HoneypotChecker.sol` before any mainnet deploy. Audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md`.
-- [ ] **HONEY-03**: `HoneypotChecker.sol` deployed on Ethereum mainnet via Hardhat Ignition. Deployed address recorded in `chainRegistry.ts` `CHAIN_TEMPLATES['eth'].honeypotChecker.deployedAddress`. Etherscan-verified.
+- [x] **HONEY-03**: `HoneypotChecker.sol` deployed on Ethereum mainnet via Hardhat Ignition at `0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD`. Address committed as literal default in `chainRegistry.ts` `CHAIN_TEMPLATES.eth.defaultHoneypotCheckerAddress` per iter-2 Blocker #3 (env overlay remains as operator override). Etherscan-verified 2026-05-19 (V2 + V3 entry points). Sepolia rehearsal preceded mainnet deploy; rehearsal artifacts in `ignition/deployments/chain-11155111/`. See `.planning/phases/18-honeypot-detection-rebuild/18-07-SUMMARY.md` and `.planning/milestones/v6.17-honeypot-checker-audit.md §HONEY-03 Deploy Artifacts`.
 - [ ] **HONEY-04**: `HoneypotChecker.sol` deployed on BSC, Base, and Arbitrum mainnets. Deployed addresses recorded in respective `CHAIN_TEMPLATES` entries. Each block-explorer-verified.
 - [x] **HONEY-05**: `src/utils/honeypot/` module created with: dispatch layer (`index.ts`), Option-D wrapper (`checkerContract.ts`), Option-C fallback skeleton (`simulator.ts`), shared `types.ts`. Per-chain dispatch via new `ChainConfig.honeypotChecker.method` field.
 - [x] **HONEY-06**: `HoneypotResult` type defined as discriminated union: `{ verdict: 'safe' | 'unsafe' | 'unknown', evidence: { buyTaxBps?, sellTaxBps?, revertReason?, ... } }`. Vacuous pass is unrepresentable in the type system. `unknown` verdict fails closed at every caller.
@@ -145,7 +145,7 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | DEBT-06 | Phase 17 | Complete (2026-04-30) |
 | HONEY-01 | Phase 18 | Complete |
 | HONEY-02 | Phase 18 | Complete (2026-05-15; plan 18-05; 13/13 Slither medium+ false-positive; Mythril 0 issues; deploy gate cleared for HONEY-03) |
-| HONEY-03 | Phase 18 | Pending |
+| HONEY-03 | Phase 18 | Complete (2026-05-19; plan 18-07; live at 0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD; Etherscan-verified; literal in chainRegistry per iter-2 Blocker #3; 2-3 day observation window open) |
 | HONEY-04 | Phase 18 | Pending |
 | HONEY-05 | Phase 18 | Complete |
 | HONEY-06 | Phase 18 | Complete |

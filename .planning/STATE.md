@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Wave 2 complete — 7/11 plans done (18-00..18-06); audit gate CLEARED for HONEY-03; paused before plan 18-07 ETH mainnet deploy (autonomous:false — operator funds deploy wallet, runs deploy + Etherscan verify)
-last_updated: "2026-05-18T18:55:00.000Z"
-last_activity: 2026-05-16 — Phase 18 Wave 0+1+2 complete; paused before Wave 3 (18-07 ETH mainnet deploy)
+stopped_at: Completed 18-07-PLAN.md (HONEY-03 ETH mainnet deploy at 0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD; Etherscan-verified V2+V3; literal in chainRegistry per iter-2 Blocker #3; 2-3 day observation window open until 2026-05-22 before plan 18-08 BSC/Base/Arb batch). 8/11 plans done; plan 18-09 is autonomous and CAN run during the observation window.
+last_updated: "2026-05-19T23:55:00.000Z"
+last_activity: 2026-05-19 — Phase 18 plan 18-07 complete (ETH mainnet HoneypotChecker deploy + Etherscan verify)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 10
-  percent: 20
+  completed_plans: 11
+  percent: 22
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 ## Current Position
 
-Phase: 18 (honeypot-detection-rebuild) — EXECUTING (paused mid-phase)
-Plan: 8 of 11 — next up is 18-07 (Wave 3, ETH mainnet deploy, autonomous:false)
-Status: Ready to resume — run `/gsd-execute-phase 18`; orchestrator picks up at Wave 3 because plans 18-00..18-06 have committed SUMMARY.md files
-Last activity: 2026-05-18 — Completed quick task 260518-jsr: README.md rewrite (main work still paused at Phase 18 Wave 2)
+Phase: 18 (honeypot-detection-rebuild) — EXECUTING (observation-window pause)
+Plan: 8 of 11 complete (18-00..18-07); 18-09 next (autonomous, can run NOW); 18-08 and 18-10 gated on 2-3 day observation window closing ~2026-05-22
+Status: Ready to resume — run `/gsd-execute-phase 18 --wave 4` to dispatch 18-09 (autonomous Option-D wrapper, parallel-safe with the 18-08 operator deploy window)
+Last activity: 2026-05-19 — Phase 18 plan 18-07 complete (HoneypotChecker ETH mainnet deploy + Etherscan verify; literal address in chainRegistry per iter-2 Blocker #3)
 
 ## Performance Metrics
 

@@ -96,7 +96,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 18-06-PLAN.md — chainRegistry.ts honeypotChecker field + tax thresholds + hardhat.config.ts deploy networks + scripts/deploy-honeypot-checker.ts CLI [HONEY-05]
 
   **Wave 3** *(after audit clean + chainRegistry wired):*
-  - [ ] 18-07-PLAN.md — ETH mainnet deploy + Etherscan verify (V2 + V3) + integration test + COMMIT ETH LITERAL INTO src/chainRegistry.ts (Blocker #3) + auto-grep audit precheck (Blocker #4) + 2-3 day observation window [HONEY-03] (autonomous: false)
+  - [x] 18-07-PLAN.md — ETH mainnet deploy + Etherscan verify (V2 + V3) + integration test + COMMIT ETH LITERAL INTO src/chainRegistry.ts (Blocker #3) + auto-grep audit precheck (Blocker #4) + 2-3 day observation window [HONEY-03] (autonomous: false)
 
   **Wave 5** *(parallel after observation window closes):*
   - [ ] 18-08-PLAN.md — BSC + Base + Arbitrum batch deploy + verify + 3 integration tests + 3 chainRegistry.ts per-chain literal commits (Blocker #3) [HONEY-04] (autonomous: false)
@@ -166,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 7/11 | In Progress|  |
+| 18. Honeypot Detection Rebuild | v6.17 | 8/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
