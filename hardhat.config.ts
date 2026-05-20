@@ -48,11 +48,12 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS, async (_args, _hre, runSuper) =>
 const config: HardhatUserConfig = {
   solidity: "0.8.28",
   networks: {
-    ...(process.env.ALCHEMY_URL
+    ...(process.env.SEPOLIA_RPC_URL && process.env.DEPLOY_PRIVATE_KEY
       ? {
           sepolia: {
-            url: process.env.ALCHEMY_URL,
-            accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+            url: process.env.SEPOLIA_RPC_URL,
+            accounts: [process.env.DEPLOY_PRIVATE_KEY],
+            chainId: 11155111,
           },
         }
       : {}),
@@ -100,12 +101,7 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY ?? '',
-      bsc: process.env.BSCSCAN_API_KEY ?? '',
-      base: process.env.BASESCAN_API_KEY ?? '',
-      arbitrumOne: process.env.ARBISCAN_API_KEY ?? '',
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY ?? '',
   },
 };
 
