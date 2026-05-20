@@ -110,15 +110,22 @@ interface ChainTemplate {
     httpRpcEnv: string;
     wsRpcEnv: string;
     // Plan 18-06: per-chain HoneypotChecker defaults. The deployed contract
-    // address is supplied at runtime via <PREFIX>_HONEYPOT_CHECKER_ADDRESS;
-    // the template captures only the dispatch method + tax-threshold
-    // defaults (10% buy / 10% sell per D-TAX-THRESHOLDS).
+    // address is supplied at runtime via <PREFIX>_HONEYPOT_CHECKER_ADDRESS,
+    // falling back to the literal `defaultHoneypotCheckerAddress` committed
+    // here (iter-2 Blocker #3 — canonical source-of-truth lives in the
+    // source file; env var is an operator OVERRIDE for hot-patching).
+    // `null` until the chain's contract is deployed (plans 18-07/18-08).
     honeypotMethod: 'on-chain-contract' | 'eth_simulateV1';
     defaultMaxBuyTaxBps: number;
     defaultMaxSellTaxBps: number;
+    defaultHoneypotCheckerAddress: string | null;
 }
 
-const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
+// Exported for test/integration/honeypotDeploy.*.test.ts (plan 18-07/18-08) so
+// the integration tests can read the canonical literal address without going
+// through buildChainRegistry() (which requires ENABLED_CHAINS / FLASHBOTS_AUTH_KEY
+// / etc. validation to fire).
+export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
     eth: {
         chainId: 1,
         name: 'eth',
@@ -160,6 +167,14 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         honeypotMethod: 'on-chain-contract',
         defaultMaxBuyTaxBps: 1000,
         defaultMaxSellTaxBps: 1000,
+        // Plan 18-07 (HONEY-03) iter-2 Blocker #3: canonical ETH HoneypotChecker
+        // address deployed via Hardhat Ignition on 2026-05-19; Etherscan-verified
+        // (V2 + V3 entry points). Committed as literal default per the audit-trail
+        // requirement that the source-of-truth lives in the source file; the
+        // ETH_HONEYPOT_CHECKER_ADDRESS env var remains as an operator override
+        // for hot-patching without redeploy. See
+        // .planning/milestones/v6.17-honeypot-checker-audit.md §HONEY-03.
+        defaultHoneypotCheckerAddress: '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD',
     },
     bsc: {
         chainId: 56,
@@ -209,6 +224,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         honeypotMethod: 'on-chain-contract',
         defaultMaxBuyTaxBps: 1000,
         defaultMaxSellTaxBps: 1000,
+        // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
+        // from plan 18-07 closes cleanly.
+        defaultHoneypotCheckerAddress: null,
     },
     base: {
         chainId: 8453,
@@ -251,6 +269,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         honeypotMethod: 'on-chain-contract',
         defaultMaxBuyTaxBps: 1000,
         defaultMaxSellTaxBps: 1000,
+        // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
+        // from plan 18-07 closes cleanly.
+        defaultHoneypotCheckerAddress: null,
     },
     arb: {
         chainId: 42161,
@@ -293,6 +314,9 @@ const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         honeypotMethod: 'on-chain-contract',
         defaultMaxBuyTaxBps: 1000,
         defaultMaxSellTaxBps: 1000,
+        // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
+        // from plan 18-07 closes cleanly.
+        defaultHoneypotCheckerAddress: null,
     },
 };
 
@@ -333,13 +357,16 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
         const minLiquidityThreshold = process.env[`${template.envPrefix}_MIN_LIQUIDITY`] || template.defaultMinLiquidityThreshold;
 
         // Plan 18-06 HONEY-05: per-chain HoneypotChecker overlay.
-        //   <PREFIX>_HONEYPOT_CHECKER_ADDRESS — deployed contract address;
-        //     null when not yet deployed (dispatch layer returns
-        //     verdict='unknown' per D-UNKNOWN-POLICY).
+        //   <PREFIX>_HONEYPOT_CHECKER_ADDRESS — operator OVERRIDE for the
+        //     literal `defaultHoneypotCheckerAddress` committed in
+        //     CHAIN_TEMPLATES (plan 18-07 iter-2 Blocker #3 — canonical
+        //     source-of-truth lives in the source file).
+        //   Falls back to template default; null when neither is set
+        //     (dispatch layer returns verdict='unknown' per D-UNKNOWN-POLICY).
         //   <PREFIX>_MAX_BUY_TAX_BPS, <PREFIX>_MAX_SELL_TAX_BPS — fail-loud
         //     validated in [0, 10000] bps. Default 1000 (10%) per
         //     D-TAX-THRESHOLDS.
-        const honeypotCheckerAddress = process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`] || null;
+        const honeypotCheckerAddress = process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`] || template.defaultHoneypotCheckerAddress;
         const maxBuyTaxBpsRaw = process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`] || String(template.defaultMaxBuyTaxBps);
         const maxSellTaxBpsRaw = process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`] || String(template.defaultMaxSellTaxBps);
         const maxBuyTaxBps = parseInt(maxBuyTaxBpsRaw, 10);
