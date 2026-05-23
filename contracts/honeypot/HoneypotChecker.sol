@@ -207,6 +207,14 @@ contract HoneypotChecker {
 
         uint expectedEthOut = r.getAmountsOut(received, pathSell)[1];
 
+        // Plan 18-WR-04 fix-along (documentation): `ethBefore` may include the
+        // ETH refund the V2 router emitted from the buy leg (the router
+        // refunds leftover ETH via receive() at the bottom of this contract
+        // when value was over-sent). The subtraction `ethAfter - ethBefore`
+        // below correctly nets out this baseline because the refund happens
+        // BEFORE this line and is captured in ethBefore. A future change to
+        // receive() that adds revert logic would break this invariant and
+        // cause `ethBefore` to be wrong. Keep receive() empty.
         uint ethBefore = address(this).balance;
         try r.swapExactTokensForETHSupportingFeeOnTransferTokens(
             received, 0, pathSell, address(this), block.timestamp + 60
@@ -389,5 +397,32 @@ contract HoneypotChecker {
     /// @notice Receive ETH refund from V2 router (V2 returns leftover ETH on
     ///         swapExactTokens* variants when value is over-sent). V3 does not
     ///         refund but receive() is harmless to keep.
+    ///
+    /// @dev    Plan 18-WR-06 fix-along (documented reentrancy invariant):
+    ///         this contract intentionally does NOT use OpenZeppelin's
+    ///         ReentrancyGuard despite calling untrusted token code (approve /
+    ///         transfer) inside checkV2 / checkV3. The reentrancy safety
+    ///         argument relies on three load-bearing invariants:
+    ///           (1) The contract ALWAYS reverts at the end (revert-always
+    ///               design: every checkV2 / checkV3 terminates in a
+    ///               RoundtripResult{,V3} revert or a BuyFailed / SellFailed /
+    ///               QuoteFailed revert). All in-transaction state mutations
+    ///               are rolled back. There is no persistent state to corrupt.
+    ///           (2) `receive()` below is EMPTY and MUST remain so. A future
+    ///               maintainer adding stateful logic to receive() would
+    ///               introduce a real reentrancy vector — a token's `approve`
+    ///               could send ETH (refund) to this contract via receive(),
+    ///               and any state mutation there would execute mid-checkV2.
+    ///           (3) `checkV2` and `checkV3` require `msg.value == amountIn`
+    ///               on entry; a reentrant call from a token hook with
+    ///               msg.value=0 fails this check immediately. Single
+    ///               in-transaction reentry from the same caller can therefore
+    ///               not bypass the buy/sell roundtrip logic.
+    ///         If any of these three invariants is ever violated by a future
+    ///         change, `nonReentrant` modifiers MUST be added to checkV2 and
+    ///         checkV3 before that change is deployed. Slither + Mythril
+    ///         reentrancy findings were dispositioned as false-positives in
+    ///         the 2026-05-15 audit on the basis of these invariants
+    ///         (.planning/milestones/v6.17-honeypot-checker-audit.md).
     receive() external payable {}
 }
