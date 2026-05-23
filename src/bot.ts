@@ -388,8 +388,13 @@ export async function handleNewPairForChain(
         });
         await sendCtxAlert(ctx, `*Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\``);
         ctx.log.info({ token: targetToken, symbol, strategy: ctx.chain.mevStrategy }, 'MEV bundle submitted');
-        ctx.log.info({ token: targetToken }, 'TX confirmed');
-        await sendCtxAlert(ctx, `*TX confirmed* for \`${symbol}\``);
+        // Plan 18-WR-07 fix-along: dropped the misleading "TX confirmed" log +
+        // alert. sendTxWithRetry returns the tx hash on success but does NOT
+        // wait for the transaction to be mined / confirmed (depends on MEV
+        // strategy). Actual settlement status arrives later via the receipt
+        // decoder, which updates the trades row from status='pending' to
+        // status='sold' (or 'failed'). Emitting "TX confirmed" here would
+        // mislead the operator into believing the trade settled.
 
         // Capture token balance for exit engine (D-07: original buy amount needed for partial sells)
         const exitTokenContract = new Contract(targetToken, ERC20_ABI, ctx.wallet);
@@ -624,8 +629,8 @@ export async function handleNewV3PoolForChain(
 
         await sendCtxAlert(ctx, `*V3 Buy TX sent via ${ctx.chain.mevStrategy}* for \`${symbol}\` (fee: ${feeTier}bps)`);
         ctx.log.info({ token: targetToken, symbol, strategy: ctx.chain.mevStrategy, feeTier }, 'V3 MEV bundle submitted');
-        ctx.log.info({ token: targetToken }, 'V3 TX confirmed');
-        await sendCtxAlert(ctx, `*V3 TX confirmed* for \`${symbol}\``);
+        // Plan 18-WR-07 fix-along: dropped the misleading "V3 TX confirmed"
+        // log + alert (same rationale as V2 handler — see comment there).
 
         // Capture token balance for exit engine (D-07)
         const exitTokenContract = new Contract(targetToken, ERC20_ABI, ctx.wallet);
