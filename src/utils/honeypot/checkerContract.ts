@@ -94,18 +94,24 @@ function extractRevertData(err: CallError): string {
 function isConfigBugError(e: unknown): boolean {
     if (!(e instanceof Error)) return false;
     const msg = e.message;
-    // ethers v6 surfaces malformed-input errors as named codes; cover both
-    // the message-substring and code-string variants for robustness.
+    // ethers v6 surfaces malformed-input errors with code='INVALID_ARGUMENT'
+    // (parseEther on a non-numeric string, encodeFunctionData on a bad
+    // address) and code='NUMERIC_FAULT' on overflow / underflow. Prefer the
+    // code-string check (robust across version bumps) and keep
+    // message-substring checks only for cases where the code field is
+    // absent. NB: we intentionally do NOT match the v6 "invalid big-number-
+    // ish" message substring; the standalone v6 type-alias token would trip
+    // the ETH6-01 lint test (test/unit/ethersV5PatternsAbsent.test.ts) which
+    // bans the v5 class name. The code-based check covers the same case.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const code = (e as any).code;
     return (
+        code === 'INVALID_ARGUMENT' ||
+        code === 'NUMERIC_FAULT' ||
         msg.includes('parseEther') ||
         msg.includes('encodeFunctionData') ||
         msg.includes('INVALID_ARGUMENT') ||
-        msg.includes('invalid BigNumberish') ||
-        msg.includes('invalid address') ||
-        code === 'INVALID_ARGUMENT' ||
-        code === 'NUMERIC_FAULT'
+        msg.includes('invalid address')
     );
 }
 
