@@ -78,6 +78,8 @@ verification:
     - "grep -c 'simulateHoneypotRoundtrip' src/bot.ts >= 3 (1 import + 2 call sites V2/V3)"
     - "grep -c 'isMutableTokenForChain' src/bot.ts >= 3 (1 import + 2 parallel-bank elements V2/V3)"
 
+---
+
 # Self-Check: PASSED
 
 **Files claimed to be created/modified — verified to exist:**
