@@ -37,7 +37,7 @@ key-files:
     - "test/integration/v2HoneypotIntegration.test.ts — 3 tests covering V2 wiring (HONEY-07 + HONEY-12 9th gate)"
     - "test/integration/v3HoneypotIntegration.test.ts — 3 tests covering V3 wiring (HONEY-08 iter-2 Blocker #1 V3-honeypot-fixture-unsafe + V3-known-good-safe + HONEY-12 9th gate)"
   modified:
-    - "src/bot.ts (V2 gate at line 232 replaced; V3 gate at line 459 replaced; isMutableTokenForChain added as 9th element of both parallel-bank Promise.all calls; conjunction at resolution extended with mutableResult.isMutable; New Token Detected alert at line ~268 augmented with BuyTax/SellTax bps; tiered D-ALERTS skip-alert format applied on both gates; TODO(18-10) markers consumed)"
+    - "src/bot.ts — V2 gate at line 232 replaced; V3 gate at line 459 replaced; isMutableTokenForChain added as 9th element of both parallel-bank Promise.all calls; conjunction at resolution extended with mutableResult.isMutable; New Token Detected alert at line ~268 augmented with BuyTax/SellTax bps; tiered D-ALERTS skip-alert format applied on both gates; TODO(18-10) markers consumed"
     - "test/unit/chainRegistry.test.ts (Test 1 updated per D-18-09-01 fix-along — ETH branch now expects the canonical literal default `0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD`; BSC/Base/Arb branches still expect null until plan 18-08)"
     - ".planning/phases/18-honeypot-detection-rebuild/deferred-items.md (D-18-09-01 marked Resolved; D-18-10-01 logged for pre-existing snipeLifecycle.test.ts fork-setup failure)"
 

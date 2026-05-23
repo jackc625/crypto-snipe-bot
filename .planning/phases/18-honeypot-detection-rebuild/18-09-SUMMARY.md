@@ -47,7 +47,7 @@ key-files:
     - "src/utils/honeypot/checkerContract.ts (REPLACED plan-18-02 placeholder with full Option-D V2+V3 wrapper: simulateViaContractV2 + simulateViaContractV3 + shared helpers decodeTerminalRevert/aggregateProbes/extractRevertData/makeProbeSummary; iter-2 Warning #9 sentinel REMOVED from comment block)"
     - "src/utils/honeypot/index.ts (dispatch signature extended with optional feeTier?: number; V3 branch passes through to simulateViaContractV3; V2 branch unchanged)"
     - "src/utils/tokenSafety.ts (DELETIONS of simulateSellForChain + simulateSellV3ForChain + V3_QUOTER_V2_ABI import; removal banner explaining D-ROLLBACK in their place)"
-    - "src/bot.ts (removed dangling imports of the deleted functions; commented out both call sites with TODO(18-10) markers; added void feeTier in the V3 branch to suppress TS unused-var warning)"
+    - "src/bot.ts — removed dangling imports of the deleted functions; commented out both call sites with TODO(18-10) markers; added void feeTier in the V3 branch to suppress TS unused-var warning"
     - "test/unit/honeypotTaxThreshold.test.ts (test refinement during GREEN phase)"
     - "test/integration/honeypotDispatch.test.ts (test refinement during GREEN phase)"
     - "test/integration/honeypotUnknownFailsClosed.test.ts (test refinement during GREEN phase)"
