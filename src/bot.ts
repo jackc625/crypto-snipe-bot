@@ -22,9 +22,12 @@ import {
     checkTokenMetadataForChain,
     hasHighTransferTaxForChain,
     hasMaxWalletOrTxLimitsForChain,
-    simulateSellForChain,
-    isBlacklistedTokenForChain,
-    simulateSellV3ForChain
+    isBlacklistedTokenForChain
+    // TODO(18-10): simulateSellForChain + simulateSellV3ForChain DELETED in
+    // plan 18-09 per D-ROLLBACK; plan 18-10 wires simulateHoneypotRoundtrip
+    // from src/utils/honeypot/index.ts into the V2 + V3 gate call-sites
+    // below (currently no-op stubs to preserve runtime behavior between
+    // the two commits).
 } from "./utils/tokenSafety";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
@@ -217,13 +220,14 @@ export async function handleNewPairForChain(
         return;
     }
 
-    // Sell simulation: always-on, hard block on failure (FIX-04)
-    const canSell = await simulateSellForChain(ctx, dex.routerAddress, targetToken);
-    if (!canSell) {
-        ctx.log.warn({ token: targetToken }, 'Sell simulation failed, skipping buy');
-        await sendCtxAlert(ctx, `*Sell simulation failed for* \`${targetToken}\` -- buy skipped`);
-        return;
-    }
+    // TODO(18-10): wire simulateHoneypotRoundtrip(ctx, dex, targetToken) here per
+    // HONEY-07. Plan 18-09 D-ROLLBACK DELETED simulateSellForChain; the replacement
+    // dispatcher in src/utils/honeypot/index.ts is plumbed but not yet wired into
+    // this V2 gate (plan 18-10 finalizes the in-place gate replacement + alert
+    // format + parallel-bank HONEY-12 9th gate). Until then, the V2 pre-buy
+    // sell-sim gate is a no-op — runtime behavior is "no gate" not "vacuous-pass"
+    // and the bot is offline during the 18-09→18-10 window per the user's
+    // observation-window pause (not actively trading).
 
     // Parallel safety checks using chain-aware versions
     const [isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits] = await Promise.all([
@@ -407,13 +411,14 @@ export async function handleNewV3PoolForChain(
         return;
     }
 
-    // V3 sell simulation using QuoterV2 (Pitfall 6: must use V3 quoter, not V2 router)
-    const canSell = await simulateSellV3ForChain(ctx, dex.quoterAddress, targetToken, feeTier);
-    if (!canSell) {
-        ctx.log.warn({ token: targetToken, feeTier }, 'V3 sell simulation failed, skipping buy');
-        await sendCtxAlert(ctx, `*V3 sell simulation failed for* \`${targetToken}\` -- buy skipped`);
-        return;
-    }
+    // TODO(18-10): wire simulateHoneypotRoundtrip(ctx, dex, targetToken, feeTier) here
+    // per HONEY-08 (V3 path passes feeTier through to simulateViaContractV3 per
+    // iter-2 Blocker #1). Plan 18-09 D-ROLLBACK DELETED simulateSellV3ForChain
+    // (the vacuous-pass that early-returned true on zero balance — the worst
+    // failure mode of all gates); the replacement dispatcher in
+    // src/utils/honeypot/index.ts is plumbed but not yet wired into this V3 gate.
+    // Plan 18-10 finalizes the in-place gate replacement.
+    void feeTier; // referenced by the future wiring; suppress TS unused-var warning
 
     // Parallel safety checks (reuse existing ForChain functions -- same checks apply to V3 tokens)
     // Note: V3 has no pair address for liquidity lock checks, so we skip isLiquidityLockedForChain

@@ -5,7 +5,7 @@ import { BLOCKLIST } from "./blocklist";
 import { retry } from "./retry";
 import { getProvider } from "./provider";
 import { logger } from "./logger";
-import { ERC20_ABI, ROUTER_ABI, PAIR_ABI, TOKEN_LIMITS_ABI, V3_QUOTER_V2_ABI } from "./abis";
+import { ERC20_ABI, ROUTER_ABI, PAIR_ABI, TOKEN_LIMITS_ABI } from "./abis";
 import type { ChainContext } from '../chainRegistry';
 import { honeypotIsCheck } from './safetyProviders/honeypotIs';
 import { goplusHoneypotCheck, goplusLiquidityLockCheck } from './safetyProviders/goplus';
@@ -554,86 +554,12 @@ export async function hasMaxWalletOrTxLimitsForChain(
     }
 }
 
-/**
- * Chain-aware sell simulation using chain-specific router and WETH.
- */
-export async function simulateSellForChain(
-    ctx: ChainContext,
-    dexRouter: string,
-    tokenAddress: string
-): Promise<boolean> {
-    try {
-        const erc20 = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
-
-        const balance = await erc20.balanceOf(ctx.wallet.address);
-        await erc20.approve(dexRouter, balance);
-
-        const router = new Contract(dexRouter, ROUTER_ABI, ctx.wallet);
-        const path = [tokenAddress, ctx.chain.wethAddress];
-        const deadline = Math.floor(Date.now() / 1000) + 60;
-
-        ctx.log.debug({ token: tokenAddress, check: 'sellSimulation' }, 'Simulating sell');
-        ctx.log.debug({ token: tokenAddress, balance: balance.toString() }, 'Sell simulation balance');
-
-        await router.swapExactTokensForETHSupportingFeeOnTransferTokens.staticCall(
-            balance,
-            0,
-            path,
-            ctx.wallet.address,
-            deadline
-        );
-
-        return true;
-    } catch (e) {
-        ctx.log.warn({ err: e, token: tokenAddress, check: 'sellSimulation' }, 'Sell simulation failed');
-        return false;
-    }
-}
-
-/**
- * Simulate V3 sell via QuoterV2 quoteExactInputSingle static call.
- * Returns true if the quoter returns a non-zero amountOut, false otherwise.
- * Per D-08: QuoterV2 accounts for tick, liquidity depth, and fee tier.
- */
-export async function simulateSellV3ForChain(
-    ctx: ChainContext,
-    quoterAddress: string,
-    tokenAddress: string,
-    feeTier: number
-): Promise<boolean> {
-    try {
-        const erc20 = new Contract(tokenAddress, ERC20_ABI, ctx.httpProvider);
-        const balance = await erc20.balanceOf(ctx.wallet.address);
-
-        if (balance === 0n) {
-            ctx.log.debug({ token: tokenAddress, check: 'v3SellSimulation' }, 'Zero balance, sim passes vacuously');
-            return true;
-        }
-
-        const quoter = new Contract(quoterAddress, V3_QUOTER_V2_ABI, ctx.httpProvider);
-
-        const quoteParams = {
-            tokenIn: tokenAddress,
-            tokenOut: ctx.chain.wethAddress,
-            amountIn: balance,
-            fee: feeTier,
-            sqrtPriceLimitX96: 0n,
-        };
-
-        ctx.log.debug({ token: tokenAddress, check: 'v3SellSimulation', feeTier }, 'Simulating V3 sell via QuoterV2');
-
-        const [amountOut] = await quoter.quoteExactInputSingle.staticCall(quoteParams);
-
-        if (amountOut === 0n) {
-            ctx.log.warn({ token: tokenAddress }, 'V3 sell simulation returned 0 amountOut');
-            return false;
-        }
-
-        ctx.log.debug({ token: tokenAddress, amountOut: amountOut.toString() }, 'V3 sell simulation passed');
-        return true;
-    } catch (e) {
-        // QuoterV2 reverts instead of returning 0 when liquidity is insufficient (Pitfall 3 from research)
-        ctx.log.warn({ err: e, token: tokenAddress }, 'V3 sell simulation failed (QuoterV2 revert -- likely illiquid)');
-        return false;
-    }
-}
+// ---------------------------------------------------------------------------
+// REMOVED per Phase 18 plan 18-09 D-ROLLBACK (2026-05-22):
+//   simulateSellForChain    — V2 sell-sim (balance=0 hard-block at every snipe)
+//   simulateSellV3ForChain  — V3 sell-sim (vacuous-pass via early-return on zero balance)
+// Both functions are gone entirely; no legacy fallback flag retained
+// (D-ROLLBACK forbids any opt-in env switch or compatibility shim).
+// Replacement is simulateHoneypotRoundtrip in src/utils/honeypot/index.ts,
+// wired into bot.ts by plan 18-10.
+// ---------------------------------------------------------------------------
