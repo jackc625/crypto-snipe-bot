@@ -427,10 +427,12 @@ export async function isLiquiditySufficientForChain(ctx: ChainContext, pairAddre
     const pair = new Contract(pairAddress, PAIR_ABI, ctx.httpProvider);
 
     try {
-        const [token0] = await Promise.all([
-            pair.token0(),
-            pair.token1()
-        ]);
+        // Plan 18-WR-02 fix-along: dropped the dead `pair.token1()` RPC call
+        // (Promise.all awaited both but token1 was destructured-out and never
+        // used). Saves one RPC round-trip per liquidity check. The single-
+        // chain variant at isLiquiditySufficient (line ~169) reads BOTH and
+        // is unaffected.
+        const token0 = await pair.token0();
 
         const { reserve0, reserve1 } = await pair.getReserves();
 
