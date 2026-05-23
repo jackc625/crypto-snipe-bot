@@ -23,12 +23,17 @@ import {
     hasHighTransferTaxForChain,
     hasMaxWalletOrTxLimitsForChain,
     isBlacklistedTokenForChain
-    // TODO(18-10): simulateSellForChain + simulateSellV3ForChain DELETED in
-    // plan 18-09 per D-ROLLBACK; plan 18-10 wires simulateHoneypotRoundtrip
-    // from src/utils/honeypot/index.ts into the V2 + V3 gate call-sites
-    // below (currently no-op stubs to preserve runtime behavior between
-    // the two commits).
 } from "./utils/tokenSafety";
+// HONEY-07 / HONEY-08 (plan 18-10): the in-place V2 + V3 gate replacements
+// dispatch through simulateHoneypotRoundtrip in src/utils/honeypot/index.ts.
+// V2 path: 3-arg call (ctx, dex, token); V3 path: 4-arg call passing the
+// runtime feeTier through to simulateViaContractV3 (iter-2 Blocker #1).
+import { simulateHoneypotRoundtrip } from "./utils/honeypot";
+// HONEY-12 (plan 18-10): 9th gate on V2 parallel bank (6th on V3 parallel bank).
+// Detects mutable-tax / blacklist / pause / max-wallet setter selectors in the
+// token bytecode — closes the owner-flips-tax-mid-position attack vector that
+// the buy->sell roundtrip cannot catch.
+import { isMutableTokenForChain } from "./utils/honeypot/bytecodeScan";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
@@ -220,17 +225,40 @@ export async function handleNewPairForChain(
         return;
     }
 
-    // TODO(18-10): wire simulateHoneypotRoundtrip(ctx, dex, targetToken) here per
-    // HONEY-07. Plan 18-09 D-ROLLBACK DELETED simulateSellForChain; the replacement
-    // dispatcher in src/utils/honeypot/index.ts is plumbed but not yet wired into
-    // this V2 gate (plan 18-10 finalizes the in-place gate replacement + alert
-    // format + parallel-bank HONEY-12 9th gate). Until then, the V2 pre-buy
-    // sell-sim gate is a no-op — runtime behavior is "no gate" not "vacuous-pass"
-    // and the bot is offline during the 18-09→18-10 window per the user's
-    // observation-window pause (not actively trading).
+    // HONEY-07 (plan 18-10): in-place V2 honeypot gate — dispatch via the
+    // HoneypotChecker on-chain roundtrip (Option D) and skip the buy on any
+    // verdict !== 'safe'. Replaces the broken simulateSellForChain (V2 sell-sim
+    // balance=0 hard-block) DELETED in plan 18-09 per D-ROLLBACK.
+    const honeypotResult = await simulateHoneypotRoundtrip(ctx, dex, targetToken);
+    if (honeypotResult.verdict !== 'safe') {
+        ctx.log.warn({
+            token: targetToken,
+            verdict: honeypotResult.verdict,
+            reason: honeypotResult.reason,
+            buyTaxBps: honeypotResult.evidence.buyTaxBps,
+            sellTaxBps: honeypotResult.evidence.sellTaxBps,
+            method: honeypotResult.evidence.method,
+            dexType: honeypotResult.evidence.dexType,
+        }, 'Honeypot gate blocked V2 snipe');
+        // D-ALERTS tiered skip alert
+        const evBuy = honeypotResult.evidence.buyTaxBps;
+        const evSell = honeypotResult.evidence.sellTaxBps;
+        const taxInfo = (evBuy !== undefined && evSell !== undefined)
+            ? ` tax: buy ${evBuy}bps sell ${evSell}bps`
+            : '';
+        await sendCtxAlert(
+            ctx,
+            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${honeypotResult.reason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
+        );
+        return;
+    }
 
-    // Parallel safety checks using chain-aware versions
-    const [isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits] = await Promise.all([
+    // Parallel safety checks using chain-aware versions.
+    // HONEY-12 (plan 18-10): 9th gate `isMutableTokenForChain` blocks tokens
+    // whose bytecode contains setTax / setBlacklist / pauseTrading / etc.
+    // selectors — closes the owner-flips-tax-mid-position attack the roundtrip
+    // cannot catch.
+    const [isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutableResult] = await Promise.all([
         checkHoneypotForChain(ctx, targetToken),
         isBlacklistedTokenForChain(ctx, targetToken),
         isLiquidityLockedForChain(ctx, pairAddress),
@@ -239,6 +267,7 @@ export async function handleNewPairForChain(
         simulateSwapForChain(ctx, dex.routerAddress, targetToken),
         hasHighTransferTaxForChain(ctx, dex.routerAddress, targetToken),
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
+        isMutableTokenForChain(ctx, targetToken),
     ]);
 
     const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
@@ -269,10 +298,19 @@ export async function handleNewPairForChain(
         ctx.log.debug({ err: e, token: targetToken, pair: pairAddress }, 'Failed to fetch LP reserve data');
     }
 
-    await sendCtxAlert(ctx, `*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nW${ctx.chain.nativeCurrency} LP: \`${nativeLiquidity} ${ctx.chain.nativeCurrency}\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPair: [\`${pairAddress}\`](${ctx.chain.explorerUrl}/address/${pairAddress})`);
+    // D-ALERTS (plan 18-10): augment the safe-path "New Token Detected" alert
+    // with BuyTax / SellTax bps from the honeypot roundtrip evidence. The early-
+    // return at the SKIP branch above guarantees that reaching this point means
+    // honeypotResult.verdict === 'safe' — the discriminated-union HoneypotResult
+    // requires numeric buyTaxBps / sellTaxBps on the 'safe' variant (HONEY-06),
+    // so these accesses are type-safe.
+    const safeEvidence = honeypotResult.verdict === 'safe' ? honeypotResult.evidence : null;
+    const buyTaxLine = safeEvidence ? `BuyTax: \`${safeEvidence.buyTaxBps}bps\`\n` : '';
+    const sellTaxLine = safeEvidence ? `SellTax: \`${safeEvidence.sellTaxBps}bps\`\n` : '';
+    await sendCtxAlert(ctx, `*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nW${ctx.chain.nativeCurrency} LP: \`${nativeLiquidity} ${ctx.chain.nativeCurrency}\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\n${buyTaxLine}${sellTaxLine}Blacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPair: [\`${pairAddress}\`](${ctx.chain.explorerUrl}/address/${pairAddress})`);
 
-    if (isHoneypot || isBlacklisted || !locked || !sufficientLiquidity || !validMetadata || !canSwap || hasTax || hasLimits) {
-        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits } }, 'Safety checks failed, skipping');
+    if (isHoneypot || isBlacklisted || !locked || !sufficientLiquidity || !validMetadata || !canSwap || hasTax || hasLimits || mutableResult.isMutable) {
+        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping');
         return;
     }
 
@@ -411,24 +449,51 @@ export async function handleNewV3PoolForChain(
         return;
     }
 
-    // TODO(18-10): wire simulateHoneypotRoundtrip(ctx, dex, targetToken, feeTier) here
-    // per HONEY-08 (V3 path passes feeTier through to simulateViaContractV3 per
-    // iter-2 Blocker #1). Plan 18-09 D-ROLLBACK DELETED simulateSellV3ForChain
-    // (the vacuous-pass that early-returned true on zero balance — the worst
-    // failure mode of all gates); the replacement dispatcher in
-    // src/utils/honeypot/index.ts is plumbed but not yet wired into this V3 gate.
-    // Plan 18-10 finalizes the in-place gate replacement.
-    void feeTier; // referenced by the future wiring; suppress TS unused-var warning
+    // HONEY-08 (plan 18-10 — iter-2 Blocker #1): in-place V3 honeypot gate —
+    // dispatch via the HoneypotChecker on-chain V3 roundtrip, passing the
+    // runtime feeTier through to simulateViaContractV3 (plan 18-09 V3 wrapper
+    // calls checkV3 with the feeTier embedded in calldata). Replaces the
+    // vacuous-pass simulateSellV3ForChain (V3 sell-sim early-returned `true`
+    // on zero balance — the worst failure mode of all gates) DELETED in plan
+    // 18-09 per D-ROLLBACK.
+    const honeypotResult = await simulateHoneypotRoundtrip(ctx, dex, targetToken, feeTier);
+    if (honeypotResult.verdict !== 'safe') {
+        ctx.log.warn({
+            token: targetToken,
+            verdict: honeypotResult.verdict,
+            reason: honeypotResult.reason,
+            buyTaxBps: honeypotResult.evidence.buyTaxBps,
+            sellTaxBps: honeypotResult.evidence.sellTaxBps,
+            method: honeypotResult.evidence.method,
+            dexType: honeypotResult.evidence.dexType,
+            feeTier,
+        }, 'Honeypot gate blocked V3 snipe');
+        // D-ALERTS tiered skip alert
+        const evBuy = honeypotResult.evidence.buyTaxBps;
+        const evSell = honeypotResult.evidence.sellTaxBps;
+        const taxInfo = (evBuy !== undefined && evSell !== undefined)
+            ? ` tax: buy ${evBuy}bps sell ${evSell}bps`
+            : '';
+        await sendCtxAlert(
+            ctx,
+            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${honeypotResult.reason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
+        );
+        return;
+    }
 
     // Parallel safety checks (reuse existing ForChain functions -- same checks apply to V3 tokens)
     // Note: V3 has no pair address for liquidity lock checks, so we skip isLiquidityLockedForChain
     // and isLiquiditySufficientForChain (those are V2-pair-specific). V3 liquidity is checked above.
-    const [isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits] = await Promise.all([
+    // HONEY-12 (plan 18-10): 6th gate `isMutableTokenForChain` extends bytecode
+    // mutability detection to the V3 path — protects V3 buys from
+    // owner-flips-tax-mid-position attacks that the V3 roundtrip cannot catch.
+    const [isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits, mutableResult] = await Promise.all([
         checkHoneypotForChain(ctx, targetToken),
         isBlacklistedTokenForChain(ctx, targetToken),
         checkTokenMetadataForChain(ctx, targetToken),
         hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, targetToken),
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
+        isMutableTokenForChain(ctx, targetToken),
     ]);
 
     const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
@@ -443,10 +508,18 @@ export async function handleNewV3PoolForChain(
         ctx.log.debug({ err: e, token: targetToken }, 'Failed to fetch token metadata, using defaults');
     }
 
-    await sendCtxAlert(ctx, `*New V3 Token Detected!*\nSymbol: \`${symbol}\`\nFee Tier: \`${feeTier} bps\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\nBlacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPool: [\`${poolAddress}\`](${ctx.chain.explorerUrl}/address/${poolAddress})`);
+    // D-ALERTS (plan 18-10): augment the safe-path "New V3 Token Detected"
+    // alert with BuyTax / SellTax bps from the V3 honeypot roundtrip evidence.
+    // The discriminated-union HoneypotResult requires numeric buyTaxBps /
+    // sellTaxBps on the 'safe' variant (HONEY-06), so these accesses are
+    // type-safe given the verdict !== 'safe' early-return above.
+    const safeEvidence = honeypotResult.verdict === 'safe' ? honeypotResult.evidence : null;
+    const buyTaxLine = safeEvidence ? `BuyTax: \`${safeEvidence.buyTaxBps}bps\`\n` : '';
+    const sellTaxLine = safeEvidence ? `SellTax: \`${safeEvidence.sellTaxBps}bps\`\n` : '';
+    await sendCtxAlert(ctx, `*New V3 Token Detected!*\nSymbol: \`${symbol}\`\nFee Tier: \`${feeTier} bps\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\n${buyTaxLine}${sellTaxLine}Blacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPool: [\`${poolAddress}\`](${ctx.chain.explorerUrl}/address/${poolAddress})`);
 
-    if (isHoneypot || isBlacklisted || !validMetadata || hasTax || hasLimits) {
-        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits } }, 'Safety checks failed, skipping V3 snipe');
+    if (isHoneypot || isBlacklisted || !validMetadata || hasTax || hasLimits || mutableResult.isMutable) {
+        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping V3 snipe');
         return;
     }
 
