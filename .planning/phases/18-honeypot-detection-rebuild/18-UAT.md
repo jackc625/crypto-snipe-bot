@@ -3,7 +3,7 @@ status: complete
 phase: 18-honeypot-detection-rebuild
 source: [18-00-SUMMARY.md, 18-01-SUMMARY.md, 18-02-SUMMARY.md, 18-03-SUMMARY.md, 18-04-SUMMARY.md, 18-05-SUMMARY.md, 18-06-SUMMARY.md, 18-07-SUMMARY.md, 18-09-SUMMARY.md, 18-10-SUMMARY.md]
 started: 2026-05-23T14:00:00Z
-updated: 2026-05-23T14:30:00Z
+updated: 2026-05-23T14:40:00Z
 ---
 
 ## Current Test
@@ -67,9 +67,9 @@ observed: "0 grep hits. Sentinel cleanly removed; real Option-D wrapper in place
 
 ### 12. HoneypotChecker Contract Live on Mainnet
 expected: `npx ts-node scripts/audit-honeypot-checker.ts` reports bytecode present at deployed address, length+hash non-zero, total tx ≈ 1, creator matches deploy wallet, no anomalous traffic, chainRegistry literal matches.
-result: issue
-reported: "Etherscan API returned NOTOK because scripts/audit-honeypot-checker.ts calls deprecated V1 endpoint. Etherscan response: 'You are using a deprecated V1 endpoint, switch to Etherscan API V2 using https://docs.etherscan.io/v2-migration'. ETHERSCAN_API_KEY is set correctly in .env — the script itself is broken. Partial pass: on-chain bytecode check works (9278 bytes, hash 0x6b3e1a14...b2ad), chainRegistry literal matches, but tx-history / creator / wallet-activity portions of audit are unreachable."
-severity: major
+result: pass
+observed: "After Etherscan V2 migration (commit ad8de18): bytecode 9278 bytes, hash 0x6b3e1a14...b2ad, 1 tx (the deploy, hash 0xe7096f6f...ed3e at block 25133489), creator 0x54f24749...e1d, deploy wallet nonce 1 + balance 0.0148 ETH, chainRegistry literal matches live address. Audit complete."
+fix: "commit ad8de18 — migrated 2 txlist URLs to Etherscan V2 base (https://api.etherscan.io/v2/api?chainid=1) via shared ETHERSCAN_V2 constant"
 
 ### 13. chainRegistry Literal Matches Ignition Deployment
 expected: chainRegistry.ts ETH literal matches ignition/deployments/chain-1/deployed_addresses.json. No drift.
@@ -94,8 +94,8 @@ observed: "Validation code in chainRegistry.ts:376-389 (parseInt → NaN || <0 |
 ## Summary
 
 total: 16
-passed: 15
-issues: 1
+passed: 16
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
@@ -103,14 +103,14 @@ blocked: 0
 ## Gaps
 
 - truth: "scripts/audit-honeypot-checker.ts reports total tx on contract, creator address, and deploy-wallet activity via Etherscan"
-  status: failed
-  reason: "User reported: Etherscan V1 API is deprecated; script calls V1 endpoint (https://api.etherscan.io/api?...). Etherscan returns NOTOK with message: 'switch to Etherscan API V2 using https://docs.etherscan.io/v2-migration'. ETHERSCAN_API_KEY is set; V2 endpoint requires chainid param and base URL https://api.etherscan.io/v2/api."
+  status: resolved
+  reason: "Etherscan V1 endpoint deprecated. Migrated both txlist URLs to V2 base (https://api.etherscan.io/v2/api?chainid=1) via shared ETHERSCAN_V2 constant. Same API key works on V2."
   severity: major
   test: 12
   artifacts:
     - path: "scripts/audit-honeypot-checker.ts"
-      issue: "Calls deprecated Etherscan V1 endpoint at line ~45 (txlist) and ~73 (wallet txlist) — needs V2 migration (base URL https://api.etherscan.io/v2/api + chainid=1 query param)"
-  missing:
-    - "Migrate the two Etherscan API calls in scripts/audit-honeypot-checker.ts to V2 endpoint format per https://docs.etherscan.io/v2-migration"
+      issue: "Calls deprecated Etherscan V1 endpoint at line ~45 (txlist) and ~73 (wallet txlist) — needs V2 migration"
+  missing: []
   root_cause: "Etherscan deprecated V1 API; the audit script was written against V1 and was never updated"
+  fix_commit: "ad8de18"
   debug_session: ""
