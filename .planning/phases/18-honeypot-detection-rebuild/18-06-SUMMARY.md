@@ -39,7 +39,7 @@ key-files:
   modified:
     - "src/chainRegistry.ts (HoneypotCheckerConfig re-export + ChainConfig.honeypotChecker required field + ChainTemplate honeypotMethod/defaultMaxBuyTaxBps/defaultMaxSellTaxBps + 4 template entries + buildChainRegistry overlay + bps validation)"
     - "src/utils/honeypot/index.ts (removed declaration-merge augmentation + NULL_CFG fallback; reads ctx.chain.honeypotChecker directly since field is now required)"
-    - "hardhat.config.ts (hardhat-ignition-ethers import + 4 conditional network entries + etherscan.apiKey block)"
+    - "./hardhat.config.ts — hardhat-ignition-ethers import + 4 conditional network entries + etherscan.apiKey block"
     - "test/unit/chainRegistry.test.ts (8 new tests + per-test env-stash scaffolding via vi.resetModules)"
 
 key-decisions:

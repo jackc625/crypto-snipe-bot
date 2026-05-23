@@ -30,7 +30,7 @@ key-files:
     - test/fork/fixtures/honeypots/eth-max-wallet.json
     - test/fork/fixtures/honeypots/eth-v3-honeypot.json
   modified:
-    - hardhat.config.ts
+    - ./hardhat.config.ts
 decisions:
   - "Pin Honeypot.sol pragma to solc 0.8.28 exact (no caret) per PATTERNS.md cross-cutting decision 4 — matches the hardhat.config.ts solidity: '0.8.28' exact pin so the test fixture compiles under the same compiler as production HoneypotChecker.sol."
   - "All 5 modes (including amount-tiered mode 4) authored at 18-01 with a 4-arg constructor (name, symbol, mode, amountTierThreshold), satisfying iter-2 Warning #6. Plan 18-09 Multi-Amount Tests 6+7 will SET the constructor arg only — the contract is now frozen and MUST NOT be extended."

@@ -37,13 +37,13 @@ tech-stack:
 key-files:
   created:
     - "test/integration/honeypotDeploy.eth.test.ts (50 LOC; 2 it.skipIf cases — bytecode-at-address + Ignition-artifact cross-check)"
-    - ".planning/milestones/v6.17-honeypot-checker-audit.md §HONEY-03 Deploy Artifacts (appended; deploy artifacts + 4 documented deviations)"
-    - "ignition/deployments/chain-1/* (Hardhat Ignition mainnet deploy artifacts — deployed_addresses.json, journal.jsonl, build-info)"
-    - "ignition/deployments/chain-11155111/* (Sepolia rehearsal artifacts — preserved for audit trail)"
+    - ".planning/milestones/v6.17-honeypot-checker-audit.md — §HONEY-03 Deploy Artifacts appended; deploy artifacts + 4 documented deviations"
+    - "ignition/deployments/chain-1/deployed_addresses.json — Hardhat Ignition mainnet deploy artifact; journal.jsonl + build-info JSON also created in same directory"
+    - "ignition/deployments/chain-11155111/deployed_addresses.json — Sepolia rehearsal artifact preserved for audit trail; journal.jsonl + build-info JSON also created in same directory"
   modified:
-    - "src/chainRegistry.ts (ChainTemplate.defaultHoneypotCheckerAddress field + 4 template entries — eth populated with literal 0x8243…13eD, bsc/base/arb null; buildChainRegistry() env-overlay falls back to template default; CHAIN_TEMPLATES promoted to named export so integration tests can read literal without buildChainRegistry side-effects)"
-    - "hardhat.config.ts (sepolia entry: ALCHEMY_URL+PRIVATE_KEY → SEPOLIA_RPC_URL+DEPLOY_PRIVATE_KEY+chainId 11155111; etherscan.apiKey: v1 per-network object → v2 single ETHERSCAN_API_KEY string)"
-    - ".env.example (Phase 18 deploy section appended: 4× HONEYPOT_CHECKER_ADDRESS slots + DEPLOY_PRIVATE_KEY + 4× explorer API keys (1 active + 3 deprecated v2-obsolete) + SEPOLIA_RPC_URL + 8× MAX_*_TAX_BPS slots)"
+    - "src/chainRegistry.ts — ChainTemplate.defaultHoneypotCheckerAddress field + 4 template entries; eth populated with literal 0x8243…13eD, bsc/base/arb null; buildChainRegistry() env-overlay falls back to template default; CHAIN_TEMPLATES promoted to named export so integration tests can read literal without buildChainRegistry side-effects"
+    - "./hardhat.config.ts — sepolia entry: ALCHEMY_URL+PRIVATE_KEY → SEPOLIA_RPC_URL+DEPLOY_PRIVATE_KEY+chainId 11155111; etherscan.apiKey: v1 per-network object → v2 single ETHERSCAN_API_KEY string"
+    - "./.env.example — Phase 18 deploy section appended: 4× HONEYPOT_CHECKER_ADDRESS slots + DEPLOY_PRIVATE_KEY + 4× explorer API keys (1 active + 3 deprecated v2-obsolete) + SEPOLIA_RPC_URL + 8× MAX_*_TAX_BPS slots"
 
 key-decisions:
   - "Same DEPLOY_PRIVATE_KEY for Sepolia rehearsal + mainnet deploy. Trade-off: the deploy wallet's address appears in faucet logs (Alchemy Sepolia faucet) — minor information exposure for a stateless immutable contract that anyone can deploy. Benefit: identical deterministic address on Sepolia and mainnet (nonce=0 derivation), single key to manage during the deploy window, and the wallet is rotated out of .env immediately after mainnet verify per D-DEPLOY-KEY. Two-wallet alternative considered and rejected as marginal-value overhead for a first-time deploy."
