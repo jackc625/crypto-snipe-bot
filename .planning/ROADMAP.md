@@ -100,10 +100,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
   **Wave 5** *(parallel after observation window closes):*
   - [ ] 18-08-PLAN.md — BSC + Base + Arbitrum batch deploy + verify + 3 integration tests + 3 chainRegistry.ts per-chain literal commits (Blocker #3) [HONEY-04] (autonomous: false)
-  - [ ] 18-09-PLAN.md — checkerContract.ts V2 + V3 wrappers (Blocker #1) + multi-amount probe + tax thresholds + DELETE broken sell-sims (D-ROLLBACK) + fork/integration/unit tests + Warning #9 sentinel removal [HONEY-07, HONEY-08, HONEY-09, HONEY-10]
+  - [x] 18-09-PLAN.md — checkerContract.ts V2 + V3 wrappers (Blocker #1) + multi-amount probe + tax thresholds + DELETE broken sell-sims (D-ROLLBACK) + fork/integration/unit tests + Warning #9 sentinel removal [HONEY-07, HONEY-08, HONEY-09, HONEY-10]
 
   **Wave 6** *(after 18-09 wrapper layer; Warning #8 density split):*
-  - [ ] 18-10-PLAN.md — bot.ts V2 + V3 in-place gate replacement (V3 feeTier passthrough per Blocker #1) + parallel-bank HONEY-12 on both paths + D-ALERTS tiered alert format + V2/V3 integration tests asserting active V3 unsafe + V3 safe paths [HONEY-07, HONEY-08, HONEY-12]
+  - [x] 18-10-PLAN.md — bot.ts V2 + V3 in-place gate replacement (V3 feeTier passthrough per Blocker #1) + parallel-bank HONEY-12 on both paths + D-ALERTS tiered alert format + V2/V3 integration tests asserting active V3 unsafe + V3 safe paths [HONEY-07, HONEY-08, HONEY-12]
 
   **Cross-cutting constraints:**
   - **D-STOP-THE-LINE:** any audit finding revealing a bug worse than V2/V3 sell-sims BLOCKS Phase 18 close; escalates to HONEY-13+ / decimal phase 18.1
@@ -166,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 9/11 | In Progress|  |
+| 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 0/? | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |

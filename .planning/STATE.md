@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Completed 18-09-PLAN.md (HONEY-07/08/09/10 Option-D V2+V3 wrapper at src/utils/honeypot/checkerContract.ts; D-AGGREGATION 1%/50%/100% probes; tax thresholds; iter-2 Warning #9 sentinel removed; fork tests for 5-mode Honeypot.sol + V3; broken simulateSellForChain + simulateSellV3ForChain DELETED per D-ROLLBACK; bot.ts call sites have TODO(18-10) markers for plan 18-10 wiring). 9/11 plans done; plan 18-10 (bot.ts wiring) is next; plan 18-08 (BSC/Base/Arb multi-chain deploy) DEFERRED per operator direction 2026-05-22.
-last_updated: "2026-05-23T03:50:00.000Z"
-last_activity: 2026-05-22 — Phase 18 plan 18-09 complete (Option-D V2+V3 wrapper + fork tests + D-ROLLBACK deletions)
+stopped_at: Completed 18-10-PLAN.md (HONEY-07/08/12 bot.ts V2+V3 wiring + parallel-bank HONEY-12 9th gate on both paths + D-ALERTS tiered Telegram format + 6 integration tests + D-18-09-01 chainRegistry.test.ts fix-along). 10/11 plans done; plan 18-08 (BSC/Base/Arb multi-chain HoneypotChecker deploy + 3 chainRegistry literals + 3 integration tests) DEFERRED per operator direction 2026-05-22 — to be scheduled as a separate gated operator session after ETH HoneypotChecker observation window confirms clean. Phase 18 verification SKIPPED pending 18-08.
+last_updated: "2026-05-23T04:00:00.000Z"
+last_activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts wiring + integration tests; bot ready to resume ETH mainnet trading)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
-  completed_plans: 12
-  percent: 24
+  completed_plans: 13
+  percent: 26
 ---
 
 # Project State
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 ## Current Position
 
-Phase: 18 (honeypot-detection-rebuild) — EXECUTING (18-08 deferred per operator direction; 18-10 next)
-Plan: 9 of 11 complete (18-00..18-07, 18-09); 18-10 next (autonomous bot.ts wiring); 18-08 (BSC/Base/Arb deploy) DEFERRED — operator chose to land 18-10 first then return to 18-08 as a separate gated step
-Status: Ready to dispatch 18-10 — wires simulateHoneypotRoundtrip into bot.ts V2 + V3 gates + parallel-bank HONEY-12 9th gate + D-ALERTS Telegram format. TODO(18-10) markers in bot.ts mark the insertion points (added in plan 18-09 commit 3958060). Pre-existing D-18-09-01 chainRegistry.test.ts:170 failure should be resolved by 18-10 or a dedicated 18-07 follow-up.
-Last activity: 2026-05-22 — Phase 18 plan 18-09 complete (Option-D V2+V3 wrapper + 6 test files + tokenSafety.ts D-ROLLBACK deletions)
+Phase: 18 (honeypot-detection-rebuild) — EXECUTING (18-08 DEFERRED; 10/11 plans done; phase verification gated on 18-08)
+Plan: 10 of 11 complete (18-00..18-07, 18-09, 18-10); 18-08 (BSC/Base/Arb multi-chain HoneypotChecker deploy) DEFERRED per operator direction
+Status: Bot V2 + V3 gates wired and ready — operator can resume ETH mainnet trading. To complete phase 18: run a fresh `/gsd-execute-phase 18` after operator confirms (a) ETH HoneypotChecker observation window closed cleanly, (b) ready to fund deploy wallets on BSC + Base + Arbitrum, (c) ready for a batched operator session of 3 deploys + 3 source-verifies + 3 chainRegistry literal commits. The phase will NOT auto-verify; only 18-08 remains.
+Last activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts V2+V3 wiring + HONEY-12 9th gate + D-ALERTS + 6 integration tests + D-18-09-01 fix-along)
 
 ## Performance Metrics
 
@@ -119,7 +119,8 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | 18-06 (HONEY-05 chainRegistry honeypotChecker required field + hardhat networks + deploy CLI) | ~12min | 3/3 | 5 | fdeeefa, c00de8e, 511aa96 |
 | 18-05 (HONEY-02 Slither + Mythril audit + CI gate evergreen) | ~45min | 3/3 (Task 1 inline) | 4 | ee2e2a1, c43c3cd |
 | 18-07 (HONEY-03 ETH mainnet HoneypotChecker deploy + Etherscan verify) | ~60min | 4/4 | 5 | 6dfcec8, ae639f1, 3463973, 052a477, cffd035 |
-| 18-09 (HONEY-07/08/09/10 Option-D V2+V3 wrapper + fork tests + D-ROLLBACK deletions) | ~30min | 3/3 | 10 | e1cd8da, 7d8f957, 3958060, d64507a, 3714a1e |
+| 18-09 (HONEY-07/08/09/10 Option-D V2+V3 wrapper + fork tests + D-ROLLBACK deletions) | ~30min | 3/3 | 10 | e1cd8da, 7d8f957, 3958060, d64507a, 3714a1e, 1c77e85 |
+| 18-10 (HONEY-07/08/12 bot.ts V2+V3 wiring + parallel-bank HONEY-12 + D-ALERTS + D-18-09-01 fix-along) | ~25min | 2/2 | 5 | 8083c96, 95e0e51, 8badd7b |
 
 ## Session Continuity
 
