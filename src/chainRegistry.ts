@@ -410,6 +410,26 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                 log.fatal({ chain: chainName }, 'Missing BLOXROUTE_AUTH_HEADER for bloXroute-enabled chain');
                 process.exit(1);
             }
+
+            // Plan 18-CR-01 fix-along: an enabled chain using `on-chain-contract`
+            // honeypot method MUST have a deployedAddress (either the literal in
+            // CHAIN_TEMPLATES.{chain}.defaultHoneypotCheckerAddress, or the env
+            // override <PREFIX>_HONEYPOT_CHECKER_ADDRESS). Without it, the
+            // dispatcher returns verdict='unknown' (no-deployed-address) and the
+            // bot.ts gate at src/bot.ts:233 / :460 hard-blocks every snipe on
+            // this chain because verdict !== 'safe'. This is technically
+            // fail-closed (correct) but is silently misleading — the operator
+            // sees "Honeypot gate blocked" alerts on every token and may not
+            // realize the gate cannot run at all on this chain. Fail loud at
+            // boot instead, so the operator knows to deploy the checker (plan
+            // 18-08 for BSC/Base/Arb) or explicitly set the env override.
+            if (template.honeypotMethod === 'on-chain-contract' && !honeypotCheckerAddress) {
+                log.fatal(
+                    { chain: chainName, envVar: `${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS` },
+                    'HoneypotChecker not deployed for enabled chain — set env var or wait for plan 18-08 deploy'
+                );
+                process.exit(1);
+            }
         }
 
         // Build MEV config with dynamic auth keys
