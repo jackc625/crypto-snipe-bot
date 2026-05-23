@@ -66,6 +66,21 @@ if (!process.env.DEPLOY_PRIVATE_KEY) {
     process.exit(1);
 }
 
+// Plan 18-WR-08 fix-along: enforce the D-DEPLOY-KEY capability split. An
+// operator who copy-pastes from .env.example and uses the same key for both
+// PRIVATE_KEY (bot wallet) and DEPLOY_PRIVATE_KEY (deploy wallet) would
+// silently bypass the split — if the bot wallet leaks, the attacker could
+// then deploy a malicious checker at a trusted address. Fail loud at deploy
+// time so the operator must consciously use a separate wallet.
+if (process.env.PRIVATE_KEY && process.env.DEPLOY_PRIVATE_KEY === process.env.PRIVATE_KEY) {
+    log.fatal(
+        'DEPLOY_PRIVATE_KEY must be DISTINCT from PRIVATE_KEY per D-DEPLOY-KEY capability split. ' +
+            'If the bot wallet leaks, the attacker drains positions but must NOT be able to deploy ' +
+            'a malicious checker at a trusted address. Generate a separate deploy wallet.'
+    );
+    process.exit(1);
+}
+
 const network = CHAIN_TO_NETWORK[chain];
 log.info({ chain, network }, 'Deploying HoneypotChecker');
 
