@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: executing
-stopped_at: Completed 18-10-PLAN.md (HONEY-07/08/12 bot.ts V2+V3 wiring + parallel-bank HONEY-12 9th gate on both paths + D-ALERTS tiered Telegram format + 6 integration tests + D-18-09-01 chainRegistry.test.ts fix-along). 10/11 plans done; plan 18-08 (BSC/Base/Arb multi-chain HoneypotChecker deploy + 3 chainRegistry literals + 3 integration tests) DEFERRED per operator direction 2026-05-22 — to be scheduled as a separate gated operator session after ETH HoneypotChecker observation window confirms clean. Phase 18 verification SKIPPED pending 18-08.
-last_updated: "2026-05-23T04:00:00.000Z"
-last_activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts wiring + integration tests; bot ready to resume ETH mainnet trading)
+status: verifying
+stopped_at: Phase 19 context gathered
+last_updated: "2026-05-23T22:15:33.007Z"
+last_activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts V2+V3 wiring + HONEY-12 9th gate + D-ALERTS + 6 integration tests + D-18-09-01 fix-along)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 14
   completed_plans: 13
-  percent: 26
+  percent: 20
 ---
 
 # Project State
@@ -124,7 +124,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-16T02:16:43.304Z
+Last session: 2026-05-23T22:15:32.991Z
 Last activity: 2026-05-15 — Phase 18 plan 18-05 complete. HONEY-02 Slither + Mythril audit run on contracts/honeypot/HoneypotChecker.sol covering BOTH checkV2 + checkV3 entry points. Slither 0.11.5 surfaced 13 medium+ findings (4 High + 9 Medium) — ALL dispositioned `false-positive` against the eth_call-only revert-always design: `arbitrary-send-eth` × 2 = caller-chosen router is by design; `reentrancy-balance` × 2 = the documented lying-balanceOf catch; `unused-return` × 6 = balance-delta reads override router-returned values; `uninitialized-local` × 2 = catch-always-reverts flow-sense limitation; `incorrect-equality` × 1 = correct semantic for `V3_SELL_WETH_ZERO`. Mythril 0.24.8 reported `success: true, issues: []`. **Stop-the-Line determination: NO escalation; deploy gate cleared for HONEY-03.** 0 `accepted-risk` rows → no operator sign-off required. Audit doc `.planning/milestones/v6.17-honeypot-checker-audit.md` (`ee2e2a1`) commits the disposition table + D-AUDIT-PATH per-host install notes. CI gate (`c43c3cd`) locks audit-bar evergreen via `dorny/paths-filter@v3` + 3 new jobs (`hardhat-compile` / `slither` / `mythril`) gated on `contracts/**`; Phase 17 evergreen `.todo` ban + `tsc --noEmit ×3` guards preserved verbatim. HONEY-02 row marked Complete in REQUIREMENTS.md.
-Stopped at: Completed 18-05-PLAN.md (HONEY-02 Slither + Mythril audit; deploy gate cleared for HONEY-03; CI gate locked evergreen on contracts/**; ready for plan 18-07 ETH mainnet deploy)
-Resume file: None
+Stopped at: Phase 19 context gathered
+Resume file: .planning/phases/19-anti-rug-runtime-monitoring/19-CONTEXT.md
