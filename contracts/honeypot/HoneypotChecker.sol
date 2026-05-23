@@ -2,6 +2,11 @@
 pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// Plan 18-CR-04 fix-along: SafeERC20.forceApprove handles ERC20 tokens that
+// return `false` from approve() (USDT-style) by reverting the approve call
+// rather than silently succeeding and tripping a downstream TRANSFER_FROM_FAILED.
+// OZ 5.x deprecated safeApprove in favor of forceApprove / safeIncreaseAllowance.
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // ---------------------------------------------------------------------------
 // Local interfaces (no Uniswap interfaces ship in @openzeppelin/contracts ^5.4.0)
@@ -85,7 +90,22 @@ interface IQuoterV2 {
 ///
 /// @dev    D-CONTRACT-IMMUTABLE: no owner key, no proxy, no killSwitch,
 ///         no selfdestruct, no tx.origin use. Patch path is deploy-v2-at-new-address.
+///
+/// @dev    Plan 18-CR-04 known limitation: an address-discriminating honeypot
+///         (a malicious token whose `approve` / `transfer` hooks branch on
+///         `msg.sender == address(this)` versus the real bot wallet) can pass
+///         this checker but block the real sell. `msg.sender` inside _v2Sell /
+///         _v3Sell is `address(this)` (the HoneypotChecker contract), not the
+///         bot wallet, so a token can selectively succeed during the audit
+///         probe and fail post-buy. The wrapper's `from: ctx.wallet.address`
+///         on `provider.call` only spoofs the OUTER caller — the inner calls
+///         the contract makes have `msg.sender == address(this)`. Downstream
+///         mitigations: (1) bytecode mutability scan (HONEY-12) catches the
+///         most common variants by detecting setter selectors; (2) Phase 19
+///         anti-rug runtime monitoring is the durable defense (detect failed
+///         sells post-buy and exit the position fast).
 contract HoneypotChecker {
+    using SafeERC20 for IERC20;
     // -----------------------------------------------------------------------
     // Custom errors — terminal revert channels (V2 + V3 + shared)
     // -----------------------------------------------------------------------
@@ -170,7 +190,16 @@ contract HoneypotChecker {
         uint8 statusIn
     ) private returns (uint sellTaxBps, uint8 status) {
         status = statusIn;
-        IERC20(token).approve(router, received);
+        // Plan 18-CR-04 fix-along: forceApprove reverts if approve() returns
+        // false (USDT-style and malicious tokens). The previous plain approve
+        // would silently swallow `return false` and the downstream
+        // swapExactTokensForETHSupportingFeeOnTransferTokens would later fail
+        // with the router's TRANSFER_FROM_FAILED — recorded as a sell-failed
+        // reason rather than the more diagnostic "approve-rejected". Note:
+        // an address-discriminating honeypot can still bypass this gate (see
+        // the contract-level @dev comment); forceApprove only closes the
+        // silent-success path, not the broader attack class.
+        IERC20(token).forceApprove(router, received);
 
         address[] memory pathSell = new address[](2);
         pathSell[0] = token;
@@ -320,7 +349,9 @@ contract HoneypotChecker {
         }
 
         // ----- Execute sell -----
-        IERC20(token).approve(swapRouter, received);
+        // Plan 18-CR-04 fix-along: forceApprove on the V3 sell mirrors the V2
+        // fix above. See _v2Sell comment for full rationale.
+        IERC20(token).forceApprove(swapRouter, received);
 
         try ISwapRouter02(swapRouter).exactInputSingle(
             ISwapRouter02.ExactInputSingleParams({
