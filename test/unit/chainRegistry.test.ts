@@ -162,9 +162,18 @@ describe('DexConfig discriminated union', () => {
 // ---------------------------------------------------------------------------
 
 describe('ChainConfig.honeypotChecker (plan 18-06)', () => {
-    it('Test 1: with no env vars, deployedAddress is null for every chain', () => {
+    it('Test 1: with no env vars, deployedAddress resolves to template default per chain', () => {
+        // Plan 18-07 (HONEY-03) iter-2 Blocker #3 committed the canonical ETH
+        // HoneypotChecker literal `0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD`
+        // as the ETH template default (CHAIN_TEMPLATES.eth.defaultHoneypotCheckerAddress).
+        // BSC / Base / Arb remain null until plan 18-08 deploys them.
+        // Plan 18-10 D-18-09-01 fix-along: assert per-chain expected defaults
+        // rather than the iter-1 "null for every chain" invariant.
+        const ETH_LITERAL = '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD';
         const registry = buildChainRegistry();
-        for (const chainName of ['eth', 'bsc', 'base', 'arb']) {
+        expect(registry.get('eth')!.honeypotChecker).toBeDefined();
+        expect(registry.get('eth')!.honeypotChecker.deployedAddress).toBe(ETH_LITERAL);
+        for (const chainName of ['bsc', 'base', 'arb']) {
             const cfg = registry.get(chainName)!;
             expect(cfg.honeypotChecker).toBeDefined();
             expect(cfg.honeypotChecker.deployedAddress).toBeNull();

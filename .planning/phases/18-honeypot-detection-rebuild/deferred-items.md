@@ -30,3 +30,10 @@ IS the new default, env overlay remains as override.
 **Impact on plan 18-09:** None. The full unit suite ran 275/276 (1 pre-existing
 failure unrelated to plan 18-09). All 7 plan-18-09 unit tests + 6 plan-18-09
 integration tests pass cleanly.
+
+**Status: Resolved by plan 18-10** — fix-along applied per the executor's
+extra_scope direction. The test now asserts per-chain expected defaults
+(ETH literal for the `eth` row; null for `bsc` / `base` / `arb` until
+plan 18-08 commits their literals). Aligned with plan 18-07's intent per
+its key-decisions — the canonical literal IS the new default. Resolved
+in commit applied alongside plan 18-10 Task 2 integration tests.
