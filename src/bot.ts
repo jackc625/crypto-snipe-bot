@@ -14,7 +14,10 @@ import {
     simulateSell
 } from "./utils/tokenSafety";
 import {
-    checkHoneypotForChain,
+    // Plan 18-CR-01b fix-along: `checkHoneypotForChain` was dropped from the
+    // V2 + V3 parallel banks because the on-chain `simulateHoneypotRoundtrip`
+    // gate (Option D) is now the authoritative honeypot check. The import
+    // was removed to satisfy tsc --noEmit strictness on unused imports.
     isLiquidityLockedForChain,
     simulateSwapForChain,
     isLiquiditySufficientForChain,
@@ -258,8 +261,17 @@ export async function handleNewPairForChain(
     // whose bytecode contains setTax / setBlacklist / pauseTrading / etc.
     // selectors — closes the owner-flips-tax-mid-position attack the roundtrip
     // cannot catch.
-    const [isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutableResult] = await Promise.all([
-        checkHoneypotForChain(ctx, targetToken),
+    //
+    // Plan 18-CR-01b fix-along: `checkHoneypotForChain` (third-party
+    // honeypot.is / GoPlus HTTP API) is intentionally NOT in this bank — the
+    // on-chain `simulateHoneypotRoundtrip` gate above (line 232) is the
+    // authoritative honeypot gate (Option D). The third-party API has known
+    // false-positive issues that would block legitimate snipes the on-chain
+    // probe says are safe; running both gates doubled cost without improving
+    // safety, and a config drift could mask divergence. `isHoneypot` from
+    // here on is hard-coded `false` so the existing log + alert lines that
+    // reference it continue to type-check.
+    const [isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutableResult] = await Promise.all([
         isBlacklistedTokenForChain(ctx, targetToken),
         isLiquidityLockedForChain(ctx, pairAddress),
         isLiquiditySufficientForChain(ctx, pairAddress),
@@ -269,6 +281,7 @@ export async function handleNewPairForChain(
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
         isMutableTokenForChain(ctx, targetToken),
     ]);
+    const isHoneypot = false;
 
     const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
 
@@ -487,14 +500,21 @@ export async function handleNewV3PoolForChain(
     // HONEY-12 (plan 18-10): 6th gate `isMutableTokenForChain` extends bytecode
     // mutability detection to the V3 path — protects V3 buys from
     // owner-flips-tax-mid-position attacks that the V3 roundtrip cannot catch.
-    const [isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits, mutableResult] = await Promise.all([
-        checkHoneypotForChain(ctx, targetToken),
+    //
+    // Plan 18-CR-01b fix-along: `checkHoneypotForChain` (third-party
+    // honeypot.is / GoPlus HTTP API) is intentionally NOT in this V3 bank —
+    // the on-chain `simulateHoneypotRoundtrip` gate above (line 459) is the
+    // authoritative honeypot gate (Option D). See the V2 handler comment for
+    // the full rationale. `isHoneypot` is hard-coded `false` so the existing
+    // log + alert lines that reference it continue to type-check.
+    const [isBlacklisted, validMetadata, hasTax, hasLimits, mutableResult] = await Promise.all([
         isBlacklistedTokenForChain(ctx, targetToken),
         checkTokenMetadataForChain(ctx, targetToken),
         hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, targetToken),
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
         isMutableTokenForChain(ctx, targetToken),
     ]);
+    const isHoneypot = false;
 
     const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
     let symbol = "?", name = "?", decimals = 18;
