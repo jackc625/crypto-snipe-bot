@@ -37,6 +37,9 @@ import { simulateHoneypotRoundtrip } from "./utils/honeypot";
 // token bytecode — closes the owner-flips-tax-mid-position attack vector that
 // the buy->sell roundtrip cannot catch.
 import { isMutableTokenForChain } from "./utils/honeypot/bytecodeScan";
+// Plan 18-CR-03 fix-along: defense-in-depth sanitizer applied at alert sites
+// for any reason/revert string that flows into Telegram markdown + dashboard WS.
+import { sanitizeReason } from "./utils/honeypot/sanitize";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
@@ -249,9 +252,14 @@ export async function handleNewPairForChain(
         const taxInfo = (evBuy !== undefined && evSell !== undefined)
             ? ` tax: buy ${evBuy}bps sell ${evSell}bps`
             : '';
+        // Plan 18-CR-03 fix-along: sanitize at the alert site as defense-in-depth.
+        // The wrapper already sanitizes (checkerContract.ts catches), but a future
+        // caller into this code path that constructs a HoneypotResult by hand
+        // should not be able to inject markdown via reason.
+        const safeReason = sanitizeReason(honeypotResult.reason);
         await sendCtxAlert(
             ctx,
-            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${honeypotResult.reason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
+            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${safeReason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
         );
         return;
     }
@@ -487,9 +495,12 @@ export async function handleNewV3PoolForChain(
         const taxInfo = (evBuy !== undefined && evSell !== undefined)
             ? ` tax: buy ${evBuy}bps sell ${evSell}bps`
             : '';
+        // Plan 18-CR-03 fix-along: sanitize at the alert site as defense-in-depth.
+        // See V2 handler at the corresponding line for full rationale.
+        const safeReason = sanitizeReason(honeypotResult.reason);
         await sendCtxAlert(
             ctx,
-            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${honeypotResult.reason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
+            `*SKIP* \`${targetToken}\` -- ${honeypotResult.verdict} (${safeReason})${taxInfo}\n[Etherscan](${ctx.chain.explorerUrl}/token/${targetToken})`
         );
         return;
     }

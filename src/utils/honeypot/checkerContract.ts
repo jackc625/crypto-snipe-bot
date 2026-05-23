@@ -44,6 +44,7 @@ import { ethers, Interface } from 'ethers';
 import type { ChainContext, DexConfig, DexConfigV3 } from '../../chainRegistry';
 import type { HoneypotProbeResult, HoneypotResult } from './types';
 import { HONEYPOT_CHECKER_ABI } from './abi';
+import { sanitizeReason } from './sanitize';
 
 const iface = new Interface(HONEYPOT_CHECKER_ABI);
 
@@ -158,16 +159,22 @@ function aggregateProbes(
     // Any gating probe outright unsafe → overall unsafe (use first probe's reason).
     for (const probe of gating) {
         if (!probe.ok) {
+            // Plan 18-CR-03 fix-along: probe.reason can carry the string
+            // argument of a custom-error revert (BuyFailed / SellFailed /
+            // QuoteFailed) which is attacker-controlled (a token's transfer
+            // hook can revert with a crafted string). Sanitize before it
+            // flows into bot.ts Telegram-markdown alerts / dashboard WS.
+            const safeReason = sanitizeReason(probe.reason ?? 'gating-probe-unsafe');
             return {
                 verdict: 'unsafe',
-                reason: probe.reason ?? 'gating-probe-unsafe',
+                reason: safeReason,
                 evidence: {
                     method: 'on-chain-contract',
                     dexType,
                     probeResults,
                     buyTaxBps: probe.buyTaxBps,
                     sellTaxBps: probe.sellTaxBps,
-                    revertReason: probe.reason,
+                    revertReason: safeReason,
                 },
             };
         }
@@ -284,9 +291,12 @@ export async function simulateViaContractV2(
             { err: e, token, check: 'honeypotRoundtripV2' },
             'V2 honeypot wrapper threw unexpectedly — failing closed',
         );
+        // Plan 18-CR-03 fix-along: e.message can contain user-controlled
+        // RPC error strings or token-revert payloads. Sanitize before it
+        // flows into the Telegram markdown alert at bot.ts:251.
         return {
             verdict: 'unsafe',
-            reason: e instanceof Error ? e.message : String(e),
+            reason: sanitizeReason(e instanceof Error ? e.message : String(e)),
             evidence: { method: 'on-chain-contract', dexType: 'v2' },
         };
     }
@@ -367,9 +377,12 @@ export async function simulateViaContractV3(
             { err: e, token, check: 'honeypotRoundtripV3' },
             'V3 honeypot wrapper threw unexpectedly — failing closed',
         );
+        // Plan 18-CR-03 fix-along: e.message can contain user-controlled
+        // RPC error strings or token-revert payloads. Sanitize before it
+        // flows into the Telegram markdown alert at bot.ts:479.
         return {
             verdict: 'unsafe',
-            reason: e instanceof Error ? e.message : String(e),
+            reason: sanitizeReason(e instanceof Error ? e.message : String(e)),
             evidence: { method: 'on-chain-contract', dexType: 'v3' },
         };
     }
