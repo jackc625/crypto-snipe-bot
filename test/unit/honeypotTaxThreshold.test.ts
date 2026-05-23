@@ -53,17 +53,23 @@ const baseCtx = (overrides?: Partial<{ maxBuyTaxBps: number; maxSellTaxBps: numb
 const v2Dex = {
     dexType: 'v2' as const,
     name: 'uniswap-v2',
-    factoryAddress: '0xfac',
+    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
     routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
 };
 
 const v3Dex = {
     dexType: 'v3' as const,
     name: 'uniswap-v3',
-    factoryAddress: '0xfac',
+    factoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
     swapRouterAddress: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
     quoterAddress: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
 };
+
+// Realistic 20-byte token address (checksummed via ethers v6) used by all tests
+// — ethers `Interface.encodeFunctionData` rejects placeholder strings like
+// "0xtoken" with INVALID_ARGUMENT, which would otherwise trip the wrapper's
+// outer try/catch and produce a verdict='unsafe' with reason=<ethers message>.
+const TOKEN_ADDR = '0x000000000000000000000000000000000000abcd';
 
 describe('Phase 18 plan 18-09 Task 1 — tax-threshold enforcement (V2 + V3)', () => {
     beforeEach(() => {
@@ -76,7 +82,7 @@ describe('Phase 18 plan 18-09 Task 1 — tax-threshold enforcement (V2 + V3)', (
         const ctx = { ...baseCtx(), httpProvider: provider } as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV2(ctx as any, v2Dex, '0xtoken', baseCtx().chain.honeypotChecker.deployedAddress!);
+        const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, baseCtx().chain.honeypotChecker.deployedAddress!);
 
         expect(result.verdict).toBe('safe');
         if (result.verdict === 'safe') {
@@ -91,7 +97,7 @@ describe('Phase 18 plan 18-09 Task 1 — tax-threshold enforcement (V2 + V3)', (
         const ctx = { ...baseCtx(), httpProvider: provider } as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV2(ctx as any, v2Dex, '0xtoken', baseCtx().chain.honeypotChecker.deployedAddress!);
+        const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, baseCtx().chain.honeypotChecker.deployedAddress!);
 
         expect(result.verdict).toBe('unsafe');
         if (result.verdict === 'unsafe') {
@@ -105,7 +111,7 @@ describe('Phase 18 plan 18-09 Task 1 — tax-threshold enforcement (V2 + V3)', (
         const ctx = { ...baseCtx(), httpProvider: provider } as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV2(ctx as any, v2Dex, '0xtoken', baseCtx().chain.honeypotChecker.deployedAddress!);
+        const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, baseCtx().chain.honeypotChecker.deployedAddress!);
 
         expect(result.verdict).toBe('unsafe');
         if (result.verdict === 'unsafe') {
@@ -119,7 +125,7 @@ describe('Phase 18 plan 18-09 Task 1 — tax-threshold enforcement (V2 + V3)', (
         const ctx = { ...baseCtx(), httpProvider: provider } as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV3(ctx as any, v3Dex, '0xtoken', baseCtx().chain.honeypotChecker.deployedAddress!, 3000);
+        const result = await simulateViaContractV3(ctx as any, v3Dex, TOKEN_ADDR, baseCtx().chain.honeypotChecker.deployedAddress!, 3000);
 
         expect(result.verdict).toBe('unsafe');
         if (result.verdict === 'unsafe') {

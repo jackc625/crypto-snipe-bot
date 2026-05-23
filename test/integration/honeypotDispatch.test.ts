@@ -46,9 +46,11 @@ function makeCtx(provider: { call: ReturnType<typeof vi.fn> }) {
 const v2Dex = {
     dexType: 'v2' as const,
     name: 'uniswap-v2',
-    factoryAddress: '0xfac',
+    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
     routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
 };
+
+const TOKEN_ADDR = '0x000000000000000000000000000000000000abcd';
 
 const snipeWei = ethers.parseEther('0.003');
 const oneCent = snipeWei / 100n;
@@ -80,7 +82,7 @@ describe('Phase 18 plan 18-09 Task 1 — multi-amount aggregation (D-AGGREGATION
         const ctx = makeCtx(provider) as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV2(ctx as any, v2Dex, '0xtoken', '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
+        const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
 
         expect(result.verdict).toBe('unsafe');
         expect(result.evidence.probeResults).toBeDefined();
@@ -107,7 +109,7 @@ describe('Phase 18 plan 18-09 Task 1 — multi-amount aggregation (D-AGGREGATION
         const ctx = makeCtx(provider) as unknown;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await simulateViaContractV2(ctx as any, v2Dex, '0xtoken', '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
+        const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
 
         expect(result.verdict).toBe('safe');
         expect(result.evidence.probeResults).toBeDefined();
