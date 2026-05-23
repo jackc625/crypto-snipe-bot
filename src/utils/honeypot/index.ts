@@ -56,11 +56,25 @@ export async function simulateHoneypotRoundtrip(
                 evidence: { method: 'on-chain-contract', dexType: dex.dexType },
             };
         }
-        if (dex.dexType === 'v2') {
-            return simulateViaContractV2(ctx, dex, token, cfg.deployedAddress);
-        }
-        if (dex.dexType === 'v3') {
-            return simulateViaContractV3(ctx, dex, token, cfg.deployedAddress, feeTier ?? 3000);
+        // Plan 18-CR-02 fix-along: use a switch on the discriminated union with
+        // an exhaustive `never` guard. This honors the README's "exhaustive
+        // never-checks at every dispatch site" claim (README:126). A future
+        // 'v4' variant added to DexConfig will fail tsc --noEmit here rather
+        // than silently falling through to the `bad-method` branch with a
+        // misleading diagnostic.
+        switch (dex.dexType) {
+            case 'v2':
+                return simulateViaContractV2(ctx, dex, token, cfg.deployedAddress);
+            case 'v3':
+                return simulateViaContractV3(ctx, dex, token, cfg.deployedAddress, feeTier ?? 3000);
+            default: {
+                const _exhaustive: never = dex;
+                return {
+                    verdict: 'unknown',
+                    reason: `unknown-dex-type:${String((_exhaustive as DexConfig).dexType)}`,
+                    evidence: { method: 'on-chain-contract' },
+                };
+            }
         }
     }
 
