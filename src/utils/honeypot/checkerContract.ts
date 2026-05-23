@@ -76,6 +76,40 @@ function extractRevertData(err: CallError): string {
 }
 
 /**
+ * Plan 18-WR-05 fix-along: heuristically classify whether a thrown error in
+ * the outer try/catch represents a CONFIG BUG (cannot run the gate) versus
+ * UNSAFE-TOKEN evidence (the probe itself threw — already handled as
+ * ok:false inside runProbeV2/runProbeV3, but the outer catch fires on
+ * pre-probe failures: parseEther on a malformed snipeAmount,
+ * encodeFunctionData on a bad address, etc.).
+ *
+ * Config bugs return verdict='unknown' (D-UNKNOWN-POLICY skip without retry)
+ * so the operator sees the actual diagnostic instead of a misleading
+ * "honeypot detected" alert. The bot.ts gate still hard-blocks the buy on
+ * 'unknown' because verdict !== 'safe'.
+ *
+ * Returns false for any non-Error throw — those are surfaced as unsafe per
+ * the pre-existing fail-closed default.
+ */
+function isConfigBugError(e: unknown): boolean {
+    if (!(e instanceof Error)) return false;
+    const msg = e.message;
+    // ethers v6 surfaces malformed-input errors as named codes; cover both
+    // the message-substring and code-string variants for robustness.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const code = (e as any).code;
+    return (
+        msg.includes('parseEther') ||
+        msg.includes('encodeFunctionData') ||
+        msg.includes('INVALID_ARGUMENT') ||
+        msg.includes('invalid BigNumberish') ||
+        msg.includes('invalid address') ||
+        code === 'INVALID_ARGUMENT' ||
+        code === 'NUMERIC_FAULT'
+    );
+}
+
+/**
  * Decode the terminal revert payload from `Interface.parseError`. Returns a
  * normalized ProbeOutcome.
  */
@@ -294,8 +328,16 @@ export async function simulateViaContractV2(
         // Plan 18-CR-03 fix-along: e.message can contain user-controlled
         // RPC error strings or token-revert payloads. Sanitize before it
         // flows into the Telegram markdown alert at bot.ts:251.
+        // Plan 18-WR-05 fix-along: differentiate config bugs from unsafe-
+        // token evidence. parseEther(snipeAmount) and encodeFunctionData on
+        // malformed addresses are CONFIG BUGS — the gate could not even run.
+        // Returning 'unsafe' for these would alert the operator "honeypot
+        // detected" on every token; surface them as 'unknown' instead
+        // (D-UNKNOWN-POLICY: skip without retry) so the operator sees the
+        // gate's diagnostic rather than a false positive. The bot.ts gate
+        // still hard-blocks the buy because verdict !== 'safe'.
         return {
-            verdict: 'unsafe',
+            verdict: isConfigBugError(e) ? 'unknown' : 'unsafe',
             reason: sanitizeReason(e instanceof Error ? e.message : String(e)),
             evidence: { method: 'on-chain-contract', dexType: 'v2' },
         };
@@ -380,8 +422,10 @@ export async function simulateViaContractV3(
         // Plan 18-CR-03 fix-along: e.message can contain user-controlled
         // RPC error strings or token-revert payloads. Sanitize before it
         // flows into the Telegram markdown alert at bot.ts:479.
+        // Plan 18-WR-05 fix-along: differentiate config bugs from unsafe-
+        // token evidence (see V2 handler for full rationale).
         return {
-            verdict: 'unsafe',
+            verdict: isConfigBugError(e) ? 'unknown' : 'unsafe',
             reason: sanitizeReason(e instanceof Error ? e.message : String(e)),
             evidence: { method: 'on-chain-contract', dexType: 'v3' },
         };
