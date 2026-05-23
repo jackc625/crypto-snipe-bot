@@ -6,8 +6,8 @@
 // regression in this layer would defeat the entire phase.
 //
 // Tests:
-//   4. V2 provider.call throws { message: 'network timeout' } with no data    → 'unsafe'.
-//   5. V2 provider.call resolves (contract bug — no revert)                   → 'unknown' with reason 'no-terminal-revert'.
+//   4. V2 provider.call throws { message: 'network timeout' } with no data    → 'unsafe' (aggregator: all-gating-probes ok:false → unsafe).
+//   5. V2 provider.call resolves (contract bug — no revert)                   → 'unsafe' with reason 'no-terminal-revert' (Plan 18-WR-01 tightened: was not.toBe('safe')).
 //   6. V2 provider.call rejects with malformed revert data '0x1234'           → 'unsafe'.
 //   7. V3 path with QuoteFailed revert (iter-2 Blocker #1)                    → 'unsafe' with reason starting 'quote-failed'.
 
@@ -64,11 +64,14 @@ describe('Phase 18 plan 18-09 Task 1 — unknown semantics fail closed (V2 + V3)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
 
-        // NEVER 'safe' on RPC noise — fail-closed.
-        expect(result.verdict).not.toBe('safe');
+        // Plan 18-WR-01 tightened: assert the precise verdict, not just "not safe".
+        // RPC noise → no revert data → decodeTerminalRevert returns ok:false with
+        // a network-timeout fallback reason. All 3 gating probes ok:false →
+        // aggregator returns 'unsafe'.
+        expect(result.verdict).toBe('unsafe');
     });
 
-    it('Test 5: V2 provider.call RESOLVES (no revert — contract bug) → unknown with reason no-terminal-revert', async () => {
+    it('Test 5: V2 provider.call RESOLVES (no revert — contract bug) → unsafe with reason no-terminal-revert', async () => {
         const { simulateViaContractV2 } = await import('../../src/utils/honeypot/checkerContract');
         const provider = { call: vi.fn().mockResolvedValue('0x') };
         const ctx = makeCtx(provider) as unknown;
@@ -76,13 +79,16 @@ describe('Phase 18 plan 18-09 Task 1 — unknown semantics fail closed (V2 + V3)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
 
+        // Plan 18-WR-01 tightened: assert the precise verdict + reason.
         // When the contract DOESN'T revert (which violates its design invariant),
-        // the wrapper treats that probe as ok:false reason:'no-terminal-revert'.
-        // For all gating probes returning no-terminal-revert, overall is unsafe;
-        // but the per-probe reason MUST surface so we can diagnose.
-        expect(result.verdict).not.toBe('safe');
-        const haystack = JSON.stringify(result);
-        expect(haystack).toContain('no-terminal-revert');
+        // each probe returns ok:false reason:'no-terminal-revert'. aggregateProbes
+        // treats all-gating-probes-ok:false as 'unsafe' (NOT 'unknown') — the
+        // previous `not.toBe('safe')` masked refactors that accidentally flipped
+        // the verdict between 'unsafe' and 'unknown'.
+        expect(result.verdict).toBe('unsafe');
+        if (result.verdict === 'unsafe') {
+            expect(result.reason).toMatch(/no-terminal-revert/);
+        }
     });
 
     it('Test 6: V2 provider.call rejects with malformed revert data 0x1234 → unsafe', async () => {
@@ -93,7 +99,10 @@ describe('Phase 18 plan 18-09 Task 1 — unknown semantics fail closed (V2 + V3)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await simulateViaContractV2(ctx as any, v2Dex, TOKEN_ADDR, '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD');
 
-        expect(result.verdict).not.toBe('safe');
+        // Plan 18-WR-01 tightened: assert the precise verdict, not just "not safe".
+        // Malformed revert → parseError fails → fallback to err.message → all
+        // gating probes ok:false → aggregator returns 'unsafe'.
+        expect(result.verdict).toBe('unsafe');
     });
 
     it('Test 7: V3 path QuoteFailed revert → unsafe with reason starting quote-failed (iter-2 Blocker #1)', async () => {
