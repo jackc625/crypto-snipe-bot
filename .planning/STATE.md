@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 19 plan 19-04a complete; ready for plan 19-04b (multi-signal evaluator)
-last_updated: "2026-05-24T02:11:21.858Z"
-last_activity: 2026-05-24 -- Phase 19 plan 19-04a complete (detector FOUNDATION skeleton)
+stopped_at: Phase 19 plan 19-04c complete; ready for plan 19-05 (bot.ts wiring + exitEngine cleanup hook)
+last_updated: "2026-05-24T03:03:56.422Z"
+last_activity: 2026-05-24
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 24
-  completed_plans: 17
+  completed_plans: 19
   percent: 20
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 19 (anti-rug-runtime-monitoring) — EXECUTING
-Plan: 3 of 10
+Plan: 4 of 10
 Status: Ready to execute
 Last activity: 2026-05-24
 
@@ -109,6 +109,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | 260518-jsr | Inspect entire codebase and write a brand-new, fully-updated README.md at the project root (engineer-first deep-dive, 502 lines, prose+bullets, WIP marked inline; grounded in 727-line research inventory) | 2026-05-18 | 847b369 | Verified | [260518-jsr-inspect-entire-codebase-and-write-a-bran](./quick/260518-jsr-inspect-entire-codebase-and-write-a-bran/) |
 | Phase 18 P05 | ~45min | 3 tasks | 4 files |
 | Phase 19 P04a | 25 | 1 tasks | 2 files |
+| Phase 19 P19-04c | 17min | 1 tasks | 2 files |
 
 ## Phase 19 Plan Execution Log
 
@@ -133,7 +134,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-24T02:11:21.848Z
+Last session: 2026-05-24T03:03:16.313Z
 Last activity: 2026-05-24 — Phase 19 plan 19-01 complete. ANTIRUG-04 + ANTIRUG-16 schema migration v4→v5 landed in `src/utils/db.ts`. New `lp_baseline` table (single-table-with-`pool_type`-discriminator shape; 12 columns + `idx_lp_baseline_pool` index) records LP-reserve / V3-active-liquidity snapshot at buy-success per trade; new `chain_state` table (PRIMARY KEY chain; `last_seen_block` + `last_updated_ts`) drives restart-time `getLogs(lastSeen+1, current)` chunked backfill per D-BACKFILL. 5 prepared statements (`upsertLpBaseline` named-bind UPSERT, `getLpBaseline`, `deleteLpBaseline`, `upsertChainState` positional UPSERT, `getChainState`) exported. `v3_position_nft_id` stays NULLABLE in v6.17 per Research Open Question #3 (V3 baseline pool-only; NFT-tracking deferred to v6.18+). 12/12 tests passing in new `test/unit/db/lpBaselineMigration.test.ts` (10 behaviors + 2 production-module integration); full unit suite 288/288 with zero regressions; tsc clean across all 3 tsconfig projects (`tsconfig.json` + `tsconfig.bot.json` + `dashboard/tsconfig.json`). Existing tables untouched per additive-only ANTIRUG-04 acceptance. Commits: `6091100` (test RED) + `522ae08` (feat GREEN). Production `data/bot.db` migrated in-place from v4 to v5 with `Created lp_baseline + chain_state tables (schema version 5)` log line on first module load. Plans 19-03 (`lpBaseline.ts`), 19-04a/b/c (`detector.ts`), 19-05 (cleanup hook) now unblocked.
 Stopped at: Phase 19 plan 19-01 complete; ready for plan 19-02
 Resume file: None
