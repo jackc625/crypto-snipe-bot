@@ -16,6 +16,35 @@ export type { HoneypotCheckerConfig };
 const log = logger.child({ module: 'chainRegistry' });
 
 // ---------------------------------------------------------------------------
+// Plan 19-02: AntiRugConfig types (Phase 19 anti-rug runtime monitoring)
+//
+// Declared inline here as the source-of-truth for plan 19-02. Plan 19-03 will
+// move these to src/anti-rug/types.ts and this file will import from there;
+// for now we ship the shape co-located with ChainConfig so the registry can
+// own the defaults + env overlay + hardcoded allowlist constants without a
+// circular import between chainRegistry.ts and the new src/anti-rug/ module.
+// ---------------------------------------------------------------------------
+
+export interface AllowlistEntry {
+    address: string;
+    lockerName: string;
+    provenance: 'hardcoded' | 'env-overlay';
+}
+
+export interface AntiRugConfig {
+    liveExecute: boolean;
+    lpRemovalPct: number;
+    confirmBlocks: number;
+    circuitBreakerTriggers: number;
+    circuitBreakerWindowHours: number;
+    gasMultiplier: number;
+    backfillCapBlocks: number;
+    maxBackfillBlocks: number;
+    allowlistV2: AllowlistEntry[];
+    allowlistV3: AllowlistEntry[];
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -72,6 +101,11 @@ export interface ChainConfig {
     // can read ctx.chain.honeypotChecker.{deployedAddress, method,
     // maxBuyTaxBps, maxSellTaxBps} without optional chaining.
     honeypotChecker: HoneypotCheckerConfig;
+    // Plan 19-02 (Phase 19 anti-rug runtime monitoring): per-chain anti-rug
+    // tuning fields + hardcoded + env-overlay locker allowlists. Required
+    // field per the must_haves contract; defaults supplied by CHAIN_TEMPLATES
+    // with per-chain env overrides validated fail-loud.
+    antiRug: AntiRugConfig;
     gas: GasConfig;
     snipeAmount: string;
     maxCapital: string;
@@ -119,6 +153,17 @@ interface ChainTemplate {
     defaultMaxBuyTaxBps: number;
     defaultMaxSellTaxBps: number;
     defaultHoneypotCheckerAddress: string | null;
+    // Plan 19-02: per-chain anti-rug defaults. ETH has a distinct
+    // backfillCapBlocks default (10, Alchemy free-tier safe per
+    // 19-RESEARCH.md CRITICAL #1); BSC/BASE/ARB default to 500.
+    // All other defaults are uniform across chains.
+    defaultAntiRugLpRemovalPct: number;
+    defaultAntiRugConfirmBlocks: number;
+    defaultAntiRugCircuitBreakerTriggers: number;
+    defaultAntiRugCircuitBreakerWindowHours: number;
+    defaultAntiRugGasMultiplier: number;
+    defaultAntiRugBackfillCapBlocks: number;
+    defaultAntiRugMaxBackfillBlocks: number;
 }
 
 // Exported for test/integration/honeypotDeploy.*.test.ts (plan 18-07/18-08) so
@@ -175,6 +220,15 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         // for hot-patching without redeploy. See
         // .planning/milestones/v6.17-honeypot-checker-audit.md §HONEY-03.
         defaultHoneypotCheckerAddress: '0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD',
+        // Plan 19-02 anti-rug defaults for ETH. backfillCapBlocks=10 is the
+        // Alchemy free-tier safe value per 19-RESEARCH.md CRITICAL #1.
+        defaultAntiRugLpRemovalPct: 50,
+        defaultAntiRugConfirmBlocks: 1,
+        defaultAntiRugCircuitBreakerTriggers: 3,
+        defaultAntiRugCircuitBreakerWindowHours: 1,
+        defaultAntiRugGasMultiplier: 2.0,
+        defaultAntiRugBackfillCapBlocks: 10,
+        defaultAntiRugMaxBackfillBlocks: 7200,
     },
     bsc: {
         chainId: 56,
@@ -227,6 +281,15 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
         // from plan 18-07 closes cleanly.
         defaultHoneypotCheckerAddress: null,
+        // Plan 19-02 anti-rug defaults for BSC. backfillCapBlocks=500 is the
+        // conservative-safe default for public BSC RPCs / Chainstack.
+        defaultAntiRugLpRemovalPct: 50,
+        defaultAntiRugConfirmBlocks: 1,
+        defaultAntiRugCircuitBreakerTriggers: 3,
+        defaultAntiRugCircuitBreakerWindowHours: 1,
+        defaultAntiRugGasMultiplier: 2.0,
+        defaultAntiRugBackfillCapBlocks: 500,
+        defaultAntiRugMaxBackfillBlocks: 7200,
     },
     base: {
         chainId: 8453,
@@ -272,6 +335,15 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
         // from plan 18-07 closes cleanly.
         defaultHoneypotCheckerAddress: null,
+        // Plan 19-02 anti-rug defaults for Base. backfillCapBlocks=500 is the
+        // conservative-safe default for public Base RPCs.
+        defaultAntiRugLpRemovalPct: 50,
+        defaultAntiRugConfirmBlocks: 1,
+        defaultAntiRugCircuitBreakerTriggers: 3,
+        defaultAntiRugCircuitBreakerWindowHours: 1,
+        defaultAntiRugGasMultiplier: 2.0,
+        defaultAntiRugBackfillCapBlocks: 500,
+        defaultAntiRugMaxBackfillBlocks: 7200,
     },
     arb: {
         chainId: 42161,
@@ -317,8 +389,189 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         // Plan 18-08 (HONEY-04) will populate after 2-3 day observation window
         // from plan 18-07 closes cleanly.
         defaultHoneypotCheckerAddress: null,
+        // Plan 19-02 anti-rug defaults for Arbitrum. backfillCapBlocks=500 is
+        // the conservative-safe default for public Arb RPCs.
+        defaultAntiRugLpRemovalPct: 50,
+        defaultAntiRugConfirmBlocks: 1,
+        defaultAntiRugCircuitBreakerTriggers: 3,
+        defaultAntiRugCircuitBreakerWindowHours: 1,
+        defaultAntiRugGasMultiplier: 2.0,
+        defaultAntiRugBackfillCapBlocks: 500,
+        defaultAntiRugMaxBackfillBlocks: 7200,
     },
 };
+
+// ---------------------------------------------------------------------------
+// Plan 19-02: Hardcoded V2 + V3 locker allowlists per chain
+//
+// Source-of-truth for known-safe LP-removal destinations. Addresses verified
+// in 19-RESEARCH.md §2.1 (V2 lockers) and §2.2 (V3 lockers). Every entry is
+// wrapped in ethers.getAddress(...) which validates checksum at module load
+// (T-19-02-01 mitigation — typo throws at boot).
+//
+// TeamFinance V3 NFT vault and PinkLock V3 entries are NOT shipped here yet
+// per Blocker 4 resolution from plan-checker iteration 1 + D-V3-ALLOWLIST
+// [USER-BINDING]. Task 3 of plan 19-02 is a `checkpoint:human-action` that
+// pauses for the operator to either provide canonical addresses (Option A)
+// or explicitly accept the gap (Option B, recorded as
+// `// OPERATOR-ACCEPTED-GAP-Phase19-{chain}-{locker}`).
+// ---------------------------------------------------------------------------
+
+const DEAD_ADDRESS = ethers.getAddress('0x000000000000000000000000000000000000dEaD');
+
+const HARDCODED_V2_ALLOWLIST: Record<string, AllowlistEntry[]> = {
+    eth: [
+        {
+            address: ethers.getAddress('0x59d7d55ddc58494fbbbca29904f108ece82ac7fb'),
+            lockerName: 'Unicrypt UniLockerV2 ETH',
+            provenance: 'hardcoded',
+        },
+        {
+            address: ethers.getAddress('0xe2fe530c047f2d85298b07d9333c05737f1435fb'),
+            lockerName: 'TeamFinance / TrustSwap Lock ETH',
+            provenance: 'hardcoded',
+        },
+        {
+            address: ethers.getAddress('0x71b5759d73262fbb223956913ecf4ecc51057641'),
+            lockerName: 'PinkLock V2 ETH',
+            provenance: 'hardcoded',
+        },
+        {
+            address: DEAD_ADDRESS,
+            lockerName: '0xdEaD burn address (universal)',
+            provenance: 'hardcoded',
+        },
+    ],
+    bsc: [
+        {
+            address: ethers.getAddress('0xC765bddB93b0D1c1A88282BA0fa6B2d00E3e0c83'),
+            lockerName: 'UNCX UniLockerV2 BSC (PancakeSwap V2)',
+            provenance: 'hardcoded',
+        },
+        {
+            address: ethers.getAddress('0x407993575c91ce7643a4d4ccacc9a98c36ee1bbe'),
+            lockerName: 'PinkLock V2 BSC',
+            provenance: 'hardcoded',
+        },
+        {
+            address: DEAD_ADDRESS,
+            lockerName: '0xdEaD burn address (universal)',
+            provenance: 'hardcoded',
+        },
+    ],
+    base: [
+        {
+            address: ethers.getAddress('0xED9180976c2a4742C7A57354FD39d8BEc6cbd8AB'),
+            lockerName: 'UNCX UniLockerV2 Base (Uniswap V2)',
+            provenance: 'hardcoded',
+        },
+        {
+            address: DEAD_ADDRESS,
+            lockerName: '0xdEaD burn address (universal)',
+            provenance: 'hardcoded',
+        },
+    ],
+    arb: [
+        {
+            address: ethers.getAddress('0x63F4B2C082B1E0bbA38874567E053800379bF8D7'),
+            lockerName: 'UNCX UniLockerV2 Arbitrum (Uniswap V2)',
+            provenance: 'hardcoded',
+        },
+        {
+            address: DEAD_ADDRESS,
+            lockerName: '0xdEaD burn address (universal)',
+            provenance: 'hardcoded',
+        },
+    ],
+};
+
+const HARDCODED_V3_ALLOWLIST: Record<string, AllowlistEntry[]> = {
+    eth: [
+        {
+            address: ethers.getAddress('0xFD235968e65B0990584585763f837A5b5330e6DE'),
+            lockerName: 'UNCX V3 Locker ETH (NFT-holding)',
+            provenance: 'hardcoded',
+        },
+        // PHASE-19-BLOCKER-4-ESCALATION (D-V3-ALLOWLIST [USER-BINDING]):
+        //   TeamFinance V3 NFT vault — address NOT resolved during plan-phase
+        //     (planner WebFetch blocked HTTP 403 on team.finance docs).
+        //     Operator verification protocol: open https://app.team.finance/,
+        //     browse to a locked V3 position, inspect the contract reference,
+        //     cross-verify on Etherscan token-tag search.
+        //   PinkLock V3 — address NOT resolved during plan-phase.
+        //     Operator verification protocol: open
+        //     https://www.pinksale.finance/pinklock, filter V3 locks, inspect
+        //     the locker contract address, cross-verify on Etherscan.
+        //   Pending checkpoint:human-action in Task 3 of plan 19-02; operator
+        //     either supplies the canonical addresses (Option A) or explicitly
+        //     accepts the gap (Option B) recorded as
+        //     `// OPERATOR-ACCEPTED-GAP-Phase19-eth-TeamFinanceV3` /
+        //     `// OPERATOR-ACCEPTED-GAP-Phase19-eth-PinkLockV3`.
+    ],
+    bsc: [
+        {
+            address: ethers.getAddress('0xfe88DAB083964C56429baa01F37eC2265AbF1557'),
+            lockerName: 'UNCX V3 Locker BSC',
+            provenance: 'hardcoded',
+        },
+        // PHASE-19-BLOCKER-4-ESCALATION: see eth comment above (TeamFinance V3
+        //   + PinkLock V3 BSC addresses pending operator resolution in Task 3).
+    ],
+    base: [
+        {
+            address: ethers.getAddress('0x231278eDd38B00B07fBd52120CEf685B9BaEBCC1'),
+            lockerName: 'UNCX V3 Locker Base',
+            provenance: 'hardcoded',
+        },
+        // PHASE-19-BLOCKER-4-ESCALATION: see eth comment above (TeamFinance V3
+        //   + PinkLock V3 Base addresses pending operator resolution in Task 3).
+    ],
+    arb: [
+        {
+            address: ethers.getAddress('0x6b5360B419e0851b4b81644e0F63c1A9778f2506'),
+            lockerName: 'UNCX V3 Locker Arbitrum',
+            provenance: 'hardcoded',
+        },
+        {
+            // ANTIRUG-15: UNCX V3 "Proof of Reserves 2" on Arbitrum (distinct
+            // contract from the standard UNCX V3 Locker; verified via
+            // Arbiscan token-tag search per 19-RESEARCH.md §2.2).
+            address: ethers.getAddress('0xcb8b00d4018ad6031e28a44bf74616014bfb62ec'),
+            lockerName: 'UNCX V3 "Proof of Reserves 2" Arbitrum (ANTIRUG-15)',
+            provenance: 'hardcoded',
+        },
+        // PHASE-19-BLOCKER-4-ESCALATION: see eth comment above (TeamFinance V3
+        //   + PinkLock V3 Arbitrum addresses pending operator resolution in
+        //   Task 3).
+    ],
+};
+
+// Plan 19-03 imports these for the startup-time getCode() check + the
+// allowlist-merge logic. Re-export for downstream module consumption.
+export { HARDCODED_V2_ALLOWLIST, HARDCODED_V3_ALLOWLIST };
+
+/**
+ * Merge the hardcoded base allowlist with the operator's env-overlay extras.
+ * Plan 19-02: dedupe by lowercased address (operator overlay takes precedence
+ * for the lockerName/provenance fields if the same address appears in both,
+ * but this is reported in the SUMMARY for operator awareness — the merge
+ * does NOT silently de-dupe with a no-op; an exact-address duplicate ships as
+ * one entry with provenance='env-overlay').
+ */
+function mergeAllowlist(
+    base: AllowlistEntry[],
+    extras: AllowlistEntry[],
+): AllowlistEntry[] {
+    const merged = new Map<string, AllowlistEntry>();
+    for (const e of base) {
+        merged.set(e.address.toLowerCase(), e);
+    }
+    // Extras overwrite same-address hardcoded entries (operator intent wins).
+    for (const e of extras) {
+        merged.set(e.address.toLowerCase(), e);
+    }
+    return [...merged.values()];
+}
 
 // Valid chain names for validation
 const VALID_CHAIN_NAMES = Object.keys(CHAIN_TEMPLATES);
@@ -386,6 +639,192 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                 'Tax threshold env var must be a valid bps integer in [0, 10000]'
             );
             process.exit(1);
+        }
+
+        // -------------------------------------------------------------------
+        // Plan 19-02: per-chain anti-rug env overlay + fail-loud validation
+        // Pattern mirrors chainRegistry.ts:376-389 (Phase 18 max-buy-tax-bps
+        // validator). Invalid env values FATAL-exit per T-19-02-04 mitigation.
+        // -------------------------------------------------------------------
+        const antiRugLiveExecuteRaw = process.env[`${template.envPrefix}_ANTIRUG_LIVE_EXECUTE`];
+        // Strict 'true' match per D-LIVE-PER-CHAIN safety; any non-exact-'true'
+        // string (including 'TRUE', '1', undefined) yields false → dry-run.
+        const antiRugLiveExecute = antiRugLiveExecuteRaw === 'true';
+
+        const antiRugLpRemovalPctRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`] ??
+            String(template.defaultAntiRugLpRemovalPct);
+        const antiRugLpRemovalPct = Number(antiRugLpRemovalPctRaw);
+        if (
+            Number.isNaN(antiRugLpRemovalPct) ||
+            antiRugLpRemovalPct < 0 ||
+            antiRugLpRemovalPct > 100
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`,
+                    value: antiRugLpRemovalPctRaw,
+                },
+                'Anti-rug LP-removal-pct must be a number in [0, 100]'
+            );
+            process.exit(1);
+        }
+
+        const antiRugConfirmBlocksRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`] ??
+            String(template.defaultAntiRugConfirmBlocks);
+        const antiRugConfirmBlocks = Number(antiRugConfirmBlocksRaw);
+        if (
+            Number.isNaN(antiRugConfirmBlocks) ||
+            !Number.isInteger(antiRugConfirmBlocks) ||
+            antiRugConfirmBlocks < 0
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`,
+                    value: antiRugConfirmBlocksRaw,
+                },
+                'Anti-rug confirm-blocks must be a non-negative integer'
+            );
+            process.exit(1);
+        }
+
+        const antiRugCBTriggersRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`] ??
+            String(template.defaultAntiRugCircuitBreakerTriggers);
+        const antiRugCBTriggers = Number(antiRugCBTriggersRaw);
+        if (
+            Number.isNaN(antiRugCBTriggers) ||
+            !Number.isInteger(antiRugCBTriggers) ||
+            antiRugCBTriggers < 1
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`,
+                    value: antiRugCBTriggersRaw,
+                },
+                'Anti-rug circuit-breaker triggers must be an integer >= 1'
+            );
+            process.exit(1);
+        }
+
+        const antiRugCBWindowHoursRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`] ??
+            String(template.defaultAntiRugCircuitBreakerWindowHours);
+        const antiRugCBWindowHours = Number(antiRugCBWindowHoursRaw);
+        if (
+            Number.isNaN(antiRugCBWindowHours) ||
+            !Number.isInteger(antiRugCBWindowHours) ||
+            antiRugCBWindowHours < 1
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`,
+                    value: antiRugCBWindowHoursRaw,
+                },
+                'Anti-rug circuit-breaker window-hours must be an integer >= 1'
+            );
+            process.exit(1);
+        }
+
+        const antiRugGasMultiplierRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`] ??
+            String(template.defaultAntiRugGasMultiplier);
+        const antiRugGasMultiplier = Number(antiRugGasMultiplierRaw);
+        if (
+            Number.isNaN(antiRugGasMultiplier) ||
+            antiRugGasMultiplier < 1.0
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`,
+                    value: antiRugGasMultiplierRaw,
+                },
+                'Anti-rug gas multiplier must be a number >= 1.0 (sub-1 is backward)'
+            );
+            process.exit(1);
+        }
+
+        const antiRugBackfillCapBlocksRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`] ??
+            String(template.defaultAntiRugBackfillCapBlocks);
+        const antiRugBackfillCapBlocks = Number(antiRugBackfillCapBlocksRaw);
+        if (
+            Number.isNaN(antiRugBackfillCapBlocks) ||
+            !Number.isInteger(antiRugBackfillCapBlocks) ||
+            antiRugBackfillCapBlocks < 1 ||
+            antiRugBackfillCapBlocks > 100_000
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`,
+                    value: antiRugBackfillCapBlocksRaw,
+                },
+                'Anti-rug backfill-cap-blocks must be an integer in [1, 100000]'
+            );
+            process.exit(1);
+        }
+
+        const antiRugMaxBackfillBlocksRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`] ??
+            String(template.defaultAntiRugMaxBackfillBlocks);
+        const antiRugMaxBackfillBlocks = Number(antiRugMaxBackfillBlocksRaw);
+        if (
+            Number.isNaN(antiRugMaxBackfillBlocks) ||
+            !Number.isInteger(antiRugMaxBackfillBlocks) ||
+            antiRugMaxBackfillBlocks < antiRugBackfillCapBlocks
+        ) {
+            log.fatal(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`,
+                    value: antiRugMaxBackfillBlocksRaw,
+                    backfillCapBlocks: antiRugBackfillCapBlocks,
+                },
+                'Anti-rug max-backfill-blocks must be an integer >= backfill-cap-blocks'
+            );
+            process.exit(1);
+        }
+
+        // Operator allowlist overlay: comma-separated checksummed addresses.
+        // Each entry validated via ethers.getAddress (FATAL on invalid checksum
+        // per T-19-02-02 mitigation). Merged into BOTH allowlistV2 and
+        // allowlistV3 per D-LIST-SOURCE (single overlay covers both pool types).
+        const antiRugAllowlistExtraRaw =
+            process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`] ?? '';
+        const antiRugAllowlistExtra: AllowlistEntry[] = [];
+        if (antiRugAllowlistExtraRaw.trim().length > 0) {
+            const tokens = antiRugAllowlistExtraRaw
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean);
+            for (const tok of tokens) {
+                try {
+                    const checksummed = ethers.getAddress(tok);
+                    antiRugAllowlistExtra.push({
+                        address: checksummed,
+                        lockerName: 'Operator overlay',
+                        provenance: 'env-overlay',
+                    });
+                } catch (err) {
+                    log.fatal(
+                        {
+                            chain: chainName,
+                            key: `${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`,
+                            badAddress: tok,
+                            err: (err as Error).message,
+                        },
+                        'Anti-rug allowlist-extra contains invalid address (checksum fail)'
+                    );
+                    process.exit(1);
+                }
+            }
         }
 
         // For ETH, fall back to ALCHEMY_URL if ETH_RPC_URL is not set (backward compat)
@@ -459,6 +898,24 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                 method: template.honeypotMethod,
                 maxBuyTaxBps,
                 maxSellTaxBps,
+            },
+            antiRug: {
+                liveExecute: antiRugLiveExecute,
+                lpRemovalPct: antiRugLpRemovalPct,
+                confirmBlocks: antiRugConfirmBlocks,
+                circuitBreakerTriggers: antiRugCBTriggers,
+                circuitBreakerWindowHours: antiRugCBWindowHours,
+                gasMultiplier: antiRugGasMultiplier,
+                backfillCapBlocks: antiRugBackfillCapBlocks,
+                maxBackfillBlocks: antiRugMaxBackfillBlocks,
+                allowlistV2: mergeAllowlist(
+                    HARDCODED_V2_ALLOWLIST[chainName] ?? [],
+                    antiRugAllowlistExtra
+                ),
+                allowlistV3: mergeAllowlist(
+                    HARDCODED_V3_ALLOWLIST[chainName] ?? [],
+                    antiRugAllowlistExtra
+                ),
             },
             gas: template.gas,
             snipeAmount,
