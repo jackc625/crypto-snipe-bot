@@ -890,8 +890,8 @@ describe('Phase 19 — Multi-signal evaluator (V3 path — Collect arrival)', ()
         ]);
 
         // Signal 2: owner NOT in allowlist
-        const owner = '0xAttacker70000000000000000000000000000007';
-        const recipient = '0xRecipient70000000000000000000000000000007';
+        const owner = '0x7700000000000000000000000000000000000077';
+        const recipient = '0x7700000000000000000000000000000000000aaa';
         const collectLog = makeV3CollectLog(pool, owner, recipient);
 
         const verdict = await evaluateRugSignals(
@@ -946,7 +946,11 @@ describe('Phase 19 — Multi-signal evaluator (V3 path — Collect arrival)', ()
         ]);
 
         // Collect with owner = UNCX V3 Locker (in allowlist)
-        const collectLog = makeV3CollectLog(pool, lockerV3, '0xRecipientB80000000000000000000000000000a');
+        const collectLog = makeV3CollectLog(
+            pool,
+            lockerV3,
+            '0xb800000000000000000000000000000000000088'
+        );
 
         const verdict = await evaluateRugSignals(
             ctx as unknown as Parameters<typeof evaluateRugSignals>[0],
@@ -988,8 +992,12 @@ describe('Phase 19 — Multi-signal evaluator (V3 path — Collect arrival)', ()
         );
 
         // Signal 2: owner NOT in allowlist (TRIPS)
-        const owner = '0xAttackerC900000000000000000000000000000c';
-        const collectLog = makeV3CollectLog(pool, owner, '0xRcptC9');
+        const owner = '0xc900000000000000000000000000000000000099';
+        const collectLog = makeV3CollectLog(
+            pool,
+            owner,
+            '0xc900000000000000000000000000000000000aaa'
+        );
 
         const verdict = await evaluateRugSignals(
             ctx as unknown as Parameters<typeof evaluateRugSignals>[0],
@@ -1161,7 +1169,7 @@ describe('Phase 19 — V3 Burn-without-Collect grace window', () => {
         const collectLog = makeV3CollectLog(
             pool,
             owner,
-            '0xRcptF0000000000000000000000000000000000a',
+            '0xf000000000000000000000000000000000000aaa',
             burnBlock + 2
         );
         const verdict = await evaluateRugSignals(
