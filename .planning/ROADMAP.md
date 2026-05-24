@@ -41,7 +41,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
 - [x] **Phase 17: Tech Debt Cleanup & Audit Baseline** â€” CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup *(completed 2026-04-30)*
 - [ ] **Phase 18: Honeypot Detection Rebuild** â€” Deploy `HoneypotChecker.sol` (Option D) on 4 chains; replace broken V2/V3 sell-sim gates; discriminated-union `HoneypotResult`; multi-amount tax probe; safety-bank audit
-- [ ] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode
+- [x] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode (completed 2026-05-24)
 - [ ] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
 - [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
 
@@ -144,7 +144,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 19-07-PLAN.md - RugPull.sol fixture + HORSE V2 fixture + V3 candidate skeleton + fork test (5 RugPull modes + HORSE replay) + end-to-end multi-signal integration test; + Blocker 2 grace-window deterministic test propagation + Info 13 HORSE address resolution directive [ANTIRUG-01, 02, 03, 05, 08, 13, 14]
 
   **Wave 7** *(after Wave 6; operator-facing docs):*
-  - [ ] 19-08-PLAN.md - docs/operations/anti-rug-rollout.md (D-OPERATOR-HANDOFF [USER-BINDING]) + anti-rug-tuning.md (D-TUNE-PROTOCOL) + README.md anti-rug section; + Warning 10 revision_path on operator checkpoint + Warning 5 env-count 7-to-9 callout + Blocker 4 V3 allowlist follow-through [ANTIRUG-10]
+  - [x] 19-08-PLAN.md - docs/operations/anti-rug-rollout.md (D-OPERATOR-HANDOFF [USER-BINDING]) + anti-rug-tuning.md (D-TUNE-PROTOCOL) + README.md anti-rug section; + Warning 10 revision_path on operator checkpoint + Warning 5 env-count 7-to-9 callout + Blocker 4 V3 allowlist follow-through [ANTIRUG-10]
 
 **Cross-cutting constraints:**
   - **D-V3-COVERAGE:** Phase 19 ships full V3-aware monitoring per CONTEXT.md (NOT log-only; NOT deferred). Researcher proposed ANTIRUG-13..16 as V3-specific requirement rows.
@@ -198,7 +198,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 9/10 | In Progress|  |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
