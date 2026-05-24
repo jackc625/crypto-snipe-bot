@@ -137,7 +137,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 19-04c-PLAN.md - anti-rug/detector.ts: heartbeat + reconnect + backfill + HTTP polling fallback + tiered D-VIS-WS-HEALTH alerts (Warning 6 split + Warning 9 added tests) [ANTIRUG-11, 12]
 
   **Wave 5** *(after Wave 4; exit pipeline + bot.ts wiring):*
-  - [ ] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook (Task 1a per Warning 7); exitTrigger bridge + raceTelemetry (Task 1b); bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring (Task 2); + Warning 11 ring buffer size note [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
+  - [x] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook (Task 1a per Warning 7); exitTrigger bridge + raceTelemetry (Task 1b); bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring (Task 2); + Warning 11 ring buffer size note [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
 
   **Wave 6** *(after Wave 5; parallel - dashboard + tests):*
   - [ ] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 5 display-only dashboard components (Task 2a per Warning 8) + 3 interactive components + PositionTable column + Overview mounting (Task 2b); + useWebSocket switch (Task 1); + Info 12 plumbing note [ANTIRUG-09, ANTIRUG-10]
@@ -198,7 +198,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 6/10 | In Progress|  |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 7/10 | In Progress|  |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
