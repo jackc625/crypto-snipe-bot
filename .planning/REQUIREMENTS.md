@@ -163,16 +163,16 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | ANTIRUG-02 | Phase 19 | Complete |
 | ANTIRUG-03 | Phase 19 | Complete |
 | ANTIRUG-04 | Phase 19 | Complete (Plan 19-01, 2026-05-24) |
-| ANTIRUG-05 | Phase 19 | Pending |
+| ANTIRUG-05 | Phase 19 | Complete (Plans 19-04b + 19-05, 2026-05-24 — multi-signal AND-chain V2 evaluator + exit-pipeline wiring) |
 | ANTIRUG-06 | Phase 19 | Complete (Plan 19-02 + 19-03, 2026-05-24) |
-| ANTIRUG-07 | Phase 19 | Pending |
-| ANTIRUG-08 | Phase 19 | Pending |
-| ANTIRUG-09 | Phase 19 | Pending |
-| ANTIRUG-10 | Phase 19 | Pending |
+| ANTIRUG-07 | Phase 19 | Complete (Plans 19-04b + 19-05, 2026-05-24 — confirm-after-N-blocks gate in evaluator + bot.ts wiring) |
+| ANTIRUG-08 | Phase 19 | Complete (Plan 19-05, 2026-05-24 — exitTrigger bridge wires detector verdict → executeFullSell with reason='anti-rug' + [ANTI-RUG EXIT] alert prefix) |
+| ANTIRUG-09 | Phase 19 | Complete (Plan 19-05, 2026-05-24 — circuitBreaker.ts per-chain rolling-window CB with manual reset + ring buffer) |
+| ANTIRUG-10 | Phase 19 | Complete (Plan 19-05, 2026-05-24 — dry-run gate via ctx.chain.antiRug.liveExecute in exitTrigger) |
 | ANTIRUG-11 | Phase 19 | Complete |
 | ANTIRUG-12 | Phase 19 | Complete |
 | ANTIRUG-13 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
-| ANTIRUG-14 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
+| ANTIRUG-14 | Phase 19 | Complete (Plans 19-04b + 19-05, 2026-05-24 — V3 multi-signal evaluator + bot.ts V3 buy-success attach pair) |
 | ANTIRUG-15 | Phase 19 | Partial (Plan 19-02, 2026-05-23 — ETH V3 allowlist resolved: UNCX V3 + TeamFinance V3 NFT (same proxy as V2 per TrustSwap blog); PinkLock V3 verified non-existent on ETH via Etherscan ABI inspection. BSC/Base/Arb V3 allowlists pending operator resolution when those chains are enabled; surfaced in Plan 19-08 Wave-1 follow-up.) |
 | ANTIRUG-16 | Phase 19 | Complete (Plan 19-01, 2026-05-24 — schema landed alongside ANTIRUG-04; consumer lands in Plan 19-03) |
 | OPS-LIVE-01 | Phase 20 | Pending |
