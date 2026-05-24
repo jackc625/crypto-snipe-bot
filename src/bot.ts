@@ -1090,6 +1090,20 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
     // (one chain at a time) keeps the startup log readable + the fail-loud
     // process.exit semantics intact. If verifyAllowlistAtStartup throws
     // (RPC unavailable etc.), that chain continues unmonitored.
+    //
+    // CR-04: track which chains successfully verified so Steps 3 + 4 can
+    // skip the unverified ones. Previously, a chain that failed verify
+    // would still re-register positions AND arm the WS listener — the
+    // detector would then dispatch against an UNVERIFIED allowlist
+    // (potentially EOA-laden, since that's exactly what verify checks
+    // for via getCode). The log claimed "chain runs without anti-rug
+    // monitoring" but in fact monitoring was active with an unverified
+    // allowlist. A flaky boot-time RPC could leave the allowlist as a
+    // leak vector (any LP transfer to an EOA-typo'd address would be
+    // allowlisted → no exit). Now, failing verify hard-skips Steps 3 + 4
+    // for that chain — the chain truly runs without anti-rug monitoring,
+    // consistent with the documented operator-visible behavior.
+    const verifiedChains = new Set<string>();
     for (const ctx of contexts) {
         try {
             await verifyAllowlistAtStartup(
@@ -1097,6 +1111,7 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
                 ctx.chain.antiRug.allowlistV2,
                 ctx.chain.antiRug.allowlistV3,
             );
+            verifiedChains.add(ctx.chain.name);
         } catch (err) {
             ctx.log.error(
                 {
@@ -1129,8 +1144,19 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
     }>;
 
     // Step 3 — re-register each open position into the per-chain anti-rug
-    // dispatch table.
+    // dispatch table. CR-04: skip positions on chains that failed verify.
     for (const trade of openTrades) {
+        if (!verifiedChains.has(trade.chain)) {
+            log.warn(
+                {
+                    tradeId: trade.id,
+                    chain: trade.chain,
+                    op: 'antirug.resume.skip-unverified-chain',
+                },
+                'Skipping anti-rug position register — chain failed allowlist verify at startup',
+            );
+            continue;
+        }
         const ctx = contexts.find(c => c.chain.name === trade.chain);
         if (!ctx) {
             log.warn(
@@ -1165,7 +1191,18 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
 
     // Step 4 — arm per-chain WS lifecycle (heartbeat + reconnect + backfill).
     // The listener naturally fires backfill via Plan 19-04c's first-call hook.
+    // CR-04: skip the WS listener for chains that failed verify.
     for (const ctx of contexts) {
+        if (!verifiedChains.has(ctx.chain.name)) {
+            ctx.log.warn(
+                {
+                    chain: ctx.chain.name,
+                    op: 'antirug.resume.skip-ws-listener-unverified',
+                },
+                'Skipping anti-rug WS listener — chain failed allowlist verify at startup',
+            );
+            continue;
+        }
         await startChainAntiRugListener(ctx);
     }
 }
