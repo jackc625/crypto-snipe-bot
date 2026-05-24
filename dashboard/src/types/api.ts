@@ -97,13 +97,21 @@ export interface CbResetPayload {
 /**
  * WS event payload for `antirug_state_update` per UI-SPEC §"Realtime Push
  * Contract". Merges into the Position row matching `tradeId`.
+ *
+ * CR-06: `success` is set on the exit-fired path (live execute) to surface
+ * whether executeFullSell returned true/false to the operator. `null` is
+ * permitted on `lastSignals` because the 'unknown'-verdict variant of
+ * RugEvaluation does not carry signals; consumers must treat both `null`
+ * and `undefined` as 'no signals available' (do not use `typeof
+ * x === 'object'` truthy checks because `null` is a truthy object).
  */
 export interface AntiRugStateUpdate {
   tradeId: number;
   chain: string;
   state: AntiRugMonitorState;
   lastEventTs?: number;
-  lastSignals?: RugSignals;
+  lastSignals?: RugSignals | null;
+  success?: boolean;
 }
 
 export interface ExitStateInfo {

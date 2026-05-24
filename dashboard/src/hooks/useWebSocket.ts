@@ -118,6 +118,14 @@ export function useWebSocket(): UseWebSocketResult {
             try {
               const update = msg.data as AntiRugStateUpdate;
               if (!update || typeof update.tradeId !== 'number') break;
+              // CR-06: normalise `lastSignals: null` (from the
+              // 'unknown'-verdict variant of RugEvaluation) to
+              // `undefined` so downstream consumers can use simple
+              // `if (signals)` checks without worrying about null being
+              // a truthy object (e.g. the AntiRugExitDetailModal would
+              // otherwise render an empty signals panel instead of the
+              // 'no signals available' fallback).
+              const lastSignals = update.lastSignals ?? undefined;
               setPositions((prev) =>
                 prev.map((p) =>
                   p.tradeId === update.tradeId
@@ -125,7 +133,7 @@ export function useWebSocket(): UseWebSocketResult {
                         ...p,
                         antiRugState: update.state,
                         antiRugLastEventTs: update.lastEventTs,
-                        antiRugLastSignals: update.lastSignals,
+                        antiRugLastSignals: lastSignals,
                       }
                     : p,
                 ),

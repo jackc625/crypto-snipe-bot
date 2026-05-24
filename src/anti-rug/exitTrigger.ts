@@ -182,12 +182,16 @@ export async function triggerAntiRugExit(
         });
 
         // Dashboard push per UI-SPEC §"Realtime Push Contract".
+        // CR-06: send `undefined` (omit field) for the unknown-verdict
+        // path instead of literal `null`. Frontend type allows both, but
+        // omitting is cleaner — `useWebSocket` normalises either to
+        // undefined before storing on Position.
         broadcast('antirug_state_update', {
             tradeId,
             chain,
             state: 'would-have-sold',
             lastEventTs: Date.now(),
-            lastSignals: 'signals' in evaluation ? evaluation.signals : null,
+            lastSignals: 'signals' in evaluation ? evaluation.signals : undefined,
         });
 
         return false;
@@ -242,12 +246,16 @@ export async function triggerAntiRugExit(
     );
 
     // (c) Broadcast exit-fired update for the dashboard.
+    // CR-06: `success` is now declared on the frontend
+    // AntiRugStateUpdate type so the value reaches the dashboard.
+    // `lastSignals: undefined` (omitted) for the unknown-verdict path
+    // instead of literal `null`.
     broadcast('antirug_state_update', {
         tradeId,
         chain,
         state: 'exit-fired',
         lastEventTs: Date.now(),
-        lastSignals: 'signals' in evaluation ? evaluation.signals : null,
+        lastSignals: 'signals' in evaluation ? evaluation.signals : undefined,
         success,
     });
 
