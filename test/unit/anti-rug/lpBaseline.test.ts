@@ -67,7 +67,11 @@ vi.mock('../../../src/utils/db', () => ({
 
 // Ethers Contract mock: each test sets the per-call returns for getReserves /
 // totalSupply / liquidity / slot0. The Contract constructor is replaced via
-// vi.mock and produces an object whose methods are the per-test mock fns.
+// vi.mock and reads the CURRENT-test mocks via the module-level let-bound
+// holders below. This indirection survives vitest's `mockReset: true` (which
+// wipes mockImplementation between tests) because the Contract is a class
+// whose `constructor` body runs at instantiation time and looks up the
+// per-test mock instances fresh on every `new Contract(...)` call.
 let pairGetReservesMock: ReturnType<typeof vi.fn>;
 let pairTotalSupplyMock: ReturnType<typeof vi.fn>;
 let poolLiquidityMock: ReturnType<typeof vi.fn>;
@@ -75,28 +79,43 @@ let poolSlot0Mock: ReturnType<typeof vi.fn>;
 
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
+    // Use a real class so production `new Contract(...)` succeeds; the class
+    // body dispatches to V2 or V3 stubs based on ABI shape. Each instance's
+    // methods reference the module-level let-bound mocks via the global
+    // helper `__getAntiRugMocks` injected onto `globalThis` from beforeEach.
+    class MockContract {
+        address: string;
+        getReserves?: ReturnType<typeof vi.fn>;
+        totalSupply?: ReturnType<typeof vi.fn>;
+        liquidity?: ReturnType<typeof vi.fn>;
+        slot0?: ReturnType<typeof vi.fn>;
+        constructor(address: string, abi: unknown[]) {
+            this.address = address;
+            const abiStr = JSON.stringify(abi);
+            const mocks = (globalThis as Record<string, unknown>)
+                .__antiRugLpBaselineMocks as {
+                pairGetReserves: ReturnType<typeof vi.fn>;
+                pairTotalSupply: ReturnType<typeof vi.fn>;
+                poolLiquidity: ReturnType<typeof vi.fn>;
+                poolSlot0: ReturnType<typeof vi.fn>;
+            } | undefined;
+            if (!mocks) {
+                throw new Error(
+                    'lpBaseline.test.ts: mocks not initialised — did beforeEach run?'
+                );
+            }
+            if (abiStr.includes('liquidity') && abiStr.includes('slot0')) {
+                this.liquidity = mocks.poolLiquidity;
+                this.slot0 = mocks.poolSlot0;
+            } else {
+                this.getReserves = mocks.pairGetReserves;
+                this.totalSupply = mocks.pairTotalSupply;
+            }
+        }
+    }
     return {
         ...actual,
-        Contract: vi.fn().mockImplementation((address: string, abi: unknown[]) => {
-            // Heuristic: if the ABI looks like the V3_POOL_ABI (contains
-            // 'liquidity' and 'slot0'), return the V3 stub; otherwise return
-            // the V2 stub. The two production-code branches in snapshotLpBaseline
-            // pass distinct ABIs (PAIR_ABI vs V3_POOL_ABI) so this branch is
-            // deterministic.
-            const abiStr = JSON.stringify(abi);
-            if (abiStr.includes('liquidity') && abiStr.includes('slot0')) {
-                return {
-                    liquidity: poolLiquidityMock,
-                    slot0: poolSlot0Mock,
-                    address,
-                };
-            }
-            return {
-                getReserves: pairGetReservesMock,
-                totalSupply: pairTotalSupplyMock,
-                address,
-            };
-        }),
+        Contract: MockContract,
     };
 });
 
@@ -135,6 +154,16 @@ beforeEach(() => {
     pairTotalSupplyMock = vi.fn();
     poolLiquidityMock = vi.fn();
     poolSlot0Mock = vi.fn();
+
+    // Expose the current-test mock instances to the MockContract class via
+    // globalThis. The class body looks them up on every `new Contract(...)`
+    // call, so this survives vitest's `mockReset: true` between tests.
+    (globalThis as Record<string, unknown>).__antiRugLpBaselineMocks = {
+        pairGetReserves: pairGetReservesMock,
+        pairTotalSupply: pairTotalSupplyMock,
+        poolLiquidity: poolLiquidityMock,
+        poolSlot0: poolSlot0Mock,
+    };
 });
 
 afterEach(() => {
