@@ -409,12 +409,27 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
 // wrapped in ethers.getAddress(...) which validates checksum at module load
 // (T-19-02-01 mitigation — typo throws at boot).
 //
-// TeamFinance V3 NFT vault and PinkLock V3 entries are NOT shipped here yet
-// per Blocker 4 resolution from plan-checker iteration 1 + D-V3-ALLOWLIST
-// [USER-BINDING]. Task 3 of plan 19-02 is a `checkpoint:human-action` that
-// pauses for the operator to either provide canonical addresses (Option A)
-// or explicitly accept the gap (Option B, recorded as
-// `// OPERATOR-ACCEPTED-GAP-Phase19-{chain}-{locker}`).
+// TeamFinance V3 NFT vault + PinkLock V3 — D-V3-ALLOWLIST [USER-BINDING]
+// resolution (plan 19-02 Task 3, completed 2026-05-23):
+//
+//   ETH (enabled):
+//     TeamFinance V3 NFT vault → `0xe2fe530c047f2d85298b07d9333c05737f1435fb`
+//       — same Gnosis-admined proxy as the V2 entry. TrustSwap blog ("Uniswap V3
+//       is now supported by Team Finance") confirms the existing locker proxy
+//       was upgraded to handle V3 NFT positions without changing the user-
+//       facing address. Listed in BOTH V2 and V3 allowlists below.
+//     PinkLock V3 → does NOT exist on Ethereum mainnet. On-chain ABI inspection
+//       of both PinkLock contracts (0x71b5759d…57641 PinkLock02 and
+//       0x33d4cc…5e2a older PinkLock) via Etherscan API on 2026-05-23 shows
+//       zero V3/NFT signatures (no `lockNFT`, no `onERC721Received`, no
+//       `tokenId` parameters — both are pure ERC20-LP-token lockers).
+//       PinkSale documentation only references V3 for BSC. Documented inline
+//       as `// OPERATOR-VERIFIED-NO-PINKLOCK-V3-eth` below.
+//
+//   BSC / BASE / ARB (not enabled): operator decision deferred — these
+//     chains retain PHASE-19-BLOCKER-4-ESCALATION comments below; Plan 19-08
+//     surfaces them in the Wave-1 follow-up table for resolution before any
+//     of those chains is enabled.
 // ---------------------------------------------------------------------------
 
 const DEAD_ADDRESS = ethers.getAddress('0x000000000000000000000000000000000000dEaD');
@@ -492,21 +507,29 @@ const HARDCODED_V3_ALLOWLIST: Record<string, AllowlistEntry[]> = {
             lockerName: 'UNCX V3 Locker ETH (NFT-holding)',
             provenance: 'hardcoded',
         },
-        // PHASE-19-BLOCKER-4-ESCALATION (D-V3-ALLOWLIST [USER-BINDING]):
-        //   TeamFinance V3 NFT vault — address NOT resolved during plan-phase
-        //     (planner WebFetch blocked HTTP 403 on team.finance docs).
-        //     Operator verification protocol: open https://app.team.finance/,
-        //     browse to a locked V3 position, inspect the contract reference,
-        //     cross-verify on Etherscan token-tag search.
-        //   PinkLock V3 — address NOT resolved during plan-phase.
-        //     Operator verification protocol: open
-        //     https://www.pinksale.finance/pinklock, filter V3 locks, inspect
-        //     the locker contract address, cross-verify on Etherscan.
-        //   Pending checkpoint:human-action in Task 3 of plan 19-02; operator
-        //     either supplies the canonical addresses (Option A) or explicitly
-        //     accepts the gap (Option B) recorded as
-        //     `// OPERATOR-ACCEPTED-GAP-Phase19-eth-TeamFinanceV3` /
-        //     `// OPERATOR-ACCEPTED-GAP-Phase19-eth-PinkLockV3`.
+        {
+            // D-V3-ALLOWLIST [USER-BINDING] Task-3 resolution (2026-05-23):
+            // Same Gnosis-admined proxy as the TeamFinance V2 entry. The
+            // existing locker contract was upgraded to handle Uniswap V3
+            // NonfungiblePositionManager NFTs without changing the user-facing
+            // address. Reference: TrustSwap blog "Uniswap V3 is now supported
+            // by Team Finance" (https://trustswap.com/blog/uniswap-v3/).
+            address: ethers.getAddress('0xe2fe530c047f2d85298b07d9333c05737f1435fb'),
+            lockerName: 'TeamFinance / TrustSwap Lock ETH (V2 + V3 unified proxy)',
+            provenance: 'hardcoded',
+        },
+        // OPERATOR-VERIFIED-NO-PINKLOCK-V3-eth (2026-05-23):
+        //   PinkLock V3 does NOT exist on Ethereum mainnet. On-chain ABI
+        //   inspection of both PinkLock contracts on ETH via Etherscan API:
+        //     0x71b5759d73262fbb223956913ecf4ecc51057641 (PinkLock02) and
+        //     0x33d4cc8716beb13f814f538ad3b2de3b036f5e2a (older PinkLock)
+        //   — neither contract has any V3/NFT-related function signatures
+        //   (no lockNFT, no onERC721Received hook, no tokenId parameter).
+        //   Both contracts are pure ERC20 LP-token lockers. PinkSale's
+        //   own documentation (https://docs.pinksale.finance/pinklock)
+        //   only references V3 functionality on BSC, never on Ethereum.
+        //   Conclusion: no PinkLock V3 ETH entry is needed; this is not a
+        //   gap to track — it's a verified absence.
     ],
     bsc: [
         {

@@ -273,11 +273,27 @@ describe('Phase 19 plan 19-02 Task 1 — ChainConfig.antiRug field', () => {
         expect(addresses).toContain(DEAD_ADDRESS.toLowerCase());
     });
 
-    it('Test 14: ETH allowlistV3 includes UNCX V3 Locker ETH', async () => {
+    it('Test 14: ETH allowlistV3 includes UNCX V3 Locker ETH + TeamFinance V2+V3 unified proxy (D-V3-ALLOWLIST Task 3 resolution)', async () => {
         const registry = await buildRegistry();
         const eth = registry.get('eth')!;
         const addresses = eth.antiRug.allowlistV3.map(e => e.address.toLowerCase());
         expect(addresses).toContain(UNCX_V3_ETH.toLowerCase());
+        // D-V3-ALLOWLIST Task 3 (2026-05-23): TeamFinance proxy upgraded for V3 NFT
+        // support — same address as V2 allowlist; must appear in BOTH lists.
+        expect(addresses).toContain(TEAMFINANCE_V2_ETH.toLowerCase());
+    });
+
+    it('Test 14b: ETH allowlistV3 does NOT include any PinkLock entry (D-V3-ALLOWLIST Task 3 OPERATOR-VERIFIED-NO-PINKLOCK-V3-eth)', async () => {
+        // PinkLock V3 verified non-existent on Ethereum (2026-05-23 Etherscan
+        // ABI inspection — both PinkLock contracts on ETH are ERC20-LP-only
+        // with zero V3/NFT signatures). This test guards against an
+        // accidental re-introduction of a PinkLock ETH entry into the V3
+        // allowlist; if PinkLock ships V3 ETH support in the future, this
+        // test must be updated alongside the new HARDCODED_V3_ALLOWLIST entry.
+        const registry = await buildRegistry();
+        const eth = registry.get('eth')!;
+        const addresses = eth.antiRug.allowlistV3.map(e => e.address.toLowerCase());
+        expect(addresses).not.toContain(PINKLOCK_V2_ETH.toLowerCase());
     });
 
     it('Test 15: BSC allowlistV2 includes UNCX V2 + PinkLock V2 BSC; allowlistV3 includes UNCX V3 BSC', async () => {

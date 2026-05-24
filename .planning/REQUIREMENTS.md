@@ -173,7 +173,7 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | ANTIRUG-12 | Phase 19 | Pending |
 | ANTIRUG-13 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
 | ANTIRUG-14 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
-| ANTIRUG-15 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
+| ANTIRUG-15 | Phase 19 | Partial (Plan 19-02, 2026-05-23 — ETH V3 allowlist resolved: UNCX V3 + TeamFinance V3 NFT (same proxy as V2 per TrustSwap blog); PinkLock V3 verified non-existent on ETH via Etherscan ABI inspection. BSC/Base/Arb V3 allowlists pending operator resolution when those chains are enabled; surfaced in Plan 19-08 Wave-1 follow-up.) |
 | ANTIRUG-16 | Phase 19 | Complete (Plan 19-01, 2026-05-24 — schema landed alongside ANTIRUG-04; consumer lands in Plan 19-03) |
 | OPS-LIVE-01 | Phase 20 | Pending |
 | OPS-LIVE-02 | Phase 20 | Pending |
