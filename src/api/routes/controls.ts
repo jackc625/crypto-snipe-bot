@@ -5,10 +5,18 @@
 
 import { Router, Request, Response } from 'express';
 import type { ChainContext, DexConfig } from '../../chainRegistry';
-import { db } from '../../utils/db';
+import { db, getPauseState, setPauseState, clearPauseState } from '../../utils/db';
 import { clearAllTimersForToken } from '../../utils/exitManager';
 import { executeFullSell } from '../../exitEngine';
 import { logger } from '../../utils/logger';
+// Phase 20 / Plan 20-05 / OPS-LIVE-09 — re-uses the shared sanitizer (already
+// strips control chars + markdown specials + clamps to 120 chars, satisfying
+// the plan's "max 200 chars + strip control chars" T-20 mitigation contract).
+import { sanitizeReason } from '../../utils/honeypot/sanitize';
+// Phase 20 / Plan 20-05 / OPS-LIVE-09 — fire-and-forget WS event so dashboard
+// banner (Plan 20-06) flips within one round-trip; banner reconciles via
+// GET /pause on reconnect.
+import { broadcast } from '../ws/broadcaster';
 
 const log = logger.child({ module: 'api:controls' });
 
@@ -215,6 +223,63 @@ export function controlRoutes(contexts: ChainContext[]): Router {
                 error: 'Emergency sell failed: ' + (err instanceof Error ? err.message : String(err)),
             });
         }
+    });
+
+    // ── POST /pause ── flip global pause flag (Phase 20 / OPS-LIVE-09) ────
+    // Auth: implicit via `apiRouter.use(authMiddleware)` in server.ts.
+    // T-20 mitigation: reason field is sanitized (strip control chars + clamp
+    // to 120 chars per the shared sanitizeReason helper — well under the
+    // plan's 200-char ceiling).
+    // WS broadcast: dashboard banner (Plan 20-06) reacts within one round-trip.
+    router.post('/pause', async (req: Request, res: Response) => {
+        const pauseLog = log.child({ action: 'pause' });
+        try {
+            const body = req.body as { reason?: string; pausedBy?: string };
+            const reason = sanitizeReason(String(body.reason ?? 'manual operator pause'));
+            const pausedBy = String(body.pausedBy ?? 'dashboard');
+            const ts = Math.floor(Date.now() / 1000);
+            setPauseState.run(ts, pausedBy, reason);
+            broadcast('pause_state_change', { paused: true, pausedBy, reason });
+            pauseLog.info({ pausedBy, reason }, 'Bot paused via API');
+            res.json({ ok: true, paused: true, pausedBy, reason });
+        } catch (err) {
+            pauseLog.error({ err }, 'Pause failed');
+            res.status(500).json({
+                error: 'Pause failed: ' + (err instanceof Error ? err.message : String(err)),
+            });
+        }
+    });
+
+    // ── POST /resume ── clear pause flag (Phase 20 / OPS-LIVE-09) ─────────
+    router.post('/resume', async (_req: Request, res: Response) => {
+        const resumeLog = log.child({ action: 'resume' });
+        try {
+            clearPauseState.run();
+            broadcast('pause_state_change', { paused: false });
+            resumeLog.info('Bot resumed via API');
+            res.json({ ok: true, paused: false });
+        } catch (err) {
+            resumeLog.error({ err }, 'Resume failed');
+            res.status(500).json({
+                error: 'Resume failed: ' + (err instanceof Error ? err.message : String(err)),
+            });
+        }
+    });
+
+    // ── GET /pause ── dashboard banner initial-state read path (Phase 20 D-PAUSE-UI) ──
+    router.get('/pause', (_req: Request, res: Response) => {
+        const row = getPauseState.get() as {
+            paused: number;
+            paused_at: number | null;
+            paused_by: string | null;
+            reason: string | null;
+        };
+        res.json({
+            paused: row.paused === 1,
+            pausedAt: row.paused_at,
+            pausedBy: row.paused_by,
+            reason: row.reason,
+        });
     });
 
     return router;
