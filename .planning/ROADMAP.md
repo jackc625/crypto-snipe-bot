@@ -128,7 +128,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
   **Wave 2** *(after Wave 1; foundation modules + detector registry skeleton):*
   - [x] 19-03-PLAN.md - anti-rug/types.ts + events.ts + allowlist.ts (verify+lookup+merge) + lpBaseline.ts (snapshot+load+clear) [ANTIRUG-04, ANTIRUG-06, ANTIRUG-15, ANTIRUG-16]
-  - [ ] 19-04a-PLAN.md - anti-rug/detector.ts skeleton: position registry + WS subscription pattern + topic filter union + getLogsForBackfill primitive (Warning 6 split) [ANTIRUG-01, 02, 03, 13]
+  - [x] 19-04a-PLAN.md - anti-rug/detector.ts skeleton: position registry + WS subscription pattern + topic filter union + getLogsForBackfill primitive (Warning 6 split) [ANTIRUG-01, 02, 03, 13]
 
   **Wave 3** *(after Wave 2; multi-signal evaluator):*
   - [ ] 19-04b-PLAN.md - anti-rug/detector.ts: multi-signal AND chain evaluator (V2 + V3 + V3 Burn-without-Collect grace window per Blocker 2 resolution (a)) + confirm-after-N-blocks gate (Warning 6 split) [ANTIRUG-05, 07, 14, 15]
@@ -198,9 +198,9 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 3/10 | In Progress|  |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 4/10 | In Progress|  |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-05-24 — Phase 19 plan 19-01 complete: ANTIRUG-04 + ANTIRUG-16 schema v4 to v5 migration (lp_baseline + chain_state) landed with 5 prepared statements + 12/12 tests passing*
+*Last updated: 2026-05-24 — Phase 19 plan 19-04a complete: anti-rug detector FOUNDATION skeleton (src/anti-rug/detector.ts — registry + WS subscription + topic-filter union + chunked getLogs primitive) landed; 11/11 detector-registry tests passing; full unit suite 354/354 (+11 new); tsc clean ×3. ANTIRUG-01/02/03/13 partial-credit (subscription mechanism shipped; multi-signal evaluator lands in 19-04b; heartbeat + reconnect + backfill in 19-04c)*

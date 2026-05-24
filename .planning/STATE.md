@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 19 plan 19-01 complete; ready for plan 19-02
-last_updated: "2026-05-24T01:33:43.728Z"
-last_activity: 2026-05-24 -- Phase 19 plan 19-01 complete (schema v4 to v5 migration)
+stopped_at: Phase 19 plan 19-04a complete; ready for plan 19-04b (multi-signal evaluator)
+last_updated: "2026-05-24T02:11:21.858Z"
+last_activity: 2026-05-24 -- Phase 19 plan 19-04a complete (detector FOUNDATION skeleton)
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 24
-  completed_plans: 14
-  percent: 24
+  completed_plans: 17
+  percent: 20
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 19 (anti-rug-runtime-monitoring) — EXECUTING
-Plan: 2 of 10
-Status: Executing Phase 19
-Last activity: 2026-05-24 -- Phase 19 plan 19-01 complete (schema v4 to v5 migration)
+Plan: 3 of 10
+Status: Ready to execute
+Last activity: 2026-05-24
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Full Key Decisions log in PROJECT.md and archived in `milestones/v6.16-ROADMAP.m
 
 **v6.17 decisions closed by research convergence (2026-04-29):**
 
+- **Plan 19-04a (2026-05-24):** Anti-rug detector FOUNDATION skeleton landed at `src/anti-rug/detector.ts` (634 lines, 5 public + 2 test-hook + 1 type exports). Position registry shape: `Map<chain, Map<addr, RegisteredPosition[]>>` — array bucket per address handles the multi-position-same-pair case (Test 20) without dispatch loss. Single-listener-per-chain WS subscription with TOPIC FILTER UNION covering all four V2 + V3 topics (`PAIR_BURN_TOPIC`, `PAIR_TRANSFER_TOPIC`, `POOL_BURN_TOPIC`, `POOL_COLLECT_TOPIC`) per Pitfall #10. `startChainAntiRugListener` is idempotent via explicit drop+recreate (`wsProvider.off(activeFilter, activeDispatcher)` before `wsProvider.on(newFilter, newDispatcher)`) — ethers v6 has no filter-replace; multiple `.on()` calls would dispatch each event N times. `evaluateRugSignals` shim mechanism: module-scoped `let` defaulted to warn-only stub + `_setEvaluateRugSignalsForTesting` injection hook so the dispatch-routing tests can run before Plan 19-04b ships the real evaluator. Chunked `getLogsForBackfill` primitive with `chunkStart += cap` / `chunkEnd = min(chunkStart + cap - 1, toBlock)` math — 6 chunks for [100,150] cap=10 (deliberate off-by-one enforces "cap blocks per call" Alchemy semantics per RESEARCH CRITICAL #1; the plan's `<behavior>` narration "5 chunks" was a typo against the unambiguous `<action>` code which the test verifies directly). 11/11 tests passing in `test/unit/anti-rug/detectorRegistry.test.ts`; full unit suite 354/354 (+11 new); tsc clean ×3. Commits: `7f671e0` (test RED) + `7f75581` (feat GREEN). **Hand-off:** Plans 19-04b (multi-signal evaluator) + 19-04c (heartbeat / reconnect / backfill / HTTP polling fallback) consume this skeleton via the stable public API (`registerAntiRugPosition` / `unregisterAntiRugPosition` / `startChainAntiRugListener` / `getLogsForBackfill` / `getRegisteredPositions`). TODO Plan 19-04c markers at lines 441 (HTTP fallback) + 512 (heartbeat / reconnect / backfill / dashboard broadcast).
 - **Plan 19-01 (2026-05-24):** ANTIRUG-04 + ANTIRUG-16 schema migration v4→v5 landed. Single-table-with-`pool_type`-discriminator shape chosen for `lp_baseline` (vs separate v2/v3 tables) per CONTEXT.md Claude's-discretion + Research Open Question #1 recommendation — matches existing v3 exit_state CHECK constraint pattern at `db.ts:64-110`. `v3_position_nft_id` stays NULLABLE in v6.17 per Research Open Question #3 (V3 baseline is pool-only; NFT-tracking deferred to v6.18+). 5 prepared statements (`upsertLpBaseline` named-bind / `getLpBaseline` / `deleteLpBaseline` / `upsertChainState` positional / `getChainState`) exported from `src/utils/db.ts`. New `chain_state` table tracks `last_seen_block` per chain for restart-time `getLogs` backfill per D-BACKFILL. 12/12 tests passing in `test/unit/db/lpBaselineMigration.test.ts` (10 behaviors + 2 production-module integration); full unit suite 288/288 with zero regressions; tsc clean across all 3 tsconfig projects. Existing tables (`trades`, `exit_state`, `bot_state`, `schema_version`) unchanged per ANTIRUG-04 additive-only acceptance. Commits: `6091100` (test RED) + `522ae08` (feat GREEN). Production `data/bot.db` migrated in-place from v4 to v5 on first module load. **Hand-off:** Plans 19-03 (`lpBaseline.ts`), 19-04a/b/c (`detector.ts`), 19-05 (cleanup hook on full close) now unblocked.
 - **Plan 18-05 (2026-05-15):** HONEY-02 Slither + Mythril audit complete. Slither 0.11.5 surfaced 13 medium+ findings (4 High = `arbitrary-send-eth` × 2 + `reentrancy-balance` × 2; 9 Medium = `unused-return` × 6 + `uninitialized-local` × 2 + `incorrect-equality` × 1) — ALL 13 dispositioned `false-positive` against the eth_call-only revert-always contract design (router is caller-controlled by intent; no state persists; lying-balanceOf catch IS the reentrancy-balance pattern; catch-always-reverts hides the uninitialized-local flow-path; strict equality IS the correct semantic for `V3_SELL_WETH_ZERO`). Mythril 0.24.8 reported `success: true, issues: []` with `--execution-timeout 300 --max-depth 30`. **Stop-the-Line determination: NO escalation; deploy gate cleared for HONEY-03 (plan 18-07).** 0 `accepted-risk` rows → no operator sign-off required. CI gate (`.github/workflows/test.yml`) locks audit-bar evergreen via `dorny/paths-filter@v3` + 3 new jobs (`hardhat-compile` / `slither` / `mythril`) gated on `contracts/**` path changes; Phase 17 evergreen `.todo` ban + `tsc --noEmit ×3` guards preserved verbatim.
 - **Plan 18-05 (2026-05-15):** D-AUDIT-PATH documented in `.planning/milestones/v6.17-honeypot-checker-audit.md`. Windows-host Mythril install requires Docker workaround: (a) `pip install mythril` fails on Python 3.13 (no prebuilt wheels for `ckzg`/`pyethash`; native build needs MSVC `cl.exe`); use `mythril/myth:latest` Docker image; (b) the image hardcodes `solc-bin.ethereum.org` (now NXDOMAIN) — bind-mount pre-downloaded Linux solc 0.8.28 ELF into `/home/mythril/.solcx/solc-v0.8.28`; (c) Mythril `--solc-args` does NOT forward remappings (calls `solc --standard-json` internally) — remappings MUST live in `--solc-json` settings JSON. CI on `ubuntu-latest` uses native `pip install mythril` + the `--solc-json` heredoc and skips the Docker dance.
@@ -107,6 +108,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | 260429-cleanup-empty-files | Find and clean up empty files/folders (root cause: 532b563 codebase mapping commit). Removed 8 empty placeholders + ignition/, cleaned 19 stale agent worktrees, patched 9 doc references, added pre-commit guard against future 0-byte commits | 2026-04-29 | 8bfab90 | Verified | [260429-cleanup-empty-files](./quick/260429-cleanup-empty-files/) |
 | 260518-jsr | Inspect entire codebase and write a brand-new, fully-updated README.md at the project root (engineer-first deep-dive, 502 lines, prose+bullets, WIP marked inline; grounded in 727-line research inventory) | 2026-05-18 | 847b369 | Verified | [260518-jsr-inspect-entire-codebase-and-write-a-bran](./quick/260518-jsr-inspect-entire-codebase-and-write-a-bran/) |
 | Phase 18 P05 | ~45min | 3 tasks | 4 files |
+| Phase 19 P04a | 25 | 1 tasks | 2 files |
 
 ## Phase 19 Plan Execution Log
 
@@ -131,7 +133,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-24T01:05:00.000Z
+Last session: 2026-05-24T02:11:21.848Z
 Last activity: 2026-05-24 — Phase 19 plan 19-01 complete. ANTIRUG-04 + ANTIRUG-16 schema migration v4→v5 landed in `src/utils/db.ts`. New `lp_baseline` table (single-table-with-`pool_type`-discriminator shape; 12 columns + `idx_lp_baseline_pool` index) records LP-reserve / V3-active-liquidity snapshot at buy-success per trade; new `chain_state` table (PRIMARY KEY chain; `last_seen_block` + `last_updated_ts`) drives restart-time `getLogs(lastSeen+1, current)` chunked backfill per D-BACKFILL. 5 prepared statements (`upsertLpBaseline` named-bind UPSERT, `getLpBaseline`, `deleteLpBaseline`, `upsertChainState` positional UPSERT, `getChainState`) exported. `v3_position_nft_id` stays NULLABLE in v6.17 per Research Open Question #3 (V3 baseline pool-only; NFT-tracking deferred to v6.18+). 12/12 tests passing in new `test/unit/db/lpBaselineMigration.test.ts` (10 behaviors + 2 production-module integration); full unit suite 288/288 with zero regressions; tsc clean across all 3 tsconfig projects (`tsconfig.json` + `tsconfig.bot.json` + `dashboard/tsconfig.json`). Existing tables untouched per additive-only ANTIRUG-04 acceptance. Commits: `6091100` (test RED) + `522ae08` (feat GREEN). Production `data/bot.db` migrated in-place from v4 to v5 with `Created lp_baseline + chain_state tables (schema version 5)` log line on first module load. Plans 19-03 (`lpBaseline.ts`), 19-04a/b/c (`detector.ts`), 19-05 (cleanup hook) now unblocked.
 Stopped at: Phase 19 plan 19-01 complete; ready for plan 19-02
-Resume file: .planning/phases/19-anti-rug-runtime-monitoring/19-02-PLAN.md
+Resume file: None
