@@ -137,11 +137,18 @@ export function incrementCircuitBreaker(
             'Anti-rug circuit breaker tripped',
         );
 
+        // CR-01: align producer payload with frontend `CbTrippedPayload`
+        // type (dashboard/src/types/api.ts). Frontend declares
+        // `triggers: TriggerEvent[]` (the array, consumed by
+        // CircuitBreakerResetModal) and `triggerCount: number` (the
+        // count, consumed by the banner headline). Previously the
+        // backend sent `triggers: <number>` + `triggerEvents: [...]`,
+        // which silently broke the manual CB-reset workflow.
         broadcast('cb_tripped', {
             chain,
-            triggers: recent.length,
+            triggers: events.slice(),
             windowHours: ctx.chain.antiRug.circuitBreakerWindowHours,
-            triggerEvents: events.slice(),
+            triggerCount: recent.length,
         });
 
         // Best-effort Telegram alert per D-VIS-CB-TRIPPED. Swallow errors so
