@@ -46,6 +46,24 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 
 // ---------------------------------------------------------------------------
+// CRITICAL: DB_PATH MUST be set BEFORE any test in this file (or any test
+// that runs after this file in the same vitest worker) imports
+// `src/utils/db`. Vitest module-level imports execute BEFORE beforeAll
+// hooks, so setting DB_PATH in beforeAll is TOO LATE — the production
+// singleton may already be bound to data/bot.db, leading to test
+// contamination of the operator's real database.
+//
+// We set DB_PATH at file-load time, BEFORE the production module can be
+// imported through any code path (including indirect imports via the
+// detector module). This guarantees the singleton's bound DB_PATH is our
+// per-test-run tmp file. The `__dirname/tmp-dryrun-ts.db` location lives
+// inside the test folder so it survives across workers within the same
+// vitest run (each worker shares this file, but our tests delete
+// chain_state between each it() so no cross-test interference).
+const TEST_DB_PATH = path.join(os.tmpdir(), `gsd-20-03-dryrun-${process.pid}-${Date.now()}.db`);
+process.env.DB_PATH = TEST_DB_PATH;
+
+// ---------------------------------------------------------------------------
 // Mocks: keep startChainAntiRugListener side-effect surface tight to the
 // new db-write under test. The WS lifecycle (heartbeat, reconnect, alerts)
 // is Plan 19-04c territory and incidental to the timestamp behavior.
@@ -97,23 +115,10 @@ vi.mock('../../../src/utils/provider', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Tmp DB setup: override DB_PATH BEFORE importing src/utils/db so the
-// production singleton binds to the test tmp file instead of data/bot.db.
-// All four tests share one tmp DB (the COALESCE-idempotent behavior is the
-// core contract being tested — each test resets the chain_state row in
-// beforeEach so cross-test interference is avoided).
+// Tmp DB lifecycle. DB_PATH was already set at file-load time (above).
+// All four tests share one tmp DB. Each test resets the chain_state row
+// in beforeEach so cross-test interference is avoided.
 // ---------------------------------------------------------------------------
-
-let tmpDir: string;
-let tmpDbPath: string;
-let originalDbPath: string | undefined;
-
-beforeAll(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'antirug-dryrun-ts-'));
-    tmpDbPath = path.join(tmpDir, 'test.db');
-    originalDbPath = process.env.DB_PATH;
-    process.env.DB_PATH = tmpDbPath;
-});
 
 afterAll(async () => {
     // Close the production singleton so the tmp file is releasable on Windows.
@@ -123,13 +128,14 @@ afterAll(async () => {
     } catch {
         // already closed or never imported
     }
-    if (originalDbPath === undefined) {
-        delete process.env.DB_PATH;
-    } else {
-        process.env.DB_PATH = originalDbPath;
-    }
     try {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
+        // Remove tmp DB + SQLite WAL/SHM sidecars if present.
+        for (const suffix of ['', '-wal', '-shm', '-journal']) {
+            const p = TEST_DB_PATH + suffix;
+            if (fs.existsSync(p)) {
+                fs.rmSync(p, { force: true });
+            }
+        }
     } catch {
         // best-effort cleanup
     }

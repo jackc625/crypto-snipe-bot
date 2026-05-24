@@ -94,7 +94,7 @@ import { triggerAntiRugExit } from './exitTrigger';
 import { sendCtxAlert } from '../utils/notifier';
 import { broadcast } from '../api/ws/broadcaster';
 import { removeWsProvider } from '../utils/provider';
-import { upsertChainState, getChainState } from '../utils/db';
+import { upsertChainState, getChainState, setAntirugDryRunStarted } from '../utils/db';
 
 const log = logger.child({ module: 'antiRug:detector' });
 
@@ -575,6 +575,14 @@ export async function startChainAntiRugListener(
         });
     }
     const state = chainState.get(chainName)!;
+
+    // Phase 20 / D-ANTIRUG-LIVE-GATE-CODE — record first-time dry-run start
+    // timestamp per chain. The UPSERT uses COALESCE so subsequent calls do
+    // NOT overwrite the original timestamp (operator restart does not reset
+    // the 7-day floor). Plan 20-02 preflight checkAntiRugLiveGate reads
+    // this timestamp to enforce <CHAIN>_ANTIRUG_LIVE_EXECUTE=true gate.
+    const nowSec = Math.floor(Date.now() / 1000);
+    setAntirugDryRunStarted.run(chainName, nowSec, nowSec);
 
     if (!ctx.wsProvider) {
         // Plan 19-04c — HTTP polling fallback. No WS endpoint configured for
