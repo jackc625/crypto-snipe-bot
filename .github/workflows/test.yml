@@ -31,6 +31,18 @@ jobs:
             echo "ERROR: .todo() test-stub invocation found in test/. Use it.skip('reason: ...') instead."
             exit 1
           fi
+      - name: Ban root-level operator-facing docs
+        run: |
+          # Phase 20 D-RUNBOOK-MOVE + D-BRIEFING-DELETE evergreen guard.
+          # GOING-LIVE.md was moved to docs/operations/going-live.md in Phase 20.
+          # HONEYPOT-SIM-BRIEFING.md was deleted in Phase 20 (Phase 18 D-BRIEFING-DISPOSITION
+          # preserved its content in .planning/phases/18-honeypot-detection-rebuild/18-CONTEXT.md).
+          # Re-introduction at the repo root would break the docs/operations/
+          # canonical location and bypass operator handoff discoverability.
+          # Uses 'test ! -e' (existence check; file or directory) per Plan 20-07
+          # Task 3 vitest self-test contract; -e is strictly broader than -f.
+          test ! -e GOING-LIVE.md || { echo "ERROR: GOING-LIVE.md reappeared at repo root. Move to docs/operations/going-live.md."; exit 1; }
+          test ! -e HONEYPOT-SIM-BRIEFING.md || { echo "ERROR: HONEYPOT-SIM-BRIEFING.md reappeared at repo root. The Phase 18 honeypot rebuild superseded this briefing; the file is deleted permanently."; exit 1; }
       - name: TypeScript check (root tsconfig.json)
         run: npx tsc --noEmit -p tsconfig.json
       - name: TypeScript check (tsconfig.bot.json)
