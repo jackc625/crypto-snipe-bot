@@ -113,34 +113,40 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 ### Phase 19: Anti-Rug Runtime Monitoring
 **Goal**: When liquidity is removed from a pool the bot has an open position in, the bot fires a frontrun-exit through the existing `executeFullSell` path with elevated gas â€” within 1-2 confirmation blocks of the LP-removal event, with multi-signal logic (>50% LP removed AND destination not in allowlist AND reserves below sell-threshold) that does not cascade into panic-sells on legitimate V2â†’V3 migrations, lock-contract transfers, or normal multisig rebalances
 **Depends on**: Phase 18 (HONEY establishes the `ChainConfig` extension pattern that ANTIRUG reuses for its own per-chain config; ANTIRUG bridges to `executeFullSell` whose reason union is extended here)
-**Requirements**: ANTIRUG-01, ANTIRUG-02, ANTIRUG-03, ANTIRUG-04, ANTIRUG-05, ANTIRUG-06, ANTIRUG-07, ANTIRUG-08, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11, ANTIRUG-12
+**Requirements**: ANTIRUG-01, ANTIRUG-02, ANTIRUG-03, ANTIRUG-04, ANTIRUG-05, ANTIRUG-06, ANTIRUG-07, ANTIRUG-08, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11, ANTIRUG-12, ANTIRUG-13, ANTIRUG-14, ANTIRUG-15, ANTIRUG-16
 **Success Criteria** (what must be TRUE):
   1. On a contrived-fork rug-pull scenario (real captured rug-pull replayed against a fork), the bot exits the rugged position via `executeFullSell` with `reason: 'anti-rug'` and a 2.0Ã— gas multiplier within N blocks of the LP-removal event firing â€” the sell lock, receipt decoding, DB cleanup, and Telegram alert all execute through the existing v6.16 sell pipeline (no parallel exit path)
   2. A V2â†’V3 migration test (LP burn coinciding with V3 pool creation for the same token pair) does NOT trigger the exit because the destination is in the allowlist and/or reserves do not drop below sell-threshold â€” the multi-signal logic (>50% removed AND not-allowlisted AND reserves drop) prevents the cascading-panic-sell pattern. Lock-contract transfers (Unicrypt, TeamFinance, PinkLock canonical addresses per chain) likewise do NOT trigger exits
   3. Default deploy is dry-run mode (`ANTIRUG_LIVE_EXECUTE=false`) â€” the bot logs structured "would-have-sold" pino events on detection without executing, so the operator can compare against actual outcomes for 7 days before flipping the env-flag to live execution. Live-execution requires the explicit env flag
   4. WebSocket disconnect-and-reconnect on the LP-removal listener restores monitoring without losing events â€” heartbeat ping/pong on `WebSocketProvider` detects silent failures, automatic reconnect re-subscribes the active filters, and `getLogs` over `(lastSeenBlock, currentBlock)` backfills the disconnect window. A simulated WS-kill in the test suite proves the bot does not silently miss events
   5. The per-chain circuit breaker disables anti-rug for that chain after N triggers in a configurable window (default 3 in 1h) â€” operator can manually reset via the dashboard, and the dashboard surfaces "anti-rug halted on chain X" prominently. A misbehaving event-stream cannot trigger N panic-sells in a row
-**Plans**: 8 plans
+**Plans**: 10 plans (revision iteration 1: 19-04 split into 19-04a/b/c per Warning 6; 19-02 + 19-05 + 19-06 + 19-08 also revised per Blockers 1-4 + Warnings 5-11 + Infos 12-13)
 
   **Wave 1** *(foundation; parallel-safe - no inter-plan file overlap):*
   - [ ] 19-01-PLAN.md - Schema migration v4 to v5 (lp_baseline + chain_state) + db.ts prepared statements [ANTIRUG-04]
-  - [ ] 19-02-PLAN.md - ChainConfig.antiRug field + per-chain envs + .env.example + REQUIRED_ENV_VARS + hardcoded V2+V3 allowlists [ANTIRUG-06, ANTIRUG-07, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11]
+  - [ ] 19-02-PLAN.md - ChainConfig.antiRug field + per-chain envs + .env.example + REQUIRED_ENV_VARS + hardcoded V2+V3 allowlists; + operator checkpoint for TeamFinance V3 + PinkLock V3 (Blocker 4) [ANTIRUG-06, ANTIRUG-07, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11]
 
-  **Wave 2** *(after Wave 1; foundation modules + detector):*
+  **Wave 2** *(after Wave 1; foundation modules + detector registry skeleton):*
   - [ ] 19-03-PLAN.md - anti-rug/types.ts + events.ts + allowlist.ts (verify+lookup+merge) + lpBaseline.ts (snapshot+load+clear) [ANTIRUG-04, ANTIRUG-06, ANTIRUG-15, ANTIRUG-16]
-  - [ ] 19-04-PLAN.md - anti-rug/detector.ts: single-listener-per-chain WS + heartbeat + reconnect + backfill + multi-signal AND chain (V2+V3) + confirm-blocks gate [ANTIRUG-01, 02, 03, 05, 07, 11, 12, 13, 14]
+  - [ ] 19-04a-PLAN.md - anti-rug/detector.ts skeleton: position registry + WS subscription pattern + topic filter union + getLogsForBackfill primitive (Warning 6 split) [ANTIRUG-01, 02, 03, 13]
 
-  **Wave 3** *(after Wave 2; exit pipeline + bot.ts wiring):*
-  - [ ] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook; exitTrigger bridge + circuitBreaker + raceTelemetry; bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
+  **Wave 3** *(after Wave 2; multi-signal evaluator):*
+  - [ ] 19-04b-PLAN.md - anti-rug/detector.ts: multi-signal AND chain evaluator (V2 + V3 + V3 Burn-without-Collect grace window per Blocker 2 resolution (a)) + confirm-after-N-blocks gate (Warning 6 split) [ANTIRUG-05, 07, 14, 15]
 
-  **Wave 4** *(after Wave 3; parallel - dashboard + tests):*
-  - [ ] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 8 dashboard components + useWebSocket switch + PositionTable column + Overview mounting [ANTIRUG-09, ANTIRUG-10]
-  - [ ] 19-07-PLAN.md - RugPull.sol fixture + HORSE V2 fixture + V3 candidate skeleton + fork test (5 RugPull modes + HORSE replay) + end-to-end multi-signal integration test [ANTIRUG-01, 02, 03, 05, 08, 13, 14]
+  **Wave 4** *(after Wave 3; lifecycle layer — sequential after evaluator due to same-file modifications):*
+  - [ ] 19-04c-PLAN.md - anti-rug/detector.ts: heartbeat + reconnect + backfill + HTTP polling fallback + tiered D-VIS-WS-HEALTH alerts (Warning 6 split + Warning 9 added tests) [ANTIRUG-11, 12]
 
-  **Wave 5** *(after Wave 4; operator-facing docs):*
-  - [ ] 19-08-PLAN.md - docs/operations/anti-rug-rollout.md (D-OPERATOR-HANDOFF [USER-BINDING]) + anti-rug-tuning.md (D-TUNE-PROTOCOL) + README.md anti-rug section [ANTIRUG-10]
+  **Wave 5** *(after Wave 4; exit pipeline + bot.ts wiring):*
+  - [ ] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook (Task 1a per Warning 7); exitTrigger bridge + raceTelemetry (Task 1b); bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring (Task 2); + Warning 11 ring buffer size note [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
 
-  **Cross-cutting constraints:**
+  **Wave 6** *(after Wave 5; parallel - dashboard + tests):*
+  - [ ] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 5 display-only dashboard components (Task 2a per Warning 8) + 3 interactive components + PositionTable column + Overview mounting (Task 2b); + useWebSocket switch (Task 1); + Info 12 plumbing note [ANTIRUG-09, ANTIRUG-10]
+  - [ ] 19-07-PLAN.md - RugPull.sol fixture + HORSE V2 fixture + V3 candidate skeleton + fork test (5 RugPull modes + HORSE replay) + end-to-end multi-signal integration test; + Blocker 2 grace-window deterministic test propagation + Info 13 HORSE address resolution directive [ANTIRUG-01, 02, 03, 05, 08, 13, 14]
+
+  **Wave 7** *(after Wave 6; operator-facing docs):*
+  - [ ] 19-08-PLAN.md - docs/operations/anti-rug-rollout.md (D-OPERATOR-HANDOFF [USER-BINDING]) + anti-rug-tuning.md (D-TUNE-PROTOCOL) + README.md anti-rug section; + Warning 10 revision_path on operator checkpoint + Warning 5 env-count 7-to-9 callout + Blocker 4 V3 allowlist follow-through [ANTIRUG-10]
+
+**Cross-cutting constraints:**
   - **D-V3-COVERAGE:** Phase 19 ships full V3-aware monitoring per CONTEXT.md (NOT log-only; NOT deferred). Researcher proposed ANTIRUG-13..16 as V3-specific requirement rows.
   - **D-LIVE-GATE:** Default deploy is dry-run; per-chain live-flip requires 7-day floor AND 0 confirmed false-positives per CONTEXT.md.
   - **D-OPERATOR-HANDOFF [USER-BINDING]:** Phase 19 cannot ship without docs/operations/anti-rug-rollout.md per CONTEXT.md non-negotiable.
@@ -192,9 +198,9 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 0/8 | Not started | - |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 0/10 | Not started | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-04-30 â€” Phase 17 complete (DEBT-01..06 closed; baseline doc + 7+2 retroactive Nyquist + getTradesByToken deletion + CI invariant lock)*
+*Last updated: 2026-05-23 — Phase 19 revision iteration 1: 19-04 split into 19-04a/b/c per Warning 6; ANTIRUG-13..16 added to REQUIREMENTS.md per Blocker 1; Blockers 2-4 + Warnings 5-11 + Infos 12-13 addressed in plans 19-01/02/04a-c/05/06/07/08*

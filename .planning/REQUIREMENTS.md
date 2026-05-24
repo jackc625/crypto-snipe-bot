@@ -53,6 +53,10 @@ DETECT-02 — runtime monitoring of open positions for liquidity-removal events 
 - [ ] **ANTIRUG-10**: 7-day dry-run mode — log "would-have-sold" events without executing the exit. Dry-run flips to live via explicit env-flag (`ANTIRUG_LIVE_EXECUTE=true`); default dry-run-only at first deploy.
 - [ ] **ANTIRUG-11**: WebSocket reconnect-resubscribe-backfill — on disconnect, ethers v6 `WebSocketProvider` does not auto-reconnect (issue #1053). Module reconnects, re-subscribes, and backfills missed events via `getLogs` over `(lastSeenBlock, currentBlock)`.
 - [ ] **ANTIRUG-12**: Heartbeat ping/pong on `WebSocketProvider` using existing `ws@^8.20.0`. Periodic ping (default 30s); silent failure detection beyond library defaults.
+- [ ] **ANTIRUG-13**: V3 Burn/Collect event subscriptions per enabled chain — `UniswapV3Pool.Burn(address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)` AND `UniswapV3Pool.Collect(address indexed owner, address recipient, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount0, uint128 amount1)`. Either event arrival re-evaluates the full multi-signal AND chain. Subscribed via the same single-listener-per-chain WS pattern as ANTIRUG-02/03. Added per CONTEXT.md D-V3-COVERAGE + D-V3-EVENTS; sourced from 19-RESEARCH.md §1.2 (V3 event signatures).
+- [ ] **ANTIRUG-14**: V3 multi-signal evaluator branch — V3 path of ANTIRUG-05 multi-signal AND chain. Signal 1 reads `pool.liquidity()` (current active liquidity at the current tick) and computes percent-dropped vs `lp_baseline.v3_active_liquidity`. Signal 2 reads `owner` from the V3 Burn event payload (D-V3-ALLOWLIST). Signal 3 calls `QuoterV2.quoteExactInputSingle.staticCall({tokenIn, tokenOut: WETH, fee: lp_baseline.v3_fee_tier, amountIn: position size, sqrtPriceLimitX96: 0n})` and trips if quoted output < 50% of baseline expected (D-V3-SIGNAL3); revert is treated as signal-3 trip per fail-closed discipline. Burn-without-Collect grace-window applied per Blocker 2 resolution (a): V3.Burn sets `pendingV3Burn[pool] = blockNumber`; evaluator fires AND chain only when Collect arrives within N blocks OR Burn-only reaches grace timeout. Added per CONTEXT.md D-V3-COVERAGE + D-V3-EVENTS + D-V3-THRESHOLD; sourced from 19-RESEARCH.md §1.3 + §3.
+- [ ] **ANTIRUG-15**: V3 allowlist per chain — separate from V2 allowlist per CONTEXT.md D-V3-ALLOWLIST. Includes UNCX V3 Locker per chain (ETH `0xFD235968e65B0990584585763f837A5b5330e6DE`, BSC `0xfe88DAB083964C56429baa01F37eC2265AbF1557`, Base `0x231278eDd38B00B07fBd52120CEf685B9BaEBCC1`, Arb `0x6b5360B419e0851b4b81644e0F63c1A9778f2506`); UNCX V3 "Proof of Reserves 2" on Arbitrum (`0xcb8b00d4018ad6031e28a44bf74616014bfb62ec`); TeamFinance V3 NFT vault per chain (Plan 19-02 resolves canonical addresses via Etherscan contract-tag verification at plan-phase; any chain that cannot be resolved with high confidence is surfaced to operator pre-execution rather than shipping a null placeholder per Blocker 4 resolution); PinkLock V3 per chain (same resolution protocol); 0xdEaD burn address universal. Owner-only check on Burn; owner-only check on Collect per 19-RESEARCH.md §2.2 recommendation. Added per CONTEXT.md D-V3-COVERAGE + D-V3-ALLOWLIST; sourced from 19-RESEARCH.md §2.2.
+- [ ] **ANTIRUG-16**: V3 `lp_baseline` row shape — extends ANTIRUG-04 schema with three V3-specific columns (`v3_active_liquidity TEXT`, `v3_tick_at_snapshot INTEGER`, `v3_fee_tier INTEGER`) and the optional `v3_position_nft_id TEXT` (nullable; NFT-tracking deferred to v6.18+ per CONTEXT.md Claude's Discretion). Pool-only baseline in v6.17. Discriminated by `pool_type TEXT NOT NULL CHECK(pool_type IN ('v2','v3'))` column; V2 columns NULL when `pool_type='v3'` and vice versa. Snapshot via `pool.liquidity()` + `pool.slot0()` at buy success in `src/anti-rug/lpBaseline.ts`. Added per CONTEXT.md D-V3-COVERAGE + D-V3-THRESHOLD; sourced from 19-RESEARCH.md §1.3.
 
 ### Going-Live Ops Hardening (OPS-LIVE)
 
@@ -167,6 +171,10 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | ANTIRUG-10 | Phase 19 | Pending |
 | ANTIRUG-11 | Phase 19 | Pending |
 | ANTIRUG-12 | Phase 19 | Pending |
+| ANTIRUG-13 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
+| ANTIRUG-14 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
+| ANTIRUG-15 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
+| ANTIRUG-16 | Phase 19 | Pending (added 2026-05-23 per Plan 19 revision iteration 1 Blocker 1; authorized by CONTEXT.md D-V3-COVERAGE) |
 | OPS-LIVE-01 | Phase 20 | Pending |
 | OPS-LIVE-02 | Phase 20 | Pending |
 | OPS-LIVE-03 | Phase 20 | Pending |
@@ -193,10 +201,10 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | EXIT-LIVE-11 | Phase 21 | Pending |
 
 **Coverage:**
-- v1 requirements: 54 total (DEBT 6, HONEY 12, ANTIRUG 12, OPS-LIVE 13, EXIT-LIVE 11)
-- Mapped to phases: 54 (initial mapping; roadmapper finalizes)
+- v1 requirements: 58 total (DEBT 6, HONEY 12, ANTIRUG 16, OPS-LIVE 13, EXIT-LIVE 11)
+- Mapped to phases: 58 (initial mapping; roadmapper finalizes)
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-29*
-*Last updated: 2026-04-29 after initial definition (research-informed)*
+*Last updated: 2026-05-23 — added ANTIRUG-13..16 per Plan 19 revision iteration 1 Blocker 1 (authorized by CONTEXT.md D-V3-COVERAGE).*
