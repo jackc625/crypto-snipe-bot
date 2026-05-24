@@ -112,7 +112,8 @@ beforeEach(() => {
     logError.mockClear();
     logFatal.mockClear();
     logDebug.mockClear();
-    sendCtxAlertMock.mockClear();
+    // mockReset (per vitest.config.ts) wipes the resolved value — restore it.
+    sendCtxAlertMock.mockClear().mockResolvedValue(undefined);
     broadcastMock.mockClear();
     vi.useFakeTimers();
 });

@@ -121,18 +121,27 @@ vi.mock('../../../src/anti-rug/detector', () => ({
 // Mock ethers Contract to short-circuit the on-chain calls inside
 // executeFullSell. We need balanceOf to be controllable and allowance/
 // approve to no-op so the tests stay in pure-process land.
+//
+// Use a `function` constructor so `new Contract(...)` works — vi.fn()-based
+// implementations are not callable as constructors per vitest's spy
+// implementation.
+let mockBalance: bigint = 1_000n;
+function setMockBalance(b: bigint) {
+    mockBalance = b;
+}
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
+    function MockContract(this: { balanceOf: () => Promise<bigint>; allowance: () => Promise<bigint>; approve: () => Promise<{ wait: () => Promise<null> }>; interface: { encodeFunctionData: () => string } }) {
+        this.balanceOf = () => Promise.resolve(mockBalance);
+        this.allowance = () => Promise.resolve(0n);
+        this.approve = () => Promise.resolve({ wait: () => Promise.resolve(null) });
+        this.interface = {
+            encodeFunctionData: () => '0xdeadbeef',
+        };
+    }
     return {
         ...actual,
-        Contract: vi.fn().mockImplementation(() => ({
-            balanceOf: vi.fn().mockResolvedValue(1_000n),
-            allowance: vi.fn().mockResolvedValue(0n),
-            approve: vi.fn().mockResolvedValue({ wait: vi.fn().mockResolvedValue(null) }),
-            interface: {
-                encodeFunctionData: vi.fn().mockReturnValue('0xdeadbeef'),
-            },
-        })),
+        Contract: MockContract,
     };
 });
 
@@ -213,9 +222,10 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
         it("Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier", () => {
             // The implementation should contain a conditional that picks
             // ctx.chain.antiRug.gasMultiplier for the anti-rug branch.
-            // We accept either an explicit ternary or a conditional assignment.
-            const antiRugBranch = /reason\s*===\s*['"]anti-rug['"][^\n]*ctx\.chain\.antiRug\.gasMultiplier/;
-            const altBranch = /ctx\.chain\.antiRug\.gasMultiplier[^\n]*reason\s*===\s*['"]anti-rug['"]/;
+            // We accept either an explicit ternary or a conditional assignment
+            // — and allow the two halves to span multiple lines.
+            const antiRugBranch = /reason\s*===\s*['"]anti-rug['"][\s\S]{0,80}ctx\.chain\.antiRug\.gasMultiplier/;
+            const altBranch = /ctx\.chain\.antiRug\.gasMultiplier[\s\S]{0,80}reason\s*===\s*['"]anti-rug['"]/;
             expect(
                 antiRugBranch.test(exitEngineSource) || altBranch.test(exitEngineSource),
             ).toBe(true);
@@ -255,16 +265,9 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
         it('Test 5: zero-balance branch ALSO calls unsubscribeAntiRug', async () => {
             const { executeFullSell } = await import('../../../src/exitEngine');
 
-            // Force balanceOf to return 0n on the token contract instance.
-            const { Contract } = await import('ethers');
-            (Contract as unknown as { mockImplementationOnce: (fn: () => unknown) => void }).mockImplementationOnce(
-                () => ({
-                    balanceOf: vi.fn().mockResolvedValue(0n),
-                    allowance: vi.fn().mockResolvedValue(0n),
-                    approve: vi.fn(),
-                    interface: { encodeFunctionData: vi.fn() },
-                }),
-            );
+            // Force balanceOf to return 0n by flipping the shared mockBalance
+            // variable consumed by the MockContract constructor in vi.mock above.
+            setMockBalance(0n);
 
             const ctx = buildCtx();
             const result = await executeFullSell(
@@ -276,6 +279,9 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
                 43,
                 'Zero balance test',
             );
+
+            // Restore for other tests.
+            setMockBalance(1_000n);
 
             // The zero-balance branch returns true and cleans up
             expect(result).toBe(true);

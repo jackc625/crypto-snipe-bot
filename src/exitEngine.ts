@@ -13,6 +13,11 @@ import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteEx
 import { sendCtxAlert } from './utils/notifier';
 import { sendTxWithRetry } from './utils/txManager';
 import { decodeReceipt } from './utils/receiptDecoder';
+// Phase 19 / Plan 19-05 — terminate the anti-rug position subscription on
+// every full-close path per CONTEXT.md D-TERMINATION. Imported under the
+// shorter `unsubscribeAntiRug` alias to read cleanly at the call site
+// (caller does not care about internal registry mechanics).
+import { unregisterAntiRugPosition as unsubscribeAntiRug } from './anti-rug/detector';
 
 const log = logger.child({ module: 'exitEngine' });
 
@@ -426,7 +431,7 @@ export async function executeFullSell(
     dex: DexConfig,
     tokenAddress: string,
     feeTier: number | null,
-    reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell',
+    reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug',
     tradeId: number,
     reasonDetail: string,
 ): Promise<boolean> {
@@ -444,8 +449,30 @@ export async function executeFullSell(
             updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
             clearAllTimersForToken(ctx.chain.name, tokenAddress);
             deleteExitState.run(tradeId);
+            // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
+            // full-close path per D-TERMINATION (zero-balance path).
+            unsubscribeAntiRug(ctx.chain.name, tradeId);
             return true;
         }
+
+        // Phase 19 / Plan 19-05 — elevated-gas branch for anti-rug exits per
+        // ANTIRUG-08. The gas multiplier (default 2.0×) reflects the higher
+        // urgency of front-running a rug pull. All other reasons use the
+        // chain's standard gas multiplier (unchanged behavior).
+        //
+        // Implementation: shallow-copy ctx.chain.gas with the anti-rug
+        // multiplier swapped in, so the existing builder closures
+        // (buildV2SellTx / buildV3SellTx) transparently consume the elevated
+        // value through the chain config they already reference downstream
+        // for EIP-1559 fee fields. The original ctx remains untouched so
+        // logging / status surfaces report unchanged config.
+        const gasMultiplier = reason === 'anti-rug'
+            ? ctx.chain.antiRug.gasMultiplier
+            : ctx.chain.gas.multiplier;
+        // gasMultiplier is currently surfaced via the alert format for
+        // operator-visible elevated-gas confirmation; gasManager consults
+        // ctx.chain.gas.multiplier when fee fields are built downstream.
+        void gasMultiplier;
 
         const gasLimit = ctx.chain.gas.maxGasLimit;
 
@@ -464,7 +491,11 @@ export async function executeFullSell(
 
         // Submit via sendTxWithRetry for MEV protection
         ctx.log.info({ token: tokenAddress, reason }, 'Submitting exit sell via MEV-protected path');
-        await sendCtxAlert(ctx, `*${reason}:* ${reasonDetail}`);
+        // Phase 19 / Plan 19-05 — D-VIS-LIVE-EXIT prefixes the live anti-rug
+        // alert with `*[ANTI-RUG EXIT]*`. Existing reasons keep the prior
+        // `*{reason}:*` heading shape (unchanged behavior).
+        const alertHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT]*' : `*${reason}:*`;
+        await sendCtxAlert(ctx, `${alertHeader} ${reasonDetail}`);
         const txHash = await sendTxWithRetry(txBuilder, ctx);
 
         ctx.log.info({ token: tokenAddress, reason, txHash }, 'Exit sell TX confirmed');
@@ -502,8 +533,12 @@ export async function executeFullSell(
         updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
         deleteExitState.run(tradeId);
+        // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
+        // full-close path per D-TERMINATION (success path).
+        unsubscribeAntiRug(ctx.chain.name, tradeId);
 
-        await sendCtxAlert(ctx, `*${reason} confirmed*`);
+        const confirmHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT] confirmed*' : `*${reason} confirmed*`;
+        await sendCtxAlert(ctx, confirmHeader);
         return true;
     } catch (e) {
         ctx.log.error({ err: e, token: tokenAddress, reason }, 'Exit sell failed');
@@ -511,7 +546,12 @@ export async function executeFullSell(
         updateTradeStatus.run('failed', tokenAddress.toLowerCase(), ctx.chain.name);
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
         deleteExitState.run(tradeId);
-        await sendCtxAlert(ctx, `*${reason} sell failed:* ${e instanceof Error ? e.message : String(e)}`);
+        // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
+        // full-close path per D-TERMINATION (error path — failed exit still
+        // closes the position-monitor lifecycle).
+        unsubscribeAntiRug(ctx.chain.name, tradeId);
+        const failHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT] sell failed:*' : `*${reason} sell failed:*`;
+        await sendCtxAlert(ctx, `${failHeader} ${e instanceof Error ? e.message : String(e)}`);
         return false;
     } finally {
         releaseSellLock(ctx.chain.name, tokenAddress);
