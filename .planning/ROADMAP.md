@@ -163,7 +163,35 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   3. Operator runs `npm run preflight` from a fresh terminal â€” script executes all OPS-LIVE-02..05 checks, prints structured per-chain pass/fail output, and exits non-zero on any FATAL â€” without starting the bot. Operator runs `npm run pause` and dashboard reflects pause state; operator runs `npm run resume` and dashboard reflects resume â€” both wrap the existing dashboard endpoints with `DASHBOARD_API_KEY` from `.env`
   4. Operator presses pause via dashboard while a snipe is mid-flight in `handleNewPairForChain` â€” the multi-stage kill-switch re-check at post-safety-bank, post-bundle-build, and post-MEV-submit aborts the in-flight execution. Pause state survives a full bot restart (loaded from SQLite at boot), so an operator-pressed pause cannot result in a position opening after the bot reboots
   5. `GOING-LIVE.md` no longer exists at the repo root â€” moved to `docs/operations/going-live.md` (atomic with the root-file delete in the same PR), README links to the new path, and a CI guard fails the build if `GOING-LIVE.md` reappears at the repo root. `HONEYPOT-SIM-BRIEFING.md` is either moved to `docs/decisions/honeypot-sim-rebuild.md` (preserved as decision record) or deleted â€” disposition documented during HONEY plan-phase and resolved in this phase
-**Plans**: TBD
+**Plans**: 8 plans (Wave 0 Nyquist baseline + 7 implementation waves)
+
+  **Wave 0** *(no dependencies; produces Nyquist test stub baseline before any implementation):*
+  - [ ] 20-00-PLAN.md — 14 vitest test stubs across test/unit/preflight/, test/unit/db/, and test/integration/ for all OPS-LIVE-NN requirements; every it.skip names the concrete observable per D-04 [OPS-LIVE-01..11]
+
+  **Wave 1** *(after Wave 0; parallel-safe foundation):*
+  - [ ] 20-01-PLAN.md — Schema migration v5→v6 (pause_state table + antirug_dry_run_started column on chain_state) + 5 new prepared statements + REQUIREMENTS.md row reword for OPS-LIVE-02 (D-BALANCE-FLOOR) + OPS-LIVE-06 (D-STALE-THRESHOLDS) [OPS-LIVE-02, OPS-LIVE-06, OPS-LIVE-09]
+
+  **Wave 2** *(after Wave 1; preflight module + chainRegistry extension):*
+  - [ ] 20-02-PLAN.md — src/preflight.ts (preflight + preflightDryRun dual-shape API, 7 check functions, cross-env validator, anti-rug 7-day live-gate, stale-data) + chainRegistry.ts defaultGasBuffer + defaultBlockAgeToleranceSec per chain + config.ts REQUIRED_ENV_VARS (12 new envs) + .env.example per D-ENV-EXAMPLE [OPS-LIVE-02, OPS-LIVE-03, OPS-LIVE-04, OPS-LIVE-05, OPS-LIVE-06, OPS-LIVE-07]
+
+  **Wave 3** *(after Wave 2; bot.ts wiring + anti-rug timestamp):*
+  - [ ] 20-03-PLAN.md — src/anti-rug/detector.ts: insert setAntirugDryRunStarted.run() at startChainAntiRugListener first-time-start path (D-ANTIRUG-LIVE-GATE-CODE source for Plan 20-02 7-day floor check) [OPS-LIVE-07]
+  - [ ] 20-04-PLAN.md — src/bot.ts: preflight() call at line 880 + chainId-block removal + 3 V2 killswitch checkpoints + 3 V3 killswitch checkpoints + mid-run wallet setInterval (D-MID-RUN-CHECK + D-KILLSWITCH-CP1/CP2/CP3 + D-PREFLIGHT-FLOW + D-ROLLBACK) [OPS-LIVE-01, OPS-LIVE-02, OPS-LIVE-08]
+
+  **Wave 4** *(after Wave 3; dashboard endpoints + CLI scripts + banner):*
+  - [ ] 20-05-PLAN.md — src/api/routes/controls.ts (POST /pause + POST /resume + GET /pause with sanitized reason + WS broadcast) + scripts/preflight.ts + scripts/pause.ts + scripts/resume.ts + package.json wiring [OPS-LIVE-09, OPS-LIVE-10, OPS-LIVE-11]
+  - [ ] 20-06-PLAN.md — dashboard/src/components/PauseBanner.tsx full-bleed red banner (bg-loss text-white per CB banner analog) + WebSocketContext + useWebSocket extension for pause_state_change WS event + initial state hydration via GET /api/controls/pause + Resume button (D-PAUSE-UI) [OPS-LIVE-09]
+
+  **Wave 5** *(after Wave 4; runbook + CI guard + docs):*
+  - [ ] 20-07-PLAN.md — git mv GOING-LIVE.md → docs/operations/going-live.md + git rm HONEYPOT-SIM-BRIEFING.md + README.md link update + .github/workflows/test.yml CI guard step + docs/operations/going-live.md content authoring (5 sections per D-OPERATOR-HANDOFF) [OPS-LIVE-12, OPS-LIVE-13]
+
+  **Cross-cutting constraints:**
+  - **D-ENV-EXAMPLE [USER-BINDING]:** every new env var introduced in Phase 20 lands in .env.example with default + 1-line description (Plan 20-02 owns the registration)
+  - **D-OPERATOR-HANDOFF [USER-BINDING]:** docs/operations/going-live.md IS the operator handoff doc at phase close (Plan 20-07 authors all 5 sections)
+  - **D-STOP-THE-LINE:** any preflight discovery revealing a production bug (e.g., a chain config silently broken because preflight wasn't catching it) BLOCKS Phase 20 close; treated as OPS-LIVE-14+ / decimal phase 20.1
+  - **D-ROLLBACK:** no legacy fallback flags; preflight is always-on; no SKIP_PREFLIGHT=true escape hatch; if preflight is buggy, operator git-reverts the preflight commit
+  - **D-ALERTS:** structured pino + Telegram alerts for every FATAL preflight failure with: chain name, failed check, specific reason, remediation pointer to docs/operations/going-live.md
+  - **D-04 observable-effect rigor:** every new preflight check test asserts a concrete observable effect (process.exit code, pino log line content, SQLite row written, Telegram alert sent) — no expect(true).toBe(true) hollow fills
 
 ### Phase 21: Exit-Engine Live-Runtime Hardening
 **Goal**: The 6 deferred human-verification items from v6.16 close are CLOSED with real-mainnet artifacts â€” Etherscan tx hashes, dashboard screenshots, pino log excerpts, DB row excerpts â€” committed in `.planning/milestones/v6.17-VERIFICATION-EVIDENCE.md`. "Test passing on a fork" is no longer accepted as closure for any of these items. Future regressions in the exit engine are caught earlier via real-launch fork fixtures and `op`-field log enrichment
@@ -199,7 +227,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
+| 20. Going-Live Ops Hardening | v6.17 | 0/8 | Planned | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
