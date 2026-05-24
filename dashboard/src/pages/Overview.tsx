@@ -16,7 +16,7 @@ import type { RiskExposure, RiskLimits, HealthResponse, AntiRugEvent } from '../
 import { formatPnL } from '../utils/formatters';
 
 export function Overview() {
-  const { positions, notifications, antiRugEvents, circuitBreakerTrips } = useWs();
+  const { positions, notifications, antiRugEvents, circuitBreakerTrips, chainWsHealth } = useWs();
   const { data: exposure } = useApi<RiskExposure>('/api/risk/exposure');
   const { data: limits } = useApi<RiskLimits>('/api/risk/limits');
   const { data: health } = useApi<HealthResponse>('/health');
@@ -221,6 +221,7 @@ export function Overview() {
         <AntiRugMonitorTile
           chain={activeChain}
           events={antiRugEvents[activeChain] ?? []}
+          wsHealth={chainWsHealth[activeChain]}
           onEventClick={(evt) => {
             // Find the matching position by pair (best-effort — fallback opens modal with empty target)
             const matchPos = positions.find(

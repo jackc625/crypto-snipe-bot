@@ -783,6 +783,17 @@ function setupHeartbeat(ctx: ChainContext): void {
             rawWs.terminate(); // triggers 'close' → handleWsClose
             return;
         }
+        // Re-broadcast the connected state on every healthy tick so dashboards
+        // that connected AFTER the initial startChainAntiRugListener broadcast
+        // still receive a chain_ws_health_change within HEARTBEAT_INTERVAL_MS.
+        // The API server has no state-snapshot replay on new client connect,
+        // so without this the indicator would stay empty until the next
+        // register / reconnect event.
+        broadcast('chain_ws_health_change', {
+            chain: chainName,
+            state: 'connected',
+            lastPongTs: state.lastPongTs,
+        });
         rawWs.isAlive = false;
         rawWs.ping();
     }, HEARTBEAT_INTERVAL_MS);

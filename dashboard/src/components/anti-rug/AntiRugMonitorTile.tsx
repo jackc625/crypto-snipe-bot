@@ -14,17 +14,19 @@
 //   - dashboard/src/components/EventFeed.tsx — last-N list pattern + severityColor
 //   - dashboard/src/components/ChainBadge.tsx — per-chain badge primitive
 
-import type { AntiRugEvent } from '../../types/api';
+import type { AntiRugEvent, ChainWsHealthChange } from '../../types/api';
 import { ChainBadge } from '../ChainBadge';
+import { WsHealthIndicator } from './WsHealthIndicator';
 import { formatAddress, formatTimeAgo } from '../../utils/formatters';
 
 interface AntiRugMonitorTileProps {
   chain: string;
   events: AntiRugEvent[];
   onEventClick?: (evt: AntiRugEvent) => void;
+  wsHealth?: ChainWsHealthChange;
 }
 
-export function AntiRugMonitorTile({ chain, events, onEventClick }: AntiRugMonitorTileProps) {
+export function AntiRugMonitorTile({ chain, events, onEventClick, wsHealth }: AntiRugMonitorTileProps) {
   // Per-chain stats — events from today on this chain only.
   const startOfTodayMs = (() => {
     const d = new Date();
@@ -42,7 +44,17 @@ export function AntiRugMonitorTile({ chain, events, onEventClick }: AntiRugMonit
     <div className="bg-surface-light border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold leading-[1.2]">Anti-Rug Monitor</h3>
-        <ChainBadge chain={chain} />
+        <div className="flex items-center gap-2">
+          {wsHealth && (
+            <WsHealthIndicator
+              chain={chain}
+              state={wsHealth.state}
+              lastPongTs={wsHealth.lastPongTs}
+              disconnectedDurationSec={wsHealth.disconnectedDurationSec}
+            />
+          )}
+          <ChainBadge chain={chain} />
+        </div>
       </div>
 
       {/* Per-chain stat row — uses StatCard 28px pattern inline */}
