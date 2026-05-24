@@ -544,11 +544,28 @@ export async function startChainAntiRugListener(
     ctx: ChainContext,
 ): Promise<void> {
     const chainName = ctx.chain.name;
-    const state = chainState.get(chainName);
-    if (!state) {
-        // No registrations on this chain yet — nothing to subscribe to.
-        return;
+    // CR-05: initialise chainState even when no positions are registered
+    // for this chain. Previously the function early-returned when
+    // chainState.get(chainName) was undefined, which happened on bot
+    // restart with zero open positions on a chain. The result: heartbeat
+    // + reconnect + backfill scaffolding was dormant, and the backfill
+    // window between restart and first-buy was silently lost (the next
+    // buy's register seeds chain_state.last_seen_block with the CURRENT
+    // block, not the restart-window). Now the WS lifecycle arms
+    // regardless of position count.
+    if (!chainState.has(chainName)) {
+        chainState.set(chainName, {
+            wsProvider: null,
+            heartbeatInterval: null,
+            reconnectAttempts: 0,
+            lastSeenBlock: 0,
+            healthState: 'disconnected',
+            lastPongTs: 0,
+            activeDispatcher: null,
+            activeFilter: null,
+        });
     }
+    const state = chainState.get(chainName)!;
 
     if (!ctx.wsProvider) {
         // Plan 19-04c — HTTP polling fallback. No WS endpoint configured for
@@ -569,50 +586,80 @@ export async function startChainAntiRugListener(
     const addresses = getRegisteredPositions(chainName).map(
         (p) => p.pairOrPoolAddress,
     );
-    if (addresses.length === 0) {
-        // No addresses registered — nothing to filter. Plan 19-04c will
-        // decide whether to keep the WS subscription alive with empty
-        // address filter or tear it down.
-        return;
+    // CR-05: do NOT early-return when addresses.length === 0. We still
+    // need to seed the WS handle + heartbeat + close-handler +
+    // backfillSinceLastSeen so the resume window between restart and
+    // first-buy isn't lost. The address-filter subscription is skipped
+    // when empty (no events to dispatch yet); the lifecycle scaffolding
+    // arms regardless. registerAntiRugPosition will call
+    // startChainAntiRugListener again when the first position lands,
+    // which will install the actual address-filter subscription.
+
+    // CR-05: only install the address-filter subscription when at least
+    // one position is registered. With empty addresses, ethers v6 filter
+    // semantics are RPC-provider-specific (some return all matching
+    // topics chain-wide; others return nothing) — neither is what we
+    // want. Skip the filter; the next registerAntiRugPosition call will
+    // re-enter startChainAntiRugListener and install the correct filter
+    // at that point. The heartbeat / close-handler / backfill scaffolding
+    // below still arms regardless.
+    if (addresses.length > 0) {
+        // Topic filter union — single subscription covers all four topics
+        // (V2 Pair.Burn + Pair.Transfer + V3 Pool.Burn + Pool.Collect).
+        // ethers v6 treats `topics: [[topic0_a, topic0_b, ...]]` as the
+        // standard OR-at-position-0 filter shape.
+        const topicUnion = [
+            PAIR_BURN_TOPIC,
+            PAIR_TRANSFER_TOPIC,
+            POOL_BURN_TOPIC,
+            POOL_COLLECT_TOPIC,
+        ];
+        const filter = {
+            address: addresses,
+            topics: [topicUnion],
+        };
+
+        // Drop the prior dispatcher before installing the fresh one. ethers v6
+        // does not support filter-replace natively; calling .on(...) twice on
+        // the same provider would install BOTH handlers and dispatch each
+        // event twice. Drop+recreate is the explicit pattern.
+        if (state.activeDispatcher && state.activeFilter) {
+            ctx.wsProvider.off(state.activeFilter, state.activeDispatcher);
+        }
+
+        const dispatcher = (logEvent: Log): void => {
+            // dispatchEvent is intentionally fire-and-forget at this layer.
+            // The evaluator is async; we await internally via the shim, but
+            // any rejection is logged inside dispatchEvent so unhandled
+            // rejections do not surface to the WS subscription wrapper.
+            void dispatchEvent(ctx, logEvent);
+        };
+
+        ctx.wsProvider.on(filter, dispatcher);
+        state.activeDispatcher = dispatcher;
+        state.activeFilter = filter;
+
+        log.info(
+            {
+                chain: chainName,
+                addresses: addresses.length,
+                topics: topicUnion.length,
+                op: 'antirug.listener.subscribed',
+            },
+            'Anti-rug WS subscription installed',
+        );
+    } else {
+        log.info(
+            {
+                chain: chainName,
+                op: 'antirug.listener.armed-no-positions',
+            },
+            'Anti-rug WS lifecycle armed with zero registered positions — heartbeat + backfill active, address-filter deferred until first register',
+        );
     }
-
-    // Topic filter union — single subscription covers all four topics
-    // (V2 Pair.Burn + Pair.Transfer + V3 Pool.Burn + Pool.Collect).
-    // ethers v6 treats `topics: [[topic0_a, topic0_b, ...]]` as the
-    // standard OR-at-position-0 filter shape.
-    const topicUnion = [
-        PAIR_BURN_TOPIC,
-        PAIR_TRANSFER_TOPIC,
-        POOL_BURN_TOPIC,
-        POOL_COLLECT_TOPIC,
-    ];
-    const filter = {
-        address: addresses,
-        topics: [topicUnion],
-    };
-
-    // Drop the prior dispatcher before installing the fresh one. ethers v6
-    // does not support filter-replace natively; calling .on(...) twice on
-    // the same provider would install BOTH handlers and dispatch each
-    // event twice. Drop+recreate is the explicit pattern.
-    if (state.activeDispatcher && state.activeFilter) {
-        ctx.wsProvider.off(state.activeFilter, state.activeDispatcher);
-    }
-
-    const dispatcher = (logEvent: Log): void => {
-        // dispatchEvent is intentionally fire-and-forget at this layer.
-        // The evaluator is async; we await internally via the shim, but
-        // any rejection is logged inside dispatchEvent so unhandled
-        // rejections do not surface to the WS subscription wrapper.
-        void dispatchEvent(ctx, logEvent);
-    };
-
-    ctx.wsProvider.on(filter, dispatcher);
 
     state.wsProvider = ctx.wsProvider;
     state.healthState = 'connected';
-    state.activeDispatcher = dispatcher;
-    state.activeFilter = filter;
 
     // Plan 19-04c — populate health bookkeeping on (re-)subscription so the
     // dashboard's per-chain WS-status indicator (D-VIS-WS-HEALTH) reflects the
@@ -627,16 +674,6 @@ export async function startChainAntiRugListener(
         state: 'connected',
         lastPongTs: state.lastPongTs,
     });
-
-    log.info(
-        {
-            chain: chainName,
-            addresses: addresses.length,
-            topics: topicUnion.length,
-            op: 'antirug.listener.subscribed',
-        },
-        'Anti-rug WS subscription installed',
-    );
 
     // Plan 19-04c — heartbeat + reconnect 'close' handler + backfill.
     // setupHeartbeat installs the 30s ws.ping()/pong/terminate cycle per
