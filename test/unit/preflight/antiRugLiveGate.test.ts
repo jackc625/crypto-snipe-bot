@@ -125,4 +125,15 @@ describe('checkAntiRugLiveGate boundary', () => {
         vi.useRealTimers();
         delete process.env.ETH_ANTIRUG_LIVE_EXECUTE;
     });
+
+    it('passes at exactly the 7-day boundary (ts is exactly now - 7*86400)', async () => {
+        process.env.ETH_ANTIRUG_LIVE_EXECUTE = 'true';
+        const now = 1_700_000_000;
+        vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+        dryRunGet.mockReturnValue({ antirug_dry_run_started: now - SEVEN_DAYS });
+        const { checkAntiRugLiveGate } = await import('../../../src/preflight');
+        const result = await checkAntiRugLiveGate(makeChain() as never);
+        expect(result.passed).toBe(true);
+        expect(result.check).toBe('antirug-live-gate');
+    });
 });
