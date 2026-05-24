@@ -22,9 +22,9 @@ and `docs/CONFIGURATION.md` (general env-var format reference).
 
 ## 1. Pre-flight — Required `.env` changes
 
-Anti-rug introduces **9 env vars per chain × 4 chains = 36 env vars total**. All have
-sensible defaults that ship in `.env.example`; you do not need to change them for
-dry-run operation. You only edit them when graduating to live mode (the
+Anti-rug introduces **11 env vars per chain × 4 chains = 44 env vars total**. All
+have sensible defaults that ship in `.env.example`; you do not need to change them
+for dry-run operation. You only edit them when graduating to live mode (the
 `<CHAIN>_ANTIRUG_LIVE_EXECUTE` flag) or when tuning thresholds based on dry-run
 telemetry (see `anti-rug-tuning.md`).
 
@@ -33,7 +33,13 @@ telemetry (see `anti-rug-tuning.md`).
 > (`BACKFILL_CAP_BLOCKS` + `MAX_BACKFILL_BLOCKS`) to make the WebSocket
 > reconnect+backfill path operable per `19-RESEARCH.md` CRITICAL #1 (Alchemy
 > free-tier 10-block `getLogs` cap). The additions are authorized under
-> `CONTEXT.md` "Claude's Discretion" on the backfill window cap.
+> `CONTEXT.md` "Claude's Discretion" on the backfill window cap. Code-review
+> iter-1 WR-08 added 2 more (`ALLOWLIST_EXTRA_V2` + `ALLOWLIST_EXTRA_V3`) to
+> allow per-pool-type locker overlay — V2 lockers and V3 NFT-vault lockers are
+> distinct categories and mixing them silently bypasses the per-pool-type
+> `lockerName` check. The original unified `ALLOWLIST_EXTRA` is preserved as a
+> deprecated alias (warn fires at startup when set). Net: 7 + 2 + 2 = 11
+> envs/chain × 4 chains = 44.
 
 ### Env-var reference table
 
@@ -47,10 +53,15 @@ telemetry (see `anti-rug-tuning.md`).
 | `GAS_MULTIPLIER` | `2.0` | Multiplier applied to EIP-1559 fee fields when `reason='anti-rug'`. Default doubles the standard fee to outbid the rug-pull tx. |
 | `BACKFILL_CAP_BLOCKS` | `10` (ETH) / `500` (BSC/Base/Arb) | Per-`getLogs`-call block range cap. ETH defaults to 10 for Alchemy free-tier safety; **upgrade Alchemy to Pay-As-You-Go and bump this to `2000+` before going live**. |
 | `MAX_BACKFILL_BLOCKS` | `7200` | Hard ceiling on the backfill window (~1 day on ETH). If `currentBlock - lastSeenBlock > MAX_BACKFILL_BLOCKS`, the detector FAILS CLOSED with a `[GAP DETECTED]` alert (per `D-BACKFILL`). |
-| `ALLOWLIST_EXTRA` | (empty) | Optional comma-separated extra V2+V3 locker checksummed addresses to add to the merged allowlist. Empty in normal operation. |
+| `ALLOWLIST_EXTRA` | (empty) | **DEPRECATED.** Optional comma-separated extra V2+V3 locker checksummed addresses, placed in BOTH the V2 and V3 allowlists. Kept for backward compatibility; emits a startup deprecation warn (`op: 'antirug.allowlist.deprecated-unified-extra'`) when set. Prefer `ALLOWLIST_EXTRA_V2` / `ALLOWLIST_EXTRA_V3` below — placing a V2-only locker in the V3 allowlist (or vice versa) silently bypasses the per-pool-type `lockerName` check. |
+| `ALLOWLIST_EXTRA_V2` | (empty) | Optional comma-separated **V2-only** locker checksummed addresses. Merged into `allowlistV2` only — not visible to the V3 detector. Preferred over the deprecated unified `ALLOWLIST_EXTRA` when the locker is V2-specific (e.g., a TeamFinance V2 ERC20-LP-only vault or a PinkLock V2 contract). |
+| `ALLOWLIST_EXTRA_V3` | (empty) | Optional comma-separated **V3-only** locker checksummed addresses. Merged into `allowlistV3` only — not visible to the V2 detector. Preferred over the deprecated unified `ALLOWLIST_EXTRA` when the locker is a V3 NFT-vault. |
 
-`<CHAIN>` is one of `ETH`, `BSC`, `BASE`, `ARB`. Each chain has its own set of nine
-variables (e.g. `ETH_ANTIRUG_LIVE_EXECUTE`, `BSC_ANTIRUG_LP_REMOVAL_PCT`, etc.).
+`<CHAIN>` is one of `ETH`, `BSC`, `BASE`, `ARB`. Each chain has its own set of
+eleven variables (e.g. `ETH_ANTIRUG_LIVE_EXECUTE`, `BSC_ANTIRUG_LP_REMOVAL_PCT`,
+`ARB_ANTIRUG_ALLOWLIST_EXTRA_V3`, etc.). Empty values (the defaults) are inert —
+the unified deprecation warn only fires when an operator explicitly sets the
+unified `ALLOWLIST_EXTRA` to a non-empty value.
 
 ### Critical for ETH (Alchemy backfill cap)
 
@@ -489,20 +500,36 @@ disposition at Phase 19 ship time.
 ### Env-var-count delta vs original D-ENV-EXAMPLE
 
 `D-ENV-EXAMPLE` originally enumerated **7 envs per chain**. Plan 19-02 shipped
-**9 envs per chain** (8 required + 1 optional `ALLOWLIST_EXTRA`). The two
-additions are:
+**9 envs per chain** (8 required + 1 optional unified `ALLOWLIST_EXTRA`). Code-
+review iter-1 finding WR-08 added two more per-chain envs to split the unified
+locker overlay by pool type, bringing the total to **11 envs per chain × 4
+chains = 44 `*_ANTIRUG_*` rows in `.env.example`**. The four additions are:
 
 - `<CHAIN>_ANTIRUG_BACKFILL_CAP_BLOCKS` — per-`getLogs`-call block range cap.
   ETH=10 (Alchemy free-tier safe per `19-RESEARCH.md` CRITICAL #1); BSC/Base/Arb=500.
 - `<CHAIN>_ANTIRUG_MAX_BACKFILL_BLOCKS` — hard ceiling. Default 7200 (~1 day
   on ETH). FAIL CLOSED above this — Scenario C above.
+- `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V2` — V2-only locker overlay. Empty default.
+  Added in WR-08 (iter-1) so V2-only lockers (e.g. PinkLock V2 ERC20-LP-only
+  contracts) do not end up in the V3 allowlist, where they would bypass the
+  per-pool-type `lockerName` check.
+- `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V3` — V3-only locker overlay. Empty default.
+  Added in WR-08 (iter-1) so V3-only NFT-vault lockers do not end up in the V2
+  allowlist, where they would bypass the per-pool-type `lockerName` check.
 
-Justification: without these envs the operator cannot adjust the cap when
-upgrading to a paid Alchemy tier (or moving to a different RPC). The additions
-are authorized under `CONTEXT.md` "Claude's Discretion" on backfill window cap;
-they are uniformly applied across all 4 chains. The pre-flight env table in §1
-above is the authoritative reference; you will see 9 envs × 4 chains = 36
-`*_ANTIRUG_*` rows in `.env.example`.
+The original unified `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA` is preserved as a
+deprecated alias for backward compatibility; setting it to a non-empty value
+emits a structured-log warn at startup
+(`op: 'antirug.allowlist.deprecated-unified-extra'`) recommending the operator
+migrate to the per-pool-type vars.
+
+Justification: without `BACKFILL_CAP_BLOCKS` / `MAX_BACKFILL_BLOCKS` the
+operator cannot adjust the cap when upgrading to a paid Alchemy tier (or moving
+to a different RPC) — authorized under `CONTEXT.md` "Claude's Discretion" on
+backfill window cap. Without per-pool-type `ALLOWLIST_EXTRA_V2/V3`, a V2 locker
+hot-patched via the unified env would be silently allowlisted on the V3
+detection path. All four additions are uniformly applied across the 4 chains.
+The pre-flight env table in §1 above is the authoritative reference.
 
 ### V3 rug-fixture backfill (during 7-day dry-run window)
 

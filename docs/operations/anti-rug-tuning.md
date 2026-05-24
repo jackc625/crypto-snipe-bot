@@ -61,14 +61,24 @@ the §2 procedure in `anti-rug-rollout.md`.
 
 | Env Var | Default | When to tune |
 |---------|---------|--------------|
-| `ALLOWLIST_EXTRA` | (empty) | Add a comma-separated locker checksummed address (or addresses) when dry-run telemetry shows legitimate locked-position triggers (e.g., a custom multisig locker not in the hardcoded base, OR a TeamFinance V3 / PinkLock V3 locker resolved during the Wave-1 follow-up per `anti-rug-rollout.md` §7). |
+| `ALLOWLIST_EXTRA` (DEPRECATED) | (empty) | **DEPRECATED.** Adds the address(es) to BOTH the V2 and V3 allowlists at once. Kept for backward compatibility; setting it to a non-empty value emits a startup deprecation warn (`op: 'antirug.allowlist.deprecated-unified-extra'`). Prefer the per-pool-type vars below — placing a V2-only locker in the V3 allowlist (or vice versa) silently bypasses the per-pool-type `lockerName` check, leaving a soft footgun on the hot-patch path. |
+| `ALLOWLIST_EXTRA_V2` | (empty) | Add a comma-separated **V2-only** locker checksummed address (or addresses) when dry-run telemetry shows legitimate locked-position triggers on a V2 pool whose locker is not in `HARDCODED_V2_ALLOWLIST` (e.g., a custom multisig vault or a newly-resolved PinkLock V2 locker not yet promoted to hardcoded). |
+| `ALLOWLIST_EXTRA_V3` | (empty) | Add a comma-separated **V3-only** locker checksummed address (or addresses) when dry-run telemetry shows legitimate locked-position triggers on a V3 pool whose locker is not in `HARDCODED_V3_ALLOWLIST` (e.g., a TeamFinance V3 / PinkLock V3 NFT-vault resolved during the Wave-1 follow-up per `anti-rug-rollout.md` §7). |
 
-Treat `ALLOWLIST_EXTRA` as a hot-patch path. The long-term path for a verified
-locker is a PR to `HARDCODED_V2_ALLOWLIST` / `HARDCODED_V3_ALLOWLIST` in
-`src/chainRegistry.ts` so the address gets the `provenance: 'hardcoded'` tag
-and is covered by source-of-truth git history. Per `D-LIST-VERIFY`, the bot
-runs `getCode()` on every env-overlay address at startup and fatal-exits if
-any is an EOA — your overlay entries are auto-validated.
+Treat any `ALLOWLIST_EXTRA*` as a hot-patch path. The long-term path for a
+verified locker is a PR to `HARDCODED_V2_ALLOWLIST` / `HARDCODED_V3_ALLOWLIST`
+in `src/chainRegistry.ts` so the address gets the `provenance: 'hardcoded'`
+tag and is covered by source-of-truth git history. Per `D-LIST-VERIFY`, the
+bot runs `getCode()` on every env-overlay address at startup and fatal-exits
+if any is an EOA — your overlay entries are auto-validated regardless of
+which of the three env keys you used.
+
+**Migration note (WR-08 iter-1):** If you previously had `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA`
+populated with V2-only or V3-only lockers, migrate them to the appropriate
+per-pool-type var to silence the deprecation warn and to avoid the silent
+cross-pool-type bypass. The semantics for an already-correct entry are
+unchanged (it lands in the same merged allowlist either way); the deprecation
+is purely about operator hygiene and review-time clarity.
 
 ---
 

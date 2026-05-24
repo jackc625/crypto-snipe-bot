@@ -64,14 +64,18 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'PARTIAL_SELL_TARGETS', required: false, description: 'Partial sell tiers, e.g. "2x:50,5x:25" (default: empty = no partial sells)' },
     { name: 'STOP_LOSS_PCT', required: false, description: 'Fixed stop-loss percentage below entry, active before trailing activates (default: 25)' },
 
-    // --- Anti-Rug Runtime Monitoring (Phase 19, plan 19-02) ---
+    // --- Anti-Rug Runtime Monitoring (Phase 19, plan 19-02 + WR-08 iter-1 + WR-08-FOLLOWUP iter-2) ---
     // Per D-ENV-EXAMPLE [USER-BINDING]: every var here also lives in
     // .env.example with default + 1-line inline-comment description.
-    // 9 vars × 4 chains = 36 entries (8 numeric + 1 comma-list per chain).
+    // 11 vars × 4 chains = 44 entries (8 numeric + 3 comma-list per chain).
     // Env-var delta vs CONTEXT.md D-ENV-EXAMPLE: added BACKFILL_CAP_BLOCKS
     // and MAX_BACKFILL_BLOCKS per 19-RESEARCH.md CRITICAL #1 (Alchemy
     // free-tier 10-block getLogs cap) under CONTEXT.md "Claude's Discretion"
-    // on backfill window cap.
+    // on backfill window cap. WR-08 (iter-1) added ALLOWLIST_EXTRA_V2 and
+    // ALLOWLIST_EXTRA_V3 in chainRegistry.ts to avoid placing V2-only lockers
+    // in the V3 allowlist (or vice versa); WR-08-FOLLOWUP (iter-2) registers
+    // those new vars here so operators can discover them via the canonical
+    // env-vars source-of-truth and so .env.example covers them.
 
     // ETH
     { name: 'ETH_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for ETH (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
@@ -82,7 +86,9 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'ETH_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for ETH (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
     { name: 'ETH_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for ETH (default: 10 Alchemy-free-tier safe per 19-RESEARCH.md CRITICAL #1)' },
     { name: 'ETH_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for ETH; gap > this fires [GAP DETECTED] (default: 7200 = ~1 day on ETH)' },
-    { name: 'ETH_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for ETH (default: empty; merged into both V2 and V3 allowlists)' },
+    { name: 'ETH_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'DEPRECATED unified V2+V3 locker overlay for ETH (default: empty; prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2-only lockers in the V3 allowlist or vice versa; deprecation warn fires at startup when set)' },
+    { name: 'ETH_ANTIRUG_ALLOWLIST_EXTRA_V2', required: false, description: 'V2-only locker checksummed addresses for ETH (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
+    { name: 'ETH_ANTIRUG_ALLOWLIST_EXTRA_V3', required: false, description: 'V3-only locker checksummed addresses for ETH (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
 
     // BSC
     { name: 'BSC_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for BSC (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
@@ -93,7 +99,9 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'BSC_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for BSC (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
     { name: 'BSC_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for BSC (default: 500 conservative for public BSC RPC / Chainstack)' },
     { name: 'BSC_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for BSC; gap > this fires [GAP DETECTED] (default: 7200)' },
-    { name: 'BSC_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for BSC (default: empty; merged into both V2 and V3 allowlists)' },
+    { name: 'BSC_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'DEPRECATED unified V2+V3 locker overlay for BSC (default: empty; prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2-only lockers in the V3 allowlist or vice versa; deprecation warn fires at startup when set)' },
+    { name: 'BSC_ANTIRUG_ALLOWLIST_EXTRA_V2', required: false, description: 'V2-only locker checksummed addresses for BSC (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
+    { name: 'BSC_ANTIRUG_ALLOWLIST_EXTRA_V3', required: false, description: 'V3-only locker checksummed addresses for BSC (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
 
     // BASE
     { name: 'BASE_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for Base (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
@@ -104,7 +112,9 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'BASE_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for Base (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
     { name: 'BASE_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for Base (default: 500 conservative for public Base RPC)' },
     { name: 'BASE_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for Base; gap > this fires [GAP DETECTED] (default: 7200)' },
-    { name: 'BASE_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for Base (default: empty; merged into both V2 and V3 allowlists)' },
+    { name: 'BASE_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'DEPRECATED unified V2+V3 locker overlay for Base (default: empty; prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2-only lockers in the V3 allowlist or vice versa; deprecation warn fires at startup when set)' },
+    { name: 'BASE_ANTIRUG_ALLOWLIST_EXTRA_V2', required: false, description: 'V2-only locker checksummed addresses for Base (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
+    { name: 'BASE_ANTIRUG_ALLOWLIST_EXTRA_V3', required: false, description: 'V3-only locker checksummed addresses for Base (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
 
     // ARB
     { name: 'ARB_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for Arbitrum (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
@@ -115,7 +125,9 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'ARB_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for Arbitrum (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
     { name: 'ARB_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for Arbitrum (default: 500 conservative for public Arb RPC)' },
     { name: 'ARB_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for Arbitrum; gap > this fires [GAP DETECTED] (default: 7200)' },
-    { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for Arbitrum (default: empty; merged into both V2 and V3 allowlists)' },
+    { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'DEPRECATED unified V2+V3 locker overlay for Arbitrum (default: empty; prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2-only lockers in the V3 allowlist or vice versa; deprecation warn fires at startup when set)' },
+    { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA_V2', required: false, description: 'V2-only locker checksummed addresses for Arbitrum (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
+    { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA_V3', required: false, description: 'V3-only locker checksummed addresses for Arbitrum (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
 ];
 
 function validateEnvVars(): void {
