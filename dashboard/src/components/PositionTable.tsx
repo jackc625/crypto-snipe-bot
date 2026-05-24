@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import type { Position } from '../types/api';
 import { ChainBadge } from './ChainBadge';
+import { AntiRugStateBadge } from './anti-rug/AntiRugStateBadge';
 import { formatAddress, formatPnL, formatEth, formatDuration, pnlColor } from '../utils/formatters';
 
 interface PositionTableProps {
   positions: Position[];
   onForceSell: (tradeId: number, token: string, chain: string) => void;
+  /** Phase 19 / Plan 19-06 — opens the AntiRugExitDetailModal for the given trade. */
+  onAntiRugBadgeClick?: (tradeId: number, token: string, chain: string) => void;
 }
 
-export function PositionTable({ positions, onForceSell }: PositionTableProps) {
+export function PositionTable({ positions, onForceSell, onAntiRugBadgeClick }: PositionTableProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   // Sort by unrealized P&L by default (descending), fall back to realized pnl
@@ -58,6 +61,7 @@ export function PositionTable({ positions, onForceSell }: PositionTableProps) {
             <th className="text-right text-xs text-text-muted px-4 py-3 font-normal">Current</th>
             <th className="text-right text-xs text-text-muted px-4 py-3 font-normal">P&L</th>
             <th className="text-left text-xs text-text-muted px-4 py-3 font-normal">Exit Mode</th>
+            <th className="text-left text-xs text-text-muted px-4 py-3 font-normal">Anti-Rug</th>
             <th className="text-right text-xs text-text-muted px-4 py-3 font-normal">Time Held</th>
             <th className="w-8"></th>
           </tr>
@@ -70,6 +74,11 @@ export function PositionTable({ positions, onForceSell }: PositionTableProps) {
               expanded={expandedRow === rowKey(pos)}
               onToggle={() => toggleRow(rowKey(pos))}
               onForceSell={() => onForceSell(pos.tradeId, pos.token, pos.chain)}
+              onAntiRugBadgeClick={
+                onAntiRugBadgeClick
+                  ? () => onAntiRugBadgeClick(pos.tradeId, pos.token, pos.chain)
+                  : undefined
+              }
               exitMode={getExitMode(pos)}
               timeHeld={getTimeHeld(pos)}
             />
@@ -85,12 +94,38 @@ interface PositionRowProps {
   expanded: boolean;
   onToggle: () => void;
   onForceSell: () => void;
+  onAntiRugBadgeClick?: () => void;
   exitMode: string;
   timeHeld: string;
 }
 
-function PositionRow({ position, expanded, onToggle, onForceSell, exitMode, timeHeld }: PositionRowProps) {
+const antiRugTooltips: Record<string, (chain: string) => string> = {
+  'live': (chain) =>
+    `Anti-rug monitor is live on ${chain.toUpperCase()}. A confirmed rug signal will trigger an exit through executeFullSell.`,
+  'dry-run': (chain) =>
+    `Anti-rug monitor is in dry-run on ${chain.toUpperCase()}. Detections are logged but no exit is fired.`,
+  'would-have-sold': () =>
+    `Dry-run detected a confirmed rug signal. Click for evidence.`,
+  'exit-fired': () =>
+    `Anti-rug exit fired. Click for tx artifacts.`,
+  'halted': (chain) =>
+    `Circuit breaker tripped on ${chain.toUpperCase()}. Anti-rug monitoring is paused until manual reset.`,
+  'unmonitored': () =>
+    `No LP baseline recorded for this position. Anti-rug monitoring is not active.`,
+};
+
+function PositionRow({
+  position,
+  expanded,
+  onToggle,
+  onForceSell,
+  onAntiRugBadgeClick,
+  exitMode,
+  timeHeld,
+}: PositionRowProps) {
   const pos = position;
+  const arState = pos.antiRugState ?? 'unmonitored';
+  const arTooltip = (antiRugTooltips[arState] ?? antiRugTooltips['unmonitored'])(pos.chain);
 
   return (
     <>
@@ -114,6 +149,14 @@ function PositionRow({ position, expanded, onToggle, onForceSell, exitMode, time
           {formatPnL(pos.unrealizedPnl ?? pos.pnl)}
         </td>
         <td className="px-4 py-3 text-sm">{exitMode}</td>
+        <td className="px-4 py-3">
+          <AntiRugStateBadge
+            state={pos.antiRugState ?? 'unmonitored'}
+            chain={pos.chain}
+            onClick={onAntiRugBadgeClick}
+            title={arTooltip}
+          />
+        </td>
         <td className="px-4 py-3 text-sm text-right text-text-muted">{timeHeld}</td>
         <td className="px-2 py-3 text-text-muted">
           <svg
@@ -128,7 +171,7 @@ function PositionRow({ position, expanded, onToggle, onForceSell, exitMode, time
       {/* Expanded detail section -- accordion pattern, only one row at a time */}
       {expanded && (
         <tr className="cursor-pointer" onClick={onToggle}>
-          <td colSpan={8} className="bg-surface px-6 py-4 border-b border-border">
+          <td colSpan={9} className="bg-surface px-6 py-4 border-b border-border">
             <div
               className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm"
               style={{ animation: 'slideDown 150ms ease-out' }}

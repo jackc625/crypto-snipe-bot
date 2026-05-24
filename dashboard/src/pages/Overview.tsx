@@ -5,11 +5,18 @@ import { StatCard } from '../components/StatCard';
 import { PositionTable } from '../components/PositionTable';
 import { EventFeed } from '../components/EventFeed';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import type { RiskExposure, RiskLimits, HealthResponse } from '../types/api';
+// Phase 19 / Plan 19-06 — Anti-rug dashboard surfaces
+import { CircuitBreakerBanner } from '../components/anti-rug/CircuitBreakerBanner';
+import { CircuitBreakerResetModal } from '../components/anti-rug/CircuitBreakerResetModal';
+import { AntiRugMonitorTile } from '../components/anti-rug/AntiRugMonitorTile';
+import { AntiRugExitDetailModal } from '../components/anti-rug/AntiRugExitDetailModal';
+import { FrontrunDistributionPanel } from '../components/anti-rug/FrontrunDistributionPanel';
+import { GapDetectedBanner } from '../components/anti-rug/GapDetectedBanner';
+import type { RiskExposure, RiskLimits, HealthResponse, AntiRugEvent } from '../types/api';
 import { formatPnL } from '../utils/formatters';
 
 export function Overview() {
-  const { positions, notifications } = useWs();
+  const { positions, notifications, antiRugEvents, circuitBreakerTrips } = useWs();
   const { data: exposure } = useApi<RiskExposure>('/api/risk/exposure');
   const { data: limits } = useApi<RiskLimits>('/api/risk/limits');
   const { data: health } = useApi<HealthResponse>('/health');
@@ -21,6 +28,34 @@ export function Overview() {
     chain: string;
   } | null>(null);
   const [forceSellError, setForceSellError] = useState<string | null>(null);
+
+  // Phase 19 / Plan 19-06 — Modal-open state lifted to Overview (single source
+  // of truth across PositionTable click + AntiRugMonitorTile row click triggers).
+  const [resetModalTarget, setResetModalTarget] = useState<string | null>(null);
+  const [antiRugDetailTarget, setAntiRugDetailTarget] = useState<{
+    tradeId: number;
+    token: string;
+    chain: string;
+  } | null>(null);
+
+  // Determine the active chain — for the Anti-Rug Monitor + Frontrun panel.
+  // For v6.17 ETH is the only enabled chain; fall back gracefully.
+  const activeChain = useMemo(() => {
+    const chainSet = new Set<string>();
+    positions.forEach((p) => chainSet.add(p.chain));
+    Object.keys(antiRugEvents).forEach((c) => chainSet.add(c));
+    return Array.from(chainSet)[0] ?? 'eth';
+  }, [positions, antiRugEvents]);
+
+  // Per-chain most-recent gap-detected event (drives GapDetectedBanner).
+  const gapEventByChain = useMemo(() => {
+    const out: Record<string, AntiRugEvent | null> = {};
+    for (const [chain, events] of Object.entries(antiRugEvents)) {
+      const gap = events.find((e) => e.kind === 'gap-detected');
+      out[chain] = gap ?? null;
+    }
+    return out;
+  }, [antiRugEvents]);
 
   // Calculate stat card values from positions data
   const stats = useMemo(() => {
@@ -77,8 +112,41 @@ export function Overview() {
     ? Math.min((limits.dailyLoss.used / (limits.dailyLoss.limitPct || 100)) * 100, 100)
     : 0;
 
+  // Triggers for the CB-reset modal — pulled from circuitBreakerTrips for the
+  // currently-targeted chain.
+  const resetModalTriggers = resetModalTarget
+    ? circuitBreakerTrips[resetModalTarget]?.triggers ?? []
+    : [];
+  const resetModalWindowHours = resetModalTarget
+    ? circuitBreakerTrips[resetModalTarget]?.windowHours ?? 1
+    : 1;
+
+  // Build detail modal props — for v6.17 the modal renders signals from the
+  // position's antiRugLastSignals (the future fork test fleshes out tx
+  // artifacts). Variant inferred from the position's antiRugState.
+  const detailPosition = antiRugDetailTarget
+    ? positions.find((p) => p.tradeId === antiRugDetailTarget.tradeId)
+    : null;
+  const detailVariant: 'live' | 'dry-run' | 'pending-confirm' =
+    detailPosition?.antiRugState === 'exit-fired'
+      ? 'live'
+      : detailPosition?.antiRugState === 'would-have-sold'
+      ? 'dry-run'
+      : 'pending-confirm';
+
   return (
     <div className="space-y-8">
+      {/* Phase 19 — CB-tripped banner (sticky at top when any chain tripped) */}
+      <CircuitBreakerBanner
+        trips={circuitBreakerTrips}
+        onResetClick={(chain) => setResetModalTarget(chain)}
+      />
+
+      {/* Phase 19 — Per-chain gap-detected banners */}
+      {Object.entries(gapEventByChain).map(([chain, evt]) => (
+        <GapDetectedBanner key={chain} chain={chain} event={evt} />
+      ))}
+
       {/* Page title */}
       <h1 className="text-xl font-bold">Overview</h1>
 
@@ -95,6 +163,9 @@ export function Overview() {
         positions={positions}
         onForceSell={(tradeId, token, chain) =>
           setForceSellTarget({ tradeId, token, chain })
+        }
+        onAntiRugBadgeClick={(tradeId, token, chain) =>
+          setAntiRugDetailTarget({ tradeId, token, chain })
         }
       />
 
@@ -145,6 +216,28 @@ export function Overview() {
         </div>
       </div>
 
+      {/* Phase 19 — Anti-Rug Monitor tile + Frontrun distribution panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AntiRugMonitorTile
+          chain={activeChain}
+          events={antiRugEvents[activeChain] ?? []}
+          onEventClick={(evt) => {
+            // Find the matching position by pair (best-effort — fallback opens modal with empty target)
+            const matchPos = positions.find(
+              (p) => p.chain === evt.chain && p.token.toLowerCase() === (evt.token ?? '').toLowerCase(),
+            );
+            if (matchPos) {
+              setAntiRugDetailTarget({
+                tradeId: matchPos.tradeId,
+                token: matchPos.token,
+                chain: matchPos.chain,
+              });
+            }
+          }}
+        />
+        <FrontrunDistributionPanel chain={activeChain} events={antiRugEvents[activeChain] ?? []} />
+      </div>
+
       {/* Force sell confirmation dialog */}
       <ConfirmDialog
         open={forceSellTarget !== null}
@@ -160,6 +253,26 @@ export function Overview() {
           setForceSellTarget(null);
           setForceSellError(null);
         }}
+      />
+
+      {/* Phase 19 — CB-reset modal (opens when operator clicks a banner chip) */}
+      <CircuitBreakerResetModal
+        open={resetModalTarget !== null}
+        chain={resetModalTarget ?? ''}
+        triggers={resetModalTriggers}
+        windowHours={resetModalWindowHours}
+        onConfirmed={() => setResetModalTarget(null)}
+        onDismiss={() => setResetModalTarget(null)}
+      />
+
+      {/* Phase 19 — Anti-Rug exit detail modal */}
+      <AntiRugExitDetailModal
+        open={antiRugDetailTarget !== null}
+        variant={detailVariant}
+        tokenSymbol={antiRugDetailTarget?.token ? antiRugDetailTarget.token.slice(0, 10) + '...' : ''}
+        chain={antiRugDetailTarget?.chain ?? ''}
+        signals={detailPosition?.antiRugLastSignals}
+        onDismiss={() => setAntiRugDetailTarget(null)}
       />
 
       {/* Force sell error banner */}
