@@ -1,0 +1,24 @@
+{
+  "slug": "eth-v2-horse",
+  "chain": "eth",
+  "dexType": "v2",
+  "tokenAddress": null,
+  "tokenSymbol": "HORSE",
+  "pairAddress": "0x77A838d43Aa717b5C0eEd82E3A3078560e9429b3",
+  "routerAddress": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  "lpAddBlock": 18401564,
+  "lpRemovalBlock": 18401609,
+  "lpRemovalTxHash": "0xed945fa47225956c7dfdd7ec29fb4201f7a914bbdad2f81a7903f4726ebf3952",
+  "forkBlockNumber": 18401608,
+  "destinationOnBurn": null,
+  "expectedVerdict": "unsafe",
+  "expectedSignals": {
+    "lpRemovedPct": ">99",
+    "allowlistHit": "unsafe",
+    "v2ReservePctBelow": ">99"
+  },
+  "bugPattern": "lp-removal-no-allowlist",
+  "discoveredVia": "medium-article",
+  "discoveredOn": "2026-05-23",
+  "notes": "100% rug ~10min after LP add; pair lifespan <10min; sourced from 19-RESEARCH.md §4.1 candidate A. tokenAddress + destinationOnBurn (scammer wallet ending 33b03A) resolved at fork-test run time per Plan 19-07 §Step 2 option 3: spin up a local hardhat fork at lpRemovalBlock, call provider.getTransactionReceipt(lpRemovalTxHash), parse logs[].topics — Burn event topic[2] decodes to the destination; pair token0()/token1() identifies the HORSE token (whichever is not WETH 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2). Operator: alternative resolution paths in Plan 19-07 PLAN Step 2 (Etherscan-via-browser, Etherscan API). The forkBlockNumber MUST be lpRemovalBlock - 1 so the fork replays the removal txn as the next block."
+}

@@ -1,0 +1,27 @@
+{
+  "slug": "eth-v3-CANDIDATE",
+  "chain": "eth",
+  "dexType": "v3",
+  "tokenAddress": null,
+  "poolAddress": null,
+  "swapRouterAddress": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
+  "quoterAddress": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+  "nonfungiblePositionManager": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+  "feeTier": 3000,
+  "lpAddBlock": null,
+  "lpRemovalBlock": null,
+  "removalTxHash": null,
+  "forkBlockNumber": null,
+  "destinationOnBurn": null,
+  "destinationOnCollect": null,
+  "expectedVerdict": "unsafe",
+  "expectedSignals": {
+    "lpRemovedPct": ">50",
+    "allowlistHit": "unsafe",
+    "sellSimSlippagePct": ">50"
+  },
+  "bugPattern": "v3-decrease-liquidity-then-collect",
+  "notes": "Block-pin pending Wave-1 follow-up during 7-day dry-run window. Discovery paths per 19-RESEARCH.md §4.2: (a) honeypot.is V3 feed — query their API for V3 entries flagged with rugged_status; (b) DEX Screener V3 graveyard — filter for V3 pools with liquidity < $1000 created from a one-time Mint and now-zeroed liquidity. Until resolved, the contrived RugPull.sol modes 3 (v3-burn-collect) and 4 (v3-burn-only) cover the V3 detector branches in test/fork/antiRugDetector.fork.test.ts. Canonical V3 swapRouter / quoter / nonfungiblePositionManager addresses are pre-populated from the Uniswap V3 ETH deployments docs (19-RESEARCH.md §3) so the fixture skeleton is structurally complete; the operator backfills tokenAddress + poolAddress + lpAddBlock + lpRemovalBlock + removalTxHash + forkBlockNumber + destinationOnBurn + destinationOnCollect + discoveredVia + discoveredOn during the Wave-1 follow-up window. See test/fork/fixtures/rugs/README.md §'Outstanding Block-Pin Verification' for the operator backfill tracker.",
+  "discoveredVia": null,
+  "discoveredOn": null
+}
