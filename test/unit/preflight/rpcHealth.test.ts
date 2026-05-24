@@ -1,54 +1,138 @@
-// Phase 20 / Plan 20-00 / OPS-LIVE-03 — Wave 0 test stub. Implementation lands in plan 20-02.
-//
-// Covers RPC health checks:
-//   - chainId match between configured ENABLED_CHAINS entry and httpProvider.getNetwork()
-//   - block-age within tolerance (block tip timestamp vs wall clock); tolerance scales
-//     to per-chain block-time (~5× block-time default per 20-CONTEXT.md):
-//     ETH ~300s (5×60), BSC ~75s (5×15), Base ~50s (5×10), Arb ~10s (5×2). Tunable
-//     via env per chain (e.g., ETH_BLOCK_AGE_TOLERANCE_SEC=300).
-//
-// Observable assertions per D-04:
-//   - pino fatal log fields { check: 'rpc-chainid', expected, got } on chainId mismatch
-//   - pino fatal log fields { check: 'rpc-block-age', blockAgeSec, toleranceSec } on stale tip
-//   - process.exit(1) recorded on FATAL
-//
-// Plan 20-02 will replace it.skip with it and import checkRpcChainId / checkRpcBlockAge
-// from `../../../src/preflight` (NEW).
+// Phase 20 / Plan 20-02 / OPS-LIVE-03 — Live tests for checkRpcChainId + checkRpcBlockAge.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const logFatal = vi.fn();
+vi.mock('../../../src/utils/logger', () => ({
+    logger: {
+        child: () => ({
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            fatal: logFatal,
+            debug: vi.fn(),
+        }),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        fatal: logFatal,
+        debug: vi.fn(),
+    },
+}));
+
+vi.mock('../../../src/utils/txManager', () => ({
+    createMevStrategy: vi.fn(() => ({ healthCheck: vi.fn().mockResolvedValue(true), name: 'mock' })),
+    sendTxWithRetry: vi.fn(),
+}));
+
+vi.mock('../../../src/utils/notifier', () => ({
+    sendCtxAlert: vi.fn(),
+    sendTelegramAlert: vi.fn(),
+    sendChainAlert: vi.fn(),
+}));
+
+vi.mock('../../../src/utils/db', () => ({
+    getAntirugDryRunStarted: { get: vi.fn(() => undefined) },
+    db: {},
+}));
+
+interface MockProvider {
+    getNetwork: ReturnType<typeof vi.fn>;
+    getBlock: ReturnType<typeof vi.fn>;
+    getBalance?: ReturnType<typeof vi.fn>;
+    getCode?: ReturnType<typeof vi.fn>;
+}
+
+function makeChain(opts: { chainId?: number; blockAgeToleranceSec?: number; provider: MockProvider }) {
+    return {
+        name: 'eth',
+        nativeCurrency: 'ETH',
+        snipeAmount: '0.003',
+        gasBuffer: '0.005',
+        chainId: opts.chainId ?? 1,
+        blockAgeToleranceSec: opts.blockAgeToleranceSec ?? 300,
+        envPrefix: 'ETH',
+        mevStrategy: 'flashbots' as const,
+        honeypotChecker: { deployedAddress: '0x' + 'a'.repeat(40) },
+        wallet: { address: '0x' + 'b'.repeat(40) },
+        httpProvider: opts.provider,
+    };
+}
+
 describe('checkRpcChainId', () => {
     beforeEach(() => {
-        // Plan 20-02 will: reset httpProvider.getNetwork mock, reset pino spy.
+        logFatal.mockClear();
     });
 
     afterEach(() => {
-        // Plan 20-02 will: vi.restoreAllMocks().
+        vi.restoreAllMocks();
     });
 
-    it.skip('reason: pending impl in plan 20-02 — asserts pino fatal log { check: rpc-chainid, expected: 1, got: 11155111 } + process.exit(1) when httpProvider.getNetwork().chainId mismatches CHAIN_TEMPLATES.eth.chainId', () => {
-        /* impl */
+    it('fails (passed: false) when httpProvider.getNetwork().chainId mismatches chain.chainId (expected 1, got 11155111)', async () => {
+        const provider: MockProvider = {
+            getNetwork: vi.fn().mockResolvedValue({ chainId: 11155111n }),
+            getBlock: vi.fn(),
+        };
+        const chain = makeChain({ chainId: 1, provider });
+        const { checkRpcChainId } = await import('../../../src/preflight');
+        const result = await checkRpcChainId(chain as never);
+        expect(result.passed).toBe(false);
+        expect(result.check).toBe('rpc-chainid');
+        expect(result.details?.expected).toBe(1);
+        expect(result.details?.got).toBe(11155111);
+        expect(result.chain).toBe('eth');
     });
 
-    it.skip('reason: pending impl in plan 20-02 — asserts PASS (passed: true, no fatal log) when httpProvider.getNetwork().chainId === CHAIN_TEMPLATES.eth.chainId (both === 1)', () => {
-        /* impl */
+    it('passes when httpProvider.getNetwork().chainId === chain.chainId (both === 1)', async () => {
+        const provider: MockProvider = {
+            getNetwork: vi.fn().mockResolvedValue({ chainId: 1n }),
+            getBlock: vi.fn(),
+        };
+        const chain = makeChain({ chainId: 1, provider });
+        const { checkRpcChainId } = await import('../../../src/preflight');
+        const result = await checkRpcChainId(chain as never);
+        expect(result.passed).toBe(true);
+        expect(result.check).toBe('rpc-chainid');
     });
 });
 
 describe('checkRpcBlockAge', () => {
     beforeEach(() => {
-        // Plan 20-02 will: reset httpProvider.getBlock mock, reset pino spy, reset Date.now mock.
+        logFatal.mockClear();
     });
 
     afterEach(() => {
-        // Plan 20-02 will: vi.restoreAllMocks() + vi.useRealTimers().
+        vi.restoreAllMocks();
+        vi.useRealTimers();
     });
 
-    it.skip('reason: pending impl in plan 20-02 — asserts PASS (passed: true) when block.timestamp is fresh (Date.now()/1000 - block.timestamp === 60s, well under ETH 300s tolerance)', () => {
-        /* impl */
+    it('passes when block.timestamp is fresh (60s old, well under 300s tolerance)', async () => {
+        const now = 1_700_000_000;
+        vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+        const provider: MockProvider = {
+            getNetwork: vi.fn(),
+            getBlock: vi.fn().mockResolvedValue({ timestamp: now - 60 }),
+        };
+        const chain = makeChain({ blockAgeToleranceSec: 300, provider });
+        const { checkRpcBlockAge } = await import('../../../src/preflight');
+        const result = await checkRpcBlockAge(chain as never);
+        expect(result.passed).toBe(true);
+        expect(result.check).toBe('rpc-block-age');
     });
 
-    it.skip('reason: pending impl in plan 20-02 — asserts pino fatal log { check: rpc-block-age, blockAgeSec: 750, toleranceSec: 300 } + process.exit(1) when block tip is stale (now - block.timestamp = 750s > 300s ETH tolerance)', () => {
-        /* impl */
+    it('fails when block tip stale (750s > 300s tolerance) with blockAgeSec + toleranceSec details', async () => {
+        const now = 1_700_000_000;
+        vi.spyOn(Date, 'now').mockReturnValue(now * 1000);
+        const provider: MockProvider = {
+            getNetwork: vi.fn(),
+            getBlock: vi.fn().mockResolvedValue({ timestamp: now - 750 }),
+        };
+        const chain = makeChain({ blockAgeToleranceSec: 300, provider });
+        const { checkRpcBlockAge } = await import('../../../src/preflight');
+        const result = await checkRpcBlockAge(chain as never);
+        expect(result.passed).toBe(false);
+        expect(result.check).toBe('rpc-block-age');
+        expect(result.details?.blockAgeSec).toBe(750);
+        expect(result.details?.toleranceSec).toBe(300);
     });
 });
