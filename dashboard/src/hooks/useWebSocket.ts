@@ -73,7 +73,23 @@ export function useWebSocket(): UseWebSocketResult {
   }, []);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // WR-05: bail if the previous socket is OPEN or CONNECTING. The
+    // original short-circuit only checked OPEN — when the reconnect
+    // timer fired while the previous CONNECTING socket was still
+    // negotiating, we created a second socket, overwrote wsRef.current,
+    // and dangled the previous one. The old socket would finish
+    // negotiation, attach its onopen/onclose handlers (which schedule
+    // ANOTHER reconnect on close), and the orphaned-sockets count would
+    // grow over time in a long-running dashboard tab. With two live
+    // sockets both attached to onmessage, positions_update and
+    // antirug_event would also be duplicated into state.
+    if (
+      wsRef.current &&
+      wsRef.current.readyState !== WebSocket.CLOSED &&
+      wsRef.current.readyState !== WebSocket.CLOSING
+    ) {
+      return;
+    }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
