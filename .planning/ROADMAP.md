@@ -140,7 +140,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook (Task 1a per Warning 7); exitTrigger bridge + raceTelemetry (Task 1b); bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring (Task 2); + Warning 11 ring buffer size note [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
 
   **Wave 6** *(after Wave 5; parallel - dashboard + tests):*
-  - [ ] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 5 display-only dashboard components (Task 2a per Warning 8) + 3 interactive components + PositionTable column + Overview mounting (Task 2b); + useWebSocket switch (Task 1); + Info 12 plumbing note [ANTIRUG-09, ANTIRUG-10]
+  - [x] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 5 display-only dashboard components (Task 2a per Warning 8) + 3 interactive components + PositionTable column + Overview mounting (Task 2b); + useWebSocket switch (Task 1); + Info 12 plumbing note [ANTIRUG-09, ANTIRUG-10]
   - [ ] 19-07-PLAN.md - RugPull.sol fixture + HORSE V2 fixture + V3 candidate skeleton + fork test (5 RugPull modes + HORSE replay) + end-to-end multi-signal integration test; + Blocker 2 grace-window deterministic test propagation + Info 13 HORSE address resolution directive [ANTIRUG-01, 02, 03, 05, 08, 13, 14]
 
   **Wave 7** *(after Wave 6; operator-facing docs):*
@@ -198,7 +198,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 7/10 | In Progress|  |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 8/10 | In Progress|  |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
