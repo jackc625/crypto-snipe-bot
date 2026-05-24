@@ -218,6 +218,15 @@ interface PendingV3Burn {
     burnEvent: Log;
     burnBlockNumber: number;
     timeoutBlockNumber: number; // burnBlockNumber + V3_BURN_GRACE_BLOCKS
+    // WR-06: track the block-watcher handler so it can be explicitly
+    // removed when the pending entry is consumed by handleV3CollectArrival
+    // (the Collect path superseded the grace-timeout) OR replaced by a
+    // LAST-WINS Burn within the grace window. Without this reference, the
+    // handler's own self-cleanup logic was scoped to the wrong closure
+    // (the new evaluator's chain didn't have access to the prior burn's
+    // blockHandler), causing it to tick forever once its `pending` entry
+    // no longer matched its burnBlockNumber.
+    blockHandler: (currentBlock: number) => void | Promise<void>;
 }
 
 /**
@@ -2065,26 +2074,17 @@ async function handleV3BurnArrival(
     const burnBlockNumber = burnEvent.blockNumber;
     const timeoutBlockNumber = burnBlockNumber + V3_BURN_GRACE_BLOCKS;
 
-    // LAST-WINS: latest burn replaces any prior pending entry.
-    pendingV3Burn.set(poolKey, {
-        poolAddress: poolKey,
-        position,
-        burnEvent,
-        burnBlockNumber,
-        timeoutBlockNumber,
-    });
-
-    log.info(
-        {
-            tradeId: position.tradeId,
-            chain: ctx.chain.name,
-            pool: poolKey,
-            burnBlock: burnBlockNumber,
-            timeoutBlock: timeoutBlockNumber,
-            op: 'antirug.v3-burn-grace-window',
-        },
-        'V3 Burn held pending Collect or grace timeout',
-    );
+    // WR-06: LAST-WINS — if a prior pending Burn exists for this pool,
+    // remove ITS block-watcher BEFORE overwriting the entry. Without this,
+    // the prior burn's blockHandler would tick forever (its
+    // burnBlockNumber !== currentPendingEntry.burnBlockNumber after the
+    // replace, but its self-cleanup logic only removes itself when it
+    // matches OR when the pending entry is gone — neither of which fires
+    // in the LAST-WINS replacement case).
+    const priorPending = pendingV3Burn.get(poolKey);
+    if (priorPending) {
+        ctx.httpProvider.off('block', priorPending.blockHandler);
+    }
 
     // Schedule block-watcher for grace timeout.
     const blockHandler = async (currentBlock: number) => {
@@ -2106,6 +2106,31 @@ async function handleV3BurnArrival(
         pendingV3Burn.delete(poolKey);
         await evaluateV3MultiSignal(ctx, position, burnEvent, 'grace-timeout');
     };
+
+    // LAST-WINS: latest burn replaces any prior pending entry. Store the
+    // blockHandler so handleV3CollectArrival (and future replacements)
+    // can remove it explicitly. WR-06.
+    pendingV3Burn.set(poolKey, {
+        poolAddress: poolKey,
+        position,
+        burnEvent,
+        burnBlockNumber,
+        timeoutBlockNumber,
+        blockHandler,
+    });
+
+    log.info(
+        {
+            tradeId: position.tradeId,
+            chain: ctx.chain.name,
+            pool: poolKey,
+            burnBlock: burnBlockNumber,
+            timeoutBlock: timeoutBlockNumber,
+            op: 'antirug.v3-burn-grace-window',
+        },
+        'V3 Burn held pending Collect or grace timeout',
+    );
+
     ctx.httpProvider.on('block', blockHandler);
 }
 
@@ -2121,6 +2146,14 @@ async function handleV3CollectArrival(
     const poolKey = collectEvent.address.toLowerCase();
     const pending = pendingV3Burn.get(poolKey);
     if (pending) {
+        // WR-06: explicitly remove the pending Burn's block-watcher so it
+        // does not tick forever after the Collect supersedes it. The
+        // handler's own self-cleanup logic would NOT fire in this case
+        // because the next tick finds pendingV3Burn.get(poolKey) === undefined
+        // for ETH-style block timing, but on slower block chains it can
+        // still tick once or twice before realising. Explicit off is the
+        // safer pattern.
+        ctx.httpProvider.off('block', pending.blockHandler);
         pendingV3Burn.delete(poolKey);
         log.info(
             {
