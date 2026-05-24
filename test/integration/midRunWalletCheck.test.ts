@@ -33,6 +33,13 @@ const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) =>
     throw new Error(`__process.exit(${code})__`);
 }) as never);
 
+// Module-scope mock instances for the db.prepare stmt API so we can re-arm
+// them in beforeEach (vitest.config mockReset:true wipes between tests).
+const dbStmtRunMock = vi.fn();
+const dbStmtGetMock = vi.fn();
+const dbStmtAllMock = vi.fn();
+const dbPrepareMock = vi.fn();
+
 // ---- Mocks (must be registered BEFORE the dynamic import) ----
 
 vi.doMock('../../src/preflight', () => ({
@@ -51,10 +58,11 @@ vi.doMock('../../src/chainRegistry', async () => {
 });
 
 vi.doMock('../../src/utils/db', () => {
-    const stmt = { run: vi.fn(), get: vi.fn().mockReturnValue({ paused: 0 }), all: vi.fn().mockReturnValue([]) };
+    const stmt = { run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock };
+    dbPrepareMock.mockReturnValue(stmt);
     return {
         db: {
-            prepare: vi.fn().mockReturnValue(stmt),
+            prepare: dbPrepareMock,
             pragma: vi.fn(),
             exec: vi.fn(),
             transaction: vi.fn().mockImplementation((fn: any) => fn),
@@ -156,6 +164,12 @@ function defaultChain() {
 }
 
 function rearmAllMocks() {
+    // Re-arm the db prepare/stmt mocks since mockReset:true wipes them.
+    dbStmtRunMock.mockReset();
+    dbStmtGetMock.mockReset().mockReturnValue({ paused: 0 });
+    dbStmtAllMock.mockReset().mockReturnValue([]);
+    dbPrepareMock.mockReset().mockReturnValue({ run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock });
+
     preflightMock.mockReset().mockResolvedValue(undefined);
     checkWalletBalanceMock.mockReset();
     broadcastMock.mockReset();

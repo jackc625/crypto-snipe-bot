@@ -43,7 +43,14 @@ import { sanitizeReason } from "./utils/honeypot/sanitize";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
-import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken } from "./utils/db";
+import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken, getPauseState, setPauseState } from "./utils/db";
+// Phase 20 / OPS-LIVE-01 + OPS-LIVE-02 — preflight is called before chain-context
+// creation; checkWalletBalance is reused inside the mid-run setInterval so the
+// floor formula lives in one place (D-BALANCE-FLOOR / W4 fix per Plan 20-02).
+import { preflight, checkWalletBalance } from "./preflight";
+// Phase 20 / OPS-LIVE-02 — mid-run undercut broadcasts pause_state_change so the
+// dashboard banner (Plan 20-05/06) reacts within one WS round-trip.
+import { broadcast } from "./api/ws/broadcaster";
 import { logger } from "./utils/logger";
 import { getProvider, getWallet, getWsProvider, removeWsProvider } from "./utils/provider";
 import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
@@ -878,24 +885,38 @@ export async function startMultiChainBot(): Promise<void> {
     // 1. Build chain registry
     const registry = buildChainRegistry();
 
+    // Phase 20 / OPS-LIVE-01: preflight before any chain context creation.
+    // Performs per-chain wallet/RPC/MEV/checker checks + cross-env validation.
+    // FATAL non-zero exit if any check fails on any chain (collect-all-then-exit
+    // per D-PREFLIGHT-FLOW). NO escape hatch per D-ROLLBACK.
+    //
+    // Note: the previous inline chainId / RPC-connect FATAL block now lives in
+    // src/preflight.ts checkRpcChainId and runs as part of preflight() above
+    // — removed below to avoid duplicate checking.
+    //
+    // PreflightRegistry shape adapter: preflight() needs httpProvider + wallet
+    // alongside each chain config. We attach them here (using the same per-chain
+    // provider/wallet helpers the chain-context loop uses below) so preflight
+    // can run BEFORE chain-context creation per OPS-LIVE-01.
+    const preflightRegistry = new Map<string, unknown>();
+    for (const [name, chain] of registry) {
+        const httpProvider = getProvider(chain.name, chain.httpRpcUrl);
+        const wallet = getWallet(chain.name, chain.httpRpcUrl);
+        preflightRegistry.set(name, { ...chain, httpProvider, wallet });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await preflight(preflightRegistry as any);
+
     // 2. For each enabled chain
     const contexts: ChainContext[] = [];
     for (const chain of getEnabledChains(registry)) {
         const ctx = createChainContext(chain);
 
-        // 3. Validate chainId (Pitfall 4 from research)
-        try {
-            const network = await ctx.httpProvider.getNetwork();
-            if (Number(network.chainId) !== chain.chainId) {
-                mainLog.fatal({ chain: chain.name, expected: chain.chainId, got: Number(network.chainId) }, 'Chain ID mismatch -- skipping chain');
-                continue;
-            }
-        } catch (err) {
-            mainLog.fatal({ chain: chain.name, err }, 'Failed to connect to RPC -- skipping chain');
-            continue;
-        }
-
-        // 4. MEV health check (per D-07)
+        // 3. MEV health check (per D-07) — kept as a warn-and-continue so the
+        // bot still boots if MEV recovers later in the runtime. The FATAL path
+        // for fully-broken MEV also fires inside preflight() above (Plan 20-02
+        // checkMevHealth), so a hard-down MEV will have already exited before
+        // this point.
         const strategy = createMevStrategy(chain);
         const mevHealthy = await strategy.healthCheck();
         if (!mevHealthy) {
@@ -905,7 +926,7 @@ export async function startMultiChainBot(): Promise<void> {
 
         contexts.push(ctx);
 
-        // 5. Start listeners per DEX (per D-03, D-10)
+        // 4. Start listeners per DEX (per D-03, D-10)
         for (const dex of chain.dexes) {
             await startDexListener(ctx, dex, registry);
         }
@@ -913,7 +934,7 @@ export async function startMultiChainBot(): Promise<void> {
         ctx.log.info({ dexCount: chain.dexes.length }, 'Chain listeners started');
     }
 
-    // 6. Periodic MEV health check every 5 minutes (per D-07)
+    // 5. Periodic MEV health check every 5 minutes (per D-07)
     setInterval(async () => {
         for (const ctx of contexts) {
             const strategy = createMevStrategy(ctx.chain);
@@ -924,6 +945,34 @@ export async function startMultiChainBot(): Promise<void> {
             }
         }
     }, 5 * 60 * 1000);
+
+    // Phase 20 / D-MID-RUN-CHECK / OPS-LIVE-02 — periodic wallet balance re-check.
+    // Reuses the same setInterval pattern as the MEV health check above. On
+    // undercut: flip global pause flag (paused_by='preflight') + broadcast
+    // pause_state_change to dashboard + Telegram alert + pino fatal log.
+    // Exit monitors keep running per D-PAUSE-SHAPE; operator must refund + resume.
+    //
+    // T-20-04 idempotence: the if-guard against currentPause.paused === 1
+    // skips the DB write + broadcast + alert so a sustained undercut does not
+    // flood the operator. One alert per pause-cycle (cleared on resume).
+    const midRunIntervalMs = Number(process.env.MID_RUN_CHECK_INTERVAL_SEC || '300') * 1000;
+    setInterval(async () => {
+        for (const ctx of contexts) {
+            const pchain = { ...ctx.chain, httpProvider: ctx.httpProvider, wallet: ctx.wallet };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await checkWalletBalance(pchain as any);
+            if (!result.passed) {
+                // T-20-04 idempotence: skip duplicate alerts when already paused
+                const currentPause = getPauseState.get() as { paused: number };
+                if (currentPause.paused !== 1) {
+                    setPauseState.run(Math.floor(Date.now() / 1000), 'preflight', result.reason ?? 'wallet undercut');
+                    broadcast('pause_state_change', { paused: true, pausedBy: 'preflight', reason: result.reason });
+                    ctx.log.fatal({ ...result }, 'Mid-run wallet balance check failed; bot paused');
+                    await sendCtxAlert(ctx, `*BOT PAUSED* (wallet undercut) -- ${result.reason}`);
+                }
+            }
+        }
+    }, midRunIntervalMs);
 
     // 7. Resume monitoring for pending trades (chain-aware)
     resumeMultiChainMonitoring(contexts);

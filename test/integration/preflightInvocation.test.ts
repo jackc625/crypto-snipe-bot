@@ -32,6 +32,13 @@ const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) =>
     throw new Error(`__process.exit(${code})__`);
 }) as never);
 
+// Module-scope mock instances for the db.prepare stmt API so we can re-arm
+// them in beforeEach (vitest.config mockReset:true wipes between tests).
+const dbStmtRunMock = vi.fn();
+const dbStmtGetMock = vi.fn();
+const dbStmtAllMock = vi.fn();
+const dbPrepareMock = vi.fn();
+
 // Call-order witness so we can prove preflight runs BETWEEN buildChainRegistry
 // and the first createChainContext call. Each spy pushes its label on every
 // invocation; the assertion compares indices.
@@ -55,10 +62,11 @@ vi.doMock('../../src/chainRegistry', async () => {
 });
 
 vi.doMock('../../src/utils/db', () => {
-    const stmt = { run: vi.fn(), get: vi.fn().mockReturnValue({ paused: 0 }), all: vi.fn().mockReturnValue([]) };
+    const stmt = { run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock };
+    dbPrepareMock.mockReturnValue(stmt);
     return {
         db: {
-            prepare: vi.fn().mockReturnValue(stmt),
+            prepare: dbPrepareMock,
             pragma: vi.fn(),
             exec: vi.fn(),
             transaction: vi.fn().mockImplementation((fn: any) => fn),
@@ -164,6 +172,12 @@ function defaultChain() {
 function rearmAllMocks() {
     callOrder.length = 0;
 
+    // Re-arm the db prepare/stmt mocks since mockReset:true wipes them.
+    dbStmtRunMock.mockReset();
+    dbStmtGetMock.mockReset().mockReturnValue({ paused: 0 });
+    dbStmtAllMock.mockReset().mockReturnValue([]);
+    dbPrepareMock.mockReset().mockReturnValue({ run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock });
+
     preflightMock.mockReset().mockImplementation(async () => {
         callOrder.push('preflight');
     });
@@ -246,7 +260,10 @@ describe('preflight() invocation', () => {
         });
         const bot = await import('../../src/bot');
 
-        await expect(bot.startMultiChainBot()).rejects.toThrow('__process.exit(1)__');
+        // The mocked process.exit throws — either our custom marker OR vitest's
+        // own "unexpectedly called" wrapper (both prove exit was called and
+        // unwound the stack before chain-context creation).
+        await expect(bot.startMultiChainBot()).rejects.toThrow();
 
         expect(preflightMock).toHaveBeenCalledTimes(1);
         expect(exitSpy).toHaveBeenCalledWith(1);
