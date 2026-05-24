@@ -1,5 +1,111 @@
 // TypeScript interfaces for API responses
 
+// ---------------------------------------------------------------------------
+// Phase 19 / Plan 19-06 — Anti-Rug runtime monitoring types
+// ---------------------------------------------------------------------------
+
+/**
+ * UI-SPEC §"Anti-Rug column header and badges" — 6 semantic badge states for
+ * the Anti-Rug positions-table column. Mirrors the backend
+ * `AntiRugMonitorState` union in src/anti-rug/types.ts; declared locally so
+ * the dashboard tsconfig (separate ts root) is self-contained.
+ */
+export type AntiRugMonitorState =
+  | 'live'
+  | 'dry-run'
+  | 'would-have-sold'
+  | 'exit-fired'
+  | 'halted'
+  | 'unmonitored';
+
+/**
+ * Per-signal evidence payload from the multi-signal AND-chain evaluator.
+ * Matches the backend `RugSignals` interface in src/anti-rug/types.ts.
+ */
+export interface RugSignals {
+  lpRemovedPct: number;
+  destination: string;
+  allowlistHit: 'safe' | 'unsafe' | 'unknown';
+  sellSimSlippagePct: number | null;
+  v2ReservePctBelow: number | null;
+}
+
+/**
+ * Single trigger event payload. Backend `TriggerEvent` mirror — consumed by
+ * the CB-reset modal + Anti-Rug Monitor tile.
+ */
+export interface TriggerEvent {
+  token: string;
+  pair: string;
+  signals: RugSignals;
+  outcome: string;
+  timestamp: number;
+  chain: string;
+}
+
+/**
+ * WS event payload for `antirug_event` per UI-SPEC §"Realtime Push Contract".
+ * Discriminated by `kind`:
+ *   - 'trigger'              — confirmed rug signal evaluated (dry-run or live)
+ *   - 'allowlist-suppression' — destination matched a known locker; no trigger
+ *   - 'gap-detected'         — backfill window exceeded maxBackfillBlocks
+ */
+export interface AntiRugEvent {
+  chain: string;
+  kind: 'trigger' | 'allowlist-suppression' | 'gap-detected';
+  token?: string;
+  pair: string;
+  signals?: RugSignals;
+  outcome?: 'live-exit' | 'dry-run-would-have-sold' | 'too-late' | 'would-have-saved-X-ETH';
+  timestamp: number;
+  lockerName?: string;
+  gapBlocks?: number;
+  fromBlock?: number;
+  toBlock?: number;
+}
+
+/**
+ * WS event payload for `chain_ws_health_change` per UI-SPEC §"Realtime Push
+ * Contract". Drives the per-chain 🟢/🟡/🔴 indicator + sidebar dot.
+ */
+export interface ChainWsHealthChange {
+  chain: string;
+  state: 'connected' | 'reconnecting' | 'disconnected';
+  lastPongTs?: number;
+  disconnectedDurationSec?: number;
+}
+
+/**
+ * WS event payload for `cb_tripped` per UI-SPEC §"Realtime Push Contract".
+ * Pre-populates the CircuitBreakerResetModal triggers list per Warning 11.
+ */
+export interface CbTrippedPayload {
+  chain: string;
+  triggers: TriggerEvent[];
+  windowHours: number;
+  triggerCount: number;
+}
+
+/**
+ * WS event payload for `cb_reset` per UI-SPEC §"Realtime Push Contract".
+ */
+export interface CbResetPayload {
+  chain: string;
+  resetByOperatorTs: number;
+}
+
+/**
+ * WS event payload for `antirug_state_update` per UI-SPEC §"Realtime Push
+ * Contract". Merges into the Position row matching `tradeId`.
+ */
+export interface AntiRugStateUpdate {
+  tradeId: number;
+  chain: string;
+  state: AntiRugMonitorState;
+  lastEventTs?: number;
+  lastSignals?: RugSignals;
+}
+
 export interface ExitStateInfo {
   highWaterMark: number;
   trailingActivated: boolean;
@@ -26,6 +132,10 @@ export interface Position {
   feeTier: number | null;
   sellRevenue: number;              // Aggregated sell revenue from partial sells
   exitState: ExitStateInfo | null;
+  // Phase 19 / Plan 19-06 — anti-rug per-position state
+  antiRugState?: AntiRugMonitorState;
+  antiRugLastEventTs?: number;
+  antiRugLastSignals?: RugSignals;
 }
 
 export interface Trade {

@@ -1,6 +1,14 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useWebSocket } from './useWebSocket';
-import type { Position, NotificationEvent, ChainStatus, WsEvent } from '../types/api';
+import type {
+  Position,
+  NotificationEvent,
+  ChainStatus,
+  WsEvent,
+  AntiRugEvent,
+  ChainWsHealthChange,
+  CbTrippedPayload,
+} from '../types/api';
 
 interface WebSocketContextValue {
   connected: boolean;
@@ -8,6 +16,10 @@ interface WebSocketContextValue {
   positions: Position[];
   notifications: NotificationEvent[];
   chainStatuses: ChainStatus[];
+  // Phase 19 / Plan 19-06 — anti-rug push state
+  antiRugEvents: Record<string, AntiRugEvent[]>;
+  chainWsHealth: Record<string, ChainWsHealthChange>;
+  circuitBreakerTrips: Record<string, CbTrippedPayload>;
 }
 
 const WebSocketCtx = createContext<WebSocketContextValue | null>(null);

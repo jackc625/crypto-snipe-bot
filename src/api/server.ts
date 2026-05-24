@@ -18,6 +18,7 @@ import { tradeRoutes } from './routes/trades';
 import { riskRoutes } from './routes/risk';
 import { chainRoutes, RestartChainListenersCallback } from './routes/chains';
 import { controlRoutes } from './routes/controls';
+import { antiRugRoutes } from './routes/antiRug';
 import { authMiddleware, sessions } from './middleware/auth';
 import { errorMiddleware } from './middleware/errorHandler';
 import { handleUpgrade } from './ws/handler';
@@ -67,6 +68,7 @@ export function startApiServer(
     apiRouter.use('/risk', riskRoutes(contexts));
     apiRouter.use('/chains', chainRoutes(contexts, stoppedChains, onRestart));
     apiRouter.use('/controls', controlRoutes(contexts));
+    apiRouter.use('/anti-rug', antiRugRoutes(contexts));
     app.use('/api', authMiddleware, apiRouter);
 
     // 4. Static file serving for SPA (D-07)

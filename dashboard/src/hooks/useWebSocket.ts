@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Position, NotificationEvent, WsEvent, ChainStatus } from '../types/api';
+import type {
+  Position,
+  NotificationEvent,
+  WsEvent,
+  ChainStatus,
+  AntiRugEvent,
+  AntiRugStateUpdate,
+  ChainWsHealthChange,
+  CbTrippedPayload,
+  CbResetPayload,
+} from '../types/api';
 
 interface UseWebSocketResult {
   connected: boolean;
@@ -7,6 +17,10 @@ interface UseWebSocketResult {
   positions: Position[];
   notifications: NotificationEvent[];
   chainStatuses: ChainStatus[];
+  // Phase 19 / Plan 19-06 — anti-rug push state
+  antiRugEvents: Record<string, AntiRugEvent[]>;
+  chainWsHealth: Record<string, ChainWsHealthChange>;
+  circuitBreakerTrips: Record<string, CbTrippedPayload>;
 }
 
 /**
@@ -15,6 +29,13 @@ interface UseWebSocketResult {
  * - positions_update: updates positions state
  * - notification: prepends to notifications (capped at 100 per D-10)
  * - chain_status_change: updates chain status state
+ *
+ * Phase 19 additions (Plan 19-06 — per UI-SPEC §"Realtime Push Contract"):
+ * - antirug_state_update: merges state + lastSignals into matching Position by tradeId
+ * - antirug_event: prepends to per-chain last-100 events list; handles gap-detected
+ * - chain_ws_health_change: updates per-chain WS health map (drives 🟢/🟡/🔴 indicator)
+ * - cb_tripped: adds chain to circuitBreakerTrips (drives CircuitBreakerBanner + modal)
+ * - cb_reset: removes chain from circuitBreakerTrips
  *
  * Auto-reconnects with 3-second delay on disconnect.
  * On reconnect, triggers REST refresh of positions and chain status.
@@ -25,6 +46,10 @@ export function useWebSocket(): UseWebSocketResult {
   const [positions, setPositions] = useState<Position[]>([]);
   const [notifications, setNotifications] = useState<NotificationEvent[]>([]);
   const [chainStatuses, setChainStatuses] = useState<ChainStatus[]>([]);
+  // Phase 19 — anti-rug push state
+  const [antiRugEvents, setAntiRugEvents] = useState<Record<string, AntiRugEvent[]>>({});
+  const [chainWsHealth, setChainWsHealth] = useState<Record<string, ChainWsHealthChange>>({});
+  const [circuitBreakerTrips, setCircuitBreakerTrips] = useState<Record<string, CbTrippedPayload>>({});
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -85,6 +110,84 @@ export function useWebSocket(): UseWebSocketResult {
             setChainStatuses(data.chains || []);
             break;
           }
+          // ─────────────────────────────────────────────────────────────────
+          // Phase 19 / Plan 19-06 — Anti-Rug push event dispatch
+          // ─────────────────────────────────────────────────────────────────
+          case 'antirug_state_update': {
+            // Defensive narrowing per threat T-19-06-06: never throw on parse failure.
+            try {
+              const update = msg.data as AntiRugStateUpdate;
+              if (!update || typeof update.tradeId !== 'number') break;
+              setPositions((prev) =>
+                prev.map((p) =>
+                  p.tradeId === update.tradeId
+                    ? {
+                        ...p,
+                        antiRugState: update.state,
+                        antiRugLastEventTs: update.lastEventTs,
+                        antiRugLastSignals: update.lastSignals,
+                      }
+                    : p,
+                ),
+              );
+            } catch {
+              // Malformed payload -- drop silently, do not break dispatch
+            }
+            break;
+          }
+          case 'antirug_event': {
+            try {
+              const evt = msg.data as AntiRugEvent;
+              if (!evt || typeof evt.chain !== 'string') break;
+              setAntiRugEvents((prev) => {
+                const existing = prev[evt.chain] ?? [];
+                return {
+                  ...prev,
+                  // Prepend newest, cap at 100 per-chain (matches notification cap)
+                  [evt.chain]: [evt, ...existing].slice(0, 100),
+                };
+              });
+            } catch {
+              // Malformed payload -- drop silently
+            }
+            break;
+          }
+          case 'chain_ws_health_change': {
+            try {
+              const health = msg.data as ChainWsHealthChange;
+              if (!health || typeof health.chain !== 'string') break;
+              setChainWsHealth((prev) => ({ ...prev, [health.chain]: health }));
+            } catch {
+              // Malformed payload -- drop silently
+            }
+            break;
+          }
+          case 'cb_tripped': {
+            try {
+              const trip = msg.data as CbTrippedPayload;
+              if (!trip || typeof trip.chain !== 'string') break;
+              setCircuitBreakerTrips((prev) => ({ ...prev, [trip.chain]: trip }));
+            } catch {
+              // Malformed payload -- drop silently
+            }
+            break;
+          }
+          case 'cb_reset': {
+            try {
+              const reset = msg.data as CbResetPayload;
+              if (!reset || typeof reset.chain !== 'string') break;
+              setCircuitBreakerTrips((prev) => {
+                // Remove the chain key; per UI-SPEC §CB-banner: if no chains
+                // remain tripped, the banner hides automatically.
+                const { [reset.chain]: _removed, ...rest } = prev;
+                void _removed;
+                return rest;
+              });
+            } catch {
+              // Malformed payload -- drop silently
+            }
+            break;
+          }
         }
       } catch {
         // Ignore malformed messages
@@ -118,5 +221,14 @@ export function useWebSocket(): UseWebSocketResult {
     };
   }, [connect]);
 
-  return { connected, lastMessage, positions, notifications, chainStatuses };
+  return {
+    connected,
+    lastMessage,
+    positions,
+    notifications,
+    chainStatuses,
+    antiRugEvents,
+    chainWsHealth,
+    circuitBreakerTrips,
+  };
 }
