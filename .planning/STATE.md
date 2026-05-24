@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 20 plan 20-03 complete (anti-rug detector setAntirugDryRunStarted insertion + Rule 1 cascading test-isolation fix)
-last_updated: "2026-05-24T21:30:00Z"
-last_activity: 2026-05-24 -- Phase 20 plan 20-03 complete (detector.ts +8 LOC setAntirugDryRunStarted insertion at startChainAntiRugListener entry + 4 dryRunTimestamp tests + Rule 1 fix-in-flight cascading db mocks to 5 existing anti-rug tests)
+stopped_at: Phase 20 plan 20-04 complete
+last_updated: "2026-05-24T22:06:14.754Z"
+last_activity: 2026-05-24
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 32
-  completed_plans: 27
-  percent: 50
+  completed_plans: 28
+  percent: 40
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 20 (going-live-ops-hardening) — EXECUTING
-Plan: 4 of 8 (20-00 + 20-01 + 20-02 complete; 20-03 next)
-Status: Executing Phase 20
-Last activity: 2026-05-24 -- Phase 20 plan 20-02 complete (src/preflight.ts 641 LOC + 32 preflight tests + chainRegistry gasBuffer/blockAgeToleranceSec + 12 new envs)
+Plan: 5 of 8 (20-00 + 20-01 + 20-02 + 20-03 + 20-04 complete; 20-05 next)
+Status: Ready to execute
+Last activity: 2026-05-24 — Phase 20 plan 20-04 complete (bot.ts preflight wiring + 6 V2/V3 killswitch CPs + mid-run wallet setInterval with T-20-04 idempotence; 16 new integration tests across 4 files; 2 cascade fix-in-flight test mocks; 7 commits; full unit 535/535 + integration 185/185; tsc clean ×3)
 
 ## Performance Metrics
 
@@ -113,6 +113,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | Phase 19 P19-04c | 17min | 1 tasks | 2 files |
 | Phase 19 P19-08 | 28 | 2 tasks | 3 files |
 | Phase 20 P20-00 | ~10min | 2 tasks | 14 files |
+| Phase 20 P04 | ~33min | 4 tasks | 6 files |
 
 ## Phase 19 Plan Execution Log
 
@@ -145,8 +146,8 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-24T20:50:00Z
+Last session: 2026-05-24T22:06:14.744Z
 Last activity: 2026-05-24 — Phase 20 plan 20-02 complete. `src/preflight.ts` shipped (641 LOC, 11 exports) implementing the dual-shape API: `preflight(registry)` collect-all-then-FATAL boot entry + `preflightDryRun(registry)` returns-without-exit for Plan 20-05 CLI consumer. Six per-chain check functions (`checkRpcChainId`, `checkRpcBlockAge`, `checkWalletBalance` [exported per W4 fix for Plan 20-04 mid-run setInterval reuse], `checkMevHealth`, `checkHoneypotCheckerCode`, `checkAntiRugLiveGate`) + chain-agnostic `validateCrossEnvRules` (4 rules: MEV-flashbots-auth-key, bsc-bloxroute, telegram-5-tuple, per-chain-rpc-url) + `checkStaleData` one-shot stale-position scanner. D-PREFLIGHT-FLOW collect-all then exit; D-BALANCE-FLOOR formula `parseEther(snipeAmount) × MAX_OPEN_POSITIONS + parseEther(gasBuffer)`; D-ANTIRUG-LIVE-GATE-CODE `SEVEN_DAYS_SEC = 7 * 86400` floor; D-ALERTS structured pino + `sendTelegramAlert` with remediation pointer to `docs/operations/going-live.md`; D-ROLLBACK enforced statically (grep `SKIP_PREFLIGHT` returns 0 even in comments). Type-only `import type { ChainConfig }` + inlined generic `getEnabledChains<T extends { enabled: boolean }>` to avoid the runtime chainRegistry → provider → config → `dotenv.config()` cascade that would clobber test isolation (Rule 1 fix-in-flight discovered during first vitest run). Exported `PreflightChain = ChainConfig & { httpProvider; wallet }` + `PreflightRegistry = Map<string, PreflightChain>` so Plan 20-04 wiring can adapt ChainContext list → PreflightRegistry without circular dependency. Empty `describe('checkAntiRugLiveGate boundary', ...)` block from 629e6ba (vitest treats empty suites as failures) populated with the exact-7-day-boundary test (Rule 1 fix-in-flight). chainRegistry.ts extended: `ChainConfig.gasBuffer` + `.blockAgeToleranceSec`; `ChainTemplate.defaultGasBuffer` + `.defaultBlockAgeToleranceSec`; 4 per-chain template defaults (ETH 0.005/300, BSC 0.003/60, Base 0.0005/30, Arb 0.0005/30 per D-GAS-BUFFER + RESEARCH OQ4); env-overlay reads in `buildChainRegistry()` with fail-loud NaN/`<=0` FATAL on block-age tolerance. config.ts +12 REQUIRED_ENV_VARS entries under Phase 20 header (4 GAS_BUFFER + 4 BLOCK_AGE_TOLERANCE_SEC + MID_RUN_CHECK_INTERVAL_SEC + STALE_WARN_SEC + STALE_ERROR_SEC + DASHBOARD_URL). .env.example +30 LOC Phase 20 section with all 12 envs + inline-comment descriptions per D-ENV-EXAMPLE [USER-BINDING]. **Test results:** 32/32 preflight tests pass (6+4+4+3+6+4+5); full unit suite 531 pass / 0 fail (up from 499, +32 from this plan); full integration 169 pass / 29 skip (skips are Phase 20 Wave 0 stubs from Plans 20-04..07; no regressions); tsc clean ×3 (root + bot + dashboard). Commits: `c2c7699` (Task 2 chainRegistry+config+.env.example) + `67f2066` (Task 1 GREEN preflight.ts + antiRug boundary fix-in-flight). **Hand-off:** Plan 20-03 (anti-rug detector timestamp wiring) inserts `setAntirugDryRunStarted.run(chain.name, ts, ts)` at `startChainAntiRugListener` first-time-start path so `checkAntiRugLiveGate` has timestamps to read; Plan 20-04 (bot.ts preflight call + mid-run setInterval + 3 V2 + 3 V3 killswitch checkpoints) imports `preflight`, `checkWalletBalance`, and `PreflightChain` from `./preflight`, builds PreflightRegistry by spreading ChainContext into the shape preflight expects, calls preflight at line 880, removes the inline chainId check at lines 887-895, and adds the mid-run wallet setInterval after line 926; Plan 20-05 (operator CLI) imports `preflightDryRun` from `../src/preflight` and uses the no-exit shape so the CLI can format human/--json output + decide its own exit code.
 Last activity (priorline preserved): 2026-05-24 — Phase 20 plan 20-01 complete. Schema migration v5→v6 in `src/utils/db.ts` shipped via single atomic `db.transaction()` block: creates `pause_state` (id INTEGER PK CHECK(id=1) + paused INTEGER DEFAULT 0 + paused_at/paused_by/reason nullable per D-PAUSE-STORAGE single-row pattern); INSERT OR IGNORE seeds the id=1 row preventing double-insert on re-run; ALTER guard via `PRAGMA table_info('chain_state')` + `columns.some(c => c.name === 'antirug_dry_run_started')` clones v3→v4 pattern as defense-in-depth before `ADD COLUMN antirug_dry_run_started INTEGER`. 5 new prepared statements exported (`getPauseState` / `setPauseState` / `clearPauseState` / `setAntirugDryRunStarted` COALESCE-on-conflict idempotent UPSERT so first-call-per-chain wins per D-ANTIRUG-LIVE-GATE-CODE / `getAntirugDryRunStarted`). Production `data/bot.db` migrated in-place to user_version=6 on first module load post-merge (verified via `node -e "...pragma('user_version')..."` → `[{user_version: 6}]`). 12/12 tests pass in `test/unit/db/pauseStateMigration.test.ts` (10 in-memory schema/statement behaviors + 2 production integration). REQUIREMENTS.md OPS-LIVE-02 reworded per D-BALANCE-FLOOR (operational floor `snipeAmount × maxOpenPositions + <CHAIN>_GAS_BUFFER` replaces `maxCapital` deployment ceiling — bot funded at 0.0124 ETH < 1.0 ETH `maxCapital` would have FATAL-exited despite being capable of running one snipe); OPS-LIVE-06 reworded per D-STALE-THRESHOLDS (2-min warn / 10-min error envs `STALE_WARN_SEC` / `STALE_ERROR_SEC` replace 10s/20s "2× poll interval" wording that would have flooded operator with normal-poll-cycle noise). A1 verified: `db.transaction()` accepts DDL on better-sqlite3 v12.8.0; ALTER guard stays as defense-in-depth per T-20-W1-04. **One Rule 1 fix-in-flight:** `test/unit/db/lpBaselineMigration.test.ts:207` `expect(version).toBe(5)` → `.toBeGreaterThanOrEqual(5)` — Phase 19 test was implicitly coupled to v5 being permanent; greater-than-or-equal preserves "v5 schema is the floor" intent without breaking on every future schema bump. Full unit suite 499 passed + 31 skipped (+12 new from pauseStateMigration; -6 flipped from skip→it); tsc clean ×3 (tsconfig.json + tsconfig.bot.json + dashboard/tsconfig.json). Commits: `131b54b` (test RED) + `103e953` (feat GREEN) + `67db735` (docs REQUIREMENTS reword). Hand-off: Plans 20-02 (preflight) / 20-03 (anti-rug timestamp wiring) / 20-04 (bot.ts kill-switch) / 20-05 (controls.ts pause/resume endpoints) consume the 5 new prepared statements via `import { ... } from './utils/db'`; OPS-LIVE-02 + OPS-LIVE-06 refined text is the verbatim acceptance criterion for Plans 20-02 walletBalance + 20-06 staleData.
-Stopped at: Phase 20 plan 20-02 complete; ready for /gsd-execute-plan 20-03
-Resume file: .planning/phases/20-going-live-ops-hardening/20-03-PLAN.md
+Stopped at: Phase 20 plan 20-04 complete
+Resume file: .planning/phases/20-going-live-ops-hardening/20-05-PLAN.md
