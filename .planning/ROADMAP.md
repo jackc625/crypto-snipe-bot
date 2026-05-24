@@ -175,7 +175,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 20-02-PLAN.md — src/preflight.ts (preflight + preflightDryRun dual-shape API, 7 check functions, cross-env validator, anti-rug 7-day live-gate, stale-data) + chainRegistry.ts defaultGasBuffer + defaultBlockAgeToleranceSec per chain + config.ts REQUIRED_ENV_VARS (12 new envs) + .env.example per D-ENV-EXAMPLE [OPS-LIVE-02, OPS-LIVE-03, OPS-LIVE-04, OPS-LIVE-05, OPS-LIVE-06, OPS-LIVE-07] *(completed 2026-05-24)*
 
   **Wave 3** *(after Wave 2; bot.ts wiring + anti-rug timestamp):*
-  - [ ] 20-03-PLAN.md — src/anti-rug/detector.ts: insert setAntirugDryRunStarted.run() at startChainAntiRugListener first-time-start path (D-ANTIRUG-LIVE-GATE-CODE source for Plan 20-02 7-day floor check) [OPS-LIVE-07]
+  - [x] 20-03-PLAN.md — src/anti-rug/detector.ts: insert setAntirugDryRunStarted.run() at startChainAntiRugListener first-time-start path (D-ANTIRUG-LIVE-GATE-CODE source for Plan 20-02 7-day floor check) [OPS-LIVE-07]
   - [ ] 20-04-PLAN.md — src/bot.ts: preflight() call at line 880 + chainId-block removal + 3 V2 killswitch checkpoints + 3 V3 killswitch checkpoints + mid-run wallet setInterval (D-MID-RUN-CHECK + D-KILLSWITCH-CP1/CP2/CP3 + D-PREFLIGHT-FLOW + D-ROLLBACK) [OPS-LIVE-01, OPS-LIVE-02, OPS-LIVE-08]
 
   **Wave 4** *(after Wave 3; dashboard endpoints + CLI scripts + banner):*
@@ -227,7 +227,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 1/8 | In Progress | - |
+| 20. Going-Live Ops Hardening | v6.17 | 4/8 | In Progress|  |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---

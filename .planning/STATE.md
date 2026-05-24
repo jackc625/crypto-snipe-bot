@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 20 plan 20-02 complete (src/preflight.ts dual-shape API + chainRegistry/config/.env.example Phase 20 envs)
-last_updated: "2026-05-24T20:50:00Z"
-last_activity: 2026-05-24 -- Phase 20 plan 20-02 complete (src/preflight.ts 641 LOC + 32 preflight tests + chainRegistry gasBuffer/blockAgeToleranceSec + 12 new envs)
+stopped_at: Phase 20 plan 20-03 complete (anti-rug detector setAntirugDryRunStarted insertion + Rule 1 cascading test-isolation fix)
+last_updated: "2026-05-24T21:30:00Z"
+last_activity: 2026-05-24 -- Phase 20 plan 20-03 complete (detector.ts +8 LOC setAntirugDryRunStarted insertion at startChainAntiRugListener entry + 4 dryRunTimestamp tests + Rule 1 fix-in-flight cascading db mocks to 5 existing anti-rug tests)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 32
-  completed_plans: 26
-  percent: 47
+  completed_plans: 27
+  percent: 50
 ---
 
 # Project State
