@@ -86,7 +86,7 @@ import {
 import { loadLpBaseline } from './lpBaseline';
 import { isAddressAllowlisted } from './allowlist';
 import type { LpBaselineRow, RugEvaluation, RugSignals } from './types';
-import { PAIR_ABI, V3_POOL_ABI, V3_QUOTER_V2_ABI } from '../utils/abis';
+import { PAIR_ABI, V3_POOL_ABI, V3_QUOTER_V2_ABI, ERC20_ABI } from '../utils/abis';
 import { logger } from '../utils/logger';
 import { triggerAntiRugExit } from './exitTrigger';
 // Plan 19-04c — WS lifecycle dependencies (heartbeat + reconnect + backfill
@@ -1657,10 +1657,26 @@ async function evaluateV3Signals(
             V3_QUOTER_V2_ABI,
             ctx.httpProvider,
         );
-        // Probe amount: use the baseline active liquidity as a proxy (the real
-        // production value is the position's amount; for v6.17 we use the
-        // baseline as a normalized probe amount — see SUMMARY).
-        const probeAmount = baselineLiquidity;
+        // WR-03: probe amount is the bot's actual token balance, NOT the
+        // pool's baseline active liquidity. The previous implementation
+        // used `baselineLiquidity` as a proxy (acknowledged as
+        // dimensionally wrong in the inline SUMMARY note) — V3 pool
+        // active-liquidity is NOT denominated in the same unit as the
+        // token amount, so selling "1e18 liquidity worth of token" would
+        // drain almost all WETH from a balanced pool and yield
+        // quotedRatioBps < 50% on every benign pool, tripping signal-3
+        // on every benign V3 position with ANY size mismatch. The fix
+        // queries the position's actual token balance held by
+        // ctx.wallet and uses that as the QuoterV2 amountIn — the only
+        // amount that matches what executeFullSell would actually swap.
+        const tokenContract = new Contract(
+            position.tokenAddress,
+            ERC20_ABI,
+            ctx.httpProvider,
+        );
+        const probeAmount = BigInt(
+            (await tokenContract.balanceOf(ctx.wallet.address)).toString(),
+        );
         const quoteParams = {
             tokenIn: position.tokenAddress,
             tokenOut: ctx.chain.wethAddress,
@@ -1672,12 +1688,14 @@ async function evaluateV3Signals(
             quoteParams,
         );
         const quotedOut = BigInt(result[0].toString());
-        // Compare against baselineLiquidity (proxy for baseline expected). The
-        // ratio is quotedOut / baselineLiquidity. <50% trips signal-3.
+        // WR-03: the ratio denominator is now the probe amount the
+        // operator would actually sell. quotedRatioBps reflects the
+        // realised quote-out divided by the input amount; <50% indicates
+        // > 50% slippage on the would-be sell (the real anti-rug signal).
         const quotedRatioBps =
-            baselineLiquidity === 0n
-                ? 0n
-                : (quotedOut * 10000n) / baselineLiquidity;
+            probeAmount === 0n
+                ? 10000n
+                : (quotedOut * 10000n) / probeAmount;
         const quotedRatioPct = Number(quotedRatioBps) / 100;
         sellSimSlippagePct = 100 - quotedRatioPct;
         signal3Tripped = quotedRatioPct < 50;

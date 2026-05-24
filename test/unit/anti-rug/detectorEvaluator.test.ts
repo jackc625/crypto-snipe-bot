@@ -132,6 +132,11 @@ vi.mock('ethers', async () => {
         liquidity?: ReturnType<typeof vi.fn>;
         slot0?: ReturnType<typeof vi.fn>;
         quoteExactInputSingle?: { staticCall: ReturnType<typeof vi.fn> };
+        // WR-03: ERC20.balanceOf for the V3 sell-sim probe-amount fix.
+        // Now the evaluator queries the bot's actual token balance via
+        // tokenContract.balanceOf(ctx.wallet.address) instead of using
+        // the dimensionally-wrong baselineLiquidity proxy.
+        balanceOf?: ReturnType<typeof vi.fn>;
         constructor(address: string, abi: unknown[]) {
             this.address = address;
             const abiStr = JSON.stringify(abi);
@@ -141,6 +146,7 @@ vi.mock('ethers', async () => {
                 pairTotalSupply: ReturnType<typeof vi.fn>;
                 poolLiquidity: ReturnType<typeof vi.fn>;
                 quoteExactInputSingle: ReturnType<typeof vi.fn>;
+                erc20BalanceOf?: ReturnType<typeof vi.fn>;
             };
             // Dispatch by ABI shape.
             if (abiStr.includes('getReserves')) {
@@ -153,6 +159,11 @@ vi.mock('ethers', async () => {
                 this.quoteExactInputSingle = {
                     staticCall: mocks.quoteExactInputSingle,
                 };
+            } else if (abiStr.includes('balanceOf')) {
+                // ERC20 ABI dispatch — WR-03 probe-amount path.
+                this.balanceOf =
+                    mocks.erc20BalanceOf ??
+                    vi.fn().mockResolvedValue(BigInt('1000000000000000000'));
             }
         }
     }
@@ -203,6 +214,9 @@ interface StubChainCtx {
     };
     wsProvider: StubWsProvider | null;
     httpProvider: StubProvider;
+    // WR-03: wallet.address used by the V3 sell-sim probe-amount path
+    // (tokenContract.balanceOf(ctx.wallet.address)).
+    wallet: { address: string };
 }
 
 interface CtxOverrides {
@@ -267,6 +281,10 @@ function buildCtx(overrides: CtxOverrides = {}): StubChainCtx {
             on: onSpy,
             off: offSpy,
         },
+        // WR-03: bot wallet used by the V3 sell-sim probe-amount path.
+        // Any non-zero address shape is fine — the MockContract balanceOf
+        // returns a fixed 1e18 default when no per-test override is set.
+        wallet: { address: '0x000000000000000000000000000000000000bEEF' },
     };
 }
 
