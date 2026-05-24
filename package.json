@@ -11,7 +11,10 @@
     "test:integration": "vitest run --project integration --reporter=verbose",
     "test:fork": "vitest run --project fork --reporter=verbose",
     "test:all": "vitest run --reporter=verbose",
-    "test:coverage": "vitest run --coverage --reporter=verbose"
+    "test:coverage": "vitest run --coverage --reporter=verbose",
+    "preflight": "ts-node scripts/preflight.ts",
+    "pause": "ts-node scripts/pause.ts",
+    "resume": "ts-node scripts/resume.ts"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",
