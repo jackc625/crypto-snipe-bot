@@ -9,6 +9,8 @@ import type {
   ChainWsHealthChange,
   CbTrippedPayload,
   CbResetPayload,
+  PauseState,
+  PauseStateChangePayload,
 } from '../types/api';
 
 interface UseWebSocketResult {
@@ -21,6 +23,8 @@ interface UseWebSocketResult {
   antiRugEvents: Record<string, AntiRugEvent[]>;
   chainWsHealth: Record<string, ChainWsHealthChange>;
   circuitBreakerTrips: Record<string, CbTrippedPayload>;
+  // Phase 20 / Plan 20-06 — global pause-state push (D-PAUSE-UI)
+  pauseState: PauseState | null;
 }
 
 /**
@@ -50,14 +54,22 @@ export function useWebSocket(): UseWebSocketResult {
   const [antiRugEvents, setAntiRugEvents] = useState<Record<string, AntiRugEvent[]>>({});
   const [chainWsHealth, setChainWsHealth] = useState<Record<string, ChainWsHealthChange>>({});
   const [circuitBreakerTrips, setCircuitBreakerTrips] = useState<Record<string, CbTrippedPayload>>({});
+  // Phase 20 / Plan 20-06 — global pause-state push (D-PAUSE-UI)
+  const [pauseState, setPauseState] = useState<PauseState | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshFromRest = useCallback(async () => {
     try {
-      const [posRes, chainRes] = await Promise.all([
+      // Phase 20 / Plan 20-06 — also hydrate pause-state on connect/reconnect.
+      // Per RESEARCH §Pitfall 5 + T-20-W6-02 mitigation: re-fetch on reconnect
+      // ensures banner reconciles to authoritative server state within one
+      // reconnect cycle (in case a pause_state_change event was missed
+      // mid-disconnect).
+      const [posRes, chainRes, pauseRes] = await Promise.all([
         fetch('/api/positions', { credentials: 'include' }),
         fetch('/api/chains', { credentials: 'include' }),
+        fetch('/api/controls/pause', { credentials: 'include' }),
       ]);
       if (posRes.ok) {
         const posData = await posRes.json();
@@ -66,6 +78,17 @@ export function useWebSocket(): UseWebSocketResult {
       if (chainRes.ok) {
         const chainData = await chainRes.json();
         setChainStatuses(chainData.chains || []);
+      }
+      if (pauseRes.ok) {
+        const pauseData = await pauseRes.json() as PauseState;
+        // Normalise the GET /api/controls/pause shape to PauseState
+        // (controls.ts:GET returns the same shape verbatim per Plan 20-05).
+        setPauseState({
+          paused: !!pauseData.paused,
+          pausedAt: pauseData.pausedAt ?? null,
+          pausedBy: pauseData.pausedBy ?? null,
+          reason: pauseData.reason ?? null,
+        });
       }
     } catch {
       // REST refresh failed silently -- WebSocket push will deliver state
@@ -222,6 +245,29 @@ export function useWebSocket(): UseWebSocketResult {
             }
             break;
           }
+          // ─────────────────────────────────────────────────────────────────
+          // Phase 20 / Plan 20-06 — Global pause-state push (D-PAUSE-UI)
+          // Broadcast sources (Plan 20-04 + 20-05):
+          //   - bot mid-run wallet-undercut setInterval (src/bot.ts)
+          //   - POST /api/controls/pause (src/api/routes/controls.ts)
+          //   - POST /api/controls/resume (src/api/routes/controls.ts)
+          // Defensive narrowing per T-19-06-06 carry-forward: never throw on parse failure.
+          // ─────────────────────────────────────────────────────────────────
+          case 'pause_state_change': {
+            try {
+              const payload = msg.data as PauseStateChangePayload;
+              if (!payload || typeof payload.paused !== 'boolean') break;
+              setPauseState({
+                paused: payload.paused,
+                pausedAt: payload.pausedAt ?? null,
+                pausedBy: payload.pausedBy ?? null,
+                reason: payload.reason ?? null,
+              });
+            } catch {
+              // Malformed payload -- drop silently
+            }
+            break;
+          }
         }
       } catch {
         // Ignore malformed messages
@@ -264,5 +310,6 @@ export function useWebSocket(): UseWebSocketResult {
     antiRugEvents,
     chainWsHealth,
     circuitBreakerTrips,
+    pauseState,
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
+import { PauseBanner } from './PauseBanner';
 import { useWs } from '../hooks/WebSocketContext';
 import { useApi } from '../hooks/useApi';
 import type { HealthResponse } from '../types/api';
@@ -35,9 +36,17 @@ export function Layout({ children }: LayoutProps) {
         wsConnected={connected}
         telegramStatus={telegramStatus}
       />
-      <main className="flex-1 overflow-y-auto p-8">
-        {children}
-      </main>
+      {/* Phase 20 / Plan 20-06 — PauseBanner sits inside the scroll area so it
+          is the first thing the operator sees on every dashboard page when the
+          bot is globally paused, per D-PAUSE-UI "header banner visible on
+          every dashboard page". The banner is full-bleed (-mx-{4|6|8}) so it
+          consumes the same horizontal padding that <main> currently uses; we
+          keep the p-8 wrapper on the scroll container so children continue to
+          inherit the same padding context. */}
+      <div className="flex-1 overflow-y-auto p-8">
+        <PauseBanner />
+        <main>{children}</main>
+      </div>
     </div>
   );
 }

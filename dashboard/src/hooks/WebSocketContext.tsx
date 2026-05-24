@@ -8,6 +8,7 @@ import type {
   AntiRugEvent,
   ChainWsHealthChange,
   CbTrippedPayload,
+  PauseState,
 } from '../types/api';
 
 interface WebSocketContextValue {
@@ -20,6 +21,10 @@ interface WebSocketContextValue {
   antiRugEvents: Record<string, AntiRugEvent[]>;
   chainWsHealth: Record<string, ChainWsHealthChange>;
   circuitBreakerTrips: Record<string, CbTrippedPayload>;
+  // Phase 20 / Plan 20-06 — global pause-state push (D-PAUSE-UI)
+  // Null until the initial GET /api/controls/pause hydration completes; PauseBanner
+  // treats null as "not paused" (no banner) so the dashboard does not flash empty.
+  pauseState: PauseState | null;
 }
 
 const WebSocketCtx = createContext<WebSocketContextValue | null>(null);

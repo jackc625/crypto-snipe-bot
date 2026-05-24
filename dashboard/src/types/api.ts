@@ -100,6 +100,39 @@ export interface CbResetPayload {
   resetByOperatorTs: number;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 20 / Plan 20-06 — Global pause-state surfaces (D-PAUSE-UI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Global pause-state snapshot. Returned by `GET /api/controls/pause` (Plan 20-05)
+ * and pushed via the `pause_state_change` WS event (Plan 20-04 mid-run
+ * setInterval + Plan 20-05 POST /pause + POST /resume endpoints).
+ *
+ * Sentinel union for `pausedBy` mirrors the canonical paused_by set from
+ * Plan 20-04 / D-PAUSE-SHAPE: 'dashboard' (Resume button), 'cli' (operator
+ * `npm run pause`), 'preflight' (mid-run wallet undercut handler), 'manual'
+ * (default for unattributed pauses).
+ */
+export interface PauseState {
+  paused: boolean;
+  pausedAt: number | null;  // unix seconds
+  pausedBy: 'dashboard' | 'cli' | 'preflight' | 'manual' | null;
+  reason: string | null;
+}
+
+/**
+ * WS event payload for `pause_state_change` per Plan 20-04 broadcaster wiring.
+ * Fields beyond `paused` are present only on the paused=true flip; the
+ * paused=false flip (resume) ships just `{ paused: false }`.
+ */
+export interface PauseStateChangePayload {
+  paused: boolean;
+  pausedBy?: 'dashboard' | 'cli' | 'preflight' | 'manual';
+  reason?: string;
+  pausedAt?: number;
+}
+
 /**
  * WS event payload for `antirug_state_update` per UI-SPEC §"Realtime Push
  * Contract". Merges into the Position row matching `tradeId`.
