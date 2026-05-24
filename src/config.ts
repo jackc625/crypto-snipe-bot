@@ -63,6 +63,59 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'TRAILING_MAX_PCT', required: false, description: 'Maximum trailing stop percentage after volatility adjustment (default: 40)' },
     { name: 'PARTIAL_SELL_TARGETS', required: false, description: 'Partial sell tiers, e.g. "2x:50,5x:25" (default: empty = no partial sells)' },
     { name: 'STOP_LOSS_PCT', required: false, description: 'Fixed stop-loss percentage below entry, active before trailing activates (default: 25)' },
+
+    // --- Anti-Rug Runtime Monitoring (Phase 19, plan 19-02) ---
+    // Per D-ENV-EXAMPLE [USER-BINDING]: every var here also lives in
+    // .env.example with default + 1-line inline-comment description.
+    // 9 vars × 4 chains = 36 entries (8 numeric + 1 comma-list per chain).
+    // Env-var delta vs CONTEXT.md D-ENV-EXAMPLE: added BACKFILL_CAP_BLOCKS
+    // and MAX_BACKFILL_BLOCKS per 19-RESEARCH.md CRITICAL #1 (Alchemy
+    // free-tier 10-block getLogs cap) under CONTEXT.md "Claude's Discretion"
+    // on backfill window cap.
+
+    // ETH
+    { name: 'ETH_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for ETH (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
+    { name: 'ETH_ANTIRUG_LP_REMOVAL_PCT', required: false, description: 'Anti-rug LP-removal-pct trigger threshold for ETH (default: 50; signal 1 fires when >this pct of LP removed vs baseline)' },
+    { name: 'ETH_ANTIRUG_CONFIRM_BLOCKS', required: false, description: 'Anti-rug confirm-after-N-blocks delay before exit fires on ETH (default: 1; higher values for reorg-volatile chains)' },
+    { name: 'ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS', required: false, description: 'Anti-rug circuit-breaker trigger threshold for ETH (default: 3; CB trips after N triggers within window)' },
+    { name: 'ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS', required: false, description: 'Anti-rug circuit-breaker rolling window in hours for ETH (default: 1)' },
+    { name: 'ETH_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for ETH (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
+    { name: 'ETH_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for ETH (default: 10 Alchemy-free-tier safe per 19-RESEARCH.md CRITICAL #1)' },
+    { name: 'ETH_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for ETH; gap > this fires [GAP DETECTED] (default: 7200 = ~1 day on ETH)' },
+    { name: 'ETH_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for ETH (default: empty; merged into both V2 and V3 allowlists)' },
+
+    // BSC
+    { name: 'BSC_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for BSC (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
+    { name: 'BSC_ANTIRUG_LP_REMOVAL_PCT', required: false, description: 'Anti-rug LP-removal-pct trigger threshold for BSC (default: 50; signal 1 fires when >this pct of LP removed vs baseline)' },
+    { name: 'BSC_ANTIRUG_CONFIRM_BLOCKS', required: false, description: 'Anti-rug confirm-after-N-blocks delay before exit fires on BSC (default: 1; higher values for reorg-volatile chains)' },
+    { name: 'BSC_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS', required: false, description: 'Anti-rug circuit-breaker trigger threshold for BSC (default: 3; CB trips after N triggers within window)' },
+    { name: 'BSC_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS', required: false, description: 'Anti-rug circuit-breaker rolling window in hours for BSC (default: 1)' },
+    { name: 'BSC_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for BSC (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
+    { name: 'BSC_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for BSC (default: 500 conservative for public BSC RPC / Chainstack)' },
+    { name: 'BSC_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for BSC; gap > this fires [GAP DETECTED] (default: 7200)' },
+    { name: 'BSC_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for BSC (default: empty; merged into both V2 and V3 allowlists)' },
+
+    // BASE
+    { name: 'BASE_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for Base (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
+    { name: 'BASE_ANTIRUG_LP_REMOVAL_PCT', required: false, description: 'Anti-rug LP-removal-pct trigger threshold for Base (default: 50; signal 1 fires when >this pct of LP removed vs baseline)' },
+    { name: 'BASE_ANTIRUG_CONFIRM_BLOCKS', required: false, description: 'Anti-rug confirm-after-N-blocks delay before exit fires on Base (default: 1; higher values for reorg-volatile chains)' },
+    { name: 'BASE_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS', required: false, description: 'Anti-rug circuit-breaker trigger threshold for Base (default: 3; CB trips after N triggers within window)' },
+    { name: 'BASE_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS', required: false, description: 'Anti-rug circuit-breaker rolling window in hours for Base (default: 1)' },
+    { name: 'BASE_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for Base (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
+    { name: 'BASE_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for Base (default: 500 conservative for public Base RPC)' },
+    { name: 'BASE_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for Base; gap > this fires [GAP DETECTED] (default: 7200)' },
+    { name: 'BASE_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for Base (default: empty; merged into both V2 and V3 allowlists)' },
+
+    // ARB
+    { name: 'ARB_ANTIRUG_LIVE_EXECUTE', required: false, description: 'Anti-rug live-execute flag for Arbitrum (default: false → dry-run; flip to true ONLY after 7-day dry-run with 0 confirmed false positives per D-LIVE-GATE)' },
+    { name: 'ARB_ANTIRUG_LP_REMOVAL_PCT', required: false, description: 'Anti-rug LP-removal-pct trigger threshold for Arbitrum (default: 50; signal 1 fires when >this pct of LP removed vs baseline)' },
+    { name: 'ARB_ANTIRUG_CONFIRM_BLOCKS', required: false, description: 'Anti-rug confirm-after-N-blocks delay before exit fires on Arbitrum (default: 1; higher values for reorg-volatile chains)' },
+    { name: 'ARB_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS', required: false, description: 'Anti-rug circuit-breaker trigger threshold for Arbitrum (default: 3; CB trips after N triggers within window)' },
+    { name: 'ARB_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS', required: false, description: 'Anti-rug circuit-breaker rolling window in hours for Arbitrum (default: 1)' },
+    { name: 'ARB_ANTIRUG_GAS_MULTIPLIER', required: false, description: 'Anti-rug exit gas multiplier for Arbitrum (default: 2.0; applied to EIP-1559 fields when reason=anti-rug)' },
+    { name: 'ARB_ANTIRUG_BACKFILL_CAP_BLOCKS', required: false, description: 'Anti-rug per-getLogs-call block-range cap for Arbitrum (default: 500 conservative for public Arb RPC)' },
+    { name: 'ARB_ANTIRUG_MAX_BACKFILL_BLOCKS', required: false, description: 'Anti-rug hard ceiling on backfill window for Arbitrum; gap > this fires [GAP DETECTED] (default: 7200)' },
+    { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'Comma-separated extra V2+V3 locker checksummed addresses for Arbitrum (default: empty; merged into both V2 and V3 allowlists)' },
 ];
 
 function validateEnvVars(): void {
