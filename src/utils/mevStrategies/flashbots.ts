@@ -54,15 +54,28 @@ export class FlashbotsMevStrategy implements MevStrategy {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         // Phase 19 / D-RACE-TELEMETRY: optional gasMultiplier elevates anti-rug exit gas.
-        const rawGasPrice = (await provider.getFeeData()).gasPrice;
-        const gasPrice = applyGasMultiplier(rawGasPrice, gasMultiplier);
+        // CR-02: ETH chain template declares `gas: { type: 'eip1559', ... }`, so the
+        // multiplier MUST flow into maxFeePerGas / maxPriorityFeePerGas — applying
+        // it only to legacy `gasPrice` silently fails to outbid on EIP-1559 chains.
+        // Mirror the passthrough strategy's EIP-1559-aware branching.
+        const feeData = await provider.getFeeData();
         const populatedTx: TransactionRequest = {
           ...txRequest,
           gasLimit: txRequest.gasLimit || 300_000n,
-          gasPrice,
           nonce: baseNonce + attempt,
           chainId: (await provider.getNetwork()).chainId,
         };
+
+        if (feeData.maxFeePerGas) {
+          populatedTx.maxFeePerGas =
+            applyGasMultiplier(feeData.maxFeePerGas, gasMultiplier) ?? undefined;
+          populatedTx.maxPriorityFeePerGas =
+            applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? undefined;
+          populatedTx.type = 2;
+        } else {
+          populatedTx.gasPrice =
+            applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? undefined;
+        }
 
         const targetBlock = (await provider.getBlockNumber()) + 1;
         const bundle = await flashbotsProvider.sendBundle(
