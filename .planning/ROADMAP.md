@@ -42,7 +42,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 - [x] **Phase 17: Tech Debt Cleanup & Audit Baseline** â€” CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup *(completed 2026-04-30)*
 - [ ] **Phase 18: Honeypot Detection Rebuild** â€” Deploy `HoneypotChecker.sol` (Option D) on 4 chains; replace broken V2/V3 sell-sim gates; discriminated-union `HoneypotResult`; multi-amount tax probe; safety-bank audit
 - [x] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode (completed 2026-05-24)
-- [ ] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
+- [x] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization (completed 2026-05-24)
 - [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
 
 ## Phase Details
@@ -183,7 +183,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 20-06-PLAN.md — dashboard/src/components/PauseBanner.tsx full-bleed red banner (bg-loss text-white per CB banner analog) + WebSocketContext + useWebSocket extension for pause_state_change WS event + initial state hydration via GET /api/controls/pause + Resume button (D-PAUSE-UI) [OPS-LIVE-09]
 
   **Wave 5** *(after Wave 4; runbook + CI guard + docs):*
-  - [ ] 20-07-PLAN.md — git mv GOING-LIVE.md → docs/operations/going-live.md + git rm HONEYPOT-SIM-BRIEFING.md + README.md link update + .github/workflows/test.yml CI guard step + docs/operations/going-live.md content authoring (5 sections per D-OPERATOR-HANDOFF) [OPS-LIVE-12, OPS-LIVE-13]
+  - [x] 20-07-PLAN.md — git mv GOING-LIVE.md → docs/operations/going-live.md + git rm HONEYPOT-SIM-BRIEFING.md + README.md link update + .github/workflows/test.yml CI guard step + docs/operations/going-live.md content authoring (5 sections per D-OPERATOR-HANDOFF) [OPS-LIVE-12, OPS-LIVE-13]
 
   **Cross-cutting constraints:**
   - **D-ENV-EXAMPLE [USER-BINDING]:** every new env var introduced in Phase 20 lands in .env.example with default + 1-line description (Plan 20-02 owns the registration)
@@ -227,7 +227,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 7/8 | In Progress|  |
+| 20. Going-Live Ops Hardening | v6.17 | 8/8 | Complete   | 2026-05-24 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---

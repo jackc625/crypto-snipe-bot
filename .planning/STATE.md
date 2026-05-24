@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 20 plan 20-06 complete (dashboard PauseBanner + WebSocket pauseState push)
-last_updated: "2026-05-24T22:30:00Z"
-last_activity: 2026-05-24 -- Phase 20 plan 20-06 complete (PauseBanner.tsx full-bleed red banner + WebSocketContext/useWebSocket pauseState wiring + Layout mount + 1 unit test live)
+stopped_at: Phase 20 COMPLETE (all 8 plans shipped — going-live ops hardening done)
+last_updated: "2026-05-24T23:13:00Z"
+last_activity: 2026-05-24 -- Phase 20 plan 20-07 complete (docs/operations/going-live.md consolidated runbook + root-doc CI guard + vitest self-test); Phase 20 COMPLETE 8/8 plans
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 32
-  completed_plans: 30
-  percent: 56
+  completed_plans: 32
+  percent: 60
 ---
 
 # Project State
