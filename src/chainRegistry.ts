@@ -819,20 +819,27 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
 
         // Operator allowlist overlay: comma-separated checksummed addresses.
         // Each entry validated via ethers.getAddress (FATAL on invalid checksum
-        // per T-19-02-02 mitigation). Merged into BOTH allowlistV2 and
-        // allowlistV3 per D-LIST-SOURCE (single overlay covers both pool types).
-        const antiRugAllowlistExtraRaw =
-            process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`] ?? '';
-        const antiRugAllowlistExtra: AllowlistEntry[] = [];
-        if (antiRugAllowlistExtraRaw.trim().length > 0) {
-            const tokens = antiRugAllowlistExtraRaw
-                .split(',')
-                .map(s => s.trim())
-                .filter(Boolean);
+        // per T-19-02-02 mitigation).
+        //
+        // WR-08: now supports per-pool-type env vars in addition to the
+        // unified ALLOWLIST_EXTRA. V2 and V3 lockers are different categories
+        // (TeamFinance V2 vs TeamFinance V3 NFT vault); placing a V2-only
+        // locker in the V3 allowlist (or vice versa) bypasses the per-pool-
+        // type lockerName check. The new explicit vars:
+        //   - <CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V2 — V2-only addresses
+        //   - <CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V3 — V3-only addresses
+        //   - <CHAIN>_ANTIRUG_ALLOWLIST_EXTRA   — DEPRECATED, applied to BOTH
+        //     V2 and V3 (kept for backward compatibility; a deprecation warn
+        //     is logged at startup when set).
+        const parseAllowlistExtra = (envKey: string): AllowlistEntry[] => {
+            const raw = process.env[envKey] ?? '';
+            if (raw.trim().length === 0) return [];
+            const out: AllowlistEntry[] = [];
+            const tokens = raw.split(',').map(s => s.trim()).filter(Boolean);
             for (const tok of tokens) {
                 try {
                     const checksummed = ethers.getAddress(tok);
-                    antiRugAllowlistExtra.push({
+                    out.push({
                         address: checksummed,
                         lockerName: 'Operator overlay',
                         provenance: 'env-overlay',
@@ -841,7 +848,7 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                     log.fatal(
                         {
                             chain: chainName,
-                            key: `${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`,
+                            key: envKey,
                             badAddress: tok,
                             err: (err as Error).message,
                         },
@@ -850,7 +857,32 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                     process.exit(1);
                 }
             }
+            return out;
+        };
+
+        const antiRugAllowlistExtraUnified = parseAllowlistExtra(
+            `${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`,
+        );
+        if (antiRugAllowlistExtraUnified.length > 0) {
+            log.warn(
+                {
+                    chain: chainName,
+                    key: `${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`,
+                    entryCount: antiRugAllowlistExtraUnified.length,
+                    op: 'antirug.allowlist.deprecated-unified-extra',
+                },
+                'Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)',
+            );
         }
+
+        const antiRugAllowlistExtraV2 = [
+            ...antiRugAllowlistExtraUnified,
+            ...parseAllowlistExtra(`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V2`),
+        ];
+        const antiRugAllowlistExtraV3 = [
+            ...antiRugAllowlistExtraUnified,
+            ...parseAllowlistExtra(`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V3`),
+        ];
 
         // For ETH, fall back to ALCHEMY_URL if ETH_RPC_URL is not set (backward compat)
         let resolvedHttpRpcUrl = httpRpcUrl;
@@ -933,13 +965,16 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
                 gasMultiplier: antiRugGasMultiplier,
                 backfillCapBlocks: antiRugBackfillCapBlocks,
                 maxBackfillBlocks: antiRugMaxBackfillBlocks,
+                // WR-08: per-pool-type allowlist extras feed only their
+                // matching list. The deprecated unified ALLOWLIST_EXTRA
+                // contributes to BOTH (preserved for backward compat).
                 allowlistV2: mergeAllowlist(
                     HARDCODED_V2_ALLOWLIST[chainName] ?? [],
-                    antiRugAllowlistExtra
+                    antiRugAllowlistExtraV2
                 ),
                 allowlistV3: mergeAllowlist(
                     HARDCODED_V3_ALLOWLIST[chainName] ?? [],
-                    antiRugAllowlistExtra
+                    antiRugAllowlistExtraV3
                 ),
             },
             gas: template.gas,
