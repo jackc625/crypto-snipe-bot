@@ -264,7 +264,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-    // Best-effort registry reset between tests.
+    // Best-effort registry reset between tests — this also clears any
+    // active heartbeat setIntervals (Plan 19-04c added this guard in
+    // _resetRegistryForTesting to prevent setInterval closures from
+    // bleeding state into subsequent tests).
     try {
         const mod = await import('../../../src/anti-rug/detector');
         if (typeof mod._resetRegistryForTesting === 'function') {
@@ -273,15 +276,22 @@ afterEach(async () => {
     } catch {
         // Module may not have loaded — that's fine.
     }
+    // Clear any remaining pending timers BEFORE switching back to real
+    // timers, so background work scheduled by the production code (e.g.
+    // reconnect-backoff sleeps awaiting fake-timer advances) does not
+    // race through real time and call into now-unmocked binaries.
+    if (vi.isFakeTimers()) {
+        vi.clearAllTimers();
+    }
     vi.useRealTimers();
-    vi.doUnmock('../../../src/utils/logger');
-    vi.doUnmock('../../../src/utils/notifier');
-    vi.doUnmock('../../../src/api/ws/broadcaster');
-    vi.doUnmock('../../../src/utils/provider');
-    vi.doUnmock('../../../src/anti-rug/exitTrigger');
-    vi.doUnmock('../../../src/anti-rug/lpBaseline');
-    vi.doUnmock('../../../src/utils/db');
-    vi.doUnmock('ethers');
+    // NOTE: do NOT call vi.doUnmock here. vi.resetModules() at the start
+    // of the next beforeEach reloads the module graph fresh, and the
+    // next beforeEach re-establishes vi.doMock for each dependency. An
+    // explicit vi.doUnmock here could fight with module-graph caching
+    // edge cases when a prior test's production code still holds an
+    // import reference (e.g. a still-pending Promise inside the reconnect
+    // loop). The cleanest invariant is: doMock in beforeEach, then
+    // resetModules at the start of the next beforeEach handles isolation.
 });
 
 // ---------------------------------------------------------------------------
@@ -436,10 +446,11 @@ describe('Phase 19 — Anti-rug WS lifecycle: heartbeat', () => {
             terminateCountBefore,
         );
         // Terminate fires the 'close' handler, which triggers the reconnect
-        // path. A new WebSocketProvider instance was constructed.
-        // (Even if reconnect is awaited internally, the construction must
-        // have happened before the reconnect await returns.)
-        await vi.runAllTimersAsync();
+        // path. Advance through reconnect backoff (1s) + buffer for the
+        // reconnect await chain. We do NOT use runAllTimersAsync here because
+        // the heartbeat setInterval (re-armed by the successful reconnect)
+        // would loop forever for the test timer-budget.
+        await vi.advanceTimersByTimeAsync(2_000);
         expect(mockWsInstances.length).toBeGreaterThanOrEqual(2);
     });
 });
@@ -481,8 +492,10 @@ describe('Phase 19 — Anti-rug WS lifecycle: reconnect', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        // Reconnect uses exponential backoff starting at 1s; drive it.
-        await vi.runAllTimersAsync();
+        // Reconnect uses exponential backoff starting at 1s; drive past the
+        // first attempt. Bounded advance (NOT runAllTimersAsync) so the
+        // post-reconnect heartbeat setInterval doesn't loop forever.
+        await vi.advanceTimersByTimeAsync(2_000);
 
         // A new wsProvider was constructed.
         expect(mockWsInstances.length).toBeGreaterThanOrEqual(2);
@@ -533,10 +546,11 @@ describe('Phase 19 — Anti-rug WS lifecycle: reconnect', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        // Drive the exponential backoff: 1s + 2s + 4s + 8s = 15s should cover
-        // the first 4 attempts. (We use runAllTimersAsync to fully drain the
-        // backoff queue, including the eventual successful attempt on retry 4.)
-        await vi.runAllTimersAsync();
+        // Drive the exponential backoff: 1s + 2s + 4s + 8s = 15s covers the
+        // first 4 attempts (3 failures + 1 success). Use bounded advance
+        // (NOT runAllTimersAsync) so the post-reconnect heartbeat setInterval
+        // doesn't loop forever.
+        await vi.advanceTimersByTimeAsync(20_000);
 
         // sendCtxAlert was called with the WS RECONNECT FAILED message format.
         const reconnectFailedCall = sendCtxAlertMock.mock.calls.find(
@@ -642,7 +656,12 @@ describe('Phase 19 — Anti-rug WS lifecycle: backfillSinceLastSeen', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        await vi.runAllTimersAsync();
+        // Bounded advance past the 1s backoff + the cascade of awaits in
+        // handleWsClose → startChainAntiRugListener → backfillSinceLastSeen.
+        // Use 5s to drain the multi-tick microtask chain (the heartbeat
+        // setInterval first fires at 30s so it does not loop forever within
+        // this bound).
+        await vi.advanceTimersByTimeAsync(5_000);
 
         // backfill called getLogs in chunks of cap=10.
         // gap=30 → calls cover [18_000_001, 18_000_010], [18_000_011, 18_000_020],
@@ -698,7 +717,7 @@ describe('Phase 19 — Anti-rug WS lifecycle: backfillSinceLastSeen', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(5_000);
 
         // FAIL CLOSED: no getLogs calls made.
         expect(ctx.httpProvider.getLogs).not.toHaveBeenCalled();
@@ -774,7 +793,7 @@ describe('Phase 19 — Anti-rug WS lifecycle: backfillSinceLastSeen', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(2_000);
 
         // CRITICAL: triggerAntiRugExit NEVER called on backfilled events.
         expect(triggerAntiRugExitMock).not.toHaveBeenCalled();
@@ -827,7 +846,7 @@ describe('Phase 19 — Anti-rug WS lifecycle: backfillSinceLastSeen', () => {
         for (const h of wsProvider.websocket.closeHandlers) {
             h();
         }
-        await vi.runAllTimersAsync();
+        await vi.advanceTimersByTimeAsync(5_000);
 
         const gapAlert = sendCtxAlertMock.mock.calls.find(
             (c) =>
@@ -859,7 +878,22 @@ describe('Phase 19 — Anti-rug WS lifecycle: HTTP polling fallback', () => {
         const ctx = buildCtx({ withWs: false });
         const pair = '0x3333000000000000000000000000000000000aa9';
 
+        // Configure getBlockNumber to return increasing values across polls:
+        // initial seed call → 18_000_000; subsequent poll ticks → 18_000_005.
+        // mockImplementation is installed BEFORE registerAntiRugPosition so
+        // the seed call inside the production code path gets a known value.
+        let pollIdx = 0;
+        ctx.httpProvider.getBlockNumber.mockImplementation(async () => {
+            pollIdx += 1;
+            if (pollIdx === 1) return 18_000_000;
+            return 18_000_005;
+        });
+        ctx.httpProvider.getLogs.mockResolvedValue([]);
+        getChainStateGet.mockReturnValue(undefined);
+
         loadLpBaselineMock.mockReturnValueOnce(makeBaseline('v2', pair, 26));
+        // registerAntiRugPosition internally calls startChainAntiRugListener
+        // which routes to startHttpPollingAntiRug because ctx.wsProvider===null.
         await mod.registerAntiRugPosition(
             ctx as unknown as Parameters<typeof mod.registerAntiRugPosition>[0],
             V2_DEX as unknown as Parameters<typeof mod.registerAntiRugPosition>[1],
@@ -869,25 +903,10 @@ describe('Phase 19 — Anti-rug WS lifecycle: HTTP polling fallback', () => {
             null,
         );
 
-        // Initial poll: block 18_000_000; next poll: 18_000_005.
-        let pollIdx = 0;
-        ctx.httpProvider.getBlockNumber.mockImplementation(async () => {
-            pollIdx += 1;
-            if (pollIdx === 1) return 18_000_000;
-            return 18_000_005;
-        });
-        ctx.httpProvider.getLogs.mockResolvedValue([]);
-
-        // Trigger the HTTP polling fallback by starting the listener.
-        getChainStateGet.mockReturnValue(undefined);
-        await mod.startChainAntiRugListener(
-            ctx as unknown as Parameters<typeof mod.startChainAntiRugListener>[0],
-        );
-
         // Advance through one poll tick (default 2s like bot.ts:758-810).
         await vi.advanceTimersByTimeAsync(2_500);
 
-        // upsertChainState.run called with the new block.
+        // upsertChainState.run called with the new block (18_000_005).
         const upsertCall = upsertChainStateRun.mock.calls.find(
             (c) => c[0] === 'eth' && c[1] === 18_000_005,
         );

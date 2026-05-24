@@ -74,8 +74,8 @@
 //       §5 CRITICAL #1 (Alchemy 10-block cap) + §6 (single-listener-per-chain)
 //   - src/bot.ts:656-752 (startDexListener — canonical single-listener-per-chain analog)
 
-import { Contract } from 'ethers';
-import type { Log, WebSocketProvider } from 'ethers';
+import { Contract, WebSocketProvider } from 'ethers';
+import type { Log } from 'ethers';
 import type { ChainContext, DexConfig } from '../chainRegistry';
 import {
     PAIR_BURN_TOPIC,
@@ -89,8 +89,48 @@ import type { LpBaselineRow, RugEvaluation, RugSignals } from './types';
 import { PAIR_ABI, V3_POOL_ABI, V3_QUOTER_V2_ABI } from '../utils/abis';
 import { logger } from '../utils/logger';
 import { triggerAntiRugExit } from './exitTrigger';
+// Plan 19-04c — WS lifecycle dependencies (heartbeat + reconnect + backfill
+// + HTTP polling fallback + tiered D-VIS-WS-HEALTH alerts).
+import { sendCtxAlert } from '../utils/notifier';
+import { broadcast } from '../api/ws/broadcaster';
+import { removeWsProvider } from '../utils/provider';
+import { upsertChainState, getChainState } from '../utils/db';
 
 const log = logger.child({ module: 'antiRug:detector' });
+
+// ---------------------------------------------------------------------------
+// Plan 19-04c — WS lifecycle constants
+// ---------------------------------------------------------------------------
+
+/** Heartbeat ping interval per ANTIRUG-12 + ws@^8.20.0 README §heartbeat. */
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+/**
+ * Reconnect exponential-backoff ceiling — matches src/bot.ts:660-752
+ * precedent (1s → 2s → 4s → ... → capped at 60s).
+ */
+const MAX_RECONNECT_DELAY_MS = 60_000;
+
+/**
+ * Threshold for the "[WS DISCONNECTED >60s]" alert tier per D-VIS-WS-HEALTH
+ * (Warning 9 from plan-checker iteration 1). Fires AT MOST ONCE per
+ * disconnect window via the `alertedFor60s` flag in handleWsClose.
+ */
+const DISCONNECT_ALERT_THRESHOLD_MS = 60_000;
+
+/**
+ * Threshold for the "[WS RECONNECT FAILED]" alert tier per D-VIS-WS-HEALTH.
+ * Fires AT MOST ONCE per disconnect window (when `consecutiveFailures`
+ * crosses this count exactly once).
+ */
+const RECONNECT_FAILURE_ALERT_THRESHOLD = 3;
+
+/**
+ * HTTP polling fallback interval — matches src/bot.ts:758-810 startHttpPollingListener
+ * precedent (2 seconds). Slow vs WS but functional when no WS endpoint is
+ * configured for the chain.
+ */
+const HTTP_POLL_INTERVAL_MS = 2_000;
 
 // ---------------------------------------------------------------------------
 // Types — registry + per-chain state
@@ -250,6 +290,19 @@ export function _setEvaluateRugSignalsForTesting(
  * V3 Burn entries do not bleed between tests.
  */
 export function _resetRegistryForTesting(): void {
+    // Plan 19-04c — clear any active heartbeat setIntervals BEFORE wiping
+    // chainState; otherwise the still-firing setInterval closures (which
+    // captured the old `state` reference) would keep ticking after the
+    // test's afterEach and bleed state into subsequent tests
+    // (e.g. terminate() → close → handleWsClose constructs a fresh
+    // WebSocketProvider against the now-unmocked ethers binding, leading
+    // to ENOTFOUND DNS errors against the test URL).
+    for (const state of chainState.values()) {
+        if (state.heartbeatInterval) {
+            clearInterval(state.heartbeatInterval);
+            state.heartbeatInterval = null;
+        }
+    }
     positionRegistry.clear();
     chainState.clear();
     pendingV3Burn.clear();
@@ -498,16 +551,18 @@ export async function startChainAntiRugListener(
     }
 
     if (!ctx.wsProvider) {
-        // TODO Plan 19-04c — HTTP polling fallback (startHttpPollingAntiRug)
-        // for chains without a WS endpoint configured. See src/bot.ts:758-810
-        // for the canonical polling-fallback pattern.
+        // Plan 19-04c — HTTP polling fallback. No WS endpoint configured for
+        // this chain; spin up a setInterval poll loop that scans for the
+        // registered pair/pool addresses' topic union every HTTP_POLL_INTERVAL_MS.
+        // Pattern mirrors src/bot.ts:758-810 startHttpPollingListener verbatim.
         log.warn(
             {
                 chain: chainName,
-                op: 'antirug.listener.no-ws',
+                op: 'antirug.listener.no-ws-falling-back-to-http',
             },
-            'Anti-rug WS provider missing — TODO Plan 19-04c: HTTP polling fallback',
+            'Anti-rug WS provider missing — falling back to HTTP polling',
         );
+        await startHttpPollingAntiRug(ctx);
         return;
     }
 
@@ -559,6 +614,20 @@ export async function startChainAntiRugListener(
     state.activeDispatcher = dispatcher;
     state.activeFilter = filter;
 
+    // Plan 19-04c — populate health bookkeeping on (re-)subscription so the
+    // dashboard's per-chain WS-status indicator (D-VIS-WS-HEALTH) reflects the
+    // live state. lastPongTs seeded with the current wall-clock so the >60s
+    // alert tier has a meaningful "we WERE alive at moment X" anchor.
+    state.healthState = 'connected';
+    state.lastPongTs = Date.now();
+    state.reconnectAttempts = 0;
+
+    broadcast('chain_ws_health_change', {
+        chain: chainName,
+        state: 'connected',
+        lastPongTs: state.lastPongTs,
+    });
+
     log.info(
         {
             chain: chainName,
@@ -566,11 +635,621 @@ export async function startChainAntiRugListener(
             topics: topicUnion.length,
             op: 'antirug.listener.subscribed',
         },
-        'Anti-rug WS subscription installed (skeleton — TODO Plan 19-04c: heartbeat + reconnect + backfill)',
+        'Anti-rug WS subscription installed',
     );
 
-    // TODO Plan 19-04c — heartbeat setup, reconnect 'close' handler,
-    // backfillSinceLastSeen call, broadcast 'chain_ws_health_change'.
+    // Plan 19-04c — heartbeat + reconnect 'close' handler + backfill.
+    // setupHeartbeat installs the 30s ws.ping()/pong/terminate cycle per
+    // ws@^8.20.0 README + ANTIRUG-12. The 'close' handler below kicks off
+    // handleWsClose's exponential-backoff reconnect with tiered alerts.
+    //
+    // Defensive: production WebSocketProvider always exposes `.websocket`,
+    // but unit tests (Plans 19-04a/b) use synthetic `wsProvider` stubs
+    // without `.websocket` — they exercise registry / dispatch / evaluator
+    // semantics only, NOT the WS lifecycle. Skip heartbeat/close-handler
+    // wiring when `.websocket` is absent so those unit tests can still
+    // exercise startChainAntiRugListener without the lifecycle scaffolding.
+    const rawWs = (ctx.wsProvider as unknown as { websocket?: WsLike })
+        .websocket;
+    if (rawWs && typeof rawWs.on === 'function') {
+        setupHeartbeat(ctx);
+        rawWs.on('close', () => {
+            void handleWsClose(ctx);
+        });
+        // backfillSinceLastSeen reads chain_state.last_seen_block and replays
+        // the missed-block window through evaluateRugSignals — backfilled
+        // triggers log 'antirug.backfill.too-late' but NEVER call
+        // triggerAntiRugExit per D-BACKFILL (anti-pattern: live exit on stale
+        // event).
+        await backfillSinceLastSeen(ctx);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Plan 19-04c — WS lifecycle internals
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal shape of the underlying ws WebSocket exposed by ethers v6's
+ * WebSocketProvider via `(provider as any).websocket`. Strongly-typed here
+ * so the lifecycle code reads cleanly without `(rawWs as any)` proliferation.
+ *
+ * ethers v6 does NOT publicly type this surface — the cast is necessary per
+ * 19-RESEARCH.md §6.1 + ethers-io/ethers.js#1053 (no built-in heartbeat;
+ * direct ws access is the recommended workaround).
+ */
+interface WsLike {
+    isAlive?: boolean;
+    on(event: 'close' | 'pong', handler: () => void): void;
+    ping(): void;
+    terminate(): void;
+}
+
+/**
+ * Install the heartbeat ping/pong cycle on the active wsProvider.
+ *
+ * Pattern from 19-RESEARCH.md §6.1 + ws@^8.20.0 README "How to detect and close
+ * broken connections":
+ *   1. Initialise isAlive=true on the raw ws.
+ *   2. Register pong handler that re-sets isAlive=true.
+ *   3. Every HEARTBEAT_INTERVAL_MS:
+ *      - If isAlive is still false from the previous tick (no pong arrived)
+ *        → ws.terminate() to fire 'close' → reconnect path.
+ *      - Otherwise: set isAlive=false; call ws.ping(). The remote SHOULD
+ *        respond with a pong before the next tick, flipping isAlive=true
+ *        via the registered pong handler.
+ *   4. Clear the heartbeat interval on close so we don't leak setInterval
+ *      handles across reconnects.
+ *
+ * ANTIRUG-12 mandates this surface because ethers v6 has no built-in
+ * heartbeat (issue #1053) — NAT timeouts and half-open sockets would
+ * otherwise leave the anti-rug detector silently dead.
+ */
+function setupHeartbeat(ctx: ChainContext): void {
+    const chainName = ctx.chain.name;
+    const state = chainState.get(chainName);
+    if (!state || !ctx.wsProvider) return;
+
+    const rawWs = (ctx.wsProvider as unknown as { websocket: WsLike })
+        .websocket;
+    rawWs.isAlive = true;
+
+    rawWs.on('pong', () => {
+        rawWs.isAlive = true;
+        state.lastPongTs = Date.now();
+    });
+
+    // Clear any pre-existing interval (defence-in-depth — if reconnect raced
+    // a stale heartbeat tick).
+    if (state.heartbeatInterval) {
+        clearInterval(state.heartbeatInterval);
+    }
+
+    state.heartbeatInterval = setInterval(() => {
+        if (rawWs.isAlive === false) {
+            log.warn(
+                {
+                    chain: chainName,
+                    op: 'antirug.heartbeat.dead',
+                },
+                'WS heartbeat dead — terminating',
+            );
+            rawWs.terminate(); // triggers 'close' → handleWsClose
+            return;
+        }
+        rawWs.isAlive = false;
+        rawWs.ping();
+    }, HEARTBEAT_INTERVAL_MS);
+
+    rawWs.on('close', () => {
+        if (state.heartbeatInterval) {
+            clearInterval(state.heartbeatInterval);
+            state.heartbeatInterval = null;
+        }
+    });
+}
+
+/**
+ * Reconnect loop with exponential backoff (1s → 60s capped) + tiered
+ * D-VIS-WS-HEALTH alerts.
+ *
+ * Tier 1 (info): each reconnect attempt logs at warn level with structured
+ *   fields (chain, attempts, delay). No Telegram alert.
+ * Tier 2 (warning): consecutive failures hits RECONNECT_FAILURE_ALERT_THRESHOLD
+ *   → sendCtxAlert with "[WS RECONNECT FAILED] {chain} — 3 consecutive
+ *   reconnect attempts failed; manual intervention may be required".
+ *   Fires AT MOST ONCE per disconnect window.
+ * Tier 3 (critical): elapsed disconnected duration exceeds
+ *   DISCONNECT_ALERT_THRESHOLD_MS → sendCtxAlert with "[WS DISCONNECTED >60s]
+ *   {chain} — anti-rug monitor offline for {N} seconds; positions on this
+ *   chain are UNMONITORED" + broadcast 'chain_ws_health_change' state='disconnected'.
+ *   Fires AT MOST ONCE per disconnect window via `alertedFor60s`.
+ *
+ * On successful reconnect:
+ *   1. Construct new WebSocketProvider (raises if RPC unreachable; loops).
+ *   2. Mutate ctx.wsProvider to the new instance — preserves the same
+ *      ChainContext shape callers across the codebase expect.
+ *   3. Re-subscribe via startChainAntiRugListener (which re-arms heartbeat
+ *      + close handler + backfill).
+ *
+ * Pre-existing wsProvider is `destroy()`-ed via removeWsProvider so the
+ * cached singleton in src/utils/provider.ts doesn't leak.
+ */
+async function handleWsClose(ctx: ChainContext): Promise<void> {
+    const chainName = ctx.chain.name;
+    const state = chainState.get(chainName);
+    if (!state) return;
+
+    // Idempotency guard: if we are already mid-reconnect for this chain,
+    // skip a second concurrent loop. ethers v6 + ws's terminate() can fire
+    // 'close' multiple times in rapid succession (e.g. heartbeat-dead +
+    // server-side hangup race).
+    if (state.healthState === 'reconnecting') {
+        log.debug(
+            {
+                chain: chainName,
+                op: 'antirug.ws.reconnect-already-in-progress',
+            },
+            'Skipping duplicate close — reconnect already underway',
+        );
+        return;
+    }
+    state.healthState = 'reconnecting';
+
+    broadcast('chain_ws_health_change', {
+        chain: chainName,
+        state: 'reconnecting',
+    });
+
+    log.warn(
+        {
+            chain: chainName,
+            op: 'antirug.ws.disconnected',
+        },
+        'Anti-rug WS disconnected — beginning reconnect loop',
+    );
+
+    const disconnectStartTs = Date.now();
+    let reconnectDelay = 1000;
+    let consecutiveFailures = 0;
+    let alertedFor60s = false;
+    let alertedForReconnectFailures = false;
+
+    // Reconnect loop — terminates on successful reconnect (break).
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+        await new Promise((r) => setTimeout(r, reconnectDelay));
+        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
+
+        // Tier 3 check: elapsed disconnected duration > 60s threshold.
+        const disconnectedDurationMs = Date.now() - disconnectStartTs;
+        if (
+            disconnectedDurationMs > DISCONNECT_ALERT_THRESHOLD_MS &&
+            !alertedFor60s
+        ) {
+            const durationSec = Math.floor(disconnectedDurationMs / 1000);
+            log.error(
+                {
+                    chain: chainName,
+                    durationSec,
+                    op: 'antirug.ws.disconnected-over-60s',
+                },
+                'WS disconnected >60s',
+            );
+            await sendCtxAlert(
+                ctx,
+                `*[WS DISCONNECTED >60s]* ${chainName} — anti-rug monitor offline for ${durationSec} seconds; positions on this chain are UNMONITORED`,
+            );
+            broadcast('chain_ws_health_change', {
+                chain: chainName,
+                state: 'disconnected',
+                disconnectedDurationSec: durationSec,
+            });
+            alertedFor60s = true;
+        }
+
+        try {
+            // Drop the stale provider from the singleton cache and construct
+            // a fresh one. removeWsProvider's destroy() releases the underlying
+            // ws socket.
+            removeWsProvider(chainName);
+            const newWsProvider = new WebSocketProvider(
+                ctx.chain.wsRpcUrl!,
+                ctx.chain.chainId,
+            );
+            ctx.wsProvider = newWsProvider;
+            state.wsProvider = newWsProvider;
+            state.reconnectAttempts = 0;
+
+            log.info(
+                {
+                    chain: chainName,
+                    op: 'antirug.ws.reconnected',
+                },
+                'Anti-rug WS reconnected — re-subscribing + backfilling',
+            );
+
+            // Force a fresh subscription. startChainAntiRugListener is
+            // idempotent: it drops the prior activeDispatcher/activeFilter
+            // (which point at the now-dead ws) before installing a fresh one.
+            // Then it re-arms the heartbeat + close handler + backfill.
+            state.activeDispatcher = null;
+            state.activeFilter = null;
+            await startChainAntiRugListener(ctx);
+            break;
+        } catch (err) {
+            consecutiveFailures += 1;
+            state.reconnectAttempts = consecutiveFailures;
+            log.warn(
+                {
+                    err: err instanceof Error ? err.message : String(err),
+                    chain: chainName,
+                    attempts: consecutiveFailures,
+                    delay: reconnectDelay,
+                    op: 'antirug.ws.reconnect-failed',
+                },
+                'Anti-rug WS reconnect failed — retrying',
+            );
+
+            // Tier 2 check: hit RECONNECT_FAILURE_ALERT_THRESHOLD consecutive failures.
+            // Fires AT MOST ONCE per disconnect window so a long outage with
+            // many failures does not spam Telegram.
+            if (
+                consecutiveFailures >= RECONNECT_FAILURE_ALERT_THRESHOLD &&
+                !alertedForReconnectFailures
+            ) {
+                log.error(
+                    {
+                        chain: chainName,
+                        attempts: consecutiveFailures,
+                        op: 'antirug.ws.reconnect-failed-3x',
+                    },
+                    'Anti-rug WS reconnect failed 3 consecutive times',
+                );
+                await sendCtxAlert(
+                    ctx,
+                    `*[WS RECONNECT FAILED]* ${chainName} — 3 consecutive reconnect attempts failed; manual intervention may be required`,
+                );
+                alertedForReconnectFailures = true;
+            }
+        }
+    }
+}
+
+/**
+ * Replay the missed-block window through the evaluator after a reconnect or
+ * at restart time. Reads `chain_state.last_seen_block` (Plan 19-01) for the
+ * window's lower bound; `ctx.httpProvider.getBlockNumber()` for the upper bound.
+ *
+ * FAIL CLOSED branch (D-BACKFILL): if gap exceeds `maxBackfillBlocks`, fire
+ * the [GAP DETECTED] tier-3 alert + broadcast 'antirug_event' kind='gap-detected'
+ * + skip backfill entirely. Operator must review manually.
+ *
+ * Within-cap branch: chunked getLogs via `getLogsForBackfill` (Plan 19-04a) at
+ * `backfillCapBlocks` per call. For each event:
+ *   - Evaluate via evaluateRugSignals.
+ *   - If verdict='unsafe': log `antirug.backfill.too-late` + broadcast
+ *     'antirug_event' outcome='too-late'.
+ *   - NEVER call `triggerAntiRugExit` — backfilled events are stale; live
+ *     exits on stale data are an explicit D-BACKFILL anti-pattern.
+ *
+ * After backfill completes, upserts chain_state with (chainName, currentBlock,
+ * unix-ts-now) so the next reconnect has the correct lower bound.
+ *
+ * No-prior-state path: if chain_state has no row for this chain, seed it with
+ * the current block — the bot has no missed-block window to replay.
+ */
+async function backfillSinceLastSeen(ctx: ChainContext): Promise<void> {
+    const chainName = ctx.chain.name;
+    const chainStateRow = getChainState.get(chainName) as
+        | { last_seen_block: number; last_updated_ts: number }
+        | undefined;
+
+    const currentBlock = await ctx.httpProvider.getBlockNumber();
+
+    if (!chainStateRow) {
+        // No prior chain_state — first reconnect on this chain. Seed with the
+        // current block; nothing to replay.
+        upsertChainState.run(
+            chainName,
+            currentBlock,
+            Math.floor(Date.now() / 1000),
+        );
+        log.info(
+            {
+                chain: chainName,
+                seedBlock: currentBlock,
+                op: 'antirug.backfill.seed',
+            },
+            'Seeded chain_state.last_seen_block (no prior state)',
+        );
+        return;
+    }
+
+    const lastSeen = chainStateRow.last_seen_block;
+    const gapBlocks = currentBlock - lastSeen;
+
+    if (gapBlocks <= 0) {
+        // No gap (or backwards — reorg / mock-time edge case). Idempotent
+        // refresh: update the timestamp without changing the block.
+        upsertChainState.run(
+            chainName,
+            lastSeen,
+            Math.floor(Date.now() / 1000),
+        );
+        return;
+    }
+
+    if (gapBlocks > ctx.chain.antiRug.maxBackfillBlocks) {
+        // FAIL CLOSED per D-BACKFILL — gap exceeds the maximum back-replay
+        // window. The operator must review the missed-block window manually;
+        // we do NOT pull a partial window because that would imply we have
+        // visibility into events we explicitly do not.
+        log.error(
+            {
+                chain: chainName,
+                gapBlocks,
+                lastSeen,
+                currentBlock,
+                maxBackfillBlocks: ctx.chain.antiRug.maxBackfillBlocks,
+                op: 'antirug.backfill.gap-detected',
+            },
+            '[GAP DETECTED] backfill skipped — gap exceeds maxBackfillBlocks',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[GAP DETECTED]* ${chainName} missed ${gapBlocks} blocks (${lastSeen}-${currentBlock}); backfill skipped per D-BACKFILL fail-closed; review anti-rug events manually`,
+        );
+        broadcast('antirug_event', {
+            chain: chainName,
+            kind: 'gap-detected',
+            gapBlocks,
+            fromBlock: lastSeen,
+            toBlock: currentBlock,
+            timestamp: Date.now(),
+        });
+        // Update chain_state to the current block so the NEXT reconnect
+        // doesn't re-hit the same gap. Operator review is informed via
+        // Telegram + dashboard — we are not silently swallowing the gap.
+        upsertChainState.run(
+            chainName,
+            currentBlock,
+            Math.floor(Date.now() / 1000),
+        );
+        return;
+    }
+
+    // Within-cap branch: chunked getLogs over (lastSeen+1, currentBlock).
+    const addresses = getRegisteredPositions(chainName).map(
+        (p) => p.pairOrPoolAddress,
+    );
+    if (addresses.length === 0) {
+        // No positions registered — nothing to backfill.
+        upsertChainState.run(
+            chainName,
+            currentBlock,
+            Math.floor(Date.now() / 1000),
+        );
+        return;
+    }
+
+    const topicUnion = [
+        PAIR_BURN_TOPIC,
+        PAIR_TRANSFER_TOPIC,
+        POOL_BURN_TOPIC,
+        POOL_COLLECT_TOPIC,
+    ];
+
+    let events: Log[];
+    try {
+        events = await getLogsForBackfill(
+            ctx,
+            lastSeen + 1,
+            currentBlock,
+            addresses,
+            [topicUnion],
+        );
+    } catch (err) {
+        // getLogsForBackfill propagates per Plan 19-04a; surface and abort.
+        // Do NOT update chain_state — next reconnect re-attempts the same
+        // window.
+        log.error(
+            {
+                err: err instanceof Error ? err.message : String(err),
+                chain: chainName,
+                fromBlock: lastSeen + 1,
+                toBlock: currentBlock,
+                op: 'antirug.backfill.getlogs-failed',
+            },
+            'Anti-rug backfill getLogs failed — chain_state preserved for retry',
+        );
+        return;
+    }
+
+    log.info(
+        {
+            chain: chainName,
+            fromBlock: lastSeen + 1,
+            toBlock: currentBlock,
+            gapBlocks,
+            eventCount: events.length,
+            op: 'antirug.backfill.window',
+        },
+        'Anti-rug backfill window replayed',
+    );
+
+    // Replay events through the evaluator — but log+broadcast as 'too-late'
+    // per D-BACKFILL anti-pattern rejection. NEVER call triggerAntiRugExit.
+    for (const event of events) {
+        const pairAddress = event.address.toLowerCase();
+        const perChain = positionRegistry.get(chainName);
+        if (!perChain) continue;
+        const positions = perChain.get(pairAddress) ?? [];
+        for (const position of positions) {
+            try {
+                const evaluation = (await evaluateRugSignalsShim(
+                    ctx,
+                    position,
+                    event,
+                )) as RugEvaluation | undefined;
+                if (evaluation && evaluation.verdict === 'unsafe') {
+                    log.warn(
+                        {
+                            tradeId: position.tradeId,
+                            chain: chainName,
+                            pair: pairAddress,
+                            evaluation,
+                            blockNumber: event.blockNumber,
+                            op: 'antirug.backfill.too-late',
+                        },
+                        'Backfilled would-have-sold event (too late to exit)',
+                    );
+                    broadcast('antirug_event', {
+                        chain: chainName,
+                        kind: 'trigger',
+                        token: position.tokenAddress,
+                        pair: pairAddress,
+                        signals:
+                            'signals' in evaluation
+                                ? evaluation.signals
+                                : undefined,
+                        outcome: 'too-late',
+                        timestamp: Date.now(),
+                    });
+                }
+            } catch (err) {
+                log.error(
+                    {
+                        err: err instanceof Error ? err.message : String(err),
+                        tradeId: position.tradeId,
+                        chain: chainName,
+                        op: 'antirug.backfill.eval-failed',
+                    },
+                    'Backfill evaluator failed for a position — continuing',
+                );
+            }
+        }
+    }
+
+    upsertChainState.run(
+        chainName,
+        currentBlock,
+        Math.floor(Date.now() / 1000),
+    );
+}
+
+/**
+ * HTTP polling fallback for chains without a WS endpoint configured.
+ *
+ * Pattern mirrors src/bot.ts:758-810 startHttpPollingListener:
+ *   - Every HTTP_POLL_INTERVAL_MS, call getBlockNumber() + getLogs() over the
+ *     (lastBlock+1, currentBlock) window with the registered address+topic union.
+ *   - For each event, route through dispatchEvent → evaluateRugSignals — same
+ *     LIVE path as WS (HTTP polling is LIVE, not BACKFILL).
+ *   - After each poll, upsertChainState so a future WS reconnect knows the
+ *     correct last-seen-block.
+ *
+ * Unlike the WS path, HTTP polling has no heartbeat — the loop self-detects
+ * RPC issues via the try/catch on getBlockNumber+getLogs. Errors are logged
+ * but the interval continues.
+ */
+async function startHttpPollingAntiRug(ctx: ChainContext): Promise<void> {
+    const chainName = ctx.chain.name;
+    const state = chainState.get(chainName);
+    if (!state) return;
+
+    // Seed lastBlock from chain_state or current block.
+    let lastBlock: number;
+    const chainStateRow = getChainState.get(chainName) as
+        | { last_seen_block: number; last_updated_ts: number }
+        | undefined;
+    if (chainStateRow) {
+        lastBlock = chainStateRow.last_seen_block;
+    } else {
+        lastBlock = await ctx.httpProvider.getBlockNumber();
+        upsertChainState.run(
+            chainName,
+            lastBlock,
+            Math.floor(Date.now() / 1000),
+        );
+    }
+
+    state.healthState = 'connected'; // HTTP polling counts as connected for D-VIS-WS-HEALTH
+    state.lastSeenBlock = lastBlock;
+    broadcast('chain_ws_health_change', {
+        chain: chainName,
+        state: 'connected',
+        mode: 'http-polling',
+        lastPongTs: Date.now(),
+    });
+
+    log.info(
+        {
+            chain: chainName,
+            startBlock: lastBlock,
+            pollIntervalMs: HTTP_POLL_INTERVAL_MS,
+            op: 'antirug.http-polling.started',
+        },
+        'Anti-rug HTTP polling fallback started',
+    );
+
+    setInterval(async () => {
+        try {
+            const currentBlock = await ctx.httpProvider.getBlockNumber();
+            if (currentBlock <= lastBlock) return;
+
+            const addresses = getRegisteredPositions(chainName).map(
+                (p) => p.pairOrPoolAddress,
+            );
+            if (addresses.length === 0) {
+                lastBlock = currentBlock;
+                upsertChainState.run(
+                    chainName,
+                    currentBlock,
+                    Math.floor(Date.now() / 1000),
+                );
+                return;
+            }
+
+            const events = await ctx.httpProvider.getLogs({
+                address: addresses,
+                fromBlock: lastBlock + 1,
+                toBlock: currentBlock,
+                topics: [
+                    [
+                        PAIR_BURN_TOPIC,
+                        PAIR_TRANSFER_TOPIC,
+                        POOL_BURN_TOPIC,
+                        POOL_COLLECT_TOPIC,
+                    ],
+                ],
+            });
+
+            for (const event of events) {
+                // HTTP polling is LIVE — events through this path can fire
+                // triggerAntiRugExit (via the evaluator's confirm-blocks gate).
+                // dispatchEvent is the same router the WS path uses.
+                await dispatchEvent(ctx, event);
+            }
+
+            lastBlock = currentBlock;
+            state.lastSeenBlock = currentBlock;
+            upsertChainState.run(
+                chainName,
+                currentBlock,
+                Math.floor(Date.now() / 1000),
+            );
+        } catch (err) {
+            log.error(
+                {
+                    err: err instanceof Error ? err.message : String(err),
+                    chain: chainName,
+                    op: 'antirug.http-polling.error',
+                },
+                'Anti-rug HTTP polling cycle failed — will retry next tick',
+            );
+        }
+    }, HTTP_POLL_INTERVAL_MS);
 }
 
 // ---------------------------------------------------------------------------
