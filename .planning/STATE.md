@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: verifying
-stopped_at: Phase 19 context gathered
-last_updated: "2026-05-23T22:15:33.007Z"
-last_activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts V2+V3 wiring + HONEY-12 9th gate + D-ALERTS + 6 integration tests + D-18-09-01 fix-along)
+status: executing
+stopped_at: Phase 19 UI-SPEC approved
+last_updated: "2026-05-24T00:41:20.953Z"
+last_activity: 2026-05-24 -- Phase 19 planning complete
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 14
+  total_plans: 24
   completed_plans: 13
   percent: 20
 ---
@@ -32,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 Phase: 18 (honeypot-detection-rebuild) — EXECUTING (18-08 DEFERRED; 10/11 plans done; phase verification gated on 18-08)
 Plan: 10 of 11 complete (18-00..18-07, 18-09, 18-10); 18-08 (BSC/Base/Arb multi-chain HoneypotChecker deploy) DEFERRED per operator direction
-Status: Bot V2 + V3 gates wired and ready — operator can resume ETH mainnet trading. To complete phase 18: run a fresh `/gsd-execute-phase 18` after operator confirms (a) ETH HoneypotChecker observation window closed cleanly, (b) ready to fund deploy wallets on BSC + Base + Arbitrum, (c) ready for a batched operator session of 3 deploys + 3 source-verifies + 3 chainRegistry literal commits. The phase will NOT auto-verify; only 18-08 remains.
-Last activity: 2026-05-22 — Phase 18 plan 18-10 complete (bot.ts V2+V3 wiring + HONEY-12 9th gate + D-ALERTS + 6 integration tests + D-18-09-01 fix-along)
+Status: Ready to execute
+Last activity: 2026-05-24 -- Phase 19 planning complete
 
 ## Performance Metrics
 
@@ -124,7 +124,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-23T22:15:32.991Z
+Last session: 2026-05-23T22:56:48.409Z
 Last activity: 2026-05-15 — Phase 18 plan 18-05 complete. HONEY-02 Slither + Mythril audit run on contracts/honeypot/HoneypotChecker.sol covering BOTH checkV2 + checkV3 entry points. Slither 0.11.5 surfaced 13 medium+ findings (4 High + 9 Medium) — ALL dispositioned `false-positive` against the eth_call-only revert-always design: `arbitrary-send-eth` × 2 = caller-chosen router is by design; `reentrancy-balance` × 2 = the documented lying-balanceOf catch; `unused-return` × 6 = balance-delta reads override router-returned values; `uninitialized-local` × 2 = catch-always-reverts flow-sense limitation; `incorrect-equality` × 1 = correct semantic for `V3_SELL_WETH_ZERO`. Mythril 0.24.8 reported `success: true, issues: []`. **Stop-the-Line determination: NO escalation; deploy gate cleared for HONEY-03.** 0 `accepted-risk` rows → no operator sign-off required. Audit doc `.planning/milestones/v6.17-honeypot-checker-audit.md` (`ee2e2a1`) commits the disposition table + D-AUDIT-PATH per-host install notes. CI gate (`c43c3cd`) locks audit-bar evergreen via `dorny/paths-filter@v3` + 3 new jobs (`hardhat-compile` / `slither` / `mythril`) gated on `contracts/**`; Phase 17 evergreen `.todo` ban + `tsc --noEmit ×3` guards preserved verbatim. HONEY-02 row marked Complete in REQUIREMENTS.md.
-Stopped at: Phase 19 context gathered
-Resume file: .planning/phases/19-anti-rug-runtime-monitoring/19-CONTEXT.md
+Stopped at: Phase 19 UI-SPEC approved
+Resume file: .planning/phases/19-anti-rug-runtime-monitoring/19-UI-SPEC.md
