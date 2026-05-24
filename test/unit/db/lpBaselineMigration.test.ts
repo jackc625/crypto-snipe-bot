@@ -201,10 +201,15 @@ describe('Phase 19 — Schema v4→v5 lp_baseline + chain_state migration', () =
             expect(dbModule.getChainState).toBeDefined();
         });
 
-        it('production user_version pragma reports 5 after module load', async () => {
+        it('production user_version pragma reports >= 5 after module load (Phase 19 floor; future migrations advance it further)', async () => {
+            // Phase 19 / ANTIRUG-04 introduced v5. Plan 20-01 (Phase 20) bumped to v6.
+            // This test asserts the Phase 19 floor — production DB must be AT LEAST v5.
+            // Tightening to `=== N` would break each time a future plan lands a new
+            // migration step. Per-migration version asserts live in their own
+            // *Migration.test.ts file (e.g., pauseStateMigration.test.ts asserts v6).
             const dbModule = await import('../../../src/utils/db');
             const version = dbModule.db.pragma('user_version', { simple: true }) as number;
-            expect(version).toBe(5);
+            expect(version).toBeGreaterThanOrEqual(5);
         });
     });
 

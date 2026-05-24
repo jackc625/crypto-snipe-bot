@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -151,6 +151,44 @@ function migrateSchema(): void {
             );
         `);
         logger.info('Created lp_baseline + chain_state tables (schema version 5)');
+    }
+
+    if (version < 6) {
+        // Phase 20 / Plan 20-01 / OPS-LIVE-09 + D-PAUSE-STORAGE + D-ANTIRUG-LIVE-GATE-CODE.
+        // Adds two operationally-critical surfaces atomically:
+        //   (a) pause_state — single-row table (CHECK(id=1)) tracking the operator
+        //       kill-switch flag, audit-columned (paused_at, paused_by, reason) so
+        //       restart preserves the pause state per OPS-LIVE-09 + D-PAUSED-RESTART.
+        //       paused_by sentinel values: 'dashboard' / 'cli' / 'preflight' / 'manual'.
+        //   (b) chain_state.antirug_dry_run_started — INTEGER column added via
+        //       PRAGMA-guarded ALTER (defense-in-depth) recording the first-ever
+        //       dry-run timestamp per chain. The 7-day live-gate floor per
+        //       D-ANTIRUG-LIVE-GATE-CODE checks this column.
+        //
+        // DDL wrapped in db.transaction() for atomicity (RESEARCH §1 + A1) — if any
+        // statement fails, the whole migration rolls back so the bot never sees a
+        // partial v5.5 state. INSERT OR IGNORE + ALTER guard make re-runs no-ops.
+        db.transaction(() => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS pause_state (
+                    id INTEGER PRIMARY KEY CHECK(id = 1),
+                    paused INTEGER NOT NULL DEFAULT 0,
+                    paused_at INTEGER,
+                    paused_by TEXT,
+                    reason TEXT
+                );
+            `);
+            db.exec(`INSERT OR IGNORE INTO pause_state (id, paused, paused_at, paused_by, reason) VALUES (1, 0, NULL, NULL, NULL)`);
+
+            // ALTER guard — clone v3→v4 pattern at db.ts:113-119. If the column already
+            // exists (e.g. partial-rerun after a prior crash mid-transaction), skip the ALTER.
+            const columns = db.prepare("PRAGMA table_info('chain_state')").all() as Array<{ name: string }>;
+            const hasColumn = columns.some(c => c.name === 'antirug_dry_run_started');
+            if (!hasColumn) {
+                db.exec(`ALTER TABLE chain_state ADD COLUMN antirug_dry_run_started INTEGER`);
+            }
+        })();
+        logger.info('Created pause_state table + antirug_dry_run_started column (schema version 6)');
     }
 
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -494,6 +532,45 @@ const upsertChainState = db.prepare(`
 
 const getChainState = db.prepare(`SELECT last_seen_block, last_updated_ts FROM chain_state WHERE chain = ?`);
 
+// --- Pause-State Prepared Statements (Phase 20 / Plan 20-01 / OPS-LIVE-09 / D-PAUSE-STORAGE) ---
+//
+// Single-row pause_state table; CHECK(id=1) guarantees the row is always at id=1
+// and the v6 migration seeds it on first boot (INSERT OR IGNORE), so the SELECT
+// here always returns a row — readers never need to handle null.
+//
+// Consumers (Plans 20-02 / 20-04 / 20-05 / 20-07 / 20-08):
+//   - getPauseState: kill-switch checkpoints + dashboard read + startMultiChainBot
+//                    boot-time pause replay (D-PAUSED-RESTART) read.
+//   - setPauseState: dashboard pause endpoint + CLI pause script + preflight wallet
+//                    undercut handler (paused_by sentinel values:
+//                    'dashboard' / 'cli' / 'preflight' / 'manual').
+//   - clearPauseState: dashboard resume + CLI resume.
+const getPauseState = db.prepare(`SELECT paused, paused_at, paused_by, reason FROM pause_state WHERE id = 1`);
+const setPauseState = db.prepare(`UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 1`);
+const clearPauseState = db.prepare(`UPDATE pause_state SET paused = 0, paused_at = NULL, paused_by = NULL, reason = NULL WHERE id = 1`);
+
+// --- Anti-Rug Dry-Run Gate (Phase 20 / Plan 20-01 / D-ANTIRUG-LIVE-GATE-CODE) ---
+//
+// setAntirugDryRunStarted is intentionally idempotent: ONLY the first call per
+// chain records the timestamp. Subsequent calls preserve the original ts via
+// COALESCE(chain_state.antirug_dry_run_started, excluded.antirug_dry_run_started).
+// This guarantees the 7-day live-gate floor is measured from the operator's
+// real first-ever dry-run boot, not from the most recent restart.
+//
+// Three positional binds: (chain, now-unix-ts as last_updated_ts, now-unix-ts as
+// antirug_dry_run_started). When chain row already exists, last_updated_ts may
+// also need refresh elsewhere — this statement is scoped to the dry-run-start
+// signal only. last_seen_block defaults to 0 on first insert (the anti-rug
+// detector will overwrite via upsertChainState on first event).
+const setAntirugDryRunStarted = db.prepare(`
+    INSERT INTO chain_state (chain, last_seen_block, last_updated_ts, antirug_dry_run_started)
+    VALUES (?, 0, ?, ?)
+    ON CONFLICT(chain) DO UPDATE SET
+        antirug_dry_run_started = COALESCE(chain_state.antirug_dry_run_started, excluded.antirug_dry_run_started)
+`);
+
+const getAntirugDryRunStarted = db.prepare(`SELECT antirug_dry_run_started FROM chain_state WHERE chain = ?`);
+
 // --- Exports ---
 
 export function closeDb(): void {
@@ -519,4 +596,10 @@ export {
     deleteLpBaseline,
     upsertChainState,
     getChainState,
+    // Phase 20 / Plan 20-01 / OPS-LIVE-09 / D-PAUSE-STORAGE + D-ANTIRUG-LIVE-GATE-CODE
+    getPauseState,
+    setPauseState,
+    clearPauseState,
+    setAntirugDryRunStarted,
+    getAntirugDryRunStarted,
 };
