@@ -1,54 +1,305 @@
-// Phase 20 / Plan 20-00 / OPS-LIVE-02 (mid-run path) — Wave 0 test stub.
-// Implementation lands in plan 20-04 (auto-pause-on-undercut wiring).
+// Phase 20 / Plan 20-04 / OPS-LIVE-02 (mid-run path) — auto-pause-on-undercut wiring.
 //
-// Covers D-MID-RUN-CHECK from 20-CONTEXT.md: periodic re-check at default 5-minute
-// interval uses the SAME snipeAmount × maxOpenPositions + gas_buffer floor as the
-// preflight. On undercut: flip the global pause flag with paused_by='preflight' +
-// reason='wallet balance below floor: {chain} {balance} < {floor}'; Telegram alert;
-// pino fatal log. Exit monitors keep running. Operator must refund + resume.
-//
-// Idempotency mitigation (T-20-04 from threat model): re-firing the mid-run check
-// while already paused must NOT broadcast a duplicate pause_state_change event nor
-// send a duplicate Telegram alert.
-//
-// Observable assertions per D-04:
-//   - setPauseState.run called with paused_by='preflight' + reason containing
-//     'wallet balance below floor: '
-//   - broadcast spy called with 'pause_state_change' event ONCE per undercut
-//   - pino fatal log emitted with { check: 'wallet-balance', chain, balance, floor }
-//   - sendCtxAlert spy called with message containing '*BOT PAUSED*'
-//   - Idempotent re-fire: when already paused, broadcast + sendCtxAlert NOT called again
-//
-// Plan 20-04 will replace it.skip with it; pattern follows
-// test/integration/v3LiquidityWait.test.ts (vi.doMock of httpProvider, db, sendCtxAlert,
-// broadcast; vi.useFakeTimers() to advance the 5-min interval).
+// Asserts that startMultiChainBot() schedules a setInterval at
+// MID_RUN_CHECK_INTERVAL_SEC (default 300s = 300_000ms) and that on undercut
+// the global pause flag flips with paused_by='preflight', a broadcast fires
+// with 'pause_state_change', a Telegram alert is sent, and the path is
+// idempotent (T-20-04: re-firing while already paused does NOT alert again).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Module-scope spies — re-armed in beforeEach because mockReset: true in
+// vitest.config.ts wipes implementations between tests.
+const preflightMock = vi.fn();
+const checkWalletBalanceMock = vi.fn();
+const broadcastMock = vi.fn();
+const sendCtxAlertMock = vi.fn();
+const sendTelegramAlertMock = vi.fn();
+const setPauseStateRunMock = vi.fn();
+const getPauseStateGetMock = vi.fn();
+const buildChainRegistryMock = vi.fn();
+const getEnabledChainsMock = vi.fn();
+const createChainContextMock = vi.fn();
+const createMevStrategyMock = vi.fn();
+const healthCheckMock = vi.fn();
+const startApiServerMock = vi.fn();
+const startTelegramListenerMock = vi.fn();
+const verifyAllowlistMock = vi.fn();
+const startChainAntiRugListenerMock = vi.fn();
+const registerAntiRugPositionMock = vi.fn();
+const fatalLogMock = vi.fn();
+
+const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+    throw new Error(`__process.exit(${code})__`);
+}) as never);
+
+// ---- Mocks (must be registered BEFORE the dynamic import) ----
+
+vi.doMock('../../src/preflight', () => ({
+    preflight: preflightMock,
+    checkWalletBalance: checkWalletBalanceMock,
+}));
+
+vi.doMock('../../src/chainRegistry', async () => {
+    const actual = await vi.importActual<typeof import('../../src/chainRegistry')>('../../src/chainRegistry');
+    return {
+        ...actual,
+        buildChainRegistry: buildChainRegistryMock,
+        getEnabledChains: getEnabledChainsMock,
+        createChainContext: createChainContextMock,
+    };
+});
+
+vi.doMock('../../src/utils/db', () => {
+    const stmt = { run: vi.fn(), get: vi.fn().mockReturnValue({ paused: 0 }), all: vi.fn().mockReturnValue([]) };
+    return {
+        db: {
+            prepare: vi.fn().mockReturnValue(stmt),
+            pragma: vi.fn(),
+            exec: vi.fn(),
+            transaction: vi.fn().mockImplementation((fn: any) => fn),
+        },
+        insertTrade: { run: vi.fn() },
+        updateTradeStatus: { run: vi.fn() },
+        isTokenSniped: { get: vi.fn().mockReturnValue(undefined) },
+        getTradeIdForPendingToken: { get: vi.fn() },
+        upsertExitState: { run: vi.fn() },
+        getExitState: { get: vi.fn() },
+        deleteExitState: { run: vi.fn() },
+        getOpenPositionCount: vi.fn().mockReturnValue(0),
+        getTotalExposure: vi.fn().mockReturnValue(0),
+        getDailyRealizedLoss: vi.fn().mockReturnValue(0),
+        upsertLpBaseline: { run: vi.fn() },
+        getLpBaseline: { get: vi.fn() },
+        deleteLpBaseline: { run: vi.fn() },
+        upsertChainState: { run: vi.fn() },
+        getChainState: { get: vi.fn() },
+        setAntirugDryRunStarted: { run: vi.fn() },
+        getAntirugDryRunStarted: { get: vi.fn().mockReturnValue({ antirug_dry_run_started: null }) },
+        getPauseState: { get: getPauseStateGetMock },
+        setPauseState: { run: setPauseStateRunMock },
+        clearPauseState: { run: vi.fn() },
+    };
+});
+
+vi.doMock('../../src/anti-rug/detector', () => ({
+    registerAntiRugPosition: registerAntiRugPositionMock,
+    startChainAntiRugListener: startChainAntiRugListenerMock,
+}));
+
+vi.doMock('../../src/anti-rug/allowlist', () => ({
+    verifyAllowlistAtStartup: verifyAllowlistMock,
+}));
+
+vi.doMock('../../src/api/server', () => ({
+    startApiServer: startApiServerMock,
+}));
+
+vi.doMock('../../src/utils/notifier', () => ({
+    sendTelegramAlert: sendTelegramAlertMock,
+    sendCtxAlert: sendCtxAlertMock,
+}));
+
+vi.doMock('../../src/telegramListener', () => ({
+    startTelegramListener: startTelegramListenerMock,
+}));
+
+vi.doMock('../../src/api/ws/broadcaster', () => ({
+    broadcast: broadcastMock,
+    addClient: vi.fn(),
+    removeClient: vi.fn(),
+    getClientCount: vi.fn().mockReturnValue(0),
+}));
+
+vi.doMock('../../src/utils/provider', () => ({
+    getProvider: vi.fn().mockReturnValue({
+        getNetwork: vi.fn().mockResolvedValue({ chainId: 1n }),
+        getBalance: vi.fn().mockResolvedValue(BigInt('1000000000000000000')),
+    }),
+    getWallet: vi.fn().mockReturnValue({ address: '0xWallet' }),
+    getWsProvider: vi.fn().mockReturnValue(null),
+    removeWsProvider: vi.fn(),
+}));
+
+vi.doMock('../../src/utils/txManager', () => ({
+    sendTxWithRetry: vi.fn().mockResolvedValue('0xtxhash'),
+    createMevStrategy: createMevStrategyMock,
+}));
+
+function defaultChain() {
+    return {
+        chainId: 1,
+        name: 'eth',
+        displayName: '[ETH]',
+        enabled: true,
+        nativeCurrency: 'ETH',
+        wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+        httpRpcUrl: 'http://test',
+        wsRpcUrl: null,
+        dexes: [] as unknown[],
+        mevStrategy: 'passthrough' as const,
+        mevConfig: {},
+        safetyApis: { honeypot: 'honeypot.is' as const, liquidityLock: 'unicrypt' as const, tokenSecurity: 'goplus' as const },
+        snipeAmount: '0.01',
+        maxCapital: '1.0',
+        gasBuffer: '0.005',
+        blockAgeToleranceSec: 300,
+        honeypotChecker: {
+            deployedAddress: '0x0000000000000000000000000000000000000001',
+            method: 'exactInputSingle' as const,
+            maxBuyTaxBps: 1000,
+            maxSellTaxBps: 1000,
+        },
+        antiRug: {},
+        allowlist: [],
+    };
+}
+
+function rearmAllMocks() {
+    preflightMock.mockReset().mockResolvedValue(undefined);
+    checkWalletBalanceMock.mockReset();
+    broadcastMock.mockReset();
+    sendCtxAlertMock.mockReset().mockResolvedValue(undefined);
+    sendTelegramAlertMock.mockReset().mockResolvedValue(undefined);
+    setPauseStateRunMock.mockReset();
+    getPauseStateGetMock.mockReset().mockReturnValue({ paused: 0 });
+    healthCheckMock.mockReset().mockResolvedValue(true);
+    createMevStrategyMock.mockReset().mockReturnValue({ healthCheck: healthCheckMock });
+    startApiServerMock.mockReset().mockResolvedValue(undefined);
+    startTelegramListenerMock.mockReset().mockResolvedValue({ stop: vi.fn() });
+    verifyAllowlistMock.mockReset().mockResolvedValue(undefined);
+    startChainAntiRugListenerMock.mockReset().mockResolvedValue(undefined);
+    registerAntiRugPositionMock.mockReset().mockResolvedValue(undefined);
+    fatalLogMock.mockReset();
+    exitSpy.mockClear();
+
+    buildChainRegistryMock.mockReset().mockImplementation(() => {
+        const registry = new Map<string, ReturnType<typeof defaultChain>>();
+        registry.set('eth', defaultChain());
+        return registry;
+    });
+    getEnabledChainsMock.mockReset().mockImplementation((registry: Map<string, unknown>) =>
+        Array.from(registry.values()).filter((c: any) => c.enabled),
+    );
+    createChainContextMock.mockReset().mockImplementation((chain: any) => ({
+        chain,
+        httpProvider: {
+            getNetwork: vi.fn().mockResolvedValue({ chainId: BigInt(chain.chainId) }),
+            getBalance: vi.fn().mockResolvedValue(BigInt('1000000000000000000')),
+        },
+        wsProvider: null,
+        wallet: { address: '0xWallet' },
+        log: {
+            info: vi.fn(),
+            warn: vi.fn(),
+            debug: vi.fn(),
+            error: vi.fn(),
+            fatal: fatalLogMock,
+        },
+    }));
+}
+
 describe('mid-run wallet undercut', () => {
     beforeEach(() => {
-        // Plan 20-04 will: vi.useFakeTimers(); seed in-memory DB at user_version=6
-        // with pause_state.paused=0; mock httpProvider.getBalance; mock sendCtxAlert
-        // + broadcast spies; pino fatal spy.
+        vi.useFakeTimers();
+        rearmAllMocks();
+        delete process.env.MID_RUN_CHECK_INTERVAL_SEC;
     });
 
     afterEach(() => {
-        // Plan 20-04 will: vi.restoreAllMocks() + vi.useRealTimers() + vi.resetModules().
+        vi.useRealTimers();
+        delete process.env.MID_RUN_CHECK_INTERVAL_SEC;
     });
 
-    it.skip('reason: pending impl in plan 20-04 — asserts balance drop below floor mid-run (httpProvider.getBalance returns 0.001 ETH < 0.008 floor) → setPauseState.run called with paused_by=preflight + reason containing wallet balance below floor: eth 0.001 < 0.008 ETH (SQLite row + paused_by audit assertion)', () => {
-        /* impl */
+    it('schedules setInterval at MID_RUN_CHECK_INTERVAL_SEC (default 300_000ms) and calls checkWalletBalance per chain context on tick', async () => {
+        checkWalletBalanceMock.mockResolvedValue({
+            chain: 'eth',
+            check: 'wallet-balance',
+            passed: true,
+        });
+        const bot = await import('../../src/bot');
+        await bot.startMultiChainBot();
+
+        const callsBefore = checkWalletBalanceMock.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(300_000);
+        expect(checkWalletBalanceMock.mock.calls.length).toBeGreaterThan(callsBefore);
     });
 
-    it.skip('reason: pending impl in plan 20-04 — asserts broadcast spy called exactly once with WebSocket event pause_state_change payload { paused: true, pausedBy: preflight, reason: ... } on first undercut detection', () => {
-        /* impl */
+    it('on undercut: flips pause flag with paused_by=preflight, broadcasts pause_state_change, sends sendCtxAlert containing *BOT PAUSED*, emits pino fatal', async () => {
+        checkWalletBalanceMock.mockResolvedValue({
+            chain: 'eth',
+            check: 'wallet-balance',
+            passed: false,
+            reason: 'wallet balance below floor: 0.001 < 0.105 ETH',
+            details: { balance: '0.001', floor: '0.105' },
+        });
+        // getPauseState defaults to { paused: 0 } from rearmAllMocks
+        const bot = await import('../../src/bot');
+        await bot.startMultiChainBot();
+
+        await vi.advanceTimersByTimeAsync(300_000);
+        // Drain the promise queue inside the setInterval callback
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(setPauseStateRunMock).toHaveBeenCalled();
+        const callArgs = setPauseStateRunMock.mock.calls[0];
+        // Args: (paused_at_unix_ts, paused_by, reason)
+        expect(callArgs[1]).toBe('preflight');
+        expect(String(callArgs[2])).toContain('wallet balance below floor');
+
+        expect(broadcastMock).toHaveBeenCalledWith(
+            'pause_state_change',
+            expect.objectContaining({ paused: true, pausedBy: 'preflight' }),
+        );
+
+        expect(sendCtxAlertMock).toHaveBeenCalled();
+        const pauseAlert = sendCtxAlertMock.mock.calls.find((c) => String(c[1]).includes('*BOT PAUSED*'));
+        expect(pauseAlert).toBeDefined();
+
+        expect(fatalLogMock).toHaveBeenCalled();
     });
 
-    it.skip('reason: pending impl in plan 20-04 — asserts pino fatal log emitted with { check: wallet-balance, chain: eth, balance, floor } AND sendCtxAlert spy called with Telegram message containing *BOT PAUSED* on first undercut detection', () => {
-        /* impl */
+    it('T-20-04 idempotence: when already paused, second tick does NOT call setPauseState, broadcast, or sendCtxAlert again', async () => {
+        checkWalletBalanceMock.mockResolvedValue({
+            chain: 'eth',
+            check: 'wallet-balance',
+            passed: false,
+            reason: 'wallet balance below floor: 0.001 < 0.105 ETH',
+            details: { balance: '0.001', floor: '0.105' },
+        });
+        // Simulate already-paused state from before startup.
+        getPauseStateGetMock.mockReturnValue({ paused: 1, paused_at: 123, paused_by: 'preflight', reason: 'prior' });
+
+        const bot = await import('../../src/bot');
+        await bot.startMultiChainBot();
+
+        await vi.advanceTimersByTimeAsync(300_000);
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(setPauseStateRunMock).not.toHaveBeenCalled();
+        expect(broadcastMock).not.toHaveBeenCalledWith('pause_state_change', expect.anything());
+        const pauseAlerts = sendCtxAlertMock.mock.calls.filter((c) => String(c[1]).includes('*BOT PAUSED*'));
+        expect(pauseAlerts.length).toBe(0);
     });
 
-    it.skip('reason: pending impl in plan 20-04 — asserts idempotent re-fire (T-20-04 mitigation): when mid-run check fires a SECOND time while pause_state.paused=1 already, broadcast NOT called again AND sendCtxAlert NOT called again — single alert per pause cycle, not flood', () => {
-        /* impl */
+    it('env override MID_RUN_CHECK_INTERVAL_SEC=60 → setInterval scheduled at 60_000ms', async () => {
+        process.env.MID_RUN_CHECK_INTERVAL_SEC = '60';
+        checkWalletBalanceMock.mockResolvedValue({
+            chain: 'eth',
+            check: 'wallet-balance',
+            passed: true,
+        });
+        const bot = await import('../../src/bot');
+        await bot.startMultiChainBot();
+
+        // Before 60_000ms: no mid-run call (allow short ticks for the initial
+        // promise-chain settling done by startMultiChainBot to drain).
+        await vi.advanceTimersByTimeAsync(59_000);
+        const callsAt59s = checkWalletBalanceMock.mock.calls.length;
+
+        // After 60_000ms: mid-run call fires
+        await vi.advanceTimersByTimeAsync(2_000);
+        const callsAt61s = checkWalletBalanceMock.mock.calls.length;
+        expect(callsAt61s).toBeGreaterThan(callsAt59s);
     });
 });
