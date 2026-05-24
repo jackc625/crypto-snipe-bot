@@ -115,6 +115,20 @@ vi.mock('../../../src/anti-rug/exitTrigger', () => ({
     triggerAntiRugExit: triggerAntiRugExitMock,
 }));
 
+// db mock — Phase 20 / Plan 20-03 added setAntirugDryRunStarted.run() inside
+// startChainAntiRugListener entry. Without this mock, every test that calls
+// startChainAntiRugListener writes to the production data/bot.db singleton
+// because src/utils/db.ts binds the DB at module-load time (no path override
+// once the singleton is created). Stubbed as no-ops because this evaluator
+// test verifies the multi-signal AND chain + grace-window state, not db
+// persistence.
+vi.mock('../../../src/utils/db', () => ({
+    upsertChainState: { run: vi.fn() },
+    getChainState: { get: vi.fn().mockReturnValue(undefined) },
+    setAntirugDryRunStarted: { run: vi.fn() },
+    getAntirugDryRunStarted: { get: vi.fn().mockReturnValue(undefined) },
+}));
+
 // Ethers Contract mock — every test injects per-Contract mocks via the
 // __antiRugEvaluatorMocks globalThis bridge (class-based pattern from Plan
 // 19-03 lpBaseline.test.ts; survives vitest's mockReset: true).

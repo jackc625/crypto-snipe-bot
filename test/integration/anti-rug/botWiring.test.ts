@@ -121,6 +121,12 @@ vi.mock('../../../src/utils/db', () => ({
     deleteLpBaseline: { run: vi.fn() },
     upsertChainState: { run: vi.fn() },
     getChainState: { get: vi.fn() },
+    // Phase 20 / Plan 20-03 — startChainAntiRugListener now calls
+    // setAntirugDryRunStarted.run(chain, now, now). Stub as no-op since
+    // this test verifies bot.ts wiring of the detector lifecycle, not db
+    // persistence of the dry-run timestamp.
+    setAntirugDryRunStarted: { run: vi.fn() },
+    getAntirugDryRunStarted: { get: vi.fn().mockReturnValue(undefined) },
 }));
 
 // Heavyweight imports that bot.ts pulls in transitively — silence them.

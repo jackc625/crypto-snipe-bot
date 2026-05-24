@@ -93,6 +93,20 @@ vi.mock('../../../src/anti-rug/lpBaseline', () => ({
     loadLpBaseline: loadLpBaselineMock,
 }));
 
+// db mock — Phase 20 / Plan 20-03 added setAntirugDryRunStarted.run() inside
+// startChainAntiRugListener entry. Without this mock, every test that calls
+// startChainAntiRugListener writes to the production data/bot.db singleton
+// because src/utils/db.ts binds the DB at module-load time (no path override
+// once the singleton is created). The chain_state prepared statements are
+// stubbed as no-ops since this test verifies registry/dispatch/topic-filter
+// shape, not db persistence.
+vi.mock('../../../src/utils/db', () => ({
+    upsertChainState: { run: vi.fn() },
+    getChainState: { get: vi.fn().mockReturnValue(undefined) },
+    setAntirugDryRunStarted: { run: vi.fn() },
+    getAntirugDryRunStarted: { get: vi.fn().mockReturnValue(undefined) },
+}));
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------

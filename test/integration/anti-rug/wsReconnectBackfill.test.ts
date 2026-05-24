@@ -188,6 +188,12 @@ beforeEach(() => {
         upsertLpBaseline: { run: vi.fn() },
         getLpBaseline: { get: vi.fn() },
         deleteLpBaseline: { run: vi.fn() },
+        // Phase 20 / Plan 20-03 — startChainAntiRugListener now calls
+        // setAntirugDryRunStarted.run(chain, now, now). Stub as no-op since
+        // this test verifies WS lifecycle (heartbeat + reconnect + backfill),
+        // not db persistence of the dry-run timestamp.
+        setAntirugDryRunStarted: { run: vi.fn() },
+        getAntirugDryRunStarted: { get: vi.fn().mockReturnValue(undefined) },
     }));
 
     // Mock ethers — class-based WebSocketProvider; bare-bones Contract.

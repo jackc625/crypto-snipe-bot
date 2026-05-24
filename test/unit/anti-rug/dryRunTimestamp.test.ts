@@ -27,41 +27,80 @@
 //           proving COALESCE-idempotence under controlled-clock semantics.
 //
 // Test infrastructure:
-//   - process.env.DB_PATH is set to a tmp file BEFORE importing the
-//     production db module so the production singleton binds to the test
-//     file (not data/bot.db). The real schema migration v1..v6 runs against
-//     the tmp file; real prepared statements are exercised.
-//   - mock dependencies of src/anti-rug/detector that aren't needed for
-//     this test surface: lpBaseline (no positions registered), allowlist
-//     (no allowlist lookups), notifier+broadcaster+provider (no
-//     ws-lifecycle alerts in this test path).
+//   - src/utils/db is FULLY MOCKED with an in-memory better-sqlite3 instance
+//     and real-shape prepared statements (same SQL the production module uses).
+//     This eliminates singleton-cache contamination of data/bot.db that would
+//     otherwise occur whenever vitest workers load src/utils/db before this
+//     test file runs (the production singleton is bound at module-load time
+//     based on whoever imports first).
+//   - Mock detector dependencies that aren't needed for this test surface:
+//     lpBaseline (no positions registered), allowlist (no allowlist lookups),
+//     notifier+broadcaster+provider (no ws-lifecycle alerts in this path).
 //   - Ctx is built minimally: chain.name + chain.antiRug.* fields +
-//     wsProvider stub + httpProvider stub. Plan 19-04c WS lifecycle
-//     scaffolding fires on startChainAntiRugListener but we only assert
-//     the new db-write behavior; the WS plumbing is incidental.
+//     wsProvider stub + httpProvider stub.
 
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
+import Database from 'better-sqlite3';
 
 // ---------------------------------------------------------------------------
-// CRITICAL: DB_PATH MUST be set BEFORE any test in this file (or any test
-// that runs after this file in the same vitest worker) imports
-// `src/utils/db`. Vitest module-level imports execute BEFORE beforeAll
-// hooks, so setting DB_PATH in beforeAll is TOO LATE — the production
-// singleton may already be bound to data/bot.db, leading to test
-// contamination of the operator's real database.
+// Mock src/utils/db with an in-memory SQLite instance + real-shape prepared
+// statements. This is the ONLY way to guarantee the production singleton's
+// data/bot.db file is never touched by this test (regardless of which other
+// test files share the vitest worker).
 //
-// We set DB_PATH at file-load time, BEFORE the production module can be
-// imported through any code path (including indirect imports via the
-// detector module). This guarantees the singleton's bound DB_PATH is our
-// per-test-run tmp file. The `__dirname/tmp-dryrun-ts.db` location lives
-// inside the test folder so it survives across workers within the same
-// vitest run (each worker shares this file, but our tests delete
-// chain_state between each it() so no cross-test interference).
-const TEST_DB_PATH = path.join(os.tmpdir(), `gsd-20-03-dryrun-${process.pid}-${Date.now()}.db`);
-process.env.DB_PATH = TEST_DB_PATH;
+// The setAntirugDryRunStarted SQL is COPIED verbatim from src/utils/db.ts
+// (Phase 20 / Plan 20-01) so this test verifies the COALESCE-on-conflict
+// semantic the production module relies on. If the production SQL changes,
+// this test must be updated in lockstep.
+// ---------------------------------------------------------------------------
+
+const mockDb = new Database(':memory:');
+mockDb.pragma('journal_mode = WAL');
+
+// Apply the v6 schema shape that startChainAntiRugListener depends on
+// (chain_state table with antirug_dry_run_started column). Mirrors the
+// Plan 20-01 migration v5→v6 contract.
+mockDb.exec(`
+    CREATE TABLE IF NOT EXISTS chain_state (
+        chain TEXT PRIMARY KEY,
+        last_seen_block INTEGER NOT NULL,
+        last_updated_ts INTEGER NOT NULL,
+        antirug_dry_run_started INTEGER
+    );
+`);
+
+// Prepared statements — same SQL as src/utils/db.ts:565-572
+const mockSetAntirugDryRunStarted = mockDb.prepare(`
+    INSERT INTO chain_state (chain, last_seen_block, last_updated_ts, antirug_dry_run_started)
+    VALUES (?, 0, ?, ?)
+    ON CONFLICT(chain) DO UPDATE SET
+        antirug_dry_run_started = COALESCE(chain_state.antirug_dry_run_started, excluded.antirug_dry_run_started)
+`);
+const mockGetAntirugDryRunStarted = mockDb.prepare(
+    `SELECT antirug_dry_run_started FROM chain_state WHERE chain = ?`,
+);
+// Other db.ts exports that detector.ts imports (upsertChainState, getChainState).
+// Plan 19-04c WS lifecycle calls these in some code paths; provide no-op-safe stubs.
+const mockUpsertChainState = mockDb.prepare(
+    `INSERT INTO chain_state (chain, last_seen_block, last_updated_ts)
+     VALUES (?, ?, ?)
+     ON CONFLICT(chain) DO UPDATE SET
+        last_seen_block = excluded.last_seen_block,
+        last_updated_ts = excluded.last_updated_ts`,
+);
+const mockGetChainState = mockDb.prepare(
+    `SELECT chain, last_seen_block, last_updated_ts, antirug_dry_run_started FROM chain_state WHERE chain = ?`,
+);
+
+vi.mock('../../../src/utils/db', () => ({
+    db: mockDb,
+    setAntirugDryRunStarted: mockSetAntirugDryRunStarted,
+    getAntirugDryRunStarted: mockGetAntirugDryRunStarted,
+    upsertChainState: mockUpsertChainState,
+    getChainState: mockGetChainState,
+    // closeDb is a no-op for this test surface (mockDb is module-scoped).
+    closeDb: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // Mocks: keep startChainAntiRugListener side-effect surface tight to the
@@ -115,31 +154,9 @@ vi.mock('../../../src/utils/provider', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Tmp DB lifecycle. DB_PATH was already set at file-load time (above).
-// All four tests share one tmp DB. Each test resets the chain_state row
-// in beforeEach so cross-test interference is avoided.
+// Lifecycle: reset mock-DB chain_state row + detector registry between tests
+// so each test starts from a clean slate.
 // ---------------------------------------------------------------------------
-
-afterAll(async () => {
-    // Close the production singleton so the tmp file is releasable on Windows.
-    try {
-        const dbModule = await import('../../../src/utils/db');
-        dbModule.closeDb();
-    } catch {
-        // already closed or never imported
-    }
-    try {
-        // Remove tmp DB + SQLite WAL/SHM sidecars if present.
-        for (const suffix of ['', '-wal', '-shm', '-journal']) {
-            const p = TEST_DB_PATH + suffix;
-            if (fs.existsSync(p)) {
-                fs.rmSync(p, { force: true });
-            }
-        }
-    } catch {
-        // best-effort cleanup
-    }
-});
 
 beforeEach(async () => {
     logInfo.mockClear();
@@ -147,19 +164,18 @@ beforeEach(async () => {
     logError.mockClear();
     logFatal.mockClear();
     logDebug.mockClear();
-    // Wipe chain_state between tests so each starts from a clean slate
-    // (prepared statements have ON CONFLICT(chain) DO UPDATE semantics —
-    // we need a fresh row for each "first-time-start" assertion).
-    const dbModule = await import('../../../src/utils/db');
-    dbModule.db.prepare(`DELETE FROM chain_state`).run();
+    mockDb.prepare(`DELETE FROM chain_state`).run();
 });
 
 afterEach(async () => {
-    // Clear detector internal registry between tests.
     const mod = await import('../../../src/anti-rug/detector');
     if (typeof mod._resetRegistryForTesting === 'function') {
         mod._resetRegistryForTesting();
     }
+});
+
+afterAll(() => {
+    mockDb.close();
 });
 
 // ---------------------------------------------------------------------------
@@ -225,7 +241,6 @@ function buildCtx(chainName: string): StubChainCtx {
 describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GATE-CODE", () => {
     it('Test 1: first call to startChainAntiRugListener records antirug_dry_run_started near current unix ts', async () => {
         const { startChainAntiRugListener } = await import('../../../src/anti-rug/detector');
-        const { getAntirugDryRunStarted } = await import('../../../src/utils/db');
 
         const ctx = buildCtx('eth');
         const beforeCallSec = Math.floor(Date.now() / 1000);
@@ -234,7 +249,7 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         );
         const afterCallSec = Math.floor(Date.now() / 1000);
 
-        const row = getAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null } | undefined;
+        const row = mockGetAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null } | undefined;
         expect(row).toBeDefined();
         expect(row!.antirug_dry_run_started).toBeTypeOf('number');
         // Recorded ts is within the [beforeCall, afterCall] window (±5s tolerance).
@@ -244,7 +259,6 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
 
     it('Test 2: re-calling startChainAntiRugListener for the same chain does NOT overwrite the original ts (COALESCE-idempotent)', async () => {
         const { startChainAntiRugListener } = await import('../../../src/anti-rug/detector');
-        const { getAntirugDryRunStarted } = await import('../../../src/utils/db');
 
         const ctx = buildCtx('eth');
 
@@ -252,7 +266,7 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         await startChainAntiRugListener(
             ctx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const firstRow = getAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
+        const firstRow = mockGetAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
         const firstTs = firstRow.antirug_dry_run_started!;
         expect(firstTs).toBeTypeOf('number');
 
@@ -265,20 +279,19 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         await startChainAntiRugListener(
             ctx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const secondRow = getAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
+        const secondRow = mockGetAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
         expect(secondRow.antirug_dry_run_started).toBe(firstTs);
     });
 
-    it('Test 3: cross-chain isolation — bsc registration records its own ts; eth ts from Test 1 is unaffected', async () => {
+    it('Test 3: cross-chain isolation — bsc registration records its own ts; eth ts is unaffected', async () => {
         const { startChainAntiRugListener } = await import('../../../src/anti-rug/detector');
-        const { getAntirugDryRunStarted } = await import('../../../src/utils/db');
 
         // Register eth first.
         const ethCtx = buildCtx('eth');
         await startChainAntiRugListener(
             ethCtx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const ethRow = getAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
+        const ethRow = mockGetAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
         const ethTs = ethRow.antirug_dry_run_started!;
         expect(ethTs).toBeTypeOf('number');
 
@@ -290,12 +303,12 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         await startChainAntiRugListener(
             bscCtx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const bscRow = getAntirugDryRunStarted.get('bsc') as { antirug_dry_run_started: number | null };
+        const bscRow = mockGetAntirugDryRunStarted.get('bsc') as { antirug_dry_run_started: number | null };
         const bscTs = bscRow.antirug_dry_run_started!;
         expect(bscTs).toBeTypeOf('number');
 
         // Each chain has its own ts; the bsc registration did NOT clobber eth.
-        const ethRowAfter = getAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
+        const ethRowAfter = mockGetAntirugDryRunStarted.get('eth') as { antirug_dry_run_started: number | null };
         expect(ethRowAfter.antirug_dry_run_started).toBe(ethTs);
 
         // bsc ts is distinct from eth ts (>= eth + 1s due to the sleep).
@@ -304,7 +317,6 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
 
     it('Test 4: with fake timers — first call records T0; after advancing 1 day, re-call leaves stored ts at T0', async () => {
         const { startChainAntiRugListener } = await import('../../../src/anti-rug/detector');
-        const { getAntirugDryRunStarted } = await import('../../../src/utils/db');
 
         const T0_MS = 1_700_000_000_000; // fixed wall-clock millisecond instant
         const T0_SEC = Math.floor(T0_MS / 1000);
@@ -316,7 +328,7 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         await startChainAntiRugListener(
             ctx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const row1 = getAntirugDryRunStarted.get('arb') as { antirug_dry_run_started: number | null };
+        const row1 = mockGetAntirugDryRunStarted.get('arb') as { antirug_dry_run_started: number | null };
         expect(row1.antirug_dry_run_started).toBe(T0_SEC);
 
         // Advance one day on the fake clock.
@@ -326,7 +338,7 @@ describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GA
         await startChainAntiRugListener(
             ctx as unknown as Parameters<typeof startChainAntiRugListener>[0],
         );
-        const row2 = getAntirugDryRunStarted.get('arb') as { antirug_dry_run_started: number | null };
+        const row2 = mockGetAntirugDryRunStarted.get('arb') as { antirug_dry_run_started: number | null };
         expect(row2.antirug_dry_run_started).toBe(T0_SEC);
 
         vi.useRealTimers();
