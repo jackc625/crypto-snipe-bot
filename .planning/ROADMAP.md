@@ -127,7 +127,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 19-02-PLAN.md - ChainConfig.antiRug field + per-chain envs + .env.example + REQUIRED_ENV_VARS + hardcoded V2+V3 allowlists; + operator checkpoint for TeamFinance V3 + PinkLock V3 (Blocker 4) [ANTIRUG-06, ANTIRUG-07, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11]
 
   **Wave 2** *(after Wave 1; foundation modules + detector registry skeleton):*
-  - [ ] 19-03-PLAN.md - anti-rug/types.ts + events.ts + allowlist.ts (verify+lookup+merge) + lpBaseline.ts (snapshot+load+clear) [ANTIRUG-04, ANTIRUG-06, ANTIRUG-15, ANTIRUG-16]
+  - [x] 19-03-PLAN.md - anti-rug/types.ts + events.ts + allowlist.ts (verify+lookup+merge) + lpBaseline.ts (snapshot+load+clear) [ANTIRUG-04, ANTIRUG-06, ANTIRUG-15, ANTIRUG-16]
   - [ ] 19-04a-PLAN.md - anti-rug/detector.ts skeleton: position registry + WS subscription pattern + topic filter union + getLogsForBackfill primitive (Warning 6 split) [ANTIRUG-01, 02, 03, 13]
 
   **Wave 3** *(after Wave 2; multi-signal evaluator):*
@@ -198,7 +198,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 2/10 | In Progress|  |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 3/10 | In Progress|  |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 

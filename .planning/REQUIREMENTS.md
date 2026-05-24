@@ -46,7 +46,7 @@ DETECT-02 — runtime monitoring of open positions for liquidity-removal events 
 - [ ] **ANTIRUG-03**: LP-token `Transfer(_, to=0xdEaD..., _)` event subscription as alternative rug-pattern (V2 path).
 - [x] **ANTIRUG-04**: Schema migration v4→v5 — adds `lp_baseline` table (`trade_id`, `pair_or_pool_address`, `pool_type` discriminator, `v2_token0_reserve`, `v2_token1_reserve`, `v2_lp_total_supply`, `snapshot_block`, `snapshot_ts`) AND `chain_state` table (`chain`, `last_seen_block`, `last_updated_ts`). Snapshot taken at buy-success. Additive only; no existing tables modified. *(Plan 19-01, 2026-05-24, commits `6091100` test + `522ae08` feat — 12/12 tests passing, full unit suite 288/288, tsc clean ×3.)*
 - [ ] **ANTIRUG-05**: Multi-signal trigger logic — fires only when (a) >50% of LP removed vs baseline AND (b) destination address NOT in allowlist AND (c) reserves drop below configurable sell-threshold. Single-signal triggers explicitly rejected.
-- [ ] **ANTIRUG-06**: Hardcoded allowlist of LP locker / multisig / known-safe destinations per chain — Unicrypt, TeamFinance, PinkLock canonical addresses verified during plan-phase. Stored in `src/anti-rug/allowlist.ts` and per-chain in `CHAIN_TEMPLATES`.
+- [x] **ANTIRUG-06**: Hardcoded allowlist of LP locker / multisig / known-safe destinations per chain — Unicrypt, TeamFinance, PinkLock canonical addresses verified during plan-phase. Stored in `src/anti-rug/allowlist.ts` and per-chain in `CHAIN_TEMPLATES`. *(Plan 19-02 + 19-03, 2026-05-24 — V2 + V3 HARDCODED_V*_ALLOWLIST constants ship per chain in `src/chainRegistry.ts`; `src/anti-rug/allowlist.ts` provides `verifyAllowlistAtStartup` (D-LIST-VERIFY `getCode()` + log.fatal on EOA), `isAddressAllowlisted` (case-insensitive lookup), `mergeAllowlist` (hardcoded + env-overlay concat). 9 allowlist module tests passing.)*
 - [ ] **ANTIRUG-07**: Confirm-after-N-blocks delay before exit fires (default 1 block on ETH, configurable per chain via env). Suppresses false positives on reorg-volatile or fast-finality chains.
 - [ ] **ANTIRUG-08**: Bridge to `exitEngine.executeFullSell` with new `reason: 'anti-rug'` discriminant on the existing reason union. Anti-rug calls `executeFullSell` (does NOT submit transactions directly — preserves sell lock, receipt decoding, DB cleanup, Telegram alerts). Elevated gas multiplier (default 2.0×, per-chain configurable).
 - [ ] **ANTIRUG-09**: Per-chain circuit breaker — auto-disable anti-rug for that chain after N triggers in a configurable window (default 3 in 1h). Manual operator-reset via dashboard.
@@ -164,7 +164,7 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | ANTIRUG-03 | Phase 19 | Pending |
 | ANTIRUG-04 | Phase 19 | Complete (Plan 19-01, 2026-05-24) |
 | ANTIRUG-05 | Phase 19 | Pending |
-| ANTIRUG-06 | Phase 19 | Pending |
+| ANTIRUG-06 | Phase 19 | Complete (Plan 19-02 + 19-03, 2026-05-24) |
 | ANTIRUG-07 | Phase 19 | Pending |
 | ANTIRUG-08 | Phase 19 | Pending |
 | ANTIRUG-09 | Phase 19 | Pending |
