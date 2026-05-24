@@ -86,7 +86,10 @@ export function AntiRugMonitorTile({ chain, events, onEventClick }: AntiRugMonit
               <span className="text-xs text-text-muted whitespace-nowrap shrink-0">
                 {formatTimeAgo(evt.timestamp)}
               </span>
-              <span className="text-sm text-text font-mono">{formatAddress(evt.pair)}</span>
+              {/* WR-09: gap-detected events have no pair (chain-level event). */}
+              <span className="text-sm text-text font-mono">
+                {evt.kind === 'gap-detected' ? '—' : formatAddress(evt.pair ?? '')}
+              </span>
               <span className="text-sm text-text-muted flex-1 truncate">
                 {evt.kind === 'allowlist-suppression'
                   ? `Allowlist hit — ${evt.lockerName ?? 'unknown locker'}`

@@ -49,12 +49,18 @@ export interface TriggerEvent {
  *   - 'trigger'              — confirmed rug signal evaluated (dry-run or live)
  *   - 'allowlist-suppression' — destination matched a known locker; no trigger
  *   - 'gap-detected'         — backfill window exceeded maxBackfillBlocks
+ *
+ * WR-09: `pair` is OPTIONAL because the 'gap-detected' kind is a
+ * chain-level event with no pair anchor. Consumers that destructure
+ * `pair` must guard for undefined (use `pair ?? ''` or branch on
+ * `kind`). Previously declared required, which silently mismatched the
+ * backend's gap-detected broadcast that omitted the field.
  */
 export interface AntiRugEvent {
   chain: string;
   kind: 'trigger' | 'allowlist-suppression' | 'gap-detected';
   token?: string;
-  pair: string;
+  pair?: string;
   signals?: RugSignals;
   outcome?: 'live-exit' | 'dry-run-would-have-sold' | 'too-late' | 'would-have-saved-X-ETH';
   timestamp: number;
