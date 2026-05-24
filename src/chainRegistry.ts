@@ -90,6 +90,16 @@ export interface ChainConfig {
     antiRug: AntiRugConfig;
     gas: GasConfig;
     snipeAmount: string;
+    // Phase 20 / Plan 20-02 / D-BALANCE-FLOOR + D-GAS-BUFFER: per-chain native-units
+    // gas buffer used in the preflight wallet-balance floor formula
+    // floor = parseEther(snipeAmount) × MAX_OPEN_POSITIONS + parseEther(gasBuffer).
+    // Operator override via <CHAIN>_GAS_BUFFER; default from CHAIN_TEMPLATES.
+    gasBuffer: string;
+    // Phase 20 / Plan 20-02 / OPS-LIVE-03: tolerance window for RPC block-tip
+    // staleness in seconds. preflight FATAL when (now - block.timestamp) > this.
+    // ~5× chain block-time per RESEARCH Open Question 4; env override via
+    // <CHAIN>_BLOCK_AGE_TOLERANCE_SEC.
+    blockAgeToleranceSec: number;
     maxCapital: string;
     explorerUrl: string;
     minLiquidityThreshold: string;
@@ -146,6 +156,14 @@ interface ChainTemplate {
     defaultAntiRugGasMultiplier: number;
     defaultAntiRugBackfillCapBlocks: number;
     defaultAntiRugMaxBackfillBlocks: number;
+    // Phase 20 / Plan 20-02 / D-GAS-BUFFER: per-chain native-units default for
+    // the preflight wallet-balance floor. Operator override via <CHAIN>_GAS_BUFFER
+    // (string, native units). Defaults: ETH 0.005, BSC 0.003, Base 0.0005, Arb 0.0005.
+    defaultGasBuffer: string;
+    // Phase 20 / Plan 20-02 / OPS-LIVE-03: per-chain RPC block-age tolerance default
+    // in seconds. Operator override via <CHAIN>_BLOCK_AGE_TOLERANCE_SEC. Defaults
+    // (~5× chain block-time per RESEARCH Open Question 4): ETH 300, BSC 60, Base 30, Arb 30.
+    defaultBlockAgeToleranceSec: number;
 }
 
 // Exported for test/integration/honeypotDeploy.*.test.ts (plan 18-07/18-08) so
@@ -211,6 +229,9 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultAntiRugGasMultiplier: 2.0,
         defaultAntiRugBackfillCapBlocks: 10,
         defaultAntiRugMaxBackfillBlocks: 7200,
+        // Phase 20 / Plan 20-02 / D-GAS-BUFFER + OPS-LIVE-03: ETH defaults.
+        defaultGasBuffer: '0.005',
+        defaultBlockAgeToleranceSec: 300,
     },
     bsc: {
         chainId: 56,
@@ -272,6 +293,9 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultAntiRugGasMultiplier: 2.0,
         defaultAntiRugBackfillCapBlocks: 500,
         defaultAntiRugMaxBackfillBlocks: 7200,
+        // Phase 20 / Plan 20-02 / D-GAS-BUFFER + OPS-LIVE-03: BSC defaults.
+        defaultGasBuffer: '0.003',
+        defaultBlockAgeToleranceSec: 60,
     },
     base: {
         chainId: 8453,
@@ -326,6 +350,9 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultAntiRugGasMultiplier: 2.0,
         defaultAntiRugBackfillCapBlocks: 500,
         defaultAntiRugMaxBackfillBlocks: 7200,
+        // Phase 20 / Plan 20-02 / D-GAS-BUFFER + OPS-LIVE-03: Base defaults.
+        defaultGasBuffer: '0.0005',
+        defaultBlockAgeToleranceSec: 30,
     },
     arb: {
         chainId: 42161,
@@ -380,6 +407,9 @@ export const CHAIN_TEMPLATES: Record<string, ChainTemplate> = {
         defaultAntiRugGasMultiplier: 2.0,
         defaultAntiRugBackfillCapBlocks: 500,
         defaultAntiRugMaxBackfillBlocks: 7200,
+        // Phase 20 / Plan 20-02 / D-GAS-BUFFER + OPS-LIVE-03: Arb defaults.
+        defaultGasBuffer: '0.0005',
+        defaultBlockAgeToleranceSec: 30,
     },
 };
 
@@ -633,6 +663,23 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
         const snipeAmount = process.env[`${template.envPrefix}_SNIPE_AMOUNT`] || template.defaultSnipeAmount;
         const maxCapital = process.env[`${template.envPrefix}_MAX_CAPITAL`] || template.defaultMaxCapital;
         const minLiquidityThreshold = process.env[`${template.envPrefix}_MIN_LIQUIDITY`] || template.defaultMinLiquidityThreshold;
+
+        // Phase 20 / Plan 20-02 / D-GAS-BUFFER: env overlay for native-units gas
+        // buffer (consumed by preflight + mid-run wallet floor formula).
+        const gasBuffer = process.env[`${template.envPrefix}_GAS_BUFFER`] || template.defaultGasBuffer;
+
+        // Phase 20 / Plan 20-02 / OPS-LIVE-03: env overlay for RPC block-age
+        // tolerance. Fail-loud on NaN / <=0 mirroring the Phase 18 tax-threshold
+        // FATAL pattern at chainRegistry.ts:654-660 (T-20-W2-02 fail-closed).
+        const blockAgeRaw = process.env[`${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`];
+        const blockAgeToleranceSec = blockAgeRaw ? Number(blockAgeRaw) : template.defaultBlockAgeToleranceSec;
+        if (Number.isNaN(blockAgeToleranceSec) || blockAgeToleranceSec <= 0) {
+            log.fatal(
+                { chain: chainName, key: `${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`, value: blockAgeRaw },
+                'Block-age tolerance must be a positive number (seconds)'
+            );
+            process.exit(1);
+        }
 
         // Plan 18-06 HONEY-05: per-chain HoneypotChecker overlay.
         //   <PREFIX>_HONEYPOT_CHECKER_ADDRESS — operator OVERRIDE for the
@@ -979,6 +1026,9 @@ export function buildChainRegistry(): Map<string, ChainConfig> {
             },
             gas: template.gas,
             snipeAmount,
+            // Phase 20 / Plan 20-02 — wired into ChainConfig for preflight + mid-run.
+            gasBuffer,
+            blockAgeToleranceSec,
             maxCapital,
             explorerUrl: template.explorerUrl,
             minLiquidityThreshold,

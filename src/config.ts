@@ -128,6 +128,32 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA', required: false, description: 'DEPRECATED unified V2+V3 locker overlay for Arbitrum (default: empty; prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2-only lockers in the V3 allowlist or vice versa; deprecation warn fires at startup when set)' },
     { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA_V2', required: false, description: 'V2-only locker checksummed addresses for Arbitrum (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
     { name: 'ARB_ANTIRUG_ALLOWLIST_EXTRA_V3', required: false, description: 'V3-only locker checksummed addresses for Arbitrum (operator overlay; preferred over the deprecated unified ALLOWLIST_EXTRA)' },
+
+    // --- Going-Live Ops Hardening (Phase 20, plan 20-02) ---
+    // Per D-ENV-EXAMPLE [USER-BINDING]: every var here lives in .env.example
+    // with default + 1-line inline-comment description. All required: false.
+    // Per-chain gas buffers (native units) for the preflight wallet-balance
+    // floor (D-BALANCE-FLOOR) and the mid-run undercut detector. Defaults
+    // chosen for capital safety on ~0.0124 ETH funded mainnet wallet.
+    { name: 'ETH_GAS_BUFFER', required: false, description: 'Per-chain gas buffer added to preflight wallet-balance floor for ETH (native units, default: 0.005)' },
+    { name: 'BSC_GAS_BUFFER', required: false, description: 'Per-chain gas buffer added to preflight wallet-balance floor for BSC (native units, default: 0.003)' },
+    { name: 'BASE_GAS_BUFFER', required: false, description: 'Per-chain gas buffer added to preflight wallet-balance floor for Base (native units, default: 0.0005)' },
+    { name: 'ARB_GAS_BUFFER', required: false, description: 'Per-chain gas buffer added to preflight wallet-balance floor for Arbitrum (native units, default: 0.0005)' },
+    // Per-chain RPC block-age tolerance (seconds) for the preflight RPC health
+    // check. Tip stale beyond this fires FATAL non-zero exit. Defaults ~5×
+    // chain block-time per RESEARCH Open Question 4.
+    { name: 'ETH_BLOCK_AGE_TOLERANCE_SEC', required: false, description: 'Preflight RPC block-age tolerance in seconds for ETH (default: 300; FATAL when (now - block.timestamp) > this)' },
+    { name: 'BSC_BLOCK_AGE_TOLERANCE_SEC', required: false, description: 'Preflight RPC block-age tolerance in seconds for BSC (default: 60)' },
+    { name: 'BASE_BLOCK_AGE_TOLERANCE_SEC', required: false, description: 'Preflight RPC block-age tolerance in seconds for Base (default: 30)' },
+    { name: 'ARB_BLOCK_AGE_TOLERANCE_SEC', required: false, description: 'Preflight RPC block-age tolerance in seconds for Arbitrum (default: 30)' },
+    // Mid-run wallet-balance re-check interval per D-MID-RUN-CHECK (consumed
+    // by Plan 20-04 setInterval wiring; registered now for D-ENV-EXAMPLE).
+    { name: 'MID_RUN_CHECK_INTERVAL_SEC', required: false, description: 'Periodic mid-run wallet re-check interval in seconds (default: 300 = 5 min)' },
+    // Stale-data warning + error thresholds per D-STALE-THRESHOLDS.
+    { name: 'STALE_WARN_SEC', required: false, description: 'Stale-position warn-threshold age in seconds (default: 120 = 2 min)' },
+    { name: 'STALE_ERROR_SEC', required: false, description: 'Stale-position error-threshold age in seconds (default: 600 = 10 min)' },
+    // Dashboard URL — consumed by Plan 20-05 operator CLI scripts (pause/resume).
+    { name: 'DASHBOARD_URL', required: false, description: 'Dashboard URL for operator CLI scripts (default: http://localhost:3000)' },
 ];
 
 function validateEnvVars(): void {
