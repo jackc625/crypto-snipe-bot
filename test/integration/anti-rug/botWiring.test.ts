@@ -298,12 +298,18 @@ beforeEach(() => {
     [logInfo, logWarn, logError, logFatal, logDebug,
      ctxLogInfo, ctxLogWarn, ctxLogError, ctxLogFatal, ctxLogDebug]
         .forEach(m => m.mockClear());
-    registerAntiRugPositionMock.mockClear();
-    startChainAntiRugListenerMock.mockClear();
+    registerAntiRugPositionMock.mockClear().mockResolvedValue(undefined);
+    startChainAntiRugListenerMock.mockClear().mockResolvedValue(undefined);
     verifyAllowlistAtStartupMock.mockClear().mockResolvedValue(undefined);
-    snapshotLpBaselineMock.mockClear();
+    snapshotLpBaselineMock.mockClear().mockResolvedValue(undefined);
     allMock.mockReset().mockReturnValue([]);
-    prepareSpy.mockClear();
+    // mockReset:true (per vitest.config.ts) wipes implementations between
+    // tests — re-set prepareSpy's factory so db.prepare(sql).all() works.
+    prepareSpy.mockClear().mockImplementation((_sql: string) => ({
+        all: allMock,
+        get: vi.fn(),
+        run: vi.fn(),
+    }));
 });
 
 // -----------------------------------------------------------------------------

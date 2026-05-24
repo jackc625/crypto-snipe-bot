@@ -64,6 +64,14 @@ import {
     isDexV2,
     isDexV3
 } from "./chainRegistry";
+// Phase 19 / Plan 19-05 — anti-rug wiring imports. snapshotLpBaseline writes
+// the V2/V3 LP baseline at buy success; registerAntiRugPosition hooks the
+// position into the per-chain WS dispatch; verifyAllowlistAtStartup is the
+// D-LIST-VERIFY startup-time getCode() audit per chain;
+// startChainAntiRugListener arms the WS lifecycle.
+import { snapshotLpBaseline } from './anti-rug/lpBaseline';
+import { registerAntiRugPosition, startChainAntiRugListener } from './anti-rug/detector';
+import { verifyAllowlistAtStartup } from './anti-rug/allowlist';
 import { canSnipe, recordSnipe } from "./riskManager";
 import { startApiServer } from './api/server';
 import { startTelegramListener, TelegramListenerHandle } from './telegramListener';
@@ -404,6 +412,28 @@ export async function handleNewPairForChain(
         const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
         if (tradeRow) {
             await startExitMonitor(ctx, dex, targetToken, null, ctx.chain.snipeAmount, tradeRow.id, originalTokenAmount);
+
+            // Phase 19 / Plan 19-05 — parallel anti-rug attach. snapshotLpBaseline
+            // writes the V2 reserves baseline; registerAntiRugPosition hooks the
+            // position into the per-chain anti-rug WS dispatch table. On baseline
+            // failure, the catch logs op='antirug.baseline-snapshot-failed' and
+            // SKIPS the register — the position is left UNMONITORED for anti-rug
+            // (operator-visible via the dashboard's per-position state badge per
+            // UI-SPEC) but the standard exit monitor remains active.
+            try {
+                await snapshotLpBaseline(ctx, dex, tradeRow.id, pairAddress, null);
+                registerAntiRugPosition(ctx, dex, targetToken, pairAddress, tradeRow.id, null);
+            } catch (err) {
+                ctx.log.error(
+                    {
+                        err,
+                        op: 'antirug.baseline-snapshot-failed',
+                        tradeId: tradeRow.id,
+                        pair: pairAddress,
+                    },
+                    'Anti-rug baseline snapshot failed; position UNMONITORED',
+                );
+            }
         } else {
             ctx.log.error({ token: targetToken }, 'Could not find trade ID for exit monitor');
         }
@@ -639,6 +669,26 @@ export async function handleNewV3PoolForChain(
         const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
         if (tradeRow) {
             await startExitMonitor(ctx, dex, targetToken, feeTier, ctx.chain.snipeAmount, tradeRow.id, originalTokenAmount);
+
+            // Phase 19 / Plan 19-05 — parallel anti-rug attach (V3). Threads
+            // poolAddress + feeTier into snapshotLpBaseline + registerAntiRugPosition.
+            // Baseline failure → log + skip register; position is UNMONITORED but
+            // standard exit monitor remains active.
+            try {
+                await snapshotLpBaseline(ctx, dex, tradeRow.id, poolAddress, feeTier);
+                registerAntiRugPosition(ctx, dex, targetToken, poolAddress, tradeRow.id, feeTier);
+            } catch (err) {
+                ctx.log.error(
+                    {
+                        err,
+                        op: 'antirug.baseline-snapshot-failed',
+                        tradeId: tradeRow.id,
+                        pool: poolAddress,
+                        feeTier,
+                    },
+                    'Anti-rug V3 baseline snapshot failed; position UNMONITORED',
+                );
+            }
         } else {
             ctx.log.error({ token: targetToken }, 'Could not find V3 trade ID for exit monitor');
         }
@@ -870,6 +920,14 @@ export async function startMultiChainBot(): Promise<void> {
     // 7. Resume monitoring for pending trades (chain-aware)
     resumeMultiChainMonitoring(contexts);
 
+    // Phase 19 / Plan 19-05 — resume anti-rug monitoring for pending trades
+    // after exit-engine resume. The lifecycle ordering is intentional:
+    // exit-engine first (so existing trailing-stop / stop-loss timers re-arm
+    // before the anti-rug detector starts re-evaluating events), then
+    // anti-rug. Allowlist verification (D-LIST-VERIFY) runs per chain inside
+    // resumeAntiRugMonitoring before the per-position re-register loop.
+    await resumeAntiRugMonitoring(contexts);
+
     // 7.5. Build onRestart callback for chain restart via dashboard (revised D-09)
     const onRestart = async (ctx: ChainContext): Promise<{ warnings: string[] }> => {
         const warnings: string[] = [];
@@ -990,6 +1048,117 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
         }).catch((e: unknown) => {
             ctx.log.error({ err: e, token }, 'Error checking balance for pending token');
         });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 19 / Plan 19-05 — resume anti-rug monitoring across all chains
+// ---------------------------------------------------------------------------
+
+/**
+ * Restart-time anti-rug resume. For every enabled chain:
+ *   1. verifyAllowlistAtStartup — D-LIST-VERIFY getCode() check on every
+ *      hardcoded + env-overlay allowlist address. process.exit(1) inside
+ *      verify on any EOA; if we reach the catch the call itself failed
+ *      (e.g. RPC unavailable) — log + continue (chain runs UNMONITORED).
+ *   2. SELECT t.id, t.token, t.chain, t.pool_type, t.fee_tier,
+ *      b.pair_or_pool_address FROM trades t INNER JOIN lp_baseline b ON
+ *      b.trade_id = t.id WHERE t.status = 'pending' AND t.action = 'buy'.
+ *      The INNER JOIN naturally excludes pre-Phase-19 trades that lack a
+ *      baseline row (CONTEXT.md "Real capital context" — bot has zero open
+ *      positions at ship time so this only matters defensively).
+ *   3. For each open trade, locate the matching DexConfig by `pool_type`
+ *      and call registerAntiRugPosition. Detector's restart-resume path
+ *      (Plan 19-04c) carries the WS lifecycle from here.
+ *   4. Per-chain startChainAntiRugListener — arms heartbeat + reconnect +
+ *      backfill via the lifecycle layer.
+ *
+ * Called from startMultiChainBot once at boot, AFTER resumeMultiChainMonitoring
+ * so the exit-engine timers are armed first before anti-rug events start
+ * dispatching.
+ */
+export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise<void> {
+    // Step 1 — per-chain allowlist verification per D-LIST-VERIFY. Serial
+    // (one chain at a time) keeps the startup log readable + the fail-loud
+    // process.exit semantics intact. If verifyAllowlistAtStartup throws
+    // (RPC unavailable etc.), that chain continues unmonitored.
+    for (const ctx of contexts) {
+        try {
+            await verifyAllowlistAtStartup(
+                ctx,
+                ctx.chain.antiRug.allowlistV2,
+                ctx.chain.antiRug.allowlistV3,
+            );
+        } catch (err) {
+            ctx.log.error(
+                {
+                    err,
+                    chain: ctx.chain.name,
+                    op: 'antirug.allowlist-verify-rpc-failed',
+                },
+                'Allowlist verify RPC failed; chain runs without anti-rug monitoring',
+            );
+            // Continue to the next chain — the chain itself stays up but
+            // anti-rug is silently disabled on that chain. Surfaces via the
+            // dashboard's per-chain WS health indicator (Plan 19-06).
+            continue;
+        }
+    }
+
+    // Step 2 — scan trades INNER JOIN lp_baseline for open positions.
+    const openTrades = db.prepare(`
+        SELECT t.id, t.token, t.chain, t.pool_type, t.fee_tier, b.pair_or_pool_address
+        FROM trades t
+        INNER JOIN lp_baseline b ON b.trade_id = t.id
+        WHERE t.status = 'pending' AND t.action = 'buy'
+    `).all() as Array<{
+        id: number;
+        token: string;
+        chain: string;
+        pool_type: 'v2' | 'v3';
+        fee_tier: number | null;
+        pair_or_pool_address: string;
+    }>;
+
+    // Step 3 — re-register each open position into the per-chain anti-rug
+    // dispatch table.
+    for (const trade of openTrades) {
+        const ctx = contexts.find(c => c.chain.name === trade.chain);
+        if (!ctx) {
+            log.warn(
+                { tradeId: trade.id, chain: trade.chain, op: 'antirug.resume.no-context' },
+                'Cannot resume anti-rug — no active context for chain',
+            );
+            continue;
+        }
+        // Find the DexConfig matching pool_type — first V2 dex for V2
+        // positions, the V3 dex for V3 positions.
+        const dex = ctx.chain.dexes.find(d => d.dexType === trade.pool_type);
+        if (!dex) {
+            ctx.log.error(
+                {
+                    tradeId: trade.id,
+                    poolType: trade.pool_type,
+                    op: 'antirug.resume.no-dex',
+                },
+                'Cannot resume anti-rug — no matching DEX for trade pool_type',
+            );
+            continue;
+        }
+        await registerAntiRugPosition(
+            ctx,
+            dex,
+            trade.token,
+            trade.pair_or_pool_address,
+            trade.id,
+            trade.fee_tier,
+        );
+    }
+
+    // Step 4 — arm per-chain WS lifecycle (heartbeat + reconnect + backfill).
+    // The listener naturally fires backfill via Plan 19-04c's first-call hook.
+    for (const ctx of contexts) {
+        await startChainAntiRugListener(ctx);
     }
 }
 
