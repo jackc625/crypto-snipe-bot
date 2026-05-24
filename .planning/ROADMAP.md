@@ -123,7 +123,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 10 plans (revision iteration 1: 19-04 split into 19-04a/b/c per Warning 6; 19-02 + 19-05 + 19-06 + 19-08 also revised per Blockers 1-4 + Warnings 5-11 + Infos 12-13)
 
   **Wave 1** *(foundation; parallel-safe - no inter-plan file overlap):*
-  - [ ] 19-01-PLAN.md - Schema migration v4 to v5 (lp_baseline + chain_state) + db.ts prepared statements [ANTIRUG-04]
+  - [x] 19-01-PLAN.md - Schema migration v4 to v5 (lp_baseline + chain_state) + db.ts prepared statements [ANTIRUG-04] *(completed 2026-05-24)*
   - [ ] 19-02-PLAN.md - ChainConfig.antiRug field + per-chain envs + .env.example + REQUIRED_ENV_VARS + hardcoded V2+V3 allowlists; + operator checkpoint for TeamFinance V3 + PinkLock V3 (Blocker 4) [ANTIRUG-06, ANTIRUG-07, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11]
 
   **Wave 2** *(after Wave 1; foundation modules + detector registry skeleton):*
@@ -198,9 +198,9 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 0/10 | Not started | - |
+| 19. Anti-Rug Runtime Monitoring | v6.17 | 1/10 | In Progress | - |
 | 20. Going-Live Ops Hardening | v6.17 | 0/? | Not started | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-05-23 — Phase 19 revision iteration 1: 19-04 split into 19-04a/b/c per Warning 6; ANTIRUG-13..16 added to REQUIREMENTS.md per Blocker 1; Blockers 2-4 + Warnings 5-11 + Infos 12-13 addressed in plans 19-01/02/04a-c/05/06/07/08*
+*Last updated: 2026-05-24 — Phase 19 plan 19-01 complete: ANTIRUG-04 + ANTIRUG-16 schema v4 to v5 migration (lp_baseline + chain_state) landed with 5 prepared statements + 12/12 tests passing*
