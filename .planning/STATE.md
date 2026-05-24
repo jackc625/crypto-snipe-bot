@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 20 plan 20-04 complete
-last_updated: "2026-05-24T22:06:14.754Z"
-last_activity: 2026-05-24
+stopped_at: Phase 20 plan 20-05 complete (controls.ts pause/resume routes + CLI scripts + npm bins)
+last_updated: "2026-05-24T22:15:00Z"
+last_activity: 2026-05-24 -- Phase 20 plan 20-05 complete (controls.ts +3 routes + scripts/{preflight,pause,resume}.ts + 3 npm bins + 9 CLI integration tests live)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 32
-  completed_plans: 28
-  percent: 40
+  completed_plans: 29
+  percent: 50
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 20 (going-live-ops-hardening) — EXECUTING
-Plan: 5 of 8 (20-00 + 20-01 + 20-02 + 20-03 + 20-04 complete; 20-05 next)
+Plan: 6 of 8 (20-00 + 20-01 + 20-02 + 20-03 + 20-04 + 20-05 complete; 20-06 next)
 Status: Ready to execute
 Last activity: 2026-05-24 — Phase 20 plan 20-04 complete (bot.ts preflight wiring + 6 V2/V3 killswitch CPs + mid-run wallet setInterval with T-20-04 idempotence; 16 new integration tests across 4 files; 2 cascade fix-in-flight test mocks; 7 commits; full unit 535/535 + integration 185/185; tsc clean ×3)
 

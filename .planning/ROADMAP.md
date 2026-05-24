@@ -179,7 +179,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 20-04-PLAN.md — src/bot.ts: preflight() call at line 880 + chainId-block removal + 3 V2 killswitch checkpoints + 3 V3 killswitch checkpoints + mid-run wallet setInterval (D-MID-RUN-CHECK + D-KILLSWITCH-CP1/CP2/CP3 + D-PREFLIGHT-FLOW + D-ROLLBACK) [OPS-LIVE-01, OPS-LIVE-02, OPS-LIVE-08]
 
   **Wave 4** *(after Wave 3; dashboard endpoints + CLI scripts + banner):*
-  - [ ] 20-05-PLAN.md — src/api/routes/controls.ts (POST /pause + POST /resume + GET /pause with sanitized reason + WS broadcast) + scripts/preflight.ts + scripts/pause.ts + scripts/resume.ts + package.json wiring [OPS-LIVE-09, OPS-LIVE-10, OPS-LIVE-11]
+  - [x] 20-05-PLAN.md — src/api/routes/controls.ts (POST /pause + POST /resume + GET /pause with sanitized reason + WS broadcast) + scripts/preflight.ts + scripts/pause.ts + scripts/resume.ts + package.json wiring [OPS-LIVE-09, OPS-LIVE-10, OPS-LIVE-11]
   - [ ] 20-06-PLAN.md — dashboard/src/components/PauseBanner.tsx full-bleed red banner (bg-loss text-white per CB banner analog) + WebSocketContext + useWebSocket extension for pause_state_change WS event + initial state hydration via GET /api/controls/pause + Resume button (D-PAUSE-UI) [OPS-LIVE-09]
 
   **Wave 5** *(after Wave 4; runbook + CI guard + docs):*
@@ -227,7 +227,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 5/8 | In Progress|  |
+| 20. Going-Live Ops Hardening | v6.17 | 6/8 | In Progress|  |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
