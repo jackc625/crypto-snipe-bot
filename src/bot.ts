@@ -352,6 +352,16 @@ export async function handleNewPairForChain(
 
     ctx.log.info({ token: targetToken, symbol }, 'All safety checks passed, buying');
 
+    // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP1 — post-safety-bank pause check.
+    // Pause flag set → return BEFORE bundle construction. No expensive RPC/MEV work.
+    {
+        const pauseStateCp1 = getPauseState.get() as { paused: number };
+        if (pauseStateCp1.paused === 1) {
+            ctx.log.info({ op: 'killswitch.cp1', token: targetToken, reason: 'global-pause' }, 'CP1 pause-check: aborting before bundle construction');
+            return;
+        }
+    }
+
     const path = [ctx.chain.wethAddress, targetToken];
     const deadline = Math.floor(Date.now() / 1000) + 60;
     const amountIn = ethers.parseEther(ctx.chain.snipeAmount);
@@ -368,6 +378,16 @@ export async function handleNewPairForChain(
         ctx.log.warn({ token: targetToken }, 'Failed to calculate slippage-adjusted minOut, defaulting to 0');
     }
 
+    // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP2 — post-bundle-build, pre-submit.
+    // Pause flag set → discard built bundle, do NOT submit.
+    {
+        const pauseStateCp2 = getPauseState.get() as { paused: number };
+        if (pauseStateCp2.paused === 1) {
+            ctx.log.info({ op: 'killswitch.cp2', token: targetToken, reason: 'global-pause' }, 'CP2 pause-check: discarding bundle before submit');
+            return;
+        }
+    }
+
     try {
         await sendTxWithRetry(
             () => ctx.wallet.populateTransaction({
@@ -382,6 +402,17 @@ export async function handleNewPairForChain(
             }),
             ctx
         );
+
+        // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 — post-MEV-submit audit log.
+        // Bundle is in flight; pause flipped between submit and record-trade.
+        // Trade IS recorded, exit monitor IS started. Pause never panic-sells.
+        {
+            const pauseStateCp3 = getPauseState.get() as { paused: number };
+            if (pauseStateCp3.paused === 1) {
+                ctx.log.info({ op: 'killswitch.cp3', token: targetToken, reason: 'global-pause-after-submit' }, 'CP3 pause-check: bundle already submitted, recording trade and arming exit monitor');
+                // intentionally fall through — do NOT return; pause never panic-sells
+            }
+        }
 
         recordSnipe(ctx.chain.name);
 

@@ -37,6 +37,11 @@ const getTradeIdForPendingTokenGetMock = vi
     .mockReturnValue({ id: 1 });
 const startExitMonitorMock = vi.fn().mockResolvedValue(undefined);
 
+// Phase 20 / Plan 20-04 — pause-state mocks hoisted to module scope.
+const getPauseStateGetMock = vi.fn().mockReturnValue({ paused: 0 });
+const setPauseStateRunMock = vi.fn();
+const clearPauseStateRunMock = vi.fn();
+
 const loggerInfoMock = vi.fn();
 const loggerWarnMock = vi.fn();
 const loggerErrorMock = vi.fn();
@@ -176,6 +181,17 @@ vi.doMock('../../src/utils/db', () => {
         getTotalExposure: vi.fn().mockReturnValue(0),
         getDailyRealizedLoss: vi.fn().mockReturnValue(0),
         closeDb: vi.fn(),
+        // Phase 20 / Plan 20-04 — pause-state references hoisted to module scope.
+        getPauseState: { get: getPauseStateGetMock },
+        setPauseState: { run: setPauseStateRunMock },
+        clearPauseState: { run: clearPauseStateRunMock },
+        upsertLpBaseline: { run: vi.fn() },
+        getLpBaseline: { get: vi.fn() },
+        deleteLpBaseline: { run: vi.fn() },
+        upsertChainState: { run: vi.fn() },
+        getChainState: { get: vi.fn() },
+        setAntirugDryRunStarted: { run: vi.fn() },
+        getAntirugDryRunStarted: { get: vi.fn().mockReturnValue({ antirug_dry_run_started: null }) },
     };
 });
 
@@ -271,6 +287,9 @@ describe('Phase 18 plan 18-10 — bot.ts V3 honeypot gate wiring (HONEY-08 + HON
         isTokenSnipedGetMock.mockReset().mockReturnValue(undefined);
         getTradeIdForPendingTokenGetMock.mockReset().mockReturnValue({ id: 1 });
         startExitMonitorMock.mockReset().mockResolvedValue(undefined);
+        getPauseStateGetMock.mockReset().mockReturnValue({ paused: 0 });
+        setPauseStateRunMock.mockReset();
+        clearPauseStateRunMock.mockReset();
         checkHoneypotForChainMock.mockReset().mockResolvedValue(false);
         isBlacklistedTokenForChainMock.mockReset().mockResolvedValue(false);
         checkTokenMetadataForChainMock.mockReset().mockResolvedValue(true);
