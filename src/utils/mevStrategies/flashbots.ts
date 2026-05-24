@@ -4,6 +4,7 @@
 import { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
 import type { MevStrategy } from './types';
+import { applyGasMultiplier } from './types';
 import { logger } from '../logger';
 
 const log = logger.child({ module: 'mev-flashbots' });
@@ -41,7 +42,8 @@ export class FlashbotsMevStrategy implements MevStrategy {
     txRequest: TransactionRequest,
     wallet: Wallet,
     provider: JsonRpcProvider,
-    maxRetries = 3
+    maxRetries = 3,
+    gasMultiplier?: number
   ): Promise<string> {
     const authSigner = new Wallet(this.authKey);
     const flashbotsProvider = await FlashbotsBundleProvider.create(
@@ -51,7 +53,9 @@ export class FlashbotsMevStrategy implements MevStrategy {
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        const gasPrice = (await provider.getFeeData()).gasPrice;
+        // Phase 19 / D-RACE-TELEMETRY: optional gasMultiplier elevates anti-rug exit gas.
+        const rawGasPrice = (await provider.getFeeData()).gasPrice;
+        const gasPrice = applyGasMultiplier(rawGasPrice, gasMultiplier);
         const populatedTx: TransactionRequest = {
           ...txRequest,
           gasLimit: txRequest.gasLimit || 300_000n,

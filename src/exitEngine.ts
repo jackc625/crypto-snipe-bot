@@ -460,19 +460,16 @@ export async function executeFullSell(
         // urgency of front-running a rug pull. All other reasons use the
         // chain's standard gas multiplier (unchanged behavior).
         //
-        // Implementation: shallow-copy ctx.chain.gas with the anti-rug
-        // multiplier swapped in, so the existing builder closures
-        // (buildV2SellTx / buildV3SellTx) transparently consume the elevated
-        // value through the chain config they already reference downstream
-        // for EIP-1559 fee fields. The original ctx remains untouched so
-        // logging / status surfaces report unchanged config.
-        const gasMultiplier = reason === 'anti-rug'
-            ? ctx.chain.antiRug.gasMultiplier
-            : ctx.chain.gas.multiplier;
-        // gasMultiplier is currently surfaced via the alert format for
-        // operator-visible elevated-gas confirmation; gasManager consults
-        // ctx.chain.gas.multiplier when fee fields are built downstream.
-        void gasMultiplier;
+        // Phase 19 Gap-1 closure (2026-05-24): the gas multiplier is
+        // threaded into the MEV strategy via the sendTxWithRetry sixth
+        // argument. When reason='anti-rug', the chain's anti-rug
+        // multiplier (default 2.0 — see CHAIN_TEMPLATES) elevates the
+        // EIP-1559 maxFee/priorityFee (or legacy gasPrice) of the
+        // populated tx to improve race odds against the rug-puller.
+        // For all other reasons, no multiplier is passed (raw feeData,
+        // preserving prior behavior for trailing-stop / stop-loss /
+        // urgency-market-sell).
+        const gasMultiplier = reason === 'anti-rug' ? ctx.chain.antiRug.gasMultiplier : undefined;
 
         const gasLimit = ctx.chain.gas.maxGasLimit;
 
@@ -496,7 +493,12 @@ export async function executeFullSell(
         // `*{reason}:*` heading shape (unchanged behavior).
         const alertHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT]*' : `*${reason}:*`;
         await sendCtxAlert(ctx, `${alertHeader} ${reasonDetail}`);
-        const txHash = await sendTxWithRetry(txBuilder, ctx);
+        // Phase 19 Gap-1 closure: pass gasMultiplier (defined above) through
+        // the multi-chain dispatcher. undefined = raw feeData (preserves prior
+        // behavior for non-anti-rug reasons). Args 3-5 (walletOrRetries,
+        // useFlashbots, maxRetries) intentionally undefined for this overload;
+        // sendTxWithRetry's multi-chain path uses the ChainContext directly.
+        const txHash = await sendTxWithRetry(txBuilder, ctx, undefined, undefined, undefined, gasMultiplier);
 
         ctx.log.info({ token: tokenAddress, reason, txHash }, 'Exit sell TX confirmed');
 

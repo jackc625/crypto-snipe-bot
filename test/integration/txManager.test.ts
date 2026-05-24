@@ -104,8 +104,11 @@ describe('sendTxWithRetry (multi-chain path)', () => {
 
         await sendTxWithRetry(txBuilder, ctx, 5);
 
+        // Phase 19 Gap-1 closure: sendTransaction now takes a 5th gasMultiplier
+        // arg. When no multiplier is passed at the sendTxWithRetry layer it
+        // arrives as `undefined` at the strategy (== no elevation, raw feeData).
         expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
-            expect.any(Object), expect.anything(), expect.anything(), 5,
+            expect.any(Object), expect.anything(), expect.anything(), 5, undefined,
         );
     });
 
@@ -117,7 +120,22 @@ describe('sendTxWithRetry (multi-chain path)', () => {
         await sendTxWithRetry(txBuilder, ctx);
 
         expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
-            expect.any(Object), expect.anything(), expect.anything(), 3,
+            expect.any(Object), expect.anything(), expect.anything(), 3, undefined,
+        );
+    });
+
+    it('Phase 19 Gap-1: propagates gasMultiplier to strategy.sendTransaction', async () => {
+        const { sendTxWithRetry } = await importWithMockedStrategies();
+        const ctx = createMockChainContext();
+        const txBuilder = vi.fn().mockResolvedValue(createMockTxRequest());
+
+        // Multi-chain overload signature: txBuilder, ctx, walletOrRetries,
+        // useFlashbots, maxRetries, gasMultiplier. Slots 3-5 are intentionally
+        // unused on the multi-chain path; slot 6 carries the multiplier.
+        await sendTxWithRetry(txBuilder, ctx, undefined, undefined, undefined, 2.0);
+
+        expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
+            expect.any(Object), expect.anything(), expect.anything(), 3, 2.0,
         );
     });
 

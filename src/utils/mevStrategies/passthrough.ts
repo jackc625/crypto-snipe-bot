@@ -4,6 +4,7 @@
 // No external MEV service needed -- direct transaction submission.
 import { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import type { MevStrategy } from './types';
+import { applyGasMultiplier } from './types';
 import { logger } from '../logger';
 
 const log = logger.child({ module: 'mev-passthrough' });
@@ -26,7 +27,8 @@ export class PassthroughMevStrategy implements MevStrategy {
     txRequest: TransactionRequest,
     wallet: Wallet,
     provider: JsonRpcProvider,
-    maxRetries = 3
+    maxRetries = 3,
+    gasMultiplier?: number
   ): Promise<string> {
     const baseNonce = await provider.getTransactionCount(wallet.address, 'latest');
 
@@ -40,12 +42,14 @@ export class PassthroughMevStrategy implements MevStrategy {
           chainId: (await provider.getNetwork()).chainId,
         };
 
-        // Use EIP-1559 if available, fallback to legacy
+        // Use EIP-1559 if available, fallback to legacy.
+        // Phase 19 / D-RACE-TELEMETRY: optional gasMultiplier elevates the
+        // anti-rug exit's gas to improve race odds against the rug-puller.
         if (feeData.maxFeePerGas) {
-          populatedTx.maxFeePerGas = feeData.maxFeePerGas;
-          populatedTx.maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+          populatedTx.maxFeePerGas = applyGasMultiplier(feeData.maxFeePerGas, gasMultiplier) ?? undefined;
+          populatedTx.maxPriorityFeePerGas = applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? undefined;
         } else {
-          populatedTx.gasPrice = feeData.gasPrice;
+          populatedTx.gasPrice = applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? undefined;
         }
 
         const tx = await wallet.sendTransaction(populatedTx);

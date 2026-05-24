@@ -48,8 +48,11 @@ export function createMevStrategy(chain: ChainConfig): MevStrategy {
  * Send a transaction with MEV protection and retry logic.
  *
  * **Multi-chain overload** (preferred):
- *   sendTxWithRetry(txBuilder, ctx, maxRetries?)
+ *   sendTxWithRetry(txBuilder, ctx, maxRetries?, gasMultiplier?)
  *   Dispatches to the correct MEV strategy based on ctx.chain.mevStrategy.
+ *   Optional `gasMultiplier` elevates EIP-1559 maxFee/priorityFee or legacy
+ *   gasPrice on the populated tx (Phase 19 anti-rug exit uses
+ *   ctx.chain.antiRug.gasMultiplier when reason='anti-rug').
  *
  * **Legacy overload** (backward compat -- use ChainContext version for multi-chain):
  *   sendTxWithRetry(txBuilder, provider, wallet, useFlashbots?, maxRetries?)
@@ -60,7 +63,8 @@ export async function sendTxWithRetry(
     providerOrCtx: JsonRpcProvider | ChainContext,
     walletOrRetries?: Wallet | number,
     useFlashbots?: boolean,
-    maxRetries?: number
+    maxRetries?: number,
+    gasMultiplier?: number
 ): Promise<string | void> {
     // Duck-type check for ChainContext
     if (
@@ -70,14 +74,18 @@ export async function sendTxWithRetry(
         'httpProvider' in providerOrCtx
     ) {
         // --- New multi-chain path ---
+        // `useFlashbots` arg slot is unused on this path (the multi-chain
+        // dispatcher picks the strategy via ctx.chain.mevStrategy); the
+        // `gasMultiplier` slot is the Phase 19 / D-RACE-TELEMETRY hook for
+        // elevating anti-rug exit gas.
         const ctx = providerOrCtx as ChainContext;
         const retries = (typeof walletOrRetries === 'number' ? walletOrRetries : maxRetries) || 3;
         const strategy = createMevStrategy(ctx.chain);
 
-        ctx.log.info({ chain: ctx.chain.name, strategy: strategy.name }, 'Dispatching TX via MEV strategy');
+        ctx.log.info({ chain: ctx.chain.name, strategy: strategy.name, gasMultiplier: gasMultiplier ?? 1.0 }, 'Dispatching TX via MEV strategy');
 
         const tx = await txBuilder();
-        return strategy.sendTransaction(tx, ctx.wallet, ctx.httpProvider, retries);
+        return strategy.sendTransaction(tx, ctx.wallet, ctx.httpProvider, retries, gasMultiplier);
     }
 
     // --- Legacy single-chain path (existing code, unchanged) ---

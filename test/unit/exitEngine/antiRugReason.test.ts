@@ -231,10 +231,32 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
             ).toBe(true);
         });
 
-        it("Test 3: when reason !== 'anti-rug', gasMultiplier preserves ctx.chain.gas.multiplier", () => {
-            // The same conditional must keep the non-anti-rug branch wired to
-            // ctx.chain.gas.multiplier.
-            expect(exitEngineSource).toContain('ctx.chain.gas.multiplier');
+        it("Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)", () => {
+            // Phase 19 Gap-1 closure (2026-05-24): the original PLAN.md design
+            // attempted to swap-in ctx.chain.gas.multiplier on non-anti-rug
+            // branches, but the value was being discarded via `void` and never
+            // reached the MEV-strategy fee-data layer (MEV strategies have
+            // always consumed raw feeData). The Gap-1 fix replaces the
+            // discard with a real threading through sendTxWithRetry's
+            // gasMultiplier slot. For non-anti-rug reasons (trailing-stop /
+            // stop-loss / urgency-market-sell), we pass `undefined` —
+            // preserving exact prior behavior at the MEV layer (raw feeData,
+            // no elevation).
+            const undefinedBranch = /reason\s*===\s*['"]anti-rug['"][\s\S]{0,80}:\s*undefined/;
+            expect(undefinedBranch.test(exitEngineSource)).toBe(true);
+        });
+
+        it("Test 3b: gasMultiplier is threaded into sendTxWithRetry (Gap-1 closure)", () => {
+            // Phase 19 Gap-1 closure: the multiplier MUST actually reach the
+            // MEV strategy via sendTxWithRetry's gasMultiplier arg-6 slot.
+            // The pre-Gap-1 code discarded gasMultiplier via `void` — this
+            // guard prevents that regression from creeping back in.
+            expect(exitEngineSource).not.toContain('void gasMultiplier');
+            // sendTxWithRetry must be called with gasMultiplier as the final
+            // positional arg (slots 3-5 are intentionally undefined for the
+            // multi-chain ChainContext overload — see txManager.ts).
+            const sendTxWithGasMultiplier = /sendTxWithRetry\(\s*txBuilder\s*,\s*ctx\s*,[\s\S]{0,80}gasMultiplier\s*\)/;
+            expect(sendTxWithGasMultiplier.test(exitEngineSource)).toBe(true);
         });
     });
 
