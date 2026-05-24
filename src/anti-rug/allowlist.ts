@@ -14,11 +14,15 @@
 //       first match's lockerName for the D-LIST-AUDIT structured log
 //       emitted by the detector's signal-2 evaluator (Plan 19-04).
 //
-//   - mergeAllowlist(base, extras)
-//       Defensive concat of the hardcoded base + env-overlay extras.
-//       Duplicates between the two are kept as separate entries
-//       (operator chose to add them; preserve the provenance trail so
-//       D-LIST-AUDIT shows BOTH rows rather than silently de-duping).
+// WR-01: this module USED to export a `mergeAllowlist` function with
+// concat-keep-duplicates semantics. Production however never imported it —
+// `buildChainRegistry` always called the chainRegistry-internal
+// `mergeAllowlist` which dedupes by lowercased address with env-overlay
+// winning on conflicts. The exported function was dead code with its
+// own test that asserted behavior production did not exhibit. The
+// exported function and its tests have been removed; the audit-trail
+// concern (knowing when an env entry overrides a hardcoded one) is
+// now structured-logged from chainRegistry's mergeAllowlist instead.
 //
 // Discretionary call: verifyAllowlistAtStartup takes BOTH lists in a single
 // invocation so the structured-log dump is one consolidated line per chain
@@ -41,45 +45,6 @@ import { logger } from '../utils/logger';
 import type { ChainContext } from '../chainRegistry';
 
 const log = logger.child({ module: 'antiRug:allowlist' });
-
-// ---------------------------------------------------------------------------
-// mergeAllowlist
-// ---------------------------------------------------------------------------
-
-/**
- * Concat the hardcoded base allowlist with the operator's env-overlay extras.
- *
- * Order is preserved — hardcoded entries first, env-overlay entries after.
- * Duplicates (same address in both lists) are KEPT as separate entries.
- * Rationale: when an operator overlays an address that already exists in the
- * hardcoded base, the audit trail benefits from showing BOTH rows (the
- * operator's intent is logged via the env-overlay row's provenance field;
- * the hardcoded row stays as the canonical-source reference). The downstream
- * signal-2 lookup (`isAddressAllowlisted`) operates on first-match semantics
- * so dedupe is unnecessary for correctness.
- *
- * Defensive: undefined / missing inputs return an empty array without
- * throwing. This is the degenerate-but-valid case for chains with no
- * configured allowlist (would normally never happen in production because
- * defaults always supply at least DEAD_ADDRESS).
- *
- * @param base   Hardcoded base allowlist entries (may be undefined).
- * @param extras Env-overlay entries supplied by the operator (may be undefined).
- * @returns Merged array preserving order; empty array if both inputs are absent.
- */
-export function mergeAllowlist(
-    base: AllowlistEntry[] | undefined,
-    extras: AllowlistEntry[] | undefined,
-): AllowlistEntry[] {
-    const out: AllowlistEntry[] = [];
-    if (base) {
-        for (const e of base) out.push(e);
-    }
-    if (extras) {
-        for (const e of extras) out.push(e);
-    }
-    return out;
-}
 
 // ---------------------------------------------------------------------------
 // isAddressAllowlisted

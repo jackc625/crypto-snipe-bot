@@ -269,54 +269,15 @@ describe('Phase 19 — Allowlist module', () => {
         });
     });
 
-    describe('mergeAllowlist (hardcoded + env overlay merger)', () => {
-        it('Test 7: concat preserves order — hardcoded first, env-overlay after; duplicates kept', async () => {
-            const { mergeAllowlist } = await import('../../../src/anti-rug/allowlist');
-
-            // ENTRY_A is hardcoded; ENTRY_A_DUP has the same address but env-overlay
-            const ENTRY_A_DUP: AllowlistEntry = {
-                address: LOCKER_A_ADDR, // same address as ENTRY_A
-                lockerName: 'Operator overlay',
-                provenance: 'env-overlay',
-            };
-
-            const merged = mergeAllowlist([ENTRY_A, ENTRY_B], [ENTRY_C_OVERLAY, ENTRY_A_DUP]);
-
-            // Concat preserves order: hardcoded first, then env-overlay
-            expect(merged).toHaveLength(4);
-            expect(merged[0]).toEqual(ENTRY_A);
-            expect(merged[1]).toEqual(ENTRY_B);
-            expect(merged[2]).toEqual(ENTRY_C_OVERLAY);
-            expect(merged[3]).toEqual(ENTRY_A_DUP);
-
-            // Duplicate address entries are NOT silently de-duped — both rows are
-            // kept so D-LIST-AUDIT can show the operator both provenances.
-            const addrCount = merged.filter(
-                e => e.address.toLowerCase() === LOCKER_A_ADDR.toLowerCase()
-            ).length;
-            expect(addrCount).toBe(2);
-        });
-
-        it('Test 8: undefined arguments — returns [] without throwing (defensive)', async () => {
-            const { mergeAllowlist } = await import('../../../src/anti-rug/allowlist');
-
-            // The degenerate "no entries at all" case. Should never happen in
-            // production (defaults always supply at least DEAD_ADDRESS), but
-            // empty-list is a valid base case for tests and for any future
-            // configuration that explicitly disables allowlisting on a chain.
-            expect(() =>
-                mergeAllowlist(
-                    undefined as unknown as AllowlistEntry[],
-                    undefined as unknown as AllowlistEntry[]
-                )
-            ).not.toThrow();
-            expect(
-                mergeAllowlist(
-                    undefined as unknown as AllowlistEntry[],
-                    undefined as unknown as AllowlistEntry[]
-                )
-            ).toEqual([]);
-        });
+    describe('verifyAllowlistAtStartup DEAD_ADDRESS handling', () => {
+        // WR-01: removed Test 7 + Test 8. They asserted concat-keep-duplicates
+        // semantics on src/anti-rug/allowlist.ts:mergeAllowlist, which was
+        // dead code — production (buildChainRegistry in src/chainRegistry.ts)
+        // always called a chainRegistry-internal `mergeAllowlist` with
+        // dedupe semantics, not the exported one. The exported function and
+        // its tests were a pair of self-consistent-but-untrue invariants.
+        // Removed function from allowlist.ts; chainRegistry's mergeAllowlist
+        // now structured-logs override events for the audit trail.
 
         it('Test 9: env-overlay DEAD_ADDRESS — verifyAllowlistAtStartup skips getCode on it too', async () => {
             const { verifyAllowlistAtStartup } = await import(

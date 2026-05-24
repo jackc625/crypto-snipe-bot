@@ -572,8 +572,28 @@ function mergeAllowlist(
         merged.set(e.address.toLowerCase(), e);
     }
     // Extras overwrite same-address hardcoded entries (operator intent wins).
+    // WR-01: when an env-overlay entry replaces a hardcoded entry, structured-
+    // log the override so the audit trail captures the operator's intent
+    // (previously the override happened silently — the dead `mergeAllowlist`
+    // export in anti-rug/allowlist.ts preserved BOTH rows for audit, but
+    // production used this dedupe path which dropped the hardcoded row).
     for (const e of extras) {
-        merged.set(e.address.toLowerCase(), e);
+        const lc = e.address.toLowerCase();
+        const prior = merged.get(lc);
+        if (prior && prior.provenance !== e.provenance) {
+            logger.warn(
+                {
+                    address: e.address,
+                    overriddenLockerName: prior.lockerName,
+                    overriddenProvenance: prior.provenance,
+                    overrideLockerName: e.lockerName,
+                    overrideProvenance: e.provenance,
+                    op: 'antirug.allowlist.env-override-hardcoded',
+                },
+                'Anti-rug allowlist env-overlay entry overrode hardcoded entry — operator intent retained',
+            );
+        }
+        merged.set(lc, e);
     }
     return [...merged.values()];
 }
