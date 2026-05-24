@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -117,6 +117,40 @@ function migrateSchema(): void {
             db.exec(`ALTER TABLE trades ADD COLUMN dex_name TEXT DEFAULT NULL`);
         }
         logger.info('Added dex_name column (schema version 4)');
+    }
+
+    if (version < 5) {
+        // Phase 19 / ANTIRUG-04 / ANTIRUG-16: lp_baseline (LP-reserve / V3-active-liquidity
+        // snapshot at buy-success per trade) + chain_state (last-seen-block per chain for
+        // restart-time getLogs backfill per D-BACKFILL). Single-table-with-pool_type-
+        // discriminator shape chosen per Research Open Question #1 + CONTEXT.md
+        // D-V3-THRESHOLD. v3_position_nft_id stays NULLABLE — V3 baseline is pool-only
+        // in v6.17; NFT-tracking deferred to v6.18+.
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS lp_baseline (
+                trade_id INTEGER PRIMARY KEY,
+                pool_type TEXT NOT NULL CHECK(pool_type IN ('v2', 'v3')),
+                pair_or_pool_address TEXT NOT NULL COLLATE NOCASE,
+                v2_token0_reserve TEXT,
+                v2_token1_reserve TEXT,
+                v2_lp_total_supply TEXT,
+                v3_active_liquidity TEXT,
+                v3_tick_at_snapshot INTEGER,
+                v3_position_nft_id TEXT,
+                v3_fee_tier INTEGER,
+                snapshot_block INTEGER NOT NULL,
+                snapshot_ts INTEGER NOT NULL,
+                FOREIGN KEY (trade_id) REFERENCES trades(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_lp_baseline_pool ON lp_baseline(pair_or_pool_address);
+
+            CREATE TABLE IF NOT EXISTS chain_state (
+                chain TEXT PRIMARY KEY,
+                last_seen_block INTEGER NOT NULL,
+                last_updated_ts INTEGER NOT NULL
+            );
+        `);
+        logger.info('Created lp_baseline + chain_state tables (schema version 5)');
     }
 
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -410,6 +444,56 @@ const getTradeIdForPendingToken = db.prepare(
     `SELECT id FROM trades WHERE token = ? AND chain = ? AND status = 'pending' AND action = 'buy' ORDER BY timestamp DESC LIMIT 1`
 );
 
+// --- Anti-Rug Prepared Statements (Phase 19 / ANTIRUG-04 / ANTIRUG-16) ---
+//
+// upsertLpBaseline: insert or refresh the LP-baseline snapshot for a trade.
+// Called from src/anti-rug/lpBaseline.ts (Plan 19-03) on buy-success. Named bind
+// parameters match better-sqlite3 v12.8 convention used by upsertExitState above.
+// V2 callers populate v2_* columns and set v3_* to null; V3 callers do the inverse.
+// On conflict (re-snapshot during resume / partial replay), V2 reserve fields and
+// V3 active-liquidity / tick fields are refreshed alongside the new snapshot block
+// + ts; pair_or_pool_address and pool_type are immutable per row (set on first insert).
+const upsertLpBaseline = db.prepare(`
+    INSERT INTO lp_baseline (
+        trade_id, pool_type, pair_or_pool_address,
+        v2_token0_reserve, v2_token1_reserve, v2_lp_total_supply,
+        v3_active_liquidity, v3_tick_at_snapshot, v3_position_nft_id, v3_fee_tier,
+        snapshot_block, snapshot_ts
+    )
+    VALUES (
+        @tradeId, @poolType, @pairOrPoolAddress,
+        @v2Token0Reserve, @v2Token1Reserve, @v2LpTotalSupply,
+        @v3ActiveLiquidity, @v3TickAtSnapshot, @v3PositionNftId, @v3FeeTier,
+        @snapshotBlock, @snapshotTs
+    )
+    ON CONFLICT(trade_id) DO UPDATE SET
+        v2_token0_reserve = @v2Token0Reserve,
+        v2_token1_reserve = @v2Token1Reserve,
+        v2_lp_total_supply = @v2LpTotalSupply,
+        v3_active_liquidity = @v3ActiveLiquidity,
+        v3_tick_at_snapshot = @v3TickAtSnapshot,
+        snapshot_block = @snapshotBlock,
+        snapshot_ts = @snapshotTs
+`);
+
+const getLpBaseline = db.prepare(`SELECT * FROM lp_baseline WHERE trade_id = ?`);
+
+const deleteLpBaseline = db.prepare(`DELETE FROM lp_baseline WHERE trade_id = ?`);
+
+// chain_state: per-chain last-seen block for restart-time getLogs(lastSeen+1, current)
+// backfill per CONTEXT.md D-BACKFILL. Consumed by src/anti-rug/detector.ts (Plan 19-04)
+// on every confirmed event processed and on restart resume. Positional binds used to
+// stay symmetric with the simple two-column row shape.
+const upsertChainState = db.prepare(`
+    INSERT INTO chain_state (chain, last_seen_block, last_updated_ts)
+    VALUES (?, ?, ?)
+    ON CONFLICT(chain) DO UPDATE SET
+        last_seen_block = excluded.last_seen_block,
+        last_updated_ts = excluded.last_updated_ts
+`);
+
+const getChainState = db.prepare(`SELECT last_seen_block, last_updated_ts FROM chain_state WHERE chain = ?`);
+
 // --- Exports ---
 
 export function closeDb(): void {
@@ -417,4 +501,22 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
-export { db, insertTrade, updateTradeStatus, isTokenSniped, getOpenPositionCount, getTotalExposure, getDailyRealizedLoss, upsertExitState, getExitState, deleteExitState, getTradeIdForPendingToken };
+export {
+    db,
+    insertTrade,
+    updateTradeStatus,
+    isTokenSniped,
+    getOpenPositionCount,
+    getTotalExposure,
+    getDailyRealizedLoss,
+    upsertExitState,
+    getExitState,
+    deleteExitState,
+    getTradeIdForPendingToken,
+    // Phase 19 / ANTIRUG-04 / ANTIRUG-16
+    upsertLpBaseline,
+    getLpBaseline,
+    deleteLpBaseline,
+    upsertChainState,
+    getChainState,
+};
