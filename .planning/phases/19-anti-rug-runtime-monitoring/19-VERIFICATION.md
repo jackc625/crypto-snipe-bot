@@ -1,20 +1,32 @@
 ---
 phase: 19-anti-rug-runtime-monitoring
 verified: 2026-05-24T05:15:00Z
-status: gaps_found
-verdict: PARTIAL-PASS
-score: 4/5 success criteria fully verified; 1 partial (gas multiplier deviation)
+gaps_closed: 2026-05-24T05:25:00Z
+status: gaps_closed
+verdict: PASS
+score: 5/5 success criteria fully verified (both initial gaps closed operator-authorized)
 re_verification:
   is_re_verification: false
 test_totals_verified:
-  unit: 478
-  integration: 168
+  unit: 489
+  integration: 169
   fork: not_executed_no_archive_RPC
   tsc_clean: true
+gap_closure_summary: |
+  Gap-1 (gas multiplier discard) and Gap-2 (REQUIREMENTS.md checkbox drift)
+  surfaced at first verification 05:15Z. Operator chose "Implement now"
+  for Gap-1 and "Fix now" for Gap-2 via verification AskUserQuestion gate.
+  Both closed in follow-up commits — see commit `7d35c46` (Gap-1: threads
+  gasMultiplier through MevStrategy.sendTransaction + applies to EIP-1559
+  maxFee/priorityFee or legacy gasPrice on populated tx in all three
+  strategies; 11 new tests including 10 strategy-level + Test 3b regression
+  guard) and the subsequent REQUIREMENTS.md sweep commit (Gap-2).
 gaps:
   - truth: "Anti-rug exit applies the 2.0× gas multiplier from ctx.chain.antiRug.gasMultiplier to actual EIP-1559 fee fields (ROADMAP Phase 19 SC #1)"
-    status: failed
-    reason: "Plan 19-05 SUMMARY documents this as an explicit deviation: gasMultiplier is computed (src/exitEngine.ts:469-471) but then immediately discarded via `void gasMultiplier;` (line 475). Comment claims operator-visible surfacing via alert header (line 498), but the alert format `*[ANTI-RUG EXIT]* ${reasonDetail}` does not include the multiplier value. Downstream gas computation (gasManager.getGasOptionsForChain + MEV strategy implementations in passthrough.ts/flashbots.ts) reads ctx.chain.gas.multiplier or raw feeData — never ctx.chain.antiRug.gasMultiplier. Test 2 in test/unit/exitEngine/antiRugReason.test.ts only asserts the source-text derivation exists; it does not assert the value is APPLIED. Operator docs (docs/operations/anti-rug-rollout.md:47) claim the multiplier IS applied. Plan 19-05 SUMMARY decision §1 documents the deviation with a follow-up commitment but no concrete follow-up plan was created."
+    status: closed_2026-05-24
+    closure_commit: "7d35c46"
+    closure_summary: "Threaded gasMultiplier through MevStrategy.sendTransaction signature (new optional arg-5); sendTxWithRetry's multi-chain overload accepts arg-6 gasMultiplier and passes through; exitEngine.ts replaces `void gasMultiplier;` with real wire-up. PassthroughMevStrategy applies to EIP-1559 maxFee/priorityFee + legacy gasPrice fallback. FlashbotsMevStrategy + BloxrouteMevStrategy apply to gasPrice. New test/unit/mevStrategies/gasMultiplier.test.ts (10 tests) covers applyGasMultiplier helper math (bigint *100/100n) + strategy-level multiplier propagation. test/unit/exitEngine/antiRugReason.test.ts Test 3b is a regression guard against future `void gasMultiplier` reintroduction. Backward compat preserved: gasMultiplier=undefined or 1.0 == raw feeData (prior behavior). Operator docs claims are now accurate."
+    original_reason: "Plan 19-05 SUMMARY documents this as an explicit deviation: gasMultiplier is computed (src/exitEngine.ts:469-471) but then immediately discarded via `void gasMultiplier;` (line 475). Comment claims operator-visible surfacing via alert header (line 498), but the alert format `*[ANTI-RUG EXIT]* ${reasonDetail}` does not include the multiplier value. Downstream gas computation (gasManager.getGasOptionsForChain + MEV strategy implementations in passthrough.ts/flashbots.ts) reads ctx.chain.gas.multiplier or raw feeData — never ctx.chain.antiRug.gasMultiplier. Test 2 in test/unit/exitEngine/antiRugReason.test.ts only asserts the source-text derivation exists; it does not assert the value is APPLIED. Operator docs (docs/operations/anti-rug-rollout.md:47) claim the multiplier IS applied. Plan 19-05 SUMMARY decision §1 documents the deviation with a follow-up commitment but no concrete follow-up plan was created."
     artifacts:
       - path: "src/exitEngine.ts"
         issue: "Lines 469-475: gasMultiplier derived then `void gasMultiplier;` — value discarded. Builder closures (buildV2SellTx/buildV3SellTx) never receive elevated multiplier."
@@ -29,8 +41,9 @@ gaps:
     missing:
       - "Either: (a) thread ctx.chain.antiRug.gasMultiplier into buildV2SellTx/buildV3SellTx via shallow-config-override per PLAN.md Step 1(b), AND verify it reaches passthrough.ts + flashbots.ts gas-field computation; OR (b) update docs/operations/anti-rug-rollout.md + README.md + ROADMAP SC #1 to accurately describe current behavior (`reason='anti-rug'` discriminant propagated through alert headers + CB telemetry; gas-field elevation deferred). Either remediation must include an executable test assertion (NOT source-text regex) that asserts the on-chain gas fields when reason=anti-rug. Until resolved, this defect is masked by the dry-run safety invariant (which IS intact)."
   - truth: "REQUIREMENTS.md inline checkbox state is consistent with the bottom coverage table"
-    status: failed
-    reason: "REQUIREMENTS.md has mixed checkbox state between inline list (lines 44-59) and bottom coverage table (lines 162-177). Inline ANTIRUG-05/07/08/09/14 show `[ ]` (unchecked) but table lists them Complete. Inline ANTIRUG-13 shows `[x]` (checked) but table lists Pending. Inline ANTIRUG-15 shows `[ ]` but table lists Partial. Book-keeping defect — does not affect implementation but causes confusion for future readers."
+    status: closed_2026-05-24
+    closure_summary: "Inline checkbox sweep aligning ANTIRUG-05/07/08/09/14 to `[x]` (Complete), ANTIRUG-13 table promoted from Pending to Complete to match inline `[x]`, ANTIRUG-15 inline marked `[~]` Partial (ETH resolved; BSC/Base/Arb pending) to match the table's Partial status."
+    original_reason: "REQUIREMENTS.md has mixed checkbox state between inline list (lines 44-59) and bottom coverage table (lines 162-177). Inline ANTIRUG-05/07/08/09/14 show `[ ]` (unchecked) but table lists them Complete. Inline ANTIRUG-13 shows `[x]` (checked) but table lists Pending. Inline ANTIRUG-15 shows `[ ]` but table lists Partial. Book-keeping defect — does not affect implementation but causes confusion for future readers."
     artifacts:
       - path: ".planning/REQUIREMENTS.md"
         issue: "Inline checkbox state at lines 48, 50-52, 56-58 does not match table state at lines 166-176."
