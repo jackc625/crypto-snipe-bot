@@ -169,7 +169,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 20-00-PLAN.md — 14 vitest test stubs across test/unit/preflight/, test/unit/db/, and test/integration/ for all OPS-LIVE-NN requirements; every it.skip names the concrete observable per D-04 [OPS-LIVE-01..11] (completed 2026-05-24)
 
   **Wave 1** *(after Wave 0; parallel-safe foundation):*
-  - [ ] 20-01-PLAN.md — Schema migration v5→v6 (pause_state table + antirug_dry_run_started column on chain_state) + 5 new prepared statements + REQUIREMENTS.md row reword for OPS-LIVE-02 (D-BALANCE-FLOOR) + OPS-LIVE-06 (D-STALE-THRESHOLDS) [OPS-LIVE-02, OPS-LIVE-06, OPS-LIVE-09]
+  - [x] 20-01-PLAN.md — Schema migration v5→v6 (pause_state table + antirug_dry_run_started column on chain_state) + 5 new prepared statements + REQUIREMENTS.md row reword for OPS-LIVE-02 (D-BALANCE-FLOOR) + OPS-LIVE-06 (D-STALE-THRESHOLDS) [OPS-LIVE-02, OPS-LIVE-06, OPS-LIVE-09] *(completed 2026-05-24)*
 
   **Wave 2** *(after Wave 1; preflight module + chainRegistry extension):*
   - [ ] 20-02-PLAN.md — src/preflight.ts (preflight + preflightDryRun dual-shape API, 7 check functions, cross-env validator, anti-rug 7-day live-gate, stale-data) + chainRegistry.ts defaultGasBuffer + defaultBlockAgeToleranceSec per chain + config.ts REQUIRED_ENV_VARS (12 new envs) + .env.example per D-ENV-EXAMPLE [OPS-LIVE-02, OPS-LIVE-03, OPS-LIVE-04, OPS-LIVE-05, OPS-LIVE-06, OPS-LIVE-07]

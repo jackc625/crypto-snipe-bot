@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 20 context gathered
-last_updated: "2026-05-24T19:52:14Z"
-last_activity: 2026-05-24 -- Phase 20 plan 20-00 complete (14 Wave-0 test stubs)
+stopped_at: Phase 20 plan 20-01 complete (schema v5 to v6 + REQUIREMENTS.md reword)
+last_updated: "2026-05-24T20:11:05Z"
+last_activity: 2026-05-24 -- Phase 20 plan 20-01 complete (schema v6 migration + 5 prepared statements + OPS-LIVE-02/06 reword)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 32
-  completed_plans: 24
-  percent: 43
+  completed_plans: 25
+  percent: 44
 ---
 
 # Project State
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 20 (going-live-ops-hardening) — EXECUTING
-Plan: 2 of 8 (20-00 complete; 20-01 next)
+Plan: 3 of 8 (20-00 + 20-01 complete; 20-02 next)
 Status: Executing Phase 20
-Last activity: 2026-05-24 -- Phase 20 plan 20-00 complete (14 Wave-0 test stubs)
+Last activity: 2026-05-24 -- Phase 20 plan 20-01 complete (schema v6 migration + 5 prepared statements + OPS-LIVE-02/06 reword)
 
 ## Performance Metrics
 
@@ -125,6 +125,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
 | 20-00 (Wave-0 vitest stubs: 14 files / 66 it.skip across OPS-LIVE-01..11 + schema v5→v6) | ~10min | 2/2 | 14 | 4327725 (8 unit stubs), 5a2a195 (6 integration stubs) |
+| 20-01 (Schema v5→v6 migration + 5 prepared statements + REQUIREMENTS.md OPS-LIVE-02/06 reword) | ~25min | 2/2 | 4 | 131b54b (test RED), 103e953 (feat GREEN), 67db735 (docs REQUIREMENTS) |
 
 ## Phase 18 Plan Execution Log
 
@@ -143,7 +144,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-24T19:52:14Z
-Last activity: 2026-05-24 — Phase 20 plan 20-00 complete. 14 Wave-0 vitest test-stub files shipped (8 unit at `test/unit/preflight/` + `test/unit/db/`; 6 integration at `test/integration/`) covering OPS-LIVE-01..11 + schema v5→v6 migration. 66 `it.skip` blocks total (37 unit + 29 integration). Per D-04 observable-effect rigor (Phase 17 carry-forward), every reason string names the concrete observable the implementation plan will assert (pino fatal log field shape, process.exit code, SQLite row, broadcast event type, spy-call assertion, exit code) — zero `expect(true).toBe(true)` hollow filler. D-09 `.todo` ban CI guard preserved (0 `.todo` matches across `test/`). Full unit suite 487 passed + 37 skipped (+37 matches new stub count exactly; 0 regressions); full integration suite 169 passed + 29 skipped (+29 matches; 0 regressions); tsc clean across all 3 tsconfig projects. Plan does NOT close OPS-LIVE-01..11 requirements — they stay Pending in REQUIREMENTS.md until implementation plans 20-02..05 land. Per-file header comments name target implementation plan (20-02 / 20-03 / 20-04 / 20-05) so the next executor can `grep "Plan 20-02 will"` to enumerate every stub their plan must populate. killswitchCheckpoints.test.ts uses 8 separate describe blocks (V2 CP1/CP2/CP3 + V3 CP1/CP2/CP3 + 2 cross-cutting) to keep vitest output tree readable when Plan 20-04 flips skip→it. midRunWalletCheck.test.ts includes T-20-04 idempotency assertion (no-duplicate-alert-when-already-paused) so Plan 20-04's executor sees the threat-mitigation requirement at the test contract level. Commits: `4327725` (8 unit stubs test) + `5a2a195` (6 integration stubs test). Plans 20-01..07 unblocked.
-Stopped at: Phase 20 plan 20-00 complete; ready for /gsd-execute-plan 20-01
-Resume file: .planning/phases/20-going-live-ops-hardening/20-01-PLAN.md
+Last session: 2026-05-24T20:11:05Z
+Last activity: 2026-05-24 — Phase 20 plan 20-01 complete. Schema migration v5→v6 in `src/utils/db.ts` shipped via single atomic `db.transaction()` block: creates `pause_state` (id INTEGER PK CHECK(id=1) + paused INTEGER DEFAULT 0 + paused_at/paused_by/reason nullable per D-PAUSE-STORAGE single-row pattern); INSERT OR IGNORE seeds the id=1 row preventing double-insert on re-run; ALTER guard via `PRAGMA table_info('chain_state')` + `columns.some(c => c.name === 'antirug_dry_run_started')` clones v3→v4 pattern as defense-in-depth before `ADD COLUMN antirug_dry_run_started INTEGER`. 5 new prepared statements exported (`getPauseState` / `setPauseState` / `clearPauseState` / `setAntirugDryRunStarted` COALESCE-on-conflict idempotent UPSERT so first-call-per-chain wins per D-ANTIRUG-LIVE-GATE-CODE / `getAntirugDryRunStarted`). Production `data/bot.db` migrated in-place to user_version=6 on first module load post-merge (verified via `node -e "...pragma('user_version')..."` → `[{user_version: 6}]`). 12/12 tests pass in `test/unit/db/pauseStateMigration.test.ts` (10 in-memory schema/statement behaviors + 2 production integration). REQUIREMENTS.md OPS-LIVE-02 reworded per D-BALANCE-FLOOR (operational floor `snipeAmount × maxOpenPositions + <CHAIN>_GAS_BUFFER` replaces `maxCapital` deployment ceiling — bot funded at 0.0124 ETH < 1.0 ETH `maxCapital` would have FATAL-exited despite being capable of running one snipe); OPS-LIVE-06 reworded per D-STALE-THRESHOLDS (2-min warn / 10-min error envs `STALE_WARN_SEC` / `STALE_ERROR_SEC` replace 10s/20s "2× poll interval" wording that would have flooded operator with normal-poll-cycle noise). A1 verified: `db.transaction()` accepts DDL on better-sqlite3 v12.8.0; ALTER guard stays as defense-in-depth per T-20-W1-04. **One Rule 1 fix-in-flight:** `test/unit/db/lpBaselineMigration.test.ts:207` `expect(version).toBe(5)` → `.toBeGreaterThanOrEqual(5)` — Phase 19 test was implicitly coupled to v5 being permanent; greater-than-or-equal preserves "v5 schema is the floor" intent without breaking on every future schema bump. Full unit suite 499 passed + 31 skipped (+12 new from pauseStateMigration; -6 flipped from skip→it); tsc clean ×3 (tsconfig.json + tsconfig.bot.json + dashboard/tsconfig.json). Commits: `131b54b` (test RED) + `103e953` (feat GREEN) + `67db735` (docs REQUIREMENTS reword). Hand-off: Plans 20-02 (preflight) / 20-03 (anti-rug timestamp wiring) / 20-04 (bot.ts kill-switch) / 20-05 (controls.ts pause/resume endpoints) consume the 5 new prepared statements via `import { ... } from './utils/db'`; OPS-LIVE-02 + OPS-LIVE-06 refined text is the verbatim acceptance criterion for Plans 20-02 walletBalance + 20-06 staleData.
+Stopped at: Phase 20 plan 20-01 complete; ready for /gsd-execute-plan 20-02
+Resume file: .planning/phases/20-going-live-ops-hardening/20-02-PLAN.md
