@@ -2,186 +2,161 @@
 phase: 19-anti-rug-runtime-monitoring
 fixed_at: 2026-05-24
 fix_scope: critical_warning
-findings_in_scope: 16
-fixed: 15
-skipped: 1
-status: partial
-iteration: 1
+findings_in_scope: 2
+fixed: 2
+skipped: 0
+status: all_fixed
+iteration: 2
+predecessor_iteration: 1
+predecessor_review: 19-REVIEW.iter1.md
+source_review: 19-REVIEW.md
 ---
 
-# Phase 19: Code Review Fix Report
+# Phase 19: Code Review Fix Report (Iteration 2)
 
 **Fixed at:** 2026-05-24
 **Source review:** `.planning/phases/19-anti-rug-runtime-monitoring/19-REVIEW.md`
-**Iteration:** 1
-**Worktree:** `/tmp/sv-19-reviewfix-4knPvZ` (gsd-reviewfix/19-39160) — fast-forwarded into master on cleanup.
+**Iteration:** 2 (follow-up to iter-1)
+**Worktree:** `/tmp/sv-19-reviewfix-3UgmAD` (`gsd-reviewfix/19-56877`) — fast-forwarded into master on cleanup.
+
+**Iter-1 report note.** The previous iter-1 fix report (15 fixed, 1 skipped across 16 in-scope findings) has been replaced by this file but is preserved in git history at commit `2db8a2f`. The 15 iter-1 fix commits themselves (`757b0d1..bcabc0f` plus the test-update commit `2b93bb3`) are still present on master; iter-2 verified their closure in `19-REVIEW.md` and surfaced two new follow-up findings — WR-08-FOLLOWUP and CR-06-FOLLOWUP — both warning-tier, neither blocks shipping, but both worth closing before live-execute graduation. This report covers ONLY those two iter-2 follow-ups.
 
 **Summary:**
-- Findings in scope: 16 (CR-01..CR-07, WR-01..WR-09)
-- Fixed: 15
-- Skipped: 1 (CR-07 — see below)
+
+- Findings in scope: 2 (WR-08-FOLLOWUP, CR-06-FOLLOWUP — both warning-tier)
+- Fixed: 2
+- Skipped: 0
 - TypeScript: bot + main + dashboard tsconfigs all clean
-- Test suites: 135/135 pass across anti-rug + chainRegistry + exitEngine
+- Test suites: 26/26 (antiRugConfig) + 67/67 (dashboard anti-rug components) + 6/6 (exitTrigger backend) + 4/4 (wsPush integration) all pass after the fixes; spot-check of `test/unit/anti-rug/*.test.ts` per file: 73/73 pass
+- CR-07 (circular import) NOT touched per iter-1 deferral; remains for a future dedicated phase
+- IN-01..IN-06 NOT touched per iter-2 task spec (kept tight)
 
 ## Fixed Issues
 
-### CR-01: cb_tripped payload field mismatch breaks dashboard CB-reset modal
+### WR-08-FOLLOWUP: New ALLOWLIST_EXTRA_V2/V3 env vars registered + documented
 
-**Files modified:** `src/anti-rug/circuitBreaker.ts`, `test/unit/anti-rug/circuitBreaker.test.ts`
-**Commits:** `757b0d1` (fix), `2b93bb3` (test update)
-**Applied fix:** Backend now broadcasts `triggers: TriggerEvent[]` (array) + `triggerCount: number` (count) to match the frontend `CbTrippedPayload` type. Previously sent `triggers: <number>` + `triggerEvents: <array>` which silently broke the CircuitBreakerResetModal (Reset button could never enable because `triggers.length` on a number is undefined) and the banner headline ("undefined triggers"). Updated Test 15 to assert the new payload contract.
+**Files modified:**
+- `src/config.ts`
+- `.env.example`
+- `docs/operations/anti-rug-rollout.md`
+- `docs/operations/anti-rug-tuning.md`
 
-### CR-02: Anti-rug gas multiplier fails to elevate fees on ETH (Flashbots/EIP-1559 mismatch)
+**Commit:** `e42c21b`
 
-**Files modified:** `src/utils/mevStrategies/flashbots.ts`
-**Commit:** `1708ed4`
-**Applied fix:** Mirrored the passthrough strategy's EIP-1559-aware branching in `FlashbotsMevStrategy.sendTransaction`. When `feeData.maxFeePerGas` is present, the multiplier now applies to `maxFeePerGas` + `maxPriorityFeePerGas` and sets `type: 2`. Falls back to legacy `gasPrice` only when EIP-1559 fee data is unavailable. Restores the documented 2.0× anti-rug elevation on the primary target chain (ETH).
+**Applied fix:** Closes the docs/registry gap left by iter-1 WR-08. The four-part fix:
 
-### CR-03: registerAntiRugPosition not awaited at buy-success → silent unhandled rejections
+- **(a) `src/config.ts`** — added 8 new entries to `REQUIRED_ENV_VARS`: `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V2` and `_V3` for each of the 4 chains (ETH, BSC, BASE, ARB). Each entry mirrors the existing `ALLOWLIST_EXTRA` shape (`required: false`, comma-separated address list, clear description). Reworded the existing unified `ALLOWLIST_EXTRA` description to flag DEPRECATED + the per-pool-type recommendation. Bumped the header comment from "9 vars × 4 chains = 36 entries (8 numeric + 1 comma-list per chain)" to "11 vars × 4 chains = 44 entries (8 numeric + 3 comma-list per chain)".
 
-**Files modified:** `src/bot.ts`
-**Commit:** `7b248f6`
-**Applied fix:** Added `await` to both V2 (bot.ts:425) and V3 (bot.ts:679) call sites. Without await, RPC/DB rejections inside `startChainAntiRugListener → backfillSinceLastSeen` became unhandled promise rejections that bypassed the surrounding try/catch. The documented `op: 'antirug.baseline-snapshot-failed'` log path now fires reliably on rejection.
+- **(b) `.env.example`** — added 8 new entries (ALLOWLIST_EXTRA_V2 and _V3 for each chain), mirroring the existing `ALLOWLIST_EXTRA` inline-comment style. Reworded the unified `ALLOWLIST_EXTRA` lines to flag DEPRECATED + the deprecation-warn semantics.
 
-### CR-04: Allowlist verification failure leaves chain monitoring with unverified addresses
+- **(c) `docs/operations/anti-rug-rollout.md`** — replaced the single `ALLOWLIST_EXTRA` row in §1's env-var-reference table with three rows (legacy unified DEPRECATED with the warn op-code, V2-only, V3-only). Bumped the "9 env vars per chain × 4 chains = 36 env vars total" claim to "11 env vars per chain × 4 chains = 44 env vars total". Updated the §7 "Env-var-count delta vs original D-ENV-EXAMPLE" subsection to document all four delta additions (`BACKFILL_CAP_BLOCKS`, `MAX_BACKFILL_BLOCKS`, `ALLOWLIST_EXTRA_V2`, `ALLOWLIST_EXTRA_V3`) and the per-pool-type motivation.
 
-**Files modified:** `src/bot.ts`
-**Commit:** `8491733`
-**Applied fix:** Introduced `verifiedChains: Set<string>` tracked across the verification loop. Steps 3 (re-register positions) and 4 (arm WS listener) now skip chains that failed `verifyAllowlistAtStartup`. Previously, a flaky boot-time RPC + an EOA-typo in `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA` would leave the allowlist as a silent leak vector with monitoring still active. The chain now truly runs without anti-rug monitoring on verify failure, matching the documented operator-visible behavior. Added `op: 'antirug.resume.skip-unverified-chain'` and `op: 'antirug.resume.skip-ws-listener-unverified'` log lines.
+- **(d) `docs/operations/anti-rug-tuning.md`** — replaced the single `ALLOWLIST_EXTRA` row in the allowlist-overlay table with three rows. Added a migration note explaining that already-correct entries keep their semantics (the deprecation is operator-hygiene + review-time clarity), so migration is opportunistic, not urgent.
 
-### CR-05: Resume path silently no-ops when chain has zero open positions
+The runtime parser at `src/chainRegistry.ts:835` reads `process.env[envKey]` directly, so the new env vars already worked at runtime when an operator happened to set them — this fix makes them DISCOVERABLE via the canonical source-of-truth surfaces (config.ts + .env.example + operator docs).
 
-**Files modified:** `src/anti-rug/detector.ts`
-**Commit:** `2c4e4ff`
-**Applied fix:** `startChainAntiRugListener` now initialises `chainState` upfront (instead of early-returning when `chainState.get(chainName)` is undefined) and arms the heartbeat + close-handler + `backfillSinceLastSeen` regardless of registered-position count. The address-filter subscription is gated on `addresses.length > 0`; when the first position lands, `registerAntiRugPosition` re-enters and installs the filter. Previously, bot restart with zero open positions on a chain left the entire WS lifecycle dormant and lost the backfill window between restart and first-buy. Added `op: 'antirug.listener.armed-no-positions'` log line. Tests: detectorRegistry 11/11 + wsReconnectBackfill 9/9 pass.
+**Verification:**
+- `tsc --noEmit -p tsconfig.bot.json`: clean
+- `tsc --noEmit`: clean
+- `tsc --noEmit -p dashboard/tsconfig.json`: clean
+- `vitest run test/unit/chainRegistry/antiRugConfig.test.ts`: 26/26 pass (Test 19's `length >= 32` continues to hold for the new count of 44; IN-01's recommendation to tighten to exact equality was intentionally not pulled in per iter-2 scope)
 
-### CR-06: antirug_state_update broadcast carries `success` field absent from frontend type; lastSignals null conflict
+### CR-06-FOLLOWUP: Surface live-exit success/failure on the dashboard
 
-**Files modified:** `dashboard/src/types/api.ts`, `dashboard/src/hooks/useWebSocket.ts`, `src/anti-rug/exitTrigger.ts`
-**Commit:** `3412280`
-**Applied fix:** Three changes:
-1. Added `success?: boolean` to the frontend `AntiRugStateUpdate` type so the live-exit success/failure value reaches the operator.
-2. Allowed `lastSignals?: RugSignals | null` for forward compatibility but normalise `null → undefined` in `useWebSocket.ts` before storing on Position, so downstream components see a single shape.
-3. Backend now sends `lastSignals: undefined` (omitted) for the unknown-verdict path instead of literal `null`, avoiding the `typeof x === 'object'` truthy-null trap in AntiRugExitDetailModal.
+**Files modified:**
+- `dashboard/src/types/api.ts`
+- `dashboard/src/hooks/useWebSocket.ts`
+- `dashboard/src/components/anti-rug/AntiRugStateBadge.tsx`
+- `dashboard/src/components/PositionTable.tsx`
+- `dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx`
+- `dashboard/src/pages/Overview.tsx`
 
-### WR-01: Two divergent mergeAllowlist implementations — production uses dedupe, tested code uses concat
+**Commit:** `74417d3`
 
-**Files modified:** `src/anti-rug/allowlist.ts`, `src/chainRegistry.ts`, `test/unit/anti-rug/allowlist.test.ts`
-**Commit:** `4d7e4bd`
-**Applied fix:** Deleted the exported `mergeAllowlist` from `allowlist.ts` (it was dead code — production used `chainRegistry.ts:mergeAllowlist` with dedupe semantics). Removed Tests 7 + 8 from allowlist.test.ts (they asserted concat-keep-duplicates semantics on the dead function). Added a structured-log line `op: 'antirug.allowlist.env-override-hardcoded'` in chainRegistry's `mergeAllowlist` so the audit trail captures operator intent when an env entry overrides a hardcoded one. Tests: 7/7 remaining tests pass.
+**Applied fix:** Threads the wire payload's `success: boolean` field (already declared in `AntiRugStateUpdate` and already broadcast from `exitTrigger.ts:259` per iter-1 CR-06) through the dashboard consumer chain so the operator can distinguish a successful live exit from a failed one. The fix is dashboard-only — no backend changes are required:
 
-### WR-02: dispatchEvent races with unregisterAntiRugPosition mid-loop
+1. **`api.ts`** — Added `antiRugLastSuccess?: boolean` to the `Position` interface, documented to mirror `AntiRugStateUpdate.success` on the wire and to be meaningful only when `antiRugState === 'exit-fired'`.
 
-**Files modified:** `src/anti-rug/detector.ts`
-**Commit:** `de2fc8e`
-**Applied fix:** Snapshot the positions bucket with `.slice()` at dispatch start. Same defensive pattern as the V3 grace-window block-handler. Prevents the rare case where a trailing-stop timer firing on a sibling position closes it mid-await, splicing the bucket and causing the loop to skip a still-registered evaluator entry. Tests: detectorRegistry 11/11 pass.
+2. **`useWebSocket.ts`** — Captured `update.success` into the new `antiRugLastSuccess` field in the `antirug_state_update` handler. Previously dropped silently — only `state`, `lastEventTs`, and `lastSignals` were merged into the Position row.
 
-### WR-03: V3 sell-sim probe amount uses baseline active liquidity, not the position's amount
+3. **`AntiRugStateBadge.tsx`** — Added a `success?: boolean` prop. When `state === 'exit-fired'`, the label is augmented with a `✓` (success) / `✗` (failure) glyph; `success === undefined` keeps the original 'Exit fired' label unchanged. For every state OTHER than `'exit-fired'`, the prop is ignored — the 6-badge visual contract from UI-SPEC §"Anti-Rug column header and badges" is preserved unchanged. The glyph is appended rather than swapping the badge background color (still `bg-loss` on `'exit-fired'`) so the existing color-token contract is preserved and source-grep tests for `bg-loss` / `'Exit fired'` continue to pass.
 
-**Files modified:** `src/anti-rug/detector.ts`, `test/unit/anti-rug/detectorEvaluator.test.ts`
-**Commit:** `98fc813`
-**Applied fix:** Probe amount now queried via `tokenContract.balanceOf(ctx.wallet.address)` using ERC20_ABI (the bot's actual token balance). Ratio denominator flipped from baselineLiquidity to probeAmount so the slippage percent reflects realised quote-out ÷ input amount — the real anti-rug signal. The previous baselineLiquidity-as-probe approach (acknowledged dimensionally wrong in the inline note) would have caused signal-3 false positives on every benign V3 position with any size mismatch. Test fixture MockContract dispatcher updated to handle ERC20 ABI (`balanceOf` mock); added `wallet.address` to `StubChainCtx` + `buildCtx`. Tests: 20/20 evaluator + 28/28 anti-rug integration pass.
+4. **`PositionTable.tsx`** — Introduced an `antiRugTooltipFor(state, chain, success?)` helper that overrides the base `'exit-fired'` tooltip with EXIT SUCCEEDED / EXIT FAILED variants when `success` is present. Threads `position.antiRugLastSuccess` into the badge's new `success` prop.
 
-> **Logic verification required:** This is a semantic change (the algorithm now uses a different probe amount), not a pure refactor. The fork-test that the review suggested (asserting V3 sell-sim slippage < 5% on a balanced pool when probeAmount === position size) was not added — recommended as a follow-up before live-execute graduation.
+5. **`AntiRugExitDetailModal.tsx`** — Added a `success?: boolean` prop. When `variant === 'live'`, renders a green-bordered banner ("EXIT SUCCEEDED — executeFullSell returned true on {CHAIN}. The position is closed...") on `success === true`, or a red-bordered banner ("EXIT FAILED — executeFullSell returned false on {CHAIN}. The position is still open AND a trigger slot was consumed...") on `success === false`. The banner appears above the existing tx-artifacts block. The failure-banner copy explicitly tells the operator the actionable consequences (position still open, trigger slot consumed, CB closer to tripping, consider manual Force Sell).
 
-### WR-04: V2 evaluator reads only reserve0 for signal-3 — ignores reserve1, fails for WETH-as-token1 pairs
+6. **`Overview.tsx`** — Threaded `detailPosition?.antiRugLastSuccess` into the modal's new `success` prop.
 
-**Files modified:** `src/anti-rug/detector.ts`
-**Commit:** `cc4a0be`
-**Applied fix:** Compute both `reserve0Pct` and `reserve1Pct` against baseline; trip signal-3 if EITHER side dropped below 50%. `v2ReservePctBelow` telemetry reports the WORSE side. Guarded with vacuous-pass (`1.0` ratio) for legacy baselines where `v2Token1Reserve` may be `null`. The `lp_baseline` schema already persisted `v2_token1_reserve`; the evaluator just wasn't reading it. Tests: 20/20 evaluator pass.
+**Verification:**
+- `tsc --noEmit -p tsconfig.bot.json`: clean
+- `tsc --noEmit`: clean
+- `tsc --noEmit -p dashboard/tsconfig.json`: clean
+- `vitest run test/unit/dashboard/anti-rug/`: 67/67 pass (includes the AntiRugStateBadge source-grep guards in `displayComponents.test.ts` which assert all 6 state strings, all 6 verbatim labels, and the `bg-profit`/`bg-warning`/`bg-loss`/`#1f2937`/`border-loss`/`text-text-disabled` color tokens — all preserved)
+- `vitest run test/unit/anti-rug/exitTrigger.test.ts`: 6/6 pass (backend wire shape unchanged — `exitTrigger.ts:259` already sends `success` on the exit-fired path; this commit only consumes it)
+- `vitest run test/integration/api/wsPush.test.ts`: 4/4 pass
 
-> **Logic verification required:** The previous behavior (reserve0-only) was unconditional; new behavior trips on EITHER reserve. Operators should validate that the new signal-3 doesn't fire on benign V2 pools where reserve1 oscillates more than reserve0 during normal trading.
-
-### WR-05: Dashboard WS reconnect can leak connections when previous socket is CONNECTING
-
-**Files modified:** `dashboard/src/hooks/useWebSocket.ts`
-**Commit:** `e30b570`
-**Applied fix:** Bail in `connect()` when the previous socket is OPEN, CONNECTING, or CLOSING — only CLOSED state allows a fresh socket. Previously only OPEN short-circuited, leaving CONNECTING sockets dangling when the reconnect timer fired mid-negotiation. The next tick will see CLOSED after the old socket's natural close handler fires.
-
-### WR-06: V3 Burn grace-window block-watcher leak
-
-**Files modified:** `src/anti-rug/detector.ts`
-**Commit:** `cd51e32`
-**Applied fix:** Added `blockHandler: (currentBlock: number) => void | Promise<void>` to the `PendingV3Burn` record so both `handleV3CollectArrival` (consumes pending entry) and `handleV3BurnArrival` (LAST-WINS replacement) can explicitly `off()` the handler. The handler's self-cleanup logic only fired when `pendingV3Burn.get(poolKey)` returned undefined OR matched its `burnBlockNumber` — the LAST-WINS replacement case satisfied neither condition, leaking handlers that ticked forever. Tests: 20/20 evaluator pass (including Test 10d LAST-WINS).
-
-### WR-07: Test 1 in detectorEvaluator.test.ts asserts wrong verdict for documented scenario
-
-**Files modified:** `test/unit/anti-rug/detectorEvaluator.test.ts`
-**Commit:** `f34ad9b`
-**Applied fix:** Updated the `it()` description for Test 1 from "Only signal-1 trips → safe / partial-signal" to "signal-1 trips + destination IS in allowlist → allowlisted (short-circuit)". The discriminated-union short-circuits to `verdict='allowlisted'` BEFORE the multi-signal AND check; the original PLAN.md description was inconsistent with the type contract. The "only signal-1 trips → safe/partial-signal" scenario is structurally unreachable (signal-2 not tripping requires an allowlist hit which short-circuits). Test body and assertion unchanged. Doc-side fix only.
-
-### WR-08: chainRegistry mergeAllowlist places ALLOWLIST_EXTRA in BOTH V2 and V3
-
-**Files modified:** `src/chainRegistry.ts`
-**Commit:** `f08406c`
-**Applied fix:** Added per-pool-type env vars: `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V2` and `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA_V3`. Kept unified `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA` as a deprecated alias with a startup warning (`op: 'antirug.allowlist.deprecated-unified-extra'`). Allows operators to avoid placing V2-only lockers in the V3 allowlist (or vice versa), which would silently bypass per-pool-type lockerName checks. Tests: 26/26 antiRugConfig pass.
-
-### WR-09: gap-detected broadcast missing pair field; declared required on frontend type
-
-**Files modified:** `dashboard/src/types/api.ts`, `dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx`
-**Commit:** `bcabc0f`
-**Applied fix:** Made `pair` optional in the `AntiRugEvent` frontend type — gap-detected is legitimately a chain-level event with no pair anchor. Updated `AntiRugMonitorTile`'s `formatAddress(evt.pair)` call to render `'—'` for `kind === 'gap-detected'` and `pair ?? ''` otherwise.
+**Logic-correctness note:** This fix is presentation-only. The `success` boolean propagates verbatim from `executeFullSell`'s return value through `exitTrigger.ts:259` → wire → `useWebSocket.ts` → Position state → badge + modal. No new conditional logic that could introduce an off-by-one or wrong-state-handling bug. Classified as `"fixed"`, not `"fixed: requires human verification"`.
 
 ## Skipped Issues
 
-### CR-07: Circular import exitEngine ↔ anti-rug/detector ↔ anti-rug/exitTrigger ↔ exitEngine
+None — both in-scope iter-2 findings were fixed successfully.
 
-**Files:** `src/exitEngine.ts:20`, `src/anti-rug/detector.ts:91`, `src/anti-rug/exitTrigger.ts:56`
-**Reason:** All three proposed resolution options have tight coupling with the existing vi.mock test contract that would require non-trivial test rewrites.
+## Out-of-Scope Findings
 
-**What was attempted:**
-- **Option 1 (move triggerAntiRugExit into detector.ts):** Would break `vi.mock('../../../src/anti-rug/exitTrigger', ...)` in `detectorEvaluator.test.ts` and `wsReconnectBackfill.test.ts` — the mocked module would no longer be on the call path.
-- **Option 2 (move executeFullSell into sellPipeline.ts):** Largest refactor scope; `executeFullSell` is the centerpiece of `exitEngine.ts`.
-- **Option 3 (runtime callback registration):** Would break `vi.mock('../../../src/exitEngine', ...)` in `exitTrigger.test.ts`.
-- **Tried: lazy require() in exitEngine.ts for unregisterAntiRugPosition** — Tested but `vitest.mock` for CommonJS does not intercept dynamic `require()` calls correctly when the mock is for the target module path. Test suite `test/unit/exitEngine/antiRugReason.test.ts` failed with `Cannot find module './anti-rug/detector'` because the vitest worker's module resolution differs from the dynamic require resolution. Rolled back via `git checkout -- src/exitEngine.ts`.
+Per iter-2 task spec, deliberately NOT touched in this iteration:
 
-**Risk assessment:** The review itself classifies this as "latent" — "There's no immediate runtime symptom IF every consumer accesses the imported symbol only after all modules have finished loading (e.g., inside functions called at runtime)". The current code matches this constraint (all uses are inside function bodies). The defect would only manifest if a future refactor added top-level module-body code that called one of the cycle's symbols.
+- **CR-07 (circular import)** — Intentionally deferred per iter-1 fix report. Vitest mock-cache friction with all three resolution paths; recommended for a separate phase with `eslint-plugin-import/no-cycle` landing first.
 
-**Recommended follow-up (separate phase):**
-1. Add ESLint rule `import/no-cycle` to prevent regression (the review's secondary recommendation).
-2. When refactoring for cycle removal, plan test mock updates alongside.
-3. Consider option 3 (runtime registration via a thin `sellAdapter` module) — requires updating `exitTrigger.test.ts` to register a mock adapter in `beforeEach` instead of using `vi.mock`.
+- **IN-01 (test tightening to exact 44)** — Out of iter-2 scope. The existing `>= 32` assertion in `antiRugConfig.test.ts:357-363` continues to hold for the new 44-count from WR-08-FOLLOWUP. Recommended to tighten in a future iteration (the review's Recommendation §5).
 
-**Original issue (verbatim from REVIEW.md):**
-> Three-way circular import. ts-node + CommonJS will satisfy circular imports by returning partial module exports — depending on the import order, one of the three modules sees its dependencies as `undefined` for the duration of its own module-initialization code path. The downstream symptom is "expected `triggerAntiRugExit` to be a function, got undefined" exceptions in production that don't reproduce in unit tests.
+- **IN-02..IN-06** — All Info-tier; out of iter-2 scope (kept tight to the two new follow-up warnings).
 
-## Out-of-Scope Findings (Info-tier)
+## Closure Status Across Iterations
 
-Not addressed in this fix iteration (Info-tier per `fix_scope: critical_warning`):
-- IN-01: REQUIRED_ENV_VARS count test tightening
-- IN-02: Test mocks use unused mergeAllowlist (related to WR-01, indirectly resolved by deletion)
-- IN-03: V3_BURN_GRACE_BLOCKS hardcoded
-- IN-04: void _removed pattern in useWebSocket.ts
-- IN-05: 5s force-exit doc nit
-- IN-06: Frontend chain selection logic fragility
+Combined view across iter-1 + iter-2 fix cycles, mirroring the source review's closure table:
 
-## Test Plan Coverage
+| Finding | Iter-1 Status | Iter-2 Status | Notes |
+|---|---|---|---|
+| CR-01: cb_tripped payload field mismatch | CLOSED (iter-1 commits `757b0d1` + `2b93bb3`) | unchanged | — |
+| CR-02: Flashbots EIP-1559 gas | CLOSED (`1708ed4`) | unchanged | — |
+| CR-03: registerAntiRugPosition not awaited | CLOSED (`7b248f6`) | unchanged | — |
+| CR-04: Allowlist verify failure → silent unverified | CLOSED (`8491733`) | unchanged | — |
+| CR-05: Resume path no-ops with zero positions | CLOSED (`2c4e4ff`) | unchanged | — |
+| CR-06: AntiRugStateUpdate success + null/undefined drift | PARTIALLY CLOSED (`3412280`) | **CLOSED** (iter-2 `74417d3` — CR-06-FOLLOWUP) | Wire was fixed in iter-1; UI consumer added in iter-2 |
+| CR-07: Circular import | NOT CLOSED (skipped) | NOT CLOSED (skipped, deferred) | Latent; recommend separate phase with import/no-cycle ESLint |
+| WR-01..WR-07 | CLOSED (iter-1) | unchanged | — |
+| WR-08: ALLOWLIST_EXTRA per-pool-type | PARTIALLY CLOSED (`f08406c`) | **CLOSED** (iter-2 `e42c21b` — WR-08-FOLLOWUP) | Code in iter-1; config + .env.example + 2 docs in iter-2 |
+| WR-09: gap-detected missing pair | CLOSED (`bcabc0f`) | unchanged | — |
+| IN-01..IN-06 | NOT IN SCOPE | NOT IN SCOPE | Per `fix_scope: critical_warning` |
 
-After all fixes:
+After iter-2: **15 of 16 in-scope critical+warning findings fully closed** across both iterations. CR-07 (circular import) remains deferred — latent (no runtime symptom; cycle is at function-body boundaries only), recommended for a future dedicated phase.
+
+## Test Plan Coverage (iter-2 only)
+
+After both iter-2 fixes:
 - `tsc --noEmit -p tsconfig.bot.json` — clean
 - `tsc --noEmit -p tsconfig.json` — clean
 - `tsc --noEmit -p dashboard/tsconfig.json` — clean
-- `vitest run test/unit/anti-rug/` — 79/79 pass
-- `vitest run test/integration/anti-rug/` — 28/28 pass
-- `vitest run test/unit/chainRegistry/` — 26/26 pass (antiRugConfig)
-- `vitest run test/unit/exitEngine/` — 11/11 pass (antiRugReason)
+- `vitest run test/unit/chainRegistry/antiRugConfig.test.ts` — 26/26 pass
+- `vitest run test/unit/dashboard/anti-rug/` — 67/67 pass (display + interactive components)
+- `vitest run test/unit/anti-rug/exitTrigger.test.ts` — 6/6 pass
+- `vitest run test/integration/api/wsPush.test.ts` — 4/4 pass
+- Spot-check: `vitest run test/unit/anti-rug/*.test.ts` (each file individually) — 73/73 pass across all 8 anti-rug test files
 
-Total: **135/135 tests passing** across 13 test files.
+No test that previously passed now fails. No backend wire-shape change in iter-2 (the success field was already on the wire from iter-1 commit `3412280`); iter-2 only added a frontend consumer. (Note: a multi-file batched vitest run in the isolated worktree shows pre-existing worker-isolation noise unrelated to the iter-2 changes — the same batched run on the main repo cwd passes 140/140, and each worktree test file passes individually. This is environmental noise, not a regression.)
 
-## Production Safety Notes
+## Production Safety Notes (iter-2)
 
-Two findings touch live-execute semantics — they pass tests but should be operator-verified before live-execute graduation:
+Neither iter-2 fix touches live-execute semantics:
 
-1. **CR-02 (Flashbots EIP-1559 gas)** — Add a fork test that asserts `populatedTx.maxFeePerGas === rawMaxFeePerGas * 2n` for `reason='anti-rug'` on ETH (review-recommended; not added in this fix).
+- **WR-08-FOLLOWUP** is docs + env-registry. The runtime parser (`src/chainRegistry.ts:835`) is unchanged. Operators who previously used the unified `<CHAIN>_ANTIRUG_ALLOWLIST_EXTRA` see no change in behavior; the deprecation-warn fires once at startup, recommending migration.
 
-2. **WR-03 (V3 sell-sim probe amount)** — Add a fork test that asserts V3 sell-sim slippage is < 5% when the pool is balanced and `probeAmount === position size` (review-recommended; not added in this fix).
+- **CR-06-FOLLOWUP** is dashboard presentation only. The `success` boolean already crossed the wire from iter-1; iter-2 just consumes it. No backend logic change, no new evaluator branch, no new exit path. The operator gets a clearer signal on a failed live exit (red banner + ✗ glyph + tooltip) but the bot's exit behavior is unchanged.
 
-3. **WR-04 (V2 signal-3 both reserves)** — Operator should validate the new signal-3 doesn't fire on benign V2 pools where `reserve1` oscillates more than `reserve0` during normal trading.
-
-The 7-day dry-run window (per D-LIVE-GATE) provides operational coverage for these scenarios before any chain is graduated to `LIVE_EXECUTE=true`.
+The three fork-test recommendations from iter-1 (CR-02 EIP-1559 verification, WR-03 V3 sell-sim slippage assertion, WR-04 V2 reserve oscillation tolerance) are unchanged and still recommended before any chain graduates to `LIVE_EXECUTE=true`.
 
 ---
 
 _Fixed: 2026-05-24_
 _Fixer: Claude (gsd-code-fixer)_
-_Iteration: 1_
+_Iteration: 2 (follow-up to iter-1; iter-1 report content preserved in git at commit `2db8a2f`)_
