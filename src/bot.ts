@@ -422,7 +422,14 @@ export async function handleNewPairForChain(
             // UI-SPEC) but the standard exit monitor remains active.
             try {
                 await snapshotLpBaseline(ctx, dex, tradeRow.id, pairAddress, null);
-                registerAntiRugPosition(ctx, dex, targetToken, pairAddress, tradeRow.id, null);
+                // CR-03: registerAntiRugPosition is async (awaits
+                // startChainAntiRugListener → backfillSinceLastSeen which
+                // performs RPC + DB writes). Without await, rejections
+                // become unhandled promise rejections and bypass the
+                // surrounding try/catch — the documented
+                // op='antirug.baseline-snapshot-failed' log path never
+                // fires and the position appears registered when it isn't.
+                await registerAntiRugPosition(ctx, dex, targetToken, pairAddress, tradeRow.id, null);
             } catch (err) {
                 ctx.log.error(
                     {
@@ -676,7 +683,8 @@ export async function handleNewV3PoolForChain(
             // standard exit monitor remains active.
             try {
                 await snapshotLpBaseline(ctx, dex, tradeRow.id, poolAddress, feeTier);
-                registerAntiRugPosition(ctx, dex, targetToken, poolAddress, tradeRow.id, feeTier);
+                // CR-03: same async-not-awaited issue on the V3 path.
+                await registerAntiRugPosition(ctx, dex, targetToken, poolAddress, tradeRow.id, feeTier);
             } catch (err) {
                 ctx.log.error(
                     {
