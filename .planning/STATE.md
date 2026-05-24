@@ -4,14 +4,14 @@ milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
 stopped_at: Phase 20 context gathered
-last_updated: "2026-05-24T19:34:12.030Z"
-last_activity: 2026-05-24 -- Phase 20 planning complete
+last_updated: "2026-05-24T19:52:14Z"
+last_activity: 2026-05-24 -- Phase 20 plan 20-00 complete (14 Wave-0 test stubs)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 32
-  completed_plans: 23
-  percent: 40
+  completed_plans: 24
+  percent: 43
 ---
 
 # Project State
@@ -26,14 +26,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 19 — anti-rug-runtime-monitoring
+**Current focus:** Phase 20 — going-live-ops-hardening
 
 ## Current Position
 
-Phase: 19 — COMPLETE
-Plan: 5 of 10
-Status: Ready to execute
-Last activity: 2026-05-24 -- Phase 20 planning complete
+Phase: 20 (going-live-ops-hardening) — EXECUTING
+Plan: 2 of 8 (20-00 complete; 20-01 next)
+Status: Executing Phase 20
+Last activity: 2026-05-24 -- Phase 20 plan 20-00 complete (14 Wave-0 test stubs)
 
 ## Performance Metrics
 
@@ -112,12 +112,19 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 | Phase 19 P04a | 25 | 1 tasks | 2 files |
 | Phase 19 P19-04c | 17min | 1 tasks | 2 files |
 | Phase 19 P19-08 | 28 | 2 tasks | 3 files |
+| Phase 20 P20-00 | ~10min | 2 tasks | 14 files |
 
 ## Phase 19 Plan Execution Log
 
 | Plan | Duration | Tasks | Files | Commit |
 |------|----------|-------|-------|--------|
 | 19-01 (ANTIRUG-04 schema v4 to v5 + 5 prepared statements) | ~20min | 2/2 | 2 | 6091100 (test RED), 522ae08 (feat GREEN) |
+
+## Phase 20 Plan Execution Log
+
+| Plan | Duration | Tasks | Files | Commit |
+|------|----------|-------|-------|--------|
+| 20-00 (Wave-0 vitest stubs: 14 files / 66 it.skip across OPS-LIVE-01..11 + schema v5→v6) | ~10min | 2/2 | 14 | 4327725 (8 unit stubs), 5a2a195 (6 integration stubs) |
 
 ## Phase 18 Plan Execution Log
 
@@ -136,7 +143,7 @@ Closed by Phase 17 (DEBT-05). Phases 01, 02, 03, 05, 06, 07, 08, 09, 10 each hav
 
 ## Session Continuity
 
-Last session: 2026-05-24T18:06:34.401Z
-Last activity: 2026-05-24 — Phase 19 plan 19-01 complete. ANTIRUG-04 + ANTIRUG-16 schema migration v4→v5 landed in `src/utils/db.ts`. New `lp_baseline` table (single-table-with-`pool_type`-discriminator shape; 12 columns + `idx_lp_baseline_pool` index) records LP-reserve / V3-active-liquidity snapshot at buy-success per trade; new `chain_state` table (PRIMARY KEY chain; `last_seen_block` + `last_updated_ts`) drives restart-time `getLogs(lastSeen+1, current)` chunked backfill per D-BACKFILL. 5 prepared statements (`upsertLpBaseline` named-bind UPSERT, `getLpBaseline`, `deleteLpBaseline`, `upsertChainState` positional UPSERT, `getChainState`) exported. `v3_position_nft_id` stays NULLABLE in v6.17 per Research Open Question #3 (V3 baseline pool-only; NFT-tracking deferred to v6.18+). 12/12 tests passing in new `test/unit/db/lpBaselineMigration.test.ts` (10 behaviors + 2 production-module integration); full unit suite 288/288 with zero regressions; tsc clean across all 3 tsconfig projects (`tsconfig.json` + `tsconfig.bot.json` + `dashboard/tsconfig.json`). Existing tables untouched per additive-only ANTIRUG-04 acceptance. Commits: `6091100` (test RED) + `522ae08` (feat GREEN). Production `data/bot.db` migrated in-place from v4 to v5 with `Created lp_baseline + chain_state tables (schema version 5)` log line on first module load. Plans 19-03 (`lpBaseline.ts`), 19-04a/b/c (`detector.ts`), 19-05 (cleanup hook) now unblocked.
-Stopped at: Phase 20 context gathered
-Resume file: .planning/phases/20-going-live-ops-hardening/20-CONTEXT.md
+Last session: 2026-05-24T19:52:14Z
+Last activity: 2026-05-24 — Phase 20 plan 20-00 complete. 14 Wave-0 vitest test-stub files shipped (8 unit at `test/unit/preflight/` + `test/unit/db/`; 6 integration at `test/integration/`) covering OPS-LIVE-01..11 + schema v5→v6 migration. 66 `it.skip` blocks total (37 unit + 29 integration). Per D-04 observable-effect rigor (Phase 17 carry-forward), every reason string names the concrete observable the implementation plan will assert (pino fatal log field shape, process.exit code, SQLite row, broadcast event type, spy-call assertion, exit code) — zero `expect(true).toBe(true)` hollow filler. D-09 `.todo` ban CI guard preserved (0 `.todo` matches across `test/`). Full unit suite 487 passed + 37 skipped (+37 matches new stub count exactly; 0 regressions); full integration suite 169 passed + 29 skipped (+29 matches; 0 regressions); tsc clean across all 3 tsconfig projects. Plan does NOT close OPS-LIVE-01..11 requirements — they stay Pending in REQUIREMENTS.md until implementation plans 20-02..05 land. Per-file header comments name target implementation plan (20-02 / 20-03 / 20-04 / 20-05) so the next executor can `grep "Plan 20-02 will"` to enumerate every stub their plan must populate. killswitchCheckpoints.test.ts uses 8 separate describe blocks (V2 CP1/CP2/CP3 + V3 CP1/CP2/CP3 + 2 cross-cutting) to keep vitest output tree readable when Plan 20-04 flips skip→it. midRunWalletCheck.test.ts includes T-20-04 idempotency assertion (no-duplicate-alert-when-already-paused) so Plan 20-04's executor sees the threat-mitigation requirement at the test contract level. Commits: `4327725` (8 unit stubs test) + `5a2a195` (6 integration stubs test). Plans 20-01..07 unblocked.
+Stopped at: Phase 20 plan 20-00 complete; ready for /gsd-execute-plan 20-01
+Resume file: .planning/phases/20-going-live-ops-hardening/20-01-PLAN.md

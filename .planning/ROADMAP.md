@@ -166,7 +166,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 8 plans (Wave 0 Nyquist baseline + 7 implementation waves)
 
   **Wave 0** *(no dependencies; produces Nyquist test stub baseline before any implementation):*
-  - [ ] 20-00-PLAN.md — 14 vitest test stubs across test/unit/preflight/, test/unit/db/, and test/integration/ for all OPS-LIVE-NN requirements; every it.skip names the concrete observable per D-04 [OPS-LIVE-01..11]
+  - [x] 20-00-PLAN.md — 14 vitest test stubs across test/unit/preflight/, test/unit/db/, and test/integration/ for all OPS-LIVE-NN requirements; every it.skip names the concrete observable per D-04 [OPS-LIVE-01..11] (completed 2026-05-24)
 
   **Wave 1** *(after Wave 0; parallel-safe foundation):*
   - [ ] 20-01-PLAN.md — Schema migration v5→v6 (pause_state table + antirug_dry_run_started column on chain_state) + 5 new prepared statements + REQUIREMENTS.md row reword for OPS-LIVE-02 (D-BALANCE-FLOOR) + OPS-LIVE-06 (D-STALE-THRESHOLDS) [OPS-LIVE-02, OPS-LIVE-06, OPS-LIVE-09]
@@ -227,8 +227,8 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 0/8 | Planned | - |
+| 20. Going-Live Ops Hardening | v6.17 | 1/8 | In Progress | - |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
-*Last updated: 2026-05-24 — Phase 19 plan 19-04a complete: anti-rug detector FOUNDATION skeleton (src/anti-rug/detector.ts — registry + WS subscription + topic-filter union + chunked getLogs primitive) landed; 11/11 detector-registry tests passing; full unit suite 354/354 (+11 new); tsc clean ×3. ANTIRUG-01/02/03/13 partial-credit (subscription mechanism shipped; multi-signal evaluator lands in 19-04b; heartbeat + reconnect + backfill in 19-04c)*
+*Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
