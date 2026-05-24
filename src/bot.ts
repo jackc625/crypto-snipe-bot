@@ -636,6 +636,15 @@ export async function handleNewV3PoolForChain(
 
     ctx.log.info({ token: targetToken, symbol, feeTier }, 'All V3 safety checks passed, buying');
 
+    // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP1 (V3 path)
+    {
+        const pauseStateCp1 = getPauseState.get() as { paused: number };
+        if (pauseStateCp1.paused === 1) {
+            ctx.log.info({ op: 'killswitch.cp1', token: targetToken, feeTier, reason: 'global-pause' }, 'V3 CP1 pause-check: aborting before V3 bundle construction');
+            return;
+        }
+    }
+
     const amountIn = ethers.parseEther(ctx.chain.snipeAmount);
 
     // Calculate minOut via QuoterV2 with slippage (V3-03)
@@ -674,6 +683,15 @@ export async function handleNewV3PoolForChain(
         // Use multicall for deadline enforcement on SwapRouter02 (Pitfall 1: no deadline in struct)
         const swapData = v3Router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
 
+        // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP2 (V3 path)
+        {
+            const pauseStateCp2 = getPauseState.get() as { paused: number };
+            if (pauseStateCp2.paused === 1) {
+                ctx.log.info({ op: 'killswitch.cp2', token: targetToken, feeTier, reason: 'global-pause' }, 'V3 CP2 pause-check: discarding V3 bundle before submit');
+                return;
+            }
+        }
+
         await sendTxWithRetry(
             () => ctx.wallet.populateTransaction({
                 to: dex.swapRouterAddress,
@@ -682,6 +700,15 @@ export async function handleNewV3PoolForChain(
             }),
             ctx
         );
+
+        // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 (V3 path) — audit log only
+        {
+            const pauseStateCp3 = getPauseState.get() as { paused: number };
+            if (pauseStateCp3.paused === 1) {
+                ctx.log.info({ op: 'killswitch.cp3', token: targetToken, feeTier, reason: 'global-pause-after-submit' }, 'V3 CP3 pause-check: bundle already submitted');
+                // intentionally fall through — do NOT return; pause never panic-sells
+            }
+        }
 
         recordSnipe(ctx.chain.name);
 
