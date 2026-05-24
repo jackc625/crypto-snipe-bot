@@ -37,6 +37,15 @@ interface AntiRugExitDetailModalProps {
   ethReceived?: string;
   gasMultiplier?: number;
   roiVsEntry?: number;
+  // CR-06-FOLLOWUP (iter-2): live-exit success/failure flag from the
+  // wire payload's `AntiRugStateUpdate.success`. Only meaningful when
+  // `variant === 'live'`; ignored otherwise.
+  //   - `true`  → green success banner above the tx-artifacts block
+  //   - `false` → red failure banner ("position still open, trigger
+  //               slot consumed") above the tx-artifacts block
+  //   - undefined → no banner (older positions in flight before the
+  //                 iter-2 wire change landed)
+  success?: boolean;
   // pending-confirm artifact
   confirmBlocksRemaining?: number;
   // explorer
@@ -56,6 +65,7 @@ export function AntiRugExitDetailModal({
   ethReceived,
   gasMultiplier,
   roiVsEntry,
+  success,
   confirmBlocksRemaining,
   explorerUrl,
   onDismiss,
@@ -108,6 +118,28 @@ export function AntiRugExitDetailModal({
                 </span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* CR-06-FOLLOWUP (iter-2): live-exit success/failure banner.
+            Rendered above the tx-artifacts block when variant === 'live'
+            AND the wire payload included a `success` boolean. Operator
+            can now distinguish a confirmed live exit from a failed one
+            at-a-glance — the failed case is the more operationally-
+            important signal (position still open, trigger slot
+            consumed, CB one step closer to tripping). */}
+        {variant === 'live' && success === true && (
+          <div className="mt-4 border-l-2 border-profit bg-surface rounded-r px-3 py-3">
+            <p className="text-sm text-profit">
+              <span className="font-bold">EXIT SUCCEEDED</span> — executeFullSell returned true on {chain.toUpperCase()}. The position is closed; see the tx artifacts below for the receipt.
+            </p>
+          </div>
+        )}
+        {variant === 'live' && success === false && (
+          <div className="mt-4 border-l-2 border-loss bg-surface rounded-r px-3 py-3">
+            <p className="text-sm text-loss">
+              <span className="font-bold">EXIT FAILED</span> — executeFullSell returned false on {chain.toUpperCase()}. The position is still open AND a trigger slot was consumed (circuit breaker is one step closer to tripping). Review the bot logs and consider a manual Force Sell.
+            </p>
           </div>
         )}
 

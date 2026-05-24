@@ -114,6 +114,28 @@ const antiRugTooltips: Record<string, (chain: string) => string> = {
     `No LP baseline recorded for this position. Anti-rug monitoring is not active.`,
 };
 
+/**
+ * CR-06-FOLLOWUP (iter-2): override the base 'exit-fired' tooltip when
+ * the wire payload's `success` boolean is present, so the operator can
+ * differentiate `exit-fired-success` from `exit-fired-failure` from the
+ * positions table hover-tip alone — without needing to click into the
+ * detail modal. `success === undefined` falls through to the base
+ * tooltip from `antiRugTooltips` above (covers the pre-iter-2 wire and
+ * the would-have-sold path, where success is not applicable).
+ */
+function antiRugTooltipFor(state: string, chain: string, success?: boolean): string {
+  if (state === 'exit-fired') {
+    if (success === true) {
+      return `Anti-rug exit SUCCEEDED on ${chain.toUpperCase()}. executeFullSell returned true. Click for tx artifacts.`;
+    }
+    if (success === false) {
+      return `Anti-rug exit FAILED on ${chain.toUpperCase()}. executeFullSell returned false — the position is still open and a trigger slot was consumed. Click for tx artifacts.`;
+    }
+  }
+  const fn = antiRugTooltips[state] ?? antiRugTooltips['unmonitored'];
+  return fn(chain);
+}
+
 function PositionRow({
   position,
   expanded,
@@ -125,7 +147,9 @@ function PositionRow({
 }: PositionRowProps) {
   const pos = position;
   const arState = pos.antiRugState ?? 'unmonitored';
-  const arTooltip = (antiRugTooltips[arState] ?? antiRugTooltips['unmonitored'])(pos.chain);
+  // CR-06-FOLLOWUP (iter-2): pass `success` into the tooltip helper so
+  // exit-fired hovers reflect the live-execute outcome.
+  const arTooltip = antiRugTooltipFor(arState, pos.chain, pos.antiRugLastSuccess);
 
   return (
     <>
@@ -155,6 +179,7 @@ function PositionRow({
             chain={pos.chain}
             onClick={onAntiRugBadgeClick}
             title={arTooltip}
+            success={pos.antiRugLastSuccess}
           />
         </td>
         <td className="px-4 py-3 text-sm text-right text-text-muted">{timeHeld}</td>

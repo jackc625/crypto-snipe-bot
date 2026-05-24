@@ -265,13 +265,17 @@ export function Overview() {
         onDismiss={() => setResetModalTarget(null)}
       />
 
-      {/* Phase 19 — Anti-Rug exit detail modal */}
+      {/* Phase 19 — Anti-Rug exit detail modal
+          CR-06-FOLLOWUP (iter-2): thread `antiRugLastSuccess` so the
+          modal renders the green-success or red-failure banner on the
+          live variant. */}
       <AntiRugExitDetailModal
         open={antiRugDetailTarget !== null}
         variant={detailVariant}
         tokenSymbol={antiRugDetailTarget?.token ? antiRugDetailTarget.token.slice(0, 10) + '...' : ''}
         chain={antiRugDetailTarget?.chain ?? ''}
         signals={detailPosition?.antiRugLastSignals}
+        success={detailPosition?.antiRugLastSuccess}
         onDismiss={() => setAntiRugDetailTarget(null)}
       />
 

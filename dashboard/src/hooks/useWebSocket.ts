@@ -142,6 +142,15 @@ export function useWebSocket(): UseWebSocketResult {
               // otherwise render an empty signals panel instead of the
               // 'no signals available' fallback).
               const lastSignals = update.lastSignals ?? undefined;
+              // CR-06-FOLLOWUP (iter-2): the wire payload's `success`
+              // boolean was being silently dropped — only `state`,
+              // `lastEventTs`, and `lastSignals` were destructured into
+              // the Position row. Capturing it into the new
+              // `antiRugLastSuccess` field lets AntiRugStateBadge and
+              // AntiRugExitDetailModal differentiate
+              // `exit-fired-success` from `exit-fired-failure` on the
+              // dashboard (the most operationally-important signal
+              // before live-execute graduation).
               setPositions((prev) =>
                 prev.map((p) =>
                   p.tradeId === update.tradeId
@@ -150,6 +159,7 @@ export function useWebSocket(): UseWebSocketResult {
                         antiRugState: update.state,
                         antiRugLastEventTs: update.lastEventTs,
                         antiRugLastSignals: lastSignals,
+                        antiRugLastSuccess: update.success,
                       }
                     : p,
                 ),

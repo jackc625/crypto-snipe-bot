@@ -150,6 +150,19 @@ export interface Position {
   antiRugState?: AntiRugMonitorState;
   antiRugLastEventTs?: number;
   antiRugLastSignals?: RugSignals;
+  /**
+   * CR-06-FOLLOWUP (iter-2): mirrored from `AntiRugStateUpdate.success`
+   * over the wire. Only meaningful when `antiRugState === 'exit-fired'`:
+   *   - `true`  : executeFullSell returned true (live exit confirmed)
+   *   - `false` : executeFullSell returned false (live exit failed —
+   *               position still open, trigger slot consumed, CB one
+   *               step closer to tripping)
+   *   - undefined: state is not 'exit-fired' (e.g., 'would-have-sold'
+   *                dry-run path, where success is not applicable).
+   * Drives the green-check vs red-X overlay on AntiRugStateBadge and
+   * the success/failure banner inside AntiRugExitDetailModal.
+   */
+  antiRugLastSuccess?: boolean;
 }
 
 export interface Trade {
