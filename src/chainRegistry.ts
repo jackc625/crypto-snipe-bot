@@ -6,6 +6,7 @@ import type pino from 'pino';
 import { logger } from './utils/logger';
 import { getProvider, getWsProvider } from './utils/provider';
 import type { HoneypotCheckerConfig } from './utils/honeypot/types';
+import type { AllowlistEntry, AntiRugConfig } from './anti-rug/types';
 
 // Plan 18-06 Task 1: re-export so other modules can import HoneypotCheckerConfig
 // from the chain-registry source of truth (matching the SafetyApiConfig /
@@ -13,36 +14,17 @@ import type { HoneypotCheckerConfig } from './utils/honeypot/types';
 // src/utils/honeypot/types.ts; this re-export keeps a single import target.
 export type { HoneypotCheckerConfig };
 
+// Plan 19-03 Task 1: re-export AllowlistEntry + AntiRugConfig from the
+// src/anti-rug/types.ts source of truth. Plan 19-02 declared these inline
+// here as a forward-compat shim while src/anti-rug/ did not yet exist; Plan
+// 19-03 hoists the canonical declaration into the anti-rug module and this
+// file now imports the types (matching the HoneypotCheckerConfig precedent
+// above). Re-export preserves all existing import sites that previously
+// pulled `AllowlistEntry` / `AntiRugConfig` from `./chainRegistry` (single
+// migration point + no downstream import churn).
+export type { AllowlistEntry, AntiRugConfig };
+
 const log = logger.child({ module: 'chainRegistry' });
-
-// ---------------------------------------------------------------------------
-// Plan 19-02: AntiRugConfig types (Phase 19 anti-rug runtime monitoring)
-//
-// Declared inline here as the source-of-truth for plan 19-02. Plan 19-03 will
-// move these to src/anti-rug/types.ts and this file will import from there;
-// for now we ship the shape co-located with ChainConfig so the registry can
-// own the defaults + env overlay + hardcoded allowlist constants without a
-// circular import between chainRegistry.ts and the new src/anti-rug/ module.
-// ---------------------------------------------------------------------------
-
-export interface AllowlistEntry {
-    address: string;
-    lockerName: string;
-    provenance: 'hardcoded' | 'env-overlay';
-}
-
-export interface AntiRugConfig {
-    liveExecute: boolean;
-    lpRemovalPct: number;
-    confirmBlocks: number;
-    circuitBreakerTriggers: number;
-    circuitBreakerWindowHours: number;
-    gasMultiplier: number;
-    backfillCapBlocks: number;
-    maxBackfillBlocks: number;
-    allowlistV2: AllowlistEntry[];
-    allowlistV3: AllowlistEntry[];
-}
 
 // ---------------------------------------------------------------------------
 // Types
