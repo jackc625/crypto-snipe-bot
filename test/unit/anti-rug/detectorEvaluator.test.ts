@@ -485,7 +485,18 @@ afterEach(async () => {
 // ===========================================================================
 
 describe('Phase 19 — Multi-signal evaluator (V2 path)', () => {
-    it('Test 1: only signal-1 trips (LP removed > 50%, dest allowlisted) → safe / partial-signal', async () => {
+    // WR-07: test description corrected. The PLAN.md row originally
+    // claimed "Only signal 1 trips → safe / partial-signal" but the
+    // discriminated-union short-circuits to verdict='allowlisted' BEFORE
+    // the multi-signal AND check when the destination is in the
+    // allowlist. The actual scenario this test exercises (LP removed
+    // > 50%, destination IS in allowlist) hits the short-circuit and
+    // the assertion is verdict='allowlisted' — which matches the
+    // implementation's safer semantic. The "only signal-1 trips →
+    // safe/partial-signal" combination is structurally unreachable per
+    // the type contract (signal-2 not tripping requires an allowlist
+    // hit, which always short-circuits).
+    it('Test 1: signal-1 trips + destination IS in allowlist → allowlisted (short-circuit)', async () => {
         const {
             evaluateRugSignals,
             registerAntiRugPosition,
