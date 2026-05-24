@@ -1538,8 +1538,18 @@ async function evaluateV2Signals(
 
     const baselineSupply = BigInt(position.baseline.v2LpTotalSupply);
     const baselineReserve0 = BigInt(position.baseline.v2Token0Reserve);
+    // WR-04: also read reserve1. Uniswap V2 orders token0/token1
+    // lexicographically by address, so the new token may be either
+    // index. Reading only reserve0 means a rug-puller draining WETH
+    // from a pair where WETH happens to be token1 (the more common
+    // case for new tokens with address > WETH) goes undetected by
+    // signal-3. Compute both percentages and trip if EITHER side
+    // dropped below 50% of baseline. The lp_baseline schema already
+    // persists v2_token1_reserve (db.ts) — we just weren't reading it.
+    const baselineReserve1 = BigInt(position.baseline.v2Token1Reserve ?? '0');
     const currentSupply = BigInt(totalSupply.toString());
     const currentReserve0 = BigInt(reserves[0].toString());
+    const currentReserve1 = BigInt(reserves[1].toString());
 
     // Signal 1: LP-removed percentage = (1 - currentSupply/baselineSupply) * 100
     // Use integer math via basis points to avoid floating-point drift.
@@ -1558,14 +1568,25 @@ async function evaluateV2Signals(
     const allowlistHit = hit.hit;
     const signal2Tripped = !allowlistHit;
 
-    // Signal 3: V2 reserves below sell-threshold (50% of baseline reserves)
+    // Signal 3: V2 reserves below sell-threshold (50% of baseline reserves).
+    // WR-04: evaluate BOTH reserves and trip if EITHER drops below 50%.
+    // baselineReserve1 may be 0n if the baseline row predates the WR-04
+    // schema change — guard with a vacuous-pass (1.0 ratio) for that case
+    // so legacy positions still rely on reserve0 only.
     const reserve0PctBps =
         baselineReserve0 === 0n
-            ? 0n
+            ? 10000n
             : (currentReserve0 * 10000n) / baselineReserve0;
+    const reserve1PctBps =
+        baselineReserve1 === 0n
+            ? 10000n
+            : (currentReserve1 * 10000n) / baselineReserve1;
     const reserve0Pct = Number(reserve0PctBps) / 100;
-    const v2ReservePctBelow = 100 - reserve0Pct;
-    const signal3Tripped = reserve0Pct < 50;
+    const reserve1Pct = Number(reserve1PctBps) / 100;
+    // v2ReservePctBelow reports the WORSE (further-dropped) side so
+    // downstream telemetry surfaces the larger drain.
+    const v2ReservePctBelow = Math.max(100 - reserve0Pct, 100 - reserve1Pct);
+    const signal3Tripped = reserve0Pct < 50 || reserve1Pct < 50;
 
     const signals: RugSignals = {
         lpRemovedPct,
