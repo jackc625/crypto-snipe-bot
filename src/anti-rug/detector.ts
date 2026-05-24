@@ -1324,7 +1324,15 @@ async function dispatchEvent(
         return;
     }
 
-    for (const position of positions) {
+    // WR-02: snapshot the positions bucket at dispatch start. The
+    // evaluator awaits internally (RPC + DB), which yields to the event
+    // loop. If unregisterAntiRugPosition fires during the await (e.g. a
+    // trailing-stop timer on a sibling position closes it via
+    // executeFullSell → unsubscribeAntiRug → bucket.splice mid-iteration),
+    // iterating the live bucket would skip the still-registered sibling.
+    // Snapshot pattern matches the V3 grace-window block-handler pattern.
+    const positionsSnapshot = positions.slice();
+    for (const position of positionsSnapshot) {
         try {
             // Plan 19-04b lands the actual evaluator; the let-shim above
             // routes through it. Failure is logged but does not break the
