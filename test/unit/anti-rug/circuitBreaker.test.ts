@@ -196,11 +196,18 @@ describe('Phase 19 — Circuit breaker', () => {
         expect(isCircuitBreakerTripped('eth')).toBe(true);
         expect(logFatal).toHaveBeenCalled();
         expect(broadcastMock).toHaveBeenCalledWith('cb_tripped', expect.objectContaining({ chain: 'eth' }));
-        // Verify the broadcast payload includes triggers count + windowHours
+        // CR-01: payload now matches the frontend CbTrippedPayload type —
+        // `triggers: TriggerEvent[]` (the array consumed by the modal) and
+        // `triggerCount: number` (the count consumed by the banner). The
+        // previous shape (triggers=count, triggerEvents=array) was a
+        // contract mismatch that silently broke the dashboard CB-reset
+        // modal.
         const cbTrippedCall = broadcastMock.mock.calls.find(c => c[0] === 'cb_tripped');
         expect(cbTrippedCall).toBeTruthy();
         const payload = cbTrippedCall![1] as Record<string, unknown>;
-        expect(payload.triggers).toBe(3);
+        expect(payload.triggerCount).toBe(3);
+        expect(Array.isArray(payload.triggers)).toBe(true);
+        expect((payload.triggers as unknown[]).length).toBe(3);
         expect(payload.windowHours).toBe(1);
 
         expect(sendCtxAlertMock).toHaveBeenCalled();
