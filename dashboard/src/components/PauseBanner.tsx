@@ -23,11 +23,19 @@
 //   - dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx — visual analog
 //   - dashboard/src/hooks/WebSocketContext.tsx — useWs().pauseState source
 
+import { useState } from 'react';
 import { PauseCircle } from 'lucide-react';
 import { useWs } from '../hooks/WebSocketContext';
 
 export function PauseBanner() {
   const { pauseState } = useWs();
+  // WR-04 fix: track in-flight resume so a double-click cannot fire a second
+  // POST /api/controls/resume. The previous version allowed two POSTs to race
+  // → two clearPauseState writes → two broadcast events → audit-log noise.
+  // On network failure we re-enable the button so the operator can retry; on
+  // success, the WS pause_state_change event drives the component to unmount
+  // (no need to reset resuming).
+  const [resuming, setResuming] = useState(false);
   if (!pauseState || !pauseState.paused) return null;
 
   // Format unix seconds → operator-localised string. Null falls back to a
@@ -37,18 +45,23 @@ export function PauseBanner() {
     ts ? new Date(ts * 1000).toLocaleString() : 'unknown';
 
   async function handleResume() {
+    if (resuming) return;
+    setResuming(true);
     try {
       // credentials: 'include' is required by the dashboard session-cookie auth
       // middleware (matches the same pattern as useApi.ts and the CB-reset POST).
-      await fetch('/api/controls/resume', { method: 'POST', credentials: 'include' });
+      const res = await fetch('/api/controls/resume', { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error(`Resume failed: ${res.status}`);
       // Deliberately do NOT setPauseState locally — the WS pause_state_change
       // event (broadcast by controls.ts POST /resume handler) drives the
       // component unmount. This keeps the server as the single source of truth
       // for pause state.
     } catch (e) {
-      // Network failure → leave the banner visible. The operator can retry by
-      // clicking Resume again, or fall back to `npm run resume` on the host.
+      // Network failure → leave the banner visible and re-enable the button so
+      // the operator can retry by clicking Resume again, or fall back to
+      // `npm run resume` on the host.
       console.error('Resume request failed', e);
+      setResuming(false);
     }
   }
 
@@ -64,9 +77,12 @@ export function PauseBanner() {
           <button
             type="button"
             onClick={handleResume}
-            className="inline-flex items-center gap-2 mt-3 bg-surface-light rounded px-3 py-1 hover:opacity-80 transition-opacity text-accent underline"
+            disabled={resuming}
+            className={`inline-flex items-center gap-2 mt-3 bg-surface-light rounded px-3 py-1 transition-opacity text-accent underline ${
+              resuming ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
+            }`}
           >
-            Resume
+            {resuming ? 'Resuming...' : 'Resume'}
           </button>
         </div>
       </div>
