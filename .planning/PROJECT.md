@@ -73,6 +73,8 @@ v6.17 Defensive Hardening for Live Mainnet — categories: Pre-buy safety (HONEY
 
 **Phase 17 (DEBT) closed 2026-04-30** — DEBT-01..06 all satisfied. Wave-0 CI baseline confirmed the v6.16 close audit's 37/.todo and 6/TS-error claims were stale (actual: 0/0). 7 retroactive harm-prevention tests + 2 inline VALIDATION.md augmentations close DEBT-05. `getTradesByToken` deleted from `src/utils/db.ts`. `.github/workflows/test.yml` locks the verified-empty baseline as evergreen via `.todo` ban + `tsc --noEmit` × 3 invariant guards.
 
+**Phase 20 (OPS-LIVE) closed 2026-05-25** — OPS-LIVE-01..13 all verified at code-level (verifier 13/13 must-haves pass; status `human_needed` pending 4 live-bot/browser items tracked in `20-HUMAN-UAT.md`). Ships: `src/preflight.ts` dual-shape API (preflight + preflightDryRun) with 7 startup-time fail-fast checks (wallet floor, RPC chainId+block-age, MEV health, honeypot-checker code-at-address, cross-env rules, anti-rug 7-day live-gate, stale-data); D-PAUSED-RESTART pause_state SQLite persistence (schema v5→v6) with API (`/api/controls/pause|resume`) + CLI (`npm run pause`/`resume`/`preflight`) + dashboard PauseBanner (WebSocket push); 6 V2/V3 multi-stage killswitch checkpoints in `bot.ts` (CP1/CP2/CP3 × V2/V3) + mid-run wallet setInterval; consolidated runbook at `docs/operations/going-live.md` + root-doc CI guard. Code review flagged 4 Critical issues (CR-01..CR-04) deferred to `/gsd:code-review 20 --fix` before live mainnet UAT. Anti-rug live-gate ready for 7-day dry-run timer (per-chain `<CHAIN>_ANTIRUG_LIVE_EXECUTE=true` graduation requires the floor).
+
 ### Future
 
 <!-- Deferred to a future offensive milestone, not abandoned. -->
