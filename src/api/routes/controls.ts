@@ -235,8 +235,18 @@ export function controlRoutes(contexts: ChainContext[]): Router {
         const pauseLog = log.child({ action: 'pause' });
         try {
             const body = req.body as { reason?: string; pausedBy?: string };
-            const reason = sanitizeReason(String(body.reason ?? 'manual operator pause'));
-            const pausedBy = String(body.pausedBy ?? 'dashboard');
+            // WR-05 fix: previously `String(body.pausedBy ?? 'dashboard')` would
+            // coerce ANY type (e.g. number 12345 from a curl misuse) into the
+            // paused_by column, which violates the documented union type in
+            // dashboard/src/types/api.ts (`'dashboard' | 'cli' | 'preflight' |
+            // 'manual' | null`). Same `String(null)` → 'null' problem for
+            // reason. Validate strictly: only accept string types, then clamp
+            // pausedBy to the allowlist (fallback 'manual').
+            const ALLOWED_PAUSED_BY = new Set(['dashboard', 'cli', 'preflight', 'manual']);
+            const rawPausedBy = typeof body.pausedBy === 'string' ? body.pausedBy : 'manual';
+            const pausedBy = ALLOWED_PAUSED_BY.has(rawPausedBy) ? rawPausedBy : 'manual';
+            const rawReason = typeof body.reason === 'string' ? body.reason : 'manual operator pause';
+            const reason = sanitizeReason(rawReason);
             const ts = Math.floor(Date.now() / 1000);
             setPauseState.run(ts, pausedBy, reason);
             // CR-04: force WAL fsync so the pause flag survives SIGKILL + restart
