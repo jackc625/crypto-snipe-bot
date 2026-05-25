@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: executing
-stopped_at: Phase 20 COMPLETE (all 8 plans shipped — going-live ops hardening done)
-last_updated: "2026-05-24T23:13:00Z"
+status: ready_to_plan
+stopped_at: Phase 20 complete (8/8) — ready to discuss Phase 21
+last_updated: 2026-05-25T00:30:29.064Z
 last_activity: 2026-05-24 -- Phase 20 plan 20-07 complete (docs/operations/going-live.md consolidated runbook + root-doc CI guard + vitest self-test); Phase 20 COMPLETE 8/8 plans
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 32
-  completed_plans: 32
+  completed_plans: 86
   percent: 60
 ---
 
@@ -26,20 +26,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 20 — going-live-ops-hardening
+**Current focus:** Phase 21 — exit engine live runtime hardening
 
 ## Current Position
 
-Phase: 20 (going-live-ops-hardening) — EXECUTING
-Plan: 7 of 8 (20-00 through 20-06 complete; 20-07 next)
-Status: Ready to execute
-Last activity: 2026-05-24 — Phase 20 plan 20-04 complete (bot.ts preflight wiring + 6 V2/V3 killswitch CPs + mid-run wallet setInterval with T-20-04 idempotence; 16 new integration tests across 4 files; 2 cascade fix-in-flight test mocks; 7 commits; full unit 535/535 + integration 185/185; tsc clean ×3)
+Phase: 21
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-25
 
 ## Performance Metrics
 
 **v6.16 velocity (reference):**
 
-- Total plans completed: 55
+- Total plans completed: 63
 - Timeline: 26 days (2026-03-19 → 2026-04-13)
 - Git: 395 conventional commits, 379 files changed, +87,015 / -71 lines
 

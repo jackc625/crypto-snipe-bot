@@ -62,19 +62,19 @@ DETECT-02 — runtime monitoring of open positions for liquidity-removal events 
 
 Code-level hardening of the going-live runbook gaps, env validation upgrades, kill-switch hardening. Formalizes the working-tree-root briefing files into versioned docs.
 
-- [ ] **OPS-LIVE-01**: New `src/preflight.ts` startup-time fail-fast module. Called from `startMultiChainBot` BEFORE chain context creation. All checks below execute via this module.
-- [ ] **OPS-LIVE-02**: Wallet balance pre-flight — FATAL on undercut (exit non-zero), never warn-and-continue. Per-chain minimum derived as `snipeAmount × maxOpenPositions + <CHAIN>_GAS_BUFFER` (operational floor, not deployment ceiling — see Phase 20 D-BALANCE-FLOOR). Periodic re-check during operation (default every 5 minutes, configurable via `MID_RUN_CHECK_INTERVAL_SEC`); on undercut, flip global pause flag with `paused_by='preflight'` + Telegram alert. Exit monitors keep running.
-- [ ] **OPS-LIVE-03**: RPC health pre-flight per enabled chain — chainId match (FATAL on mismatch, preserves v6.16 behavior), latest-block-age within tolerance, WebSocket reachability.
-- [ ] **OPS-LIVE-04**: MEV connectivity pre-flight per chain — Flashbots auth on ETH (HEAD against `relay.flashbots.net`), bloXroute auth on BSC (HEAD with auth header), passthrough chains skipped explicitly.
-- [ ] **OPS-LIVE-05**: HoneypotChecker code-at-address pre-flight — `getCode` against `chainRegistry[chain].honeypotChecker.deployedAddress` for each enabled chain. FATAL if no code at address.
-- [ ] **OPS-LIVE-06**: Stale-data warnings — at startup, flag positions whose `trades.timestamp` exceeds operationally-meaningful thresholds (default: warn at >2 minutes, error at >10 minutes; configurable via `STALE_WARN_SEC` / `STALE_ERROR_SEC` envs). Original "2×/4× poll interval" wording was too noisy (10s/20s = normal poll-cycle traffic per Phase 20 D-STALE-THRESHOLDS).
-- [ ] **OPS-LIVE-07**: Cross-variable env validation — refuse to start with internally-inconsistent env. Rules include: `MEV_STRATEGY=flashbots` requires `FLASHBOTS_AUTH_KEY`; `ENABLED_CHAINS` includes `bsc` requires `BLOXROUTE_AUTH_HEADER`; `TELEGRAM_API_ID` requires the full 5-tuple of Telegram listener vars; etc.
-- [ ] **OPS-LIVE-08**: Multi-stage kill-switch — pause flag re-checked at three points within `handleNewPairForChain`: post-safety-bank, post-bundle-build, post-MEV-submit. Operator-pressed pause cannot result in a position opening 30s later.
-- [ ] **OPS-LIVE-09**: SQLite-persisted pause state — pause flag survives restart. Loaded at boot from `bot_state` table (or new dedicated table); read-through on dashboard control queries; written on operator pause/resume.
-- [ ] **OPS-LIVE-10**: `npm run preflight` script — runs all OPS-LIVE-02..05 checks and exits non-zero if any fail; does NOT start the bot. Operator can run before manual boot.
-- [ ] **OPS-LIVE-11**: `npm run pause` and `npm run resume` scripts — operator-friendly wrappers around the existing dashboard pause/resume endpoints. Read `DASHBOARD_API_KEY` from `.env`; perform login + pause/resume in one command.
-- [ ] **OPS-LIVE-12**: `GOING-LIVE.md` moved from working-tree root to `docs/operations/going-live.md` (atomic with root-file delete). README links to it. CI guard added that fails the build if `GOING-LIVE.md` reappears at the repo root.
-- [ ] **OPS-LIVE-13**: `HONEYPOT-SIM-BRIEFING.md` either moved to `docs/decisions/honeypot-sim-rebuild.md` (preserved as decision record) or deleted (briefing closed by HONEY-01..11) — disposition decided during HONEY plan-phase.
+- [x] **OPS-LIVE-01**: New `src/preflight.ts` startup-time fail-fast module. Called from `startMultiChainBot` BEFORE chain context creation. All checks below execute via this module.
+- [x] **OPS-LIVE-02**: Wallet balance pre-flight — FATAL on undercut (exit non-zero), never warn-and-continue. Per-chain minimum derived as `snipeAmount × maxOpenPositions + <CHAIN>_GAS_BUFFER` (operational floor, not deployment ceiling — see Phase 20 D-BALANCE-FLOOR). Periodic re-check during operation (default every 5 minutes, configurable via `MID_RUN_CHECK_INTERVAL_SEC`); on undercut, flip global pause flag with `paused_by='preflight'` + Telegram alert. Exit monitors keep running.
+- [x] **OPS-LIVE-03**: RPC health pre-flight per enabled chain — chainId match (FATAL on mismatch, preserves v6.16 behavior), latest-block-age within tolerance, WebSocket reachability.
+- [x] **OPS-LIVE-04**: MEV connectivity pre-flight per chain — Flashbots auth on ETH (HEAD against `relay.flashbots.net`), bloXroute auth on BSC (HEAD with auth header), passthrough chains skipped explicitly.
+- [x] **OPS-LIVE-05**: HoneypotChecker code-at-address pre-flight — `getCode` against `chainRegistry[chain].honeypotChecker.deployedAddress` for each enabled chain. FATAL if no code at address.
+- [x] **OPS-LIVE-06**: Stale-data warnings — at startup, flag positions whose `trades.timestamp` exceeds operationally-meaningful thresholds (default: warn at >2 minutes, error at >10 minutes; configurable via `STALE_WARN_SEC` / `STALE_ERROR_SEC` envs). Original "2×/4× poll interval" wording was too noisy (10s/20s = normal poll-cycle traffic per Phase 20 D-STALE-THRESHOLDS).
+- [x] **OPS-LIVE-07**: Cross-variable env validation — refuse to start with internally-inconsistent env. Rules include: `MEV_STRATEGY=flashbots` requires `FLASHBOTS_AUTH_KEY`; `ENABLED_CHAINS` includes `bsc` requires `BLOXROUTE_AUTH_HEADER`; `TELEGRAM_API_ID` requires the full 5-tuple of Telegram listener vars; etc.
+- [x] **OPS-LIVE-08**: Multi-stage kill-switch — pause flag re-checked at three points within `handleNewPairForChain`: post-safety-bank, post-bundle-build, post-MEV-submit. Operator-pressed pause cannot result in a position opening 30s later.
+- [x] **OPS-LIVE-09**: SQLite-persisted pause state — pause flag survives restart. Loaded at boot from `bot_state` table (or new dedicated table); read-through on dashboard control queries; written on operator pause/resume.
+- [x] **OPS-LIVE-10**: `npm run preflight` script — runs all OPS-LIVE-02..05 checks and exits non-zero if any fail; does NOT start the bot. Operator can run before manual boot.
+- [x] **OPS-LIVE-11**: `npm run pause` and `npm run resume` scripts — operator-friendly wrappers around the existing dashboard pause/resume endpoints. Read `DASHBOARD_API_KEY` from `.env`; perform login + pause/resume in one command.
+- [x] **OPS-LIVE-12**: `GOING-LIVE.md` moved from working-tree root to `docs/operations/going-live.md` (atomic with root-file delete). README links to it. CI guard added that fails the build if `GOING-LIVE.md` reappears at the repo root.
+- [x] **OPS-LIVE-13**: `HONEYPOT-SIM-BRIEFING.md` either moved to `docs/decisions/honeypot-sim-rebuild.md` (preserved as decision record) or deleted (briefing closed by HONEY-01..11) — disposition decided during HONEY plan-phase.
 
 ### Exit-Engine Live-Runtime Hardening (EXIT-LIVE)
 
@@ -175,19 +175,19 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | ANTIRUG-14 | Phase 19 | Complete (Plans 19-04b + 19-05, 2026-05-24 — V3 multi-signal evaluator + bot.ts V3 buy-success attach pair) |
 | ANTIRUG-15 | Phase 19 | Partial (Plan 19-02, 2026-05-23 — ETH V3 allowlist resolved: UNCX V3 + TeamFinance V3 NFT (same proxy as V2 per TrustSwap blog); PinkLock V3 verified non-existent on ETH via Etherscan ABI inspection. BSC/Base/Arb V3 allowlists pending operator resolution when those chains are enabled; surfaced in Plan 19-08 Wave-1 follow-up.) |
 | ANTIRUG-16 | Phase 19 | Complete (Plan 19-01, 2026-05-24 — schema landed alongside ANTIRUG-04; consumer lands in Plan 19-03) |
-| OPS-LIVE-01 | Phase 20 | Pending |
-| OPS-LIVE-02 | Phase 20 | Pending |
-| OPS-LIVE-03 | Phase 20 | Pending |
-| OPS-LIVE-04 | Phase 20 | Pending |
-| OPS-LIVE-05 | Phase 20 | Pending |
-| OPS-LIVE-06 | Phase 20 | Pending |
-| OPS-LIVE-07 | Phase 20 | Pending |
-| OPS-LIVE-08 | Phase 20 | Pending |
-| OPS-LIVE-09 | Phase 20 | Pending |
-| OPS-LIVE-10 | Phase 20 | Pending |
-| OPS-LIVE-11 | Phase 20 | Pending |
-| OPS-LIVE-12 | Phase 20 | Pending |
-| OPS-LIVE-13 | Phase 20 | Pending |
+| OPS-LIVE-01 | Phase 20 | Complete |
+| OPS-LIVE-02 | Phase 20 | Complete |
+| OPS-LIVE-03 | Phase 20 | Complete |
+| OPS-LIVE-04 | Phase 20 | Complete |
+| OPS-LIVE-05 | Phase 20 | Complete |
+| OPS-LIVE-06 | Phase 20 | Complete |
+| OPS-LIVE-07 | Phase 20 | Complete |
+| OPS-LIVE-08 | Phase 20 | Complete |
+| OPS-LIVE-09 | Phase 20 | Complete |
+| OPS-LIVE-10 | Phase 20 | Complete |
+| OPS-LIVE-11 | Phase 20 | Complete |
+| OPS-LIVE-12 | Phase 20 | Complete |
+| OPS-LIVE-13 | Phase 20 | Complete |
 | EXIT-LIVE-01 | Phase 21 | Pending |
 | EXIT-LIVE-02 | Phase 21 | Pending |
 | EXIT-LIVE-03 | Phase 21 | Pending |
