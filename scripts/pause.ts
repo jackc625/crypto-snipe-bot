@@ -27,16 +27,33 @@ dotenv.config();
 
 const log = logger.child({ module: 'pause-cli' });
 
+/**
+ * WR-03: parse the operator's --reason argument, supporting BOTH the
+ * `--reason value` (space-separated) and `--reason=value` (GNU long-option)
+ * forms. Returns 'CLI pause' as the default sentinel when neither form is
+ * present. The `=` form is checked first because it is unambiguous (the
+ * argv element starts with the literal `--reason=` prefix); the space form
+ * falls back to the indexOf-then-peek lookup.
+ */
+function getReasonArg(): string {
+    const argv = process.argv;
+    const eqArg = argv.find(a => a.startsWith('--reason='));
+    if (eqArg) return eqArg.slice('--reason='.length);
+    const idx = argv.indexOf('--reason');
+    if (idx >= 0 && idx + 1 < argv.length) return argv[idx + 1];
+    return 'CLI pause';
+}
+
 async function main(): Promise<void> {
     const apiKey = process.env.DASHBOARD_API_KEY;
     const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
 
-    // Extract --reason "..." arg.
-    const reasonArgIdx = process.argv.indexOf('--reason');
-    const reason =
-        reasonArgIdx >= 0 && reasonArgIdx + 1 < process.argv.length
-            ? process.argv[reasonArgIdx + 1]
-            : 'CLI pause';
+    // WR-03 fix: handle BOTH `--reason value` (space-separated) AND
+    // `--reason=value` (GNU long-option form). The previous parser only
+    // handled the space-separated form, so an operator running
+    // `npm run pause -- --reason=foo` silently fell back to the default
+    // 'CLI pause' reason without any warning.
+    const reason = getReasonArg();
 
     if (!apiKey) {
         // T-20-05: the env-var NAME is logged (operator needs to know what to set);
