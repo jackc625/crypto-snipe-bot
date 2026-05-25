@@ -414,22 +414,30 @@ export async function checkAntiRugLiveGate(chain: PreflightChain): Promise<Prefl
 export function validateCrossEnvRules(): PreflightResult[] {
     const results: PreflightResult[] = [];
 
-    // Rule 1: MEV_STRATEGY=flashbots ⇔ FLASHBOTS_AUTH_KEY non-empty
-    if (process.env.MEV_STRATEGY === 'flashbots' && !process.env.FLASHBOTS_AUTH_KEY) {
-        results.push({
-            chain: 'global',
-            check: 'cross-env-rule',
-            passed: false,
-            reason: 'MEV_STRATEGY=flashbots requires FLASHBOTS_AUTH_KEY to be set',
-            details: { rule: 'mev-flashbots-auth-key' },
-        });
-    }
-
-    // Rule 2: ENABLED_CHAINS includes bsc ⇔ BLOXROUTE_AUTH_HEADER non-empty
+    // ENABLED_CHAINS is consulted by Rule 1, Rule 2, and Rule 4 — parse once.
     const enabledChains = (process.env.ENABLED_CHAINS || '')
         .split(',')
         .map(s => s.trim().toLowerCase())
         .filter(Boolean);
+
+    // Rule 1: ENABLED_CHAINS includes eth ⇔ FLASHBOTS_AUTH_KEY non-empty
+    // WR-08 fix: the previous predicate gated on `process.env.MEV_STRATEGY === 'flashbots'`,
+    // but MEV_STRATEGY is NOT consulted anywhere in the env contract —
+    // chainRegistry.ts hardcodes mev strategy per chain template (eth always
+    // uses flashbots). So the prior rule was dead code; the per-chain FATAL
+    // at chainRegistry.ts:948 caught it. This rewrite matches the actual
+    // contract: if ENABLED_CHAINS contains eth, FLASHBOTS_AUTH_KEY must be set.
+    if (enabledChains.includes('eth') && !process.env.FLASHBOTS_AUTH_KEY) {
+        results.push({
+            chain: 'global',
+            check: 'cross-env-rule',
+            passed: false,
+            reason: 'ENABLED_CHAINS includes eth (Flashbots) but FLASHBOTS_AUTH_KEY is not set',
+            details: { rule: 'eth-flashbots-auth-key' },
+        });
+    }
+
+    // Rule 2: ENABLED_CHAINS includes bsc ⇔ BLOXROUTE_AUTH_HEADER non-empty
     if (enabledChains.includes('bsc') && !process.env.BLOXROUTE_AUTH_HEADER) {
         results.push({
             chain: 'global',

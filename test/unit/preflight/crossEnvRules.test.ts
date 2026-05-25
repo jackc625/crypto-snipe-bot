@@ -78,10 +78,13 @@ describe('validateCrossEnvRules', () => {
         }
     });
 
-    it('fails (1 violation) when MEV_STRATEGY=flashbots and FLASHBOTS_AUTH_KEY unset', async () => {
+    it('fails (1 violation) when ENABLED_CHAINS includes eth and FLASHBOTS_AUTH_KEY unset', async () => {
+        // WR-08: the cross-env rule now gates on ENABLED_CHAINS=eth (matching
+        // the real env contract — MEV_STRATEGY is not consulted anywhere) rather
+        // than the dead MEV_STRATEGY=flashbots predicate. The test still passes
+        // because the original setup also has ENABLED_CHAINS=eth + no FLASHBOTS_AUTH_KEY.
         process.env.ENABLED_CHAINS = 'eth';
         process.env.ETH_RPC_URL = 'https://example';
-        process.env.MEV_STRATEGY = 'flashbots';
         // FLASHBOTS_AUTH_KEY intentionally unset
         const { validateCrossEnvRules } = await import('../../../src/preflight');
         const results = validateCrossEnvRules();
