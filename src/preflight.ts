@@ -46,7 +46,7 @@ import type { JsonRpcProvider, Wallet } from 'ethers';
 import { logger } from './utils/logger';
 import { sendTelegramAlert } from './utils/notifier';
 import { createMevStrategy } from './utils/txManager';
-import { getAntirugDryRunStarted, db } from './utils/db';
+import { getAntirugDryRunStarted, getStaleTradesQuery } from './utils/db';
 // Type-only import to avoid loading chainRegistry's runtime module body
 // (which transitively triggers `dotenv.config()` via src/utils/provider.ts ->
 // src/config.ts). The runtime import would re-inject .env values mid-test
@@ -502,10 +502,11 @@ export async function checkStaleData(): Promise<PreflightResult[]> {
     const errorSec = Number(process.env.STALE_ERROR_SEC) || 600;
     const nowSec = Math.floor(Date.now() / 1000);
 
-    const stmt = db.prepare(
-        `SELECT id, token, chain, timestamp FROM trades WHERE status = 'pending' AND action = 'buy' AND timestamp < ?`,
-    );
-    const rows = stmt.all(nowSec - warnSec) as Array<{
+    // WR-06: use the cached prepared statement from db.ts (module-load) instead
+    // of re-preparing on every call. Any SQL syntax error now surfaces at
+    // require-time rather than first invocation, matching the pattern used by
+    // every other prepared statement in the codebase.
+    const rows = getStaleTradesQuery.all(nowSec - warnSec) as Array<{
         id: number;
         token: string;
         chain: string;

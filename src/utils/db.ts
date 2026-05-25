@@ -482,6 +482,17 @@ const getTradeIdForPendingToken = db.prepare(
     `SELECT id FROM trades WHERE token = ? AND chain = ? AND status = 'pending' AND action = 'buy' ORDER BY timestamp DESC LIMIT 1`
 );
 
+// WR-06: cached prepared statement for src/preflight.ts checkStaleData scan.
+// Previously the statement was rebuilt inside checkStaleData on every call,
+// bypassing the prepared-statement caching pattern used everywhere else here.
+// One-shot scan today; setInterval-driven by a future phase (the comment at
+// preflight.ts:482 already hints). Hoisting now keeps the SQL literal under
+// the same test surface as the other cached statements and surfaces SQL syntax
+// errors at module load instead of first call.
+const getStaleTradesQuery = db.prepare(
+    `SELECT id, token, chain, timestamp FROM trades WHERE status = 'pending' AND action = 'buy' AND timestamp < ?`
+);
+
 // --- Anti-Rug Prepared Statements (Phase 19 / ANTIRUG-04 / ANTIRUG-16) ---
 //
 // upsertLpBaseline: insert or refresh the LP-baseline snapshot for a trade.
@@ -614,6 +625,8 @@ export {
     getExitState,
     deleteExitState,
     getTradeIdForPendingToken,
+    // WR-06: cached query for preflight checkStaleData
+    getStaleTradesQuery,
     // Phase 19 / ANTIRUG-04 / ANTIRUG-16
     upsertLpBaseline,
     getLpBaseline,
