@@ -130,7 +130,25 @@ const ANTIRUG_DOC = 'docs/operations/anti-rug-rollout.md';
  * with a wrapped reason. T-20-W2-02 mitigation.
  */
 export async function checkWalletBalance(chain: PreflightChain): Promise<PreflightResult> {
-    const maxOpen = Number(process.env.MAX_OPEN_POSITIONS) || 10;
+    // CR-01 fix: `||` treated MAX_OPEN_POSITIONS=0 as falsy → defaulted to 10,
+    // inflating the wallet floor by 10x. An operator who deliberately sets
+    // MAX_OPEN_POSITIONS=0 to halt new entries would either fail preflight on a
+    // partially-funded wallet, or pass preflight with a falsely-high floor that
+    // then trips spurious mid-run undercut auto-pauses. Use explicit
+    // undefined/empty check + strict integer validation instead.
+    const maxOpenRaw = process.env.MAX_OPEN_POSITIONS;
+    const maxOpen = maxOpenRaw === undefined || maxOpenRaw === ''
+        ? 10
+        : Number(maxOpenRaw);
+    if (!Number.isInteger(maxOpen) || maxOpen < 0) {
+        return {
+            chain: chain.name,
+            check: 'wallet-balance',
+            passed: false,
+            reason: `MAX_OPEN_POSITIONS must be a non-negative integer; got "${maxOpenRaw}"`,
+            details: { maxOpenPositions: maxOpenRaw },
+        };
+    }
     try {
         const balance = await chain.httpProvider.getBalance(chain.wallet.address);
         const floor =
