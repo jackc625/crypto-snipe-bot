@@ -51,7 +51,24 @@ export function startApiServer(
     app.use(express.json());
     app.use(cookieParser());
     app.use(helmet({ contentSecurityPolicy: false }));
-    app.use(cors({ origin: true, credentials: true }));
+    // CR-02 fix: `origin: true` reflects ANY incoming Origin header, which —
+    // combined with `credentials: true` and SameSite=lax cookies — would let
+    // any malicious page the operator visits in the same browser POST to
+    // /api/controls/pause, /api/controls/resume, /api/controls/emergency-sell
+    // etc. (classic CSRF via CORS-anti-pattern). Restrict to an explicit
+    // allowlist via DASHBOARD_ALLOWED_ORIGINS (comma-separated). Same-origin
+    // requests (no Origin header) and OPTIONS preflight checks are still
+    // allowed so the SPA served from the same Express app continues to work.
+    const allowedOrigins = (process.env.DASHBOARD_ALLOWED_ORIGINS || '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+    app.use(cors({
+        origin: (origin, cb) => {
+            // Allow same-origin (no Origin header) + explicit allowlist
+            if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+            cb(new Error('CORS: origin not allowed'));
+        },
+        credentials: true,
+    }));
 
     // --- Routes (order matters per Pitfall 8) ---
 
