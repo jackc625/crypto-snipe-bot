@@ -629,6 +629,11 @@ export async function preflight(registry: PreflightRegistry): Promise<void> {
 
     const failed = results.filter(r => !r.passed);
     if (failed.length > 0) {
+        // CR-03 fix: previously `await sendTelegramAlert(...)` ran inside the for-loop,
+        // so a hung Telegram (the exact condition where you most need fast preflight)
+        // could stall the FATAL exit indefinitely. `sendTelegramAlert` has no built-in
+        // timeout. Now fire alerts in parallel, each wrapped in a 5s Promise.race so
+        // the entire alert phase is bounded to ≤5s regardless of failure count.
         for (const r of failed) {
             log.fatal(
                 {
@@ -640,15 +645,25 @@ export async function preflight(registry: PreflightRegistry): Promise<void> {
                 },
                 `Preflight failed: ${r.check} on ${r.chain}`,
             );
-            try {
-                await sendTelegramAlert(
-                    `*PREFLIGHT FATAL* [${r.chain}] ${r.check}: ${r.reason ?? 'no reason'} — see ${REMEDIATION_DOC}`,
-                );
-            } catch (err) {
-                // Telegram failure must not mask the FATAL exit path.
-                log.warn({ err: (err as Error).message }, 'Telegram alert during preflight FATAL failed');
-            }
         }
+        const alertPromises = failed.map(r =>
+            Promise.race<void>([
+                sendTelegramAlert(
+                    `*PREFLIGHT FATAL* [${r.chain}] ${r.check}: ${r.reason ?? 'no reason'} — see ${REMEDIATION_DOC}`,
+                ),
+                new Promise<void>((_, reject) =>
+                    setTimeout(() => reject(new Error('Telegram alert timed out')), 5000),
+                ),
+            ]).catch(err =>
+                // Telegram failure (or timeout) must not mask the FATAL exit path.
+                log.warn(
+                    { err: (err as Error).message, chain: r.chain, check: r.check },
+                    'Telegram alert during preflight FATAL failed',
+                ),
+            ),
+        );
+        // allSettled bounds the wait to ≤5s total (every race resolves or rejects within 5s).
+        await Promise.allSettled(alertPromises);
         process.exit(1);
     }
 
