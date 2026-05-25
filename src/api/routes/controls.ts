@@ -274,19 +274,36 @@ export function controlRoutes(contexts: ChainContext[]): Router {
     });
 
     // ── GET /pause ── dashboard banner initial-state read path (Phase 20 D-PAUSE-UI) ──
+    // WR-02 fix: previously, if getPauseState.get() threw (DB locked, file
+    // deleted mid-run, corruption recovery), the error propagated to the
+    // Express default handler → useWebSocket.refreshFromRest swallowed the
+    // non-200 silently → pauseState stayed null → banner showed "no pause"
+    // when the bot might actually be paused on disk. Fail-CLOSED: on DB
+    // read failure return 503 + paused:true so the banner is sticky and the
+    // operator can investigate via logs.
     router.get('/pause', (_req: Request, res: Response) => {
-        const row = getPauseState.get() as {
-            paused: number;
-            paused_at: number | null;
-            paused_by: string | null;
-            reason: string | null;
-        };
-        res.json({
-            paused: row.paused === 1,
-            pausedAt: row.paused_at,
-            pausedBy: row.paused_by,
-            reason: row.reason,
-        });
+        try {
+            const row = getPauseState.get() as {
+                paused: number;
+                paused_at: number | null;
+                paused_by: string | null;
+                reason: string | null;
+            };
+            res.json({
+                paused: row.paused === 1,
+                pausedAt: row.paused_at,
+                pausedBy: row.paused_by,
+                reason: row.reason,
+            });
+        } catch (err) {
+            log.error({ err }, 'GET /pause: DB read failed');
+            res.status(503).json({
+                paused: true,
+                pausedAt: null,
+                pausedBy: 'unknown',
+                reason: 'pause-state DB read failed; see server logs',
+            });
+        }
     });
 
     return router;
