@@ -578,6 +578,30 @@ export function closeDb(): void {
     logger.info('Database connection closed');
 }
 
+/**
+ * CR-04 fix: force a WAL fsync after kill-switch state mutations.
+ *
+ * The connection is configured `synchronous = NORMAL` (line 22) for throughput,
+ * which means SQLite does NOT fsync the WAL on every commit — a "committed"
+ * transaction can be lost on SIGKILL within the WAL-flush window. For most
+ * data that is acceptable; for the pause/resume kill-switch it is NOT — the
+ * D-PAUSED-RESTART contract per docs/operations/going-live.md and Plan 20-01
+ * promises that a pause flag survives SIGKILL + restart.
+ *
+ * Call this AFTER setPauseState.run(...) or clearPauseState.run(...) to force
+ * the WAL contents into the main DB file via a FULL checkpoint, giving the
+ * single-write fsync the kill-switch contract requires. The performance cost
+ * is one extra fsync per pause/resume — pause/resume are infrequent operator
+ * actions, so the cost is amortized away.
+ *
+ * Implementation note: db.pragma('wal_checkpoint(FULL)') returns a row that
+ * we deliberately ignore — the checkpoint succeeding is the durability
+ * signal; the (busy, log, checkpointed) tuple is purely diagnostic.
+ */
+export function forceWalCheckpoint(): void {
+    db.pragma('wal_checkpoint(FULL)');
+}
+
 export {
     db,
     insertTrade,

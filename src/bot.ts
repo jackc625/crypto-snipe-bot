@@ -43,7 +43,7 @@ import { sanitizeReason } from "./utils/honeypot/sanitize";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
-import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken, getPauseState, setPauseState } from "./utils/db";
+import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken, getPauseState, setPauseState, forceWalCheckpoint } from "./utils/db";
 // Phase 20 / OPS-LIVE-01 + OPS-LIVE-02 — preflight is called before chain-context
 // creation; checkWalletBalance is reused inside the mid-run setInterval so the
 // floor formula lives in one place (D-BALANCE-FLOOR / W4 fix per Plan 20-02).
@@ -1024,6 +1024,10 @@ export async function startMultiChainBot(): Promise<void> {
                 const currentPause = getPauseState.get() as { paused: number };
                 if (currentPause.paused !== 1) {
                     setPauseState.run(Math.floor(Date.now() / 1000), 'preflight', result.reason ?? 'wallet undercut');
+                    // CR-04: force WAL fsync so the auto-pause survives SIGKILL + restart.
+                    // Mid-run undercut is the most safety-critical pause path; if this write
+                    // is lost the bot restarts believing it can still buy with insufficient gas.
+                    forceWalCheckpoint();
                     broadcast('pause_state_change', { paused: true, pausedBy: 'preflight', reason: result.reason });
                     ctx.log.fatal({ ...result }, 'Mid-run wallet balance check failed; bot paused');
                     await sendCtxAlert(ctx, `*BOT PAUSED* (wallet undercut) -- ${result.reason}`);

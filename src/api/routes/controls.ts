@@ -5,7 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import type { ChainContext, DexConfig } from '../../chainRegistry';
-import { db, getPauseState, setPauseState, clearPauseState } from '../../utils/db';
+import { db, getPauseState, setPauseState, clearPauseState, forceWalCheckpoint } from '../../utils/db';
 import { clearAllTimersForToken } from '../../utils/exitManager';
 import { executeFullSell } from '../../exitEngine';
 import { logger } from '../../utils/logger';
@@ -239,6 +239,9 @@ export function controlRoutes(contexts: ChainContext[]): Router {
             const pausedBy = String(body.pausedBy ?? 'dashboard');
             const ts = Math.floor(Date.now() / 1000);
             setPauseState.run(ts, pausedBy, reason);
+            // CR-04: force WAL fsync so the pause flag survives SIGKILL + restart
+            // per the D-PAUSED-RESTART kill-switch contract.
+            forceWalCheckpoint();
             broadcast('pause_state_change', { paused: true, pausedBy, reason });
             pauseLog.info({ pausedBy, reason }, 'Bot paused via API');
             res.json({ ok: true, paused: true, pausedBy, reason });
@@ -255,6 +258,10 @@ export function controlRoutes(contexts: ChainContext[]): Router {
         const resumeLog = log.child({ action: 'resume' });
         try {
             clearPauseState.run();
+            // CR-04: force WAL fsync so the resume survives SIGKILL + restart
+            // (otherwise a lost resume write leaves the bot paused after restart,
+            // which is the SAFE direction — but symmetry with /pause matters).
+            forceWalCheckpoint();
             broadcast('pause_state_change', { paused: false });
             resumeLog.info('Bot resumed via API');
             res.json({ ok: true, paused: false });
