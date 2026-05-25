@@ -187,8 +187,10 @@ export function useWebSocket(): UseWebSocketResult {
                     : p,
                 ),
               );
-            } catch {
-              // Malformed payload -- drop silently, do not break dispatch
+            } catch (err) {
+              // WR-09: log to DevTools so malformed payload regressions are
+              // visible (still doesn't break dispatch).
+              console.warn('[WS] antirug_state_update: malformed payload', err);
             }
             break;
           }
@@ -204,8 +206,8 @@ export function useWebSocket(): UseWebSocketResult {
                   [evt.chain]: [evt, ...existing].slice(0, 100),
                 };
               });
-            } catch {
-              // Malformed payload -- drop silently
+            } catch (err) {
+              console.warn('[WS] antirug_event: malformed payload', err);
             }
             break;
           }
@@ -214,8 +216,8 @@ export function useWebSocket(): UseWebSocketResult {
               const health = msg.data as ChainWsHealthChange;
               if (!health || typeof health.chain !== 'string') break;
               setChainWsHealth((prev) => ({ ...prev, [health.chain]: health }));
-            } catch {
-              // Malformed payload -- drop silently
+            } catch (err) {
+              console.warn('[WS] chain_ws_health_change: malformed payload', err);
             }
             break;
           }
@@ -224,8 +226,8 @@ export function useWebSocket(): UseWebSocketResult {
               const trip = msg.data as CbTrippedPayload;
               if (!trip || typeof trip.chain !== 'string') break;
               setCircuitBreakerTrips((prev) => ({ ...prev, [trip.chain]: trip }));
-            } catch {
-              // Malformed payload -- drop silently
+            } catch (err) {
+              console.warn('[WS] cb_tripped: malformed payload', err);
             }
             break;
           }
@@ -240,8 +242,8 @@ export function useWebSocket(): UseWebSocketResult {
                 void _removed;
                 return rest;
               });
-            } catch {
-              // Malformed payload -- drop silently
+            } catch (err) {
+              console.warn('[WS] cb_reset: malformed payload', err);
             }
             break;
           }
@@ -263,14 +265,21 @@ export function useWebSocket(): UseWebSocketResult {
                 pausedBy: payload.pausedBy ?? null,
                 reason: payload.reason ?? null,
               });
-            } catch {
-              // Malformed payload -- drop silently
+            } catch (err) {
+              console.warn('[WS] pause_state_change: malformed payload', err);
             }
             break;
           }
+          default: {
+            // WR-09: surface unknown event types (typo / version mismatch
+            // between bot and dashboard). Previously fell through silently,
+            // making regressions impossible to diagnose.
+            console.warn('[WS] unknown event type:', msg.type);
+          }
         }
-      } catch {
-        // Ignore malformed messages
+      } catch (err) {
+        // WR-09: log JSON.parse failures instead of dropping silently
+        console.warn('[WS] failed to parse message:', err);
       }
     };
 
