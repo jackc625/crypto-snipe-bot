@@ -1022,7 +1022,20 @@ export async function startMultiChainBot(): Promise<void> {
     // T-20-04 idempotence: the if-guard against currentPause.paused === 1
     // skips the DB write + broadcast + alert so a sustained undercut does not
     // flood the operator. One alert per pause-cycle (cleared on resume).
-    const midRunIntervalMs = Number(process.env.MID_RUN_CHECK_INTERVAL_SEC || '300') * 1000;
+    // WR-07: validate MID_RUN_CHECK_INTERVAL_SEC. Previously bad values silently
+    // misbehaved: 'abc' → NaN → setInterval(cb, NaN) → fires every event-loop tick,
+    // hammering RPC + DB; '0' → '0'||'300' = '300' (incidental safe behavior but
+    // not designed). Use ?? and reject anything non-finite or < 10s.
+    const midRunRaw = process.env.MID_RUN_CHECK_INTERVAL_SEC ?? '300';
+    const midRunSec = Number(midRunRaw);
+    if (!Number.isFinite(midRunSec) || midRunSec < 10) {
+        mainLog.fatal(
+            { key: 'MID_RUN_CHECK_INTERVAL_SEC', value: midRunRaw },
+            'MID_RUN_CHECK_INTERVAL_SEC must be a finite number >= 10 seconds',
+        );
+        process.exit(1);
+    }
+    const midRunIntervalMs = midRunSec * 1000;
     setInterval(async () => {
         for (const ctx of contexts) {
             const pchain = { ...ctx.chain, httpProvider: ctx.httpProvider, wallet: ctx.wallet };
