@@ -380,6 +380,12 @@ export async function handleNewPairForChain(
 
     // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP2 — post-bundle-build, pre-submit.
     // Pause flag set → discard built bundle, do NOT submit.
+    // WR-01 NOTE: there is a TOCTOU window between the pause-read here and the
+    // network call inside sendTxWithRetry (microseconds to seconds depending on
+    // event-loop saturation and MEV strategy). A pause flipped DURING that
+    // window will NOT abort the in-flight submit — there is no abort signal
+    // threaded into sendTxWithRetry. CP3 below logs (audit only) the
+    // after-the-fact case; pause never panic-sells per D-PAUSE-SHAPE.
     {
         const pauseStateCp2 = getPauseState.get() as { paused: number };
         if (pauseStateCp2.paused === 1) {
@@ -684,6 +690,9 @@ export async function handleNewV3PoolForChain(
         const swapData = v3Router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP2 (V3 path)
+        // WR-01 NOTE: TOCTOU window between this pause-read and the network
+        // call inside sendTxWithRetry — pause flipped during that window will
+        // NOT abort the in-flight submit. CP3 logs the after-the-fact case.
         {
             const pauseStateCp2 = getPauseState.get() as { paused: number };
             if (pauseStateCp2.paused === 1) {
