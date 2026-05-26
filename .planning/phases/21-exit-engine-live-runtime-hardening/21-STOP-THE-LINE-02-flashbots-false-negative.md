@@ -58,10 +58,12 @@ The bought tokens sit **untracked and unmonitored** in the wallet.
 
 ## Immediate operational impact (handled this session)
 
-- The untracked LADYS position is being recovered via a DIRECT (non-Flashbots) sell
+- The untracked LADYS position WAS recovered via a DIRECT (non-Flashbots) sell
   (`scripts/recover-sell-ladys.ts`) — public-mempool swap, sidesteps this bug.
-- No double-spend occurred (only one buy landed); no funds lost (value is in LADYS,
-  recovered to ETH).
+  Recovery sell tx `0x424ed3e4ea2e81093694ecb7dafa301aa4184e696f59e80e430b72e786cc26c7`
+  (block 25182862, SUCCESS); wallet restored to 0.009103 ETH, LADYS balance 0.
+- No double-spend occurred (only one buy landed); no funds lost — net cost of the whole
+  buy+recover round trip ≈ 0.00005 ETH (~$0.15) in Uniswap fees + recovery gas.
 
 ## Affected files
 
