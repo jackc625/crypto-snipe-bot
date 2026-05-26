@@ -27,3 +27,37 @@ changes. Logged per the executor scope-boundary rule; NOT fixed in-plan.
   `src/utils/db` mock in `staleData.test.ts` (replacing/augmenting the
   `db.prepare` shim), so the cached-statement path is exercised. Owner: whoever
   re-opens the OPS-LIVE-06 stale-data test (Plan 20-02 / 20-06 area).
+
+## 20-09 (CLI dashboard URL derivation + clear connection errors)
+
+### Pre-existing: `test/integration/pauseCli.test.ts` — 4 failing tests (db mock missing `forceWalCheckpoint`)
+
+- **Found during:** 20-09 Task 2 verify run (`npx vitest run --project integration
+  test/integration/pauseCli.test.ts`).
+- **Symptom:** Tests 1, 2, 3, 5 (the `OPS-LIVE-11 CLI HTTP flow` block) fail with
+  `expected 500 to be 200` on the `/api/controls/{pause,resume}` action POST;
+  Test 5 additionally sees `broadcast` called 0 times.
+- **Root cause:** The CR-04 WAL-fsync fix added `forceWalCheckpoint()` to BOTH
+  `src/api/routes/controls.ts` POST `/pause` (line 254) and POST `/resume`
+  (line 274), imported from `src/utils/db`. The test's
+  `vi.mock('../../src/utils/db', ...)` block (pauseCli.test.ts:43-50) mocks
+  `db`, `setPauseState`, `clearPauseState`, `getPauseState` but does NOT export
+  a mocked `forceWalCheckpoint`. So the import resolves to `undefined`, calling
+  it throws `TypeError`, the route's try/catch returns `res.status(500)`, and the
+  throw happens BEFORE the `broadcast('pause_state_change', ...)` call → Test 5's
+  broadcast never fires. Identical failure shape to the documented 20-08
+  `staleData.test.ts` break (db mock missing a newly-added export).
+- **Verified pre-existing:** `git show HEAD~1:src/api/routes/controls.ts` already
+  imports + calls `forceWalCheckpoint()` at lines 254/274, and
+  `git show HEAD~1:test/integration/pauseCli.test.ts` already lacks the
+  `forceWalCheckpoint` mock export (db mock at lines 47-49 only). Predates all
+  20-09 changes (commit `1182765` and the Task 2 edits).
+- **Out of scope for 20-09:** 20-09 touches only `scripts/pause.ts`,
+  `scripts/resume.ts` (CLI URL derivation + connection-error catch),
+  `src/config.ts` (DASHBOARD_URL description string), and APPENDS a `20-09`
+  static-grep describe block to `pauseCli.test.ts`. It does NOT modify
+  `controls.ts`, the db mock, `forceWalCheckpoint`, or Tests 1–5. The 8 new
+  20-09 grep tests (4 pause.ts + 4 resume.ts) all PASS.
+- **Suggested fix (future):** add `forceWalCheckpoint: vi.fn()` to the
+  `src/utils/db` mock in `pauseCli.test.ts:43-50`. Owner: whoever owns the CR-04
+  WAL-fsync change / re-opens the OPS-LIVE-09 pause/resume HTTP-flow tests.

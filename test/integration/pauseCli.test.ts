@@ -332,3 +332,60 @@ describe('T-20-05 mitigation: apiKey never logged in CLI scripts', () => {
         expect(src).not.toMatch(/process\.argv\.indexOf\(['"]--api-key/);
     });
 });
+
+// ---------------------------------------------------------------------------
+// 20-09: CLI default URL derived from DASHBOARD_HOST/DASHBOARD_PORT (the server
+// bind), NOT the old hardcoded http://localhost:3000. Source-grep guard —
+// matches the established static-grep idiom above and is deterministic (the
+// in-process harness binds an ephemeral listen(0) port and does not expose it
+// to process.env.DASHBOARD_PORT, and the CLI scripts are not invoked in-process,
+// so a behavioral assertion would not actually exercise the scripts' default).
+// ---------------------------------------------------------------------------
+
+describe('20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT', () => {
+    const readScript = (name: 'pause.ts' | 'resume.ts'): string =>
+        fs.readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
+
+    for (const script of ['pause.ts', 'resume.ts'] as const) {
+        it(`scripts/${script} no longer hardcodes the 'http://localhost:3000' default`, () => {
+            const src = readScript(script);
+            // The literal default string must be gone from both scripts entirely
+            // (the bug was dialing the SPA dev :3000 instead of the API bind).
+            expect(src).not.toContain('localhost:3000');
+            expect(src).not.toContain("'http://localhost:3000'");
+        });
+
+        it(`scripts/${script} derives the default from DASHBOARD_PORT with an 8080 fallback`, () => {
+            const src = readScript(script);
+            // Reads DASHBOARD_PORT (mirrors src/api/server.ts:161-162 bind)…
+            expect(src).toMatch(/process\.env\.DASHBOARD_PORT/);
+            // …with the 8080 server-bind fallback…
+            expect(src).toMatch(/DASHBOARD_PORT\s*\|\|\s*['"]8080['"]/);
+            // …and DASHBOARD_HOST defaulting to the IPv4 127.0.0.1 (NOT localhost,
+            // to avoid the ::1 IPv6 refusal from the live UAT).
+            expect(src).toMatch(/DASHBOARD_HOST\s*\|\|\s*['"]127\.0\.0\.1['"]/);
+            // The composed default is http://<host>:<port>.
+            expect(src).toMatch(/http:\/\/\$\{host\}:\$\{port\}/);
+        });
+
+        it(`scripts/${script} still honors an explicit DASHBOARD_URL override`, () => {
+            const src = readScript(script);
+            // process.env.DASHBOARD_URL || <derived default> — operator override
+            // is unchanged; only the fallback side of the || moved off :3000.
+            expect(src).toMatch(/process\.env\.DASHBOARD_URL\s*\|\|/);
+        });
+
+        it(`scripts/${script} connection-error catch references host:port + DASHBOARD_PORT, never apiKey`, () => {
+            const src = readScript(script);
+            // The crash handler must surface a clear message (no empty err:'').
+            expect(src).toMatch(/Could not reach the dashboard API/);
+            expect(src).toMatch(/DASHBOARD_PORT/);
+            // T-20-05: apiKey must not appear inside the new connection-error
+            // log call (re-assert the static guard against the new catch block).
+            const fatalCalls = src.match(/log\.fatal\s*\([^;]*?\)/gs) ?? [];
+            for (const call of fatalCalls) {
+                expect(call).not.toContain('apiKey');
+            }
+        });
+    }
+});

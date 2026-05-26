@@ -153,7 +153,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'STALE_WARN_SEC', required: false, description: 'Stale-position warn-threshold age in seconds (default: 120 = 2 min)' },
     { name: 'STALE_ERROR_SEC', required: false, description: 'Stale-position error-threshold age in seconds (default: 600 = 10 min)' },
     // Dashboard URL — consumed by Plan 20-05 operator CLI scripts (pause/resume).
-    { name: 'DASHBOARD_URL', required: false, description: 'Dashboard URL for operator CLI scripts (default: http://localhost:3000)' },
+    { name: 'DASHBOARD_URL', required: false, description: 'Dashboard URL for operator CLI scripts (default: derived from DASHBOARD_HOST:DASHBOARD_PORT, e.g. http://127.0.0.1:8080)' },
 ];
 
 function validateEnvVars(): void {
