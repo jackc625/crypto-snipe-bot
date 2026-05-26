@@ -15,6 +15,12 @@
 //
 // Usage:
 //   npm run resume
+//
+// DASHBOARD_URL is OPTIONAL. When unset it is derived from
+// DASHBOARD_HOST:DASHBOARD_PORT (default http://127.0.0.1:8080) — the SAME
+// address the API server binds (src/api/server.ts). Set DASHBOARD_URL only for
+// a non-default host/port or a remote dashboard; the CLI works out of the box
+// on a fresh clone with the server on its default bind.
 
 import * as dotenv from 'dotenv';
 import axios from 'axios';
@@ -24,9 +30,23 @@ dotenv.config();
 
 const log = logger.child({ module: 'resume-cli' });
 
+/**
+ * 20-09: derive the dashboard URL the CLI dials. When DASHBOARD_URL is set it
+ * is honored verbatim (operator override). When unset, the default is built
+ * from DASHBOARD_HOST/DASHBOARD_PORT, mirroring the server bind in
+ * src/api/server.ts:161-162. 127.0.0.1 (IPv4) — NOT localhost — to avoid the
+ * ::1 IPv6 refusal called out in the live UAT. Pure env reads, so it is safe
+ * to call again from the crash handler. (Sibling of scripts/pause.ts.)
+ */
+function resolveDashboardUrl(): string {
+    const host = process.env.DASHBOARD_HOST || '127.0.0.1';
+    const port = process.env.DASHBOARD_PORT || '8080';
+    return process.env.DASHBOARD_URL || `http://${host}:${port}`;
+}
+
 async function main(): Promise<void> {
     const apiKey = process.env.DASHBOARD_API_KEY;
-    const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+    const dashboardUrl = resolveDashboardUrl();
 
     if (!apiKey) {
         log.fatal('DASHBOARD_API_KEY not set in .env');
@@ -61,7 +81,39 @@ async function main(): Promise<void> {
     process.exit(0);
 }
 
+/**
+ * 20-09: unwrap a connection failure into a clear, non-empty operator message.
+ * On ECONNREFUSED axios throws an AggregateError whose own `.message` is '' but
+ * whose `.errors[]` holds the underlying Error with `code: 'ECONNREFUSED'` and a
+ * populated `.message` (e.g. `connect ECONNREFUSED 127.0.0.1:8080`). We dig out
+ * the real cause: the first `.errors[]` entry with a non-empty `.message`, else
+ * the error's own `.code`/`.message`. The payload references only the URL +
+ * error code — the apiKey is NEVER included (T-20-05). Sibling of pause.ts.
+ */
+function unwrapConnectionCause(err: unknown): { code: string; detail: string } | null {
+    const e = err as { code?: string; message?: string; errors?: unknown[] };
+    const hasErrors = Array.isArray(e?.errors) && e.errors.length > 0;
+    const isRefused = e?.code === 'ECONNREFUSED' || hasErrors;
+    if (!isRefused) return null;
+
+    const cause = hasErrors
+        ? (e.errors as Array<{ code?: string; message?: string }>).find(c => c && c.message)
+        : undefined;
+    const code = cause?.code || e.code || 'ECONNREFUSED';
+    const detail = cause?.message || e.message || code;
+    return { code, detail };
+}
+
 main().catch((err) => {
+    const conn = unwrapConnectionCause(err);
+    if (conn) {
+        const url = resolveDashboardUrl();
+        log.fatal(
+            { url, code: conn.code, cause: conn.detail },
+            `Could not reach the dashboard API at ${url} (${conn.code}). Is the bot running? Check DASHBOARD_URL / DASHBOARD_HOST / DASHBOARD_PORT.`,
+        );
+        process.exit(2);
+    }
     log.fatal({ err: err instanceof Error ? err.message : String(err) }, 'Resume CLI crashed');
     process.exit(2);
 });
