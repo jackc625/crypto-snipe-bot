@@ -185,6 +185,14 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   **Wave 5** *(after Wave 4; runbook + CI guard + docs):*
   - [x] 20-07-PLAN.md — git mv GOING-LIVE.md → docs/operations/going-live.md + git rm HONEYPOT-SIM-BRIEFING.md + README.md link update + .github/workflows/test.yml CI guard step + docs/operations/going-live.md content authoring (5 sections per D-OPERATOR-HANDOFF) [OPS-LIVE-12, OPS-LIVE-13]
 
+  **Wave 6 — Gap closure (live UAT 20-HUMAN-UAT.md)** *(major-first; 08/09/10 parallel, no file overlap):*
+  - [ ] 20-08-PLAN.md — [major] CORS same-origin fix (src/api/server.ts compares Origin host:port to request Host) + [major/security] DASHBOARD_API_KEY placeholder/empty/short FATAL in preflight validateCrossEnvRules [OPS-LIVE-07, OPS-LIVE-09, OPS-LIVE-10]
+  - [ ] 20-09-PLAN.md — [major] pause/resume CLI default URL derived from DASHBOARD_HOST:DASHBOARD_PORT (fixes :3000 vs :8080 ECONNREFUSED crash) + clear connection errors + config.ts DASHBOARD_URL doc fix [OPS-LIVE-11]
+  - [ ] 20-10-PLAN.md — [cosmetic] restyle PauseBanner + CircuitBreakerBanner to the dashboard card idiom (bg-surface-light border-loss border-l-4 rounded-lg) + update pauseBanner.test.ts Test 6 [OPS-LIVE-09]
+
+  **Wave 7 — Gap closure docs** *(after Wave 6; documents the Wave-6 behavior):*
+  - [ ] 20-11-PLAN.md — .env.example DASHBOARD_ALLOWED_ORIGINS + DASHBOARD_URL=127.0.0.1:8080 + config.ts DASHBOARD_ALLOWED_ORIGINS entry + going-live.md dashboard-rebuild step / strong-key FATAL / CLI URL+CORS docs [OPS-LIVE-07, OPS-LIVE-11, OPS-LIVE-12]
+
   **Cross-cutting constraints:**
   - **D-ENV-EXAMPLE [USER-BINDING]:** every new env var introduced in Phase 20 lands in .env.example with default + 1-line description (Plan 20-02 owns the registration)
   - **D-OPERATOR-HANDOFF [USER-BINDING]:** docs/operations/going-live.md IS the operator handoff doc at phase close (Plan 20-07 authors all 5 sections)
