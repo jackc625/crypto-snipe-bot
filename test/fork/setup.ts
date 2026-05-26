@@ -62,12 +62,27 @@ export async function setup() {
 }
 
 export async function teardown() {
-    if (hardhatProcess) {
-        hardhatProcess.kill();
-        // Wait for process to exit
-        await new Promise<void>((resolve) => {
-            hardhatProcess.on('close', () => resolve());
-            setTimeout(resolve, 2000); // fallback timeout
-        });
+    if (!hardhatProcess || hardhatProcess.pid === undefined) return;
+    const pid = hardhatProcess.pid;
+
+    if (process.platform === 'win32') {
+        // spawn(..., { shell: true }) wraps `hardhat node` in a cmd.exe shell, so
+        // hardhatProcess.pid is the shell — a plain hardhatProcess.kill() sends
+        // SIGTERM to the shell and leaves the real node child alive, holding port
+        // 8545 and polluting the NEXT fork run (EADDRINUSE / stale fork state).
+        // `taskkill /T` kills the entire process tree (shell + node child).
+        try {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+        } catch {
+            // Process already exited / not found — best-effort cleanup.
+        }
+    } else {
+        hardhatProcess.kill('SIGTERM');
     }
+
+    // Wait for the process handle to close (bounded fallback so teardown can't hang).
+    await new Promise<void>((resolve) => {
+        hardhatProcess.on('close', () => resolve());
+        setTimeout(resolve, 2000);
+    });
 }

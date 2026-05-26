@@ -34,6 +34,14 @@ export default defineConfig({
                     testTimeout: 120000,
                     environment: 'node',
                     globalSetup: ['test/fork/setup.ts'],
+                    // All fork test FILES share ONE Hardhat fork node (globalSetup,
+                    // port 8545) and transact as the same Hardhat account #0. Running
+                    // files in parallel races that account's nonce across independent
+                    // ethers providers ("nonce too high" / "nonce has already been
+                    // used") and drains its shared ETH balance non-deterministically.
+                    // Force sequential file execution so each file sees a consistent
+                    // account nonce/balance. (Within a file, tests are already serial.)
+                    fileParallelism: false,
                 },
             },
         ],

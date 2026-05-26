@@ -108,6 +108,13 @@ vi.mock('../../src/utils/db', () => ({
     upsertLpBaseline: { run: vi.fn() },
     getLpBaseline: { get: vi.fn() },
     deleteLpBaseline: { run: vi.fn() },
+    // Phase 20-03 wired startChainAntiRugListener (detector.ts) to record the
+    // anti-rug dry-run start timestamp via this prepared statement. This Phase
+    // 19-07 test predates that call, so the mock omitted it — leaving
+    // setAntirugDryRunStarted undefined and throwing `.run` of undefined the
+    // moment registerAntiRugPosition -> startChainAntiRugListener executed.
+    setAntirugDryRunStarted: { run: vi.fn() },
+    getAntirugDryRunStarted: { get: vi.fn().mockReturnValue(undefined) },
 }));
 
 vi.mock('../../src/utils/provider', () => ({
@@ -119,6 +126,7 @@ let pairGetReservesMock: ReturnType<typeof vi.fn>;
 let pairTotalSupplyMock: ReturnType<typeof vi.fn>;
 let poolLiquidityMock: ReturnType<typeof vi.fn>;
 let quoteExactInputSingleMock: ReturnType<typeof vi.fn>;
+let tokenBalanceOfMock: ReturnType<typeof vi.fn>;
 
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
@@ -129,6 +137,7 @@ vi.mock('ethers', async () => {
         liquidity?: ReturnType<typeof vi.fn>;
         slot0?: ReturnType<typeof vi.fn>;
         quoteExactInputSingle?: { staticCall: ReturnType<typeof vi.fn> };
+        balanceOf?: ReturnType<typeof vi.fn>;
         constructor(address: string, abi: unknown[]) {
             this.address = address;
             const abiStr = JSON.stringify(abi);
@@ -139,6 +148,7 @@ vi.mock('ethers', async () => {
                       pairTotalSupply: ReturnType<typeof vi.fn>;
                       poolLiquidity: ReturnType<typeof vi.fn>;
                       quoteExactInputSingle: ReturnType<typeof vi.fn>;
+                      tokenBalanceOf: ReturnType<typeof vi.fn>;
                   }
                 | undefined;
             if (!mocks) return;
@@ -152,6 +162,13 @@ vi.mock('ethers', async () => {
                 this.quoteExactInputSingle = {
                     staticCall: mocks.quoteExactInputSingle,
                 };
+            } else if (abiStr.includes('balanceOf')) {
+                // WR-03 made the V3 signal-3 sell-sim probe the bot's actual
+                // token balance via ERC20.balanceOf(ctx.wallet.address) — this
+                // Phase 19-07 test predates that call, so the ERC20 token
+                // contract had no mocked balanceOf and the V3 collect path threw
+                // (non-revert) → verdict='unknown'. Route it to the dispatcher.
+                this.balanceOf = mocks.tokenBalanceOf;
             }
         }
     }
@@ -260,6 +277,11 @@ function buildCtx(opts: {
             on: onSpy,
             off: offSpy,
         },
+        // WR-03: evaluateV3Signals reads ctx.wallet.address to size the V3
+        // sell-sim probe. Production always has a wallet; this Phase 19-07 test
+        // ctx omitted it, so the V3 collect path threw on ctx.wallet.address
+        // (undefined) → verdict='unknown'. Hardhat account #0 address.
+        wallet: { address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' },
     };
 }
 
@@ -466,11 +488,16 @@ beforeEach(() => {
     pairTotalSupplyMock = vi.fn();
     poolLiquidityMock = vi.fn();
     quoteExactInputSingleMock = vi.fn();
+    // WR-03 V3 signal-3 sell-sim probe = ERC20.balanceOf(ctx.wallet.address).
+    // Default to 1e18 so the QuoterV2 mock's 1e17 quote yields a 10% sell ratio
+    // (< 50% → signal-3 trips), matching the V3 mode-3 "all signals trip" intent.
+    tokenBalanceOfMock = vi.fn().mockResolvedValue(BigInt('1000000000000000000'));
     (globalThis as Record<string, unknown>).__antiRugForkMocks = {
         pairGetReserves: pairGetReservesMock,
         pairTotalSupply: pairTotalSupplyMock,
         poolLiquidity: poolLiquidityMock,
         quoteExactInputSingle: quoteExactInputSingleMock,
+        tokenBalanceOf: tokenBalanceOfMock,
     };
 });
 
