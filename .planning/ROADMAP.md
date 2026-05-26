@@ -41,8 +41,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
 - [x] **Phase 17: Tech Debt Cleanup & Audit Baseline** â€” CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup *(completed 2026-04-30)*
 - [ ] **Phase 18: Honeypot Detection Rebuild** â€” Deploy `HoneypotChecker.sol` (Option D) on 4 chains; replace broken V2/V3 sell-sim gates; discriminated-union `HoneypotResult`; multi-amount tax probe; safety-bank audit
-- [x] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode (completed 2026-05-24)
-- [x] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization (completed 2026-05-24)
+- [x] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode
+ (completed 2026-05-24)
+- [x] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
+ (completed 2026-05-24)
 - [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
 
 ## Phase Details
@@ -210,7 +212,32 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   2. `scripts/capture-launch.ts` is committed and at least 3 captured-real-launch JSON fixtures live in `test/fork/fixtures/realLaunches/` â€” replaying any of them against `handleNewPairForChain` in a fork test exercises the full validation â†’ buy â†’ exit-monitor â†’ sell lifecycle with realistic transfer hooks, gas costs, and event ordering
   3. Test infrastructure refuses to send real-mainnet transactions without explicit gating â€” chainId guard + `ALLOW_REAL_MAINNET=1` env-gate decorator means a fork test running with `chainId === 1` (mainnet) without the gate fails loudly. CI never sets the gate. A dedicated test wallet (NOT the operator's prod wallet) is used for any real-mainnet test
   4. Every exit-engine code path logs with an `op` field (`op: 'exit-poll-cycle'`, `op: 'partial-sell-trigger'`, `op: 'flashbots-submit'`, etc.) â€” operator can filter logs by `op:exit.full.executed` during real-mainnet runs and see only confirmed exit transactions, not "code path executed" telemetry. The ground-truth metric for "exit happened" is the DB-receipt-decoded `amount_out`, NOT an instrumented try/catch metric
-**Plans**: TBD
+**Plans**: 8 plans (5 waves)
+
+  **Wave 1** *(autonomous foundation; parallel-safe, no file overlap):*
+  - [ ] 21-01-PLAN.md — exitEngine.ts op-field enrichment (dotted exit.*) + poll-cycle telemetry + flashbots.ts bundleHash->minedTxHash log [EXIT-LIVE-01, EXIT-LIVE-04, EXIT-LIVE-10]
+  - [ ] 21-02-PLAN.md — test-safety gate: global chainId===1 tripwire in setup.ts + requireRealMainnetGate decorator + fork-only test key + .env.example vars [EXIT-LIVE-08]
+  - [ ] 21-05-PLAN.md — REQUIREMENTS reword (EXIT-LIVE-01 dotted / 07 PRAGMA user_version / 06 WS-listener) + HONEY-07/08 reconciliation + going-live.md live-capture runbook [EXIT-LIVE-01, EXIT-LIVE-06, EXIT-LIVE-07]
+
+  **Wave 2** *(autonomous; after Wave 1 gate helper; parallel-safe):*
+  - [ ] 21-03-PLAN.md — scripts/capture-launch.ts archive recorder + 3 realLaunches fixtures (V2+V3, varied exits) + realLaunchReplay.fork.test.ts driving the REAL handler [EXIT-LIVE-09]
+  - [ ] 21-04-PLAN.md — exitStatePersistence.fork.test.ts: SIGTERM-restart, asserts identical exit_state strategy columns [EXIT-LIVE-02]
+
+  **Wave 3** *(autonomous; the hard gate before any real run):*
+  - [ ] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) [EXIT-LIVE-03, EXIT-LIVE-04]
+
+  **Wave 4** *(OPERATOR-GATED real capital; autonomous: false):*
+  - [ ] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false)
+
+  **Wave 5** *(operator-confirmed captures + consolidation; autonomous: false):*
+  - [ ] 21-08-PLAN.md — induced-RPC-drop warning (06) + fresh-clone migration log/user_version=6 (07) captures + v6.17-VERIFICATION-EVIDENCE.md consolidation [EXIT-LIVE-06, EXIT-LIVE-07, EXIT-LIVE-11] (autonomous: false)
+
+  **Cross-cutting constraints:**
+  - **D-EVIDENCE-BAR:** a fork-test pass alone NEVER closes any of the 6 deferred items — each needs a resolvable real-mainnet artifact (Etherscan hash / DB amount_out row / pino excerpt / timestamped screenshot) in v6.17-VERIFICATION-EVIDENCE.md
+  - **D-OP-DB-TRUTH:** the ground truth for "an exit happened" is the DB receipt-decoded trades.amount_out + the on-chain receipt, NEVER an op log line or instrumented metric
+  - **D-STOP-THE-LINE:** any bug surfaced during a capture or fixture replay BLOCKS phase close and escalates to a new requirement / decimal phase 21.1 — not fix-in-flight, not file-and-defer
+  - **D-TEST-WALLET-FORKONLY:** the automated suite uses a fork-only throwaway key with zero real ETH; the prod PRIVATE_KEY is NEVER imported into any test; ALLOW_REAL_MAINNET is never set in CI
+  - **D-ENV-EXAMPLE [USER-BINDING]:** ALLOW_REAL_MAINNET, TEST_WALLET_PRIVATE_KEY, CAPTURE_ARCHIVE_RPC_URL land in .env.example with defaults + 1-line descriptions (Plan 02)
 
 ## Progress
 
@@ -236,7 +263,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
-| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
+| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/8 | Planned | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
