@@ -1,0 +1,22 @@
+{
+  "slug": "eth-v2-tp",
+  "chain": "eth",
+  "dexType": "v2",
+  "tokenAddress": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+  "tokenSymbol": "PEPE",
+  "pairAddress": "0xA43fe16908251ee70EF74718545e4FE6C5cCEc9f",
+  "poolAddress": null,
+  "routerAddress": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  "swapRouterAddress": null,
+  "quoterAddress": null,
+  "feeTier": null,
+  "pairCreatedBlock": 17046833,
+  "mintBlock": 17046833,
+  "firstSwapBlock": null,
+  "forkBlockNumber": 17046832,
+  "expectedVerdict": "safe",
+  "expectedExitPath": "take-profit",
+  "discoveredVia": "etherscan",
+  "discoveredOn": "2026-05-26",
+  "notes": "Captured via scripts/capture-launch.ts on 2026-05-26T20:36:15.600Z. forkBlockNumber = pairCreatedBlock - 1 so the fork replays the launch as the next block. Paired against WETH. Read-only archive capture; no transaction was sent."
+}
