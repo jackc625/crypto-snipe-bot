@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: ready_to_execute
-stopped_at: Phase 21 planned — 8 plans across 5 waves, ready to execute (/gsd-execute-phase 21)
-last_updated: 2026-05-26T17:30:00.000Z
-last_activity: 2026-05-26 -- Phase 21 plan-phase complete: 8 plans across 5 waves (research → pattern-map → plan → 2 checker passes, all blockers resolved); RESEARCH + PATTERNS + VALIDATION + 8 PLAN.md committed; ready for /gsd-execute-phase 21
+status: executing
+stopped_at: Phase 21 executing — autonomous Waves 1-2 (6 plans); Waves 3-4 (21-07 real-capital, 21-08 operator-action) are autonomous:false operator-gated checkpoints
+last_updated: 2026-05-26T18:00:00.000Z
+last_activity: 2026-05-26 -- Phase 21 execute-phase started (/gsd-execute-phase 21). DAG waves: W1 [21-01,21-02,21-05] · W2 [21-03,21-04,21-06] · W3 [21-07 autonomous:false REAL MAINNET CAPITAL] · W4 [21-08 autonomous:false operator actions]. use_worktrees:false + branching:none → sequential gsd-executor (opus) on master; orchestrator is SOLE writer of STATE.md/ROADMAP.md (gsd-sdk state.* verbs corrupt this hand-maintained STATE shape — executors instructed to skip all state.*/roadmap.* writes).
 progress:
   total_phases: 5
   completed_phases: 2
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 21
-Plan: Planned — 8 plans across 5 waves (not yet executed)
-Status: Ready to execute
+Plan: Executing — Wave 1 of 4 (DAG waves): 21-01, 21-02, 21-05
+Status: Executing (autonomous Waves 1-2; Waves 3-4 operator-gated)
 Last activity: 2026-05-26
 
 ## Performance Metrics
