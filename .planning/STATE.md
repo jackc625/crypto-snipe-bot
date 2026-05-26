@@ -85,6 +85,8 @@ None — Phase 17 complete; ready for `/gsd-discuss-phase 18` or `/gsd-plan-phas
 
 ### Blockers / Concerns
 
+**🔴 Phase 21.1 BLOCKER (OPEN, surfaced 2026-05-26 by Plan 21-03 regression net):** Every Uniswap **V3** buy is aborted — `src/bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain` (`tokenSafety.ts:482`, uses `getAmountsOut`/`swapExactETHForTokens`) → reverts → fail-closed `hasTax=true`. The funded bot cannot snipe any V3 token (V2 unaffected). Per D-STOP-THE-LINE → escalated to phase **21.1**; this BLOCKS phase 21 close. Full diagnosis + fix options + affected tests: `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md`. (21-06 rehearsal / 21-07 capture use a V2 token per D-CHAIN-SINGLE-ROUNDTRIP, so they are NOT blocked by this.)
+
 **Live-runtime validation items deferred from v6.16** (now Phase 21 EXIT-LIVE-01..11):
 
 - Phase 3: bot startup with SQLite + `.bot-state.json` auto-migration → EXIT-LIVE-07
