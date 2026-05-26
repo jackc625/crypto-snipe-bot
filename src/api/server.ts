@@ -51,24 +51,50 @@ export function startApiServer(
     app.use(express.json());
     app.use(cookieParser());
     app.use(helmet({ contentSecurityPolicy: false }));
-    // CR-02 fix: `origin: true` reflects ANY incoming Origin header, which —
-    // combined with `credentials: true` and SameSite=lax cookies — would let
-    // any malicious page the operator visits in the same browser POST to
-    // /api/controls/pause, /api/controls/resume, /api/controls/emergency-sell
-    // etc. (classic CSRF via CORS-anti-pattern). Restrict to an explicit
-    // allowlist via DASHBOARD_ALLOWED_ORIGINS (comma-separated). Same-origin
-    // requests (no Origin header) and OPTIONS preflight checks are still
-    // allowed so the SPA served from the same Express app continues to work.
+    // CR-02 (commit 2d3395e) keeps `origin: true`-style reflection OFF: combined
+    // with `credentials: true` it would let any malicious page the operator
+    // visits in the same browser POST to /api/controls/pause, /resume,
+    // /emergency-sell etc. (classic CSRF-via-CORS). Cross-origin writes still
+    // require the DASHBOARD_ALLOWED_ORIGINS allowlist below.
+    //
+    // Phase 20 live UAT (test 2) gap fix: the prior callback assumed a
+    // same-origin request carries NO Origin header. That holds only for
+    // GET/HEAD — browsers DO send `Origin` on a same-origin POST. So with the
+    // shipped-default empty DASHBOARD_ALLOWED_ORIGINS, every dashboard POST
+    // (login, pause/resume) returned 500 "CORS: origin not allowed" and the
+    // SPA served BY the bot could not log in. We now detect same-origin by
+    // comparing the Origin's host:port to the request's own Host header
+    // (NOT by Origin absence): a POST from the SPA the bot itself serves is
+    // same-origin and is NOT CSRF, so it passes with zero operator config,
+    // while a cross-origin Origin (host mismatch) still requires the allowlist.
+    // `cors`'s static-options origin callback does not receive the request, so
+    // we build the middleware per-request to capture `req.headers.host`.
     const allowedOrigins = (process.env.DASHBOARD_ALLOWED_ORIGINS || '')
         .split(',').map(s => s.trim()).filter(Boolean);
-    app.use(cors({
-        origin: (origin, cb) => {
-            // Allow same-origin (no Origin header) + explicit allowlist
-            if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-            cb(new Error('CORS: origin not allowed'));
-        },
-        credentials: true,
-    }));
+    app.use((req, res, next) => {
+        const requestHost = req.headers.host;
+        return cors({
+            origin: (origin, cb) => {
+                // 1. No Origin header → allow. Covers GET/HEAD, curl, and the
+                //    pause/resume CLI (Node axios sends no Origin).
+                if (!origin) return cb(null, true);
+                // 2. TRUE same-origin: Origin host:port == request Host header.
+                //    A malformed Origin must fall through to rejection, not throw.
+                try {
+                    if (requestHost && new URL(origin).host === requestHost) {
+                        return cb(null, true);
+                    }
+                } catch {
+                    // malformed Origin — fall through to allowlist / rejection
+                }
+                // 3. Explicit allowlist for opted-in cross-origin / remote dashboards.
+                if (allowedOrigins.includes(origin)) return cb(null, true);
+                // Otherwise reject — preserves the CR-02 anti-CSRF intent.
+                cb(new Error('CORS: origin not allowed'));
+            },
+            credentials: true,
+        })(req, res, next);
+    });
 
     // --- Routes (order matters per Pitfall 8) ---
 
