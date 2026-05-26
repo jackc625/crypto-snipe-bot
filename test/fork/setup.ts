@@ -1,4 +1,6 @@
 import { spawn, execSync, ChildProcess } from 'child_process';
+import { ethers } from 'ethers';
+import { requireRealMainnetGate } from './helpers/realMainnetGate';
 
 let hardhatProcess: ChildProcess;
 
@@ -32,6 +34,31 @@ export async function setup() {
             }
         });
     });
+
+    // EXIT-LIVE-08 global tripwire (D-GATE-BOTH-LAYERS layer a): the node is up;
+    // read its chainId and abort the ENTIRE fork run if it reports real-mainnet
+    // chainId 1 without ALLOW_REAL_MAINNET=1. This protects EVERY fork test
+    // (including future ones that forget the per-test decorator) from accidentally
+    // transacting on real mainnet against the funded prod wallet.
+    //
+    // The local `hardhat node --fork` reports chainId 31337, so this NEVER fires
+    // in CI — it guards against a misconfigured ETH_FORK_RPC_URL/ALCHEMY_URL
+    // pointing at a real-mainnet node. We reuse requireRealMainnetGate() rather
+    // than re-implementing the predicate, so there is a single source of truth.
+    const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
+    try {
+        await requireRealMainnetGate(provider);
+    } catch (err) {
+        // Mirror the existing fail-fast throw shape (setup.ts rpc-url check above):
+        // surface the violation and abort globalSetup so no test runs.
+        throw new Error(
+            `Fork globalSetup aborted: the fork node reports real-mainnet chainId 1 ` +
+                `without ALLOW_REAL_MAINNET=1 — every fork test is blocked to protect the ` +
+                `prod wallet. ${(err as Error).message}`,
+        );
+    } finally {
+        provider.destroy();
+    }
 }
 
 export async function teardown() {
