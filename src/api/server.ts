@@ -86,6 +86,14 @@ export function startApiServer(
     // `DASHBOARD_TRUST_PROXY_PROTO=1` to trust `X-Forwarded-Proto`. That is the
     // only correct way to learn the browser-facing scheme behind a proxy, and
     // it is gated behind explicit config rather than trusted by default.
+    // WR-03: the allowlist and proxy-proto flag are intentionally read ONCE at
+    // boot, NOT per request. The per-request closure below exists solely to
+    // capture the request-specific `req.headers.host`/socket scheme; these env
+    // values are fixed for the process lifetime (set before startApiServer and
+    // never mutated at runtime — there is no hot-reload/config-reload path), so
+    // re-parsing them on every request would add work for zero behavioral gain.
+    // If a runtime-reconfiguration feature is ever added, move these reads
+    // inside the closure so the change takes effect per request.
     const allowedOrigins = (process.env.DASHBOARD_ALLOWED_ORIGINS || '')
         .split(',').map(s => s.trim()).filter(Boolean);
     const trustProxyProto = process.env.DASHBOARD_TRUST_PROXY_PROTO === '1';
