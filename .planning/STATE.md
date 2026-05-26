@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: executing
-stopped_at: Phase 20 plan 20-11 complete (FINAL gap-closure — docs/ops: DASHBOARD_ALLOWED_ORIGINS + DASHBOARD_URL in .env.example/config.ts + going-live runbook rebuild/strong-key/CLI-URL/CORS)
-last_updated: "2026-05-26T03:00:00.000Z"
+status: ready_to_plan
+stopped_at: Phase 20 complete (12/12) — ready to discuss Phase 21
+last_updated: 2026-05-26T02:54:50.658Z
 last_activity: 2026-05-26 -- Phase 20 plan 20-11 complete (going-live docs/ops gap closure — FINAL Phase-20 plan)
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 36
-  completed_plans: 35
-  percent: 41
+  completed_plans: 90
+  percent: 40
 ---
 
 # Project State
@@ -26,20 +26,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management
-**Current focus:** Phase 20 — going-live-ops-hardening
+**Current focus:** Phase 21 — exit engine live runtime hardening
 
 ## Current Position
 
-Phase: 20 (going-live-ops-hardening) — EXECUTING (gap-closure wave 08-11)
-Plan: 20-11 of 11 complete (all gap-closure plans done)
-Status: All Phase 20 gap-closure plans (08-11) complete — ready for Phase 20 re-verification + banner_retest UAT
-Last activity: 2026-05-26 -- Phase 20 plan 20-11 complete (going-live docs/ops gap closure — FINAL Phase-20 plan)
+Phase: 21
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-26
 
 ## Performance Metrics
 
 **v6.16 velocity (reference):**
 
-- Total plans completed: 63
+- Total plans completed: 75
 - Timeline: 26 days (2026-03-19 → 2026-04-13)
 - Git: 395 conventional commits, 379 files changed, +87,015 / -71 lines
 
