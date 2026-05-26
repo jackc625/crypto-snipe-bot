@@ -1,14 +1,23 @@
 ---
-status: diagnosed
+status: partial
 phase: 20-going-live-ops-hardening
 source: [20-VERIFICATION.md]
 started: 2026-05-24T23:30:00Z
-updated: 2026-05-26T01:13:00Z
+updated: 2026-05-26T04:30:00Z
 ---
 
 ## Current Test
 
-[testing complete]
+[operator visual retest pending] All 4 diagnosed gaps are now closed in code
+(plans 20-08..20-11; verified by 20-VERIFICATION.md, 17/17 must-haves, suite
+green). One operator step remains before go-live — rebuild the dashboard and
+re-confirm Test 2 end-to-end:
+
+1. `cd dashboard && npm run build` (the shipped dist was a stale pre-Phase-20 build)
+2. Restart the bot; open the dashboard same-origin at `http://127.0.0.1:8080`
+3. Confirm: login succeeds with empty `DASHBOARD_ALLOWED_ORIGINS` (CORS fix),
+   `npm run pause` / `npm run resume` toggle the banner via WS with `DASHBOARD_URL`
+   unset (CLI port fix), and the BOT PAUSED banner now renders in the card idiom.
 
 ## Tests
 
@@ -109,7 +118,7 @@ issues_detail: |
 ## Gaps
 
 - truth: "Operator can open and log into the dashboard so the pause banner is usable (test 2 precondition)"
-  status: failed
+  status: resolved
   reason: "User reported: 'Still CORS error. The dashboard wont even load' — every API call returns 500 'CORS: origin not allowed'. Dashboard login POST is rejected even when served same-origin from the bot at 127.0.0.1:8080."
   severity: major
   test: 2
@@ -127,7 +136,7 @@ issues_detail: |
   banner_retest: "pending — once login works, re-verify the actual pause banner (appear/persist/disappear via WS) to close test 2"
 
 - truth: "npm run pause / npm run resume reach the running bot's API server and toggle pause state (OPS-LIVE-11)"
-  status: failed
+  status: resolved
   reason: "User reported: 'Pause CLI crashed' with empty error (err:'') — AggregateError from a refused TCP connection. CLI dials http://localhost:3000 but the server listens on 127.0.0.1:8080."
   severity: major
   test: 2
@@ -145,7 +154,7 @@ issues_detail: |
   workaround: "Add DASHBOARD_URL=http://127.0.0.1:8080 to .env (no bot restart needed — CLI reads .env per invocation); re-run npm run pause"
 
 - truth: "Pause banner is styled consistently with the dashboard's visual language (the 'visual' half of test 2)"
-  status: failed
+  status: resolved
   reason: "User reported: 'the paused banner doesn't appear at all like the rest of the dashboard ... it should have some resemblance to the dashboard stylistically'. Functional WS behavior is correct; only the visual treatment clashes."
   severity: cosmetic
   test: 2
@@ -161,7 +170,7 @@ issues_detail: |
   user_intent: "'doesn't have to be perfect' — loose stylistic resemblance is enough; keep it unmistakably a red alert. Lowest priority of the test-2 findings; fix alongside the major CORS + DASHBOARD_URL gaps."
 
 - truth: "Bot refuses to start in an unsafe state — including a default/placeholder dashboard admin key (phase goal: 'refuses to start in any internally-inconsistent or unsafe state')"
-  status: failed
+  status: resolved
   reason: "User flagged .env:74 DASHBOARD_API_KEY=your-secret-dashboard-api-key-here (the shipped placeholder). The bot starts WITHOUT objection on this known-default admin credential — anyone aware of the default can log into the dashboard and pause/resume/emergency-sell a live-funds bot."
   severity: major
   test: cross-cutting (surfaced during test 2 dashboard login; user highlighted the line repeatedly)
