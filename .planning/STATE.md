@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 21
-Plan: Executing — Wave 1 of 4 (DAG waves): 21-01, 21-02, 21-05
+Plan: Wave 1 COMPLETE (21-01, 21-02, 21-05 ✓) + fork-harness hardened (2a866c6, suite now 5 files/31 tests green); Wave 2 next (21-03, 21-04, 21-06)
 Status: Executing (autonomous Waves 1-2; Waves 3-4 operator-gated)
 Last activity: 2026-05-26
 
