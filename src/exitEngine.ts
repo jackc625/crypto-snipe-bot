@@ -445,7 +445,7 @@ export async function executeFullSell(
         const balance: bigint = await token.balanceOf(ctx.wallet.address);
 
         if (balance === 0n) {
-            ctx.log.info({ token: tokenAddress, reason }, 'Zero balance, cleaning up');
+            ctx.log.info({ token: tokenAddress, reason, op: 'exit.cleanup.zero-balance' }, 'Zero balance, cleaning up');
             updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
             clearAllTimersForToken(ctx.chain.name, tokenAddress);
             deleteExitState.run(tradeId);
@@ -487,7 +487,7 @@ export async function executeFullSell(
         }
 
         // Submit via sendTxWithRetry for MEV protection
-        ctx.log.info({ token: tokenAddress, reason }, 'Submitting exit sell via MEV-protected path');
+        ctx.log.info({ token: tokenAddress, reason, op: 'exit.full.submitted' }, 'Submitting exit sell via MEV-protected path');
         // Phase 19 / Plan 19-05 — D-VIS-LIVE-EXIT prefixes the live anti-rug
         // alert with `*[ANTI-RUG EXIT]*`. Existing reasons keep the prior
         // `*{reason}:*` heading shape (unchanged behavior).
@@ -500,7 +500,10 @@ export async function executeFullSell(
         // sendTxWithRetry's multi-chain path uses the ChainContext directly.
         const txHash = await sendTxWithRetry(txBuilder, ctx, undefined, undefined, undefined, gasMultiplier);
 
-        ctx.log.info({ token: tokenAddress, reason, txHash }, 'Exit sell TX confirmed');
+        // op:exit.full.executed names the success-criterion-4 op. D-OP-DB-TRUTH:
+        // this log is for FILTERING confirmed-exit events, NOT proof an exit happened
+        // — the ground truth is the trades.amount_out row + the on-chain receipt below.
+        ctx.log.info({ token: tokenAddress, reason, txHash, op: 'exit.full.executed' }, 'Exit sell TX confirmed');
 
         // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
         // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
@@ -513,6 +516,16 @@ export async function executeFullSell(
         };
         if (txHash) {
             receiptData = await decodeReceipt(txHash, ctx.httpProvider, ctx.chain.wethAddress, ctx.wallet.address);
+            // op:exit.receipt.decoded makes receipt decoding filterable (EXIT-LIVE-10).
+            // D-OP-DB-TRUTH: this log MUST NOT be read as exit-success proof — the DB
+            // trades.amount_out row + on-chain receipt remain the only ground truth.
+            ctx.log.info({
+                token: tokenAddress,
+                txHash,
+                amountOut: receiptData.amountOut,
+                blockNumber: receiptData.blockNumber,
+                op: 'exit.receipt.decoded',
+            }, 'Exit sell receipt decoded');
         }
 
         // Record sell trade
@@ -543,7 +556,7 @@ export async function executeFullSell(
         await sendCtxAlert(ctx, confirmHeader);
         return true;
     } catch (e) {
-        ctx.log.error({ err: e, token: tokenAddress, reason }, 'Exit sell failed');
+        ctx.log.error({ err: e, token: tokenAddress, reason, op: 'exit.full.failed' }, 'Exit sell failed');
         // Full exit failure: mark failed and clean up (Pitfall 6)
         updateTradeStatus.run('failed', tokenAddress.toLowerCase(), ctx.chain.name);
         clearAllTimersForToken(ctx.chain.name, tokenAddress);
@@ -612,13 +625,13 @@ export async function executePartialSell(
         }
 
         const tierLabels = tiers.map(t => `${t.tier.multiple}x:${t.tier.percent}%`).join('+');
-        ctx.log.info({ token: tokenAddress, tiers: tierLabels }, 'Submitting partial sell via MEV-protected path');
+        ctx.log.info({ token: tokenAddress, tiers: tierLabels, op: 'exit.partial.submitted' }, 'Submitting partial sell via MEV-protected path');
         await sendCtxAlert(ctx, `*Partial sell:* ${tierLabels} at ${currentMultiple.toFixed(2)}x`);
 
         // Submit via sendTxWithRetry for MEV protection
         const txHash = await sendTxWithRetry(txBuilder, ctx);
 
-        ctx.log.info({ token: tokenAddress, tiers: tierLabels, txHash }, 'Partial sell TX confirmed');
+        ctx.log.info({ token: tokenAddress, tiers: tierLabels, txHash, op: 'exit.partial.executed' }, 'Partial sell TX confirmed');
 
         // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
         // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
@@ -664,7 +677,7 @@ export async function executePartialSell(
         return true;
     } catch (e) {
         // Pitfall 6: partial sell failure does NOT kill exit monitor
-        ctx.log.warn({ err: e, token: tokenAddress }, 'Partial sell failed, will retry next cycle');
+        ctx.log.warn({ err: e, token: tokenAddress, op: 'exit.partial.failed' }, 'Partial sell failed, will retry next cycle');
         return false;
     } finally {
         releaseSellLock(ctx.chain.name, tokenAddress);
@@ -776,14 +789,14 @@ async function pollExitStrategy(
                 priceMultiple,
                 effectivePct,
             });
-            ctx.log.info({ token: tokenAddress, detail }, 'Trailing stop triggered');
+            ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.trailing-stop' }, 'Trailing stop triggered');
             await executeFullSell(ctx, dex, tokenAddress, feeTier, 'trailing-stop', state.tradeId, detail);
             return 'exited';
         }
     } else if (priceMultiple >= 2.0) {
         // D-01: Activate trailing stop at 2x
         state.trailingActivated = true;
-        ctx.log.info({ token: tokenAddress, priceMultiple: priceMultiple.toFixed(2) }, 'Trailing stop activated at 2x');
+        ctx.log.info({ token: tokenAddress, priceMultiple: priceMultiple.toFixed(2), op: 'exit.trailing.activated' }, 'Trailing stop activated at 2x');
     }
 
     // Step 6: Below 2x: fixed stop-loss (D-01)
@@ -796,7 +809,7 @@ async function pollExitStrategy(
                 currentPrice,
                 priceMultiple,
             });
-            ctx.log.info({ token: tokenAddress, detail }, 'Fixed stop-loss triggered');
+            ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.stop-loss' }, 'Fixed stop-loss triggered');
             await executeFullSell(ctx, dex, tokenAddress, feeTier, 'stop-loss', state.tradeId, detail);
             return 'exited';
         }
@@ -810,7 +823,7 @@ async function pollExitStrategy(
             currentPrice,
             priceMultiple,
         });
-        ctx.log.info({ token: tokenAddress, detail }, 'Urgency hard exit at 30min deadline');
+        ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.urgency' }, 'Urgency hard exit at 30min deadline');
         await executeFullSell(ctx, dex, tokenAddress, feeTier, 'urgency-market-sell', state.tradeId, detail);
         return 'exited';
     }
@@ -889,6 +902,7 @@ export async function startExitMonitor(
         pollMs: exitConfig.pollIntervalMs,
         trailingStopPct: exitConfig.trailingStopPct,
         tiers: exitConfig.partialSellTiers.map(t => `${t.multiple}x:${t.percent}%`).join(',') || 'none',
+        op: 'exit.monitor.started',
     }, 'Exit monitor started');
 
     // Create the unified poll interval (D-04: 5s, D-21: single loop)
@@ -935,6 +949,7 @@ export async function resumeExitMonitor(
             highWaterMark: state.highWaterMark.toFixed(0),
             trailing: state.trailingActivated,
             completedTiers: Array.from(state.completedTierIndices),
+            op: 'exit.monitor.resumed',
         }, 'Resumed exit monitor from DB state');
     } else {
         // No exit_state row -- trade predates Phase 7. Start fresh.
