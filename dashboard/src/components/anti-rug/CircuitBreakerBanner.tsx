@@ -1,5 +1,5 @@
 // dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx
-// Phase 19 / Plan 19-06 — Full-bleed CB-tripped alert banner.
+// Phase 19 / Plan 19-06 — CB-tripped alert banner (card idiom as of 20-10).
 //
 // Renders only when at least one chain is in `circuitBreakerTrips`. For
 // multi-chain trips, renders one ChainBadge chip per tripped chain inside the
@@ -7,11 +7,18 @@
 // specific chain. Banner has NO dismiss — only a successful reset hides the
 // associated chain chip (per UI-SPEC §"CB-banner interaction").
 //
+// As of Phase 20 plan 20-10 (cosmetic alignment) this banner uses the dashboard
+// card idiom — a contained card (bg-surface-light + border + rounded-lg + p-4)
+// with a red left-border accent (border-loss border-l-4) and text-loss
+// icon + heading — rather than the original full-bleed bg-loss slab. It remains
+// an unmistakable red alert; visual parity with PauseBanner.tsx is maintained
+// (both moved to the card idiom together in 20-10).
+//
 // References:
 //   - .planning/phases/19-anti-rug-runtime-monitoring/19-UI-SPEC.md
 //       §"Circuit Breaker banner" + §"CB-banner interaction"
 //   - dashboard/src/pages/Overview.tsx:166-170 — loss-border banner precedent
-//     (Phase 19 promotes this to full-bleed)
+//   - dashboard/src/components/PauseBanner.tsx — visual analog (card idiom)
 
 import { AlertOctagon } from 'lucide-react';
 import type { CbTrippedPayload } from '../../types/api';
@@ -33,16 +40,16 @@ export function CircuitBreakerBanner({ trips, onResetClick }: CircuitBreakerBann
   const single = isSingle ? trips[trippedChains[0]] : null;
 
   return (
-    <div className="bg-loss text-white py-3 px-4 mb-4 -mx-4 sm:-mx-6 lg:-mx-8">
+    <div className="bg-surface-light border border-loss border-l-4 rounded-lg p-4 mb-6">
       <div className="flex items-start gap-3">
-        <AlertOctagon className="w-5 h-5 shrink-0 mt-0.5" />
+        <AlertOctagon className="w-5 h-5 shrink-0 mt-0.5 text-loss" />
         <div className="flex-1">
-          <h2 className="text-xl font-bold leading-[1.2]">
+          <h2 className="text-xl font-bold leading-[1.2] text-loss">
             {isSingle && single
               ? `ANTI-RUG HALTED ON ${trippedChains[0].toUpperCase()} — ${single.triggerCount} triggers in last hour`
               : `ANTI-RUG HALTED ON ${trippedChains.length} CHAINS`}
           </h2>
-          <p className="text-sm mt-1">
+          <p className="text-sm mt-1 text-text-muted">
             Anti-rug monitoring is paused on this chain. New positions will open without anti-rug coverage until you review the triggers and reset the breaker.
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
@@ -51,10 +58,10 @@ export function CircuitBreakerBanner({ trips, onResetClick }: CircuitBreakerBann
                 key={chain}
                 type="button"
                 onClick={() => onResetClick(chain)}
-                className="inline-flex items-center gap-2 bg-surface-light rounded px-2 py-1 hover:opacity-80 transition-opacity"
+                className="inline-flex items-center gap-2 bg-surface-lighter rounded px-2 py-1 hover:opacity-80 transition-opacity"
               >
                 <ChainBadge chain={chain} />
-                <span className="text-xs text-accent underline">Click to review and reset</span>
+                <span className="text-xs text-accent">Click to review and reset</span>
               </button>
             ))}
           </div>

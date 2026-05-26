@@ -39,10 +39,10 @@ export function Layout({ children }: LayoutProps) {
       {/* Phase 20 / Plan 20-06 — PauseBanner sits inside the scroll area so it
           is the first thing the operator sees on every dashboard page when the
           bot is globally paused, per D-PAUSE-UI "header banner visible on
-          every dashboard page". The banner is full-bleed (-mx-{4|6|8}) so it
-          consumes the same horizontal padding that <main> currently uses; we
-          keep the p-8 wrapper on the scroll container so children continue to
-          inherit the same padding context. */}
+          every dashboard page". As of plan 20-10 the banner is a contained card
+          (matching the sibling dashboard cards) that lives inside this p-8
+          scroll container, so it no longer needs the full-bleed negative
+          margins it previously used to span the <main> padding. */}
       <div className="flex-1 overflow-y-auto p-8">
         <PauseBanner />
         <main>{children}</main>

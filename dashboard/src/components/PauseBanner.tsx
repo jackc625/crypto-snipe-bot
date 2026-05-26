@@ -1,11 +1,16 @@
 // dashboard/src/components/PauseBanner.tsx
-// Phase 20 / Plan 20-06 / OPS-LIVE-09 D-PAUSE-UI — Full-bleed red pause banner.
+// Phase 20 / Plan 20-06 / OPS-LIVE-09 D-PAUSE-UI — Card-idiom red pause banner.
 //
-// Renders only when useWs().pauseState.paused === true. Visual parity with the
-// Phase 19 CircuitBreakerBanner.tsx is intentional (per RESEARCH §Open Question 10
-// "banner color recommendation — same bg-loss text-white as CB banner") so the
+// Renders only when useWs().pauseState.paused === true. As of Phase 20 plan 20-10
+// (live-UAT test-2 cosmetic gap) the banner uses the dashboard card idiom — a
+// contained dark card (bg-surface-light + border + rounded-lg + p-4) with a red
+// left-border accent (border-loss border-l-4) and text-loss icon + heading —
+// rather than the original full-bleed bg-loss slab, which "didn't appear at all
+// like the rest of the dashboard." It remains an UNMISTAKABLE red alert so the
 // operator instantly recognises that "something blocking new trades is happening"
-// regardless of which subsystem flipped the global stop flag.
+// regardless of which subsystem flipped the global stop flag. Visual parity with
+// CircuitBreakerBanner.tsx is maintained — both banners moved to the card idiom
+// together in 20-10.
 //
 // Banner copy per D-PAUSE-UI:
 //   "BOT PAUSED — since {paused_at_formatted} by {pausedBy}. {reason}"  + Resume button
@@ -66,20 +71,20 @@ export function PauseBanner() {
   }
 
   return (
-    <div className="bg-loss text-white py-3 px-4 mb-4 -mx-4 sm:-mx-6 lg:-mx-8">
+    <div className="bg-surface-light border border-loss border-l-4 rounded-lg p-4 mb-6">
       <div className="flex items-start gap-3">
-        <PauseCircle className="w-5 h-5 shrink-0 mt-0.5" />
+        <PauseCircle className="w-5 h-5 shrink-0 mt-0.5 text-loss" />
         <div className="flex-1">
-          <h2 className="text-xl font-bold leading-[1.2]">
+          <h2 className="text-xl font-bold leading-[1.2] text-loss">
             BOT PAUSED — since {formatTs(pauseState.pausedAt)} by {pauseState.pausedBy ?? 'unknown'}
           </h2>
-          <p className="text-sm mt-1">{pauseState.reason ?? 'No reason provided.'}</p>
+          <p className="text-sm mt-1 text-text-muted">{pauseState.reason ?? 'No reason provided.'}</p>
           <button
             type="button"
             onClick={handleResume}
             disabled={resuming}
-            className={`inline-flex items-center gap-2 mt-3 bg-surface-light rounded px-3 py-1 transition-opacity text-accent underline ${
-              resuming ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
+            className={`inline-flex items-center gap-2 mt-3 bg-accent text-white rounded px-4 py-2 text-sm hover:opacity-90 transition-colors ${
+              resuming ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
             {resuming ? 'Resuming...' : 'Resume'}
