@@ -164,6 +164,12 @@ None — no external service configuration. No new env vars, no new packages (pi
 - **Operator sign-off needed (non-blocking for code):** confirm the per-position `exit.poll.cycle` (positions:1) is the desired shape, or schedule the fleet-aggregate follow-on (new sweep timer) as a separate decision.
 - No blockers. No production bug surfaced (D-STOP-THE-LINE not triggered).
 
+## Self-Check: PASSED
+
+- Created files exist on disk: opEnrichment.test.ts, pollTelemetry.test.ts, flashbotsBundleHash.test.ts, 21-01-SUMMARY.md — all FOUND.
+- Commits exist: `79586d3` (Task 1), `12e3fa6` (Task 2), `912199c` (Task 3), `c13c8ad` (SUMMARY) — all FOUND.
+- Shared-file invariant honored: my 4 commits touched ONLY src/exitEngine.ts, src/utils/mevStrategies/flashbots.ts, the 3 test files, and this SUMMARY. STATE.md was flipped to `executing` by the ORCHESTRATOR's pre-spawn commit `7f2118c` (my first commit's parent), NOT by any executor commit. ROADMAP.md untouched. Orchestrator remains the sole writer of STATE.md/ROADMAP.md.
+
 ---
 *Phase: 21-exit-engine-live-runtime-hardening*
 *Completed: 2026-05-26*
