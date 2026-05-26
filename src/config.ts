@@ -25,6 +25,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'TELEGRAM_ALLOWED_CHANNELS', required: false, description: 'Comma-separated allowed Telegram channel/group IDs' },
     // --- Dashboard ---
     { name: 'DASHBOARD_API_KEY', required: true, description: 'Dashboard login API key (required; dashboard server starts unconditionally)' },
+    { name: 'DASHBOARD_ALLOWED_ORIGINS', required: false, description: 'Comma-separated EXTRA browser origins allowed to call the dashboard API (CORS). Empty default = same-origin works (the SPA served by the bot at DASHBOARD_HOST:DASHBOARD_PORT); set ONLY for cross-origin/remote dashboards' },
     // --- Multi-Chain Configuration ---
     { name: 'ENABLED_CHAINS', required: false, description: 'Comma-separated enabled chains: eth,bsc,base,arb (default: eth)' },
     // --- Per-Chain RPC URLs ---
