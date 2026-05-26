@@ -87,6 +87,7 @@ vi.doMock('../../src/utils/db', () => {
         getPauseState: { get: getPauseStateGetMock },
         setPauseState: { run: setPauseStateRunMock },
         clearPauseState: { run: vi.fn() },
+        forceWalCheckpoint: vi.fn(),
     };
 });
 

@@ -43,6 +43,7 @@ vi.mock('../../../src/utils/db', () => ({
         })),
     },
     getAntirugDryRunStarted: { get: vi.fn(() => undefined) },
+    getStaleTradesQuery: { all: dbAllMock },
 }));
 
 const ORIGINAL_ENV = { ...process.env };

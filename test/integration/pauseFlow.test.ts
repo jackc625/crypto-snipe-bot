@@ -277,6 +277,7 @@ vi.mock('../../src/utils/db', () => ({
     getPauseState: { get: getPauseStateGetSpy },
     setPauseState: { run: setPauseStateRunSpy },
     clearPauseState: { run: clearPauseStateRunSpy },
+    forceWalCheckpoint: vi.fn(),
 }));
 
 vi.mock('../../src/api/ws/broadcaster', () => ({

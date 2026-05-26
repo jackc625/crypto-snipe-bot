@@ -3,6 +3,14 @@
 Items found during plan execution that are NOT caused by the current plan's
 changes. Logged per the executor scope-boundary rule; NOT fixed in-plan.
 
+> **RESOLVED 2026-05-25 (user-approved at wave-0 gate):** All 12 pre-existing
+> test failures below were fixed by restoring the missing `src/utils/db` mock
+> exports — `forceWalCheckpoint: vi.fn()` in `pauseCli.test.ts`,
+> `pauseFlow.test.ts`, `midRunWalletCheck.test.ts`; `getStaleTradesQuery: { all: dbAllMock }`
+> in `staleData.test.ts`. Full suite now green (unit 57/57 files, integration
+> 27/27 files). Test-only change; no production code touched. The sections below
+> are retained as the historical diagnosis.
+
 ## 20-08 (CORS + dashboard-api-key gap closure)
 
 ### Pre-existing: `test/unit/preflight/staleData.test.ts` — 4 failing tests (db mock mismatch)
