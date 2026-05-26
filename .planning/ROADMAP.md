@@ -221,10 +221,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
   **Wave 2** *(autonomous; after Wave 1 gate helper; parallel-safe):*
   - [x] 21-03-PLAN.md — scripts/capture-launch.ts archive recorder + 3 realLaunches fixtures (V2+V3, varied exits) + realLaunchReplay.fork.test.ts driving the REAL handler [EXIT-LIVE-09] *(⚠ surfaced D-STOP-THE-LINE V3-buy blocker → phase 21.1; V2 legs green)*
-  - [ ] 21-04-PLAN.md — exitStatePersistence.fork.test.ts: SIGTERM-restart, asserts identical exit_state strategy columns [EXIT-LIVE-02]
+  - [x] 21-04-PLAN.md — exitStatePersistence.fork.test.ts: SIGTERM-restart, asserts identical exit_state strategy columns [EXIT-LIVE-02] *(module-level restart per D-TEST-WALLET-FORKONLY; columns durable)*
 
   **Wave 3** *(autonomous; the hard gate before any real run):*
-  - [ ] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) [rehearsal gate - closes no requirement; validates the EXIT-LIVE-03 mechanism + EXIT-LIVE-04 Flashbots call path; a fork has no relay so 03/04 close on the 21-07 real run]
+  - [x] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) *(GREEN on V2 token LADYS; non-null amount_out via decodeReceipt; 21-07 unblocked)* [rehearsal gate - closes no requirement; validates the EXIT-LIVE-03 mechanism + EXIT-LIVE-04 Flashbots call path; a fork has no relay so 03/04 close on the 21-07 real run]
 
   **Wave 4** *(OPERATOR-GATED real capital; autonomous: false):*
   - [ ] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false)
@@ -263,7 +263,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
-| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 4/8 | In Progress (21.1 blocker open) | - |
+| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*

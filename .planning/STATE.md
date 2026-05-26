@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 21
-Plan: Wave 1 COMPLETE (21-01, 21-02, 21-05 ✓) + fork-harness hardened (2a866c6, suite now 5 files/31 tests green); Wave 2 next (21-03, 21-04, 21-06)
-Status: Executing (autonomous Waves 1-2; Waves 3-4 operator-gated)
+Plan: Waves 1-2 COMPLETE (6/8: 21-01,02,03,04,05,06 ✓; fork suite 8 files/39 tests green incl. the D-FORK-REHEARSAL gate 21-06). PAUSED at Wave 3 = 21-07 (autonomous:false, REAL MAINNET CAPITAL) — awaiting operator. Remaining: 21-07 (real roundtrip), 21-08 (operator captures + evidence consolidation). 🔴 phase 21.1 V3-buy blocker OPEN (see Blockers/Concerns).
+Status: Paused at operator checkpoint (21-07 real-capital run); 21.1 V3-buy blocker open
 Last activity: 2026-05-26
 
 ## Performance Metrics
