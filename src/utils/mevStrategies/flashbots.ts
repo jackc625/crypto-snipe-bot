@@ -98,6 +98,17 @@ export class FlashbotsMevStrategy implements MevStrategy {
           if (!realHash) {
             throw new Error(`Flashbots bundle response missing bundleTransactions[0].hash for block ${targetBlock}`);
           }
+          // EXIT-LIVE-04 capture mechanism: surface BOTH the bundle hash and the
+          // mined tx hash from the same FlashbotsTransactionResponse so the live
+          // capture can map bundleHash -> minedTxHash. The paired
+          // op:'exit.full.executed' line (exitEngine.ts) carries the mined hash on
+          // the exit child logger; this strategy carries the bundleHash.
+          // T-21-01-03: log ONLY public, on-chain-resolvable values (bundleHash,
+          // minedTxHash, block) — never the signed raw tx or FLASHBOTS_AUTH_KEY.
+          log.info(
+            { op: 'flashbots.bundle.included', bundleHash: bundle.bundleHash, minedTxHash: realHash, block: targetBlock },
+            'Flashbots bundle mapping'
+          );
           return realHash;
         }
         throw new Error(`Bundle not included in block ${targetBlock}`);
