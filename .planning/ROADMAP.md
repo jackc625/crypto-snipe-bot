@@ -187,7 +187,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
   **Wave 6 — Gap closure (live UAT 20-HUMAN-UAT.md)** *(major-first; 08/09/10 parallel, no file overlap):*
   - [x] 20-08-PLAN.md — [major] CORS same-origin fix (src/api/server.ts compares Origin host:port to request Host) + [major/security] DASHBOARD_API_KEY placeholder/empty/short FATAL in preflight validateCrossEnvRules [OPS-LIVE-07, OPS-LIVE-09, OPS-LIVE-10]
-  - [ ] 20-09-PLAN.md — [major] pause/resume CLI default URL derived from DASHBOARD_HOST:DASHBOARD_PORT (fixes :3000 vs :8080 ECONNREFUSED crash) + clear connection errors + config.ts DASHBOARD_URL doc fix [OPS-LIVE-11]
+  - [x] 20-09-PLAN.md — [major] pause/resume CLI default URL derived from DASHBOARD_HOST:DASHBOARD_PORT (fixes :3000 vs :8080 ECONNREFUSED crash) + clear connection errors + config.ts DASHBOARD_URL doc fix [OPS-LIVE-11]
   - [ ] 20-10-PLAN.md — [cosmetic] restyle PauseBanner + CircuitBreakerBanner to the dashboard card idiom (bg-surface-light border-loss border-l-4 rounded-lg) + update pauseBanner.test.ts Test 6 [OPS-LIVE-09]
 
   **Wave 7 — Gap closure docs** *(after Wave 6; documents the Wave-6 behavior):*
@@ -235,7 +235,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 9/12 | In Progress|  |
+| 20. Going-Live Ops Hardening | v6.17 | 10/12 | In Progress|  |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
