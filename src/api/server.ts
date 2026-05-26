@@ -69,19 +69,53 @@ export function startApiServer(
     // while a cross-origin Origin (host mismatch) still requires the allowlist.
     // `cors`'s static-options origin callback does not receive the request, so
     // we build the middleware per-request to capture `req.headers.host`.
+    //
+    // WR-01 (gap-closure): the same-origin test compares the FULL web origin
+    // `(scheme, host, port)` via `URL.origin`, not just `host:port`. A bare
+    // `host:port` compare is scheme-blind, so behind a TLS-terminating proxy
+    // (`DASHBOARD_HOST=0.0.0.0` per going-live.md §5) an `http://` Origin could
+    // match the browser's `https` page and slip past as "same-origin".
+    //
+    // The request scheme is derived from the ACTUAL socket TLS state
+    // (`req.socket.encrypted`), which is NOT attacker-controllable. We do NOT
+    // enable Express `trust proxy`, because that makes Express trust ALL
+    // client-supplied forwarding headers (`X-Forwarded-For`/`-Proto`), a
+    // spoofing vector. For the TLS-terminating-proxy deployment — where TLS
+    // ends at the proxy and the proxy→bot hop is plain HTTP, so the socket
+    // reports `http` while the browser speaks `https` — operators opt in via
+    // `DASHBOARD_TRUST_PROXY_PROTO=1` to trust `X-Forwarded-Proto`. That is the
+    // only correct way to learn the browser-facing scheme behind a proxy, and
+    // it is gated behind explicit config rather than trusted by default.
     const allowedOrigins = (process.env.DASHBOARD_ALLOWED_ORIGINS || '')
         .split(',').map(s => s.trim()).filter(Boolean);
+    const trustProxyProto = process.env.DASHBOARD_TRUST_PROXY_PROTO === '1';
     app.use((req, res, next) => {
         const requestHost = req.headers.host;
+        // Scheme from the real socket (not attacker-controllable). Only when the
+        // operator opts in do we honor the proxy's X-Forwarded-Proto.
+        const socketScheme = (req.socket as { encrypted?: boolean }).encrypted ? 'https' : 'http';
+        const fwdProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+        const requestScheme = trustProxyProto && (fwdProto === 'https' || fwdProto === 'http')
+            ? fwdProto
+            : socketScheme;
+        // Normalize the request's own origin once (host can be malformed → undefined).
+        let requestOrigin: string | undefined;
+        if (requestHost) {
+            try {
+                requestOrigin = new URL(`${requestScheme}://${requestHost}`).origin;
+            } catch {
+                requestOrigin = undefined;
+            }
+        }
         return cors({
             origin: (origin, cb) => {
                 // 1. No Origin header → allow. Covers GET/HEAD, curl, and the
                 //    pause/resume CLI (Node axios sends no Origin).
                 if (!origin) return cb(null, true);
-                // 2. TRUE same-origin: Origin host:port == request Host header.
+                // 2. TRUE same-origin: full Origin (scheme+host+port) == request origin.
                 //    A malformed Origin must fall through to rejection, not throw.
                 try {
-                    if (requestHost && new URL(origin).host === requestHost) {
+                    if (requestOrigin && new URL(origin).origin === requestOrigin) {
                         return cb(null, true);
                     }
                 } catch {
