@@ -247,6 +247,44 @@ Or `Ctrl+C` the process — graceful shutdown persists exit state and exits with
 
 ---
 
+## 10. Live-capture session (EXIT-LIVE-03/04/05)
+
+This is the operator procedure for the one controlled real-capital ETH roundtrip that produces the deferred v6.16 live artifacts: the live sell `amount_out` (EXIT-LIVE-03), the Flashbots bundle→mined-tx mapping (EXIT-LIVE-04), and the dashboard WebSocket position-update screenshot (EXIT-LIVE-05). The bot runs as the **real production bot on the prod wallet** — this is production-under-observation, not a test (Phase 21 D-CAPTURE-WALLET). A passing fork test does **not** close these items; only the real-mainnet artifacts do (Phase 21 D-EVIDENCE-BAR).
+
+The method is deliberately decoupled from snipe risk: you **buy a hand-picked, liquid, established SAFE token at minimum size through the bot's own buy path, then capture its exit** (Phase 21 D-CAPTURE-METHOD). The buy is just the means to obtain a position; the sell path is the evidence you actually need.
+
+### Pre-requisites (all must be met before any real spend)
+
+1. **Fork rehearsal is green end-to-end.** Rehearse the exact capture sequence on a mainnet fork first (bot-buy the chosen token → tight-threshold exit → verify `amount_out` + receipt decode + the exit-engine trigger fired) and confirm it passes end-to-end before touching real funds (Phase 21 D-FORK-REHEARSAL). A local fork has no Flashbots relay, so the rehearsal de-risks everything **except** the Flashbots submission leg (covered by the v6.16 FIX-09 tested retry path on the real run).
+2. **The read-only go/no-go gate passes.** Run the §7 / "Preflight failure modes" read-only check — it does **not** start the bot — and confirm all six ETH checks pass (chain ID, RPC block age, wallet balance, MEV/Flashbots health, HoneypotChecker code-at-address, anti-rug live-gate):
+   ```bash
+   npm run preflight
+   ```
+   Exit code 0 = all-pass. Do not proceed on any FATAL.
+3. **Re-read LIVE balance and gas at capture time, and ABORT if gas has spiked.** No wallet top-up — capture opportunistically at calm gas (Phase 21 D-NO-TOPUP). The figures observed during planning (wallet `0x46c6D387EAb1669307c33E6f60173ADEe9Da3A5C`, balance ~0.00915 ETH, ~0.82 gwei base fee) are **point-in-time and MUST be re-read live** — use the §7 wallet-balance snippet for balance and check current gas before committing. If base fee has materially spiked since this read, **abort the capture** and wait for calm gas; the whole point of D-NO-TOPUP is that a calm-gas roundtrip costs ~$1–3 (gas + slippage; the ~0.003 ETH position mostly returns on the sell).
+4. **Verify both addresses before any spend.** Confirm the capture wallet is the prod wallet `0x46c6D387EAb1669307c33E6f60173ADEe9Da3A5C`, and confirm the chosen token's contract address on Etherscan, **before** the buy. A wrong address here spends real funds on the wrong target.
+
+### Action
+
+Once all pre-requisites are met:
+
+1. **Buy the hand-picked SAFE token at minimum size via the real buy path** (Phase 21 D-CAPTURE-METHOD). The token must be liquid, established, and pass the bot's own honeypot gate — the buy goes through the full `handleNewPairForChain` validation + on-chain `simulateHoneypotRoundtrip` gate, so if the token does not pass, the buy is correctly skipped and you pick a different token. The buy itself is **not** the EXIT-LIVE-04 artifact: the buy records a `'mev_bundle'` placeholder, not a real bundle hash.
+2. **Configure a tight take-profit/stop the position immediately satisfies** so the exit engine's own 5s poll loop fires `executeFullSell` on the next cycle (Phase 21 D-EXIT-TRIGGER). This is deterministic timing **and** exercises the real exit-engine path (poll → evaluate → sell) — which is exactly what the phase verifies. Do **NOT** use the emergency-sell / manual force-sell override (the §9 Kill switch note and the "When NOT to pause" section above) — that bypasses the engine's own trigger logic and would not exercise the path under test.
+3. **Simulate immediately before the real submission.** Run the `callStatic` / `eth_callBundle` simulate-before-submit on the sell right before it goes out, as the final safety check on the live run (Phase 21 D-FORK-REHEARSAL).
+4. **The single roundtrip yields BOTH artifacts from the SELL leg.** The sell routes through Flashbots on ETH (`executeFullSell` → `sendTxWithRetry` → the Flashbots MEV strategy), so the **sell** gives both the non-null `amount_out` (EXIT-LIVE-03, ground-truth = the `trades.amount_out` DB row + the resolvable Etherscan tx hash, never a log line) **and** the bundle-hash→mined-tx-hash mapping (EXIT-LIVE-04). EXIT-LIVE-04's artifact is the **SELL leg only** — the buy's `'mev_bundle'` placeholder is not evidence.
+5. **EXIT-LIVE-05 piggybacks — screenshot the live position update.** The dashboard already broadcasts `positions_update` every 5s (no new code); during the capture, screenshot (timestamped) the open position appearing/updating in the dashboard.
+
+**Expected, harmless post-buy auto-pause — do not mistake it for a fault.** After the ~0.003 ETH buy, the wallet balance dips below the 0.008 ETH preflight floor, so the Phase 20 mid-run wallet-undercut check flips the global pause flag with `paused_by='preflight'` and the red dashboard banner appears (Phase 21 D-NO-TOPUP accepts this). **Exit monitors keep running and the sell still completes** — pause stops *entries*, not the exit engine. This is expected behavior, not an error; see the **Mid-run wallet undercut recovery** section below for the full mechanics. After the capture, refund/raise the floor or lower `MAX_OPEN_POSITIONS`/`ETH_SNIPE_AMOUNT` and resume per that section.
+
+### Related docs
+
+- **§7 Pre-flight checks** and the **Preflight failure modes** section — the read-only `npm run preflight` go/no-go gate and per-check remediation.
+- **§9 Kill switch** and **Pause/resume CLI usage** — pause does not sell; use the exit-engine trigger (D-EXIT-TRIGGER), not emergency-sell, for the capture.
+- **Mid-run wallet undercut recovery** (below) — the expected post-buy auto-pause and how to resume after the capture.
+- **`.planning/milestones/v6.17-VERIFICATION-EVIDENCE.md`** — the consolidated evidence archive (EXIT-LIVE-11, produced in Plan 08) where the captured artifacts (Etherscan tx hash, DB `amount_out` row excerpt, Flashbots bundle-hash mapping, pino op-excerpts, dashboard screenshot) are recorded as the closure for the deferred v6.16 items.
+
+---
+
 ## Adding chains
 
 Set `ENABLED_CHAINS=eth,bsc,base,arb` (any subset). The same `PRIVATE_KEY` signs across all chains, so fund the same address on each.
