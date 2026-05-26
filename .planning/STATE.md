@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
-status: ready_to_plan
-stopped_at: Phase 21 context gathered — ready to plan (21-CONTEXT.md committed 318e323)
-last_updated: 2026-05-26T16:45:00.000Z
-last_activity: 2026-05-26 -- Phase 21 discuss-phase complete: 21-CONTEXT.md + 21-DISCUSSION-LOG.md committed (318e323); 4 gray areas locked; ready for /gsd-plan-phase 21
+status: ready_to_execute
+stopped_at: Phase 21 planned — 8 plans across 5 waves, ready to execute (/gsd-execute-phase 21)
+last_updated: 2026-05-26T17:30:00.000Z
+last_activity: 2026-05-26 -- Phase 21 plan-phase complete: 8 plans across 5 waves (research → pattern-map → plan → 2 checker passes, all blockers resolved); RESEARCH + PATTERNS + VALIDATION + 8 PLAN.md committed; ready for /gsd-execute-phase 21
 progress:
   total_phases: 5
   completed_phases: 2
@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 21
-Plan: Not started
-Status: Ready to plan
+Plan: Planned — 8 plans across 5 waves (not yet executed)
+Status: Ready to execute
 Last activity: 2026-05-26
 
 ## Performance Metrics

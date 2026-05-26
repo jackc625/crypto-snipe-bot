@@ -1,4 +1,4 @@
-﻿# Roadmap: Crypto Snipe Bot
+# Roadmap: Crypto Snipe Bot
 
 ## Overview
 
@@ -224,7 +224,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [ ] 21-04-PLAN.md — exitStatePersistence.fork.test.ts: SIGTERM-restart, asserts identical exit_state strategy columns [EXIT-LIVE-02]
 
   **Wave 3** *(autonomous; the hard gate before any real run):*
-  - [ ] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) [EXIT-LIVE-03, EXIT-LIVE-04]
+  - [ ] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) [rehearsal gate - closes no requirement; validates the EXIT-LIVE-03 mechanism + EXIT-LIVE-04 Flashbots call path; a fork has no relay so 03/04 close on the 21-07 real run]
 
   **Wave 4** *(OPERATOR-GATED real capital; autonomous: false):*
   - [ ] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false)
