@@ -14,9 +14,12 @@
   "mintBlock": 17063792,
   "firstSwapBlock": 17063794,
   "forkBlockNumber": 17063791,
+  "settledForkBlock": 17065792,
+  "blocked": true,
+  "blockedReason": "v3-tax-gate-bug",
   "expectedVerdict": "safe",
-  "expectedExitPath": "trailing-stop",
+  "expectedExitPath": "stop-loss",
   "discoveredVia": "etherscan",
   "discoveredOn": "2026-05-26",
-  "notes": "Captured via scripts/capture-launch.ts on 2026-05-26T20:38:13.151Z. forkBlockNumber = pairCreatedBlock - 1 so the fork replays the launch as the next block. Paired against WETH. Read-only archive capture; no transaction was sent."
+  "notes": "PEPE V3 1% (fee=10000) pool — full launch lifecycle resolved (PoolCreated -> Mint same block -> first Swap at 17063794). Captured via scripts/capture-launch.ts. settledForkBlock 17065792 (launch +2000) has deep liquidity and the V3 honeypot gate + waitForLiquidity same-block-Mint check pass. HOWEVER this fixture's full lifecycle is BLOCKED by a pre-existing product bug (NOT introduced by Plan 21-03): the V3 buy path at src/bot.ts:610 calls hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, token), but that function (src/utils/tokenSafety.ts:482) is hardcoded to V2 (it calls getAmountsOut + swapExactETHForTokens, which the V3 SwapRouter does NOT implement). The call reverts -> catch -> returns true (high tax) -> the V3 safety-bank AND-block (bot.ts:638) aborts EVERY V3 buy regardless of the token. Verified two ways: (1) the replay handler trail stops at 'Tax detection failed -> hasTax=true -> Safety checks failed V3 snipe'; (2) a direct probe shows getAmountsOut REVERTS on SwapRouter02. Escalated to decimal phase 21.1 per D-STOP-THE-LINE (see README STOP-THE-LINE section). The replay test marks this fixture it.skip with a reason pointing at the recorded blocker. expectedExitPath stop-loss is the intended branch once 21.1 fixes the V3 tax gate. Read-only archive capture; no transaction was sent."
 }
