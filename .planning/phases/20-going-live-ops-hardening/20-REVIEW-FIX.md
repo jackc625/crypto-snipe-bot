@@ -1,122 +1,146 @@
 ---
 phase: 20-going-live-ops-hardening
-iteration: 1
+fixed_at: 2026-05-26T03:39:09Z
+review_path: .planning/phases/20-going-live-ops-hardening/20-REVIEW.md
 fix_scope: critical_warning
-findings_in_scope: 13
-fixed: 13
+iteration: 1
+findings_in_scope: 3
+fixed: 3
 skipped: 0
 status: all_fixed
 ---
 
-# Phase 20: Code Review Fix Report
+# Phase 20: Code Review Fix Report (gap-closure)
 
-**Fixed at:** 2026-05-24
-**Source review:** .planning/phases/20-going-live-ops-hardening/20-REVIEW.md
+**Fixed at:** 2026-05-26
+**Source review:** `.planning/phases/20-going-live-ops-hardening/20-REVIEW.md` (gap-closure, 2026-05-25)
 **Iteration:** 1
+**Fix scope:** critical_warning (0 Critical + 3 Warning in scope; 4 Info out of scope)
+
+> Note: this report supersedes a prior `20-REVIEW-FIX.md` that documented the
+> earlier full-phase review (CR-01..04 / WR-01..09, 2026-05-24, 13 findings). That
+> older pass is preserved in git history. This report covers ONLY the three
+> gap-closure warnings from the 2026-05-25 `20-REVIEW.md`.
 
 **Summary:**
-- Findings in scope: 13 (4 Critical + 9 Warning; 5 Info skipped per `fix_scope = critical_warning`)
-- Fixed: 13
+- Findings in scope: 3
+- Fixed: 3
 - Skipped: 0
-- TypeScript: clean (`tsc --noEmit -p .` passes for both main project and dashboard)
+- Final `npx tsc --noEmit -p .`: PASS (exit 0)
 
 ## Fixed Issues
 
-### CR-01: `MAX_OPEN_POSITIONS=0` silently inflates wallet floor 10x
-
-**Files modified:** `src/preflight.ts`
-**Commit:** `ee044a4`
-**Applied fix:** Replaced `Number(process.env.MAX_OPEN_POSITIONS) || 10` with an explicit `undefined`/empty-string check, then `Number.isInteger(...) && >= 0` validation. `MAX_OPEN_POSITIONS=0` is now respected; non-numeric input returns a clear `passed: false` PreflightResult instead of silently defaulting to 10.
-
-### CR-02: CORS `origin: true` + `credentials: true` defeats SameSite for CSRF
+### WR-01: CORS same-origin check is scheme-blind
 
 **Files modified:** `src/api/server.ts`
-**Commit:** `2d3395e`
-**Applied fix:** Replaced reflective `origin: true` with an explicit allowlist driven by `DASHBOARD_ALLOWED_ORIGINS` (comma-separated). Same-origin requests (no Origin header) are still allowed so the SPA served from the same Express app continues to work; unlisted origins are rejected. Operators who deploy `DASHBOARD_HOST=0.0.0.0` must now populate `DASHBOARD_ALLOWED_ORIGINS` explicitly.
+**Commit:** `8d98608`
+**Applied fix:** Replaced the scheme-blind `new URL(origin).host === requestHost`
+same-origin test with a full-origin comparison using `URL.origin` (which encodes
+the `(scheme, host, port)` triple and normalizes default ports). The request's
+own origin is built once per request as `new URL(\`${requestScheme}://${requestHost}\`).origin`,
+guarded by try/catch so a malformed Host yields `requestOrigin = undefined` and
+falls through to allowlist/rejection.
 
-### CR-03: Telegram alert loop in `preflight()` can block FATAL exit indefinitely
+**Security nuance (deviation from the REVIEW suggestion — intentional):** The
+REVIEW suggested deriving the scheme from `req.protocol` with Express `trust proxy`
+enabled. I did NOT take that path because (a) without `trust proxy`, `req.protocol`
+reports the socket scheme (`http` on the proxy->bot hop), which would *invert* the
+check behind a TLS proxy — matching an attacker's `http://` Origin and rejecting
+the legit `https` browser; and (b) enabling Express `trust proxy` unconditionally
+makes Express trust ALL client-supplied forwarding headers (`X-Forwarded-For`,
+`X-Forwarded-Proto`), a spoofing vector. This project sets no `trust proxy` today
+(verified by grep). Instead:
+- The request scheme is derived from the **actual socket TLS state**
+  (`req.socket.encrypted`), which is **not attacker-controllable**. This closes
+  the scheme gap for the direct-TLS case at zero new risk.
+- For the documented TLS-terminating-proxy deployment (going-live.md §5,
+  `DASHBOARD_HOST=0.0.0.0`), operators **opt in** via a new gated env flag
+  `DASHBOARD_TRUST_PROXY_PROTO=1` to trust `X-Forwarded-Proto` for the scheme.
+  This is the only correct way to learn the browser-facing scheme behind a proxy,
+  but it is explicit/opt-in and scoped to the proto header only — it does NOT
+  enable Express `trust proxy` or trust any other forwarding header.
 
-**Files modified:** `src/preflight.ts`
-**Commit:** `eca4f61`
-**Applied fix:** Replaced the sequential `for…await sendTelegramAlert(...)` loop with parallel `Promise.race` per alert (5s timeout) + `Promise.allSettled`. Total alert phase is now bounded to ≤5s regardless of failure count or Telegram latency. Pino `log.fatal(...)` still fires first per failure so the operator gets the structured record even if Telegram is down.
+This is strictly stronger than the prior `host:port`-only check and adds no new
+spoofing surface in the secure-by-default config.
 
-### CR-04: SQLite `synchronous = NORMAL` + kill-switch design = pause write can be lost on SIGKILL
+**CLEAN behaviors preserved (re-verified by reasoning + URL-parse tests):**
+- No-Origin allow path (`if (!origin) return cb(null, true)`) — unchanged.
+- Malformed Origin throws inside try/catch -> falls through to allowlist/rejection
+  (does not allow). Malformed Host now also resolves to `undefined` -> falls through.
+- Userinfo-spoof (`http://127.0.0.1:8080@evil.com`) -> `URL.origin` = `http://evil.com`
+  -> no match -> rejected (verified).
+- Cross-origin with empty allowlist -> rejected (verified).
 
-**Files modified:** `src/utils/db.ts`, `src/api/routes/controls.ts`, `src/bot.ts`
-**Commit:** `bad8ea4`
-**Applied fix:** Added a `forceWalCheckpoint()` helper to `db.ts` that runs `db.pragma('wal_checkpoint(FULL)')`, exported it, and called it after every kill-switch write: `setPauseState.run(...)` in controls.ts POST /pause, `clearPauseState.run(...)` in controls.ts POST /resume, and `setPauseState.run(...)` in bot.ts mid-run undercut auto-pause. Throughput cost is one extra fsync per pause/resume (infrequent operator action); durability cost of the previous behavior was a violated kill-switch contract. **Requires human verification** — recommend a SIGKILL-and-restart smoke test against a non-prod DB to confirm the WAL is durable across crashes.
+**Documentation follow-up (commit `6ee8b3f`):** The new `DASHBOARD_TRUST_PROXY_PROTO`
+flag is now registered in `src/config.ts` (`required: false`, non-fatal), documented
+in `.env.example`, and explained in `docs/operations/going-live.md §5` (the TLS-proxy
+deployment case + the `DASHBOARD_ALLOWED_ORIGINS` alternative) — matching the pattern
+of every other `DASHBOARD_*` env var. This closes the go-live footgun where a
+same-origin dashboard login behind a TLS-terminating proxy would otherwise 403 with
+no runbook explanation.
 
-### WR-01: CP2→`sendTxWithRetry` TOCTOU window allows post-pause submit
+**Human verification recommended:** This touches a security-sensitive
+defense-in-depth control with a deliberate design deviation. A human should
+confirm the threat-model reasoning (socket-scheme source + opt-in proxy flag) and
+set `DASHBOARD_TRUST_PROXY_PROTO=1` if the production dashboard runs behind a
+TLS-terminating proxy. No automated CORS test suite exists in the repo to exercise
+these paths.
 
-**Files modified:** `src/bot.ts`
-**Commit:** `f7ea92d`
-**Applied fix:** Comment-only clarification on both V2 (CP2 at line 381) and V3 (CP2 at line ~692) checkpoints. Now explicitly notes the TOCTOU window between the pause-read and the network call inside `sendTxWithRetry`, and that CP3 logs the after-the-fact case for audit. No behavior change — the design intentionally accepts this race per D-PAUSE-SHAPE; the original comment overstated the guarantee.
+### WR-02: CORS rejection returned HTTP 500 + logged at error level
 
-### WR-02: `controls.ts` GET `/pause` does not handle DB read failure
+**Files modified:** `src/api/server.ts`, `src/api/middleware/errorHandler.ts`
+**Commit:** `7a0885d`
+**Applied fix:** Two coordinated changes committed atomically:
+1. `server.ts` — the CORS origin-rejection now constructs an `Error` tagged with
+   `statusCode = 403` (`Error & { statusCode?: number }`) before calling `cb(err)`,
+   so `errorMiddleware` honors it as a 403 Forbidden instead of defaulting to 500.
+2. `errorHandler.ts` — split the log level: `statusCode < 500` logs at `log.warn`
+   ("API client error"); `>= 500` keeps `log.error` ("Unhandled API error"). Routine
+   cross-origin probes now stay out of the error-level log during go-live monitoring.
 
-**Files modified:** `src/api/routes/controls.ts`
-**Commit:** `0f23c42`
-**Applied fix:** Wrapped the `getPauseState.get()` call in try/catch. On error: log via `log.error(...)` and return HTTP 503 with `{ paused: true, pausedBy: 'unknown', reason: 'pause-state DB read failed; see server logs' }`. The dashboard banner therefore stays sticky on transient DB errors instead of silently showing "no pause" — fail-CLOSED for the kill-switch invariant.
+This makes the server-condition (the misleading 500) into a correct 4xx client
+condition, and resolves the log-noise concern in one finding.
 
-### WR-03: `scripts/pause.ts --reason` parser doesn't handle `=` form
+### WR-03: `DASHBOARD_ALLOWED_ORIGINS` parsed once at boot vs. comment implying per-request
 
-**Files modified:** `scripts/pause.ts`
-**Commit:** `f12ebc6`
-**Applied fix:** Extracted a `getReasonArg()` helper that checks for `--reason=value` (GNU long-option form) first, falling back to the previous `--reason value` (space-separated) form, finally defaulting to `'CLI pause'`. Both `npm run pause -- --reason "x"` and `npm run pause -- --reason=x` now capture the reason.
+**Files modified:** `src/api/server.ts`
+**Commit:** `b6d5d65`
+**Applied fix:** Chose the comment-clarification option (over moving the parse into
+the hot per-request closure). The per-request closure genuinely exists only to
+capture request-specific `req.headers.host`/socket scheme; the allowlist and the
+new proxy-proto flag are fixed for the process lifetime (env is set before
+`startApiServer` and never mutated at runtime — no hot-reload/config-reload path).
+Added a comment stating they are intentionally read once at boot, with an explicit
+pointer to move them inside the closure if a runtime-reconfiguration feature is
+ever added. This removes the misleading per-request implication without adding
+per-request `split/map/filter` overhead for zero behavioral benefit, matching the
+existing intent of the comment block.
 
-### WR-04: `PauseBanner` Resume button has no disabled/loading state
+## Skipped Issues
 
-**Files modified:** `dashboard/src/components/PauseBanner.tsx`
-**Commit:** `f13e2b8`
-**Applied fix:** Added `useState<boolean>(false)` for `resuming`. The handler bails immediately if `resuming === true`, sets it true before the fetch, throws on non-OK responses, and re-enables (`setResuming(false)`) only on error so the operator can retry. On success, the WS event drives the unmount as before. Button label flips to `Resuming...` with `disabled + opacity-50 + cursor-not-allowed` styling while in flight.
+None — all three in-scope warnings were fixed.
 
-### WR-05: `setPauseState` audit columns can be lost if `paused_by` is undefined
+## Out of scope (not addressed — by design)
 
-**Files modified:** `src/api/routes/controls.ts`
-**Commit:** `3988233`
-**Applied fix:** Replaced `String(body.pausedBy ?? 'dashboard')` with strict-typed validation: `typeof body.pausedBy === 'string' ? ... : 'manual'`, then clamped against an `ALLOWED_PAUSED_BY` set (`'dashboard' | 'cli' | 'preflight' | 'manual'`). Same `typeof === 'string'` guard applied to `reason` so `String(null) === 'null'` can no longer leak into the banner.
+The four Info findings (IN-01 placeholder trim symmetry, IN-02 length-only key
+strength, IN-03 empty-branch overlap note, IN-04 `unwrapConnectionCause` default
+token) are excluded from `fix_scope: critical_warning` and were intentionally not
+touched.
 
-### WR-06: `checkStaleData` uses raw `db.prepare` instead of the shared singleton statement
+## Verification
 
-**Files modified:** `src/utils/db.ts`, `src/preflight.ts`
-**Commit:** `e9fccd7`
-**Applied fix:** Hoisted the stale-trades query to a cached prepared statement (`getStaleTradesQuery`) in `db.ts`, exported it, and updated `checkStaleData()` to reference it directly. Any SQL syntax error now surfaces at module load (matching every other cached statement in `db.ts`) rather than at first call; the import-once pattern eliminates a per-call `db.prepare` if Phase 21 wires this into a setInterval.
-
-### WR-07: `Number(process.env.MID_RUN_CHECK_INTERVAL_SEC || '300') * 1000` — falsy-pitfall + no validation
-
-**Files modified:** `src/bot.ts`
-**Commit:** `073b739`
-**Applied fix:** Replaced `|| '300'` with `?? '300'`, then `Number.isFinite(...) && >= 10` validation. Bad values (`NaN`, negative, < 10s) now trigger `mainLog.fatal(...)` + `process.exit(1)` at boot, preventing the prior pathology where `setInterval(cb, NaN)` would fire every event-loop tick and hammer RPC/DB.
-
-### WR-08: `validateCrossEnvRules` Rule 1 is dead code for current architecture
-
-**Files modified:** `src/preflight.ts`, `test/unit/preflight/crossEnvRules.test.ts`
-**Commit:** `bdef364`
-**Applied fix:** Rewrote Rule 1 from `process.env.MEV_STRATEGY === 'flashbots' && !FLASHBOTS_AUTH_KEY` (dead — MEV_STRATEGY is not consulted anywhere in the env contract; `chainRegistry.ts` hardcodes the strategy per chain) to `enabledChains.includes('eth') && !FLASHBOTS_AUTH_KEY`. The `details.rule` discriminator changed from `'mev-flashbots-auth-key'` to `'eth-flashbots-auth-key'`. Updated the matching unit test description; the test predicate itself still passes because the original test setup also has `ENABLED_CHAINS=eth` + no `FLASHBOTS_AUTH_KEY`.
-
-### WR-09: `useWebSocket.ts:onmessage` switch falls through silently on unknown event types
-
-**Files modified:** `dashboard/src/hooks/useWebSocket.ts`
-**Commit:** `3aeb8e1`
-**Applied fix:** Added a `default` arm to the dispatch switch that logs `'[WS] unknown event type:'` via `console.warn`. Replaced every silent `catch {}` with `catch (err)` + per-event-type `console.warn('[WS] <event>: malformed payload', err)`. The outer JSON.parse catch now logs `'[WS] failed to parse message:'` too. Behavior on malformed payloads is unchanged (still drops the event), but regressions are now visible in DevTools.
-
-## Post-Fix Verification
-
-- `tsc --noEmit -p .` (main project): passes clean
-- `tsc --noEmit -p .` (dashboard): passes clean
-- All 13 commits use conventional `fix(20): <ID> ...` format
-- No pre-existing project errors surfaced by the edits (verified via incremental tsc after each fix)
-- Pre-commit hooks honored (no `--no-verify` used); every fix commit completed without bypass
-
-**Recommended human-verification steps before merging:**
-
-1. **CR-04 (WAL durability):** smoke-test SIGKILL + restart against a non-prod SQLite DB to confirm the pause flag survives. The fix is mechanically correct but the kill-switch contract is safety-critical enough to validate empirically.
-2. **CR-02 (CORS allowlist):** operators upgrading from the prior `origin: true` posture must now populate `DASHBOARD_ALLOWED_ORIGINS` when they want cross-origin access. Default deployment (same-origin SPA served from the same Express app) is unaffected.
-3. **CR-01 (`MAX_OPEN_POSITIONS=0`):** operator-visible behavior change — `MAX_OPEN_POSITIONS=0` is now a documented "halt new entries" sentinel that PASSES preflight on any funded wallet (floor reduces to just `gasBuffer`); previously it FAILED with a falsely-inflated 10x floor. Confirm this matches the operator's mental model in `docs/operations/going-live.md §6`.
-4. **WR-08 (Rule 1 rewrite):** the cross-env rule's `details.rule` discriminator changed from `'mev-flashbots-auth-key'` to `'eth-flashbots-auth-key'`. If any monitoring / log-grep query keys off that exact value, update accordingly.
+- Each fix re-read after editing (Tier 1) — fix text present, surrounding code intact.
+- `npx tsc --noEmit -p .` run after each finding and once more at the end — PASS
+  (exit 0) every time. No new type errors introduced.
+- No CORS/server test suite exists in the repo, so behavioral paths were validated
+  by direct Node `URL` parse tests (scheme distinction, default-port normalization,
+  userinfo-spoof resolution) rather than automated tests.
+- Working tree clean after all commits; no uncommitted or partial changes remain.
+- Commits made straight to `master` (project `branching_strategy: none`); pre-commit
+  hooks ran and passed (no `--no-verify`).
 
 ---
 
-_Fixed: 2026-05-24_
+_Fixed: 2026-05-26_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
