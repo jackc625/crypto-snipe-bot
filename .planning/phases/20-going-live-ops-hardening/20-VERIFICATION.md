@@ -1,7 +1,8 @@
 ---
 phase: 20-going-live-ops-hardening
 verified: 2026-05-26T08:00:00Z
-status: human_needed
+status: verified
+human_verification_satisfied: 2026-05-26T04:04:46Z  # operator retest of Test 2 (pause banner) PASSED — see 20-HUMAN-UAT.md
 score: 17/17 must-haves verified
 overrides_applied: 0
 re_verification:
@@ -285,7 +286,9 @@ Both were accepted by the reviewer as non-exploitable. They do not block the pha
 
 ## Human Verification Required
 
-The code changes for all 4 UAT gaps are verified in source. One operator action remains pending — the `banner_retest` deferred in 20-HUMAN-UAT.md:
+> **SATISFIED 2026-05-26** — the operator action below was performed and **PASSED** (see 20-HUMAN-UAT.md Test 2 retest). Dashboard was rebuilt (`tsc -b` + `vite build` clean; card-idiom restyle now bundled), the bot started **paused** (no real-capital exposure during the visual check), same-origin login succeeded with no CORS error, the BOT PAUSED card-idiom banner rendered on load, and `npm run resume` / `npm run pause` toggled it via WS push. Phase status updated `human_needed` → `verified`.
+
+The code changes for all 4 UAT gaps are verified in source. One operator action remained pending — the `banner_retest` deferred in 20-HUMAN-UAT.md (now satisfied):
 
 ### 1. Dashboard card-idiom banner retest + same-origin login/pause/resume (banner_retest: pending)
 
