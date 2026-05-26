@@ -908,7 +908,24 @@ export async function startExitMonitor(
     // Create the unified poll interval (D-04: 5s, D-21: single loop)
     const interval = setInterval(async () => {
         try {
+            // EXIT-LIVE-01: budget-vs-actual poll telemetry. The engine runs ONE
+            // setInterval PER open position, so each cycle evaluates exactly one
+            // position → positions:1 (read from this loop's own scope, NOT a
+            // fleet aggregate; no new module-level timer). The timing wraps the
+            // EXISTING pollExitStrategy call only — no added await, no latency,
+            // no control-flow change. `overruns` (plural — locked CONTEXT schema)
+            // is durationMs > the configured pollIntervalMs budget.
+            const t0 = performance.now();
             const result = await pollExitStrategy(ctx, dex, tokenAddress, feeTier, buyAmountWei, state);
+            const durationMs = performance.now() - t0;
+            ctx.log.info({
+                op: 'exit.poll.cycle',
+                token: tokenAddress,
+                positions: 1,
+                durationMs,
+                budgetMs: exitConfig.pollIntervalMs,
+                overruns: durationMs > exitConfig.pollIntervalMs,
+            }, 'Exit poll cycle');
             if (result === 'exited') {
                 clearInterval(interval);
             }
@@ -982,7 +999,23 @@ export async function resumeExitMonitor(
     // Start poll loop (same as startExitMonitor but using loaded/created state)
     const interval = setInterval(async () => {
         try {
+            // EXIT-LIVE-01: identical budget-vs-actual poll telemetry to the
+            // startExitMonitor body — one setInterval per position → positions:1,
+            // durationMs measured around the existing pollExitStrategy call,
+            // budgetMs = the configured pollIntervalMs, overruns (plural) =
+            // durationMs > budgetMs. Additive logging only; timing/control flow
+            // unchanged.
+            const t0 = performance.now();
             const result = await pollExitStrategy(ctx, dex, tokenAddress, feeTier, buyAmountWei, state);
+            const durationMs = performance.now() - t0;
+            ctx.log.info({
+                op: 'exit.poll.cycle',
+                token: tokenAddress,
+                positions: 1,
+                durationMs,
+                budgetMs: exitConfig.pollIntervalMs,
+                overruns: durationMs > exitConfig.pollIntervalMs,
+            }, 'Exit poll cycle');
             if (result === 'exited') {
                 clearInterval(interval);
             }
