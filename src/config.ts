@@ -26,6 +26,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     // --- Dashboard ---
     { name: 'DASHBOARD_API_KEY', required: true, description: 'Dashboard login API key (required; dashboard server starts unconditionally)' },
     { name: 'DASHBOARD_ALLOWED_ORIGINS', required: false, description: 'Comma-separated EXTRA browser origins allowed to call the dashboard API (CORS). Empty default = same-origin works (the SPA served by the bot at DASHBOARD_HOST:DASHBOARD_PORT); set ONLY for cross-origin/remote dashboards' },
+    { name: 'DASHBOARD_TRUST_PROXY_PROTO', required: false, description: 'Set to 1 ONLY behind a TLS-terminating reverse proxy: trusts X-Forwarded-Proto so the CORS same-origin check sees the browser-facing https scheme instead of the plain-http proxy->bot hop. Default off = scheme read from the real socket. Does NOT enable Express `trust proxy` or trust any other forwarded header' },
     // --- Multi-Chain Configuration ---
     { name: 'ENABLED_CHAINS', required: false, description: 'Comma-separated enabled chains: eth,bsc,base,arb (default: eth)' },
     // --- Per-Chain RPC URLs ---

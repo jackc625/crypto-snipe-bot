@@ -150,6 +150,8 @@ Default bind is `127.0.0.1:8080` — local only. Do not set `DASHBOARD_HOST=0.0.
 
 **Browser dashboard access (CORS).** The SPA served by the bot at `http://DASHBOARD_HOST:DASHBOARD_PORT` is **same-origin** and needs **no** CORS config — same-origin POSTs (login, pause, resume) work out of the box with `DASHBOARD_ALLOWED_ORIGINS` empty. Only set `DASHBOARD_ALLOWED_ORIGINS` (comma-separated) to open the dashboard from a **different** origin — a remote host or a separate dev server (e.g. `http://localhost:5173`). Keep this list to trusted origins; do not use a permissive wildcard.
 
+**Behind a TLS-terminating reverse proxy** (the recommended way to expose the dashboard remotely — `DASHBOARD_HOST=0.0.0.0` with the proxy terminating `https` and forwarding plain `http` to the bot): set **`DASHBOARD_TRUST_PROXY_PROTO=1`**. The CORS same-origin check compares the **full** browser origin *including scheme*, but behind such a proxy the bot's socket only sees `http` — so without this flag the browser's `https` same-origin login/pause/resume POSTs are rejected with **403**. `DASHBOARD_TRUST_PROXY_PROTO=1` tells the bot to trust the proxy's `X-Forwarded-Proto` header **for the scheme only**; it does **not** enable Express `trust proxy` or trust any other forwarded header (e.g. `X-Forwarded-For`), so it adds no IP-spoofing surface. (Alternative: leave it off and add `https://your-dashboard-host` to `DASHBOARD_ALLOWED_ORIGINS`.)
+
 ---
 
 ## 6. Risk params — tune DOWN for the first run
