@@ -19,7 +19,7 @@
 //   Test 3: pausedAt unix-second formatting (toLocaleString())
 //   Test 4: Resume button POSTs /api/controls/resume with credentials: 'include'
 //   Test 5: useWs().pauseState === null → component returns null (initial state)
-//   Test 6: full-bleed CB-banner-parity classes (bg-loss text-white py-3 px-4 mb-4 -mx-4 sm:-mx-6 lg:-mx-8)
+//   Test 6: card-idiom red-alert classes (bg-surface-light border-loss border-l-4 rounded-lg) — NOT full-bleed (per 20-10 cosmetic restyle)
 //
 // Plus interface-shape guards on WebSocketContext + useWebSocket + Layout + api.ts.
 
@@ -34,7 +34,7 @@ function readDashboardSrc(relPath: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// PauseBanner.tsx — full-bleed red banner (D-PAUSE-UI)
+// PauseBanner.tsx — card-idiom red-alert banner (D-PAUSE-UI; restyled in 20-10)
 // ---------------------------------------------------------------------------
 
 describe('Phase 20 — PauseBanner.tsx', () => {
@@ -93,9 +93,21 @@ describe('Phase 20 — PauseBanner.tsx', () => {
         expect(src).toMatch(/pauseState/);
     });
 
-    it('Test 6: full-bleed CB-banner-parity classes ship verbatim', () => {
-        // Verbatim per plan: 'bg-loss text-white py-3 px-4 mb-4 -mx-4 sm:-mx-6 lg:-mx-8'
-        expect(src).toContain('bg-loss text-white py-3 px-4 mb-4 -mx-4 sm:-mx-6 lg:-mx-8');
+    it('Test 6: card-idiom red-alert classes ship (not full-bleed)', () => {
+        // 20-10 cosmetic restyle: the banner is now a contained dashboard card
+        // (bg-surface-light + border + rounded-lg + p-4) with a red left-border
+        // alarm accent (border-loss border-l-4), NOT the old full-bleed bg-loss slab.
+        expect(src).toContain('bg-surface-light');
+        expect(src).toContain('border-loss');
+        expect(src).toContain('border-l-4');
+        expect(src).toContain('rounded-lg');
+        // The removed full-bleed negative margins must be gone.
+        expect(src).not.toContain('-mx-4 sm:-mx-6 lg:-mx-8');
+    });
+
+    it('Test 6: Resume button uses the solid dashboard button style', () => {
+        // 20-10: Resume is now a solid bg-accent button, not underlined text.
+        expect(src).toContain('bg-accent text-white');
     });
 
     it('imports a lucide-react pause-family icon for visual parity with CB banner', () => {
