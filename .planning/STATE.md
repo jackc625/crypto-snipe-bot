@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 ## Current Position
 
 Phase: 21
-Plan: Waves 1-2 COMPLETE (6/8: 21-01,02,03,04,05,06 ✓; fork suite 8 files/39 tests green incl. the D-FORK-REHEARSAL gate 21-06). PAUSED at Wave 3 = 21-07 (autonomous:false, REAL MAINNET CAPITAL) — awaiting operator. Remaining: 21-07 (real roundtrip), 21-08 (operator captures + evidence consolidation). 🔴 phase 21.1 V3-buy blocker OPEN (see Blockers/Concerns).
-Status: Paused at operator checkpoint (21-07 real-capital run); 21.1 V3-buy blocker open
+Plan: Waves 1-2 COMPLETE (6/8). 21-07 ATTEMPTED on real mainnet → ABORTED: surfaced a CRITICAL Flashbots false-negative bug (the real LADYS buy landed on-chain but bundle.wait() reported "not included" → bot logged TX failed → untracked/unmonitored position). No funds lost (LADYS recovered to ETH via direct non-Flashbots sell). Capture BLOCKED pending 21.1. Two 21.1 blockers OPEN: (1) V3-buy tax-gate, (2) Flashbots false-negative inclusion — both must be fixed before retrying 21-07.
+Status: 21-07 aborted (D-STOP-THE-LINE); TWO 21.1 blockers open (see Blockers/Concerns). Waves 1-2 + harness fix banked.
 Last activity: 2026-05-26
 
 ## Performance Metrics
@@ -86,6 +86,8 @@ None — Phase 17 complete; ready for `/gsd-discuss-phase 18` or `/gsd-plan-phas
 ### Blockers / Concerns
 
 **🔴 Phase 21.1 BLOCKER (OPEN, surfaced 2026-05-26 by Plan 21-03 regression net):** Every Uniswap **V3** buy is aborted — `src/bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain` (`tokenSafety.ts:482`, uses `getAmountsOut`/`swapExactETHForTokens`) → reverts → fail-closed `hasTax=true`. The funded bot cannot snipe any V3 token (V2 unaffected). Per D-STOP-THE-LINE → escalated to phase **21.1**; this BLOCKS phase 21 close. Full diagnosis + fix options + affected tests: `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md`. (21-06 rehearsal / 21-07 capture use a V2 token per D-CHAIN-SINGLE-ROUNDTRIP, so they are NOT blocked by this.)
+
+**🔴 Phase 21.1 BLOCKER #2 (OPEN, CRITICAL — surfaced 2026-05-26 by the 21-07 live-capture attempt):** Flashbots `bundle.wait()` false-negative — a real ETH buy LANDED on-chain (wallet received 751M LADYS, 0.003 ETH spent) but `FlashbotsMevStrategy.sendTransaction` (`flashbots.ts:54-114`) reported "Bundle not included" → bot logged TX failed → position NEVER registered/monitored (untracked funds). `bundle.wait()!==0` is treated as failure without confirming against on-chain nonce/receipt; retry loop's `baseNonce+attempt` also risks a double-spend. Affects EVERY ETH buy AND sell (executeFullSell uses the same path) → blocks reliable 21-07 capture. Per D-STOP-THE-LINE → phase **21.1**. Full diagnosis + fix: `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-02-flashbots-false-negative.md`. The untracked LADYS was recovered to ETH via a direct non-Flashbots sell (`scripts/recover-sell-ladys.ts`).
 
 **Live-runtime validation items deferred from v6.16** (now Phase 21 EXIT-LIVE-01..11):
 
