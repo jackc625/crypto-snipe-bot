@@ -136,7 +136,7 @@ Expected: `{"ok":true,...}` and a `preflight_ok` message in your Telegram chat.
 
 ## 5. Dashboard API key
 
-Replace the weak default (`password`):
+Replace the shipped placeholder (`your-secret-dashboard-api-key-here`) with a strong random key:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
@@ -144,7 +144,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 DASHBOARD_API_KEY=<32_byte_hex>
 ```
 
+A strong random key is **mandatory, not advisory.** The bot now **FATAL-exits at startup** (via preflight `validateCrossEnvRules`) if `DASHBOARD_API_KEY` is left as the shipped placeholder `your-secret-dashboard-api-key-here`, is empty, or is shorter than 16 characters — the Phase-20 "refuses to start in an unsafe state" guarantee extended to the admin credential, so you cannot unknowingly ship a default dashboard login that lets anyone pause/resume/emergency-sell a live-funds bot. The failure appears in the preflight FATAL output with a `details.rule: 'dashboard-api-key'` pointer back to this section (run `npm run preflight` to see it without starting the bot).
+
 Default bind is `127.0.0.1:8080` — local only. Do not set `DASHBOARD_HOST=0.0.0.0` without TLS in front.
+
+**Browser dashboard access (CORS).** The SPA served by the bot at `http://DASHBOARD_HOST:DASHBOARD_PORT` is **same-origin** and needs **no** CORS config — same-origin POSTs (login, pause, resume) work out of the box with `DASHBOARD_ALLOWED_ORIGINS` empty. Only set `DASHBOARD_ALLOWED_ORIGINS` (comma-separated) to open the dashboard from a **different** origin — a remote host or a separate dev server (e.g. `http://localhost:5173`). Keep this list to trusted origins; do not use a permissive wildcard.
 
 ---
 
@@ -169,6 +173,14 @@ npm install
 npm run build
 npm run test:unit
 ```
+
+**Build the dashboard SPA** — the bot serves the compiled dashboard from `dashboard/dist`, which is a **separate** build from the root `npm run build` (the root build is the bot's `tsc`; it does NOT build the React SPA). You MUST (re)build the dashboard before §8 or the bot serves a **stale** build — or returns a 404 `Dashboard not built. Run build in dashboard/ first.` (`src/api/server.ts`) if it was never built:
+
+```bash
+cd dashboard && npm install && npm run build
+```
+
+This is **required after pulling Phase-20 dashboard changes**: a stale pre-Phase-20 `dashboard/dist` will not contain the pause banner — the dashboard would look unchanged even though the new code is on disk. If the pause banner or any new UI does not appear after an update, a stale dashboard build is the usual cause (see §8). Re-run `cd dashboard && npm run build` from the repo root each time you pull dashboard changes.
 
 Wallet balance — derives the address from `PRIVATE_KEY` automatically (avoids the manual-substitution footgun, since ethers will try to ENS-resolve a literal placeholder string):
 
@@ -211,6 +223,8 @@ Health check from another shell:
 ```bash
 curl http://127.0.0.1:8080/health
 ```
+
+> If you open the dashboard and the pause banner or other new UI does not appear after pulling an update, the usual cause is a **stale `dashboard/dist` build** — re-run `cd dashboard && npm run build` (§7) and hard-refresh the browser.
 
 ---
 
@@ -335,13 +349,14 @@ Exit code 0 = all-pass; 1 = at least one FATAL; 2 = uncaught throw.
   `{"level":50,"chain":"eth","check":"honeypot-checker-code","reason":"no bytecode at deployedAddress","address":"0x...","remediation":"docs/operations/going-live.md"}`
 
 ### validateCrossEnvRules — internally inconsistent env
-- **Triggers FATAL when:** any of four cross-variable rules fires:
+- **Triggers FATAL when:** any of these cross-variable rules fires:
   - `MEV_STRATEGY=flashbots` is selected on a chain but `FLASHBOTS_AUTH_KEY` is unset.
   - `bsc` is enabled in `ENABLED_CHAINS` but `BLOXROUTE_AUTH_HEADER` is unset.
   - One of `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` / `TELEGRAM_SESSION` is set but not all five Telegram envs (`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` + the three above) — partial Telegram config is worse than none.
   - A chain in `ENABLED_CHAINS` is missing its `<CHAIN>_RPC_URL`.
-- **Why:** These combinations would otherwise fail loudly mid-run with a confusing stack trace ("Cannot read auth-key of undefined"). Cross-env catches them at boot.
-- **Remediation:** The pino fatal log names the exact rule and the missing env. Fix that env (see §3, §4, §2 above for the canonical sources) and re-run preflight.
+  - **`DASHBOARD_API_KEY` is the shipped placeholder (`your-secret-dashboard-api-key-here`), empty, or shorter than 16 characters** (the `details.rule: 'dashboard-api-key'` rule — Phase 20). A default/weak admin credential is an unsafe startup state — **remediation: regenerate a strong random key per §5.**
+- **Why:** These combinations would otherwise fail loudly mid-run with a confusing stack trace ("Cannot read auth-key of undefined"), or — for the dashboard key — silently expose a default admin login. Cross-env catches them at boot.
+- **Remediation:** The pino fatal log names the exact rule and the missing/offending env. Fix that env (see §3, §4, §2, §5 above for the canonical sources) and re-run preflight.
 - **Example pino log:**
   `{"level":50,"check":"cross-env-rule","reason":"MEV_STRATEGY=flashbots requires FLASHBOTS_AUTH_KEY","missing":["FLASHBOTS_AUTH_KEY"],"remediation":"docs/operations/going-live.md"}`
 
@@ -389,14 +404,23 @@ Both commands do a two-step axios flow: `POST /api/auth/login` (apiKey from `DAS
 
 The `DASHBOARD_API_KEY` is **never** logged by either script (Phase 20 T-20-05 mitigation, enforced by static-grep tests).
 
+### CLI connection (DASHBOARD_URL)
+The CLI dials `DASHBOARD_URL`, which **defaults to the server bind derived from `DASHBOARD_HOST`:`DASHBOARD_PORT`** (`http://127.0.0.1:8080`). On a fresh clone with `DASHBOARD_URL` unset, `npm run pause` / `npm run resume` reach the bot's API out of the box — you do **not** need to set `DASHBOARD_URL` for the default local bot. Set it only for a **non-default host/port** or a **remote bot** (e.g. `DASHBOARD_URL=http://10.0.0.5:8080`). Use `127.0.0.1` rather than `localhost` to match the IPv4 bind and avoid an `::1` IPv6 connection refusal.
+
+A refused or failed connection now prints a clear message naming the address and cause, e.g.:
+```
+Could not reach the dashboard API at http://127.0.0.1:8080 (ECONNREFUSED). Is the bot running? Check DASHBOARD_URL / DASHBOARD_HOST / DASHBOARD_PORT.
+```
+(no more the old empty-error `Pause CLI crashed`). The error payload references only the URL / host:port + error code — never the API key. The most common cause is simply that the bot is not running, or that `DASHBOARD_URL`/`DASHBOARD_PORT` was set to something other than the bot's actual bind.
+
 ### Dashboard usage
-The dashboard shows a **full-bleed red banner** (D-PAUSE-UI) at the top of every page when paused:
+The dashboard shows a **red BOT PAUSED alert card** at the top of the content area on every page when paused (a contained card matching the dashboard's other panels, with a red left-border alarm accent — restyled from the earlier full-bleed slab in Plan 20-10):
 ```
 BOT PAUSED
 Paused by: cli       Reason: manual stop for investigation       At: 2026-05-24T14:32:18Z
                                                           [ Resume ]
 ```
-Click **Resume** to clear the flag — same effect as `npm run resume`. The banner subscribes to the `pause_state_change` WebSocket event so it flips within one round-trip of any pause/resume action from any source (dashboard, CLI, bot mid-run undercut).
+Click **Resume** to clear the flag — same effect as `npm run resume`. The banner subscribes to the `pause_state_change` WebSocket event so it flips within one round-trip of any pause/resume action from any source (dashboard, CLI, bot mid-run undercut). The dashboard SPA is served same-origin by the bot, so login + Resume work with `DASHBOARD_ALLOWED_ORIGINS` empty (see §5 for the cross-origin case).
 
 ### Restart survival
 The pause flag is persisted in SQLite, so a SIGKILL + restart with `paused=1` honors the pause at CP1 (per D-PAUSED-RESTART, verified by Plan 20-04 integration test). The operator sees the dashboard banner immediately on restart and can manage open positions via Force Sell / Emergency Sell. The pause stays in place until explicitly cleared.
@@ -543,5 +567,5 @@ The defaults `STALE_WARN_SEC=120` / `STALE_ERROR_SEC=600` were chosen per Plan 2
 
 ---
 
-*Last updated: 2026-05-24 (Phase 20 ship — runbook moved from repo root to docs/operations/; 5 D-OPERATOR-HANDOFF sections appended per Plan 20-07)*
+*Last updated: 2026-05-26 (Phase 20 gap-closure Plan 20-11 — documented the dashboard SPA rebuild step, the strong-random DASHBOARD_API_KEY requirement + placeholder/empty/short FATAL, and the pause/resume CLI DASHBOARD_URL default + DASHBOARD_ALLOWED_ORIGINS same-origin/cross-origin model from the Phase-20 live UAT findings; originally Phase 20 ship 2026-05-24 — runbook moved from repo root to docs/operations/ + 5 D-OPERATOR-HANDOFF sections per Plan 20-07)*
 *See also: `docs/operations/anti-rug-rollout.md`, `docs/operations/anti-rug-tuning.md`, `.planning/phases/20-going-live-ops-hardening/20-RESEARCH.md`*
