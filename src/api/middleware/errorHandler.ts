@@ -29,6 +29,13 @@ export function errorMiddleware(
     _next: NextFunction,
 ): void {
     const statusCode = (err as Error & { statusCode?: number }).statusCode || 500;
-    log.error({ err, statusCode }, 'Unhandled API error');
+    // WR-02: client errors (4xx, e.g. a 403 CORS rejection) log at warn so they
+    // stop masquerading as server errors and spamming the error log during
+    // go-live monitoring. Only 5xx (true server faults) log at error level.
+    if (statusCode < 500) {
+        log.warn({ err, statusCode }, 'API client error');
+    } else {
+        log.error({ err, statusCode }, 'Unhandled API error');
+    }
     res.status(statusCode).json({ error: err.message || 'Internal server error' });
 }

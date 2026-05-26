@@ -123,8 +123,13 @@ export function startApiServer(
                 }
                 // 3. Explicit allowlist for opted-in cross-origin / remote dashboards.
                 if (allowedOrigins.includes(origin)) return cb(null, true);
-                // Otherwise reject — preserves the CR-02 anti-CSRF intent.
-                cb(new Error('CORS: origin not allowed'));
+                // Otherwise reject — preserves the CR-02 anti-CSRF intent. WR-02:
+                // tag 403 so errorMiddleware reports a client (Forbidden) error
+                // instead of a misleading 500, and keeps routine cross-origin
+                // probes out of the error-level log during go-live monitoring.
+                const corsError = new Error('CORS: origin not allowed') as Error & { statusCode?: number };
+                corsError.statusCode = 403;
+                cb(corsError);
             },
             credentials: true,
         })(req, res, next);
