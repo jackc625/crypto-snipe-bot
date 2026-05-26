@@ -115,6 +115,13 @@ const SEVEN_DAYS_SEC = 7 * 86400;
 const REMEDIATION_DOC = 'docs/operations/going-live.md';
 const ANTIRUG_DOC = 'docs/operations/anti-rug-rollout.md';
 
+// The literal DASHBOARD_API_KEY value shipped in .env.example:73. Must match
+// byte-for-byte so the cross-env rule below FATAL-rejects a bot that boots on
+// the known-default admin credential (Phase 20 live UAT gap). For a phase whose
+// goal is "refuses to start in any unsafe state," a default admin key IS an
+// unsafe startup state.
+const DASHBOARD_API_KEY_PLACEHOLDER = 'your-secret-dashboard-api-key-here';
+
 // ---------------------------------------------------------------------------
 // Wallet balance — D-BALANCE-FLOOR (exported for Plan 20-04 mid-run reuse)
 // ---------------------------------------------------------------------------
@@ -486,6 +493,43 @@ export function validateCrossEnvRules(): PreflightResult[] {
                 details: { rule: 'per-chain-rpc-url', chainName, envKey },
             });
         }
+    }
+
+    // Rule 5: DASHBOARD_API_KEY must not be the shipped placeholder, empty, or
+    // weak (<16 chars). Phase 20 live UAT gap — config.ts already requires the
+    // key be SET (presence check), but a bot that boots on the documented
+    // default 'your-secret-dashboard-api-key-here' is in an unsafe startup
+    // state: anyone aware of the default can pause/resume/emergency-sell a
+    // live-funds bot. This is the unsafe-STATE guard (NOT a presence check),
+    // homed in validateCrossEnvRules per the UAT diagnosis. Placeholder /
+    // empty / too-short are mutually exclusive (if/else-if) — exactly one
+    // pushed result per invocation. The failure flows through preflight()'s
+    // collect-all FATAL + Telegram + remediation-pointer path (D-ALERTS).
+    const dashboardApiKey = process.env.DASHBOARD_API_KEY;
+    if (dashboardApiKey === DASHBOARD_API_KEY_PLACEHOLDER) {
+        results.push({
+            chain: 'global',
+            check: 'cross-env-rule',
+            passed: false,
+            reason: `DASHBOARD_API_KEY is the shipped placeholder '${DASHBOARD_API_KEY_PLACEHOLDER}' — set a strong random key; see ${REMEDIATION_DOC} §5`,
+            details: { rule: 'dashboard-api-key', cause: 'placeholder' },
+        });
+    } else if (!dashboardApiKey || dashboardApiKey.trim() === '') {
+        results.push({
+            chain: 'global',
+            check: 'cross-env-rule',
+            passed: false,
+            reason: `DASHBOARD_API_KEY is empty — set a strong random key; see ${REMEDIATION_DOC} §5`,
+            details: { rule: 'dashboard-api-key', cause: 'empty' },
+        });
+    } else if (dashboardApiKey.trim().length < 16) {
+        results.push({
+            chain: 'global',
+            check: 'cross-env-rule',
+            passed: false,
+            reason: `DASHBOARD_API_KEY too short (<16 chars) — use a strong random key; see ${REMEDIATION_DOC} §5`,
+            details: { rule: 'dashboard-api-key', cause: 'too-short' },
+        });
     }
 
     return results;

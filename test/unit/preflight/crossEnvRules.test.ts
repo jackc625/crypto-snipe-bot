@@ -54,6 +54,7 @@ const CROSS_ENV_KEYS = [
     'BSC_RPC_URL',
     'BASE_RPC_URL',
     'ARB_RPC_URL',
+    'DASHBOARD_API_KEY',
 ] as const;
 
 let savedEnv: Record<string, string | undefined>;
@@ -149,6 +150,10 @@ describe('validateCrossEnvRules', () => {
         process.env.TELEGRAM_SESSION = 'session';
         process.env.TELEGRAM_BOT_TOKEN = 'tok';
         process.env.TELEGRAM_CHAT_ID = '123';
+        // DASHBOARD_API_KEY is now a cross-env rule (Rule 5): a strong key
+        // (not the placeholder, non-empty, >=16 chars) must be set for the
+        // all-pass case to hold.
+        process.env.DASHBOARD_API_KEY = 'a-strong-random-key-32-characters-long';
         const { validateCrossEnvRules } = await import('../../../src/preflight');
         const results = validateCrossEnvRules();
         const failed = results.filter(r => !r.passed);
@@ -166,5 +171,49 @@ describe('validateCrossEnvRules', () => {
             r => r.passed === false && /ETH_RPC_URL/.test(r.reason || ''),
         );
         expect(rpcViolation).toBeDefined();
+    });
+
+    // Rule 5 (Phase 20 live UAT gap): DASHBOARD_API_KEY must not be the shipped
+    // placeholder, empty, or weak. config.ts already checks presence; this is
+    // the unsafe-STARTUP-STATE guard. Helper filters the returned results for
+    // just the dashboard-api-key rule so each case asserts on its own failure.
+    describe('Rule 5: DASHBOARD_API_KEY placeholder / weak-key guard', () => {
+        const dashboardKeyFailures = (results: { passed: boolean; details?: Record<string, unknown> }[]) =>
+            results.filter(
+                r => r.passed === false && r.details?.rule === 'dashboard-api-key',
+            );
+
+        it('(a) fails with cause "placeholder" when DASHBOARD_API_KEY is the shipped placeholder', async () => {
+            process.env.DASHBOARD_API_KEY = 'your-secret-dashboard-api-key-here';
+            const { validateCrossEnvRules } = await import('../../../src/preflight');
+            const failures = dashboardKeyFailures(validateCrossEnvRules());
+            expect(failures).toHaveLength(1);
+            expect(failures[0].passed).toBe(false);
+            expect(failures[0].details?.rule).toBe('dashboard-api-key');
+            expect(failures[0].details?.cause).toBe('placeholder');
+        });
+
+        it('(b) fails with cause "empty" when DASHBOARD_API_KEY is empty', async () => {
+            process.env.DASHBOARD_API_KEY = '';
+            const { validateCrossEnvRules } = await import('../../../src/preflight');
+            const failures = dashboardKeyFailures(validateCrossEnvRules());
+            expect(failures).toHaveLength(1);
+            expect(failures[0].details?.cause).toBe('empty');
+        });
+
+        it('(c) fails with cause "too-short" when DASHBOARD_API_KEY is shorter than 16 chars', async () => {
+            process.env.DASHBOARD_API_KEY = 'short';
+            const { validateCrossEnvRules } = await import('../../../src/preflight');
+            const failures = dashboardKeyFailures(validateCrossEnvRules());
+            expect(failures).toHaveLength(1);
+            expect(failures[0].details?.cause).toBe('too-short');
+        });
+
+        it('(d) passes (no dashboard-api-key failure) for a strong 32+ char key', async () => {
+            process.env.DASHBOARD_API_KEY = 'a-strong-random-key-32-characters-long';
+            const { validateCrossEnvRules } = await import('../../../src/preflight');
+            const failures = dashboardKeyFailures(validateCrossEnvRules());
+            expect(failures).toHaveLength(0);
+        });
     });
 });
