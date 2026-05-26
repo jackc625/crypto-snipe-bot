@@ -191,7 +191,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 20-10-PLAN.md — [cosmetic] restyle PauseBanner + CircuitBreakerBanner to the dashboard card idiom (bg-surface-light border-loss border-l-4 rounded-lg) + update pauseBanner.test.ts Test 6 [OPS-LIVE-09]
 
   **Wave 7 — Gap closure docs** *(after Wave 6; documents the Wave-6 behavior):*
-  - [ ] 20-11-PLAN.md — .env.example DASHBOARD_ALLOWED_ORIGINS + DASHBOARD_URL=127.0.0.1:8080 + config.ts DASHBOARD_ALLOWED_ORIGINS entry + going-live.md dashboard-rebuild step / strong-key FATAL / CLI URL+CORS docs [OPS-LIVE-07, OPS-LIVE-11, OPS-LIVE-12]
+  - [x] 20-11-PLAN.md — .env.example DASHBOARD_ALLOWED_ORIGINS + DASHBOARD_URL=127.0.0.1:8080 + config.ts DASHBOARD_ALLOWED_ORIGINS entry + going-live.md dashboard-rebuild step / strong-key FATAL / CLI URL+CORS docs [OPS-LIVE-07, OPS-LIVE-11, OPS-LIVE-12] (commits c7372ca, c006483)
 
   **Cross-cutting constraints:**
   - **D-ENV-EXAMPLE [USER-BINDING]:** every new env var introduced in Phase 20 lands in .env.example with default + 1-line description (Plan 20-02 owns the registration)
@@ -235,7 +235,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 11/12 | In Progress|  |
+| 20. Going-Live Ops Hardening | v6.17 | 12/12 | In Progress|  |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 0/? | Not started | - |
 
 ---
