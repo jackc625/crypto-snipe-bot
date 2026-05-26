@@ -1,23 +1,14 @@
 ---
-status: partial
+status: complete
 phase: 20-going-live-ops-hardening
 source: [20-VERIFICATION.md]
 started: 2026-05-24T23:30:00Z
-updated: 2026-05-26T04:30:00Z
+updated: 2026-05-26T04:04:46Z
 ---
 
 ## Current Test
 
-[operator visual retest pending] All 4 diagnosed gaps are now closed in code
-(plans 20-08..20-11; verified by 20-VERIFICATION.md, 17/17 must-haves, suite
-green). One operator step remains before go-live — rebuild the dashboard and
-re-confirm Test 2 end-to-end:
-
-1. `cd dashboard && npm run build` (the shipped dist was a stale pre-Phase-20 build)
-2. Restart the bot; open the dashboard same-origin at `http://127.0.0.1:8080`
-3. Confirm: login succeeds with empty `DASHBOARD_ALLOWED_ORIGINS` (CORS fix),
-   `npm run pause` / `npm run resume` toggle the banner via WS with `DASHBOARD_URL`
-   unset (CLI port fix), and the BOT PAUSED banner now renders in the card idiom.
+[testing complete]
 
 ## Tests
 
@@ -39,9 +30,10 @@ note: |
 
 ### 2. Dashboard pause banner visual + WS event delivery
 expected: With dashboard open in browser, `npm run pause -- --reason 'smoke'` causes red full-bleed BOT PAUSED banner to appear immediately; `npm run resume` removes it. Banner survives page navigation. WS push (not polling) drives both transitions.
-result: issue
-reported: "Ok it works now. Minor issue: the paused banner doesn't appear at all like the rest of the dashboard. It doesnt have to be perfect, but it should have some resemblance to the dashboard stylistically"
-severity: major
+result: pass
+retest: "2026-05-26 — operator confirmed PASS after gap closure (20-08..20-11) + CORS hardening (WR-01/02/03). Orchestrator pre-cleared prerequisites: rebuilt dashboard/dist (tsc -b + vite build clean; card-idiom restyle now bundled — index-C212GrGb.js), confirmed DASHBOARD_API_KEY is a strong key (preflight will not FATAL), confirmed pause_state.paused=1 so the bot started PAUSED (zero real-capital exposure during the visual retest). Operator-observed: same-origin login succeeded (no CORS error), BOT PAUSED card-idiom banner rendered on load, `npm run resume` removed it via WS push, `npm run pause` restored it via WS push. Original issue (below) resolved."
+original_report: "Ok it works now. Minor issue: the paused banner doesn't appear at all like the rest of the dashboard. It doesnt have to be perfect, but it should have some resemblance to the dashboard stylistically"
+original_severity: major
 note: |
   WS/functional behavior PASSED: once configured, `npm run pause` shows the BOT
   PAUSED banner and `npm run resume` removes it via WS push — confirmed by user
@@ -99,8 +91,8 @@ note: |
 ## Summary
 
 total: 4
-passed: 3
-issues: 1
+passed: 4
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
@@ -112,8 +104,14 @@ issues_detail: |
   credential (major/security, cross-cutting), banner styling mismatch (cosmetic),
   and a stale dashboard/dist build (operator/runbook). Core safety — preflight
   (test 1) and the multi-stage kill-switch incl. restart-persistence (tests 3, 4)
-  — all PASS. Net: the kill-switch works, but the operator-facing surface is not
-  usable on the shipped config + the bot starts on a default admin key.
+  — all PASS. Net (at time of issue): the kill-switch works, but the operator-facing
+  surface is not usable on the shipped config + the bot starts on a default admin key.
+  RESOLVED 2026-05-26: all 5 findings closed — same-origin CORS works out of the box
+  (20-08 + WR-01/02/03), CLI derives :8080 with clear errors (20-09), banner uses the
+  card idiom (20-10), preflight FATALs on the placeholder admin key (20-08), and the
+  stale-dist footgun is documented in the runbook (20-11). Operator retest of Test 2
+  PASSED on a rebuilt dashboard. The phase goal — "refuse to start in any unsafe state"
+  — now also covers the default admin credential.
 
 ## Gaps
 
