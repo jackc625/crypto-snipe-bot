@@ -649,7 +649,8 @@ describe('startMultiChainBot D-PAUSED-RESTART positive observable', () => {
             isLiquiditySufficientForChain: vi.fn().mockResolvedValue(true),
             isKnownBadTokenForChain: vi.fn().mockResolvedValue(false),
             checkTokenMetadataForChain: vi.fn().mockResolvedValue(true),
-            hasHighTransferTaxForChain: vi.fn().mockResolvedValue(false),
+            // hasHighTransferTaxForChain removed (plan 21.1-03): function deleted
+            // from tokenSafety.ts; this mock entry was inert (false = allow).
             hasMaxWalletOrTxLimitsForChain: vi.fn().mockResolvedValue(false),
             isBlacklistedTokenForChain: vi.fn().mockResolvedValue(false),
         }));

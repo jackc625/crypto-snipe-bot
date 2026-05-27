@@ -50,7 +50,9 @@ const loggerErrorMock = vi.fn();
 const checkHoneypotForChainMock = vi.fn().mockResolvedValue(false);
 const isBlacklistedTokenForChainMock = vi.fn().mockResolvedValue(false);
 const checkTokenMetadataForChainMock = vi.fn().mockResolvedValue(true);
-const hasHighTransferTaxForChainMock = vi.fn().mockResolvedValue(false);
+// hasHighTransferTaxForChainMock removed (plan 21.1-03): the function it mocked
+// was deleted from tokenSafety.ts. It was inert here anyway — the baseline was
+// mockResolvedValue(false) (allow) and blocks are driven via simulateHoneypotRoundtripMock.
 const hasMaxWalletOrTxLimitsForChainMock = vi.fn().mockResolvedValue(false);
 const isKnownBadTokenForChainMock = vi.fn().mockResolvedValue(false);
 
@@ -135,7 +137,6 @@ vi.doMock('../../src/utils/tokenSafety', () => ({
     isLiquiditySufficientForChain: vi.fn().mockResolvedValue(true),
     isKnownBadTokenForChain: isKnownBadTokenForChainMock,
     checkTokenMetadataForChain: checkTokenMetadataForChainMock,
-    hasHighTransferTaxForChain: hasHighTransferTaxForChainMock,
     hasMaxWalletOrTxLimitsForChain: hasMaxWalletOrTxLimitsForChainMock,
     isBlacklistedTokenForChain: isBlacklistedTokenForChainMock,
 }));
@@ -293,7 +294,6 @@ describe('Phase 18 plan 18-10 — bot.ts V3 honeypot gate wiring (HONEY-08 + HON
         checkHoneypotForChainMock.mockReset().mockResolvedValue(false);
         isBlacklistedTokenForChainMock.mockReset().mockResolvedValue(false);
         checkTokenMetadataForChainMock.mockReset().mockResolvedValue(true);
-        hasHighTransferTaxForChainMock.mockReset().mockResolvedValue(false);
         hasMaxWalletOrTxLimitsForChainMock.mockReset().mockResolvedValue(false);
         isKnownBadTokenForChainMock.mockReset().mockResolvedValue(false);
         tokenSymbolMock.mockReset().mockResolvedValue('V3TEST');

@@ -23,13 +23,17 @@
 //      src/exitEngine.ts:501-547) AND the exit-engine trigger path end-to-end.
 //
 // TOKEN CHOICE — Uniswap **V2** (LADYS, the proven Plan 21-03 realLaunches
-// fixture). The V3 buy path is BLOCKED by a pre-existing, verified product bug
-// escalated to phase 21.1 (src/bot.ts:610 passes the V3 SwapRouter to the V2-only
-// hasHighTransferTaxForChain -> reverts -> fail-closed -> aborts every V3 buy; see
+// fixture), per the locked capture decisions (D-CHAIN-SINGLE-ROUNDTRIP /
+// D-CAPTURE-METHOD): an established, liquid, SAFE ETH token, which is V2.
+// HISTORICAL NOTE: the V3 buy path was previously blocked by a V3 tax-gate bug
+// (src/bot.ts:610 passed the V3 SwapRouter to the V2-only
+// hasHighTransferTaxForChain -> reverted -> fail-closed -> aborted every V3 buy).
+// That bug is FIXED in phase 21.1 (plan 21.1-03 removed the broken tax call from
+// both banks and deleted the function; see
 // .planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md
-// and test/fork/realLaunchReplay.fork.test.ts). The locked capture decisions
-// (D-CHAIN-SINGLE-ROUNDTRIP / D-CAPTURE-METHOD) use an established liquid SAFE ETH
-// token, which is V2 — so this rehearsal is NOT blocked by the 21.1 bug.
+// and test/fork/realLaunchReplay.fork.test.ts, whose V3 fixture now drives the
+// full lifecycle). The V2 token choice here is driven by the capture decisions
+// above, not by that (now-resolved) bug.
 //
 // =====================================================================
 // CRITICAL FRAMING — THIS IS A DE-RISK GATE, NOT A REQUIREMENT CLOSURE.

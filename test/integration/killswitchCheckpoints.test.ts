@@ -51,7 +51,9 @@ const isLiquidityLockedForChainMock = vi.fn();
 const isLiquiditySufficientForChainMock = vi.fn();
 const checkTokenMetadataForChainMock = vi.fn();
 const simulateSwapForChainMock = vi.fn();
-const hasHighTransferTaxForChainMock = vi.fn();
+// hasHighTransferTaxForChainMock removed (plan 21.1-03): the function it mocked
+// was deleted from tokenSafety.ts. It was inert here anyway — beforeEach set the
+// baseline mockResolvedValue(false) (allow); pause/killswitch behavior is what these tests drive.
 const hasMaxWalletOrTxLimitsForChainMock = vi.fn();
 const isKnownBadTokenForChainMock = vi.fn();
 const isMutableTokenForChainMock = vi.fn();
@@ -85,7 +87,6 @@ vi.doMock('../../src/utils/tokenSafety', () => ({
     isLiquiditySufficientForChain: isLiquiditySufficientForChainMock,
     isKnownBadTokenForChain: isKnownBadTokenForChainMock,
     checkTokenMetadataForChain: checkTokenMetadataForChainMock,
-    hasHighTransferTaxForChain: hasHighTransferTaxForChainMock,
     hasMaxWalletOrTxLimitsForChain: hasMaxWalletOrTxLimitsForChainMock,
     isBlacklistedTokenForChain: isBlacklistedTokenForChainMock,
 }));
@@ -306,7 +307,6 @@ function rearmHappyPath() {
     isLiquiditySufficientForChainMock.mockReset().mockResolvedValue(true);
     checkTokenMetadataForChainMock.mockReset().mockResolvedValue(true);
     simulateSwapForChainMock.mockReset().mockResolvedValue(true);
-    hasHighTransferTaxForChainMock.mockReset().mockResolvedValue(false);
     hasMaxWalletOrTxLimitsForChainMock.mockReset().mockResolvedValue(false);
     isKnownBadTokenForChainMock.mockReset().mockResolvedValue(false);
     isMutableTokenForChainMock.mockReset().mockResolvedValue({ isMutable: false, hits: [] });

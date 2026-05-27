@@ -146,7 +146,8 @@ vi.mock('../../../src/utils/tokenSafety', () => ({
     isLiquiditySufficientForChain: vi.fn(),
     isKnownBadTokenForChain: vi.fn(),
     checkTokenMetadataForChain: vi.fn(),
-    hasHighTransferTaxForChain: vi.fn(),
+    // hasHighTransferTaxForChain removed (plan 21.1-03): function deleted from
+    // tokenSafety.ts; this mock entry was inert.
     hasMaxWalletOrTxLimitsForChain: vi.fn(),
     isBlacklistedTokenForChain: vi.fn(),
 }));

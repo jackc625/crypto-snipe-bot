@@ -23,7 +23,10 @@ import {
     isLiquiditySufficientForChain,
     isKnownBadTokenForChain,
     checkTokenMetadataForChain,
-    hasHighTransferTaxForChain,
+    // STOP-THE-LINE-01 + STOP-THE-LINE-03 (plan 21.1-03): the
+    // hasHighTransferTaxForChain import was REMOVED — both the V2 (:303) and V3
+    // (:610) call sites were deleted and the function itself was deleted from
+    // tokenSafety.ts (zero callers, harmful dead code, D-ROLLBACK).
     hasMaxWalletOrTxLimitsForChain,
     isBlacklistedTokenForChain
 } from "./utils/tokenSafety";
@@ -294,13 +297,23 @@ export async function handleNewPairForChain(
     // safety, and a config drift could mask divergence. `isHoneypot` from
     // here on is hard-coded `false` so the existing log + alert lines that
     // reference it continue to type-check.
-    const [isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutableResult] = await Promise.all([
+    // STOP-THE-LINE-03 (plan 21.1-03, D-V2-TAX-REMOVE): the
+    // hasHighTransferTaxForChain call was REMOVED from this V2 bank — the exact
+    // mirror of the V3 removal above. It was redundant (the simulateHoneypotRoundtrip
+    // gate at bot.ts:253, HONEY-07, already enforces V2 buy+sell tax fail-closed
+    // BEFORE this bank) AND actively HARMFUL: tokenSafety.ts fired a signer-connected
+    // swapExactETHForTokens(amountOutMin=0, {value: snipeAmount}) with NO .staticCall
+    // — i.e. a REAL on-chain buy at zero slippage on EVERY V2 snipe — then misread the
+    // TransactionResponse as a bigint[] so taxPercent=NaN -> returned false (a silent
+    // false-negative). This fired on the 21-07 capture path (a V2 token), spending a
+    // second snipeAmount with uncapped slippage. canSwap (simulateSwapForChain) is
+    // KEPT — it is a clean read-only .staticCall (audited 21.1-03, no real tx).
+    const [isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasLimits, mutableResult] = await Promise.all([
         isBlacklistedTokenForChain(ctx, targetToken),
         isLiquidityLockedForChain(ctx, pairAddress),
         isLiquiditySufficientForChain(ctx, pairAddress),
         checkTokenMetadataForChain(ctx, targetToken),
         simulateSwapForChain(ctx, dex.routerAddress, targetToken),
-        hasHighTransferTaxForChain(ctx, dex.routerAddress, targetToken),
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
         isMutableTokenForChain(ctx, targetToken),
     ]);
@@ -345,8 +358,8 @@ export async function handleNewPairForChain(
     const sellTaxLine = safeEvidence ? `SellTax: \`${safeEvidence.sellTaxBps}bps\`\n` : '';
     await sendCtxAlert(ctx, `*New Token Detected!*\nSymbol: \`${symbol}\`\nDecimals: \`${decimals}\`\nW${ctx.chain.nativeCurrency} LP: \`${nativeLiquidity} ${ctx.chain.nativeCurrency}\`\nLocked: \`${locked ? "Yes" : "No"}\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\n${buyTaxLine}${sellTaxLine}Blacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPair: [\`${pairAddress}\`](${ctx.chain.explorerUrl}/address/${pairAddress})`);
 
-    if (isHoneypot || isBlacklisted || !locked || !sufficientLiquidity || !validMetadata || !canSwap || hasTax || hasLimits || mutableResult.isMutable) {
-        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasTax, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping');
+    if (isHoneypot || isBlacklisted || !locked || !sufficientLiquidity || !validMetadata || !canSwap || hasLimits || mutableResult.isMutable) {
+        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, locked, sufficientLiquidity, validMetadata, canSwap, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping');
         return;
     }
 
@@ -604,10 +617,19 @@ export async function handleNewV3PoolForChain(
     // authoritative honeypot gate (Option D). See the V2 handler comment for
     // the full rationale. `isHoneypot` is hard-coded `false` so the existing
     // log + alert lines that reference it continue to type-check.
-    const [isBlacklisted, validMetadata, hasTax, hasLimits, mutableResult] = await Promise.all([
+    // STOP-THE-LINE-01 (plan 21.1-03, D-V3-TAX-REMOVE): the V2-only
+    // hasHighTransferTaxForChain call was REMOVED from this V3 bank. It passed
+    // the V3 SwapRouter into a V2-router ABI (getAmountsOut / swapExactETHForTokens),
+    // which reverts on the SwapRouter -> the function's catch fail-closed
+    // hasTax=true -> EVERY V3 buy aborted. The on-chain simulateHoneypotRoundtrip
+    // gate above (bot.ts ~566, fail-closed, HONEY-09 maxBuyTaxBps/maxSellTaxBps)
+    // already enforces V3 buy+sell tax BEFORE this bank, so the removed check was
+    // redundant AND broken. The whole hasHighTransferTaxForChain function was
+    // deleted (zero callers after the V2 removal too) so it can never be miscalled
+    // again (D-ROLLBACK).
+    const [isBlacklisted, validMetadata, hasLimits, mutableResult] = await Promise.all([
         isBlacklistedTokenForChain(ctx, targetToken),
         checkTokenMetadataForChain(ctx, targetToken),
-        hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, targetToken),
         hasMaxWalletOrTxLimitsForChain(ctx, targetToken),
         isMutableTokenForChain(ctx, targetToken),
     ]);
@@ -635,8 +657,8 @@ export async function handleNewV3PoolForChain(
     const sellTaxLine = safeEvidence ? `SellTax: \`${safeEvidence.sellTaxBps}bps\`\n` : '';
     await sendCtxAlert(ctx, `*New V3 Token Detected!*\nSymbol: \`${symbol}\`\nFee Tier: \`${feeTier} bps\`\nHoneypot: \`${isHoneypot ? "Yes" : "No"}\`\n${buyTaxLine}${sellTaxLine}Blacklist Function: \`${isBlacklisted ? "Yes" : "No"}\`\nMaxTx/Wallet: \`${hasLimits ? "Yes" : "No"}\`\n\nToken: [\`${targetToken}\`](${ctx.chain.explorerUrl}/token/${targetToken})\nPool: [\`${poolAddress}\`](${ctx.chain.explorerUrl}/address/${poolAddress})`);
 
-    if (isHoneypot || isBlacklisted || !validMetadata || hasTax || hasLimits || mutableResult.isMutable) {
-        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, validMetadata, hasTax, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping V3 snipe');
+    if (isHoneypot || isBlacklisted || !validMetadata || hasLimits || mutableResult.isMutable) {
+        ctx.log.info({ token: targetToken, checks: { isHoneypot, isBlacklisted, validMetadata, hasLimits, mutable: mutableResult.isMutable, mutableHits: mutableResult.hits } }, 'Safety checks failed, skipping V3 snipe');
         return;
     }
 

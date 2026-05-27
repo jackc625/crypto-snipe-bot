@@ -476,43 +476,29 @@ export async function isKnownBadTokenForChain(ctx: ChainContext, tokenAddress: s
     }
 }
 
-/**
- * Chain-aware transfer tax check using chain-specific router and WETH.
- */
-export async function hasHighTransferTaxForChain(
-    ctx: ChainContext,
-    dexRouter: string,
-    tokenAddress: string
-): Promise<boolean> {
-    const router = new Contract(dexRouter, ROUTER_ABI, ctx.httpProvider);
-    const path = [ctx.chain.wethAddress, tokenAddress];
-    const inputAmount = ethers.parseEther(ctx.chain.snipeAmount);
-
-    try {
-        const amountsOut: bigint[] = await router.getAmountsOut(inputAmount, path);
-        const expectedOutput = amountsOut[1];
-
-        const routerWithSigner = new Contract(dexRouter, ROUTER_ABI, ctx.wallet);
-
-        const actualOutput: bigint[] = await routerWithSigner.swapExactETHForTokens(
-            0n,
-            path,
-            ctx.wallet.address,
-            Math.floor(Date.now() / 1000) + 60,
-            { value: inputAmount }
-        );
-
-        const received = actualOutput[actualOutput.length - 1];
-        const taxPercent = 1 - Number(received) / Number(expectedOutput);
-
-        ctx.log.info({ token: tokenAddress, taxPercent: (taxPercent * 100).toFixed(2), check: 'transferTax' }, 'Estimated transfer tax');
-
-        return taxPercent > 0.25;
-    } catch (e) {
-        ctx.log.warn({ err: e, token: tokenAddress, check: 'transferTax' }, 'Tax detection failed');
-        return true;
-    }
-}
+// ---------------------------------------------------------------------------
+// DELETED: hasHighTransferTaxForChain (STOP-THE-LINE-01 + STOP-THE-LINE-03,
+// plan 21.1-03, D-V3-TAX-REMOVE / D-V2-TAX-REMOVE / D-ROLLBACK).
+//
+// This chain-aware "transfer tax" check was removed from BOTH safety banks and
+// then deleted entirely (zero callers). It was redundant AND harmful:
+//   - REDUNDANT: simulateHoneypotRoundtrip runs on BOTH paths BEFORE the bank
+//     (bot.ts:253 V2 / bot.ts:566 V3) and already enforces buy+sell tax
+//     fail-closed via the on-chain HoneypotChecker (maxBuyTaxBps/maxSellTaxBps,
+//     HONEY-07/09) — the authoritative tax/honeypot gate.
+//   - HARMFUL (V2): it built a SIGNER-connected router and called
+//     swapExactETHForTokens(0n, ..., {value: snipeAmount}) with NO .staticCall
+//     — a REAL on-chain buy at amountOutMin=0 (uncapped slippage) on every V2
+//     snipe — then misread the returned TransactionResponse as a bigint[] so
+//     taxPercent=NaN -> `> 0.25` is false -> the gate NEVER fired (a silent
+//     false-negative on top of the unwanted real buy / double-spend).
+//   - BROKEN (V3): the V3 SwapRouter has no getAmountsOut, so the call reverted
+//     -> catch returned true -> EVERY V3 buy aborted.
+//
+// The clean read-only sibling simulateSwapForChain (above) — which DOES use
+// .staticCall — is intentionally KEPT (audited clean). Do NOT reintroduce a
+// transfer-tax helper here: the on-chain roundtrip is the correct mechanism.
+// ---------------------------------------------------------------------------
 
 /**
  * Chain-aware max wallet/tx limits check using ctx.httpProvider.

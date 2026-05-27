@@ -52,6 +52,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { parseEther, parseUnits } from 'ethers';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { createMockProvider } from '../../helpers/mockProvider';
+import * as fs from 'fs';
+import * as path from 'path';
 // TYPE-ONLY import: erased at runtime, so it does NOT eagerly evaluate
 // reconciliation.ts (whose top-level `logger.child(...)` would trip the hoisted
 // `vi.mock('../../../src/utils/logger')` factory before the logInfo let is
@@ -474,13 +476,46 @@ describe('D-RECORD-REAL-HASH — buy row records the real hash', () => {
 // =============================================================================
 
 describe('STOP-THE-LINE-03 — V2 safety bank fires no real buy (V2-unsafe-real-buy harm #6)', () => {
-    it.skip('V2-unsafe-real-buy (STOP-THE-LINE-03): the V2 safety bank no longer references hasHighTransferTaxForChain; no real swapExactETHForTokens fires inside a safety check (source/behavior assertion, VALIDATION harm-prevention #6)', async () => {
-        // GREEN (21.1-03): source-level assertion that bot.ts has zero
-        // hasHighTransferTaxForChain references (V2 + V3 call sites both removed,
-        // function + import + dedicated test deleted) AND no signer-connected
-        // swapExactETHForTokens(amountOutMin=0) fires inside any safety check.
-        // The authoritative V2 tax gate is the bot.ts:253 honeypot roundtrip
-        // (HONEY-07), which stays and fails closed.
-        expect(true).toBe(false);
+    // The literal function name as a runtime-built string so THIS test file's own
+    // source does not contain a grep-matchable bare occurrence in the assertions.
+    const FN = ['hasHighTransfer', 'TaxForChain'].join('');
+    const SRC_DIR = path.resolve(__dirname, '../../../src');
+
+    it('V2-unsafe-real-buy (STOP-THE-LINE-03): the V2 safety bank no longer references hasHighTransferTaxForChain; the function is deleted and unexported (source/behavior assertion, VALIDATION harm-prevention #6)', async () => {
+        // GREEN (21.1-03): the live Nyquist mirror of the source grep gate. Proves
+        // BOTH STOP-THE-LINE-03 observables — (1) the tokenSafety module no longer
+        // exports the broken tax function (deleted, zero callers, D-ROLLBACK), and
+        // (2) src/bot.ts has zero NON-COMMENT references (both the V2 :303 and V3
+        // :610 call sites AND the import removed). The authoritative buy+sell-tax
+        // gate is the on-chain simulateHoneypotRoundtrip (bot.ts:253 V2 / :566 V3,
+        // HONEY-07/09, fail-closed) — unchanged — so no real swapExactETHForTokens
+        // fires inside a safety check anymore.
+
+        // (1) The tokenSafety module no longer exports the function. Lazy import
+        // (matches this file's convention) — the named export is simply gone, so
+        // this holds regardless of the module-level ethers mock.
+        const ts = await import('../../../src/utils/tokenSafety') as Record<string, unknown>;
+        expect(ts[FN]).toBeUndefined();
+
+        // (1b) Defense-in-depth source assertion: the function definition is gone
+        // from tokenSafety.ts (a deleted export can never be re-imported/miscalled).
+        const tokenSafetySrc = fs.readFileSync(path.join(SRC_DIR, 'utils', 'tokenSafety.ts'), 'utf8');
+        expect(new RegExp(`export\\s+async\\s+function\\s+${FN}\\b`).test(tokenSafetySrc)).toBe(false);
+
+        // (2) src/bot.ts has zero NON-COMMENT references — strip whole-line `//`
+        // comments (the tombstone/rationale comments intentionally name the removed
+        // function) before matching, mirroring the source grep gate in the plan's
+        // <verify> block.
+        const botSrc = fs.readFileSync(path.join(SRC_DIR, 'bot.ts'), 'utf8');
+        const botBody = botSrc
+            .split(/\r?\n/)
+            .filter((l) => !l.trim().startsWith('//'))
+            .join('\n');
+        expect(botBody.includes(FN)).toBe(false);
+
+        // (2b) And no signer-connected swapExactETHForTokens fires inside a safety
+        // check: the clean read-only sibling simulateSwapForChain uses .staticCall
+        // (audited 21.1-03), which the source still proves present.
+        expect(tokenSafetySrc.includes('swapExactETHForTokens.staticCall')).toBe(true);
     });
 });
