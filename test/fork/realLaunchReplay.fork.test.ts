@@ -39,20 +39,23 @@
 //      live .env caps would otherwise block at the risk gate.
 //
 // =====================================================================
-// STOP-THE-LINE (D-STOP-THE-LINE) — V3 path blocked by a pre-existing bug
+// STOP-THE-LINE-01 (D-STOP-THE-LINE) — V3 tax-gate bug: FIXED in phase 21.1
 // =====================================================================
-// The V2 fixtures drive the full lifecycle (buy + sell/partial_sell with
-// amount_out). The V3 fixture is BLOCKED by a pre-existing product bug (NOT
-// introduced by Plan 21-03): the V3 buy path at src/bot.ts:610 calls
+// ALL fixtures (V2 AND V3) now drive the full lifecycle (buy +
+// sell/partial_sell with amount_out). The V3 fixture WAS previously blocked by
+// a pre-existing product bug: the V3 buy path at src/bot.ts:610 called
 // hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, token), but that
-// function (src/utils/tokenSafety.ts:482) is hardcoded to V2 — it calls
-// getAmountsOut + the V2 router buy fn, which the V3 SwapRouter does NOT
-// implement, so it reverts -> catch -> returns true ("high tax") -> the V3
-// safety-bank AND-block (bot.ts:638) aborts EVERY V3 buy regardless of token.
-// Verified two ways: (1) the handler trail stops at "Tax detection failed ->
-// hasTax=true -> Safety checks failed V3 snipe"; (2) getAmountsOut reverts on
-// SwapRouter02. Escalated to decimal phase 21.1 (README STOP-THE-LINE section).
-// The V3 fixture's test is it.skip-equivalent, tied to that recorded blocker.
+// function was hardcoded to V2 (getAmountsOut + the V2 router buy fn, which the
+// V3 SwapRouter does NOT implement), so it reverted -> catch -> returned true
+// ("high tax") -> the V3 safety-bank AND-block aborted EVERY V3 buy.
+// FIXED in plan 21.1-03 (STOP-THE-LINE-01 + STOP-THE-LINE-03, D-V3-TAX-REMOVE /
+// D-V2-TAX-REMOVE): the broken hasHighTransferTaxForChain call was removed from
+// BOTH banks and the function deleted entirely; the on-chain
+// simulateHoneypotRoundtrip gate (bot.ts:253 V2 / :566 V3, fail-closed,
+// HONEY-07/09) remains the authoritative buy+sell-tax gate. The V3 fixture
+// below now asserts the benign-buy + whale-dump -> stop-loss lifecycle, and a
+// high-tax/honeypot token still fails closed via the roundtrip (covered by the
+// V3 honeypot unit/integration tests, e.g. v3HoneypotIntegration.test.ts).
 // =====================================================================
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -85,6 +88,13 @@ const PROVIDER_URL = 'http://127.0.0.1:8545';
 const FORK_RPC = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL;
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 const UNISWAP_V2_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+// Uniswap V3 SwapRouter (the ORIGINAL '0xE592...' router whose exactInputSingle
+// struct embeds `deadline`). Used by dumpV3Pool only — a DIFFERENT swap
+// primitive than the bot's buy (which uses SwapRouter02 '0x68b3...' via a
+// multicall(deadline,[exactInputSingle]) wrapper, src/bot.ts:676-707). Keeping
+// the whale's mover on a distinct primitive preserves the Anti-Pattern-A
+// invariant: the bot's buy is the only thing driving the position under test.
+const UNISWAP_V3_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
 
 interface LaunchFixture {
     slug: string;
@@ -322,6 +332,120 @@ describe('Phase 21 plan 21-03 — realLaunches replay drives the REAL handler (E
         await tx.wait();
     }
 
+    /**
+     * Detect the ERC20 `balances` mapping storage slot for `token` against
+     * `holder`, then seed `holder` with `amount` tokens via hardhat_setStorageAt.
+     *
+     * Why seed instead of buy-then-sell: a whale that BUYS its bag from the same
+     * pool and then sells it back nets the pool price to ~neutral (a buy/sell pair
+     * is symmetric minus fees) — that cannot produce the >30% NET drop the
+     * stop-loss needs. Seeding gives the whale "free" tokens it never bought from
+     * this pool, so its subsequent SELL is purely one-directional: it only removes
+     * WETH from the pool and pushes price DOWN. This is the standard fork technique
+     * for one-sided price moves (RESEARCH §Open Q2 "seed via hardhat storage").
+     *
+     * Slot is detected at runtime (not hardcoded) for robustness: for each
+     * candidate slot i in 0..maxSlot we compute the Solidity mapping slot
+     * keccak256(abi.encode(holder, i)), write a sentinel, and check whether
+     * balanceOf(holder) reflects it — restoring the original word if not.
+     */
+    async function seedTokenBalance(
+        token: string,
+        holder: string,
+        amount: bigint,
+        maxSlot = 20,
+    ): Promise<void> {
+        const erc20 = new ethers.Contract(
+            token,
+            ['function balanceOf(address) view returns (uint256)'],
+            provider,
+        );
+        const sentinel = amount;
+        const sentinelWord = '0x' + sentinel.toString(16).padStart(64, '0');
+        for (let i = 0; i < maxSlot; i++) {
+            const mappingSlot = ethers.keccak256(
+                ethers.AbiCoder.defaultAbiCoder().encode(['address', 'uint256'], [holder, i]),
+            );
+            const original: string = await provider.send('eth_getStorageAt', [token, mappingSlot, 'latest']);
+            await provider.send('hardhat_setStorageAt', [token, mappingSlot, sentinelWord]);
+            const probed = (await erc20.balanceOf(holder)) as bigint;
+            if (probed === sentinel) {
+                return; // correct slot found and balance is now seeded
+            }
+            // wrong slot — restore the original word and keep probing
+            await provider.send('hardhat_setStorageAt', [token, mappingSlot, original]);
+        }
+        throw new Error(`seedTokenBalance: could not locate balances slot for ${token} within ${maxSlot} slots`);
+    }
+
+    /**
+     * Dump the V3 pool >30% via a large WHALE SELL through the V3 SwapRouter,
+     * driving the price DOWN to trigger the fixture's expectedExitPath:"stop-loss"
+     * (STOP_LOSS_PERCENT=30 -> fixedStopPrice = entryPrice * 0.70). The V3 analog
+     * of pumpV2Pool — same conventions: a fresh random whale funded via
+     * hardhat_setBalance, a THIRD-PARTY price-mover that is NOT the bot's buy
+     * (preserving Anti-Pattern A: the bot's buy is the only thing driving the
+     * position under test). The whale starts with NO tokens, so we seed its bag
+     * via hardhat storage (see seedTokenBalance) — a buy-then-sell would net the
+     * price to neutral and never produce a stop-loss-triggering NET drop.
+     *
+     * Uses the ORIGINAL SwapRouter (exactInputSingle WITH a deadline field) — a
+     * DIFFERENT primitive than the handler's SwapRouter02 multicall buy.
+     */
+    async function dumpV3Pool(token: string, poolAddress: string, feeTier: number): Promise<void> {
+        const whale = ethers.Wallet.createRandom().connect(provider);
+        await provider.send('hardhat_setBalance', [
+            whale.address,
+            '0x' + ethers.parseEther('5000000').toString(16),
+        ]);
+
+        // Size the dump relative to pool depth: read the pool's token balance and
+        // sell a large multiple of it so the price drops far past the 30% stop.
+        // Selling ~5x the pool's current token reserve into the constant-product
+        // curve collapses the token price well below 70% of entry.
+        const tokenC = new ethers.Contract(
+            token,
+            ['function balanceOf(address) view returns (uint256)'],
+            provider,
+        );
+        const poolTokenReserve = (await tokenC.balanceOf(poolAddress)) as bigint;
+        const dumpAmount = poolTokenReserve > 0n ? poolTokenReserve * 5n : ethers.parseUnits('1000000000000', 18);
+
+        // Seed the whale with the dump bag (free tokens — one-directional sell).
+        await seedTokenBalance(token, whale.address, dumpAmount * 2n);
+
+        // Approve the V3 router to pull the whale's tokens.
+        const tokenWithSigner = new ethers.Contract(
+            token,
+            ['function approve(address,uint256) returns (bool)'],
+            whale,
+        );
+        await (await tokenWithSigner.approve(UNISWAP_V3_ROUTER, ethers.MaxUint256)).wait();
+
+        // Sell token -> WETH via the original SwapRouter exactInputSingle (struct
+        // includes deadline; amountOutMinimum=0 since this is a price-mover, not a
+        // value-preserving trade; sqrtPriceLimitX96=0 = no limit so the full size
+        // executes and moves price).
+        const router = new ethers.Contract(
+            UNISWAP_V3_ROUTER,
+            [
+                'function exactInputSingle((address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 deadline,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96)) payable returns (uint256)',
+            ],
+            whale,
+        );
+        const tx = await router.exactInputSingle({
+            tokenIn: token,
+            tokenOut: WETH,
+            fee: feeTier,
+            recipient: whale.address,
+            deadline: Math.floor(Date.now() / 1000) + 600,
+            amountIn: dumpAmount,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0n,
+        });
+        await tx.wait();
+    }
+
     /** Poll the DB up to ~maxMs for a sell/partial_sell row with amount_out set. */
     async function waitForSellRow(token: string, maxMs: number): Promise<Array<{ action: string; amount_out: string }>> {
         const deadline = Date.now() + maxMs;
@@ -362,7 +486,10 @@ describe('Phase 21 plan 21-03 — realLaunches replay drives the REAL handler (E
 
             await repinFundAndMine(forkBlock);
             const checkerAddress = await deployChecker();
-            const { ctx, getSkipChecks } = buildForkChainContext();
+            // getSkipChecks is no longer asserted: the V3 branch previously read
+            // checks.hasTax (the field removed in plan 21.1-03); the V3 fixture now
+            // drives the full buy->exit->sell lifecycle like the V2 branch.
+            const { ctx } = buildForkChainContext();
             ctx.chain.honeypotChecker.deployedAddress = checkerAddress;
 
             const token = fixture.tokenAddress;
@@ -394,19 +521,20 @@ describe('Phase 21 plan 21-03 — realLaunches replay drives the REAL handler (E
                 exitManager.clearAllTimersForToken('eth', token);
                 await provider.send('evm_setIntervalMining', [0]);
             } else {
-                // V3 path — BLOCKED by the pre-existing V3 tax-gate bug (see the
-                // STOP-THE-LINE header + the fixture's blockedReason). We still
-                // DRIVE the REAL handler (no manual swap), and assert the
-                // observable that it is reached and blocked at the safety bank's
-                // hasTax gate — NOT a hollow pass. This is the it.skip-equivalent
-                // tied to the recorded blocker (escalated to phase 21.1).
-                expect(fixture.blocked).toBe(true);
-                expect(fixture.blockedReason).toBe('v3-tax-gate-bug');
-
+                // V3 path — full validation -> buy -> exit -> sell lifecycle
+                // (D-V3-FIXTURE). The STOP-THE-LINE-01 V3 tax-gate bug is FIXED in
+                // phase 21.1 (plan 21.1-03 removed the broken hasHighTransferTaxForChain
+                // call from the V3 bank and deleted the function), so a benign V3
+                // token now passes the safety bank and the REAL handler buys. This
+                // mirrors the V2 branch above. NOTE: the fork uses the PASSTHROUGH
+                // strategy (buildForkChainContext sets mevStrategy:'passthrough' —
+                // no local Flashbots relay), so this proves the buy->register->exit
+                // wiring + passthrough reconciliation, NOT the Flashbots path (which
+                // is unit-proven in 21.1-04, D-FORK-REHEARSAL-21.1).
                 const dex = (ctx.chain.dexes as Array<{ dexType: string; name: string }>).find(
                     (d) => d.dexType === 'v3' && d.name === 'uniswap-v3',
                 );
-                // EXACT bot.ts:934 arg order:
+                // EXACT bot.ts arg order:
                 // handleNewV3PoolForChain(ctx, dex, token0, token1, feeTier, pool, blockNumber)
                 // blockNumber = the historical mintBlock so waitForLiquidity's
                 // same-block Mint query resolves (no 30s timeout).
@@ -420,16 +548,24 @@ describe('Phase 21 plan 21-03 — realLaunches replay drives the REAL handler (E
                     fixture.mintBlock,
                 );
 
-                await provider.send('evm_setIntervalMining', [0]);
+                // The buy must land — observable D-04 ground truth: a buy row in
+                // trades (the REAL handler ran the full V3 validation + bought).
+                expect(countTrades(token, 'buy')).toBeGreaterThanOrEqual(1);
 
-                // Observable (D-04): no buy row (blocked), AND the safety bank
-                // fired with hasTax=true (the V3 tax-gate bug). This proves the
-                // handler was driven and stopped exactly where the recorded bug
-                // says — escalated, not silently skipped.
-                expect(countTrades(token, 'buy')).toBe(0);
-                const checks = getSkipChecks();
-                expect(checks).not.toBeNull();
-                expect(checks).toMatchObject({ hasTax: true });
+                // Drive price DOWN >30% via a third-party whale SELL into the PEPE
+                // 1% pool so the exit-monitor poll loop fires the stop-loss
+                // (expectedExitPath:"stop-loss"). dumpV3Pool is NOT the bot's buy.
+                await dumpV3Pool(token, fixture.poolAddress as string, fixture.feeTier as number);
+
+                // Ground truth (D-OP-DB-TRUTH): a sell/partial_sell row with
+                // amount_out NOT NULL for the fixture token — read from the DB,
+                // never from an op log.
+                const sellRows = await waitForSellRow(token, 80000);
+                expect(sellRows.length).toBeGreaterThanOrEqual(1);
+                expect(sellRows[0].amount_out).toBeTruthy();
+
+                exitManager.clearAllTimersForToken('eth', token);
+                await provider.send('evm_setIntervalMining', [0]);
             }
         }, 180000);
     }

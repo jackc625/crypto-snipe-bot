@@ -15,11 +15,11 @@
   "firstSwapBlock": 17063794,
   "forkBlockNumber": 17063791,
   "settledForkBlock": 17065792,
-  "blocked": true,
-  "blockedReason": "v3-tax-gate-bug",
+  "blocked": false,
+  "blockedReason": "",
   "expectedVerdict": "safe",
   "expectedExitPath": "stop-loss",
   "discoveredVia": "etherscan",
   "discoveredOn": "2026-05-26",
-  "notes": "PEPE V3 1% (fee=10000) pool — full launch lifecycle resolved (PoolCreated -> Mint same block -> first Swap at 17063794). Captured via scripts/capture-launch.ts. settledForkBlock 17065792 (launch +2000) has deep liquidity and the V3 honeypot gate + waitForLiquidity same-block-Mint check pass. HOWEVER this fixture's full lifecycle is BLOCKED by a pre-existing product bug (NOT introduced by Plan 21-03): the V3 buy path at src/bot.ts:610 calls hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, token), but that function (src/utils/tokenSafety.ts:482) is hardcoded to V2 (it calls getAmountsOut + swapExactETHForTokens, which the V3 SwapRouter does NOT implement). The call reverts -> catch -> returns true (high tax) -> the V3 safety-bank AND-block (bot.ts:638) aborts EVERY V3 buy regardless of the token. Verified two ways: (1) the replay handler trail stops at 'Tax detection failed -> hasTax=true -> Safety checks failed V3 snipe'; (2) a direct probe shows getAmountsOut REVERTS on SwapRouter02. Escalated to decimal phase 21.1 per D-STOP-THE-LINE (see README STOP-THE-LINE section). The replay test marks this fixture it.skip with a reason pointing at the recorded blocker. expectedExitPath stop-loss is the intended branch once 21.1 fixes the V3 tax gate. Read-only archive capture; no transaction was sent."
+  "notes": "PEPE V3 1% (fee=10000) pool — full launch lifecycle resolved (PoolCreated -> Mint same block -> first Swap at 17063794). Captured via scripts/capture-launch.ts. settledForkBlock 17065792 (launch +2000) has deep liquidity and the V3 honeypot gate + waitForLiquidity same-block-Mint check pass. The V3 tax-gate bug that previously blocked this fixture (the V3 buy path at src/bot.ts:610 called the V2-only hasHighTransferTaxForChain, which reverted on the V3 SwapRouter -> fail-closed -> aborted every V3 buy) is FIXED in phase 21.1 (plan 21.1-03, STOP-THE-LINE-01 / D-V3-TAX-REMOVE): the broken tax call was removed from both banks and the function deleted; the on-chain simulateHoneypotRoundtrip gate (bot.ts:566, fail-closed, HONEY-09) remains the authoritative V3 buy+sell-tax gate. The replay test now drives the full validation -> buy -> exit -> sell lifecycle: the REAL handler buys PEPE, then a third-party whale dumps the V3 pool >30% (dumpV3Pool) to trigger expectedExitPath stop-loss, producing a sell row with amount_out. A high-tax/honeypot V3 token still fails closed via the roundtrip (v3HoneypotIntegration.test.ts / simulateViaContractV3 unit tests). Read-only archive capture; no transaction was sent."
 }

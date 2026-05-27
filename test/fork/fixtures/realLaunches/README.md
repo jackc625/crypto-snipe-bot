@@ -86,48 +86,48 @@ safety bank) passes.
 
 ---
 
-## ⛔ STOP-THE-LINE: V3 buy path blocked by a pre-existing bug
+## ✅ RESOLVED in phase 21.1: V3 buy path tax-gate bug
 
-> **Status: BLOCKER (V3 path only) — escalated to decimal phase 21.1 per
-> D-STOP-THE-LINE.** The V2 fixtures drive the full lifecycle and pass. The V3
-> fixture is blocked by a **pre-existing product bug** (NOT introduced by Plan
-> 21-03). Per D-STOP-THE-LINE, it was NOT fixed in-flight and NOT silently
-> deferred — it is surfaced here and in `21-03-SUMMARY.md` for escalation.
+> **Status: FIXED (plan 21.1-03, STOP-THE-LINE-01 + STOP-THE-LINE-03).** All
+> fixtures — V2 AND V3 — now drive the full lifecycle and pass. The V3 fixture
+> WAS blocked by a pre-existing product bug (NOT introduced by Plan 21-03),
+> surfaced by the EXIT-LIVE-09 regression net and escalated to decimal phase
+> 21.1 per D-STOP-THE-LINE (not fixed in-flight, not silently deferred).
 
-**The bug:** the V3 buy path at `src/bot.ts:610` calls
+**The bug (now removed):** the V3 buy path at `src/bot.ts:610` called
 `hasHighTransferTaxForChain(ctx, dex.swapRouterAddress, token)`, but that
-function (`src/utils/tokenSafety.ts:482`) is **hardcoded to V2** — it calls
+function (`src/utils/tokenSafety.ts:482`) was **hardcoded to V2** — it called
 `getAmountsOut` + the V2 router buy function, neither of which the Uniswap V3
-SwapRouter implements. The call reverts → the function's catch returns `true`
-("high tax") → the V3 safety-bank AND-block (`src/bot.ts:638`) aborts **EVERY**
-V3 buy regardless of the token.
+SwapRouter implements. The call reverted → the function's catch returned `true`
+("high tax") → the V3 safety-bank AND-block aborted **EVERY** V3 buy regardless
+of the token.
 
-**Verified two independent ways:**
-1. The replay handler trail stops at
+**Verified two independent ways (pre-fix):**
+1. The replay handler trail stopped at
    `Tax detection failed → hasTax=true → Safety checks failed V3 snipe`.
-2. A direct probe shows `getAmountsOut` REVERTS on the V3 SwapRouter02
+2. A direct probe showed `getAmountsOut` REVERTS on the V3 SwapRouter
    (`execution reverted; no data present`).
 
-**Provenance:** `hasHighTransferTaxForChain` and the `bot.ts:610` V3 wiring
-predate Phase 21 (untouched this phase).
+**The fix (plan 21.1-03, D-V3-TAX-REMOVE + D-V2-TAX-REMOVE):** the broken
+`hasHighTransferTaxForChain` call was removed from BOTH the V3 bank
+(`bot.ts:610`) and the V2 bank (`bot.ts:303`) — the V2 site was additionally
+**harmful** (it fired a signer-connected `swapExactETHForTokens(amountOutMin=0)`
+real buy with broken NaN tax math on every V2 snipe, STOP-THE-LINE-03). With
+zero callers the function was **deleted** entirely (D-ROLLBACK). The on-chain
+`simulateHoneypotRoundtrip` gate (`bot.ts:253` V2 / `bot.ts:566` V3,
+fail-closed, HONEY-07/09 `maxBuyTaxBps`/`maxSellTaxBps`) was already the
+authoritative buy+sell-tax gate on both paths and is unchanged — so a
+high-tax/honeypot token still fails closed (covered by the V3 honeypot
+unit/integration tests).
 
-**Live-capital impact:** on live mainnet the funded bot would reject **every**
-V3 token as high-tax and never snipe a V3 pool — a real defensive-hardening gap
-surfaced by the EXIT-LIVE-09 regression net doing its job.
+**Live-capital impact (resolved):** the funded bot can again snipe Uniswap V3
+tokens, and no longer fires an extra real `amountOutMin=0` buy inside the V2
+"tax check" before the 21-07 capture.
 
-**Why no test-side workaround:** the replay must drive the REAL handler
-(success-criterion-2 / Pitfall 5). The blocking gate is in `src/` production
-code; making it pass requires a `src/` change (forbidden in-flight per
-D-STOP-THE-LINE and the executor's product-code prohibition). The V3 fixture's
-test therefore DRIVES the real handler and asserts the **observable
-blocked-at-gate effect** (no buy row + the safety-bank skip log with
-`hasTax: true`) — it is the `it.skip`-equivalent tied to this recorded blocker,
-not a hollow pass (D-04).
-
-**Escalation:** decimal phase 21.1 should (1) make the tax check V3-aware (use
-QuoterV2 / the V3 router for the V3 path, or skip the V2-style probe for V3),
-and (2) flip the V3 fixture's `blocked` flag to false so the replay test's V3
-branch asserts a real buy + sell row.
+**The V3 fixture now** drives the full validation → buy → exit → sell lifecycle:
+the REAL `handleNewV3PoolForChain` buys PEPE, then a third-party whale dumps the
+V3 pool >30% (`dumpV3Pool` in `realLaunchReplay.fork.test.ts`) to trigger
+`expectedExitPath: stop-loss`, producing a sell row with `amount_out`.
 
 ### Note on the retracted `isBlacklisted` false-alarm
 
@@ -137,7 +137,8 @@ from a manual bytecode probe that dropped the `0x` prefix. The production code
 checks `bytecode.includes("0xdd62ed3e")` (WITH the `0x`), which essentially never
 matches a selector embedded mid-bytecode — so the gate does NOT over-block, and
 the live handler confirms `isBlacklisted: false` for real tokens. That escalation
-is fully retracted; the real (verified) V3 blocker is the tax-gate bug above.
+is fully retracted; the real (verified) V3 blocker was the tax-gate bug above,
+now FIXED in phase 21.1 (plan 21.1-03).
 
 ---
 
@@ -207,7 +208,7 @@ V2; the V2-only `pairAddress` + `routerAddress` are null for V3.
 
 ## V3 Fixtures
 
-### `eth-v3-trailing.json` — PEPE V3 (1% / fee=10000) — BLOCKED (V3 tax-gate bug)
+### `eth-v3-trailing.json` — PEPE V3 (1% / fee=10000) — full lifecycle (V3 tax-gate FIXED in 21.1)
 
 | Property | Value |
 |----------|-------|
@@ -216,8 +217,8 @@ V2; the V2-only `pairAddress` + `routerAddress` are null for V3.
 | **PoolCreated / Mint / first Swap** | 17063792 / 17063792 / 17063794 (full launch lifecycle resolved) |
 | Fork pin (replay) | settledForkBlock 17065792 (deep liquidity) |
 | Fee tier | 10000 |
-| `expectedExitPath` | stop-loss (intended once 21.1 fixes the V3 tax gate) |
-| **Status** | `blocked: true`, `blockedReason: "v3-tax-gate-bug"` — see STOP-THE-LINE above. The replay drives the REAL `handleNewV3PoolForChain`, the V3 honeypot gate + same-block-Mint check pass, but the V2-only tax gate (`bot.ts:610`) aborts the buy. Escalated to phase 21.1. |
+| `expectedExitPath` | stop-loss (whale `dumpV3Pool` drives price down >30%) |
+| **Status** | `blocked: false` — the V3 tax-gate bug is FIXED in phase 21.1 (plan 21.1-03; see RESOLVED section above). The replay drives the REAL `handleNewV3PoolForChain`: the V3 honeypot gate + same-block-Mint check pass, the buy lands, then a third-party whale dumps the pool >30% to trigger the stop-loss exit (a sell row with `amount_out`). |
 
 The PEPE V3 1% pool is the V3 DEX exemplar (D-FIXTURE-DEX V2+V3 spread).
 
@@ -258,14 +259,15 @@ All three fixtures carry resolved load-bearing pins (`pairCreatedBlock`,
 informational launch-lifecycle metadata (NOT load-bearing — the replay drives
 price action itself); they are tracked for completeness.
 
-> The dominant outstanding item for this dir is the **V3 tax-gate STOP-THE-LINE
-> blocker** documented above, escalated to decimal phase 21.1.
+> The V3 tax-gate STOP-THE-LINE blocker previously tracked here is **RESOLVED**
+> in phase 21.1 (plan 21.1-03; see the RESOLVED section above). No outstanding
+> blockers remain for this dir.
 
 | Fixture | Field(s) `null` | Follow-up | Owner | Next Step |
 |---------|-----------------|-----------|--------|-----------|
 | `eth-v2-tp.json` | — (all resolved) | — | — | — |
 | `eth-v2-partial.json` | — (all resolved) | — | — | — |
-| `eth-v3-trailing.json` | — (all resolved) | V3 tax-gate bug | @jackcutrara | Fix the V3 tax gate in phase 21.1, then flip `blocked` → false and enable the V3 buy+sell assertion. |
+| `eth-v3-trailing.json` | — (all resolved) | V3 tax-gate bug — RESOLVED in 21.1-03 | @jackcutrara | Done: the broken tax call was removed + the function deleted; `blocked` flipped to false and the V3 buy+sell lifecycle assertion is enabled. |
 
 ---
 
@@ -280,8 +282,9 @@ price action itself); they are tracked for completeness.
 - [`test/fork/fixtures/honeypots/`](../honeypots/) — Phase 18 honeypot reject
   path; the reject path stays there (D-FIXTURE-EXITS).
 - `src/bot.ts` — `handleNewPairForChain` (`:203`) / `handleNewV3PoolForChain`
-  (`:502`); the V3 tax-gate blocker is the `hasHighTransferTaxForChain` call at
-  `:610`.
+  (`:502`); the former V3 tax-gate blocker (the V2-only
+  `hasHighTransferTaxForChain` call) was removed from both banks and the
+  function deleted in plan 21.1-03 (STOP-THE-LINE-01 + STOP-THE-LINE-03).
 - `src/exitEngine.ts` — `startExitMonitor` / `executeFullSell` /
   `executePartialSell`, the exit branches the fixtures target.
 - `src/chainRegistry.ts` (ETH template) — canonical router / quoter / WETH
