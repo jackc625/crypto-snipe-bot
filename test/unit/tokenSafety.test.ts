@@ -340,26 +340,17 @@ describe('isKnownBadToken', () => {
 });
 
 // ============================================================
-// 8. hasHighTransferTax (2 tests)
+// 8. hasHighTransferTax — DELETED (Phase 21.1 review-fix, WR-01)
+// ------------------------------------------------------------
+// The function was deleted from src/utils/tokenSafety.ts: it was a
+// signer-connected swapExactETHForTokens(0n, …, {value}) WITHOUT .staticCall (a
+// real on-chain buy inside a "safety check") with broken NaN tax math, and had
+// ZERO live callers. These 2 tests, which exercised the deleted function
+// directly, are removed with it (D-DELETE-LEGACY — no re-introduction hazard).
+// Deletion is asserted in inclusionReconciliation.test.ts (the tokenSafety module
+// no longer exports the *ForChain twin) and re-verified by the WR-01 zero-caller
+// grep in the review-fix SUMMARY.
 // ============================================================
-describe('hasHighTransferTax', () => {
-    it('returns false when tax is below 25% threshold', async () => {
-        // getAmountsOut returns expected output
-        mockGetAmountsOut.mockResolvedValueOnce([10000000000000000n, 1000000000000000000n]);
-        // swapExactETHForTokens returns actual output (90% of expected = 10% tax)
-        mockSwapExactETHForTokens.mockResolvedValueOnce([10000000000000000n, 900000000000000000n]);
-        const result = await tokenSafetyModule.hasHighTransferTax(MOCK_TOKEN_ADDRESS, mockProviderInstance as never, '0xwallet');
-        expect(result).toBe(false);
-    });
-
-    it('returns true when tax exceeds 25% threshold', async () => {
-        mockGetAmountsOut.mockResolvedValueOnce([10000000000000000n, 1000000000000000000n]);
-        // actual received is 50% of expected (50% tax > 25% threshold)
-        mockSwapExactETHForTokens.mockResolvedValueOnce([10000000000000000n, 500000000000000000n]);
-        const result = await tokenSafetyModule.hasHighTransferTax(MOCK_TOKEN_ADDRESS, mockProviderInstance as never, '0xwallet');
-        expect(result).toBe(true);
-    });
-});
 
 // ============================================================
 // 9. hasMaxWalletOrTxLimits (2 tests)

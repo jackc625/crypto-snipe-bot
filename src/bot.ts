@@ -9,7 +9,10 @@ import {
     isBlacklistedToken,
     isLiquiditySufficient,
     isKnownBadToken,
-    hasHighTransferTax,
+    // hasHighTransferTax REMOVED (Phase 21.1 review-fix, WR-01): the single-chain
+    // twin was a signer-connected swapExactETHForTokens(0n, …, {value}) WITHOUT
+    // .staticCall — a real on-chain buy inside a "safety check" with broken NaN tax
+    // math. Verified zero live callers; deleted from tokenSafety.ts (D-DELETE-LEGACY).
     hasMaxWalletOrTxLimits,
     simulateSell
 } from "./utils/tokenSafety";

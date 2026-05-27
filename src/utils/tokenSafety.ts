@@ -213,44 +213,18 @@ export async function isKnownBadToken(tokenAddress: string): Promise<boolean> {
     }
 }
 
-export async function hasHighTransferTax(
-    tokenAddress: string,
-    provider: JsonRpcProvider,
-    walletAddress: string
-): Promise<boolean> {
-    const router = new Contract(CONFIG.routerAddress, ROUTER_ABI, provider);
-    const path = [CONFIG.wethAddress, tokenAddress];
-    const inputAmount = ethers.parseEther(CONFIG.snipeAmountETH);
-
-    try {
-        // 1. Estimate output via getAmountsOut
-        const amountsOut: bigint[] = await router.getAmountsOut(inputAmount, path);
-        const expectedOutput = amountsOut[1];
-
-        // 2. Simulate actual received tokens by re-instantiating router with Wallet signer
-        const wallet = new Wallet(CONFIG.walletPrivateKey, provider);
-        const routerWithSigner = new Contract(CONFIG.routerAddress, ROUTER_ABI, wallet);
-
-        // 3. "Call" the method (not send), which is static by default in ethers v6
-        const actualOutput: bigint[] = await routerWithSigner.swapExactETHForTokens(
-            0n,
-            path,
-            walletAddress,
-            Math.floor(Date.now() / 1000) + 60,
-            { value: inputAmount }
-        );
-
-        const received = actualOutput[actualOutput.length - 1];
-        const taxPercent = 1 - Number(received) / Number(expectedOutput);
-
-        log.info({ token: tokenAddress, taxPercent: (taxPercent * 100).toFixed(2), check: 'transferTax' }, 'Estimated transfer tax');
-
-        return taxPercent > 0.25; // adjust this threshold as needed
-    } catch (e) {
-        log.warn({ err: e, token: tokenAddress, check: 'transferTax' }, 'Tax detection failed');
-        return true; // default to blocking
-    }
-}
+// DELETED: hasHighTransferTax (Phase 21.1 review-fix, WR-01). The single-chain
+// twin of the already-removed hasHighTransferTaxForChain — and the MORE dangerous
+// of the two. Its comment "static by default in ethers v6" was FALSE: it built a
+// Wallet-SIGNER-connected router and called swapExactETHForTokens(0n, …, {value})
+// WITHOUT .staticCall, i.e. a REAL on-chain buy at amountOutMin=0 inside a "safety
+// check", then misread the TransactionResponse as a bigint[] so taxPercent=NaN and
+// the gate never fired (broken math). Verified ZERO live callers in src/ (the
+// chain banks use the *ForChain variants; this function was only imported, never
+// invoked). Deleted entirely (function + the src/bot.ts import + the dead unit
+// test) per D-DELETE-LEGACY / D-ROLLBACK — no re-introduction hazard. The
+// authoritative buy+sell tax/honeypot gate is the on-chain simulateHoneypotRoundtrip
+// (bot.ts:253 V2 / :566 V3, HONEY-07/09, fail-closed), unchanged.
 
 export async function hasMaxWalletOrTxLimits(
     tokenAddress: string,
