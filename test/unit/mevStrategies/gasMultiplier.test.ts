@@ -152,6 +152,14 @@ describe('Phase 19 Gap-1 closure — BloxrouteMevStrategy applies gasMultiplier'
         return {
             getTransactionCount: vi.fn().mockResolvedValue(7),
             getFeeData: vi.fn().mockResolvedValue({ gasPrice }),
+            // Phase 21.1: bloXroute now reads the balance (affordability bound) and
+            // runs provider.call(...) as simulate-before-submit. 10 ETH keeps the tx
+            // affordable; call resolves (no revert) so the relay POST is reached.
+            getBalance: vi.fn().mockResolvedValue(10_000_000_000_000_000_000n), // 10 ETH
+            call: vi.fn().mockResolvedValue('0x'),
+            // bloXroute always reconciles against chain state (relay ACK is not
+            // inclusion proof); a status-1 receipt makes the reconcile return at once.
+            getTransactionReceipt: vi.fn().mockResolvedValue({ status: 1, blockNumber: 999 }),
         } as unknown as JsonRpcProvider;
     }
 
@@ -161,18 +169,24 @@ describe('Phase 19 Gap-1 closure — BloxrouteMevStrategy applies gasMultiplier'
             address: '0xWallet000000000000000000000000000000W02',
             signTransaction: vi.fn().mockImplementation(async (tx: TransactionRequest) => {
                 captured.value = tx;
-                return '0xSignedBytes';
+                // Phase 21.1: must be VALID hex — bloXroute computes the tx hash via
+                // keccak256(signedRaw) for chain-state reconciliation.
+                return '0xdeadbeefcafe';
             }),
         } as unknown as Wallet;
         return { wallet, capturedSigned: captured };
     }
 
     it("Test 10: gasMultiplier=2.0 doubles gasPrice on BSC bloxroute path", async () => {
-        // Mock axios.post to return a tx hash without making a real network call.
+        // Phase 21.1 NOTE: bloXroute now bids max(multiplier-scaled chain gasPrice,
+        // baseFee + helper escalation). With a realistic GWEI-scale gasPrice the
+        // multiplier-scaled value dominates the 1-gwei escalation floor, proving the
+        // Phase 19 gasMultiplier STILL reaches the populated gasPrice.
         const axios = await import('axios');
         const postSpy = vi.spyOn(axios.default, 'post').mockResolvedValue({ data: { result: '0xTxHashBSC' } });
 
-        const provider = makeProvider(80n);
+        // chain gasPrice = 50 gwei → ×2 = 100 gwei (dominates baseFee 50gwei + 1gwei step).
+        const provider = makeProvider(50_000_000_000n);
         const { wallet, capturedSigned } = makeWallet();
         const strategy = new BloxrouteMevStrategy({ authHeader: 'test-header' });
         await strategy.sendTransaction(
@@ -182,7 +196,7 @@ describe('Phase 19 Gap-1 closure — BloxrouteMevStrategy applies gasMultiplier'
             0,
             2.0,
         );
-        expect(capturedSigned.value?.gasPrice).toBe(160n);
+        expect(capturedSigned.value?.gasPrice).toBe(100_000_000_000n);
         postSpy.mockRestore();
     });
 });

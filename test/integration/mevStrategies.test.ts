@@ -225,12 +225,18 @@ describe('BloxrouteMevStrategy', () => {
         }));
 
         const { BloxrouteMevStrategy } = await import('../../src/utils/mevStrategies/bloxroute');
+        const { keccak256 } = await import('ethers');
+        // Phase 21.1: bloXroute now ALWAYS reconciles against chain state (relay ACK
+        // is not inclusion proof). createMockProvider defaults getTransactionReceipt
+        // → {status:1}, so the reconciler returns the DETERMINISTIC signed-tx hash.
         const provider = createMockProvider();
 
-        // Mock wallet.signTransaction
+        // signTransaction must return a VALID-hex raw — bloXroute computes the tx
+        // hash locally via keccak256 (the hash the reconciler probes).
+        const SIGNED_RAW = '0xdeadbeefcafe';
         const wallet = {
             address: '0x1234',
-            signTransaction: vi.fn().mockResolvedValue('0xsignedtx'),
+            signTransaction: vi.fn().mockResolvedValue(SIGNED_RAW),
         } as any;
 
         const strategy = new BloxrouteMevStrategy({
@@ -240,14 +246,16 @@ describe('BloxrouteMevStrategy', () => {
 
         const result = await strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 0);
 
-        expect(result).toBe('0xbsctxhash');
+        // Returns the reconciled on-chain (locally-signed) tx hash, not the raw
+        // relay ACK string — for a real signed tx these are the same value.
+        expect(result).toBe(keccak256(SIGNED_RAW));
         expect(axiosPostMock).toHaveBeenCalledTimes(1);
         expect(axiosPostMock).toHaveBeenCalledWith(
             'https://api.blxrbdn.com',
             expect.objectContaining({
                 method: 'bsc_private_tx',
                 params: expect.objectContaining({
-                    transaction: '0xsignedtx',
+                    transaction: SIGNED_RAW,
                 }),
             }),
             expect.objectContaining({
@@ -280,13 +288,14 @@ describe('BloxrouteMevStrategy', () => {
         if (origEnv !== undefined) process.env.BLOXROUTE_AUTH_HEADER = origEnv;
     });
 
-    it('returns the data.result hash unchanged — no synthetic-hash bug on BSC path (regression)', async () => {
-        // Regression coverage for REVIEWS.md action 11: document that bloxroute.ts:91
-        // returns data.result unchanged (a real tx hash from the JSON-RPC response).
-        // This test locks in the current correct behavior so any future refactor that
-        // introduces a synthetic-hash bug (like the Flashbots one fixed in Phase 14)
-        // will fail loudly.
-        const REAL_BSC_HASH = '0xbsc_real_tx_hash_000000000000000000000000000000000000000000000';
+    it('returns a real on-chain tx hash — no synthetic-hash bug on BSC path (regression)', async () => {
+        // Regression coverage for REVIEWS.md action 11: bloXroute must return a REAL
+        // tx hash, never a synthetic placeholder (like the Flashbots bug fixed in
+        // Phase 14). Phase 21.1 strengthens this: the returned hash is the
+        // DETERMINISTIC locally-signed tx hash CONFIRMED against chain state
+        // (getTransactionReceipt status 1), not the unverified relay ACK — closing
+        // the relay-accept-then-timeout false-negative/double-spend gap.
+        const REAL_BSC_HASH = '0xbsc0real0tx0hash000000000000000000000000000000000000000000000000';
         const axiosPostMock = vi.fn().mockResolvedValue({
             data: { result: REAL_BSC_HASH, error: null },
         });
@@ -297,10 +306,12 @@ describe('BloxrouteMevStrategy', () => {
         }));
 
         const { BloxrouteMevStrategy } = await import('../../src/utils/mevStrategies/bloxroute');
+        const { keccak256 } = await import('ethers');
         const provider = createMockProvider();
+        const SIGNED_RAW = '0xfeedface1234';
         const wallet = {
             address: '0x1234',
-            signTransaction: vi.fn().mockResolvedValue('0xsignedtx'),
+            signTransaction: vi.fn().mockResolvedValue(SIGNED_RAW),
         } as any;
 
         const strategy = new BloxrouteMevStrategy({
@@ -310,7 +321,8 @@ describe('BloxrouteMevStrategy', () => {
 
         const result = await strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 0);
 
-        expect(result).toBe(REAL_BSC_HASH);
+        // The reconciled, real signed-tx hash — no synthetic prefix.
+        expect(result).toBe(keccak256(SIGNED_RAW));
         expect(result).not.toMatch(/^bloxroute_/);
         expect(result).not.toMatch(/^flashbots_bundle_block_/);
     });

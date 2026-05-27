@@ -49,7 +49,7 @@
 //     `getTransactionReceipt→{status:1}`, `getTransactionCount→42`).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseEther, parseUnits } from 'ethers';
+import { parseEther, parseUnits, keccak256 } from 'ethers';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { createMockProvider } from '../../helpers/mockProvider';
 import * as fs from 'fs';
@@ -274,11 +274,40 @@ describe('STOP-THE-LINE-02 — inclusion reconciliation (false-negative harm #1)
         expect(sendBundleMock).toHaveBeenCalledTimes(1);
     });
 
-    it.skip('false-negative-loses-position: bloXroute axios timeout but receipt.status===1 → returns relay hash', async () => {
-        // GREEN (21.1-04): vi.spyOn(axios.default,'post').mockRejectedValueOnce(
-        // new Error('timeout')) while provider.getTransactionReceipt→{status:1};
-        // assert the relay hash (data.result) is returned, axios.post called once.
-        expect(true).toBe(false);
+    it('false-negative-loses-position: bloXroute axios timeout but receipt.status===1 → returns signed-tx hash', async () => {
+        // The BSC double-spend hazard: the relay ACCEPTS (broadcasts) the tx, then
+        // the axios response TIMES OUT. The old code threw → the retry loop
+        // resubmitted at an incremented nonce → a possible second real buy. The
+        // wrapper now ALWAYS reconciles against chain state (nativeConfirmed:false)
+        // and, on a transport timeout, defers to reconciliation rather than
+        // throwing or resubmitting. getTransactionReceipt(status:1) → returns the
+        // DETERMINISTIC locally-signed tx hash. axios.post fires exactly once.
+        const axios = await import('axios');
+        const SIGNED_RAW = '0xdeadbeefcafe'; // wallet.signTransaction → raw signed bytes
+        const postSpy = vi.spyOn(axios.default, 'post').mockRejectedValue(new Error('timeout after relay accept'));
+
+        const { BloxrouteMevStrategy } = await import('../../../src/utils/mevStrategies/bloxroute');
+        const provider = makeLandedProvider(); // receipt status 1, nonce 42→43, call→'0x'
+        const wallet = {
+            address: '0xWallet000000000000000000000000000000W01',
+            signTransaction: vi.fn().mockResolvedValue(SIGNED_RAW),
+        } as unknown as Wallet;
+        const strategy = new BloxrouteMevStrategy({ authHeader: 'test-header' });
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, wallet, provider, 3);
+
+        // The reconciler returns the deterministic signed-tx hash (== keccak256 of
+        // the signed raw), NOT a throw — the position is recorded (harm-prevention #1).
+        expect(result).toBe(keccak256(SIGNED_RAW));
+        // CRITICAL (double-spend guard): exactly ONE relay POST — the timeout did
+        // NOT trigger a second submit.
+        expect(postSpy).toHaveBeenCalledTimes(1);
+        // The timeout was logged as a deferral, NOT a failure.
+        expect(logWarn).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'bloxroute.relay.timeout' }),
+            expect.any(String),
+        );
+        postSpy.mockRestore();
     });
 
     it('false-negative-loses-position: passthrough tx.wait(3) timeout but receipt.status===1 → returns tx.hash', async () => {
