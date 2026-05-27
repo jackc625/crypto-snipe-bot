@@ -297,7 +297,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
-| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Verifying (all 6 plans executed; pre-21-07 gate GREEN — unit 611/integration 216/fork 4, tsc ×3 clean; pending phase-goal verification) | - |
+| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Complete (verifier 10/10; +deep-review fix CR-01/WR-01; full gate GREEN — unit 614/integration 216/fork 39, tsc ×3 clean; 1 by-design human-UAT = 21-07 real-relay, operator-gated) | 2026-05-27 |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*

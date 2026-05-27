@@ -1,6 +1,6 @@
 # STOP-THE-LINE 01 — V3 buy path blocked by V2-only transfer-tax gate
 
-**Status:** OPEN — escalated to phase **21.1** (operator decision 2026-05-26).
+**Status:** RESOLVED 2026-05-27 — fixed in phase **21.1** (plan 21.1-03, STOP-THE-LINE-01 + STOP-THE-LINE-03): the V2-only `hasHighTransferTaxForChain` call was removed from BOTH the V3 and V2 safety banks and the function/import/test deleted; the `simulateHoneypotRoundtrip` gate remains the authoritative fail-closed buy+sell tax check. Verifier 10/10; V3 fork fixture flipped to the full validation→buy→exit→sell lifecycle. (Originally escalated by operator decision 2026-05-26.)
 **Severity:** HIGH — production bug on the funded mainnet bot.
 **Surfaced by:** Plan 21-03 (EXIT-LIVE-09 real-launch regression net), V3 fixture replay.
 **Governing decision:** D-STOP-THE-LINE — "any bug surfaced during a capture or

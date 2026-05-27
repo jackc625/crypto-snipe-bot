@@ -1,6 +1,6 @@
 # STOP-THE-LINE 02 — Flashbots bundle.wait() false-negative loses real positions
 
-**Status:** OPEN — escalated to phase **21.1**.
+**Status:** RESOLVED 2026-05-27 (code-complete; REAL-relay validation pending the operator-gated 21-07 retry) — fixed in phase **21.1** (plans 21.1-02/04/05 + review-fix CR-01): all 3 MEV strategies route through the shared receipt-primary, nonce-safe `submitWithReconciliation` helper (a mined bundle returns its real hash → trade recorded + position registered + exit monitor started; the nonce-advanced short-circuit prevents double-spend), the dead legacy `sendTxWithRetry` branch was deleted, and the real hash is persisted on the buy row. The fee-escalation ceiling + sell-gas reserve is the final authority on the bid (CR-01 fix). Unit/integration/fork GREEN; the REAL Flashbots relay path is validated on the 21-07 roundtrip (see 21.1-HUMAN-UAT.md).
 **Severity:** CRITICAL — money/position-tracking bug on the funded mainnet bot.
 **Surfaced by:** Plan 21-07 live-capture attempt (2026-05-26), the one real ETH buy.
 **Governing decision:** D-STOP-THE-LINE (bug surfaced during the capture → escalate,
