@@ -408,7 +408,12 @@ export async function handleNewPairForChain(
     }
 
     try {
-        await sendTxWithRetry(
+        // D-RECORD-REAL-HASH: capture the REAL on-chain tx hash the strategy now
+        // returns (post-21.1-04 it reconciles late inclusion to the real hash;
+        // post-21.1-05 sendTxWithRetry's type is Promise<string>) so the buy row
+        // records it instead of the 'mev_bundle' placeholder — restoring the
+        // position-tracking auditability the LADYS false-negative destroyed.
+        const realHash = await sendTxWithRetry(
             () => ctx.wallet.populateTransaction({
                 to: dex.routerAddress,
                 data: dexRouter.interface.encodeFunctionData("swapExactETHForTokens", [
@@ -439,7 +444,11 @@ export async function handleNewPairForChain(
             token: targetToken.toLowerCase(),
             chain: ctx.chain.name,
             action: 'buy',
-            txHash: 'mev_bundle',
+            // D-RECORD-REAL-HASH: persist the real reconciled hash at insert time
+            // (single atomic write, no schema change, no extra UPDATE). The
+            // `?? 'mev_bundle'` is a belt-and-suspenders null-guard; with the
+            // Promise<string> return from 21.1-05 this is always the real hash.
+            txHash: realHash ?? 'mev_bundle',
             block: null,
             timestamp: Math.floor(Date.now() / 1000),
             amountIn: ctx.chain.snipeAmount,
@@ -723,7 +732,11 @@ export async function handleNewV3PoolForChain(
             }
         }
 
-        await sendTxWithRetry(
+        // D-RECORD-REAL-HASH (V3): capture the real on-chain hash the strategy
+        // returns so the V3 buy row records it instead of the 'mev_bundle'
+        // placeholder (see the V2 analog above; CONTEXT names both bot.ts:429 V2
+        // and :728 V3 for consistent landed-buy auditability).
+        const realHash = await sendTxWithRetry(
             () => ctx.wallet.populateTransaction({
                 to: dex.swapRouterAddress,
                 data: v3Router.interface.encodeFunctionData('multicall', [deadline, [swapData]]),
@@ -747,7 +760,11 @@ export async function handleNewV3PoolForChain(
             token: targetToken.toLowerCase(),
             chain: ctx.chain.name,
             action: 'buy',
-            txHash: 'mev_bundle',
+            // D-RECORD-REAL-HASH (V3): persist the real reconciled hash atomically
+            // at insert time (no schema change, no extra UPDATE). The
+            // `?? 'mev_bundle'` null-guard is belt-and-suspenders; with the
+            // Promise<string> return from 21.1-05 this is always the real hash.
+            txHash: realHash ?? 'mev_bundle',
             block: null,
             timestamp: Math.floor(Date.now() / 1000),
             amountIn: ctx.chain.snipeAmount,

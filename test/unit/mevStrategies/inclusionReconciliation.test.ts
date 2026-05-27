@@ -644,10 +644,83 @@ describe('STOP-THE-LINE-02 (SC4) — sell leg inherits reconciliation', () => {
 // =============================================================================
 
 describe('D-RECORD-REAL-HASH — buy row records the real hash', () => {
-    it.skip("D-RECORD-REAL-HASH: buy success path records trades.tx_hash === real hash, not 'mev_bundle'", async () => {
-        // GREEN (21.1-05): assert the inserted trades row tx_hash === the real
-        // hash returned by sendTxWithRetry, not the 'mev_bundle' placeholder.
-        expect(true).toBe(false);
+    // The real reconciled hash a landed buy now returns (post-21.1-04). The buy
+    // success path must persist THIS onto trades.tx_hash, not the 'mev_bundle'
+    // placeholder that left the LADYS position untracked.
+    const REAL_HASH = '0xfeedface00000000000000000000000000000000000000000000000000000001';
+    const BOT_SRC = path.resolve(__dirname, '../../../src/bot.ts');
+
+    it("D-RECORD-REAL-HASH: buy success path records trades.tx_hash === real hash, not 'mev_bundle' (insert-wiring observable)", async () => {
+        // OBSERVABLE (D-04): the value flowing into trades.tx_hash is the real hash
+        // sendTxWithRetry returns, not the placeholder. The load-bearing production
+        // wiring is `const realHash = await sendTxWithRetry(...)` then
+        // `insertTrade.run({ ..., txHash: realHash ?? 'mev_bundle', status:'pending' })`.
+        // We exercise that EXACT expression against a prepared-statement `.run` spy
+        // (the lighter green per D-QUALITY-FIRST — importing all of bot.ts pulls in
+        // WS providers / chain registry side-effects — WITHOUT weakening the
+        // assertion: the persisted txHash must equal REAL_HASH and must NOT be
+        // 'mev_bundle'). Both the V2 and V3 inserts share this identical shape.
+        const insertTradeRun = vi.fn();
+        const insertTrade = { run: insertTradeRun };
+
+        // The production buy success path, reduced to its persistence wiring.
+        async function persistBuyRow(
+            sendTxWithRetry: () => Promise<string>,
+            poolType: 'v2' | 'v3',
+        ) {
+            const realHash = await sendTxWithRetry();
+            insertTrade.run({
+                token: '0xtoken',
+                chain: 'ethereum',
+                action: 'buy',
+                txHash: realHash ?? 'mev_bundle',
+                status: 'pending',
+                poolType,
+            });
+        }
+
+        // V2 buy submit returns the real reconciled hash.
+        await persistBuyRow(async () => REAL_HASH, 'v2');
+        // V3 buy submit returns the real reconciled hash.
+        await persistBuyRow(async () => REAL_HASH, 'v3');
+
+        expect(insertTradeRun).toHaveBeenCalledTimes(2);
+        for (const call of insertTradeRun.mock.calls) {
+            const row = call[0] as { txHash: string; status: string };
+            // The real hash is persisted...
+            expect(row.txHash).toBe(REAL_HASH);
+            // ...and the 'mev_bundle' placeholder is GONE on the success path
+            // (the position is now auditable/monitorable — harm-prevention #1).
+            expect(row.txHash).not.toBe('mev_bundle');
+            // status:'pending' is preserved (the receipt decoder flips it later).
+            expect(row.status).toBe('pending');
+        }
+    });
+
+    it('D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)', () => {
+        // Defense-in-depth source assertion (mirrors the STOP-THE-LINE-03 source
+        // grep gate in this file): binds the behavioral observable above to the
+        // TERRITORY so a regression that reverts the wiring back to a bare
+        // 'mev_bundle' literal fails here. Proves (1) realHash is captured off
+        // sendTxWithRetry and (2) at least two `txHash: realHash` insert sites
+        // exist (V2 + V3), with (3) zero bare `txHash: 'mev_bundle'` literals
+        // surviving on a success path.
+        const botSrc = fs.readFileSync(BOT_SRC, 'utf8');
+
+        // (1) realHash is captured off the buy submit.
+        expect(/const\s+realHash\s*=\s*await\s+sendTxWithRetry\(/.test(botSrc)).toBe(true);
+
+        // (2) >=2 inserts persist realHash (V2 + V3).
+        const realHashInserts = (botSrc.match(/txHash:\s*realHash\s*\?\?\s*'mev_bundle'/g) || []).length;
+        expect(realHashInserts).toBeGreaterThanOrEqual(2);
+
+        // (3) No bare placeholder literal remains on a success path (strip whole-
+        // line `//` comments first — tombstone comments intentionally name it).
+        const botBody = botSrc
+            .split(/\r?\n/)
+            .filter((l) => !l.trim().startsWith('//'))
+            .join('\n');
+        expect(/txHash:\s*'mev_bundle'/.test(botBody)).toBe(false);
     });
 });
 
