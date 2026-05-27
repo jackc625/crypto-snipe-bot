@@ -600,6 +600,179 @@ describe('STOP-THE-LINE-02 — fee escalation affordability (stranded-exit harm 
 });
 
 // =============================================================================
+// CR-01 (deep-review gap-closure) — the affordability/ceiling clamp is the FINAL
+// authority on the ACTUALLY-SUBMITTED fee, for ALL THREE strategies, EVEN WHEN
+// the live market rate is far above the ceiling. This is the test blind-spot
+// that let CR-01 ship: 21.1-04 asserted computeAffordablePriorityFee's OUTPUT
+// but never observed the strategy's post-clamp max() override, which silently
+// re-introduced the unclamped chain rate and defeated the 5-gwei ceiling + the
+// reserved sell gas on the buy path. These tests assert the REAL submitted tx
+// fields (observable), not a helper-output reimplementation.
+//
+// Default env (beforeEach): MEV_MAX_PRIORITY_FEE_GWEI ceiling = 5 gwei, step = 1
+// gwei. makeLandedProvider balance = 1 ETH ⇒ the affordability bound (thousands
+// of gwei) is far above the ceiling, so the CEILING is the binding clamp here.
+// =============================================================================
+
+describe('CR-01 — affordability/ceiling clamp is the final authority on the submitted fee', () => {
+    const CEILING_WEI = parseUnits('5', 'gwei'); // MEV_MAX_PRIORITY_FEE_GWEI default
+
+    /** A landed provider whose getFeeData reports a market priority WAY above the
+     *  5-gwei ceiling (50 gwei). baseFee = maxFee - maxPriority. Balance 1 ETH so
+     *  the affordability bound stays well above the ceiling (ceiling binds). */
+    function highMarketLandedProvider(): JsonRpcProvider {
+        return createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValueOnce(42).mockResolvedValue(43),
+            getTransactionReceipt: vi.fn().mockResolvedValue({ status: 1, blockNumber: 25182801 }),
+            getFeeData: vi.fn().mockResolvedValue({
+                maxFeePerGas: parseUnits('120', 'gwei'),
+                maxPriorityFeePerGas: parseUnits('50', 'gwei'), // 10x the 5-gwei ceiling
+                gasPrice: parseUnits('70', 'gwei'),
+            }),
+            getBalance: vi.fn().mockResolvedValue(parseEther('1')),
+        }) as unknown as JsonRpcProvider;
+    }
+
+    it('CR-01 flashbots: submitted maxPriorityFeePerGas <= ceiling even when market rate is 10x the ceiling', async () => {
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 0; // natively included — we only care about the SUBMITTED fee
+        const provider = highMarketLandedProvider();
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        await strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3);
+
+        // Observable: the REAL submitted bundle tx (sendBundle arg), not a helper
+        // reimplementation. The market rate was 50 gwei; the submitted priority is
+        // clamped to the 5-gwei ceiling — the buy can NEVER bid above it (CR-01).
+        const submittedTx = (sendBundleMock.mock.calls[0][0] as Array<{ transaction: TransactionRequest }>)[0].transaction;
+        expect(submittedTx.maxPriorityFeePerGas as bigint).toBeLessThanOrEqual(CEILING_WEI);
+        // It is exactly the ceiling (the market floor pushed the desired fee up to,
+        // but not past, the clamp). Pre-fix this was 50 gwei (the bypass).
+        expect(submittedTx.maxPriorityFeePerGas).toBe(CEILING_WEI);
+        // maxFeePerGas = baseFee (70 gwei) + clamped priority (5 gwei) = 75 gwei,
+        // consistent with the affordability model (no unclamped chainMaxFee max()).
+        const baseFee = parseUnits('120', 'gwei') - parseUnits('50', 'gwei'); // 70 gwei
+        expect(submittedTx.maxFeePerGas).toBe(baseFee + CEILING_WEI);
+        // Valid EIP-1559: priority <= maxFee.
+        expect((submittedTx.maxPriorityFeePerGas as bigint) <= (submittedTx.maxFeePerGas as bigint)).toBe(true);
+    });
+
+    it('CR-01 passthrough: submitted maxPriorityFeePerGas <= ceiling even when market rate is 10x the ceiling', async () => {
+        const { PassthroughMevStrategy } = await import('../../../src/utils/mevStrategies/passthrough');
+        const provider = highMarketLandedProvider();
+        const sendTxMock = vi.fn().mockResolvedValue({
+            hash: STUB_MINED_HASH,
+            wait: vi.fn().mockResolvedValue({ status: 1, blockNumber: 25182801 }),
+        });
+        const wallet = { address: '0xWallet000000000000000000000000000000W01', sendTransaction: sendTxMock } as unknown as Wallet;
+        const strategy = new PassthroughMevStrategy('base');
+
+        await strategy.sendTransaction(STUB_TX_REQ, wallet, provider, 3);
+
+        // Observable: the REAL submitted tx (wallet.sendTransaction arg).
+        const submittedTx = sendTxMock.mock.calls[0][0] as TransactionRequest;
+        expect(submittedTx.maxPriorityFeePerGas as bigint).toBeLessThanOrEqual(CEILING_WEI);
+        expect(submittedTx.maxPriorityFeePerGas).toBe(CEILING_WEI);
+        const baseFee = parseUnits('120', 'gwei') - parseUnits('50', 'gwei'); // 70 gwei
+        expect(submittedTx.maxFeePerGas).toBe(baseFee + CEILING_WEI);
+    });
+
+    it('CR-01 bloXroute: submitted gasPrice priority-above-base <= ceiling even when the competitive (multiplier-scaled) rate is far above it', async () => {
+        // BSC is legacy-only, so the meaningful "market rate above the ceiling"
+        // condition is on the priority-ABOVE-BASE: the Phase 19 gasMultiplier-scaled
+        // gasPrice minus baseFee. With mult=2.0 the scaled rate (140 gwei) exceeds
+        // base (70 gwei) by 70 gwei — 14x the 5-gwei ceiling — which is exactly the
+        // CR-01 bypass condition the pre-fix max() defeated on the legacy path.
+        const axios = await import('axios');
+        const SIGNED_RAW = '0xdeadbeefcafe';
+        const postSpy = vi.spyOn(axios.default, 'post').mockResolvedValue({ data: { result: '0xrelayhash' } });
+        // Capture the populated tx bloXroute signs (the observable submitted fields).
+        let signedTx: TransactionRequest | undefined;
+        const signTransaction = vi.fn(async (tx: TransactionRequest) => {
+            signedTx = tx;
+            return SIGNED_RAW;
+        });
+
+        const { BloxrouteMevStrategy } = await import('../../../src/utils/mevStrategies/bloxroute');
+        const provider = highMarketLandedProvider(); // gasPrice 70 gwei market rate
+        const wallet = { address: '0xWallet000000000000000000000000000000W01', signTransaction } as unknown as Wallet;
+        const strategy = new BloxrouteMevStrategy({ authHeader: 'test-header' });
+
+        // gasMultiplier=2.0 (the anti-rug exit path) → scaled gasPrice 140 gwei.
+        await strategy.sendTransaction(STUB_TX_REQ, wallet, provider, 3, 2.0);
+
+        // baseFee = market gasPrice (70 gwei). competitive floor = scaledGasPrice
+        // (140) - baseFee (70) = 70 gwei, folded in BEFORE the clamp; clamp = min(5
+        // gwei ceiling, bound) = 5 gwei. Submitted gasPrice = baseFee + clamped
+        // priority; the priority-above-base must be <= the 5-gwei ceiling (CR-01:
+        // pre-fix it bid max(140gwei scaled, ...) = 140 gwei — ceiling bypassed).
+        expect(signedTx).toBeDefined();
+        const baseFee = parseUnits('70', 'gwei');
+        const priorityAboveBase = (signedTx!.gasPrice as bigint) - baseFee;
+        expect(priorityAboveBase).toBeLessThanOrEqual(CEILING_WEI);
+        // Exactly baseFee + ceiling (the competitive floor pushed it up to the cap).
+        expect(signedTx!.gasPrice).toBe(baseFee + CEILING_WEI);
+        expect(postSpy).toHaveBeenCalledTimes(1);
+        postSpy.mockRestore();
+    });
+
+    it('CR-01 fail-clean: market rate above the affordable cap + tx never lands → ceiling-hit throw, no overspend (helper-logic)', async () => {
+        // The fail-clean half of D-FEE-ESCALATION: when the bid is clamped (here at
+        // the ceiling, with the market rate folded in far above it) and the tx still
+        // does not land, the helper must FAIL CLEANLY (ceiling-hit) rather than bid
+        // above the affordable cap to chase inclusion. Drive the helper directly so
+        // we can assert the submitted AttemptContext fee never exceeds the clamp AND
+        // the terminal outcome is the ceiling-hit alert+throw.
+        const { submitWithReconciliation } = await import('../../../src/utils/mevStrategies/reconciliation');
+        const wallet = makeWallet();
+        // Receipt always null + nonce never advances → genuinely not-landed every attempt.
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+            getTransactionReceipt: vi.fn().mockResolvedValue(null),
+        }) as unknown as JsonRpcProvider;
+
+        const alert = vi.fn(async () => {});
+        const submit = recordingSubmit(() => ({
+            signedTxHash: STUB_MINED_HASH,
+            submittedNonce: 42,
+            nativeConfirmed: false, // never natively confirmed → reconcile → not-landed
+        }));
+
+        await expect(
+            submitWithReconciliation(
+                submit.fn,
+                wallet,
+                provider,
+                tinyCfg(), // ceiling 5 gwei, step 1 gwei, sellGas reserve on
+                {
+                    walletBalanceWei: parseEther('1'), // affordable: bound >> ceiling
+                    baseFeeWei: parseUnits('20', 'gwei'),
+                    snipeValueWei: parseEther('0.01'),
+                    buyGasLimit: 200_000n,
+                    chainPriorityWei: parseUnits('50', 'gwei'), // market rate 10x ceiling
+                },
+                { info: logInfo, warn: logWarn, error: logError },
+                alert,
+            ),
+        ).rejects.toThrow(/ceiling/i);
+
+        // CR-01 (no overspend): EVERY submitted attempt's fee was clamped to the
+        // 5-gwei ceiling — the folded-in 50-gwei market rate NEVER reached the wire.
+        expect(submit.calls.length).toBeGreaterThan(0);
+        for (const a of submit.calls) {
+            expect(a.priorityFeeWei).toBeLessThanOrEqual(CEILING_WEI);
+        }
+        // Fail-clean: the ceiling-hit alert + dotted op fired (D-ALERTS), and the
+        // helper threw rather than bidding above the affordable cap to chase inclusion.
+        expect(alert).toHaveBeenCalled();
+        expect(logError).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'mev.escalation.ceiling-hit' }),
+            expect.any(String),
+        );
+    });
+});
+
+// =============================================================================
 // SC4 — sell leg inherits the fix. A sell-shaped tx that is misreported-but-
 // landed returns the real hash (so decodeReceipt runs and amount_out is real).
 // Owned by plan 21.1-04.

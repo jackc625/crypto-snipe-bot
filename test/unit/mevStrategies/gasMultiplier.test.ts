@@ -78,14 +78,18 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
         } as unknown as Wallet;
     }
 
-    // Phase 21.1 NOTE: the passthrough strategy now routes through
+    // Phase 21.1 NOTE: the passthrough strategy routes through
     // submitWithReconciliation, whose D-FEE-ESCALATION supplies a per-attempt
-    // priority fee with a 1-gwei floor (MEV_PRIORITY_FEE_STEP_GWEI default). The
-    // strategy bids max(multiplier-scaled chain priority, helper escalation) and
-    // raises maxFeePerGas to cover baseFee + that bid. These tests use realistic
-    // GWEI-scale fees so the multiplier-scaled chain priority dominates the floor,
-    // proving the Phase 19 gasMultiplier STILL reaches the populated priority fee.
-    it("Test 7: gasMultiplier=2.0 doubles maxFeePerGas + maxPriorityFeePerGas on EIP-1559 chain", async () => {
+    // priority fee with a 1-gwei floor (MEV_PRIORITY_FEE_STEP_GWEI default).
+    // CR-01 fix (review-fix): the multiplier-scaled chain priority is folded in as
+    // the competitive FLOOR of the DESIRED fee BEFORE the affordability/ceiling
+    // clamp, and the strategy uses the CLAMPED a.priorityFeeWei DIRECTLY (no second
+    // max() against the unclamped chain rate). The clamp — min(MEV_MAX_PRIORITY_FEE_GWEI
+    // ceiling=5 gwei default, affordabilityBound) — is therefore the FINAL authority
+    // on the submitted fee, and maxFeePerGas = baseFee + that clamped priority.
+    // These tests prove the Phase 19 gasMultiplier still ELEVATES the bid (toward
+    // the cap) while NEVER exceeding the load-bearing ceiling.
+    it("Test 7: gasMultiplier=2.0 elevates the bid toward — but never past — the 5-gwei ceiling on EIP-1559 chain", async () => {
         // chain: maxFee 50 gwei, priority 3 gwei → baseFee = 47 gwei.
         const provider = makeProvider({ maxFeePerGas: 50_000_000_000n, maxPriorityFeePerGas: 3_000_000_000n });
         const wallet = makeWallet();
@@ -98,15 +102,22 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             2.0,
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
-        // priority = max(3gwei×2, 1gwei floor) = 6 gwei; the multiplier reached it.
-        expect(capturedTx.maxPriorityFeePerGas).toBe(6_000_000_000n);
-        // maxFee cap = max(50gwei×2=100gwei, baseFee 47gwei + 6gwei = 53gwei) = 100 gwei.
-        expect(capturedTx.maxFeePerGas).toBe(100_000_000_000n);
+        // desired = max(3gwei×2 = 6gwei multiplier floor, 1gwei step) = 6 gwei, then
+        // CLAMPED to min(5gwei ceiling, huge bound) = 5 gwei. The multiplier elevated
+        // the bid above the 3-gwei chain rate, but the ceiling is the final authority
+        // (CR-01: pre-fix this was 6 gwei — the ceiling was bypassed).
+        expect(capturedTx.maxPriorityFeePerGas).toBe(5_000_000_000n);
+        // maxFee = baseFee 47gwei + clamped priority 5gwei = 52 gwei (consistent with
+        // the affordability reserve model; CR-01/WR-03 — pre-fix this was 100 gwei).
+        expect(capturedTx.maxFeePerGas).toBe(52_000_000_000n);
         // Invariant: priority never exceeds the cap (valid EIP-1559 tx).
         expect((capturedTx.maxPriorityFeePerGas as bigint) <= (capturedTx.maxFeePerGas as bigint)).toBe(true);
+        // Load-bearing CR-01 assertion: the submitted priority never exceeds the
+        // 5-gwei ceiling even though the multiplier-scaled chain rate (6 gwei) did.
+        expect((capturedTx.maxPriorityFeePerGas as bigint) <= 5_000_000_000n).toBe(true);
     });
 
-    it("Test 8: gasMultiplier=undefined preserves raw chain priority when it exceeds the escalation floor", async () => {
+    it("Test 8: gasMultiplier=undefined uses the raw chain priority when it is below the ceiling", async () => {
         // chain: maxFee 50 gwei, priority 3 gwei → baseFee = 47 gwei.
         const provider = makeProvider({ maxFeePerGas: 50_000_000_000n, maxPriorityFeePerGas: 3_000_000_000n });
         const wallet = makeWallet();
@@ -119,14 +130,23 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             // gasMultiplier omitted — no elevation, raw chain priority used.
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
-        // priority = max(3 gwei chain, 1 gwei floor) = 3 gwei (raw, unelevated).
+        // desired = max(3gwei chain floor, 1gwei step) = 3 gwei; CLAMP = min(5gwei, huge)
+        // = 3 gwei (below the ceiling, so the chain rate passes through unchanged).
         expect(capturedTx.maxPriorityFeePerGas).toBe(3_000_000_000n);
-        // maxFee cap = max(50 gwei chain, baseFee 47gwei + 3gwei = 50gwei) = 50 gwei.
+        // maxFee = baseFee 47gwei + 3gwei = 50 gwei.
         expect(capturedTx.maxFeePerGas).toBe(50_000_000_000n);
     });
 
-    it("Test 9: gasMultiplier=2.0 doubles legacy gasPrice when maxFeePerGas unavailable", async () => {
-        const provider = makeProvider({ gasPrice: 50n });
+    it("Test 9: gasMultiplier=2.0 on the legacy fallback bids baseFee + the ceiling-clamped priority (never the unclamped 2x rate)", async () => {
+        // Legacy fallback (no EIP-1559 field). Realistic GWEI-scale chain gasPrice so
+        // the multiplier-scaled floor is meaningful (the old 50-WEI fixture made the
+        // 1-gwei escalation floor dominate, masking the clamp). chain gasPrice 4 gwei
+        // → ×2 = 8 gwei; legacy competitive floor = scaledGasPrice - baseFee =
+        // 8 - 4 = 4 gwei. desired = max(4gwei floor, 1gwei step) = 4 gwei; CLAMP =
+        // min(5gwei ceiling, huge) = 4 gwei (below ceiling). gasPrice = baseFee 4gwei
+        // + clamped priority 4gwei = 8 gwei. The multiplier reached the bid, bounded
+        // by the affordability/ceiling clamp (CR-01: clamp-is-final on legacy too).
+        const provider = makeProvider({ gasPrice: 4_000_000_000n });
         const wallet = makeWallet();
         const strategy = new PassthroughMevStrategy('base');
         await strategy.sendTransaction(
@@ -137,9 +157,30 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             2.0,
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
-        // Legacy path is unchanged by D-FEE-ESCALATION (BSC/legacy escalate gasPrice
-        // separately in bloXroute; passthrough legacy keeps the multiplier-only bid).
-        expect(capturedTx.gasPrice).toBe(100n);
+        expect(capturedTx.gasPrice).toBe(8_000_000_000n);
+    });
+
+    it("Test 9b (CR-01): legacy fallback CLAMPS the bid to the ceiling when the 2x chain rate exceeds it", async () => {
+        // chain gasPrice 50 gwei → ×2 = 100 gwei; legacy floor = 100 - 50 = 50 gwei.
+        // desired = max(50gwei floor, 1gwei step) = 50 gwei; CLAMP = min(5gwei ceiling,
+        // huge bound) = 5 gwei. gasPrice = baseFee 50gwei + clamped 5gwei = 55 gwei.
+        // CR-01: pre-fix the legacy path bid max(100gwei, ...) = 100 gwei — the 5-gwei
+        // ceiling was bypassed on the buy path. The clamp is now the final authority.
+        const provider = makeProvider({ gasPrice: 50_000_000_000n });
+        const wallet = makeWallet();
+        const strategy = new PassthroughMevStrategy('base');
+        await strategy.sendTransaction(
+            { to: '0xRouter000000000000000000000000000000R01', data: '0x', gasLimit: 200_000n },
+            wallet,
+            provider,
+            0,
+            2.0,
+        );
+        const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
+        // baseFee (50 gwei) + ceiling-clamped priority (5 gwei) = 55 gwei, NOT 100 gwei.
+        expect(capturedTx.gasPrice).toBe(55_000_000_000n);
+        // The priority component never exceeds the 5-gwei ceiling.
+        expect((capturedTx.gasPrice as bigint) - 50_000_000_000n <= 5_000_000_000n).toBe(true);
     });
 });
 
@@ -177,15 +218,18 @@ describe('Phase 19 Gap-1 closure — BloxrouteMevStrategy applies gasMultiplier'
         return { wallet, capturedSigned: captured };
     }
 
-    it("Test 10: gasMultiplier=2.0 doubles gasPrice on BSC bloxroute path", async () => {
-        // Phase 21.1 NOTE: bloXroute now bids max(multiplier-scaled chain gasPrice,
-        // baseFee + helper escalation). With a realistic GWEI-scale gasPrice the
-        // multiplier-scaled value dominates the 1-gwei escalation floor, proving the
-        // Phase 19 gasMultiplier STILL reaches the populated gasPrice.
+    it("Test 10: gasMultiplier=2.0 elevates BSC gasPrice toward the bid but CLAMPS to the 5-gwei ceiling (CR-01)", async () => {
+        // Phase 21.1 + CR-01 review-fix: bloXroute folds the multiplier-scaled chain
+        // gasPrice in as the competitive FLOOR (chainPriorityWei = scaledGasPrice -
+        // baseFee) BEFORE the affordability/ceiling clamp, then bids gasPrice =
+        // baseFee + the CLAMPED priority DIRECTLY (no second max() against the
+        // unclamped 2x rate — that was the CR-01 bypass on the legacy path).
         const axios = await import('axios');
         const postSpy = vi.spyOn(axios.default, 'post').mockResolvedValue({ data: { result: '0xTxHashBSC' } });
 
-        // chain gasPrice = 50 gwei → ×2 = 100 gwei (dominates baseFee 50gwei + 1gwei step).
+        // chain gasPrice = 50 gwei → ×2 = 100 gwei; legacy floor = 100 - 50 = 50 gwei.
+        // desired = max(50gwei floor, 1gwei step) = 50 gwei; CLAMP = min(5gwei ceiling,
+        // huge bound) = 5 gwei. gasPrice = baseFee 50gwei + clamped 5gwei = 55 gwei.
         const provider = makeProvider(50_000_000_000n);
         const { wallet, capturedSigned } = makeWallet();
         const strategy = new BloxrouteMevStrategy({ authHeader: 'test-header' });
@@ -196,7 +240,11 @@ describe('Phase 19 Gap-1 closure — BloxrouteMevStrategy applies gasMultiplier'
             0,
             2.0,
         );
-        expect(capturedSigned.value?.gasPrice).toBe(100_000_000_000n);
+        // baseFee (50 gwei) + ceiling-clamped priority (5 gwei) = 55 gwei.
+        // CR-01: pre-fix this asserted 100_000_000_000n — the ceiling was bypassed.
+        expect(capturedSigned.value?.gasPrice).toBe(55_000_000_000n);
+        // The priority component above base never exceeds the 5-gwei ceiling.
+        expect((capturedSigned.value?.gasPrice as bigint) - 50_000_000_000n <= 5_000_000_000n).toBe(true);
         postSpy.mockRestore();
     });
 });

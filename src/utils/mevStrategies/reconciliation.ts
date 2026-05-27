@@ -18,7 +18,12 @@
 //     min(MEV_MAX_PRIORITY_FEE_GWEI, affordabilityBound) where the affordability
 //     bound always reserves sellGasLimit × fee so the exit leg can submit. If
 //     even attempt-0 cannot afford the reserve → alert + throw before submitting
-//     (Pitfall 7 — never strand the exit).
+//     (Pitfall 7 — never strand the exit). The clamp is the FINAL authority on
+//     the actually-submitted fee (CR-01 fix): the live market priority rate is
+//     folded INTO the desired fee BEFORE the clamp (so the bid stays competitive)
+//     and the strategies use AttemptContext.priorityFeeWei DIRECTLY with NO
+//     second max() against the unclamped chain rate — that second max() is the
+//     CR-01 bypass that defeated the ceiling on the buy path.
 //   - D-ALERTS: every genuine-failure outcome logs a dotted `op:` + sendCtxAlert.
 //
 // The `MevStrategy` interface (types.ts) is UNCHANGED — this helper is an
@@ -308,9 +313,12 @@ export async function reconcileInclusion(
  *   1. Re-fetch getTransactionCount('latest') as THIS attempt's nonce. If it has
  *      advanced past the PREVIOUS attempt's submitted nonce → STOP and reconcile
  *      the previous signedTxHash (do NOT submit again — the double-spend guard).
- *   2. Compute the escalated priorityFee (base + attempt × step) and CLAMP it to
+ *   2. Compute the desired priorityFee = max(step × (attempt+1), the live
+ *      market priority rate `feeInputs.chainPriorityWei`) and CLAMP it to
  *      min(ceiling, affordabilityBound) which always reserves sellGasLimit × fee.
- *      If attempt-0 cannot afford the reserve → alert + throw before submitting.
+ *      The clamped value is the FINAL submitted fee (CR-01 — strategies use it
+ *      directly, no second max() vs the unclamped chain rate). If attempt-0
+ *      cannot afford the reserve → alert + throw before submitting.
  *   3. Build the AttemptContext and call the per-strategy `submit`. If
  *      result.nativeConfirmed → return the signed hash (strategy keeps its own
  *      included-path op log).
@@ -325,7 +333,14 @@ export async function reconcileInclusion(
  *                 at AttemptContext.nonce + priorityFee, returning the signed-tx
  *                 hash + nativeConfirmed. MUST NOT itself retry.
  * @param feeInputs supplies the affordability inputs that are constant across
- *                 attempts (wallet balance, baseFee, snipe value, buy gas limit).
+ *                 attempts (wallet balance, baseFee, snipe value, buy gas limit)
+ *                 PLUS `chainPriorityWei` — the live market priority rate
+ *                 (already multiplier-scaled by the strategy). The helper folds
+ *                 it into the desired fee BEFORE the affordability/ceiling clamp
+ *                 so the bid stays competitive without escaping the clamp
+ *                 (CR-01 fix — the clamp is the final authority on the submitted
+ *                 fee; the strategies must NOT re-introduce the unclamped chain
+ *                 rate via a second max()).
  * @returns the REAL on-chain tx hash once reconciled-included.
  * @throws  on mined-but-reverted, ceiling-hit-not-included, landed-not-ours, or
  *          attempt-0-unaffordable — each with a structured op + alert.
@@ -335,7 +350,15 @@ export async function submitWithReconciliation(
   wallet: Wallet,
   provider: JsonRpcProvider,
   cfg: ReconcileConfig,
-  feeInputs: { walletBalanceWei: bigint; baseFeeWei: bigint; snipeValueWei: bigint; buyGasLimit: bigint },
+  feeInputs: {
+    walletBalanceWei: bigint;
+    baseFeeWei: bigint;
+    snipeValueWei: bigint;
+    buyGasLimit: bigint;
+    /** Live market priority rate (already multiplier-scaled by the strategy);
+     *  folded into the desired fee BEFORE the clamp (CR-01). 0n if unknown. */
+    chainPriorityWei: bigint;
+  },
   logSink: ReconcileLogger = log,
   alert: (msg: string) => Promise<void> = async () => {}
 ): Promise<string> {
@@ -371,8 +394,20 @@ export async function submitWithReconciliation(
     //   escalated = step × (attempt + 1).
     const escalatedPriorityFeeWei = cfg.priorityFeeStepWei * BigInt(attempt + 1);
 
+    // CR-01 fix: fold the live market priority rate (already multiplier-scaled by
+    // the strategy) INTO the desired fee BEFORE the clamp, so the bid stays
+    // competitive with the going rate without escaping the affordability/ceiling
+    // clamp. The clamp below is then the FINAL authority on the submitted fee —
+    // the strategies use aff.priorityFeeWei DIRECTLY (NO second max() against the
+    // unclamped chain rate, which was the CR-01 bypass that defeated the ceiling
+    // and the sell-gas reserve on the buy path).
+    const desiredPriorityFeeWei =
+      feeInputs.chainPriorityWei > escalatedPriorityFeeWei
+        ? feeInputs.chainPriorityWei
+        : escalatedPriorityFeeWei;
+
     const aff = computeAffordablePriorityFee({
-      desiredPriorityFeeWei: escalatedPriorityFeeWei,
+      desiredPriorityFeeWei,
       ceilingWei: cfg.maxPriorityFeeCeilingWei,
       walletBalanceWei: feeInputs.walletBalanceWei,
       snipeValueWei: feeInputs.snipeValueWei,
@@ -400,8 +435,15 @@ export async function submitWithReconciliation(
       throw new Error(msg);
     }
 
-    // Detect whether the escalation has reached/exceeded the absolute ceiling.
-    const ceilingHit = escalatedPriorityFeeWei >= cfg.maxPriorityFeeCeilingWei;
+    // Detect whether we can bid no higher: the clamped fee we are about to submit
+    // is already at the absolute ceiling OR at the affordability bound (CR-01: the
+    // clamp is the final authority, so the fail-clean trigger must read the
+    // CLAMPED submitted fee, not the raw pre-clamp escalation). Once the clamp is
+    // binding, a further escalation step cannot raise the submitted fee, so a
+    // not-landed outcome means we fail cleanly rather than spin pointless retries.
+    const ceilingHit =
+      aff.priorityFeeWei >= cfg.maxPriorityFeeCeilingWei ||
+      aff.priorityFeeWei >= aff.affordabilityBoundWei;
 
     // (3) Submit this attempt via the per-strategy closure.
     const a: AttemptContext = { attempt, nonce, priorityFeeWei: aff.priorityFeeWei };

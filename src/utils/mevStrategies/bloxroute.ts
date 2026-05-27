@@ -89,18 +89,29 @@ export class BloxrouteMevStrategy implements MevStrategy {
     const walletBalanceWei = await provider.getBalance(wallet.address);
     const snipeValueWei = (txRequest.value as bigint | undefined) ?? 0n;
     const baseFeeWei = feeData.gasPrice ?? 0n;
+    // CR-01: BSC has no EIP-1559 priority field; the competitive floor is the
+    // Phase 19 gasMultiplier-scaled gasPrice ABOVE base (scaledGasPrice - baseFee,
+    // clamped >= 0). Fold it into the desired fee BEFORE the helper's
+    // affordability/ceiling clamp so the submit closure sets gasPrice = baseFee +
+    // a.priorityFeeWei DIRECTLY — NO second max() against the unclamped scaled
+    // gasPrice (that was the CR-01 bypass for the legacy path: it let the buy
+    // exceed the ceiling and consume the reserved sell gas).
+    const scaledChainGasPrice = (applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? 0n) as bigint;
+    const legacyFloor = scaledChainGasPrice - baseFeeWei;
+    const chainPriorityWei = legacyFloor > 0n ? legacyFloor : 0n;
 
     const cfg = buildReconcileConfig(process.env, sellGasLimit, maxRetries);
 
     const submit = async (a: AttemptContext): Promise<SubmitResult> => {
-      // Phase 19 / D-RACE-TELEMETRY: gasMultiplier elevates anti-rug exit gas.
-      // BSC has no EIP-1559 priority field — escalate gasPrice instead. Bid the
-      // greater of the multiplier-scaled chain gasPrice and baseFee + the helper's
-      // escalated/affordability-clamped step (D-FEE-ESCALATION); the affordability
-      // bound (which reserves the sell gas) still applies.
-      const chainGasPrice = applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? 0n;
-      const escalatedGasPrice = baseFeeWei + a.priorityFeeWei;
-      const gasPrice = chainGasPrice > escalatedGasPrice ? chainGasPrice : escalatedGasPrice;
+      // CR-01: clamp-is-final on the legacy gasPrice path. a.priorityFeeWei is the
+      // helper's affordability/ceiling-clamped fee, with the multiplier-scaled
+      // chain gasPrice ALREADY folded in as the competitive floor BEFORE the clamp
+      // (chainPriorityWei = scaledGasPrice - baseFee). The submitted gasPrice is
+      // baseFee + the clamped priority DIRECTLY — NO second max() against the
+      // unclamped scaled gasPrice (the CR-01 bypass that defeated the ceiling and
+      // the reserved sell gas on BSC). If the going rate genuinely cannot be
+      // afforded under the sell reserve, the helper rejects cleanly (Pitfall 7).
+      const gasPrice = baseFeeWei + a.priorityFeeWei;
 
       const populatedTx: TransactionRequest = {
         ...txRequest,
@@ -187,7 +198,7 @@ export class BloxrouteMevStrategy implements MevStrategy {
       wallet,
       provider,
       cfg,
-      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit },
+      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit, chainPriorityWei },
       { info: log.info.bind(log), warn: log.warn.bind(log), error: log.error.bind(log) }
     );
   }

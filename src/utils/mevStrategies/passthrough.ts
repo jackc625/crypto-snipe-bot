@@ -63,6 +63,21 @@ export class PassthroughMevStrategy implements MevStrategy {
       feeData.maxFeePerGas != null && feeData.maxPriorityFeePerGas != null
         ? feeData.maxFeePerGas - feeData.maxPriorityFeePerGas
         : (feeData.gasPrice ?? 0n);
+    // CR-01: the live market priority rate (Phase 19 gasMultiplier-scaled) is the
+    // COMPETITIVE FLOOR, folded into the desired fee BEFORE the helper's
+    // affordability/ceiling clamp so the submit closure uses a.priorityFeeWei
+    // DIRECTLY (no second max() that would defeat the ceiling / sell-gas reserve).
+    // On the legacy fallback branch (no EIP-1559 priority field) the competitive
+    // floor is the scaled gasPrice ABOVE base (scaledGasPrice - baseFee), clamped
+    // to >= 0 so a scaledGasPrice <= baseFee contributes no negative floor.
+    let chainPriorityWei: bigint;
+    if (feeData.maxFeePerGas) {
+      chainPriorityWei = (applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? 0n) as bigint;
+    } else {
+      const scaledGasPrice = (applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? 0n) as bigint;
+      const legacyFloor = scaledGasPrice - baseFeeWei;
+      chainPriorityWei = legacyFloor > 0n ? legacyFloor : 0n;
+    }
 
     const cfg = buildReconcileConfig(process.env, sellGasLimit, maxRetries);
 
@@ -78,20 +93,22 @@ export class PassthroughMevStrategy implements MevStrategy {
       // Phase 19 / D-RACE-TELEMETRY: optional gasMultiplier elevates the anti-rug
       // exit's gas to improve race odds against the rug-puller.
       if (feeData.maxFeePerGas) {
-        // Phase 19 gasMultiplier scales the chain's fee data (anti-rug exit). The
-        // priority BID is the greater of the multiplier-scaled chain priority and
-        // the helper's escalated/affordability-clamped fee (D-FEE-ESCALATION); a
-        // retry never drops the bid below the going rate.
-        const chainPriority = applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? 0n;
-        const priorityBid = a.priorityFeeWei > chainPriority ? a.priorityFeeWei : chainPriority;
-        // The maxFeePerGas CAP must cover baseFee + the (possibly escalated) priority
-        // bid so maxPriorityFeePerGas never exceeds maxFeePerGas (invalid EIP-1559).
-        const chainMaxFee = applyGasMultiplier(feeData.maxFeePerGas, gasMultiplier) ?? 0n;
-        const requiredMaxFee = baseFeeWei + priorityBid;
-        populatedTx.maxFeePerGas = chainMaxFee > requiredMaxFee ? chainMaxFee : requiredMaxFee;
-        populatedTx.maxPriorityFeePerGas = priorityBid;
+        // CR-01: a.priorityFeeWei is the helper's affordability/ceiling-clamped fee
+        // (the multiplier-scaled chain priority is ALREADY folded in as the
+        // competitive floor BEFORE the clamp via chainPriorityWei). Use it DIRECTLY
+        // — NO second max() against the unclamped chain rate (the CR-01 bypass).
+        // maxFeePerGas = baseFee + the clamped priority (consistent with the
+        // affordability reserve model; closes WR-03). priority <= maxFee by
+        // construction (baseFee >= 0).
+        populatedTx.maxPriorityFeePerGas = a.priorityFeeWei;
+        populatedTx.maxFeePerGas = baseFeeWei + a.priorityFeeWei;
       } else {
-        populatedTx.gasPrice = applyGasMultiplier(feeData.gasPrice, gasMultiplier) ?? undefined;
+        // Legacy fallback (no EIP-1559 field): clamp-is-final here too — the
+        // submitted gasPrice is baseFee + the clamped priority (the scaled chain
+        // gasPrice was folded into chainPriorityWei as the competitive floor before
+        // the clamp). NOT an unclamped applyGasMultiplier(gasPrice) that would
+        // escape the affordability/ceiling bound.
+        populatedTx.gasPrice = baseFeeWei + a.priorityFeeWei;
       }
 
       // D-SIMULATE-BEFORE-SUBMIT: simulate the exact populated tx before broadcast
@@ -139,7 +156,7 @@ export class PassthroughMevStrategy implements MevStrategy {
       wallet,
       provider,
       cfg,
-      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit },
+      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit, chainPriorityWei },
       { info: log.info.bind(log), warn: log.warn.bind(log), error: log.error.bind(log) }
     );
   }

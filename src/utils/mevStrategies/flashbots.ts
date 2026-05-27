@@ -88,6 +88,12 @@ export class FlashbotsMevStrategy implements MevStrategy {
       feeData.maxFeePerGas != null && feeData.maxPriorityFeePerGas != null
         ? feeData.maxFeePerGas - feeData.maxPriorityFeePerGas
         : (feeData.gasPrice ?? 0n);
+    // CR-01: the live market priority rate (Phase 19 gasMultiplier-scaled) is the
+    // COMPETITIVE FLOOR for the bid. It is folded into the desired fee BEFORE the
+    // helper's affordability/ceiling clamp (the clamp is the final authority), so
+    // the submit closure can use a.priorityFeeWei DIRECTLY — no second max() that
+    // would re-introduce the unclamped chain rate and defeat the ceiling.
+    const chainPriorityWei = (applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? 0n) as bigint;
 
     // ReconcileConfig from the 5 MEV env vars (generous defaults from 21.1-02) +
     // the per-chain sell gas limit + the strategy's retry budget.
@@ -108,21 +114,19 @@ export class FlashbotsMevStrategy implements MevStrategy {
       };
 
       if (feeData.maxFeePerGas) {
-        // Phase 19 gasMultiplier scales the chain's fee data (anti-rug exit). The
-        // priority BID is the greater of the multiplier-scaled chain priority and
-        // the helper's escalated/affordability-clamped fee, so a retry never DROPS
-        // the bid below the going rate and the per-retry escalation is honored
-        // (D-FEE-ESCALATION).
-        const chainPriority = applyGasMultiplier(feeData.maxPriorityFeePerGas, gasMultiplier) ?? 0n;
-        const priorityBid = a.priorityFeeWei > chainPriority ? a.priorityFeeWei : chainPriority;
-        // The maxFeePerGas CAP must always cover baseFee + the (possibly escalated)
-        // priority bid — otherwise maxPriorityFeePerGas > maxFeePerGas is an invalid
-        // EIP-1559 tx. Take the greater of the multiplier-scaled chain cap and
-        // (baseFee + priorityBid).
-        const chainMaxFee = applyGasMultiplier(feeData.maxFeePerGas, gasMultiplier) ?? 0n;
-        const requiredMaxFee = baseFeeWei + priorityBid;
-        populatedTx.maxFeePerGas = chainMaxFee > requiredMaxFee ? chainMaxFee : requiredMaxFee;
-        populatedTx.maxPriorityFeePerGas = priorityBid;
+        // CR-01: a.priorityFeeWei is the helper's affordability/ceiling-clamped
+        // fee, with the multiplier-scaled chain priority ALREADY folded in as the
+        // competitive floor BEFORE the clamp (chainPriorityWei in feeInputs). It is
+        // the FINAL authority on the submitted priority fee — use it DIRECTLY. We
+        // must NOT take a second max() against the unclamped chain rate here: that
+        // was the CR-01 bypass that let the buy bid above the 5-gwei ceiling and
+        // consume the reserved sell gas (stranding the exit). maxFeePerGas is set
+        // consistently to baseFee + the clamped priority (the same effective price
+        // the affordability reserve models — also closes WR-03's modeling gap); it
+        // is never max()'d against an unclamped chainMaxFee that would re-introduce
+        // overspend. priority <= maxFee holds by construction (baseFee >= 0).
+        populatedTx.maxPriorityFeePerGas = a.priorityFeeWei;
+        populatedTx.maxFeePerGas = baseFeeWei + a.priorityFeeWei;
         populatedTx.type = 2;
       } else {
         populatedTx.gasPrice =
@@ -213,7 +217,7 @@ export class FlashbotsMevStrategy implements MevStrategy {
       wallet,
       provider,
       cfg,
-      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit },
+      { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit, chainPriorityWei },
       { info: log.info.bind(log), warn: log.warn.bind(log), error: log.error.bind(log) }
     );
   }
