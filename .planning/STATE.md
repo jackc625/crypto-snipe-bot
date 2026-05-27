@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v6.17
 milestone_name: Defensive Hardening for Live Mainnet
 status: executing
-stopped_at: Phase 21 executing — autonomous Waves 1-2 (6 plans); Waves 3-4 (21-07 real-capital, 21-08 operator-action) are autonomous:false operator-gated checkpoints
-last_updated: 2026-05-26T18:00:00.000Z
-last_activity: 2026-05-26 -- Phase 21 execute-phase started (/gsd-execute-phase 21). DAG waves: W1 [21-01,21-02,21-05] · W2 [21-03,21-04,21-06] · W3 [21-07 autonomous:false REAL MAINNET CAPITAL] · W4 [21-08 autonomous:false operator actions]. use_worktrees:false + branching:none → sequential gsd-executor (opus) on master; orchestrator is SOLE writer of STATE.md/ROADMAP.md (gsd-sdk state.* verbs corrupt this hand-maintained STATE shape — executors instructed to skip all state.*/roadmap.* writes).
+stopped_at: Phase 21 executing — autonomous Waves 1-2 (6 plans); Waves 3-4 (21-07 real-capital, 21-08 operator-action) are autonomous:false operator-gated checkpoints; Phase 21.1 INSERTED 2026-05-26 (urgent — V3-buy tax-gate + Flashbots false-negative inclusion) blocks 21-07; Phase 21.1 now PLANNED 2026-05-26 — 6 plans, 5 waves, plan-checker PASSED — ready for /gsd-execute-phase 21.1
+last_updated: 2026-05-26T21:45:00.000Z
+last_activity: 2026-05-26 -- Phase 21.1 PLANNED via /gsd-plan-phase 21.1 (research → pattern-map → plan → plan-checker). 6 plans, 5 waves, all autonomous: W0 [21.1-01 REQUIREMENTS rows + Nyquist it.skip stubs] · W1 [21.1-02 shared reconciliation.ts helper + 5 MEV env vars; 21.1-03 V3 tax-gate removal + eth-v3-trailing fork-fixture flip] · W2 [21.1-04 wire all 3 MEV strategies through submitWithReconciliation] · W3 [21.1-05 delete dead legacy txManager branch + record real tx hash] · W4 [21.1-06 full-suite + passthrough fork-rehearsal gate before the 21-07 retry]. plan-checker PASSED (0 blockers; 2 minor warnings fixed). RESEARCH confirmed a deferred high-severity anomaly — the V2 signer-swap (tokenSafety.ts:497) fires a real amountOutMin=0 buy on EVERY V2 snipe — recorded as STOP-THE-LINE-03 (DEFERRED, not fixed; out of D-V3-ONLY-SCOPE). branching:none → all artifacts committed to master; orchestrator is SOLE writer of STATE.md/ROADMAP.md (gsd-sdk state.*/roadmap.* verbs corrupt this hand-maintained shape — planning used hand-edits + read-only queries only).
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 2
   total_plans: 36
   completed_plans: 90
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-04-29 — v6.17 milestone scoped)
 
 ## Current Position
 
-Phase: 21
+Phase: 21.1 (PLANNED — urgent; blocks Phase 21's 21-07 real-capital capture)
 Plan: Waves 1-2 COMPLETE (6/8). 21-07 ATTEMPTED on real mainnet → ABORTED: surfaced a CRITICAL Flashbots false-negative bug (the real LADYS buy landed on-chain but bundle.wait() reported "not included" → bot logged TX failed → untracked/unmonitored position). No funds lost (LADYS recovered to ETH via direct non-Flashbots sell). Capture BLOCKED pending 21.1. Two 21.1 blockers OPEN: (1) V3-buy tax-gate, (2) Flashbots false-negative inclusion — both must be fixed before retrying 21-07.
-Status: 21-07 aborted (D-STOP-THE-LINE); TWO 21.1 blockers open (see Blockers/Concerns). Waves 1-2 + harness fix banked.
+Status: Phase 21.1 PLANNED (6 plans, 5 waves; plan-checker PASSED) — next: /gsd-execute-phase 21.1. The two 21.1 blockers remain OPEN until 21.1 executes (they are exactly what 21.1 fixes); Phase 21's 21-07 stays blocked until then.
 Last activity: 2026-05-26
 
 ## Performance Metrics
@@ -46,6 +46,10 @@ Last activity: 2026-05-26
 Per-plan breakdown preserved in `.planning/milestones/v6.16-ROADMAP.md`.
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 21.1 (V3-Buy Tax-Gate + Flashbots Inclusion Fix) inserted after Phase 21 on 2026-05-26 (URGENT) via `/gsd-phase --insert 21` — STOP-THE-LINE-01 (V3-buy tax-gate) + STOP-THE-LINE-02 (Flashbots false-negative inclusion), surfaced by the Plan 21-03 regression net + the 21-07 live-capture attempt; blocks the 21-07 real-capital roundtrip and Phase 21 close (D-STOP-THE-LINE). Directory: `.planning/phases/21.1-v3-tax-gate-and-flashbots-inclusion/`. Diagnoses live in the Phase 21 dir (`21-STOP-THE-LINE-01-v3-buy-tax-gate.md`, `21-STOP-THE-LINE-02-flashbots-false-negative.md`). Inserted by hand (not via `gsd-sdk state.*`/`roadmap.*`, which mis-parse this hand-maintained STATE/ROADMAP shape). **PLANNED 2026-05-26** via `/gsd-plan-phase 21.1`: RESEARCH + PATTERNS + VALIDATION (Nyquist) authored, 6 plans across 5 waves, plan-checker PASSED; ROADMAP §21.1 Phase Details + Progress row (0/6, Planned) hand-added by the planner agent. A confirmed-but-deferred V2 signer-swap anomaly was logged as STOP-THE-LINE-03 (out of 21.1 V3-only scope).
 
 ### Recent Decisions
 
