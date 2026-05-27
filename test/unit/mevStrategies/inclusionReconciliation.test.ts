@@ -48,7 +48,7 @@
 //   - test/helpers/mockProvider.ts — `createMockProvider` (defaults
 //     `getTransactionReceipt→{status:1}`, `getTransactionCount→42`).
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { parseEther, parseUnits } from 'ethers';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { createMockProvider } from '../../helpers/mockProvider';
@@ -169,13 +169,31 @@ function recordingSubmit(
     return { fn, calls };
 }
 
+// Snapshot the MEV confirm-window env so the per-strategy tests can inject a TINY
+// window/poll (Pitfall 5: the 45s prod default would blow testTimeout:5000 on the
+// genuinely-not-landed poll). buildReconcileConfig(process.env) reads these.
+const SAVED_ENV: Record<string, string | undefined> = {
+    MEV_CONFIRM_WINDOW_MS: process.env.MEV_CONFIRM_WINDOW_MS,
+    MEV_CONFIRM_POLL_MS: process.env.MEV_CONFIRM_POLL_MS,
+};
+
 beforeEach(() => {
+    // Tiny confirm-window/poll so the bounded reconcile loop returns fast.
+    process.env.MEV_CONFIRM_WINDOW_MS = '60';
+    process.env.MEV_CONFIRM_POLL_MS = '10';
     logInfo.mockReset();
     logWarn.mockReset();
     logError.mockReset();
     sendBundleMock.mockReset();
-    // Re-establish create→{sendBundle} (wiped by mockReset:true — vitest.config.ts:16).
-    createMock.mockReset().mockResolvedValue({ sendBundle: sendBundleMock });
+    // Re-establish create→{sendBundle, signBundle, simulate} (wiped by
+    // mockReset:true — vitest.config.ts:16). Phase 21.1: the wrapper calls
+    // signBundle + simulate before sendBundle (D-SIMULATE-BEFORE-SUBMIT). A
+    // non-revert SimulationResponseSuccess (no firstRevert) lets submit proceed.
+    createMock.mockReset().mockResolvedValue({
+        sendBundle: sendBundleMock,
+        signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+        simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
+    });
     waitResolution = 1; // misreport-but-landed default for this file
     sendBundleMock.mockResolvedValue({
         bundleHash: STUB_BUNDLE_HASH,
@@ -186,6 +204,14 @@ beforeEach(() => {
         simulate: () => Promise.resolve({}),
         receipts: () => Promise.resolve([]),
     });
+});
+
+afterEach(() => {
+    // Restore the MEV confirm-window env (avoid leaking into other test files).
+    for (const [k, v] of Object.entries(SAVED_ENV)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
 });
 
 // Silence "declared but never read" until the GREEN waves consume these in the
@@ -208,16 +234,44 @@ void STUB_TX_REQ;
 // =============================================================================
 
 describe('STOP-THE-LINE-02 — inclusion reconciliation (false-negative harm #1)', () => {
-    it.skip('false-negative-loses-position: flashbots wait()=1 but receipt.status===1 → returns real hash, no throw', async () => {
-        // GREEN (21.1-04): waitResolution=1; provider receipt status 1 + nonce
-        // advanced → strategy.sendTransaction resolves STUB_MINED_HASH, no throw.
-        expect(true).toBe(false);
+    it('false-negative-loses-position: flashbots wait()=1 but receipt.status===1 → returns real hash, no throw', async () => {
+        // The live LADYS regression: bundle.wait() resolves 1 (BlockPassed) — the
+        // relay LIES "not included" — WHILE the tx actually landed
+        // (getTransactionReceipt(signedTxHash).status===1). The wrapper must NOT
+        // throw: it routes through submitWithReconciliation, which reconciles the
+        // deterministic signed-tx hash against chain state and returns the REAL hash
+        // so the position is recorded + monitored (harm-prevention #1).
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 1; // relay reports "not included"
+        const provider = makeLandedProvider(); // receipt status 1, nonce 42→43
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3);
+
+        // SUCCESS, not throw: the real mined hash is returned (SC2).
+        expect(result).toBe(STUB_MINED_HASH);
+        // The reconciled-late inclusion logged the new op (native confirm lied).
+        expect(logInfo).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'mev.reconcile.included', minedTxHash: STUB_MINED_HASH }),
+            expect.any(String),
+        );
     });
 
-    it.skip('false-negative-loses-position: flashbots wait()=2 (AccountNonceTooHigh) but receipt.status===1 → returns real hash', async () => {
-        // GREEN (21.1-04): waitResolution=2 is an EVEN STRONGER "tx already landed"
-        // signal — short-circuit to the receipt probe; return the real hash.
-        expect(true).toBe(false);
+    it('false-negative-loses-position: flashbots wait()=2 (AccountNonceTooHigh) but receipt.status===1 → returns real hash', async () => {
+        // waitResolution=2 (AccountNonceTooHigh) is an EVEN STRONGER "tx already
+        // landed" signal (the nonce was consumed). The wrapper maps it to
+        // nativeConfirmed:false so the helper short-circuits to the receipt probe;
+        // the receipt (status 1) yields the real hash — no throw, no resubmit.
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 2; // AccountNonceTooHigh
+        const provider = makeLandedProvider();
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3);
+
+        expect(result).toBe(STUB_MINED_HASH);
+        // submit primitive fired exactly once even on the nonce-too-high signal.
+        expect(sendBundleMock).toHaveBeenCalledTimes(1);
     });
 
     it.skip('false-negative-loses-position: bloXroute axios timeout but receipt.status===1 → returns relay hash', async () => {
@@ -227,11 +281,31 @@ describe('STOP-THE-LINE-02 — inclusion reconciliation (false-negative harm #1)
         expect(true).toBe(false);
     });
 
-    it.skip('false-negative-loses-position: passthrough tx.wait(3) timeout but receipt.status===1 → returns tx.hash', async () => {
-        // GREEN (21.1-04): wallet.sendTransaction returns {hash, wait} where
-        // wait(3) rejects/times-out while provider.getTransactionReceipt(hash)→
-        // {status:1}; assert tx.hash returned, sendTransaction called once.
-        expect(true).toBe(false);
+    it('false-negative-loses-position: passthrough tx.wait(3) timeout but receipt.status===1 → returns tx.hash', async () => {
+        // Base/Arb analog of the LADYS harm: under RPC lag tx.wait(3) REJECTS
+        // (times out) even though the tx landed. The old code threw 'TX failed';
+        // the wrapper now defers to chain-state reconciliation — getTransactionReceipt
+        // (status 1) returns the real tx.hash, no throw, no double-spend.
+        const { PassthroughMevStrategy } = await import('../../../src/utils/mevStrategies/passthrough');
+        const provider = makeLandedProvider(); // receipt status 1, nonce 42→43, call→'0x'
+        const sendTxMock = vi.fn().mockResolvedValue({
+            hash: STUB_MINED_HASH,
+            wait: vi.fn().mockRejectedValue(new Error('timeout waiting for tx')),
+        });
+        const wallet = { address: '0xWallet000000000000000000000000000000W01', sendTransaction: sendTxMock } as unknown as Wallet;
+        const strategy = new PassthroughMevStrategy('base');
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, wallet, provider, 3);
+
+        // tx.hash returned (no throw) — the position is recorded (harm-prevention #1).
+        expect(result).toBe(STUB_MINED_HASH);
+        // submit primitive (wallet.sendTransaction) fired exactly once (no double-spend).
+        expect(sendTxMock).toHaveBeenCalledTimes(1);
+        // The wait-timeout was logged as a deferral, NOT a failure.
+        expect(logWarn).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'passthrough.wait.timeout' }),
+            expect.any(String),
+        );
     });
 });
 
@@ -243,16 +317,52 @@ describe('STOP-THE-LINE-02 — inclusion reconciliation (false-negative harm #1)
 // =============================================================================
 
 describe('STOP-THE-LINE-02 — nonce-safe retry (double-spend harm #2)', () => {
-    it.skip('double-spend: misreport-but-landed calls the submit primitive exactly once (toHaveBeenCalledTimes(1))', async () => {
-        // GREEN (21.1-04): expect(sendBundleMock).toHaveBeenCalledTimes(1) in the
-        // landed-but-misreported case — no second real buy.
-        expect(true).toBe(false);
+    it('double-spend: misreport-but-landed calls the submit primitive exactly once (toHaveBeenCalledTimes(1))', async () => {
+        // The flashbots misreport-but-landed case (wait()=1 lies, receipt status 1):
+        // the wrapper must reconcile the SAME submitted tx, never fire a SECOND real
+        // buy. This is the double-spend the old baseNonce+attempt loop permitted.
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 1;
+        const provider = makeLandedProvider(); // receipt status 1 on first probe
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3);
+
+        expect(result).toBe(STUB_MINED_HASH);
+        // CRITICAL (double-spend guard): exactly ONE sendBundle — no second buy.
+        expect(sendBundleMock).toHaveBeenCalledTimes(1);
     });
 
-    it.skip('double-spend: genuine resubmit uses the re-fetched "latest" nonce, never base+attempt', async () => {
-        // GREEN (21.1-04): capture the submitted tx via .mock.calls[N][0]; assert
-        // capturedTx.nonce === re-fetched getTransactionCount('latest'), not base+attempt.
-        expect(true).toBe(false);
+    it('double-spend: genuine resubmit uses the re-fetched "latest" nonce, never base+attempt', async () => {
+        // A GENUINELY not-landed attempt-0 (receipt null + nonce unchanged) escalates
+        // and resubmits. The resubmit MUST reuse the re-fetched 'latest' nonce (a
+        // replacement tx at the SAME nonce), never baseNonce+attempt (which would be
+        // 43 and risk a second real buy). attempt-1 then lands (receipt status 1).
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 1; // relay never reports inclusion → forces reconcile each attempt
+
+        // getTransactionCount stays 42 across BOTH attempts (nonce never advances),
+        // so a resubmit reuses 42 (replacement) rather than base+attempt=43.
+        // getTransactionReceipt is gated on the submit count (robust against the
+        // poll count of the bounded window): null until the SECOND sendBundle has
+        // fired (attempt-0 genuinely not-landed), then status 1 (attempt-1 landed).
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+            getTransactionReceipt: vi.fn().mockImplementation(async () =>
+                sendBundleMock.mock.calls.length >= 2 ? { status: 1, blockNumber: 25182801 } : null
+            ),
+        }) as unknown as JsonRpcProvider;
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        const result = await strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3);
+
+        expect(result).toBe(STUB_MINED_HASH);
+        // Two genuine submits (attempt-0 not-landed → escalate → attempt-1 lands).
+        expect(sendBundleMock).toHaveBeenCalledTimes(2);
+        // The SECOND submit reused the re-fetched 'latest' nonce (42), NOT base+attempt
+        // (which would be 43) — the load-bearing nonce-safety assertion (SC3).
+        const secondBundleArg = (sendBundleMock.mock.calls[1][0] as Array<{ transaction: TransactionRequest }>)[0];
+        expect(secondBundleArg.transaction.nonce).toBe(42);
     });
 
     it('double-spend: advanced "latest" nonce at attempt start → no submit fires that attempt (helper-logic, plan 21.1-02)', async () => {
@@ -354,6 +464,27 @@ describe('STOP-THE-LINE-02 — mined-but-reverted (false-success harm #4)', () =
             expect.any(String),
         );
     });
+
+    it('mined-but-reverted false-success: flashbots strategy receipt.status===0 → throws, exactly one sendBundle (per-strategy)', async () => {
+        // Per-strategy proof (plan 21.1-04): the flashbots wrapper reconciles a
+        // wait()=1 against the receipt; a status-0 receipt is a GENUINE mined-but-
+        // reverted failure → sendTransaction THROWS and does NOT resubmit the same
+        // nonce (a reverted tx is NOT a successful buy — false-success harm #4).
+        const { FlashbotsMevStrategy } = await import('../../../src/utils/mevStrategies/flashbots');
+        waitResolution = 1; // relay "not included" → reconcile by receipt
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+            getTransactionReceipt: vi.fn().mockResolvedValue({ status: 0, blockNumber: 25182801 }),
+        }) as unknown as JsonRpcProvider;
+        const strategy = new FlashbotsMevStrategy({ authKey: AUTH_KEY });
+
+        await expect(
+            strategy.sendTransaction(STUB_TX_REQ, makeWallet(), provider, 3),
+        ).rejects.toThrow(/REVERTED/i);
+
+        // No same-nonce resubmit: exactly one sendBundle fired.
+        expect(sendBundleMock).toHaveBeenCalledTimes(1);
+    });
 });
 
 // =============================================================================
@@ -446,10 +577,35 @@ describe('STOP-THE-LINE-02 — fee escalation affordability (stranded-exit harm 
 // =============================================================================
 
 describe('STOP-THE-LINE-02 (SC4) — sell leg inherits reconciliation', () => {
-    it.skip('sell-leg inherits (SC4): sell-shaped tx misreport-but-landed returns real hash', async () => {
-        // GREEN (21.1-04): a sell-shaped TransactionRequest through the same
-        // strategy → misreport-but-landed → returns the real hash (exit inherits).
-        expect(true).toBe(false);
+    it('sell-leg inherits (SC4): sell-shaped tx misreport-but-landed returns real hash', async () => {
+        // The exit leg (executeFullSell) submits through the SAME strategy +
+        // helper, so it inherits reconciliation. A sell-shaped tx (no native value,
+        // a swapExactTokensForETH-style calldata) that is misreported-but-landed
+        // must return the REAL hash so decodeReceipt runs on a real receipt and the
+        // captured amount_out is real (SC4). Proven via passthrough (the fork/exit
+        // strategy): tx.wait(3) times out while the receipt says status 1.
+        const { PassthroughMevStrategy } = await import('../../../src/utils/mevStrategies/passthrough');
+        const sellShapedTx: TransactionRequest = {
+            to: '0xRouter',
+            data: '0xSELLcalldata', // swapExactTokensForETH-shaped (no value)
+            gasLimit: 250_000n,
+        };
+        const provider = makeLandedProvider(); // receipt status 1, call→'0x'
+        const sendTxMock = vi.fn().mockResolvedValue({
+            hash: STUB_MINED_HASH,
+            wait: vi.fn().mockRejectedValue(new Error('timeout waiting for sell tx')),
+        });
+        const wallet = { address: '0xWallet000000000000000000000000000000W01', sendTransaction: sendTxMock } as unknown as Wallet;
+        const strategy = new PassthroughMevStrategy('base');
+
+        const result = await strategy.sendTransaction(sellShapedTx, wallet, provider, 3);
+
+        // The exit leg gets the real hash — the position is not stranded/mis-tracked.
+        expect(result).toBe(STUB_MINED_HASH);
+        expect(sendTxMock).toHaveBeenCalledTimes(1);
+        // The sell-shaped tx carried no native value (snipeValueWei path = 0n).
+        const capturedTx = sendTxMock.mock.calls[0][0] as TransactionRequest;
+        expect(capturedTx.value).toBeUndefined();
     });
 });
 

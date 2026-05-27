@@ -44,9 +44,13 @@ describe('FlashbotsMevStrategy', () => {
 
     it('sendTransaction calls FlashbotsBundleProvider.sendBundle', async () => {
         const mockFbProvider = {
+            // Phase 21.1: the wrapper now signs + simulates before sendBundle
+            // (D-SIMULATE-BEFORE-SUBMIT). Provide non-revert sim + a clean bundle.
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockResolvedValue({
                 bundleHash: '0xbundlehash',
-                bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
+                bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000', nonce: 42 }],
                 wait: vi.fn().mockResolvedValue(0),
             }),
         };
@@ -74,6 +78,7 @@ describe('FlashbotsMevStrategy', () => {
             expect.arrayContaining([
                 expect.objectContaining({
                     signer: wallet,
+                    // Re-fetched 'latest' nonce (42) — D-NONCE-SAFE-RETRY, no base+attempt.
                     transaction: expect.objectContaining({ nonce: 42 }),
                 }),
             ]),
@@ -84,11 +89,13 @@ describe('FlashbotsMevStrategy', () => {
     it('sendTransaction includes correct targetBlockNumber', async () => {
         const capturedBlocks: number[] = [];
         const mockFbProvider = {
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockImplementation(async (_b: any, block: number) => {
                 capturedBlocks.push(block);
                 return {
                     bundleHash: '0x',
-                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000', nonce: 42 }],
                     wait: vi.fn().mockResolvedValue(0),
                 };
             }),
@@ -134,9 +141,11 @@ describe('FlashbotsMevStrategy', () => {
     it('sendTransaction returns real tx hash from bundleTransactions[0].hash, not synthetic', async () => {
         const REAL_HASH = '0xrealtxhash0000000000000000000000000000000000000000000000000000';
         const mockFbProvider = {
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockResolvedValue({
                 bundleHash: '0xbundlehash',
-                bundleTransactions: [{ hash: REAL_HASH }],
+                bundleTransactions: [{ hash: REAL_HASH, nonce: 42 }],
                 wait: vi.fn().mockResolvedValue(0),
             }),
         };
@@ -165,6 +174,8 @@ describe('FlashbotsMevStrategy', () => {
 
     it('sendTransaction throws descriptive error if bundleTransactions[0].hash is missing', async () => {
         const mockFbProvider = {
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockResolvedValue({
                 bundleHash: '0xbundlehash',
                 bundleTransactions: [],
@@ -356,26 +367,26 @@ describe('PassthroughMevStrategy', () => {
         expect(await strategy.healthCheck()).toBe(true);
     });
 
-    it('retries on failure and succeeds on subsequent attempt', async () => {
+    it('reconciles a wait-timeout to a landed tx and returns the real hash (no resubmit)', async () => {
+        // Phase 21.1 / STOP-THE-LINE-02: the retry semantics changed. The old loop
+        // resubmitted on ANY thrown attempt (the baseNonce+attempt double-spend
+        // hazard). The wrapper now routes through submitWithReconciliation: when the
+        // native tx.wait(3) TIMES OUT (the Base/Arb LADYS class) the strategy does
+        // NOT throw/resubmit — it reconciles the deterministic tx.hash against chain
+        // state. getTransactionReceipt(status:1) → returns the real hash, ONE submit.
         vi.doMock('@flashbots/ethers-provider-bundle', () => ({
             FlashbotsBundleProvider: { create: vi.fn() },
         }));
 
         const { PassthroughMevStrategy } = await import('../../src/utils/mevStrategies/passthrough');
+        // createMockProvider defaults getTransactionReceipt → {status:1} (landed).
         const provider = createMockProvider();
 
-        let callCount = 0;
         const wallet = {
             address: '0x1234',
-            sendTransaction: vi.fn().mockImplementation(async () => {
-                callCount++;
-                if (callCount === 1) {
-                    throw new Error('TX failed first attempt');
-                }
-                return {
-                    hash: '0xretry-success',
-                    wait: vi.fn().mockResolvedValue({ status: 1, blockNumber: 18000002 }),
-                };
+            sendTransaction: vi.fn().mockResolvedValue({
+                hash: '0xretry-success',
+                wait: vi.fn().mockRejectedValue(new Error('tx.wait timeout under RPC lag')),
             }),
         } as any;
 
@@ -383,11 +394,17 @@ describe('PassthroughMevStrategy', () => {
 
         const result = await strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 2);
 
-        expect(wallet.sendTransaction).toHaveBeenCalledTimes(2);
+        // ONE submit — the timeout reconciled instead of resubmitting (no double-spend).
+        expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
         expect(result).toBe('0xretry-success');
     });
 
-    it('throws after maxRetries exhausted', async () => {
+    it('a broadcast that throws (no tx created) propagates without resubmitting the same nonce', async () => {
+        // Phase 21.1 / D-NONCE-SAFE-RETRY: a wallet.sendTransaction that THROWS
+        // produced no tx (no hash, nonce not consumed). The wrapper propagates it
+        // rather than blindly resubmitting at an incremented nonce (the old
+        // baseNonce+attempt double-spend hazard). The operator re-runs; we never
+        // fire a second real broadcast off the back of a failed one.
         vi.doMock('@flashbots/ethers-provider-bundle', () => ({
             FlashbotsBundleProvider: { create: vi.fn() },
         }));
@@ -406,7 +423,7 @@ describe('PassthroughMevStrategy', () => {
             strategy.sendTransaction(createMockTxRequest(), wallet, provider as any, 1)
         ).rejects.toThrow('always fails');
 
-        // 0 + 1 = 2 attempts total
-        expect(wallet.sendTransaction).toHaveBeenCalledTimes(2);
+        // Exactly ONE broadcast attempt — no same-nonce resubmit on a thrown broadcast.
+        expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
     });
 });

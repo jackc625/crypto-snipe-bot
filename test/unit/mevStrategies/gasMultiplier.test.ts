@@ -56,6 +56,12 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             getTransactionCount: vi.fn().mockResolvedValue(42),
             getFeeData: vi.fn().mockResolvedValue(feeData),
             getNetwork: vi.fn().mockResolvedValue({ chainId: 8453n }),
+            // Phase 21.1: the passthrough wrapper now reads the balance for the
+            // affordability bound (D-FEE-ESCALATION) and runs provider.call(...) as
+            // simulate-before-submit (D-SIMULATE-BEFORE-SUBMIT). 10 ETH keeps the tx
+            // affordable; call resolves (no revert) so the submit is reached.
+            getBalance: vi.fn().mockResolvedValue(10_000_000_000_000_000_000n), // 10 ETH
+            call: vi.fn().mockResolvedValue('0x'),
         } as unknown as JsonRpcProvider;
     }
 
@@ -72,8 +78,16 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
         } as unknown as Wallet;
     }
 
+    // Phase 21.1 NOTE: the passthrough strategy now routes through
+    // submitWithReconciliation, whose D-FEE-ESCALATION supplies a per-attempt
+    // priority fee with a 1-gwei floor (MEV_PRIORITY_FEE_STEP_GWEI default). The
+    // strategy bids max(multiplier-scaled chain priority, helper escalation) and
+    // raises maxFeePerGas to cover baseFee + that bid. These tests use realistic
+    // GWEI-scale fees so the multiplier-scaled chain priority dominates the floor,
+    // proving the Phase 19 gasMultiplier STILL reaches the populated priority fee.
     it("Test 7: gasMultiplier=2.0 doubles maxFeePerGas + maxPriorityFeePerGas on EIP-1559 chain", async () => {
-        const provider = makeProvider({ maxFeePerGas: 100n, maxPriorityFeePerGas: 10n });
+        // chain: maxFee 50 gwei, priority 3 gwei → baseFee = 47 gwei.
+        const provider = makeProvider({ maxFeePerGas: 50_000_000_000n, maxPriorityFeePerGas: 3_000_000_000n });
         const wallet = makeWallet();
         const strategy = new PassthroughMevStrategy('base');
         await strategy.sendTransaction(
@@ -84,12 +98,17 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             2.0,
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
-        expect(capturedTx.maxFeePerGas).toBe(200n);
-        expect(capturedTx.maxPriorityFeePerGas).toBe(20n);
+        // priority = max(3gwei×2, 1gwei floor) = 6 gwei; the multiplier reached it.
+        expect(capturedTx.maxPriorityFeePerGas).toBe(6_000_000_000n);
+        // maxFee cap = max(50gwei×2=100gwei, baseFee 47gwei + 6gwei = 53gwei) = 100 gwei.
+        expect(capturedTx.maxFeePerGas).toBe(100_000_000_000n);
+        // Invariant: priority never exceeds the cap (valid EIP-1559 tx).
+        expect((capturedTx.maxPriorityFeePerGas as bigint) <= (capturedTx.maxFeePerGas as bigint)).toBe(true);
     });
 
-    it("Test 8: gasMultiplier=undefined preserves raw maxFeePerGas (prior behavior — no elevation)", async () => {
-        const provider = makeProvider({ maxFeePerGas: 100n, maxPriorityFeePerGas: 10n });
+    it("Test 8: gasMultiplier=undefined preserves raw chain priority when it exceeds the escalation floor", async () => {
+        // chain: maxFee 50 gwei, priority 3 gwei → baseFee = 47 gwei.
+        const provider = makeProvider({ maxFeePerGas: 50_000_000_000n, maxPriorityFeePerGas: 3_000_000_000n });
         const wallet = makeWallet();
         const strategy = new PassthroughMevStrategy('base');
         await strategy.sendTransaction(
@@ -97,11 +116,13 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             wallet,
             provider,
             0,
-            // gasMultiplier omitted — default behavior
+            // gasMultiplier omitted — no elevation, raw chain priority used.
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
-        expect(capturedTx.maxFeePerGas).toBe(100n);
-        expect(capturedTx.maxPriorityFeePerGas).toBe(10n);
+        // priority = max(3 gwei chain, 1 gwei floor) = 3 gwei (raw, unelevated).
+        expect(capturedTx.maxPriorityFeePerGas).toBe(3_000_000_000n);
+        // maxFee cap = max(50 gwei chain, baseFee 47gwei + 3gwei = 50gwei) = 50 gwei.
+        expect(capturedTx.maxFeePerGas).toBe(50_000_000_000n);
     });
 
     it("Test 9: gasMultiplier=2.0 doubles legacy gasPrice when maxFeePerGas unavailable", async () => {
@@ -116,6 +137,8 @@ describe('Phase 19 Gap-1 closure — PassthroughMevStrategy applies gasMultiplie
             2.0,
         );
         const capturedTx = (wallet.sendTransaction as ReturnType<typeof vi.fn>).mock.calls[0][0] as TransactionRequest;
+        // Legacy path is unchanged by D-FEE-ESCALATION (BSC/legacy escalate gasPrice
+        // separately in bloXroute; passthrough legacy keeps the multiplier-only bid).
         expect(capturedTx.gasPrice).toBe(100n);
     });
 });

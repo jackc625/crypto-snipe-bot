@@ -58,6 +58,11 @@ function makeProvider(): JsonRpcProvider {
         getFeeData: vi.fn().mockResolvedValue({ maxFeePerGas: 100n, maxPriorityFeePerGas: 10n }),
         getNetwork: vi.fn().mockResolvedValue({ chainId: 1n }),
         getBlockNumber: vi.fn().mockResolvedValue(25_000_000),
+        // Phase 21.1: the strategy is now a thin wrapper around
+        // submitWithReconciliation, which reads the wallet balance for the
+        // affordability bound (D-FEE-ESCALATION). A generous 10 ETH balance keeps
+        // the tiny test tx affordable so the included-path assertions below hold.
+        getBalance: vi.fn().mockResolvedValue(10_000_000_000_000_000_000n), // 10 ETH
     } as unknown as JsonRpcProvider;
 }
 
@@ -76,7 +81,14 @@ beforeEach(() => {
     logError.mockReset();
     sendBundleMock.mockReset();
     // Re-establish the create→{sendBundle} resolution (wiped by mockReset:true).
-    createMock.mockReset().mockResolvedValue({ sendBundle: sendBundleMock });
+    // Phase 21.1: the wrapper now also calls signBundle + simulate before sendBundle
+    // (D-SIMULATE-BEFORE-SUBMIT). Provide a non-revert SimulationResponseSuccess
+    // (no firstRevert) so the included-path assertions are reached.
+    createMock.mockReset().mockResolvedValue({
+        sendBundle: sendBundleMock,
+        signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+        simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
+    });
     waitResolution = 0;
     // Default included-bundle response shape (FlashbotsTransactionResponse).
     sendBundleMock.mockResolvedValue({

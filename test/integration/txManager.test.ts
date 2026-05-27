@@ -234,22 +234,39 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
         return mod.FlashbotsMevStrategy;
     }
 
-    it('increments nonce on each retry attempt (N, N+1, N+2)', async () => {
-        const mockProvider = createMockProvider({
-            getTransactionCount: vi.fn().mockResolvedValue(42),
-        });
+    it('a genuine resubmit reuses the re-fetched "latest" nonce, NEVER base+attempt (no double-spend)', async () => {
+        // Phase 21.1 / STOP-THE-LINE-02 (D-NONCE-SAFE-RETRY): this REPLACES the old
+        // "increments nonce N, N+1, N+2" assertion, which encoded the exact
+        // baseNonce+attempt DOUBLE-SPEND that the LADYS incident exposed. Under the
+        // fix, every genuine resubmit re-fetches getTransactionCount('latest') and
+        // reuses THAT nonce (a replacement tx at the SAME nonce). With the on-chain
+        // nonce held at 42, three not-landed attempts all submit at nonce 42 —
+        // [42, 42, 42], NOT [42, 43, 44]. Resubmitting at an incremented nonce is
+        // precisely what could fire a second real buy.
+        process.env.MEV_CONFIRM_WINDOW_MS = '60';
+        process.env.MEV_CONFIRM_POLL_MS = '10';
 
         const sendBundleCalls: any[] = [];
+        // Nonce never advances → a resubmit is a replacement at the SAME nonce.
+        // Receipt stays null until the 3rd submit (genuinely not-landed twice),
+        // then status 1 (the 3rd attempt lands). wait()=1 each time so the helper
+        // reconciles rather than trusting the relay.
+        const mockProvider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+            getTransactionReceipt: vi.fn().mockImplementation(async () =>
+                sendBundleCalls.length >= 3 ? { status: 1, blockNumber: 18000099 } : null
+            ),
+        });
+
         const FlashbotsMevStrategy = await importFlashbotsStrategy({
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockImplementation(async (bundle: any) => {
                 sendBundleCalls.push(bundle);
-                if (sendBundleCalls.length <= 2) {
-                    return { error: { message: `Bundle not included` } };
-                }
                 return {
                     bundleHash: '0xbundle123',
-                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
-                    wait: vi.fn().mockResolvedValue(0),
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000', nonce: 42 }],
+                    wait: vi.fn().mockResolvedValue(1), // BlockPassed → reconcile by receipt
                 };
             }),
         });
@@ -265,7 +282,12 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
 
         expect(sendBundleCalls.length).toBe(3);
         const nonces = sendBundleCalls.map(b => b[0].transaction.nonce);
-        expect(nonces).toEqual([42, 43, 44]);
+        // The load-bearing nonce-safety assertion: re-fetched 'latest' each time,
+        // never base+attempt.
+        expect(nonces).toEqual([42, 42, 42]);
+
+        delete process.env.MEV_CONFIRM_WINDOW_MS;
+        delete process.env.MEV_CONFIRM_POLL_MS;
     });
 
     it('includes correct targetBlockNumber = currentBlock + 1', async () => {
@@ -275,11 +297,13 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
 
         const capturedTargetBlocks: number[] = [];
         const FlashbotsMevStrategy = await importFlashbotsStrategy({
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: vi.fn().mockImplementation(async (_b: any, targetBlock: number) => {
                 capturedTargetBlocks.push(targetBlock);
                 return {
                     bundleHash: '0x',
-                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000' }],
+                    bundleTransactions: [{ hash: '0xrealtxhash0000000000000000000000000000000000000000000000000000', nonce: 42 }],
                     wait: vi.fn().mockResolvedValue(0),
                 };
             }),
@@ -297,13 +321,20 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
         expect(capturedTargetBlocks[0]).toBe(18000001);
     });
 
-    it('throws after maxRetries exhausted', async () => {
+    it('a relay rejection propagates without resubmitting the same nonce (no double-spend)', async () => {
+        // Phase 21.1 / STOP-THE-LINE-02: REPLACES the old "throws after 3 attempts"
+        // assertion. A relay rejection (`'error' in bundle`) produced no signed tx,
+        // so the wrapper propagates it rather than blindly resubmitting at an
+        // incremented nonce (the old baseNonce+attempt double-spend hazard). The
+        // operator re-runs; we never fire a second real bundle off a rejected one.
         const mockProvider = createMockProvider();
         const mockSendBundle = vi.fn().mockResolvedValue({
             error: { message: 'Bundle rejected' },
         });
 
         const FlashbotsMevStrategy = await importFlashbotsStrategy({
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            simulate: vi.fn().mockResolvedValue({ results: [], totalGasUsed: 21000 }),
             sendBundle: mockSendBundle,
         });
 
@@ -317,10 +348,43 @@ describe('FlashbotsMevStrategy nonce and retry behavior', () => {
 
         await expect(
             strategy.sendTransaction(createMockTxRequest(), mockWallet, mockProvider as any, 2)
-        ).rejects.toThrow();
+        ).rejects.toThrow(/Flashbots error/i);
 
-        // 0, 1, 2 = 3 attempts total
-        expect(mockSendBundle).toHaveBeenCalledTimes(3);
+        // Exactly ONE sendBundle — no same-nonce resubmit on a relay rejection.
+        expect(mockSendBundle).toHaveBeenCalledTimes(1);
+    });
+
+    it('a simulated revert fails cleanly and is never escalated-and-resubmitted (D-SIMULATE-BEFORE-SUBMIT)', async () => {
+        // Phase 21.1: each submit closure simulates (eth_callBundle) before sending;
+        // a simulated revert (firstRevert) must FAIL the attempt WITHOUT broadcasting
+        // — we never escalate-and-resubmit a tx that would revert (threat T-21.1-15).
+        const mockProvider = createMockProvider();
+        const mockSendBundle = vi.fn();
+
+        const FlashbotsMevStrategy = await importFlashbotsStrategy({
+            signBundle: vi.fn().mockResolvedValue(['0xsignedbundletx']),
+            // firstRevert set → the bundle would revert on-chain.
+            simulate: vi.fn().mockResolvedValue({
+                results: [{ error: 'execution reverted', revert: 'reverted' }],
+                firstRevert: { error: 'execution reverted', revert: 'reverted' },
+            }),
+            sendBundle: mockSendBundle,
+        });
+
+        const strategy = new FlashbotsMevStrategy({
+            relayUrl: 'https://relay.flashbots.net',
+            network: 'mainnet',
+            authKey: '0x' + '1'.repeat(64),
+        });
+
+        const mockWallet = { address: '0x1234' } as any;
+
+        await expect(
+            strategy.sendTransaction(createMockTxRequest(), mockWallet, mockProvider as any, 2)
+        ).rejects.toThrow(/revert/i);
+
+        // The reverting bundle was NEVER broadcast.
+        expect(mockSendBundle).not.toHaveBeenCalled();
     });
 
     it('healthCheck returns true when auth key is valid', async () => {
