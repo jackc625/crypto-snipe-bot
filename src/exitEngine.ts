@@ -506,9 +506,12 @@ export async function executeFullSell(
         ctx.log.info({ token: tokenAddress, reason, txHash, op: 'exit.full.executed' }, 'Exit sell TX confirmed');
 
         // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
-        // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
-        // Legacy path at src/utils/txManager.ts:132 and :144 is intentionally unaffected by Phase 14;
-        // exitEngine uses the multi-chain ChainContext path which always returns a real hash.
+        // sendTxWithRetry has a single multi-chain dispatch path that delegates
+        // to the per-chain MevStrategy and always returns a real on-chain tx hash
+        // (Promise<string>); the legacy single-chain Flashbots branch that could
+        // return void was deleted in Phase 21.1 (D-DELETE-LEGACY). The `if (txHash)`
+        // guard below is now belt-and-suspenders against a strategy returning an
+        // empty string, not the removed void path.
         let receiptData: { amountOut: string | null; gasCost: string | null; blockNumber: number | null } = {
             amountOut: null,
             gasCost: null,
@@ -634,7 +637,10 @@ export async function executePartialSell(
         ctx.log.info({ token: tokenAddress, tiers: tierLabels, txHash, op: 'exit.partial.executed' }, 'Partial sell TX confirmed');
 
         // Decode receipt for amountOut, gasCost, blockNumber (D-01, D-03, D-06).
-        // Pitfall 3: txHash may be falsy (void) on the legacy txManager single-chain path.
+        // sendTxWithRetry always returns a real on-chain tx hash (Promise<string>)
+        // via the multi-chain strategy dispatch; the legacy void path was deleted
+        // in Phase 21.1 (D-DELETE-LEGACY). The `if (txHash)` guard is belt-and-
+        // suspenders against an empty-string hash, not the removed void path.
         let receiptData: { amountOut: string | null; gasCost: string | null; blockNumber: number | null } = {
             amountOut: null,
             gasCost: null,

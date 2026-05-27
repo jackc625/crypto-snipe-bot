@@ -1,19 +1,19 @@
 // src/utils/txManager.ts
 // Transaction submission manager with MEV strategy dispatch.
-// Supports both legacy single-chain (provider+wallet+useFlashbots) and
-// new multi-chain (ChainContext) calling conventions.
-import { JsonRpcProvider, Wallet } from "ethers";
-import type { TransactionRequest } from "ethers";
-import { getFlashbotsProvider } from "./flashbots";
-import { FlashbotsBundleProvider } from "@flashbots/ethers-provider-bundle";
-import { logger } from "./logger";
+// Multi-chain (ChainContext) calling convention only: sendTxWithRetry
+// delegates wholly to the per-chain MevStrategy (which owns retry +
+// nonce-safe + inclusion-reconciliation logic). The legacy single-chain
+// Flashbots branch was deleted in Phase 21.1 (D-DELETE-LEGACY): it carried
+// the identical premature-failure + incrementing-nonce-on-retry
+// false-negative/double-spend bug as the pre-fix FlashbotsMevStrategy and had
+// zero live callers, so per D-ROLLBACK (no legacy fallback paths) it was a
+// re-introduction hazard and removed entirely.
+import type { TransactionRequest, JsonRpcProvider, Wallet } from "ethers";
 import type { MevStrategy } from './mevStrategies/types';
 import { FlashbotsMevStrategy } from './mevStrategies/flashbots';
 import { BloxrouteMevStrategy } from './mevStrategies/bloxroute';
 import { PassthroughMevStrategy } from './mevStrategies/passthrough';
 import type { ChainConfig, ChainContext } from '../chainRegistry';
-
-const log = logger.child({ module: 'txManager' });
 
 // ---------------------------------------------------------------------------
 // MEV strategy factory
@@ -41,124 +41,60 @@ export function createMevStrategy(chain: ChainConfig): MevStrategy {
 }
 
 // ---------------------------------------------------------------------------
-// sendTxWithRetry -- multi-chain overload + legacy overload
+// sendTxWithRetry -- multi-chain dispatch
 // ---------------------------------------------------------------------------
 
 /**
  * Send a transaction with MEV protection and retry logic.
  *
- * **Multi-chain overload** (preferred):
- *   sendTxWithRetry(txBuilder, ctx, maxRetries?, gasMultiplier?)
- *   Dispatches to the correct MEV strategy based on ctx.chain.mevStrategy.
- *   Optional `gasMultiplier` elevates EIP-1559 maxFee/priorityFee or legacy
- *   gasPrice on the populated tx (Phase 19 anti-rug exit uses
- *   ctx.chain.antiRug.gasMultiplier when reason='anti-rug').
+ * Dispatches to the correct MEV strategy based on `ctx.chain.mevStrategy`.
+ * All retry / nonce-safety / inclusion-reconciliation logic lives in the
+ * strategy (the dispatcher delegates wholly), so the returned value is always
+ * the strategy's real on-chain tx hash (`Promise<string>`).
  *
- * **Legacy overload** (backward compat -- use ChainContext version for multi-chain):
- *   sendTxWithRetry(txBuilder, provider, wallet, useFlashbots?, maxRetries?)
- *   Existing Flashbots/direct submission logic, unchanged from pre-refactor.
+ * Optional `gasMultiplier` elevates EIP-1559 maxFee/priorityFee or legacy
+ * gasPrice on the populated tx (Phase 19 anti-rug exit passes
+ * `ctx.chain.antiRug.gasMultiplier` when reason='anti-rug').
+ *
+ * The arg shape is kept as
+ *   sendTxWithRetry(txBuilder, ctx, walletOrRetries?, useFlashbots?, maxRetries?, gasMultiplier?)
+ * for the existing call sites (exitEngine passes args 3-5 as `undefined` and
+ * the multiplier in slot 6). The middle slots are vestigial from the removed
+ * legacy overload — only `walletOrRetries` (as a retry count) and
+ * `gasMultiplier` are honored on the dispatch path; `providerOrCtx` must be a
+ * `ChainContext`.
  */
 export async function sendTxWithRetry(
     txBuilder: () => Promise<TransactionRequest>,
     providerOrCtx: JsonRpcProvider | ChainContext,
     walletOrRetries?: Wallet | number,
-    useFlashbots?: boolean,
+    _useFlashbots?: boolean,
     maxRetries?: number,
     gasMultiplier?: number
-): Promise<string | void> {
-    // Duck-type check for ChainContext
+): Promise<string> {
+    // Duck-type check for ChainContext. The legacy single-chain Flashbots path
+    // was deleted (D-DELETE-LEGACY); a non-ChainContext arg is now a caller bug.
     if (
-        providerOrCtx !== null &&
-        typeof providerOrCtx === 'object' &&
-        'chain' in providerOrCtx &&
-        'httpProvider' in providerOrCtx
+        providerOrCtx === null ||
+        typeof providerOrCtx !== 'object' ||
+        !('chain' in providerOrCtx) ||
+        !('httpProvider' in providerOrCtx)
     ) {
-        // --- New multi-chain path ---
-        // `useFlashbots` arg slot is unused on this path (the multi-chain
-        // dispatcher picks the strategy via ctx.chain.mevStrategy); the
-        // `gasMultiplier` slot is the Phase 19 / D-RACE-TELEMETRY hook for
-        // elevating anti-rug exit gas.
-        const ctx = providerOrCtx as ChainContext;
-        const retries = (typeof walletOrRetries === 'number' ? walletOrRetries : maxRetries) || 3;
-        const strategy = createMevStrategy(ctx.chain);
-
-        ctx.log.info({ chain: ctx.chain.name, strategy: strategy.name, gasMultiplier: gasMultiplier ?? 1.0 }, 'Dispatching TX via MEV strategy');
-
-        const tx = await txBuilder();
-        return strategy.sendTransaction(tx, ctx.wallet, ctx.httpProvider, retries, gasMultiplier);
+        throw new Error(
+            'sendTxWithRetry requires a ChainContext as the 2nd argument (the legacy provider+wallet overload was removed in Phase 21.1).'
+        );
     }
 
-    // --- Legacy single-chain path (existing code, unchanged) ---
-    // Legacy overload -- use ChainContext version for multi-chain
-    const provider = providerOrCtx as JsonRpcProvider;
-    const wallet = walletOrRetries as Wallet;
-    const useFb = useFlashbots ?? true;
-    const retries = maxRetries ?? 3;
+    // --- Multi-chain dispatch ---
+    // `_useFlashbots` arg slot is unused (the dispatcher picks the strategy via
+    // ctx.chain.mevStrategy); the `gasMultiplier` slot is the Phase 19 /
+    // D-RACE-TELEMETRY hook for elevating anti-rug exit gas.
+    const ctx = providerOrCtx as ChainContext;
+    const retries = (typeof walletOrRetries === 'number' ? walletOrRetries : maxRetries) || 3;
+    const strategy = createMevStrategy(ctx.chain);
 
-    const authSigner = new Wallet(process.env.FLASHBOTS_AUTH_KEY!);
-    const flashbotsProvider: FlashbotsBundleProvider = await getFlashbotsProvider(provider, authSigner);
-    const baseNonce = await provider.getTransactionCount(wallet.address, "latest");
+    ctx.log.info({ chain: ctx.chain.name, strategy: strategy.name, gasMultiplier: gasMultiplier ?? 1.0 }, 'Dispatching TX via MEV strategy');
 
-    let attempt = 0;
-
-    while (attempt <= retries) {
-        try {
-            const txRequest = await txBuilder();
-            const gasLimit = txRequest.gasLimit || 300_000n;
-            const gasPrice = (await provider.getFeeData()).gasPrice;
-
-            const populatedTx: TransactionRequest = {
-                ...txRequest,
-                gasLimit,
-                gasPrice,
-                nonce: baseNonce + attempt,
-                chainId: (await provider.getNetwork()).chainId,
-            };
-
-            if (useFb) {
-                const targetBlock = (await provider.getBlockNumber()) + 1;
-
-                const bundle = await flashbotsProvider.sendBundle(
-                    [
-                        {
-                            signer: wallet,
-                            transaction: populatedTx,
-                        },
-                    ],
-                    targetBlock
-                );
-
-                // Type-safe error handling
-                if ("error" in bundle) {
-                    throw new Error(`Flashbots error: ${bundle.error.message}`);
-                }
-
-                const waitResponse = await bundle.wait();
-
-                if (waitResponse === 0) {
-                    log.info({ block: targetBlock }, 'Flashbots bundle included');
-                    return;
-                } else {
-                    throw new Error(`Flashbots bundle not included in block ${targetBlock}`);
-                }
-
-            } else {
-                const tx = await wallet.sendTransaction(populatedTx);
-                log.info({ attempt: attempt + 1, txHash: tx.hash }, 'TX sent');
-
-                const receipt = await tx.wait(3);
-                if (receipt && receipt.status === 1) {
-                    log.info({ block: receipt.blockNumber }, 'TX confirmed');
-                    return;
-                } else {
-                    throw new Error("TX failed or receipt is null");
-                }
-            }
-        } catch (err) {
-            log.warn({ attempt: attempt + 1, maxRetries: retries, err }, 'TX retry');
-            attempt++;
-        }
-    }
-
-    throw new Error("Max retries reached, TX not mined");
+    const tx = await txBuilder();
+    return strategy.sendTransaction(tx, ctx.wallet, ctx.httpProvider, retries, gasMultiplier);
 }

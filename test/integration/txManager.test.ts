@@ -28,9 +28,12 @@ function setupBaseMocks() {
     vi.doMock('../../src/config', () => ({
         CONFIG: { network: 'mainnet' },
     }));
-    vi.doMock('../../src/utils/flashbots', () => ({
-        getFlashbotsProvider: vi.fn(),
-    }));
+    // Phase 21.1 (D-DELETE-LEGACY): the legacy sendTxWithRetry Flashbots branch
+    // was deleted, so txManager no longer imports `../../src/utils/flashbots`
+    // (the module itself was removed) — its getFlashbotsProvider mock is gone.
+    // The @flashbots/ethers-provider-bundle mock stays: the createMevStrategy
+    // dispatch tests below import the REAL FlashbotsMevStrategy, which imports
+    // FlashbotsBundleProvider.
     vi.doMock('@flashbots/ethers-provider-bundle', () => ({
         FlashbotsBundleProvider: { create: vi.fn() },
     }));
