@@ -252,10 +252,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 6 plans
 
   **Wave 0** *(no deps; Nyquist stubs + REQ formalization):*
-  - [ ] 21.1-01-PLAN.md — REQUIREMENTS.md STOP-THE-LINE-01/02/03 rows (all ACTIVE; -03 = V2 tax-call removal, promoted from deferred 2026-05-26) + Nyquist it.skip stubs for the reconciliation + config-var tests + the V2-unsafe-real-buy assertion [STOP-THE-LINE-01, STOP-THE-LINE-02, STOP-THE-LINE-03]
+  - [x] 21.1-01-PLAN.md — REQUIREMENTS.md STOP-THE-LINE-01/02/03 rows (all ACTIVE; -03 = V2 tax-call removal, promoted from deferred 2026-05-26) + Nyquist it.skip stubs for the reconciliation + config-var tests + the V2-unsafe-real-buy assertion [STOP-THE-LINE-01, STOP-THE-LINE-02, STOP-THE-LINE-03]
 
   **Wave 1** *(parallel; foundation + the independent V3 fix):*
-  - [ ] 21.1-02-PLAN.md — shared reconciliation.ts helper (nonce-safe retry + receipt-primary reconciliation + bounded confirm-window + sell-gas-reserving fee escalation) + 5 MEV env vars in config.ts/.env.example [STOP-THE-LINE-02]
+  - [x] 21.1-02-PLAN.md — shared reconciliation.ts helper (nonce-safe retry + receipt-primary reconciliation + bounded confirm-window + sell-gas-reserving fee escalation) + 5 MEV env vars in config.ts/.env.example [STOP-THE-LINE-02]
   - [ ] 21.1-03-PLAN.md — remove the V2-only tax call from BOTH the V2 and V3 banks (+delete the now-dead `hasHighTransferTaxForChain` function/import/test) + flip the V3 fork fixture to the full buy→exit→sell lifecycle (+ dumpV3Pool price-mover) [STOP-THE-LINE-01, STOP-THE-LINE-03]
 
   **Wave 2** *(after the helper + stubs):*
@@ -297,7 +297,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
-| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 0/6 | Planned (6 plans, 3 reqs STOP-THE-LINE-01/02/03; blocks 21-07) | - |
+| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 2/6 | In Progress (Wave 0 done: Nyquist stubs + reconciliation helper; 3 reqs STOP-THE-LINE-01/02/03; blocks 21-07) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
