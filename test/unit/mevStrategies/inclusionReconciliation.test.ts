@@ -49,8 +49,19 @@
 //     `getTransactionReceipt→{status:1}`, `getTransactionCount→42`).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { parseEther, parseUnits } from 'ethers';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { createMockProvider } from '../../helpers/mockProvider';
+// TYPE-ONLY import: erased at runtime, so it does NOT eagerly evaluate
+// reconciliation.ts (whose top-level `logger.child(...)` would trip the hoisted
+// `vi.mock('../../../src/utils/logger')` factory before the logInfo let is
+// initialized — a TDZ ReferenceError). The runtime functions are pulled in via
+// a lazy `await import(...)` INSIDE each test, mirroring flashbotsBundleHash.test.ts.
+import type {
+    AttemptContext,
+    ReconcileConfig,
+    SubmitResult,
+} from '../../../src/utils/mevStrategies/reconciliation';
 
 // -----------------------------------------------------------------------------
 // Flashbots mock harness (copied from flashbotsBundleHash.test.ts so the GREEN
@@ -111,6 +122,50 @@ function makeLandedProvider(): JsonRpcProvider {
 }
 
 const STUB_TX_REQ: TransactionRequest = { to: '0xRouter', data: '0x', gasLimit: 200_000n };
+
+// -----------------------------------------------------------------------------
+// Helper-logic harness (plan 21.1-02 / Task 1). These exercise
+// `submitWithReconciliation` + `computeAffordablePriorityFee` DIRECTLY (pure
+// helper logic) without a real strategy — the per-strategy end-to-end flips are
+// owned by 21.1-04. TINY confirmWindowMs/pollMs keep the 45s prod default from
+// blowing testTimeout:5000 (Pitfall 5).
+// -----------------------------------------------------------------------------
+
+/** A reconcile config with a TINY window/poll so the bounded loop returns fast. */
+function tinyCfg(overrides: Partial<ReconcileConfig> = {}): ReconcileConfig {
+    return {
+        confirmWindowMs: 50,
+        pollMs: 10,
+        maxRetries: 3,
+        maxPriorityFeeCeilingWei: parseUnits('5', 'gwei'),
+        priorityFeeStepWei: parseUnits('1', 'gwei'),
+        reserveSellGas: true,
+        sellGasLimit: 300_000n,
+        ...overrides,
+    };
+}
+
+/** Generous fee inputs (1 ETH balance, tiny snipe) so affordability passes by default. */
+function affordableFeeInputs() {
+    return {
+        walletBalanceWei: parseEther('1'),
+        baseFeeWei: parseUnits('20', 'gwei'),
+        snipeValueWei: parseEther('0.01'),
+        buyGasLimit: 200_000n,
+    };
+}
+
+/** A submit closure that records every AttemptContext it was called with. */
+function recordingSubmit(
+    result: (a: AttemptContext) => SubmitResult
+): { fn: (a: AttemptContext) => Promise<SubmitResult>; calls: AttemptContext[] } {
+    const calls: AttemptContext[] = [];
+    const fn = vi.fn(async (a: AttemptContext) => {
+        calls.push({ ...a });
+        return result(a);
+    });
+    return { fn, calls };
+}
 
 beforeEach(() => {
     logInfo.mockReset();
@@ -198,10 +253,54 @@ describe('STOP-THE-LINE-02 — nonce-safe retry (double-spend harm #2)', () => {
         expect(true).toBe(false);
     });
 
-    it.skip('double-spend: advanced "latest" nonce at attempt start → no submit fires that attempt', async () => {
-        // GREEN (21.1-04): getTransactionCount('latest') advanced past the
-        // submitted nonce at attempt start → stop & reconcile, no submit call.
-        expect(true).toBe(false);
+    it('double-spend: advanced "latest" nonce at attempt start → no submit fires that attempt (helper-logic, plan 21.1-02)', async () => {
+        // Helper-logic proof (plan 21.1-02): drive submitWithReconciliation directly.
+        // attempt 0 submits at nonce 42, native confirm reports false, and the first
+        // reconcile finds receipt null + nonce still 42 → 'not-landed' → escalate.
+        // attempt 1 re-fetches 'latest' = 43 (ADVANCED past the submitted 42) → the
+        // helper STOPS and reconciles the PRIOR hash WITHOUT submitting again; the
+        // receipt now reads status 1 → returns the real hash. submit fires exactly once.
+        const { submitWithReconciliation } = await import('../../../src/utils/mevStrategies/reconciliation');
+        const wallet = makeWallet();
+
+        // getTransactionCount sequence:
+        //   call 0 (attempt-0 nonce)            → 42
+        //   call 1 (reconcile nonce-corroborate)→ 42 (still not consumed → not-landed)
+        //   call 2 (attempt-1 nonce)            → 43 (ADVANCED → stop & reconcile)
+        // getTransactionReceipt sequence:
+        //   probe during attempt-0 reconcile    → null (not yet mined)
+        //   probe during nonce-advanced reconcile→ {status:1} (landed)
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn()
+                .mockResolvedValueOnce(42)
+                .mockResolvedValueOnce(42)
+                .mockResolvedValue(43),
+            getTransactionReceipt: vi.fn()
+                .mockResolvedValueOnce(null)
+                .mockResolvedValue({ status: 1, blockNumber: 25182801 }),
+        }) as unknown as JsonRpcProvider;
+
+        const submit = recordingSubmit(() => ({
+            signedTxHash: STUB_MINED_HASH,
+            submittedNonce: 42,
+            nativeConfirmed: false, // native confirm lies "not included"
+        }));
+
+        const result = await submitWithReconciliation(
+            submit.fn,
+            wallet,
+            provider,
+            tinyCfg(),
+            affordableFeeInputs(),
+        );
+
+        // The prior attempt's tx is reconciled as included → real hash returned.
+        expect(result).toBe(STUB_MINED_HASH);
+        // CRITICAL (double-spend guard): the submit primitive fired exactly ONCE —
+        // the advanced-nonce attempt did NOT submit a second real tx.
+        expect(submit.fn).toHaveBeenCalledTimes(1);
+        expect(submit.calls).toHaveLength(1);
+        expect(submit.calls[0].nonce).toBe(42);
     });
 });
 
@@ -212,11 +311,46 @@ describe('STOP-THE-LINE-02 — nonce-safe retry (double-spend harm #2)', () => {
 // =============================================================================
 
 describe('STOP-THE-LINE-02 — mined-but-reverted (false-success harm #4)', () => {
-    it.skip('mined-but-reverted false-success: receipt.status===0 → throws, no same-nonce resubmit', async () => {
-        // GREEN (21.1-04): provider.getTransactionReceipt→{status:0}; assert
-        // sendTransaction rejects AND the submit primitive is not called again at
-        // the same nonce (a reverted tx is NOT treated as a successful buy).
-        expect(true).toBe(false);
+    it('mined-but-reverted false-success: receipt.status===0 → throws, no same-nonce resubmit (helper-logic, plan 21.1-02)', async () => {
+        // Helper-logic proof (plan 21.1-02): attempt 0 submits at nonce 42, native
+        // confirm reports false, reconcile finds the receipt with status 0
+        // (mined-but-reverted = genuine failure). The helper THROWS and does NOT
+        // resubmit the same nonce (a reverted tx is NOT a successful buy).
+        const { submitWithReconciliation } = await import('../../../src/utils/mevStrategies/reconciliation');
+        const wallet = makeWallet();
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+            // First (and immediate) receipt probe in reconcileInclusion → status 0.
+            getTransactionReceipt: vi.fn().mockResolvedValue({ status: 0, blockNumber: 25182801 }),
+        }) as unknown as JsonRpcProvider;
+
+        const alert = vi.fn(async () => {});
+        const submit = recordingSubmit(() => ({
+            signedTxHash: STUB_MINED_HASH,
+            submittedNonce: 42,
+            nativeConfirmed: false,
+        }));
+
+        await expect(
+            submitWithReconciliation(
+                submit.fn,
+                wallet,
+                provider,
+                tinyCfg(),
+                affordableFeeInputs(),
+                { info: logInfo, warn: logWarn, error: logError },
+                alert,
+            ),
+        ).rejects.toThrow(/REVERTED/i);
+
+        // No same-nonce resubmit: submit fired exactly once.
+        expect(submit.fn).toHaveBeenCalledTimes(1);
+        // D-ALERTS: a genuine failure raised a structured alert + the dotted op.
+        expect(alert).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'mev.reconcile.mined-but-reverted' }),
+            expect.any(String),
+        );
     });
 });
 
@@ -228,11 +362,78 @@ describe('STOP-THE-LINE-02 — mined-but-reverted (false-success harm #4)', () =
 // =============================================================================
 
 describe('STOP-THE-LINE-02 — fee escalation affordability (stranded-exit harm #5)', () => {
-    it.skip('stranded-exit: fee ceiling clamps so walletBalance - buyMaxCost - reservedSellGas >= 0; attempt-0 unaffordable → fails cleanly, no submit', async () => {
-        // GREEN (21.1-04): a balance-too-low fixture (getBalance small) → the
-        // affordability bound rejects before submitting; assert clean failure +
-        // no submit (the reserve for the eventual sell is preserved).
-        expect(true).toBe(false);
+    it('stranded-exit: fee ceiling clamps so walletBalance - buyMaxCost - reservedSellGas >= 0; attempt-0 unaffordable → fails cleanly, no submit (helper-logic, plan 21.1-02)', async () => {
+        const { submitWithReconciliation, computeAffordablePriorityFee } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        // Part A — the clamp itself (computeAffordablePriorityFee, pure): with a
+        // generous balance the escalated fee is clamped to min(ceiling, bound) and
+        // the invariant walletBalance - buyMaxCost - reservedSellGas >= 0 holds.
+        const ceilingWei = parseUnits('5', 'gwei');
+        const baseFeeWei = parseUnits('20', 'gwei');
+        const buyGasLimit = 200_000n;
+        const sellGasLimit = 300_000n;
+        const walletBalanceWei = parseEther('1');
+        const snipeValueWei = parseEther('0.01');
+
+        const clamped = computeAffordablePriorityFee({
+            desiredPriorityFeeWei: parseUnits('1000', 'gwei'), // absurdly high → must clamp
+            ceilingWei,
+            walletBalanceWei,
+            snipeValueWei,
+            baseFeeWei,
+            buyGasLimit,
+            sellGasLimit,
+            reserveSellGas: true,
+        });
+        expect(clamped.affordable).toBe(true);
+        // Never exceeds the operator's absolute ceiling.
+        expect(clamped.priorityFeeWei <= ceilingWei).toBe(true);
+        // The buy max cost + the reserved sell gas both fit inside the balance.
+        const reservedSellGas = sellGasLimit * ((baseFeeWei * 150n) / 100n + ceilingWei);
+        const buyMaxCost = snipeValueWei + buyGasLimit * (baseFeeWei + clamped.priorityFeeWei);
+        expect(walletBalanceWei - buyMaxCost - reservedSellGas >= 0n).toBe(true);
+
+        // Part B — attempt-0 unaffordable → submitWithReconciliation fails CLEANLY,
+        // no submit (the reserve for the eventual sell is preserved; Pitfall 7).
+        const wallet = makeWallet();
+        // A balance that cannot even cover the buy gas + the reserved sell gas.
+        const provider = createMockProvider({
+            getTransactionCount: vi.fn().mockResolvedValue(42),
+        }) as unknown as JsonRpcProvider;
+        const alert = vi.fn(async () => {});
+        const submit = recordingSubmit(() => ({
+            signedTxHash: STUB_MINED_HASH,
+            submittedNonce: 42,
+            nativeConfirmed: true,
+        }));
+
+        await expect(
+            submitWithReconciliation(
+                submit.fn,
+                wallet,
+                provider,
+                tinyCfg({ sellGasLimit }),
+                {
+                    walletBalanceWei: parseEther('0.001'), // too low to reserve sell gas
+                    baseFeeWei,
+                    snipeValueWei,
+                    buyGasLimit,
+                },
+                { info: logInfo, warn: logWarn, error: logError },
+                alert,
+            ),
+        ).rejects.toThrow(/unaffordable/i);
+
+        // CRITICAL (stranded-exit guard): NO buy was submitted (the sell reserve is
+        // preserved — we never strand an unsellable position).
+        expect(submit.fn).not.toHaveBeenCalled();
+        expect(alert).toHaveBeenCalledTimes(1);
+        expect(logError).toHaveBeenCalledWith(
+            expect.objectContaining({ op: 'mev.escalation.unaffordable' }),
+            expect.any(String),
+        );
     });
 });
 
