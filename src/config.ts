@@ -156,6 +156,21 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'STALE_ERROR_SEC', required: false, description: 'Stale-position error-threshold age in seconds (default: 600 = 10 min)' },
     // Dashboard URL — consumed by Plan 20-05 operator CLI scripts (pause/resume).
     { name: 'DASHBOARD_URL', required: false, description: 'Dashboard URL for operator CLI scripts (default: derived from DASHBOARD_HOST:DASHBOARD_PORT, e.g. http://127.0.0.1:8080)' },
+
+    // --- MEV inclusion-reconciliation (Phase 21.1, STOP-THE-LINE-02) ---
+    // Per D-ENV-EXAMPLE [USER-BINDING]: every var here also lives in .env.example
+    // with default + 1-line inline-comment description. All required: false — the
+    // bot runs unchanged with all unset (RESEARCH §Q7 generous-but-safe defaults).
+    // GLOBAL (non-chain-prefixed) names: these are submission-mechanism knobs, not
+    // per-chain trading params, so they match MID_RUN_CHECK_INTERVAL_SEC /
+    // STALE_WARN_SEC rather than the per-chain ETH_* anti-rug pattern (RESEARCH A4).
+    // Consumed by the shared submitWithReconciliation helper via buildReconcileConfig
+    // (src/utils/mevStrategies/reconciliation.ts); strategies build cfg from these in 21.1-04.
+    { name: 'MEV_CONFIRM_WINDOW_MS', required: false, description: 'Bounded confirm-window (ms) to poll receipt+nonce before declaring a bundle genuinely not-landed (~3-4 ETH blocks; generous per D-QUALITY-FIRST) (default: 45000)' },
+    { name: 'MEV_CONFIRM_POLL_MS', required: false, description: 'Poll interval (ms) within the confirm-window (default: 4000)' },
+    { name: 'MEV_MAX_PRIORITY_FEE_GWEI', required: false, description: 'Hard absolute ceiling on escalated maxPriorityFeePerGas (gwei); load-bearing safety cap (default: 5)' },
+    { name: 'MEV_PRIORITY_FEE_STEP_GWEI', required: false, description: 'Per-retry priority-fee escalation step (gwei), clamped to the ceiling + affordability bound (default: 1)' },
+    { name: 'MEV_RESERVE_SELL_GAS', required: false, description: 'When true, the affordability bound always reserves sellGasLimit x fee so the exit leg can submit (default: true)' },
 ];
 
 function validateEnvVars(): void {

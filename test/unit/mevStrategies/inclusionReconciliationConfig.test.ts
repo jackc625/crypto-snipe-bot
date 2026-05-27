@@ -99,47 +99,100 @@ afterEach(() => {
 void setEnv;
 void mockExit;
 
+// A representative per-chain sell gas limit (ETH template: ctx.chain.gas.maxGasLimit).
+const SELL_GAS_LIMIT = 300_000n;
+
+// Lazily import config (proves it loads with the var registered, no validateEnvVars
+// exit) THEN the helper's env reader, and return the parsed ReconcileConfig. Mirrors
+// configEnvVar.test.ts's `await import('../../src/config')` idiom under
+// vi.resetModules(). buildReconcileConfig is the single point env vars are parsed
+// into the helper config, so asserting its output proves the var CONTROLS behavior
+// (D-04 observable effect), not mere presence.
+async function loadReconcileConfig() {
+    const { CONFIG } = await import('../../../src/config');
+    expect(CONFIG).toBeDefined(); // config imported cleanly (var registered, no exit)
+    expect(mockExit).not.toHaveBeenCalled();
+    const { buildReconcileConfig } = await import('../../../src/utils/mevStrategies/reconciliation');
+    return buildReconcileConfig(process.env, SELL_GAS_LIMIT);
+}
+
 // =============================================================================
-// Each it.skip asserts the var CONTROLS BEHAVIOR (RESEARCH §Q7 / Wave-0 gap 2).
-// GREEN form owned by plan 21.1-04 (reconciliation helper + config wiring).
+// Each test asserts the var CONTROLS BEHAVIOR (RESEARCH §Q7 / Wave-0 gap 2):
+// the parsed value flows into the ReconcileConfig the shared helper consumes —
+// override vs default. GREEN form landed by plan 21.1-02 (config plumbing).
 // =============================================================================
 
 describe('MEV_CONFIRM_WINDOW_MS env var', () => {
-    it.skip('MEV_CONFIRM_WINDOW_MS controls the confirm-window the reconciliation polls before declaring not-landed (default 45000)', async () => {
-        // GREEN (21.1-04): setEnv → import config → assert the parsed confirm-window
-        // value flows into the reconciliation config (and defaults to 45000 unset).
-        expect(true).toBe(false);
+    it('controls the confirm-window the reconciliation polls before declaring not-landed (override)', async () => {
+        setEnv('MEV_CONFIRM_WINDOW_MS', '12345');
+        const cfg = await loadReconcileConfig();
+        expect(cfg.confirmWindowMs).toBe(12345);
+    });
+
+    it('defaults to 45000 when MEV_CONFIRM_WINDOW_MS is unset', async () => {
+        delete process.env.MEV_CONFIRM_WINDOW_MS;
+        const cfg = await loadReconcileConfig();
+        expect(cfg.confirmWindowMs).toBe(45000);
     });
 });
 
 describe('MEV_CONFIRM_POLL_MS env var', () => {
-    it.skip('MEV_CONFIRM_POLL_MS controls the poll interval within the confirm-window (default 4000)', async () => {
-        // GREEN (21.1-04): assert the parsed poll-interval flows into the
-        // reconciliation config (default 4000 unset).
-        expect(true).toBe(false);
+    it('controls the poll interval within the confirm-window (override)', async () => {
+        setEnv('MEV_CONFIRM_POLL_MS', '2500');
+        const cfg = await loadReconcileConfig();
+        expect(cfg.pollMs).toBe(2500);
+    });
+
+    it('defaults to 4000 when MEV_CONFIRM_POLL_MS is unset', async () => {
+        delete process.env.MEV_CONFIRM_POLL_MS;
+        const cfg = await loadReconcileConfig();
+        expect(cfg.pollMs).toBe(4000);
     });
 });
 
 describe('MEV_MAX_PRIORITY_FEE_GWEI env var', () => {
-    it.skip('MEV_MAX_PRIORITY_FEE_GWEI controls the hard ceiling on escalated maxPriorityFeePerGas (default 5)', async () => {
-        // GREEN (21.1-04): assert the parsed gwei ceiling is the load-bearing cap
-        // the fee escalation clamps to (default 5 unset).
-        expect(true).toBe(false);
+    it('controls the hard ceiling (wei) on escalated maxPriorityFeePerGas (override)', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_MAX_PRIORITY_FEE_GWEI', '9');
+        const cfg = await loadReconcileConfig();
+        // The parsed gwei ceiling becomes the load-bearing wei cap the fee escalation clamps to.
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('9', 'gwei'));
+    });
+
+    it('defaults to 5 gwei when MEV_MAX_PRIORITY_FEE_GWEI is unset', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI;
+        const cfg = await loadReconcileConfig();
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
     });
 });
 
 describe('MEV_PRIORITY_FEE_STEP_GWEI env var', () => {
-    it.skip('MEV_PRIORITY_FEE_STEP_GWEI controls the per-retry priority-fee escalation step (default 1)', async () => {
-        // GREEN (21.1-04): assert the parsed step is the per-attempt bump (clamped
-        // to ceiling + affordability bound; default 1 unset).
-        expect(true).toBe(false);
+    it('controls the per-retry priority-fee escalation step (wei) (override)', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_PRIORITY_FEE_STEP_GWEI', '2');
+        const cfg = await loadReconcileConfig();
+        expect(cfg.priorityFeeStepWei).toBe(parseUnits('2', 'gwei'));
+    });
+
+    it('defaults to 1 gwei when MEV_PRIORITY_FEE_STEP_GWEI is unset', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_PRIORITY_FEE_STEP_GWEI;
+        const cfg = await loadReconcileConfig();
+        expect(cfg.priorityFeeStepWei).toBe(parseUnits('1', 'gwei'));
     });
 });
 
 describe('MEV_RESERVE_SELL_GAS env var', () => {
-    it.skip('MEV_RESERVE_SELL_GAS toggles whether the affordability bound reserves sell gas (default true)', async () => {
-        // GREEN (21.1-04): assert true → the bound reserves sellGasLimit×fee so the
-        // exit leg can submit (default true unset).
-        expect(true).toBe(false);
+    it('toggles the affordability sell-gas reserve OFF when set to "false"', async () => {
+        setEnv('MEV_RESERVE_SELL_GAS', 'false');
+        const cfg = await loadReconcileConfig();
+        expect(cfg.reserveSellGas).toBe(false);
+    });
+
+    it('defaults to true (reserve ON) when MEV_RESERVE_SELL_GAS is unset', async () => {
+        delete process.env.MEV_RESERVE_SELL_GAS;
+        const cfg = await loadReconcileConfig();
+        expect(cfg.reserveSellGas).toBe(true);
     });
 });
