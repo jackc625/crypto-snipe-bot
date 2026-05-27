@@ -265,7 +265,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 21.1-05-PLAN.md — delete the dead legacy sendTxWithRetry branch (D-DELETE-LEGACY) + record the real tx hash on the buy row (D-RECORD-REAL-HASH, V2+V3) [STOP-THE-LINE-02]
 
   **Wave 4** *(pre-21-07 gate; depends on everything):*
-  - [ ] 21.1-06-PLAN.md — full-suite + mainnet-fork rehearsal (passthrough path) before the 21-07 real-capital retry; records the Flashbots-is-21-07 caveat [STOP-THE-LINE-01, STOP-THE-LINE-02]
+  - [x] 21.1-06-PLAN.md — full-suite + mainnet-fork rehearsal (passthrough path) before the 21-07 real-capital retry; records the Flashbots-is-21-07 caveat [STOP-THE-LINE-01, STOP-THE-LINE-02]
 
   **Cross-cutting constraints:**
   - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code" is NOT a tiebreaker
@@ -297,7 +297,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
-| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 5/6 | In Progress (Waves 0-2 done: stubs + helper + V2/V3 tax-call removed + 3 strategies wired + legacy deleted + real hash recorded; only 21.1-06 fork-rehearsal gate remains; 3 reqs STOP-THE-LINE-01/02/03; blocks 21-07) | - |
+| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Verifying (all 6 plans executed; pre-21-07 gate GREEN — unit 611/integration 216/fork 4, tsc ×3 clean; pending phase-goal verification) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
