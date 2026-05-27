@@ -92,6 +92,31 @@ Resolves the 6 deferred human-verification items from v6.16 close as real-mainne
 - [ ] **EXIT-LIVE-10**: pino log enrichment — every exit-engine code path logs with an `op` field (e.g., `op: 'exit.poll.cycle'`, `op: 'exit.partial.executed'`, `op: 'exit.flashbots.submitted'`). Enables `op:exit.*` filtered log queries during real-mainnet runs. (Examples reworded to the dotted `exit.*` taxonomy per Phase 21 D-OP-CONVENTION — kept consistent with EXIT-LIVE-01 so the op-enrichment plan inherits one authoritative convention, not two contradictory ones.)
 - [ ] **EXIT-LIVE-11**: `.planning/milestones/v6.17-VERIFICATION-EVIDENCE.md` archive consolidating all six real-mainnet artifacts (EXIT-LIVE-03..07) — single-file source of truth that the deferred v6.16 items are now actually closed.
 
+### Stop-The-Line Blockers (STOP-THE-LINE)
+
+Production bugs surfaced during Phase 21 live-capture that BLOCK Phase 21 close per
+D-STOP-THE-LINE. Escalated to decimal phase 21.1. Full diagnoses in
+`.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-0{1,2}-*.md`.
+
+- [ ] **STOP-THE-LINE-01**: V3 buy path no longer aborts at the V2-only transfer-tax gate.
+  The `hasHighTransferTaxForChain` call is removed from the V3 safety bank (`bot.ts:610`) and
+  its `hasTax` consumers cleaned up (`:638` gate, `:639` skip-log); the on-chain V3 honeypot
+  roundtrip (`bot.ts:566`, `checkerContract.ts` `maxBuyTaxBps`/`maxSellTaxBps`, HONEY-09)
+  remains the authoritative buy+sell-tax gate and fails closed. A benign V3 token passes and a
+  high-tax/honeypot V3 token still blocks — proven unit+fork; `eth-v3-trailing.json` flipped to
+  the full validation→buy→exit→sell lifecycle.
+- [ ] **STOP-THE-LINE-02**: The MEV submit path never reports a buy/sell that actually landed
+  on-chain as failed. A non-`BundleIncluded` `bundle.wait()` (and the bloXroute/passthrough
+  analogs) is reconciled against chain state (`getTransactionReceipt(bundleTransactions[0].hash)`
+  + `getTransactionCount(wallet,'latest')`); a mined bundle returns the real hash so the trade
+  is recorded (real hash, not `'mev_bundle'`), the position registered, and the exit monitor
+  started. The retry loop re-fetches the nonce each attempt and cannot double-spend; each attempt
+  is simulated before submit; genuinely-not-included bundles escalate priority fee under a hard
+  affordability ceiling that reserves sell gas, then fail cleanly with D-ALERTS. Shared across
+  flashbots/bloXroute/passthrough via one helper; the dead legacy `sendTxWithRetry` Flashbots
+  branch is deleted. Regression replays the LADYS scenario and asserts success + no second submit.
+- [ ] **STOP-THE-LINE-03**: The V2 buy path no longer fires a real on-chain buy inside its transfer-tax safety check. The V2-only `hasHighTransferTaxForChain` call is removed from the V2 safety bank (`bot.ts:303`) and its `hasTax` consumers cleaned up (`:348` gate, `:349` skip-log) — the exact mirror of STOP-THE-LINE-01. Verified harm: `tokenSafety.ts:495-503` is a signer-connected `swapExactETHForTokens(amountOutMin=0, …, {value: snipeAmount})` with NO `.staticCall` (a REAL buy on every V2 snipe) whose `TransactionResponse` is then misread as a `bigint[]` (`:505`) so the tax math is NaN/broken; it fires on the 21-07 capture path. The on-chain V2 honeypot roundtrip (`bot.ts:253`, `checkerContract.ts` `maxBuyTaxBps`/`maxSellTaxBps`, HONEY-07) remains the authoritative buy+sell-tax gate and fails closed. With both the V2 and V3 call sites removed, the now-dead `hasHighTransferTaxForChain` function + import + dedicated test are deleted (D-ROLLBACK). The sibling `simulateSwapForChain` (`bot.ts:302`) is audited for the same missing-`.staticCall` pattern; any further real-submit found escalates as a fresh STOP-THE-LINE-04 (not fixed in-flight). Proven by a V2 fork-fixture regression + a source-level harm-prevention assertion. Diagnosis: 21.1-RESEARCH.md §"Decision Conflicts" #2.
+
 ## v2 Requirements (deferred to v6.18+)
 
 Acknowledged but not in v6.17 scope. Carried forward without committing; can be promoted via `/gsd-review-backlog`.
@@ -199,6 +224,9 @@ Initial mapping based on research SUMMARY.md phase recommendations. Roadmapper f
 | EXIT-LIVE-09 | Phase 21 | Pending |
 | EXIT-LIVE-10 | Phase 21 | Pending |
 | EXIT-LIVE-11 | Phase 21 | Pending |
+| STOP-THE-LINE-01 | Phase 21.1 | Pending |
+| STOP-THE-LINE-02 | Phase 21.1 | Pending |
+| STOP-THE-LINE-03 | Phase 21.1 | Pending |
 
 **Coverage:**
 - v1 requirements: 58 total (DEBT 6, HONEY 12, ANTIRUG 16, OPS-LIVE 13, EXIT-LIVE 11)
