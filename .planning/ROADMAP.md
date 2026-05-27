@@ -46,7 +46,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 - [x] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
  (completed 2026-05-24)
 - [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
-- [ ] **Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED)** — STOP-THE-LINE-01 (every V3 buy aborts: `bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain`) + STOP-THE-LINE-02 (CRITICAL — Flashbots `bundle.wait()` false-negative reported a landed LADYS buy as failed → untracked/unmonitored position); both block the 21-07 live capture
+- [ ] **Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED)** — STOP-THE-LINE-01 (every V3 buy aborts: `bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain`) + STOP-THE-LINE-02 (CRITICAL — Flashbots `bundle.wait()` false-negative reported a landed LADYS buy as failed → untracked/unmonitored position) + STOP-THE-LINE-03 (the mirror V2 `hasHighTransferTaxForChain` call at `bot.ts:303` fires a REAL `amountOutMin=0` buy with broken NaN tax math on every V2 snipe — promoted into scope 2026-05-26); all block the 21-07 live capture
 
 ## Phase Details
 
@@ -243,7 +243,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 ### Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED — urgent)
 **Goal**: The two STOP-THE-LINE blockers surfaced during Phase 21's live-capture work are fixed so the 21-07 real-mainnet roundtrip can proceed — (1) the funded bot can again snipe Uniswap **V3** tokens (the V3 buy path no longer aborts at a V2-only transfer-tax gate), and (2) the Flashbots submit path never reports a buy/sell that actually landed on-chain as failed (a bundle that mined is reconciled against chain state and the position is registered + monitored), with a retry loop that cannot double-spend
 **Depends on**: Phase 21 Waves 1-2 (which surfaced these bugs via the 21-03 regression net + the 21-07 live attempt). BLOCKS Phase 21 Wave 4 (21-07 real-capital capture) and therefore Phase 21 close (D-STOP-THE-LINE)
-**Requirements**: STOP-THE-LINE-01 (V3-buy tax-gate), STOP-THE-LINE-02 (Flashbots false-negative inclusion) — full diagnoses in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md` and `21-STOP-THE-LINE-02-flashbots-false-negative.md`; formalize as REQUIREMENTS.md rows at plan-phase
+**Requirements**: STOP-THE-LINE-01 (V3-buy tax-gate), STOP-THE-LINE-02 (Flashbots false-negative inclusion), STOP-THE-LINE-03 (V2-buy tax-call real-buy removal — the mirror of -01; added 2026-05-26 per D-V2-TAX-REMOVE) — full diagnoses in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md` and `21-STOP-THE-LINE-02-flashbots-false-negative.md`; formalize as REQUIREMENTS.md rows at plan-phase
 **Success Criteria** (what must be TRUE):
   1. **STOP-THE-LINE-01 resolved:** a benign Uniswap V3 token passes the bot's transfer-tax safety gate on the V3 buy path (`src/bot.ts:~610-617`, today routed into the V2-only `hasHighTransferTaxForChain` at `tokenSafety.ts:482`) and the buy proceeds, while a real high-tax/honeypot V3 token still fails closed — proven by a unit/fork test. `test/fork/realLaunchReplay.fork.test.ts` is updated so the `eth-v3-trailing.json` fixture asserts the full validation→buy→exit→sell lifecycle instead of today's blocked-at-gate observable
   2. **STOP-THE-LINE-02 resolved (inclusion reconciliation):** when `FlashbotsMevStrategy.sendTransaction` (`src/utils/mevStrategies/flashbots.ts:~52-120`) gets a non-`BundleIncluded` `bundle.wait()` result, it reconciles against chain state — `getTransactionCount(wallet,'latest')` and/or the bundle tx-hash receipt — and a bundle that actually mined is returned as the real on-chain hash so the trade is recorded, the position registered, and the exit monitor started. A regression test replays the live LADYS scenario (`wait()` says "not included" but the nonce advanced / receipt exists) and asserts success, not failure
@@ -252,11 +252,11 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 6 plans
 
   **Wave 0** *(no deps; Nyquist stubs + REQ formalization):*
-  - [ ] 21.1-01-PLAN.md — REQUIREMENTS.md STOP-THE-LINE-01/02 rows (+ deferred V2 signer-swap STOP-THE-LINE-03) + Nyquist it.skip stubs for the reconciliation + config-var tests [STOP-THE-LINE-01, STOP-THE-LINE-02]
+  - [ ] 21.1-01-PLAN.md — REQUIREMENTS.md STOP-THE-LINE-01/02/03 rows (all ACTIVE; -03 = V2 tax-call removal, promoted from deferred 2026-05-26) + Nyquist it.skip stubs for the reconciliation + config-var tests + the V2-unsafe-real-buy assertion [STOP-THE-LINE-01, STOP-THE-LINE-02, STOP-THE-LINE-03]
 
   **Wave 1** *(parallel; foundation + the independent V3 fix):*
   - [ ] 21.1-02-PLAN.md — shared reconciliation.ts helper (nonce-safe retry + receipt-primary reconciliation + bounded confirm-window + sell-gas-reserving fee escalation) + 5 MEV env vars in config.ts/.env.example [STOP-THE-LINE-02]
-  - [ ] 21.1-03-PLAN.md — remove the V2-only tax call from the V3 safety bank (V3 path only) + flip eth-v3-trailing fork fixture to the full buy→exit→sell lifecycle (+ dumpV3Pool price-mover) [STOP-THE-LINE-01]
+  - [ ] 21.1-03-PLAN.md — remove the V2-only tax call from BOTH the V2 and V3 banks (+delete the now-dead `hasHighTransferTaxForChain` function/import/test) + flip the V3 fork fixture to the full buy→exit→sell lifecycle (+ dumpV3Pool price-mover) [STOP-THE-LINE-01, STOP-THE-LINE-03]
 
   **Wave 2** *(after the helper + stubs):*
   - [ ] 21.1-04-PLAN.md — wire all 3 MEV strategies (flashbots/bloXroute/passthrough) through submitWithReconciliation + flip per-strategy misreport-but-landed / mined-but-reverted / nonce-safe / sell-leg tests green [STOP-THE-LINE-02]
@@ -269,7 +269,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
   **Cross-cutting constraints:**
   - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code" is NOT a tiebreaker
-  - **D-V3-ONLY-SCOPE:** fix the V3 path only; the V2 capture path (bot.ts:303), the hasHighTransferTaxForChain import, and the tokenSafety.ts:482 function are untouched
+  - **D-V3-ONLY-SCOPE [AMENDED 2026-05-26]:** the V3-only fence was PARTIALLY LIFTED — the V2 `hasHighTransferTaxForChain` tax-call removal (bot.ts:303) is now IN scope as STOP-THE-LINE-03 (research confirmed it fires a real amountOutMin=0 buy with broken NaN math, not the "V2 works" premise); with both call sites gone the dead function/import/tokenSafety.ts:482/test are deleted. The fence STILL holds for the REST of the V2 capture flow — only the broken tax call is removed; the bot.ts:253 honeypot roundtrip, buy/sell submit, and exit path are untouched
   - **D-FORK-REHEARSAL-21.1:** the fork rehearsal proves the passthrough reconciliation + buy→register→exit wiring; the Flashbots false-negative path is unit-proven and validated for real ONLY on the Phase-21 21-07 retry
 
 ## Progress
@@ -297,7 +297,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
-| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 0/6 | Planned (6 plans; blocks 21-07) | - |
+| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 0/6 | Planned (6 plans, 3 reqs STOP-THE-LINE-01/02/03; blocks 21-07) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
