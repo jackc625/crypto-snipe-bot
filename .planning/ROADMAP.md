@@ -47,6 +47,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
  (completed 2026-05-24)
 - [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
 - [x] **Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED)** — STOP-THE-LINE-01 (every V3 buy aborts: `bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain`) + STOP-THE-LINE-02 (CRITICAL — Flashbots `bundle.wait()` false-negative reported a landed LADYS buy as failed → untracked/unmonitored position) + STOP-THE-LINE-03 (the mirror V2 `hasHighTransferTaxForChain` call at `bot.ts:303` fires a REAL `amountOutMin=0` buy with broken NaN tax math on every V2 snipe — promoted into scope 2026-05-26); all blocked the 21-07 live capture → RESOLVED, phase complete 2026-05-27 (21-07 now unblocked, operator-gated)
+- [ ] **Phase 21.2: Calm-Gas Sell Inclusion + Exit-Engine Robustness (INSERTED)** — the 21-07 retry (2026-05-27) validated the STOP-THE-LINE-02 fix live (buy landed → reconciled → registered → monitored) but surfaced **STOP-THE-LINE-04**: (A) the Flashbots **sell** can't land at calm gas on a thin wallet (4 attempts → 13-gwei ceiling-hit → `exit.full.failed`; the buy landed only by first-attempt luck) → EXIT-LIVE-03/04/05 blocked; (B) reproducible event-loop **freeze** on MEV ceiling-hit (Ctrl+C dead, needs force-kill); (C) sell reconciliation **blocks the exit poll loop ~222s**; (D) anti-rug **unregisters a still-held position** after a failed exit (capital-safety, verify). Blocks 21-07/08 + Phase 21 close (D-STOP-THE-LINE)
 
 ## Phase Details
 
@@ -228,10 +229,10 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - [x] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) *(GREEN on V2 token LADYS; non-null amount_out via decodeReceipt; 21-07 unblocked)* [rehearsal gate - closes no requirement; validates the EXIT-LIVE-03 mechanism + EXIT-LIVE-04 Flashbots call path; a fork has no relay so 03/04 close on the 21-07 real run]
 
   **Wave 4** *(OPERATOR-GATED real capital; autonomous: false):*
-  - [ ] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false)
+  - [ ] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false) *(⚠ retry 2026-05-27: buy landed + EXIT-LIVE-01 telemetry captured + STOP-THE-LINE-02 fix validated live; but the Flashbots SELL hit the calm-gas inclusion wall → EXIT-LIVE-03/04/05 NOT captured; surfaced STOP-THE-LINE-04 → **BLOCKED on phase 21.2**)*
 
   **Wave 5** *(operator-confirmed captures + consolidation; autonomous: false):*
-  - [ ] 21-08-PLAN.md — induced-RPC-drop warning (06) + fresh-clone migration log/user_version=6 (07) captures + v6.17-VERIFICATION-EVIDENCE.md consolidation [EXIT-LIVE-06, EXIT-LIVE-07, EXIT-LIVE-11] (autonomous: false)
+  - [ ] 21-08-PLAN.md — induced-RPC-drop warning (06) + fresh-clone migration log/user_version=6 (07) captures + v6.17-VERIFICATION-EVIDENCE.md consolidation [EXIT-LIVE-06, EXIT-LIVE-07, EXIT-LIVE-11] (autonomous: false) *(blocked downstream of 21-07 / STOP-THE-LINE-04)*
 
   **Cross-cutting constraints:**
   - **D-EVIDENCE-BAR:** a fork-test pass alone NEVER closes any of the 6 deferred items — each needs a resolvable real-mainnet artifact (Etherscan hash / DB amount_out row / pino excerpt / timestamped screenshot) in v6.17-VERIFICATION-EVIDENCE.md
@@ -296,8 +297,9 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
 | 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
-| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07/08 operator-gated; 21.1 blocker open) | - |
+| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07 retry validated STL-02 fix live but surfaced STOP-THE-LINE-04 → blocked on 21.2; 21-07/08 operator-gated) | - |
 | 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Complete (verifier 10/10; +deep-review fix CR-01/WR-01; full gate GREEN — unit 614/integration 216/fork 39, tsc ×3 clean; 1 by-design human-UAT = 21-07 real-relay, operator-gated) | 2026-05-27 |
+| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 0/? | Planned — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
