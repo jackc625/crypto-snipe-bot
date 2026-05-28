@@ -1359,6 +1359,20 @@ async function dispatchEvent(
     // executeFullSell → unsubscribeAntiRug → bucket.splice mid-iteration),
     // iterating the live bucket would skip the still-registered sibling.
     // Snapshot pattern matches the V3 grace-window block-handler pattern.
+    //
+    // Phase 21.2 / Plan 21.2-07 (D-NONCE-AUTHORITY-ALL + Finding D): the
+    // anti-rug-triggered sell flows detector → scheduleConfirmBlocksGate →
+    // triggerAntiRugExit (exitTrigger.ts) → executeFullSell. The actual signing
+    // submits (token approval + the escalated/public-fallback sell, and the
+    // serial-worker drain) are ALL wrapped in
+    // withNonceLock(ctx.wallet.address, ...) inside executeFullSell — so the
+    // anti-rug sell is nonce-serialized with every other signing site bot-wide.
+    // The detector itself signs nothing; it must NEVER unregister a still-held
+    // position on a FAILED exit — executeFullSell's balance-truth catch
+    // (21.2-07) keeps anti-rug registered + re-arms the poll timer while
+    // balanceOf > dust, and only this unregisterAntiRugPosition runs on a
+    // GENUINE close (balanceOf <= dust). PRESERVE the snapshot-before-await
+    // idiom below for that exact race.
     const positionsSnapshot = positions.slice();
     for (const position of positionsSnapshot) {
         try {

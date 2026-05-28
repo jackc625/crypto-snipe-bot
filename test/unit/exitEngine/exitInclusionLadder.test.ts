@@ -27,14 +27,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const insertTradeRun = vi.fn();
 const updateTradeStatusRun = vi.fn();
 const deleteExitStateRun = vi.fn();
+// Phase 21.2-07 (Finding D balance-truth catch): executeFullSell now re-fetches
+// balanceOf on BOTH the success path and the catch, and on a still-held result
+// persists exit_failed_held via markExitFailedHeld. getExitState supplies the
+// dust threshold's original_token_amount. These ladder tests model a SUCCESSFUL
+// public sell (post-sell balance drops to 0 → genuine close), so markExitFailedHeld
+// should not normally fire — but it must be present in the mock so the catch /
+// dust read never throws on a missing export.
+const markExitFailedHeldRun = vi.fn();
 
 vi.mock('../../../src/utils/db', () => ({
     db: {},
     insertTrade: { run: insertTradeRun },
     updateTradeStatus: { run: updateTradeStatusRun },
     upsertExitState: { run: vi.fn() },
-    getExitState: { get: vi.fn() },
+    // A row with a modest original so the dust threshold is well below the test
+    // balances; the post-sell re-fetch returning 0 reads as a genuine close.
+    getExitState: { get: () => ({
+        trade_id: 1, entry_price: 1, high_water_mark: 1, trailing_activated: 0,
+        partial_tiers_completed: '[]', original_token_amount: '1000000',
+        urgency_start_ts: Date.now(), volatility_samples: '[1]',
+        exit_failure_count: 0, exit_status: null,
+    }) },
     deleteExitState: { run: deleteExitStateRun },
+    markExitFailedHeld: { run: markExitFailedHeldRun },
     getTradeIdForPendingToken: { get: vi.fn() },
 }));
 
@@ -68,6 +84,9 @@ vi.mock('../../../src/utils/exitManager', () => ({
     releaseSellLock: releaseSellLockMock,
     clearAllTimersForToken: clearAllTimersForTokenMock,
     registerExitMonitor: vi.fn(),
+    // Phase 21.2-07: the timer stays armed (these ladder positions close
+    // genuinely) so the re-arm never fires here.
+    hasExitMonitorTimer: vi.fn().mockReturnValue(true),
     tryEnqueuePosition: vi.fn().mockReturnValue(true),
     releasePositionQueue: vi.fn(),
 }));
@@ -242,7 +261,13 @@ beforeEach(() => {
     approveMock.mockReset().mockResolvedValue({ wait: vi.fn().mockResolvedValue(null) });
     getAmountsOutMock.mockReset().mockResolvedValue([0n, 1_000_000_000_000_000n]); // ~0.001 ETH out
 
-    balanceSequence = [1_000_000n, 1_000_000n];
+    markExitFailedHeldRun.mockReset();
+    // Phase 21.2-07: the THIRD balanceOf read is the success-path post-sell
+    // re-fetch (D-BALANCE-IS-TRUTH). A SUCCESSFUL public sell drops the balance to
+    // ~0, so the trailing 0n makes the post-sell re-fetch read a GENUINE close
+    // (teardown), preserving these Finding-A tests' original "sold" intent. (call
+    // 1 = initial balance, call 2 = guard re-fetch / held amount, call 3 = post-sell.)
+    balanceSequence = [1_000_000n, 1_000_000n, 0n];
     balanceCallCount = 0;
     withNonceLockCalls.length = 0;
 });
@@ -263,6 +288,11 @@ describe('Phase 21.2 / Finding A — executeFullSell inclusion ladder', () => {
             hash: '0xlateprivatelandedhash',
             receipt: { status: 1, blockNumber: 18_000_050 },
         });
+        // The private bundle landed late (no guard re-fetch on the 'included'
+        // branch). Calls: 1 = initial balance, 2 = success-path post-sell re-fetch
+        // → 0n = genuine close (D-BALANCE-IS-TRUTH), so teardown runs as before.
+        balanceSequence = [1_000_000n, 0n];
+        balanceCallCount = 0;
 
         const result = await executeFullSell(
             buildCtx(),
@@ -284,8 +314,9 @@ describe('Phase 21.2 / Finding A — executeFullSell inclusion ladder', () => {
 
         // First balanceOf (private leg setup) returns the original; the guard
         // re-fetch returns a REDUCED amount → the public sell must use the reduced
-        // balance as amountIn, NOT the original.
-        balanceSequence = [1_000_000n, 250_000n];
+        // balance as amountIn, NOT the original. The trailing 0n is the success-
+        // path post-sell re-fetch (21.2-07) → genuine close → teardown.
+        balanceSequence = [1_000_000n, 250_000n, 0n];
         balanceCallCount = 0;
 
         const result = await executeFullSell(
@@ -335,6 +366,13 @@ describe('Phase 21.2 / Finding A — executeFullSell inclusion ladder', () => {
         expect(antiRugAttempts).toBeLessThanOrEqual(1);
 
         escalatePrivateSellMock.mockClear();
+        // Reset the balance sequence for the SECOND executeFullSell call — the
+        // anti-rug call above advanced balanceCallCount past the sequence (whose
+        // tail is the post-sell 0n), so without this reset the routine call's
+        // initial balance read would be 0 → zero-balance early return (no private
+        // escalation). (call 1 = initial, 2 = guard re-fetch, 3 = post-sell close.)
+        balanceSequence = [1_000_000n, 1_000_000n, 0n];
+        balanceCallCount = 0;
 
         // Routine: default MEV_SELL_FALLBACK_ATTEMPTS = 2.
         await executeFullSell(
@@ -362,7 +400,8 @@ describe('Phase 21.2 / Finding A — executeFullSell inclusion ladder', () => {
 
         swapFeeOnTransferMock.mockClear();
         getAmountsOutMock.mockResolvedValue([0n, 1_000_000n]);
-        balanceSequence = [1_000_000n, 1_000_000n];
+        // Trailing 0n = the success-path post-sell re-fetch → genuine close (21.2-07).
+        balanceSequence = [1_000_000n, 1_000_000n, 0n];
         balanceCallCount = 0;
 
         // Anti-rug fallback: wider (>=10%) slippage → minOut <= 900_000.

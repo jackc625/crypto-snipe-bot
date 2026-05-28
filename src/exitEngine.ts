@@ -1294,13 +1294,18 @@ export async function executePartialSell(
 
         const gasLimit = ctx.chain.gas.maxGasLimit;
 
-        // Build txBuilder for MEV-protected submission
+        // Build txBuilder for MEV-protected submission. Phase 21.2-07
+        // (D-NONCE-AUTHORITY-ALL): the partial-sell approval is a signing tx, so
+        // it routes through withNonceLock — EVERY signing site is serialized by
+        // the per-wallet nonce authority (RESEARCH Q4 lists executePartialSell +
+        // its ensureApproval explicitly). Without this, a partial-sell approval
+        // could contend for the nonce with a concurrent full-exit/buy.
         let txBuilder: () => Promise<TransactionRequest>;
         if (dex.dexType === 'v3' && feeTier != null) {
-            await ensureApproval(token, dex.swapRouterAddress, actualSellAmount, ctx.wallet.address);
+            await withNonceLock(ctx.wallet.address, () => ensureApproval(token, dex.swapRouterAddress, actualSellAmount, ctx.wallet.address));
             txBuilder = buildV3SellTx(dex, tokenAddress, ctx.chain.wethAddress, ctx.wallet.address, actualSellAmount, feeTier, gasLimit);
         } else if (dex.dexType === 'v2') {
-            await ensureApproval(token, dex.routerAddress, actualSellAmount, ctx.wallet.address);
+            await withNonceLock(ctx.wallet.address, () => ensureApproval(token, dex.routerAddress, actualSellAmount, ctx.wallet.address));
             txBuilder = buildV2SellTx(dex, tokenAddress, ctx.chain.wethAddress, ctx.wallet.address, actualSellAmount, gasLimit);
         } else {
             ctx.log.error({ token: tokenAddress }, 'Unknown DEX type for partial sell');
@@ -1311,8 +1316,15 @@ export async function executePartialSell(
         ctx.log.info({ token: tokenAddress, tiers: tierLabels, op: 'exit.partial.submitted' }, 'Submitting partial sell via MEV-protected path');
         await sendCtxAlert(ctx, `*Partial sell:* ${tierLabels} at ${currentMultiple.toFixed(2)}x`);
 
-        // Submit via sendTxWithRetry for MEV protection
-        const txHash = await sendTxWithRetry(txBuilder, ctx);
+        // Submit via sendTxWithRetry for MEV protection, nonce-locked so the
+        // submit serializes with every other signing site (D-NONCE-AUTHORITY-ALL).
+        // The partial-sell catch (below, Pitfall 6) already leaves the position
+        // OPEN on failure — it does NOT tear down anti-rug or delete exit_state —
+        // so it inherits the no-double-sell + balance-truth posture: a failed
+        // partial sell simply retries on the next poll cycle (the clamp to the
+        // re-fetched balance prevents selling more than is held). Verified by
+        // antiRugReason.test.ts Test 7 (source) + Test 8 (runtime).
+        const txHash = await withNonceLock(ctx.wallet.address, () => sendTxWithRetry(txBuilder, ctx));
 
         ctx.log.info({ token: tokenAddress, tiers: tierLabels, txHash, op: 'exit.partial.executed' }, 'Partial sell TX confirmed');
 

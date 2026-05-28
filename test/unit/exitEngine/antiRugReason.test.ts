@@ -21,9 +21,14 @@
 //           deleteExitState.run(tradeId).
 //   Test 5: On the early-zero-balance branch (line 442-447), executeFullSell
 //           ALSO calls unsubscribeAntiRug (zero-balance still closes position).
-//   Test 6: On the error path (line 511-513), executeFullSell ALSO calls
-//           unsubscribeAntiRug (failed exit still terminates the subscription
-//           per D-TERMINATION).
+//   Test 6 (INVERTED — Phase 21.2 / Plan 21.2-07, Finding D): on a failed exit
+//           of a STILL-HELD position (re-fetched balanceOf > dust), executeFullSell
+//           does NOT call unsubscribeAntiRug and does NOT call deleteExitState —
+//           it KEEPS anti-rug + the poll timer and persists exit_failed_held. The
+//           PRE-21.2-07 assertion (the error path unsubscribes "per D-TERMINATION")
+//           ENCODED THE CAPITAL-SAFETY BUG (it stripped rug protection from a still-
+//           held position — the LADYS harm). D-TERMINATION correctly means "tear
+//           down when the position CLOSES"; balanceOf is the source of truth.
 //   Test 7: The partial-sell path (executePartialSell at line 531+) does NOT
 //           call unsubscribeAntiRug — partial sells leave position open and
 //           rug risk persists per CONTEXT.md D-TERMINATION explicit phrasing.
@@ -48,14 +53,24 @@ import { resolve } from 'path';
 const insertTradeRun = vi.fn();
 const updateTradeStatusRun = vi.fn();
 const deleteExitStateRun = vi.fn();
+// Phase 21.2 / Plan 21.2-07 (Finding D): the balance-truth catch persists
+// exit_failed_held via markExitFailedHeld INSTEAD of deleteExitState on a still-
+// held failure. getExitState is now consulted for the dust threshold's
+// original_token_amount + the re-read exit_failure_count, so it returns a
+// controllable row (the inverted Test 6 dials a large original so a held balance
+// reads as > dust).
+const markExitFailedHeldRun = vi.fn();
+let exitStateRow: Record<string, unknown> | undefined = undefined;
+function setExitStateRow(row: Record<string, unknown> | undefined) { exitStateRow = row; }
 
 vi.mock('../../../src/utils/db', () => ({
     db: {},
     insertTrade: { run: insertTradeRun },
     updateTradeStatus: { run: updateTradeStatusRun },
     upsertExitState: { run: vi.fn() },
-    getExitState: { get: vi.fn() },
+    getExitState: { get: () => exitStateRow },
     deleteExitState: { run: deleteExitStateRun },
+    markExitFailedHeld: { run: markExitFailedHeldRun },
     getTradeIdForPendingToken: { get: vi.fn() },
 }));
 
@@ -66,6 +81,7 @@ vi.mock('../../../src/utils/logger', () => ({
             warn: vi.fn(),
             debug: vi.fn(),
             error: vi.fn(),
+            fatal: vi.fn(),
         }),
     },
 }));
@@ -88,11 +104,30 @@ vi.mock('../../../src/config', () => ({
 const clearAllTimersForTokenMock = vi.fn();
 const tryAcquireSellLockMock = vi.fn();
 const releaseSellLockMock = vi.fn();
+// Phase 21.2-07: hasExitMonitorTimer gates the re-arm decision; registerExitMonitor
+// is the observable effect of a re-arm (resumeExitMonitor re-creates the interval).
+const hasExitMonitorTimerMock = vi.fn();
+const registerExitMonitorMock = vi.fn();
 vi.mock('../../../src/utils/exitManager', () => ({
     tryAcquireSellLock: tryAcquireSellLockMock,
     releaseSellLock: releaseSellLockMock,
     clearAllTimersForToken: clearAllTimersForTokenMock,
-    registerExitMonitor: vi.fn(),
+    registerExitMonitor: registerExitMonitorMock,
+    hasExitMonitorTimer: hasExitMonitorTimerMock,
+    tryEnqueuePosition: vi.fn().mockReturnValue(true),
+    releasePositionQueue: vi.fn(),
+}));
+
+// Phase 21.2-07: the still-held keep-monitoring path re-arms via resumeExitMonitor,
+// which (for a row present) only re-creates the interval; the nonce authority +
+// reconciliation are mocked so any code path that touches them stays in-process.
+const withNonceLockMock = vi.fn(async (_addr: string, op: () => Promise<unknown>) => op());
+vi.mock('../../../src/utils/nonceAuthority', () => ({
+    withNonceLock: withNonceLockMock,
+}));
+vi.mock('../../../src/utils/mevStrategies/reconciliation', () => ({
+    reconcileInclusion: vi.fn().mockResolvedValue({ outcome: 'not-landed', hash: null }),
+    buildReconcileConfig: vi.fn().mockReturnValue({ confirmWindowMs: 1000, pollMs: 100 }),
 }));
 
 const sendCtxAlertMock = vi.fn();
@@ -160,6 +195,10 @@ function buildCtx(opts: { liveExecute?: boolean; gasMultiplier?: number } = {}) 
             name: 'eth',
             displayName: '[ETH]',
             wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+            // Phase 21.2-07: the still-held re-arm path calls resumeExitMonitor,
+            // which reads ctx.chain.snipeAmount as the buy-amount baseline
+            // (parseEther) — mirror the startup resume convention (bot.ts:1289).
+            snipeAmount: '0.01',
             gas: {
                 multiplier: 1.2,
                 maxGasLimit: 500_000n,
@@ -193,9 +232,14 @@ beforeEach(() => {
     insertTradeRun.mockReset();
     updateTradeStatusRun.mockReset();
     deleteExitStateRun.mockReset();
+    markExitFailedHeldRun.mockReset();
     clearAllTimersForTokenMock.mockReset();
     tryAcquireSellLockMock.mockReset().mockReturnValue(true);
     releaseSellLockMock.mockReset();
+    registerExitMonitorMock.mockReset();
+    // Default: the poll timer is still armed (a failed ROUTINE exit never cleared
+    // it). The inverted Test 6 flips this to false to observe the anti-rug re-arm.
+    hasExitMonitorTimerMock.mockReset().mockReturnValue(true);
     sendCtxAlertMock.mockReset();
     sendTxWithRetryMock.mockReset().mockResolvedValue('0xtxhash');
     // Default: the private leg LANDS (inclusion ladder happy path) so the
@@ -207,6 +251,11 @@ beforeEach(() => {
         blockNumber: 18_000_000,
     });
     unregisterAntiRugPositionMock.mockReset();
+    // Default: no exit_state row → dust threshold falls to its absolute floor, so
+    // the default 1_000n mockBalance reads as a genuine close on the success path
+    // (Tests 4/5 unchanged). Tests that exercise the still-held branch set a row.
+    setExitStateRow(undefined);
+    setMockBalance(1_000n);
 });
 
 // -----------------------------------------------------------------------------
@@ -320,13 +369,34 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
             expect(unregisterAntiRugPositionMock).toHaveBeenCalledWith('eth', 43);
         });
 
-        it('Test 6: error path ALSO calls unsubscribeAntiRug', async () => {
-            const { executeFullSell } = await import('../../../src/exitEngine');
+        it('Test 6 (INVERTED — Finding D): a failed exit on a STILL-HELD position KEEPS anti-rug + the poll timer + persists exit_failed_held (does NOT unsubscribe / deleteExitState)', async () => {
+            const { executeFullSell, _resetRoutinePauseForTesting } = await import('../../../src/exitEngine');
+            _resetRoutinePauseForTesting();
 
-            // Force the private escalation (the inclusion ladder's private leg) to
-            // throw so executeFullSell takes the catch branch. Phase 21.2-06 keeps
-            // the existing catch shape (the balance-truth teardown is 21.2-07).
+            // Force the private escalation to throw → executeFullSell takes the
+            // catch branch. The CATCH now re-fetches balanceOf and gates teardown
+            // on it (21.2-07 balance-truth). Configure the position as STILL HELD:
+            //   * a large original_token_amount so the dust threshold is large…
+            //   * …but a balanceOf WAY above dust (the LADYS evidence amount).
             escalatePrivateSellMock.mockReset().mockRejectedValueOnce(new Error('tx revert'));
+            setExitStateRow({
+                trade_id: 44,
+                entry_price: 1,
+                high_water_mark: 1,
+                trailing_activated: 0,
+                partial_tiers_completed: '[]',
+                original_token_amount: '252930777000000000000', // ~252.9 (the LADYS held amount)
+                urgency_start_ts: Date.now(),
+                volatility_samples: '[1]',
+                exit_failure_count: 1,
+                exit_status: 'exit_failed_held',
+            });
+            // balanceOf returns the still-held LADYS amount (>> dust) on BOTH the
+            // initial read and the catch re-fetch.
+            setMockBalance(252_930_777_000_000_000_000n);
+            // The anti-rug live-exit path cleared the poll timer before the sell
+            // (exitTrigger.ts:222); simulate that so the re-arm is observable.
+            hasExitMonitorTimerMock.mockReturnValue(false);
 
             const ctx = buildCtx();
             const result = await executeFullSell(
@@ -336,17 +406,22 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
                 null,
                 'anti-rug',
                 44,
-                'Error path test',
+                'Still-held failed exit (keep monitoring)',
             );
 
+            // Restore default balance for sibling tests.
+            setMockBalance(1_000n);
+
             expect(result).toBe(false);
-            expect(updateTradeStatusRun).toHaveBeenCalledWith(
-                'failed',
-                '0xtoken00000000000000000000000000000000t03',
-                'eth',
-            );
-            expect(deleteExitStateRun).toHaveBeenCalledWith(44);
-            expect(unregisterAntiRugPositionMock).toHaveBeenCalledWith('eth', 44);
+            // THE CROWN-JEWEL INVERSION: a failed STILL-HELD exit must NOT strip
+            // rug protection and must NOT delete the restart-resume state.
+            expect(unregisterAntiRugPositionMock).not.toHaveBeenCalled();
+            expect(deleteExitStateRun).not.toHaveBeenCalled();
+            // It persists the distinct failed-held lifecycle status instead.
+            expect(markExitFailedHeldRun).toHaveBeenCalledWith(44);
+            // And it re-arms the routine poll timer (the position keeps being
+            // monitored AND retried — BOTH anti-rug + a poll timer present).
+            expect(registerExitMonitorMock).toHaveBeenCalled();
         });
 
         it('Test 7: executePartialSell does NOT call unsubscribeAntiRug', async () => {
@@ -366,6 +441,73 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
             const partialSellBody = partialSellMatch![0];
             expect(partialSellBody).not.toContain('unsubscribeAntiRug');
             expect(partialSellBody).not.toContain('unregisterAntiRugPosition');
+        });
+
+        it('Test 8 (Finding D verification): a FAILED executePartialSell leaves the position open — no double-sell teardown, anti-rug NOT torn down', async () => {
+            // RESEARCH Candidate-Escalation #1: executePartialSell shares the
+            // "submit-report may lie" class but is lower-stakes. It must NOT tear
+            // down anti-rug on a failure (it leaves the position open for the next
+            // cycle). Runtime assertion (complements Test 7's source-text guard).
+            const { executePartialSell, VolatilityTracker } = await import('../../../src/exitEngine');
+
+            // Force the partial submit to throw → the partial catch (Pitfall 6:
+            // does NOT kill the monitor, returns false, leaves the position open).
+            sendTxWithRetryMock.mockReset().mockRejectedValueOnce(new Error('partial revert'));
+
+            const ctx = buildCtx();
+            const state = {
+                tradeId: 60,
+                entryPrice: 1,
+                highWaterMark: 2,
+                trailingActivated: true,
+                completedTierIndices: new Set<number>(),
+                originalTokenAmount: 1_000n,
+                urgencyStartTs: Date.now(),
+                volatilityTracker: new VolatilityTracker(),
+            };
+
+            const result = await executePartialSell(
+                ctx,
+                V2_DEX as unknown as Parameters<typeof executePartialSell>[1],
+                '0xToken00000000000000000000000000000000T08',
+                null,
+                500n,
+                [{ tier: { multiple: 2, percent: 50 }, index: 0 }],
+                state,
+                2.0,
+            );
+
+            expect(result).toBe(false);
+            // The position stays OPEN: no teardown of anti-rug, no exit_state delete.
+            expect(unregisterAntiRugPositionMock).not.toHaveBeenCalled();
+            expect(deleteExitStateRun).not.toHaveBeenCalled();
+            // It did not record a 'sold' close (no double-sell / no false success).
+            expect(insertTradeRun).not.toHaveBeenCalled();
+        });
+
+        it('Test 9 (D-NONCE-AUTHORITY-ALL): the anti-rug-triggered exit submit routes through withNonceLock', async () => {
+            // The anti-rug sell flows detector → triggerAntiRugExit → executeFullSell,
+            // whose every signing submit (approval + the escalated sell, and the
+            // worker drain) is wrapped in withNonceLock(ctx.wallet.address, ...).
+            // Assert the authority layer is exercised on a (successful) anti-rug exit.
+            const { executeFullSell } = await import('../../../src/exitEngine');
+            withNonceLockMock.mockClear();
+
+            const ctx = buildCtx();
+            const result = await executeFullSell(
+                ctx,
+                V2_DEX as unknown as Parameters<typeof executeFullSell>[1],
+                '0xToken00000000000000000000000000000000T09',
+                null,
+                'anti-rug',
+                61,
+                'nonce-wrapped anti-rug exit',
+            );
+
+            expect(result).toBe(true);
+            // The approval submit (V2 path) routes through the per-wallet nonce lock.
+            expect(withNonceLockMock).toHaveBeenCalled();
+            expect(withNonceLockMock.mock.calls[0][0]).toBe(ctx.wallet.address);
         });
     });
 });

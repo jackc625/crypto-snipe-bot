@@ -34,6 +34,10 @@ const updateTradeStatusRun = vi.fn();
 const deleteExitStateRun = vi.fn();
 const upsertExitStateRun = vi.fn();
 const getExitStateGet = vi.fn();
+// Phase 21.2-07 (Finding D): the balance-truth catch persists exit_failed_held
+// on a still-held failure instead of deleteExitState — mock it so the path never
+// throws on a missing export.
+const markExitFailedHeldRun = vi.fn();
 
 vi.mock('../../../src/utils/db', () => ({
     db: {},
@@ -42,6 +46,7 @@ vi.mock('../../../src/utils/db', () => ({
     upsertExitState: { run: upsertExitStateRun },
     getExitState: { get: getExitStateGet },
     deleteExitState: { run: deleteExitStateRun },
+    markExitFailedHeld: { run: markExitFailedHeldRun },
     getTradeIdForPendingToken: { get: vi.fn() },
 }));
 
@@ -78,11 +83,14 @@ const clearAllTimersForTokenMock = vi.fn();
 const tryAcquireSellLockMock = vi.fn();
 const releaseSellLockMock = vi.fn();
 const registerExitMonitorMock = vi.fn();
+const hasExitMonitorTimerMock = vi.fn();
 vi.mock('../../../src/utils/exitManager', () => ({
     tryAcquireSellLock: tryAcquireSellLockMock,
     releaseSellLock: releaseSellLockMock,
     clearAllTimersForToken: clearAllTimersForTokenMock,
     registerExitMonitor: registerExitMonitorMock,
+    // Phase 21.2-07: timer stays armed (no re-arm) for these op-enrichment paths.
+    hasExitMonitorTimer: hasExitMonitorTimerMock,
 }));
 
 const sendCtxAlertMock = vi.fn();
@@ -113,9 +121,19 @@ vi.mock('../../../src/anti-rug/detector', () => ({
 
 // Mock ethers Contract so on-chain calls (balanceOf/allowance/approve) stay in
 // pure-process land. balanceOf is controllable via the shared mockBalance var.
-let mockBalance: bigint = 1_000_000_000_000_000_000n; // 1e18 default
+// Phase 21.2-07 (Finding D balance-truth): executeFullSell re-fetches balanceOf
+// AFTER the sell (success path) / in the catch. A successful exit drops the
+// balance to ~0, so the POST-SELL read returns mockPostSellBalance (default 0n)
+// → a genuine close → teardown (preserving the original op-enrichment intent).
+// The FIRST read (the initial balance gate) returns mockBalance.
+let mockBalance: bigint = 1_000_000_000_000_000_000n; // 1e18 default (initial read)
+let mockPostSellBalance: bigint = 0n;                  // post-sell / catch re-fetch
+let balanceReadCount = 0;
 function setMockBalance(b: bigint) {
     mockBalance = b;
+}
+function setMockPostSellBalance(b: bigint) {
+    mockPostSellBalance = b;
 }
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
@@ -125,7 +143,13 @@ vi.mock('ethers', async () => {
         approve: () => Promise<{ wait: () => Promise<null> }>;
         interface: { encodeFunctionData: () => string };
     }) {
-        this.balanceOf = () => Promise.resolve(mockBalance);
+        this.balanceOf = () => {
+            // First read = the initial balance gate; any subsequent read = the
+            // post-sell / catch re-fetch (balance-truth teardown decision).
+            const v = balanceReadCount === 0 ? mockBalance : mockPostSellBalance;
+            balanceReadCount++;
+            return Promise.resolve(v);
+        };
         this.allowance = () => Promise.resolve(0n);
         this.approve = () => Promise.resolve({ wait: () => Promise.resolve(null) });
         this.interface = { encodeFunctionData: () => '0xdeadbeef' };
@@ -201,6 +225,9 @@ beforeEach(() => {
     tryAcquireSellLockMock.mockReset().mockReturnValue(true);
     releaseSellLockMock.mockReset();
     registerExitMonitorMock.mockReset();
+    markExitFailedHeldRun.mockReset();
+    // Default: timer stays armed → the still-held re-arm path does not fire.
+    hasExitMonitorTimerMock.mockReset().mockReturnValue(true);
     sendCtxAlertMock.mockReset();
     sendTxWithRetryMock.mockReset().mockResolvedValue('0xtxhash');
     // Default: the private leg LANDS (the inclusion ladder's happy path) so these
@@ -212,7 +239,11 @@ beforeEach(() => {
         blockNumber: 18_000_000,
     });
     unregisterAntiRugPositionMock.mockReset();
+    // Initial balance read = non-zero (proceeds to sell); post-sell re-fetch = 0
+    // (a successful exit drops the balance → genuine close, balance-truth teardown).
     setMockBalance(1_000_000_000_000_000_000n);
+    setMockPostSellBalance(0n);
+    balanceReadCount = 0;
 });
 
 // -----------------------------------------------------------------------------
