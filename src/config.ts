@@ -192,6 +192,16 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'EXIT_GATE_SELL_GAS_BUFFER', required: false, description: 'Multiplier on base fee when reserving worst-case public-exit gas for the buy-time affordability gate. Finding A. (default: 2.0)' },
     { name: 'MEV_SELL_FALLBACK_ATTEMPTS', required: false, description: 'Routine (non-anti-rug) private sell attempts before the public-mempool fallback; anti-rug uses 0-1. Finding A. (default: 2)' },
     { name: 'MEV_SELL_ANTIRUG_SLIPPAGE_PCT', required: false, description: 'WIDER public-fallback slippage (%) for anti-rug exits to maximize landing while liquidity drains; routine fallbacks reuse the configured exit slippage. Finding A. (default: 15)' },
+
+    // --- Failed-exit position protection (Phase 21.2, Finding D — STOP-THE-LINE-04-D) ---
+    // GLOBAL (non-chain-prefixed) balance-truth teardown knobs. CODE-read config,
+    // NOT secrets. Read via the never-NaN/never-negative parse helpers in
+    // consuming code (exitEngine.ts). These gate the capital-safety invariant: a
+    // failed exit of a STILL-HELD position keeps anti-rug + the poll timer rather
+    // than tearing down. Registered here so 21.2-07 (balance-truth catch) consumes
+    // them WITHOUT re-touching config.ts.
+    { name: 'EXIT_DUST_THRESHOLD_BPS', required: false, description: 'Dust threshold (basis points of the original token amount) at/under which a re-fetched balanceOf is treated as a GENUINE close → teardown; above it the position is STILL HELD → keep anti-rug + re-arm the poll timer. Relative + a tiny absolute floor. Finding D. (default: 1 = 0.01%)' },
+    { name: 'EXIT_ROUTINE_MAX_FAILURES', required: false, description: 'Consecutive ROUTINE (non-anti-rug) failed-exit count after which routine retries pause + hard-alert; anti-rug emergency exits ALWAYS bypass the pause and fire. Finding D. (default: 5)' },
 ];
 
 function validateEnvVars(): void {

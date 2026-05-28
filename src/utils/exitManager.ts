@@ -175,6 +175,27 @@ export function registerExitMonitor(
     timerRegistry.set(key, { exitMonitorInterval: interval });
 }
 
+/**
+ * Phase 21.2 / Finding D (D-FAILED-EXIT-KEEP-MONITORING) — report whether a
+ * routine exit-monitor poll interval is currently armed for {chain, token}.
+ *
+ * The anti-rug live-exit path calls {@link clearAllTimersForToken} BEFORE the
+ * sell (exitTrigger.ts:222) to eliminate the poll-loop race. If that anti-rug
+ * sell then FAILS on a STILL-HELD position, the balance-truth catch must RE-ARM
+ * the routine poll timer (a still-held position must end with BOTH anti-rug
+ * registered AND a poll timer armed). This predicate lets the catch re-arm ONLY
+ * when the timer was actually cleared — it never double-arms a position whose
+ * routine interval is still running (e.g. a failed trailing-stop, where the
+ * interval was never cleared because routine triggers return 'continue').
+ *
+ * Keyed identically to the timer registry ("chain:token" composite, lowercased).
+ */
+export function hasExitMonitorTimer(chainName: string, tokenAddress: string): boolean {
+    const key = `${chainName}:${tokenAddress.toLowerCase()}`;
+    const entry = timerRegistry.get(key);
+    return !!(entry && entry.exitMonitorInterval);
+}
+
 export function clearAllTimersForToken(token: string): void;
 export function clearAllTimersForToken(chainName: string, token: string): void;
 export function clearAllTimersForToken(chainOrToken: string, token?: string): void {

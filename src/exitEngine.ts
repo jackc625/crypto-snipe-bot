@@ -8,9 +8,9 @@ import { CONFIG } from './config';
 import { logger } from './utils/logger';
 import type { ChainContext, DexConfig, DexConfigV2, DexConfigV3 } from './chainRegistry';
 import { ROUTER_ABI, ERC20_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from './utils/abis';
-import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimersForToken, tryEnqueuePosition, releasePositionQueue } from './utils/exitManager';
+import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimersForToken, hasExitMonitorTimer, tryEnqueuePosition, releasePositionQueue } from './utils/exitManager';
 import { withNonceLock } from './utils/nonceAuthority';
-import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState } from './utils/db';
+import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState, markExitFailedHeld } from './utils/db';
 import { sendCtxAlert } from './utils/notifier';
 import { sendTxWithRetry, escalatePrivateSell } from './utils/txManager';
 import { reconcileInclusion, buildReconcileConfig } from './utils/mevStrategies/reconciliation';
@@ -549,6 +549,200 @@ async function executePublicFallbackSell(
     return txHash;
 }
 
+// ---------------------------------------------------------------------------
+// Finding D balance-truth teardown (Phase 21.2 / Plan 21.2-07)
+// D-FAILED-EXIT-KEEP-MONITORING + D-BALANCE-IS-TRUTH + D-PERSIST-FAILED-HELD
+// ---------------------------------------------------------------------------
+//
+// THE CAPITAL-SAFETY CROWN JEWEL. The cardinal invariant: a failed exit must
+// NEVER strip anti-rug protection from a STILL-HELD position. The old catch
+// (pre-21.2-07) treated a FAILED exit like a successful close —
+// updateTradeStatus('failed') + clearAllTimersForToken + deleteExitState +
+// unsubscribeAntiRug — which stripped rug protection from a still-held position
+// (the LADYS evidence: 252,930,777 LADYS confirmed held AFTER the reported
+// failure). This corrects a MISapplication of Phase 19 D-TERMINATION (which
+// always meant "tear down when the position CLOSES"); it is NOT a reversal.
+//
+// The fix: on BOTH the success path AND the catch the teardown decision is made
+// by a re-fetched on-chain balanceOf (the only signal that did not lie):
+//   * balanceOf <= dust (relative to original_token_amount) → GENUINE close →
+//     run the normal teardown (updateTradeStatus + clearAllTimersForToken +
+//     deleteExitState + unsubscribeAntiRug).
+//   * balanceOf > dust → STILL HELD → markExitFailedHeld (status
+//     'exit_failed_held' + exit_failure_count++, DB v7 from 21.2-03), do NOT
+//     deleteExitState, do NOT unsubscribeAntiRug, and RE-ARM the routine poll
+//     timer if it was cleared (the anti-rug path clears it at exitTrigger.ts:222
+//     BEFORE the sell). After N=5 consecutive ROUTINE failures, routine retries
+//     pause + hard-alert; anti-rug emergency exits ALWAYS bypass the pause.
+
+/** never-NaN/never-negative positive-int parse used for the Finding D knobs. */
+function parsePositiveIntDefault(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/** EXIT_ROUTINE_MAX_FAILURES (default 5): the bounded-routine-retry ceiling. */
+function routineMaxFailures(): number {
+    return parsePositiveIntDefault(process.env.EXIT_ROUTINE_MAX_FAILURES, 5);
+}
+
+/**
+ * Dust threshold for a position, relative to its original token amount
+ * (EXIT_DUST_THRESHOLD_BPS, default 1 bps = 0.01% per RESEARCH A6) PLUS a tiny
+ * absolute floor so a fee-on-transfer remainder of a few wei never reads as
+ * "still held". balanceOf <= this → genuine close; above → still held.
+ *
+ * `originalTokenAmount` comes from the exit_state row (the authoritative buy
+ * amount). When it is unavailable (0 / no row), the relative term is 0 and only
+ * the absolute floor applies — fail-safe toward "still held" for any non-trivial
+ * balance (we never tear down a held position on missing metadata).
+ */
+function computeDustThreshold(originalTokenAmount: bigint): bigint {
+    const bps = BigInt(parsePositiveIntDefault(process.env.EXIT_DUST_THRESHOLD_BPS, 1));
+    const relative = (originalTokenAmount * bps) / 10_000n;
+    // Absolute floor: 1000 wei of the token's smallest unit. Negligible value on
+    // any real position; catches fee-on-transfer rounding crumbs.
+    const absoluteFloor = 1_000n;
+    return relative > absoluteFloor ? relative : absoluteFloor;
+}
+
+/**
+ * Read the position's original token amount from the persisted exit_state row.
+ * Returns 0n if the row is absent (the dust threshold then falls back to its
+ * absolute floor — see computeDustThreshold).
+ */
+function readOriginalTokenAmount(tradeId: number): bigint {
+    try {
+        const row = getExitState.get(tradeId) as ExitStateRow | undefined;
+        if (row && row.original_token_amount) return BigInt(row.original_token_amount);
+    } catch { /* fall through to 0n */ }
+    return 0n;
+}
+
+// Routine-retry pause registry (D-FAILED-EXIT-KEEP-MONITORING). Keyed
+// "chain:token" (lowercased) to line up with the sell-lock / timer-registry /
+// nonce-authority conventions. A position lands here once its persisted
+// exit_failure_count reaches EXIT_ROUTINE_MAX_FAILURES; while present, ROUTINE
+// (trailing-stop / stop-loss / urgency-market-sell) exits are skipped. ANTI-RUG
+// exits ALWAYS bypass this set — an emergency exit must be able to fire no matter
+// how many routine attempts have failed. A genuine close clears the entry.
+const routinePausedPositions = new Set<string>();
+
+function pauseKey(chainName: string, tokenAddress: string): string {
+    return `${chainName}:${tokenAddress.toLowerCase()}`;
+}
+
+/** True if ROUTINE retries are paused for this position (anti-rug ignores it). */
+export function isRoutinePaused(chainName: string, tokenAddress: string): boolean {
+    return routinePausedPositions.has(pauseKey(chainName, tokenAddress));
+}
+
+/** Test-only: clear the routine-pause registry between tests. */
+export function _resetRoutinePauseForTesting(): void {
+    routinePausedPositions.clear();
+}
+
+/**
+ * GENUINE-close teardown (balanceOf <= dust). Identical to the historical
+ * success-path teardown (the CORRECT-close reference): mark sold, clear timers,
+ * delete exit_state, unsubscribe anti-rug, and lift any routine pause. Used by
+ * BOTH the success path and the catch once balanceOf confirms the position is
+ * closed (D-BALANCE-IS-TRUTH).
+ */
+function teardownGenuineClose(ctx: ChainContext, tokenAddress: string, tradeId: number): void {
+    updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
+    clearAllTimersForToken(ctx.chain.name, tokenAddress);
+    deleteExitState.run(tradeId);
+    // Phase 19 / Plan 19-05 — terminate anti-rug subscription ONLY on a genuine
+    // full-close (D-TERMINATION applied correctly: the position has CLOSED).
+    unsubscribeAntiRug(ctx.chain.name, tradeId);
+    routinePausedPositions.delete(pauseKey(ctx.chain.name, tokenAddress));
+}
+
+/**
+ * STILL-HELD failed exit (balanceOf > dust) — the Finding D keep-monitoring path.
+ * Persists exit_failed_held + increments the failure counter (does NOT delete
+ * exit_state), KEEPS anti-rug registered (NO unsubscribeAntiRug), and RE-ARMS the
+ * routine poll timer if it was cleared (the anti-rug path clears it BEFORE the
+ * sell at exitTrigger.ts:222 — without the re-arm a still-held position would be
+ * anti-rug-monitored but never routinely retried). After N=5 consecutive ROUTINE
+ * failures it pauses routine retries + hard-alerts; anti-rug always bypasses the
+ * pause. Returns nothing — the caller's catch/return value is unchanged.
+ */
+async function keepMonitoringFailedHeld(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    reason: FullSellReason,
+    tradeId: number,
+    heldBalance: bigint,
+): Promise<void> {
+    // Persist the distinct lifecycle status + increment the consecutive-failure
+    // counter (DB v7, 21.2-03). NOTE: we do NOT call deleteExitState — the row
+    // (and its restart-resume state) survives so the position keeps being
+    // monitored and re-registers anti-rug on a reboot.
+    markExitFailedHeld.run(tradeId);
+
+    // Re-read the persisted counter for the bounded-retry decision (the UPDATE
+    // does not return the new value; getExitState surfaces the full v7 row).
+    let failureCount = 0;
+    try {
+        const row = getExitState.get(tradeId) as (ExitStateRow & { exit_failure_count?: number }) | undefined;
+        failureCount = row?.exit_failure_count ?? 0;
+    } catch { /* leave 0 — we still keep monitoring, just don't pause yet */ }
+
+    ctx.log.error(
+        {
+            token: tokenAddress, reason, tradeId,
+            heldBalance: heldBalance.toString(), failureCount,
+            op: 'exit.failed.held',
+        },
+        'Exit FAILED on a STILL-HELD position — keeping anti-rug + the poll timer (balance-is-truth)',
+    );
+
+    // RE-ARM the routine poll timer if it was cleared (the anti-rug live-exit
+    // path clears it at exitTrigger.ts:222 BEFORE the sell). A failed routine
+    // exit never cleared its interval (routine triggers return 'continue'), so
+    // hasExitMonitorTimer is already true there and we do NOT double-arm.
+    if (!hasExitMonitorTimer(ctx.chain.name, tokenAddress)) {
+        ctx.log.info(
+            { token: tokenAddress, reason, tradeId, op: 'exit.failed.held.rearm-timer' },
+            'Re-arming the routine poll timer for a still-held position (was cleared before the anti-rug exit)',
+        );
+        // resumeExitMonitor reloads exit_state and re-creates the 5s poll
+        // interval. ctx.chain.snipeAmount is the same buy-amount baseline the
+        // startup resume path uses (bot.ts:1289/1296) for the price quote.
+        await resumeExitMonitor(ctx, dex, tokenAddress, feeTier, ctx.chain.snipeAmount, tradeId);
+    }
+
+    // Bounded ROUTINE retries (D-FAILED-EXIT-KEEP-MONITORING). Anti-rug NEVER
+    // pauses — an emergency exit must be able to fire regardless of how many
+    // routine attempts failed. Routine retries pause once the persisted
+    // consecutive-failure counter reaches the ceiling, with a hard alert.
+    if (reason !== 'anti-rug' && failureCount >= routineMaxFailures()) {
+        routinePausedPositions.add(pauseKey(ctx.chain.name, tokenAddress));
+        ctx.log.fatal(
+            { token: tokenAddress, reason, tradeId, failureCount, max: routineMaxFailures(), op: 'exit.failed.held.routine-paused' },
+            'ROUTINE exit retries PAUSED after consecutive failures — anti-rug emergency exits still fire',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[EXIT ROUTINE PAUSED]* ${reason}: ${failureCount} consecutive failed exits on a still-held position. ` +
+            `Routine retries are PAUSED to stop burning gas; anti-rug emergency exits STILL fire. ` +
+            `Remediation: inspect the position (sell-reverting? honeypot?) and resume manually.`,
+        );
+    } else {
+        await sendCtxAlert(
+            ctx,
+            `*[EXIT FAILED — STILL HELD]* ${reason}: exit attempt failed but the position is STILL HELD ` +
+            `(balance ${heldBalance.toString()}). Anti-rug protection KEPT + the poll timer is armed; ` +
+            `the position will be retried (failure ${failureCount}/${routineMaxFailures()}).`,
+        );
+    }
+}
+
 /**
  * Execute a full sell of remaining token balance.
  * Per D-05: sell entire remaining balance after partial sells.
@@ -559,6 +753,13 @@ async function executePublicFallbackSell(
  * (reconcileInclusion on the last private attempt + a re-fetched balanceOf) if not
  * landed, then (3) falls back to a guaranteed nonce-locked public-mempool sell.
  * The public fallback is an ENGINE PATH, not a bypass flag (D-ROLLBACK).
+ *
+ * Phase 21.2 / Finding D balance-truth teardown (D-FAILED-EXIT-KEEP-MONITORING +
+ * D-BALANCE-IS-TRUTH + D-PERSIST-FAILED-HELD): on BOTH the success path AND the
+ * catch the teardown decision is gated on a RE-FETCHED balanceOf. balanceOf <=
+ * dust → genuine close (teardownGenuineClose). balanceOf > dust → still held
+ * (keepMonitoringFailedHeld: KEEP anti-rug + re-arm the poll timer + persist
+ * exit_failed_held; bounded routine retries, anti-rug always fires).
  */
 export async function executeFullSell(
     ctx: ChainContext,
@@ -569,6 +770,20 @@ export async function executeFullSell(
     tradeId: number,
     reasonDetail: string,
 ): Promise<boolean> {
+    // Finding D bounded-routine-retry gate (D-FAILED-EXIT-KEEP-MONITORING). If a
+    // position's routine retries are PAUSED (N consecutive failures), skip a
+    // ROUTINE (trailing-stop / stop-loss / urgency) submit entirely — do NOT
+    // tear down, do NOT submit (no more gas burn). ANTI-RUG exits ALWAYS bypass
+    // the pause: an emergency exit must be able to fire regardless. The check is
+    // BEFORE the sell-lock so a paused routine trigger does not even contend.
+    if (reason !== 'anti-rug' && isRoutinePaused(ctx.chain.name, tokenAddress)) {
+        ctx.log.warn(
+            { token: tokenAddress, reason, tradeId, op: 'exit.routine.paused-skip' },
+            'Routine exit retries are paused for this position — skipping submit (anti-rug would still fire)',
+        );
+        return false;
+    }
+
     if (!tryAcquireSellLock(ctx.chain.name, tokenAddress)) {
         ctx.log.info({ token: tokenAddress, reason }, 'Another exit already handling token, skipping');
         return false;
@@ -580,12 +795,8 @@ export async function executeFullSell(
 
         if (balance === 0n) {
             ctx.log.info({ token: tokenAddress, reason, op: 'exit.cleanup.zero-balance' }, 'Zero balance, cleaning up');
-            updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
-            clearAllTimersForToken(ctx.chain.name, tokenAddress);
-            deleteExitState.run(tradeId);
-            // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
-            // full-close path per D-TERMINATION (zero-balance path).
-            unsubscribeAntiRug(ctx.chain.name, tradeId);
+            // GENUINE close (no balance) → teardown (D-BALANCE-IS-TRUTH).
+            teardownGenuineClose(ctx, tokenAddress, tradeId);
             return true;
         }
 
@@ -770,28 +981,80 @@ export async function executeFullSell(
             feeTier: feeTier,
             dexName: dex.name,
         });
-        updateTradeStatus.run('sold', tokenAddress.toLowerCase(), ctx.chain.name);
-        clearAllTimersForToken(ctx.chain.name, tokenAddress);
-        deleteExitState.run(tradeId);
-        // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
-        // full-close path per D-TERMINATION (success path).
-        unsubscribeAntiRug(ctx.chain.name, tradeId);
-
-        const confirmHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT] confirmed*' : `*${reason} confirmed*`;
-        await sendCtxAlert(ctx, confirmHeader);
-        return true;
+        // Finding D balance-truth teardown (D-BALANCE-IS-TRUTH) — SUCCESS PATH.
+        // Even on the "success" path the submit-report can lie (a fee-on-transfer
+        // remainder, a partial fill, a late-landed bundle that only sold part).
+        // Re-fetch balanceOf and let it — not the report — decide teardown. <=
+        // dust → genuine close; > dust → still held (keep anti-rug + re-arm
+        // timer + persist exit_failed_held).
+        const postSellBalance: bigint = await token.balanceOf(ctx.wallet.address);
+        const dust = computeDustThreshold(readOriginalTokenAmount(tradeId));
+        if (postSellBalance <= dust) {
+            teardownGenuineClose(ctx, tokenAddress, tradeId);
+            const confirmHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT] confirmed*' : `*${reason} confirmed*`;
+            await sendCtxAlert(ctx, confirmHeader);
+            return true;
+        }
+        // The sell "succeeded" but the position is STILL HELD (dust check). Keep
+        // monitoring rather than tear down — the trade row already recorded the
+        // partial sell above; the position keeps anti-rug + a poll timer.
+        await keepMonitoringFailedHeld(ctx, dex, tokenAddress, feeTier, reason, tradeId, postSellBalance);
+        return false;
     } catch (e) {
         ctx.log.error({ err: e, token: tokenAddress, reason, op: 'exit.full.failed' }, 'Exit sell failed');
-        // Full exit failure: mark failed and clean up (Pitfall 6)
+        // Finding D balance-truth teardown (D-FAILED-EXIT-KEEP-MONITORING +
+        // D-BALANCE-IS-TRUTH) — CATCH PATH. The OLD code unconditionally tore
+        // down here (updateTradeStatus('failed') + clearAllTimersForToken +
+        // deleteExitState + unsubscribeAntiRug), STRIPPING rug protection from a
+        // still-held position (the LADYS harm). Now the on-chain balanceOf gates
+        // the decision: re-fetch it (the only signal that did not lie) and only
+        // tear down when the position is genuinely closed.
+        //
+        // PRESERVE the `e instanceof Error ? e.message : String(e)` guard:
+        // Flashbots bundle.wait() rejects with a BARE STRING, not an Error
+        // (RESEARCH Finding B root cause). The error message is computed up front
+        // so it is available on either branch.
+        const errMsg = e instanceof Error ? e.message : String(e);
+        let heldBalance: bigint;
+        try {
+            const token = new Contract(tokenAddress, ERC20_ABI, ctx.wallet);
+            heldBalance = await token.balanceOf(ctx.wallet.address);
+        } catch (balErr) {
+            // The re-fetch ITSELF failed (RPC down mid-failure). FAIL SAFE toward
+            // "still held" — NEVER tear down rug protection on a balance we could
+            // not confirm as zero. Treat as held with a sentinel non-zero balance.
+            ctx.log.error(
+                { err: balErr, token: tokenAddress, reason, tradeId, op: 'exit.failed.balance-refetch-failed' },
+                'Could not re-fetch balanceOf after a failed exit — failing safe to KEEP monitoring (never strip protection on an unknown balance)',
+            );
+            heldBalance = -1n; // sentinel: unknown but assumed held (definitely > dust)
+        }
+
+        const dust = computeDustThreshold(readOriginalTokenAmount(tradeId));
+        if (heldBalance >= 0n && heldBalance <= dust) {
+            // GENUINE close confirmed by balanceOf (the submit threw, but the
+            // position is actually closed — e.g. a late-landed sell + a throwing
+            // post-step). Tear down exactly as a real close.
+            ctx.log.info(
+                { token: tokenAddress, reason, tradeId, heldBalance: heldBalance.toString(), op: 'exit.failed.but-closed' },
+                'Exit threw but balanceOf confirms the position is CLOSED — tearing down',
+            );
+            // teardownGenuineClose marks the trade 'sold' (the position is closed,
+            // not failed) + clears timers + deletes exit_state + unsubscribes.
+            teardownGenuineClose(ctx, tokenAddress, tradeId);
+            const failHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT]* sell reported failure but position closed' : `*${reason}* sell reported failure but position closed`;
+            await sendCtxAlert(ctx, `${failHeader}: ${errMsg}`);
+            return false;
+        }
+
+        // STILL HELD (balanceOf > dust, or unknown/sentinel). KEEP anti-rug + the
+        // poll timer + persist exit_failed_held (the crown-jewel invariant). Mark
+        // the trades row 'failed' for operator visibility — but do NOT delete
+        // exit_state and do NOT unsubscribe anti-rug.
         updateTradeStatus.run('failed', tokenAddress.toLowerCase(), ctx.chain.name);
-        clearAllTimersForToken(ctx.chain.name, tokenAddress);
-        deleteExitState.run(tradeId);
-        // Phase 19 / Plan 19-05 — terminate anti-rug subscription on every
-        // full-close path per D-TERMINATION (error path — failed exit still
-        // closes the position-monitor lifecycle).
-        unsubscribeAntiRug(ctx.chain.name, tradeId);
+        await keepMonitoringFailedHeld(ctx, dex, tokenAddress, feeTier, reason, tradeId, heldBalance);
         const failHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT] sell failed:*' : `*${reason} sell failed:*`;
-        await sendCtxAlert(ctx, `${failHeader} ${e instanceof Error ? e.message : String(e)}`);
+        await sendCtxAlert(ctx, `${failHeader} ${errMsg}`);
         return false;
     } finally {
         releaseSellLock(ctx.chain.name, tokenAddress);
