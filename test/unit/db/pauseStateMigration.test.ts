@@ -223,10 +223,18 @@ describe('Phase 20 — Schema v5→v6 pause_state + chain_state.antirug_dry_run_
             expect(dbModule.getAntirugDryRunStarted).toBeDefined();
         });
 
-        it('production user_version pragma reports 6 after module load', async () => {
+        it('production user_version pragma reports >= 6 after module load (Phase 20 floor; future migrations advance it further)', async () => {
+            // Phase 20 / Plan 20-01 introduced v6. Phase 21.2 / Plan 21.2-03 bumped to v7
+            // (exit_failed_held + exit_failure_count on exit_state). This asserts the
+            // Phase 20 floor — the production DB must be AT LEAST v6. Tightening to
+            // `=== 6` would (and did) break each time a future plan lands a new
+            // migration step; the v6-EXACT assert lives in this file's own
+            // `migration mechanics` block (applyV6Migration against an isolated
+            // in-memory v5-seeded DB). This mirrors the floor-assert precedent in
+            // lpBaselineMigration.test.ts ('reports >= 5 after module load').
             const dbModule = await import('../../../src/utils/db');
             const version = dbModule.db.pragma('user_version', { simple: true }) as number;
-            expect(version).toBe(6);
+            expect(version).toBeGreaterThanOrEqual(6);
         });
     });
 
