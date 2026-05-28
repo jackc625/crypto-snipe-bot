@@ -24,7 +24,7 @@ db.pragma('synchronous = NORMAL');
 db.pragma('busy_timeout = 5000');
 
 // --- Schema Migration ---
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 function migrateSchema(): void {
     const version = db.pragma('user_version', { simple: true }) as number;
@@ -189,6 +189,44 @@ function migrateSchema(): void {
             }
         })();
         logger.info('Created pause_state table + antirug_dry_run_started column (schema version 6)');
+    }
+
+    if (version < 7) {
+        // Phase 21.2 / Plan 21.2-03 / STOP-THE-LINE-04-D / D-PERSIST-FAILED-HELD.
+        //
+        // Persist a still-held FAILED exit so it survives restart. On a failed exit
+        // of a still-held position (on-chain balanceOf > dust) the exit engine must
+        // NOT delete exit_state; it marks a distinct status `exit_failed_held`
+        // (separate from `sold` and from `failed`=dead) and bumps a persisted
+        // failure counter (`exit_failure_count`) that drives the bounded-routine-retry
+        // logic. On restart, `exit_failed_held` rows re-enter monitoring +
+        // re-register anti-rug (the write path lands in 21.2-07; the fork
+        // restart-resume proof lands in 21.2-10).
+        //
+        // RESEARCH A9 + Runtime State Inventory: the new status + counter live on
+        // `exit_state` (the monitoring-lifecycle table, already keyed by trade_id) —
+        // the ADDITIVE ALTER-guard path (clone of the v5.5/v6 idiom at :185-189),
+        // explicitly chosen OVER recreating the trades.status CHECK constraint.
+        // SQLite cannot ALTER a CHECK, so that path is the heavy recreate-table-copy
+        // pattern (:83-107) which would risk the trades table; the additive ALTER on
+        // exit_state is both lighter AND safer (D-QUALITY-FIRST: chosen for safety,
+        // not for fewer lines).
+        //
+        // DDL wrapped in db.transaction() for atomicity (RESEARCH §1 + A1) — if the
+        // second ALTER fails, the first rolls back so the bot never sees a partial v7
+        // state. The PRAGMA table_info guard makes re-runs no-ops (idempotent): if
+        // exit_failure_count already exists (partial-rerun after a prior crash
+        // mid-transaction, or a re-open), both ALTERs are skipped together. The two
+        // columns are always added as a pair, so guarding on the first is sufficient.
+        db.transaction(() => {
+            const columns = db.prepare("PRAGMA table_info('exit_state')").all() as Array<{ name: string }>;
+            const hasCol = columns.some(c => c.name === 'exit_failure_count');
+            if (!hasCol) {
+                db.exec(`ALTER TABLE exit_state ADD COLUMN exit_failure_count INTEGER NOT NULL DEFAULT 0`);
+                db.exec(`ALTER TABLE exit_state ADD COLUMN exit_status TEXT`);   // 'exit_failed_held' marker
+            }
+        })();
+        logger.info('Added exit_failure_count + exit_status columns to exit_state (schema version 7)');
     }
 
     db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`);
@@ -474,7 +512,37 @@ const upsertExitState = db.prepare(`
         volatility_samples = @volatilitySamples
 `);
 
+// getExitState returns the FULL row including the v7 columns (exit_failure_count +
+// exit_status). The restart-resume path (21.2-10) reads exit_status to decide
+// whether a row re-enters monitoring as a still-held failed exit.
 const getExitState = db.prepare(`SELECT * FROM exit_state WHERE trade_id = ?`);
+
+// --- Failed-Held Exit Persistence (Phase 21.2 / Plan 21.2-03 / D-PERSIST-FAILED-HELD) ---
+//
+// markExitFailedHeld: on a failed exit of a STILL-HELD position (on-chain
+// balanceOf > dust), the exit engine (21.2-07) calls this INSTEAD of
+// deleteExitState. It stamps the distinct lifecycle status `exit_failed_held`
+// (separate from `sold` and from `trades.status='failed'`=dead) and atomically
+// increments the persisted consecutive-failure counter. The counter drives the
+// bounded-routine-retry logic (default N=5 → pause routine retries + hard-alert;
+// anti-rug emergency exits still fire). On restart, getExitState surfaces
+// exit_status so the row re-enters monitoring + re-registers anti-rug.
+//
+// `exit_failure_count + 1` reads the persisted column inside the UPDATE so the
+// count is monotonic across process restarts (it is NOT reset by a reboot — that
+// is the whole point of persisting it). A successful close calls deleteExitState,
+// which removes the row (and thus the counter) entirely; on a fresh re-buy a new
+// exit_state row starts the counter back at the DEFAULT 0.
+//
+// The status string literal MUST stay exactly 'exit_failed_held' — it is the
+// shared contract with the consumer in 21.2-07 and the fork restart-resume test
+// in 21.2-10.
+const markExitFailedHeld = db.prepare(`
+    UPDATE exit_state
+    SET exit_status = 'exit_failed_held',
+        exit_failure_count = exit_failure_count + 1
+    WHERE trade_id = ?
+`);
 
 const deleteExitState = db.prepare(`DELETE FROM exit_state WHERE trade_id = ?`);
 
@@ -623,6 +691,8 @@ export {
     getDailyRealizedLoss,
     upsertExitState,
     getExitState,
+    // Phase 21.2 / Plan 21.2-03 / D-PERSIST-FAILED-HELD
+    markExitFailedHeld,
     deleteExitState,
     getTradeIdForPendingToken,
     // WR-06: cached query for preflight checkStaleData
