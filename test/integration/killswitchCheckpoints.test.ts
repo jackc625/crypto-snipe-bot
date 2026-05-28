@@ -250,6 +250,10 @@ function makeCtx() {
             snipeAmount: '0.01',
             maxCapital: '1.0',
             gasBuffer: '0.005',
+            // ETH chain template (chainRegistry.ts:204 / test/fixtures/chainConfig.ts:62).
+            // Required by the Plan 21.2-08 buy-time entry affordability gate, which
+            // reads chain.gas.maxGasLimit to price the worst-case guaranteed exit.
+            gas: { type: 'eip1559', multiplier: 1.2, maxGasLimit: 300_000n },
             blockAgeToleranceSec: 300,
             honeypotChecker: { deployedAddress: '0x0000000000000000000000000000000000000001', method: 'exactInputSingle', maxBuyTaxBps: 1000, maxSellTaxBps: 1000 },
             antiRug: {},
@@ -257,7 +261,18 @@ function makeCtx() {
             explorerUrl: 'https://etherscan.io',
             minLiquidityThreshold: '0.1',
         },
-        httpProvider: {} as unknown,
+        // The entry affordability gate (preflight.checkEntryExitAffordability) reads
+        // getBalance + getFeeData off ctx.httpProvider. 1 ETH clears the floor
+        // (snipe 0.01 + worst-case buy/sell gas + 0.005 cushion ≈ 0.03 ETH);
+        // 30 gwei maxFee / 10 gwei priority → 20 gwei base fee for the exit math.
+        httpProvider: {
+            getBalance: vi.fn().mockResolvedValue(BigInt('1000000000000000000')),
+            getFeeData: vi.fn().mockResolvedValue({
+                maxFeePerGas: BigInt('30000000000'),
+                maxPriorityFeePerGas: BigInt('10000000000'),
+                gasPrice: BigInt('30000000000'),
+            }),
+        } as unknown,
         wsProvider: null,
         wallet: {
             address: '0xWallet',
