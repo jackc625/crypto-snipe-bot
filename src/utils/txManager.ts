@@ -9,6 +9,7 @@
 // zero live callers, so per D-ROLLBACK (no legacy fallback paths) it was a
 // re-introduction hazard and removed entirely.
 import type { TransactionRequest, JsonRpcProvider, Wallet } from "ethers";
+import { keccak256 } from "ethers";
 import type { MevStrategy } from './mevStrategies/types';
 import { FlashbotsMevStrategy } from './mevStrategies/flashbots';
 import { BloxrouteMevStrategy } from './mevStrategies/bloxroute';
@@ -97,4 +98,95 @@ export async function sendTxWithRetry(
 
     const tx = await txBuilder();
     return strategy.sendTransaction(tx, ctx.wallet, ctx.httpProvider, retries, gasMultiplier);
+}
+
+// ---------------------------------------------------------------------------
+// escalatePrivateSell -- the PRIVATE leg of the Finding A inclusion ladder
+// (Phase 21.2 / Plan 21.2-06, D-EXIT-INCLUSION + D-FALLBACK-NO-DOUBLE-SELL)
+// ---------------------------------------------------------------------------
+
+/**
+ * Structured outcome of a private-escalation sell attempt for the inclusion
+ * ladder. Unlike {@link sendTxWithRetry} (which returns a bare hash or THROWS on
+ * genuine not-landed), this normalizes BOTH paths into a structured result so the
+ * ladder can fall through to the public-mempool fallback WITHOUT treating a
+ * not-landed bundle as a hard error:
+ *   - `landed:true`  → the private bundle was included (possibly late-reconciled
+ *      by 21.1's receipt+nonce probe); `txHash` is the REAL on-chain hash.
+ *   - `landed:false` → the private bundle genuinely did not land within the
+ *      escalation budget; `lastSignedHash` + `lastNonce` are the deterministic
+ *      signed-tx hash + the submitted nonce of the LAST attempt, so the engine's
+ *      no-double-sell guard can re-run `reconcileInclusion` on them before any
+ *      public fallback (the LADYS / STOP-THE-LINE-02 late-land guard).
+ */
+export interface PrivateSellResult {
+    landed: boolean;
+    /** Real on-chain hash when landed:true. */
+    txHash?: string;
+    /** Deterministic signed-tx hash of the last attempt (for the no-double-sell guard). */
+    lastSignedHash?: string;
+    /** Submitted nonce of the last attempt (for the no-double-sell guard). */
+    lastNonce?: number;
+}
+
+/**
+ * Run the PRIVATE escalation leg of the inclusion ladder and normalize the
+ * outcome to {@link PrivateSellResult}. The deterministic signed-tx hash + nonce
+ * are captured BEFORE dispatch (by populating + locally signing the sell tx — the
+ * same block-independent `signedTxHash` discipline 21.1 uses) so that, on a
+ * not-landed outcome, the engine can reconcile the exact attempt against chain
+ * state before falling back to the public mempool. Local signing does NOT
+ * broadcast — the existing `sendTxWithRetry` strategy dispatch performs the real
+ * submit, so there is no double-submit here.
+ *
+ * @param attempts reason-aware private-attempt budget (anti-rug → 0-1; routine →
+ *                 MEV_SELL_FALLBACK_ATTEMPTS). Passed to the strategy as its
+ *                 maxRetries so a not-landed bundle exhausts cleanly and returns
+ *                 `landed:false` rather than spinning.
+ */
+export async function escalatePrivateSell(
+    txBuilder: () => Promise<TransactionRequest>,
+    ctx: ChainContext,
+    attempts: number,
+    gasMultiplier?: number
+): Promise<PrivateSellResult> {
+    // Capture the deterministic signed-tx hash + submitted nonce of the attempt
+    // we are about to dispatch. This is block-independent (depends only on the
+    // signed bytes), so it is the stable handle the no-double-sell guard probes.
+    let lastSignedHash: string | undefined;
+    let lastNonce: number | undefined;
+    try {
+        const tx = await txBuilder();
+        const nonce = await ctx.httpProvider.getTransactionCount(ctx.wallet.address, 'latest');
+        lastNonce = nonce;
+        const populated = await ctx.wallet.populateTransaction({ ...tx, nonce });
+        const signedRaw = await ctx.wallet.signTransaction(populated);
+        lastSignedHash = keccak256(signedRaw);
+    } catch (e) {
+        // A pre-dispatch populate/sign failure is non-fatal to the ladder: the
+        // guard will fall back to balanceOf-as-truth (the authoritative
+        // no-double-sell signal). Log + continue to the real dispatch.
+        ctx.log.warn(
+            { err: e instanceof Error ? e.message : String(e), op: 'exit.private.presign-failed' },
+            'Could not pre-sign the private sell attempt for the no-double-sell guard; relying on balanceOf truth',
+        );
+    }
+
+    try {
+        // The strategy owns nonce-safe retry + receipt+nonce reconciliation; it
+        // returns the REAL hash even on a late land (so `landed:true` already
+        // covers the LADYS late-inclusion at the strategy layer).
+        const txHash = await sendTxWithRetry(txBuilder, ctx, attempts, undefined, undefined, gasMultiplier);
+        return { landed: true, txHash };
+    } catch (e) {
+        // Genuine not-landed / ceiling-hit (the strategy threw). This is NOT a
+        // hard error for the ladder — the public-mempool fallback is the
+        // guaranteed exit. PRESERVE the bare-string guard (Flashbots bundle.wait()
+        // rejects with a string, not an Error — Finding B root cause).
+        ctx.log.warn(
+            { err: e instanceof Error ? e.message : String(e), op: 'exit.private.not-landed' },
+            'Private escalation did not land within the budget — proceeding to the no-double-sell guard + public fallback',
+        );
+        return { landed: false, lastSignedHash, lastNonce };
+    }
 }

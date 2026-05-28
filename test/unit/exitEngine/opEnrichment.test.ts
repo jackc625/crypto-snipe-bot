@@ -91,8 +91,14 @@ vi.mock('../../../src/utils/notifier', () => ({
 }));
 
 const sendTxWithRetryMock = vi.fn();
+// Phase 21.2 / Plan 21.2-06: executeFullSell's private leg now routes through
+// escalatePrivateSell (the Finding A inclusion ladder). Default to a LANDED
+// private result so these EXIT-LIVE-10 op-enrichment paths keep their original
+// success-path semantics (private bundle lands → no public fallback).
+const escalatePrivateSellMock = vi.fn();
 vi.mock('../../../src/utils/txManager', () => ({
     sendTxWithRetry: sendTxWithRetryMock,
+    escalatePrivateSell: escalatePrivateSellMock,
 }));
 
 const decodeReceiptMock = vi.fn();
@@ -197,6 +203,9 @@ beforeEach(() => {
     registerExitMonitorMock.mockReset();
     sendCtxAlertMock.mockReset();
     sendTxWithRetryMock.mockReset().mockResolvedValue('0xtxhash');
+    // Default: the private leg LANDS (the inclusion ladder's happy path) so these
+    // op-enrichment success paths are unchanged from pre-21.2-06 behavior.
+    escalatePrivateSellMock.mockReset().mockResolvedValue({ landed: true, txHash: '0xtxhash' });
     decodeReceiptMock.mockReset().mockResolvedValue({
         amountOut: '1000000000',
         gasCost: '21000',
@@ -236,7 +245,10 @@ describe('EXIT-LIVE-10 — executeFullSell op enrichment', () => {
         const { executeFullSell } = await import('../../../src/exitEngine');
         const { ctx, log } = buildCtx();
 
-        sendTxWithRetryMock.mockReset().mockRejectedValueOnce(new Error('tx revert'));
+        // Phase 21.2-06: the full-sell submit now runs the inclusion ladder via
+        // escalatePrivateSell. A throw from it (e.g. an unrecoverable error before
+        // the public fallback) reaches the catch and emits exit.full.failed.
+        escalatePrivateSellMock.mockReset().mockRejectedValueOnce(new Error('tx revert'));
 
         const result = await executeFullSell(
             ctx as Parameters<typeof executeFullSell>[0],

@@ -64,8 +64,27 @@ vi.mock('../../src/utils/notifier', () => ({
 }));
 
 const sendTxWithRetryMock = vi.fn();
+// Phase 21.2 / Plan 21.2-06: executeFullSell's private leg now routes through
+// escalatePrivateSell (the Finding A inclusion ladder). The full-sell tests set
+// this per-case; executePartialSell still uses sendTxWithRetry directly.
+const escalatePrivateSellMock = vi.fn();
 vi.mock('../../src/utils/txManager', () => ({
     sendTxWithRetry: sendTxWithRetryMock,
+    escalatePrivateSell: escalatePrivateSellMock,
+}));
+
+// The no-double-sell guard probe (reconcileInclusion). Default not-landed.
+const reconcileInclusionMock = vi.fn();
+vi.mock('../../src/utils/mevStrategies/reconciliation', async () => {
+    const actual = await vi.importActual<
+        typeof import('../../src/utils/mevStrategies/reconciliation')
+    >('../../src/utils/mevStrategies/reconciliation');
+    return { ...actual, reconcileInclusion: reconcileInclusionMock };
+});
+
+// withNonceLock: passthrough wrapper (runs the op) for the nonce-locked submits.
+vi.mock('../../src/utils/nonceAuthority', () => ({
+    withNonceLock: vi.fn(async (_addr: string, op: () => Promise<unknown>) => op()),
 }));
 
 const decodeReceiptMock = vi.fn();
@@ -76,12 +95,25 @@ vi.mock('../../src/utils/receiptDecoder', () => ({
 // Mock ethers Contract so we don't actually hit a chain.
 // Use a real class (not vi.fn().mockImplementation) so vitest's `mockReset: true`
 // (set in vitest.config.ts) does NOT wipe the constructor between tests.
+// `mockBalanceSequence` lets a test return a reduced/zero balance on the guard
+// re-fetch (the no-double-sell sell-only-held / abort-on-zero paths).
+let mockBalanceSequence: bigint[] = [1000000000000000000n];
+let mockBalanceCall = 0;
+function setBalanceSequence(seq: bigint[]) { mockBalanceSequence = seq; mockBalanceCall = 0; }
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
     class MockContract {
-        async balanceOf() { return 1000000000000000000n; } // 1 token
+        async balanceOf() {
+            const idx = Math.min(mockBalanceCall, mockBalanceSequence.length - 1);
+            mockBalanceCall++;
+            return mockBalanceSequence[idx];
+        }
         async allowance() { return 1n << 200n; } // huge allowance, no approval needed
         async approve() { return { wait: async () => ({}) }; }
+        async getAmountsOut() { return [0n, 1000000000000000n]; }
+        async swapExactTokensForETHSupportingFeeOnTransferTokens() {
+            return { hash: '0xpublicfallback', wait: async () => ({ status: 1, blockNumber: 1 }) };
+        }
     }
     return {
         ...actual,
@@ -125,8 +157,11 @@ beforeEach(async () => {
     updateTradeStatusRun.mockReset();
     deleteExitStateRun.mockReset();
     sendTxWithRetryMock.mockReset();
+    escalatePrivateSellMock.mockReset();
+    reconcileInclusionMock.mockReset().mockResolvedValue({ outcome: 'not-landed' });
     decodeReceiptMock.mockReset();
     tryAcquireSellLockMock.mockReset().mockReturnValue(true);
+    setBalanceSequence([1000000000000000000n]);
 
     const mod = await import('../../src/exitEngine');
     executeFullSell = mod.executeFullSell;
@@ -135,7 +170,11 @@ beforeEach(async () => {
 
 describe('executeFullSell — receipt decoding integration', () => {
     it('records non-null amountOut/gasCost/block when decodeReceipt returns data', async () => {
-        sendTxWithRetryMock.mockResolvedValue('0xabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc0');
+        // Private leg LANDS with the real hash → decodeReceipt runs on it.
+        escalatePrivateSellMock.mockResolvedValue({
+            landed: true,
+            txHash: '0xabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc0',
+        });
         decodeReceiptMock.mockResolvedValue({
             amountOut: '1000000000000000000',
             gasCost: '300000000000000',
@@ -171,8 +210,20 @@ describe('executeFullSell — receipt decoding integration', () => {
         );
     });
 
-    it('skips decodeReceipt and records nulls when sendTxWithRetry returns void (legacy path)', async () => {
-        sendTxWithRetryMock.mockResolvedValue(undefined);
+    it('skips decodeReceipt and records nulls on a no-new-tx close (guard aborts public fallback — already sold)', async () => {
+        // Phase 21.2-06: the legacy "sendTxWithRetry returns void" path was deleted
+        // in 21.1. The equivalent no-new-tx close under the inclusion ladder is the
+        // no-double-sell guard ABORTING the public fallback because the re-fetched
+        // balance is 0 (the private bundle already sold). No new tx → txHash stays
+        // null → decodeReceipt is skipped → the sell row records nulls.
+        escalatePrivateSellMock.mockResolvedValue({
+            landed: false,
+            lastSignedHash: '0xlast',
+            lastNonce: 5,
+        });
+        reconcileInclusionMock.mockResolvedValue({ outcome: 'not-landed' });
+        // Initial balance read = 1 token; guard re-fetch = 0 (already sold).
+        setBalanceSequence([1000000000000000000n, 0n]);
         decodeReceiptMock.mockResolvedValue({
             amountOut: 'SHOULD_NOT_BE_USED',
             gasCost: 'SHOULD_NOT_BE_USED',
@@ -272,7 +323,12 @@ describe('Phase 7 EXIT-01: executeFullSell accepts reason="stop-loss" discrimina
         // The existing receipt-decoding tests cover executeFullSell call shape;
         // this test reinforces that the reason='stop-loss' discriminant is accepted and round-trips.
 
-        sendTxWithRetryMock.mockResolvedValue('0xstoplossharmprevhash00000000000000000000000000000000000000000000');
+        // Phase 21.2-06: the full-sell submit now runs the inclusion ladder; the
+        // private leg lands with the real hash (the success path is unchanged).
+        escalatePrivateSellMock.mockResolvedValue({
+            landed: true,
+            txHash: '0xstoplossharmprevhash00000000000000000000000000000000000000000000',
+        });
         decodeReceiptMock.mockResolvedValue({
             amountOut: '750000000000000000',
             gasCost: '200000000000000',
@@ -294,8 +350,9 @@ describe('Phase 7 EXIT-01: executeFullSell accepts reason="stop-loss" discrimina
 
         // D-04 observable effect 1: sell call returned true
         expect(ok).toBe(true);
-        // D-04 observable effect 2: sell transaction submitted
-        expect(sendTxWithRetryMock).toHaveBeenCalledTimes(1);
+        // D-04 observable effect 2: sell transaction submitted (via the private leg
+        // of the inclusion ladder — escalatePrivateSell).
+        expect(escalatePrivateSellMock).toHaveBeenCalledTimes(1);
         // D-04 observable effect 3: DB row inserted with action='sell'
         expect(insertTradeRun).toHaveBeenCalledWith(
             expect.objectContaining({

@@ -24,6 +24,10 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
         const deleteExitStateRun = vi.fn();
         const clearAllTimersForTokenMock = vi.fn();
         const sendTxWithRetryMock = vi.fn();
+        // Phase 21.2-06: executeFullSell's private leg now uses escalatePrivateSell.
+        // These tests exercise the ZERO-balance early return (before the ladder), so
+        // the symbol need only exist; default it to a landed result for safety.
+        const escalatePrivateSellMock = vi.fn().mockResolvedValue({ landed: true, txHash: '0xhash' });
 
         vi.doMock('../../src/utils/db', () => ({
             db: {},
@@ -75,6 +79,7 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
 
         vi.doMock('../../src/utils/txManager', () => ({
             sendTxWithRetry: sendTxWithRetryMock,
+            escalatePrivateSell: escalatePrivateSellMock,
         }));
 
         vi.doMock('../../src/utils/receiptDecoder', () => ({
@@ -207,6 +212,9 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
         const deleteExitStateRun = vi.fn();
         const clearAllTimersForTokenMock = vi.fn();
         const sendTxWithRetryMock = vi.fn().mockResolvedValue('0xhash');
+        // Phase 21.2-06: the control case (non-zero balance) now drives the
+        // inclusion ladder. The private leg LANDS → the on-chain sell happened.
+        const escalatePrivateSellMock = vi.fn().mockResolvedValue({ landed: true, txHash: '0xhash' });
 
         vi.doMock('../../src/utils/db', () => ({
             db: {},
@@ -244,6 +252,7 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
         }));
         vi.doMock('../../src/utils/txManager', () => ({
             sendTxWithRetry: sendTxWithRetryMock,
+            escalatePrivateSell: escalatePrivateSellMock,
         }));
         vi.doMock('../../src/utils/receiptDecoder', () => ({
             decodeReceipt: vi.fn().mockResolvedValue({
@@ -266,8 +275,8 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
             mockCtx, mockDex, TOKEN, null, 'trailing-stop', TRADE_ID, 'non-zero test',
         );
 
-        // sendTxWithRetry was called (on-chain sell happened)
-        expect(sendTxWithRetryMock).toHaveBeenCalledOnce();
+        // The private leg of the inclusion ladder was driven (on-chain sell happened).
+        expect(escalatePrivateSellMock).toHaveBeenCalledOnce();
         // Trade row was recorded
         expect(insertTradeRun).toHaveBeenCalledOnce();
     });

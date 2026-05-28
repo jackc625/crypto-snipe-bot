@@ -12,7 +12,8 @@ import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimer
 import { withNonceLock } from './utils/nonceAuthority';
 import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState } from './utils/db';
 import { sendCtxAlert } from './utils/notifier';
-import { sendTxWithRetry } from './utils/txManager';
+import { sendTxWithRetry, escalatePrivateSell } from './utils/txManager';
+import { reconcileInclusion, buildReconcileConfig } from './utils/mevStrategies/reconciliation';
 import { decodeReceipt } from './utils/receiptDecoder';
 // Phase 19 / Plan 19-05 — terminate the anti-rug position subscription on
 // every full-close path per CONTEXT.md D-TERMINATION. Imported under the
@@ -422,10 +423,142 @@ async function ensureApproval(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Finding A inclusion ladder helpers (Phase 21.2 / Plan 21.2-06)
+// D-EXIT-INCLUSION + D-FALLBACK-TRIGGER + D-FALLBACK-NO-DOUBLE-SELL
+// ---------------------------------------------------------------------------
+
+type FullSellReason = 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug';
+
+/** never-NaN, never-negative positive-int env parse (mirrors reconciliation.ts). */
+function parsePositiveIntEnv(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/** never-NaN, never-negative positive-number env parse. */
+function parsePositiveNumberEnv(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Reason-aware PRIVATE-attempt budget (D-FALLBACK-TRIGGER). A rug is happening
+ * NOW, so anti-rug burns at most ONE quick private attempt before going public;
+ * routine exits (trailing/stop-loss/urgency) escalate privately for
+ * MEV_SELL_FALLBACK_ATTEMPTS (default 2) attempts before the public fallback.
+ */
+export function privateAttemptBudget(reason: FullSellReason): number {
+    if (reason === 'anti-rug') return 1;
+    return parsePositiveIntEnv(process.env.MEV_SELL_FALLBACK_ATTEMPTS, 2);
+}
+
+/**
+ * Reason-aware public-fallback slippage percent (D-FALLBACK-NO-DOUBLE-SELL §Q3).
+ * Routine fallbacks reuse the engine's configured exit slippage (~5%); anti-rug
+ * fallbacks WIDEN (default 15%, never below a 10% floor) to maximize landing
+ * while liquidity drains. A sandwiched sell beats a stranded position (T-21.2-SANDWICH).
+ */
+export function fallbackSlippagePct(reason: FullSellReason): number {
+    const routine = parsePositiveNumberEnv(undefined, CONFIG.slippagePercent || 5);
+    if (reason !== 'anti-rug') return routine;
+    const antiRug = parsePositiveNumberEnv(process.env.MEV_SELL_ANTIRUG_SLIPPAGE_PCT, 15);
+    // Never narrower than the 10% mainnet-proven floor (recover-sell-ladys.ts) and
+    // never narrower than the routine slippage (anti-rug must bid AT LEAST as wide).
+    return Math.max(antiRug, 10, routine);
+}
+
+/**
+ * Compute the fee-on-transfer-safe public-sell minOut from a fresh quote and a
+ * reason-aware slippage percent. BigInt-only (no float drift): minOut =
+ * expectedOut × (100 - slippagePct) / 100.
+ */
+function computePublicMinOut(expectedOut: bigint, slippagePct: number): bigint {
+    // Round slippage to an integer percent for exact bigint math (matches the
+    // recover-sell-ladys.ts `* 90n / 100n` idiom; 5% → ×95/100, 15% → ×85/100).
+    const keepPct = BigInt(Math.max(0, Math.round(100 - slippagePct)));
+    return (expectedOut * keepPct) / 100n;
+}
+
+/**
+ * The GUARANTEED public-mempool fallback sell (Finding A). Promotes the
+ * mainnet-proven recover-sell-ladys.ts logic into the engine: quote → approve (if
+ * needed) → swapExactTokensForETHSupportingFeeOnTransferTokens (fee-on-transfer-
+ * safe). Both the approval AND the swap each run inside withNonceLock so the
+ * per-wallet nonce authority serializes them (D-NONCE-AUTHORITY-ALL). The
+ * `amountIn` is the RE-FETCHED held balance (sell only what is still held); the
+ * `minOut` uses reason-aware slippage. Returns the real on-chain tx hash.
+ */
+async function executePublicFallbackSell(
+    ctx: ChainContext,
+    dex: DexConfigV2,
+    token: Contract,
+    tokenAddress: string,
+    heldBalance: bigint,
+    reason: FullSellReason,
+): Promise<string> {
+    const router = new Contract(dex.routerAddress, ROUTER_ABI, ctx.wallet);
+    const path = [tokenAddress, ctx.chain.wethAddress];
+
+    // Fresh quote → reason-aware minOut (anti-rug widens to maximize landing).
+    const amounts: bigint[] = await router.getAmountsOut(heldBalance, path);
+    const expectedOut = amounts[1];
+    const slippagePct = fallbackSlippagePct(reason);
+    const minOut = computePublicMinOut(expectedOut, slippagePct);
+
+    ctx.log.info(
+        {
+            token: tokenAddress, reason, amountIn: heldBalance.toString(),
+            expectedOut: expectedOut.toString(), minOut: minOut.toString(),
+            slippagePct, op: 'exit.fallback.public.submit',
+        },
+        'Public-mempool fallback sell (private escalation did not land)',
+    );
+    await sendCtxAlert(
+        ctx,
+        `*[EXIT FALLBACK → PUBLIC]* ${reason}: private escalation did not land — selling on the public mempool ` +
+        `(slippage ${slippagePct}%). Remediation: if this recurs at calm gas, raise MEV_SELL_MAX_PRIORITY_FEE_GWEI ` +
+        `or inspect relay inclusion.`,
+    );
+
+    // Approval (nonce-locked). Only fires when the current allowance is short.
+    const currentAllowance: bigint = await token.allowance(ctx.wallet.address, dex.routerAddress);
+    if (currentAllowance < heldBalance) {
+        await withNonceLock(ctx.wallet.address, async () => {
+            const approveTx = await token.approve(dex.routerAddress, heldBalance);
+            await approveTx.wait();
+        });
+    }
+
+    // The swap (nonce-locked). Fee-on-transfer-safe variant + a generous deadline
+    // (promoted from recover-sell-ladys.ts:76-80).
+    const deadline = Math.floor(Date.now() / 1000) + 600;
+    const txHash = await withNonceLock(ctx.wallet.address, async () => {
+        const stx = await router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+            heldBalance, minOut, path, ctx.wallet.address, deadline,
+        );
+        const rec = await stx.wait();
+        ctx.log.info(
+            { token: tokenAddress, reason, txHash: stx.hash, blockNumber: rec?.blockNumber, op: 'exit.fallback.public.mined' },
+            'Public-mempool fallback sell mined',
+        );
+        return stx.hash as string;
+    });
+    return txHash;
+}
+
 /**
  * Execute a full sell of remaining token balance.
  * Per D-05: sell entire remaining balance after partial sells.
- * Routes through sendTxWithRetry for MEV protection (Flashbots/bloXroute/passthrough).
+ *
+ * Phase 21.2 / Finding A inclusion ladder (D-EXIT-INCLUSION + D-FALLBACK-TRIGGER +
+ * D-FALLBACK-NO-DOUBLE-SELL): the exit (1) escalates PRIVATELY with the independent
+ * sell-leg ceiling (reason-aware attempts), (2) runs the no-double-sell guard
+ * (reconcileInclusion on the last private attempt + a re-fetched balanceOf) if not
+ * landed, then (3) falls back to a guaranteed nonce-locked public-mempool sell.
+ * The public fallback is an ENGINE PATH, not a bypass flag (D-ROLLBACK).
  */
 export async function executeFullSell(
     ctx: ChainContext,
@@ -474,32 +607,116 @@ export async function executeFullSell(
 
         const gasLimit = ctx.chain.gas.maxGasLimit;
 
-        // Build txBuilder for MEV-protected submission
+        // Build txBuilder for MEV-protected submission. The private-leg approval
+        // signs a tx, so it routes through withNonceLock too (D-NONCE-AUTHORITY-ALL
+        // — EVERY signing site, including approvals).
         let txBuilder: () => Promise<TransactionRequest>;
         if (dex.dexType === 'v3' && feeTier != null) {
-            await ensureApproval(token, dex.swapRouterAddress, balance, ctx.wallet.address);
+            await withNonceLock(ctx.wallet.address, () => ensureApproval(token, dex.swapRouterAddress, balance, ctx.wallet.address));
             txBuilder = buildV3SellTx(dex, tokenAddress, ctx.chain.wethAddress, ctx.wallet.address, balance, feeTier, gasLimit);
         } else if (dex.dexType === 'v2') {
-            await ensureApproval(token, dex.routerAddress, balance, ctx.wallet.address);
+            await withNonceLock(ctx.wallet.address, () => ensureApproval(token, dex.routerAddress, balance, ctx.wallet.address));
             txBuilder = buildV2SellTx(dex, tokenAddress, ctx.chain.wethAddress, ctx.wallet.address, balance, gasLimit);
         } else {
             ctx.log.error({ token: tokenAddress, dexType: dex.dexType }, 'Unknown DEX type for sell');
             return false;
         }
 
-        // Submit via sendTxWithRetry for MEV protection
+        // ---------------------------------------------------------------------
+        // Finding A inclusion ladder (Phase 21.2 / Plan 21.2-06): private escalate
+        // → no-double-sell guard → public-mempool fallback. The ladder resolves to
+        // a real on-chain tx hash (or null for a no-new-tx close, e.g. the private
+        // bundle landed late or the balance is already 0), plus the amount actually
+        // sold (`soldAmountIn`).
+        // ---------------------------------------------------------------------
         ctx.log.info({ token: tokenAddress, reason, op: 'exit.full.submitted' }, 'Submitting exit sell via MEV-protected path');
         // Phase 19 / Plan 19-05 — D-VIS-LIVE-EXIT prefixes the live anti-rug
         // alert with `*[ANTI-RUG EXIT]*`. Existing reasons keep the prior
         // `*{reason}:*` heading shape (unchanged behavior).
         const alertHeader = reason === 'anti-rug' ? '*[ANTI-RUG EXIT]*' : `*${reason}:*`;
         await sendCtxAlert(ctx, `${alertHeader} ${reasonDetail}`);
-        // Phase 19 Gap-1 closure: pass gasMultiplier (defined above) through
-        // the multi-chain dispatcher. undefined = raw feeData (preserves prior
-        // behavior for non-anti-rug reasons). Args 3-5 (walletOrRetries,
-        // useFlashbots, maxRetries) intentionally undefined for this overload;
-        // sendTxWithRetry's multi-chain path uses the ChainContext directly.
-        const txHash = await sendTxWithRetry(txBuilder, ctx, undefined, undefined, undefined, gasMultiplier);
+
+        let txHash: string | null = null;
+        let soldAmountIn: bigint = balance;
+
+        // (1) PRIVATE escalation with the INDEPENDENT sell-leg ceiling, reason-aware
+        // attempt budget (anti-rug → 1 quick attempt; routine → MEV_SELL_FALLBACK_
+        // ATTEMPTS). escalatePrivateSell normalizes not-landed into a structured
+        // result (it does NOT throw) so the ladder can fall through to the public
+        // fallback — the GUARANTEED inclusion lever (D-EXIT-INCLUSION).
+        const attempts = privateAttemptBudget(reason);
+        const priv = await escalatePrivateSell(txBuilder, ctx, attempts, gasMultiplier);
+
+        if (priv.landed && priv.txHash) {
+            // The private bundle landed (possibly late-reconciled by 21.1). Done.
+            txHash = priv.txHash;
+            ctx.log.info({ token: tokenAddress, reason, txHash, op: 'exit.full.private-landed' }, 'Private exit bundle landed');
+        } else {
+            // (2) NO-DOUBLE-SELL GUARD before going public (D-FALLBACK-NO-DOUBLE-SELL).
+            // (2a) Reconcile the last private attempt (receipt + nonce — the proven
+            // 21.1 probe). If it actually landed late (the LADYS / STOP-THE-LINE-02
+            // false-negative class), ABORT the public fallback and treat it as a
+            // landed sell. A bounded window/poll from the sell-leg reconcile config.
+            if (priv.lastSignedHash && priv.lastNonce != null) {
+                const rcfg = buildReconcileConfig(process.env, ctx.chain.gas.maxGasLimit, attempts, 'sell');
+                const recon = await reconcileInclusion(
+                    priv.lastSignedHash, priv.lastNonce, ctx.wallet, ctx.httpProvider, rcfg.confirmWindowMs, rcfg.pollMs,
+                );
+                if (recon.outcome === 'included') {
+                    txHash = recon.hash ?? priv.lastSignedHash;
+                    ctx.log.info(
+                        { token: tokenAddress, reason, txHash, op: 'exit.fallback.aborted.late-land' },
+                        'No-double-sell guard: the private bundle landed late — aborting the public fallback',
+                    );
+                    await sendCtxAlert(
+                        ctx,
+                        `*[EXIT GUARD]* ${reason}: private bundle landed late (reconciled) — public fallback ABORTED ` +
+                        `to prevent a double-sell.`,
+                    );
+                }
+            }
+
+            // (2b) If still not resolved, balanceOf is the authoritative truth.
+            // Re-fetch the on-chain held balance and sell ONLY what is still held.
+            if (txHash === null) {
+                const held: bigint = await token.balanceOf(ctx.wallet.address);
+                if (held === 0n) {
+                    // Already sold (private landed, or a manual/competing sell). Abort
+                    // the public fallback — nothing to sell (T-21.2-SELLNOTHING).
+                    ctx.log.info(
+                        { token: tokenAddress, reason, op: 'exit.fallback.aborted.zero-held' },
+                        'No-double-sell guard: re-fetched balance is 0 — aborting the public fallback (already sold)',
+                    );
+                    await sendCtxAlert(
+                        ctx,
+                        `*[EXIT GUARD]* ${reason}: re-fetched balance is 0 — public fallback ABORTED (position already closed).`,
+                    );
+                    // txHash stays null; the success teardown below treats it as a close.
+                    soldAmountIn = 0n;
+                } else if (dex.dexType === 'v2') {
+                    // (3) PUBLIC-MEMPOOL FALLBACK (the GUARANTEED exit). Sell ONLY the
+                    // re-fetched held balance via the fee-on-transfer-safe router call,
+                    // reason-aware slippage, every submit nonce-locked.
+                    soldAmountIn = held;
+                    txHash = await executePublicFallbackSell(ctx, dex, token, tokenAddress, held, reason);
+                } else {
+                    // V3 has no fee-on-transfer-safe public router analog wired here;
+                    // surface loudly rather than silently strand (D-ALERTS). The
+                    // position stays held + monitored (the catch does not run on this
+                    // return; 21.2-07 gates teardown on balanceOf).
+                    ctx.log.error(
+                        { token: tokenAddress, reason, dexType: dex.dexType, op: 'exit.fallback.unsupported-dex' },
+                        'Public-mempool fallback is V2-only; private escalation did not land for a V3 position',
+                    );
+                    await sendCtxAlert(
+                        ctx,
+                        `*[EXIT FALLBACK UNAVAILABLE]* ${reason}: V3 position did not land privately and the public ` +
+                        `fee-on-transfer fallback is V2-only. Position stays held + monitored — inspect manually.`,
+                    );
+                    return false;
+                }
+            }
+        }
 
         // op:exit.full.executed names the success-criterion-4 op. D-OP-DB-TRUTH:
         // this log is for FILTERING confirmed-exit events, NOT proof an exit happened
@@ -540,7 +757,11 @@ export async function executeFullSell(
             txHash: txHash || null,
             block: receiptData.blockNumber,
             timestamp: Math.floor(Date.now() / 1000),
-            amountIn: balance.toString(),
+            // Finding A: the recorded amountIn is what was ACTUALLY sold — the
+            // original balance for a private-landed sell, or the re-fetched held
+            // balance for a public-mempool fallback (sell-only-held). 0n when the
+            // guard aborted a fallback on an already-closed position.
+            amountIn: soldAmountIn.toString(),
             amountOut: receiptData.amountOut,
             gasCost: receiptData.gasCost,
             priceAtAction: null,

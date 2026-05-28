@@ -101,8 +101,13 @@ vi.mock('../../../src/utils/notifier', () => ({
 }));
 
 const sendTxWithRetryMock = vi.fn();
+// Phase 21.2 / Plan 21.2-06: executeFullSell's private leg now routes through
+// escalatePrivateSell (the Finding A inclusion ladder). Default LANDED so these
+// Phase 19 reason-union / cleanup tests keep their original success semantics.
+const escalatePrivateSellMock = vi.fn();
 vi.mock('../../../src/utils/txManager', () => ({
     sendTxWithRetry: sendTxWithRetryMock,
+    escalatePrivateSell: escalatePrivateSellMock,
 }));
 
 const decodeReceiptMock = vi.fn();
@@ -193,6 +198,9 @@ beforeEach(() => {
     releaseSellLockMock.mockReset();
     sendCtxAlertMock.mockReset();
     sendTxWithRetryMock.mockReset().mockResolvedValue('0xtxhash');
+    // Default: the private leg LANDS (inclusion ladder happy path) so the
+    // success / zero-balance cleanup assertions are unchanged from Phase 19.
+    escalatePrivateSellMock.mockReset().mockResolvedValue({ landed: true, txHash: '0xtxhash' });
     decodeReceiptMock.mockReset().mockResolvedValue({
         amountOut: '1000000000',
         gasCost: '0',
@@ -246,17 +254,18 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
             expect(undefinedBranch.test(exitEngineSource)).toBe(true);
         });
 
-        it("Test 3b: gasMultiplier is threaded into sendTxWithRetry (Gap-1 closure)", () => {
-            // Phase 19 Gap-1 closure: the multiplier MUST actually reach the
-            // MEV strategy via sendTxWithRetry's gasMultiplier arg-6 slot.
-            // The pre-Gap-1 code discarded gasMultiplier via `void` — this
-            // guard prevents that regression from creeping back in.
+        it("Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)", () => {
+            // Phase 19 Gap-1 closure: the multiplier MUST actually reach the MEV
+            // strategy. The pre-Gap-1 code discarded gasMultiplier via `void` —
+            // this guard prevents that regression from creeping back in.
             expect(exitEngineSource).not.toContain('void gasMultiplier');
-            // sendTxWithRetry must be called with gasMultiplier as the final
-            // positional arg (slots 3-5 are intentionally undefined for the
-            // multi-chain ChainContext overload — see txManager.ts).
-            const sendTxWithGasMultiplier = /sendTxWithRetry\(\s*txBuilder\s*,\s*ctx\s*,[\s\S]{0,80}gasMultiplier\s*\)/;
-            expect(sendTxWithGasMultiplier.test(exitEngineSource)).toBe(true);
+            // Phase 21.2-06 (Finding A inclusion ladder): the full-sell private leg
+            // is now escalatePrivateSell(txBuilder, ctx, attempts, gasMultiplier) —
+            // the multiplier remains threaded through to the MEV strategy (escalate
+            // PrivateSell forwards it to sendTxWithRetry). Assert the gasMultiplier
+            // reaches the private escalation as its final positional arg.
+            const escalateWithGasMultiplier = /escalatePrivateSell\(\s*txBuilder\s*,\s*ctx\s*,[\s\S]{0,80}gasMultiplier\s*\)/;
+            expect(escalateWithGasMultiplier.test(exitEngineSource)).toBe(true);
         });
     });
 
@@ -314,8 +323,10 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
         it('Test 6: error path ALSO calls unsubscribeAntiRug', async () => {
             const { executeFullSell } = await import('../../../src/exitEngine');
 
-            // Force sendTxWithRetry to throw so executeFullSell takes the catch branch.
-            sendTxWithRetryMock.mockReset().mockRejectedValueOnce(new Error('tx revert'));
+            // Force the private escalation (the inclusion ladder's private leg) to
+            // throw so executeFullSell takes the catch branch. Phase 21.2-06 keeps
+            // the existing catch shape (the balance-truth teardown is 21.2-07).
+            escalatePrivateSellMock.mockReset().mockRejectedValueOnce(new Error('tx revert'));
 
             const ctx = buildCtx();
             const result = await executeFullSell(
