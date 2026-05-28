@@ -53,7 +53,7 @@ import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPending
 // Phase 20 / OPS-LIVE-01 + OPS-LIVE-02 — preflight is called before chain-context
 // creation; checkWalletBalance is reused inside the mid-run setInterval so the
 // floor formula lives in one place (D-BALANCE-FLOOR / W4 fix per Plan 20-02).
-import { preflight, checkWalletBalance } from "./preflight";
+import { preflight, checkWalletBalance, checkEntryExitAffordability } from "./preflight";
 // Phase 20 / OPS-LIVE-02 — mid-run undercut broadcasts pause_state_change so the
 // dashboard banner (Plan 20-05/06) reacts within one WS round-trip.
 import { broadcast } from "./api/ws/broadcaster";
@@ -199,6 +199,54 @@ async function maybeApproveForChain(ctx: ChainContext, tokenContract: Contract, 
     if (currentAllowance < amount) {
         await tokenContract.approve(routerAddress, amount);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Buy-time entry affordability gate — Finding A / D-EXIT-AFFORDABILITY-GATE
+// (Phase 21.2 / Plan 21.2-08, STOP-THE-LINE-04-A)
+//
+// NEVER enter a position the wallet cannot guarantee an exit from. Called at BOTH
+// the V2 and V3 buy submit sites, JUST BEFORE sendTxWithRetry. Refuses the snipe
+// unless the wallet balance covers
+//   snipeValue + worstCaseBuyGas + worstCasePublicSellGas + cushion
+// where worstCasePublicSellGas prices the GUARANTEED PUBLIC exit (a normal-priced
+// public sell — base fee × EXIT_GATE_SELL_GAS_BUFFER + approval gas), NOT the
+// optimistic private priority-fee path. The decision logic + math lives in
+// preflight.checkEntryExitAffordability (single source of truth, fails CLOSED on
+// any RPC error). On a REFUSE this emits structured pino + a Telegram alert with a
+// remediation pointer (D-ALERTS) and the caller SKIPS the buy (the trap is made
+// impossible to ENTER, not merely survivable).
+//
+// Returns true when the snipe may proceed, false when it must be refused.
+// ---------------------------------------------------------------------------
+async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: string): Promise<boolean> {
+    // checkEntryExitAffordability consumes a PreflightChain (the chain config plus
+    // its live httpProvider + wallet) — exactly the fields ChainContext already
+    // holds. Reuse them rather than reconstruct (no duplicated formula).
+    const result = await checkEntryExitAffordability({
+        ...ctx.chain,
+        httpProvider: ctx.httpProvider,
+        wallet: ctx.wallet,
+    });
+    if (result.passed) {
+        return true;
+    }
+    // REFUSE — structured op-log + Telegram with a remediation pointer (D-ALERTS).
+    ctx.log.error(
+        {
+            op: 'entry.exit-affordability.refused',
+            token: targetToken,
+            chain: ctx.chain.name,
+            reason: result.reason,
+            details: result.details,
+        },
+        'Entry REFUSED: wallet cannot guarantee an exit (worst-case public sell + buffer) — skipping snipe',
+    );
+    await sendCtxAlert(
+        ctx,
+        `*Entry REFUSED* for \`${targetToken}\` — wallet cannot guarantee an exit (worst-case public sell + buffer). ${sanitizeReason(result.reason ?? 'unaffordable')}`,
+    );
+    return false;
 }
 
 
@@ -408,6 +456,16 @@ export async function handleNewPairForChain(
             ctx.log.info({ op: 'killswitch.cp2', token: targetToken, reason: 'global-pause' }, 'CP2 pause-check: discarding bundle before submit');
             return;
         }
+    }
+
+    // Phase 21.2 / Plan 21.2-08 (Finding A, D-EXIT-AFFORDABILITY-GATE): buy-time
+    // entry affordability gate — JUST BEFORE the buy submit. NEVER enter a position
+    // the wallet cannot guarantee an exit from (worst-case normal-priced public
+    // sell + buffer). Fails CLOSED on RPC error inside the gate; on a refuse it
+    // alerts (D-ALERTS) and we SKIP the buy. This is the thin-wallet trap (Finding
+    // A) made impossible to ENTER.
+    if (!(await enforceEntryExitAffordability(ctx, targetToken))) {
+        return;
     }
 
     try {
@@ -733,6 +791,15 @@ export async function handleNewV3PoolForChain(
                 ctx.log.info({ op: 'killswitch.cp2', token: targetToken, feeTier, reason: 'global-pause' }, 'V3 CP2 pause-check: discarding V3 bundle before submit');
                 return;
             }
+        }
+
+        // Phase 21.2 / Plan 21.2-08 (Finding A, D-EXIT-AFFORDABILITY-GATE): buy-time
+        // entry affordability gate on the V3 path — identical posture to V2. The
+        // thin-wallet trap is the same on both paths, so the gate (single source of
+        // truth in preflight.checkEntryExitAffordability) guards BOTH. Fails CLOSED
+        // on RPC error; on a refuse it alerts (D-ALERTS) and SKIPS the buy.
+        if (!(await enforceEntryExitAffordability(ctx, targetToken))) {
+            return;
         }
 
         // D-RECORD-REAL-HASH (V3): capture the real on-chain hash the strategy

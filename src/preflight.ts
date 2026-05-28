@@ -47,6 +47,16 @@ import { logger } from './utils/logger';
 import { sendTelegramAlert } from './utils/notifier';
 import { createMevStrategy } from './utils/txManager';
 import { getAntirugDryRunStarted, getStaleTradesQuery } from './utils/db';
+// Phase 21.2 / Plan 21.2-08 (Finding A, D-EXIT-AFFORDABILITY-GATE): the buy-time
+// entry affordability gate reuses the SAME no-float bigint fee scaling the MEV
+// strategies use (applyGasMultiplier), so the buy-time worst-case-public-exit gas
+// math and the runtime sell reserve agree on the spelling. We deliberately apply
+// the entry-gate-specific EXIT_GATE_SELL_GAS_BUFFER (default 2.0) rather than the
+// runtime SELL_GAS_BASEFEE_BUFFER (1.5): a buy-time gate should be STRICTLY MORE
+// conservative than the live clamp (D-QUALITY-FIRST — refuse a marginal entry
+// rather than risk an unexitable one). applyGasMultiplier guarantees no float
+// drift and is the banned-v5-pattern-safe scaling helper.
+import { applyGasMultiplier } from './utils/mevStrategies/types';
 // Type-only import to avoid loading chainRegistry's runtime module body
 // (which transitively triggers `dotenv.config()` via src/utils/provider.ts ->
 // src/config.ts). The runtime import would re-inject .env values mid-test
@@ -101,7 +111,10 @@ export interface PreflightResult {
         | 'honeypot-checker-code'
         | 'cross-env-rule'
         | 'antirug-live-gate'
-        | 'stale-data';
+        | 'stale-data'
+        // Phase 21.2 / Plan 21.2-08 (Finding A): buy-time entry affordability gate
+        // — REFUSE a snipe the wallet cannot guarantee an exit from.
+        | 'entry-exit-affordability';
     passed: boolean;
     reason?: string;
     details?: Record<string, unknown>;
@@ -121,6 +134,24 @@ const ANTIRUG_DOC = 'docs/operations/anti-rug-rollout.md';
 // goal is "refuses to start in any unsafe state," a default admin key IS an
 // unsafe startup state.
 const DASHBOARD_API_KEY_PLACEHOLDER = 'your-secret-dashboard-api-key-here';
+
+// Phase 21.2 / Plan 21.2-08 (Finding A, D-EXIT-AFFORDABILITY-GATE) constants.
+//
+// EXIT_GATE_SELL_GAS_BUFFER default — the base-fee multiplier applied when pricing
+// the worst-case GUARANTEED PUBLIC exit gas at buy time. Matches config.ts:192 +
+// .env.example:250 (default 2.0). The gate prices a NORMAL-priced public sell
+// (baseFee × this buffer), NOT a high private priority fee — that is the whole
+// point of Finding A: the always-available exit must always be affordable.
+const EXIT_GATE_SELL_GAS_BUFFER_DEFAULT = 2.0;
+
+// One-time ERC-20 approval gas the public exit may need (the private MEV strategy
+// already holds its approval, but the guaranteed PUBLIC fallback the gate prices
+// against may have to approve first). A standard ERC-20 approve is ~46k gas; we
+// reserve a generous 60k (D-QUALITY-FIRST — over-reserve a touch rather than
+// strand the exit's approval). Reserved at the same normal public-sell price.
+const EXIT_GATE_APPROVAL_GAS_LIMIT = 60_000n;
+
+const EXIT_GATE_DOC = 'docs/operations/going-live.md';
 
 // ---------------------------------------------------------------------------
 // Wallet balance — D-BALANCE-FLOOR (exported for Plan 20-04 mid-run reuse)
@@ -188,6 +219,193 @@ export async function checkWalletBalance(chain: PreflightChain): Promise<Preflig
                 err: (err as Error).message,
                 snipeAmount: chain.snipeAmount,
                 maxOpenPositions: maxOpen,
+                gasBuffer: chain.gasBuffer,
+            },
+        };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Buy-time entry affordability gate — Finding A / D-EXIT-AFFORDABILITY-GATE
+// (Phase 21.2 / Plan 21.2-08, STOP-THE-LINE-04-A)
+// ---------------------------------------------------------------------------
+
+/** Inputs for the worst-case GUARANTEED-public-exit gas (the entry-gate term). */
+export interface WorstCasePublicExitGasInputs {
+    /** baseFee in wei — getFeeData().maxFeePerGas - maxPriorityFeePerGas, or gasPrice. */
+    baseFeeWei: bigint;
+    /** Gas limit reserved for the eventual sell (ctx.chain.gas.maxGasLimit). */
+    sellGasLimit: bigint;
+    /** One-time ERC-20 approval gas the PUBLIC exit may need. Defaults to the
+     *  entry-gate's generous 60k reserve. */
+    approvalGasLimit?: bigint;
+    /** Base-fee multiplier (EXIT_GATE_SELL_GAS_BUFFER). Defaults to 2.0. */
+    sellGasBuffer?: number;
+}
+
+/**
+ * The worst-case GUARANTEED-public-exit gas the buy-time entry gate must reserve
+ * (Finding A / D-EXIT-AFFORDABILITY-GATE).
+ *
+ *   worstCasePublicSellGas = (sellGasLimit + approvalGasLimit) × (baseFee × buffer)
+ *
+ * The exit's GUARANTEED inclusion path is the PUBLIC-mempool sell — a NORMAL-PRICED
+ * tx (base fee × a modest buffer, NO high private priority fee). That is the whole
+ * point of Finding A: the always-available exit must always be affordable, so the
+ * gate prices THAT, not the optimistic private priority-fee path. Pricing the
+ * private CEILING (e.g. 25 gwei) would both over-reserve AND mis-target what the
+ * guaranteed exit actually costs.
+ *
+ * All scaling uses the shared fractional-bigint `applyGasMultiplier` helper (no
+ * float drift, banned-v5-pattern-safe) — the SAME spelling the MEV strategies and
+ * the runtime sell reserve (computePublicExitReserveWei) use, so the buy-time gate
+ * and the runtime clamp agree on the math. The gate's buffer (EXIT_GATE_SELL_GAS_-
+ * BUFFER, default 2.0) is deliberately ≥ the runtime SELL_GAS_BASEFEE_BUFFER (1.5):
+ * a buy-time gate should be STRICTLY MORE conservative than the live clamp.
+ */
+export function computeWorstCasePublicExitGas(inputs: WorstCasePublicExitGasInputs): bigint {
+    const {
+        baseFeeWei,
+        sellGasLimit,
+        approvalGasLimit = EXIT_GATE_APPROVAL_GAS_LIMIT,
+        sellGasBuffer = EXIT_GATE_SELL_GAS_BUFFER_DEFAULT,
+    } = inputs;
+    // Normal-priced public exit: base fee × buffer (NO private priority-fee term).
+    const bufferedBaseFee = (applyGasMultiplier(baseFeeWei, sellGasBuffer) ?? baseFeeWei) as bigint;
+    // A public sell may need a one-time approval; reserve its gas at the same price.
+    return (sellGasLimit + approvalGasLimit) * bufferedBaseFee;
+}
+
+/** Parse EXIT_GATE_SELL_GAS_BUFFER from env — never NaN, never ≤0 (mirrors the
+ *  reconciliation.ts parsePositiveNumber discipline, V5 input-validation domain). */
+function parseExitGateBuffer(): number {
+    const raw = process.env.EXIT_GATE_SELL_GAS_BUFFER;
+    if (raw === undefined || raw === '') return EXIT_GATE_SELL_GAS_BUFFER_DEFAULT;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : EXIT_GATE_SELL_GAS_BUFFER_DEFAULT;
+}
+
+/**
+ * Derive the wei base fee from a getFeeData() result. EIP-1559 chains expose
+ * maxFeePerGas + maxPriorityFeePerGas (baseFee = maxFee - priority); legacy chains
+ * (BSC) expose gasPrice only. Returns null when neither is available (caller
+ * fails closed). Worst-case BUY gas is priced at the FULL maxFeePerGas (or
+ * gasPrice) — the most the buy can pay — so the gate never UNDER-reserves the buy.
+ */
+function deriveFeeWei(feeData: {
+    maxFeePerGas?: bigint | null;
+    maxPriorityFeePerGas?: bigint | null;
+    gasPrice?: bigint | null;
+}): { baseFeeWei: bigint; maxBuyFeeWei: bigint } | null {
+    if (feeData.maxFeePerGas != null) {
+        const priority = feeData.maxPriorityFeePerGas ?? 0n;
+        // baseFee = maxFee - priority, clamped ≥ 0 (defensive against odd oracles).
+        const baseFeeWei = feeData.maxFeePerGas > priority ? feeData.maxFeePerGas - priority : 0n;
+        return { baseFeeWei, maxBuyFeeWei: feeData.maxFeePerGas };
+    }
+    if (feeData.gasPrice != null) {
+        // Legacy: gasPrice is both the base price and the max the buy pays.
+        return { baseFeeWei: feeData.gasPrice, maxBuyFeeWei: feeData.gasPrice };
+    }
+    return null;
+}
+
+/**
+ * The hard buy-time entry affordability gate (Finding A / D-EXIT-AFFORDABILITY-GATE,
+ * STOP-THE-LINE-04-A): NEVER enter a position the wallet cannot guarantee an exit
+ * from. Refuses the snipe unless:
+ *
+ *   balance >= snipeValue + worstCaseBuyGas + worstCasePublicSellGas + cushion
+ *
+ * where
+ *   worstCaseBuyGas        = maxGasLimit × maxFeePerGas         (the most the buy can pay)
+ *   worstCasePublicSellGas = (maxGasLimit + approvalGas) × (baseFee × EXIT_GATE_SELL_GAS_BUFFER)
+ *                            — a NORMAL-priced GUARANTEED public sell (Finding A)
+ *   cushion                = parseEther(gasBuffer)              (the per-chain fixed cushion)
+ *
+ * Posture mirrors `checkWalletBalance` (same parseEther + per-chain gasBuffer
+ * idiom) and FAILS CLOSED on any RPC error in the balance/fee fetch (a thin or
+ * unknown balance refuses the snipe — never enter what you cannot prove you can
+ * exit). All math is bigint (no float; T-21.2-GATE-FLOAT). The result is a pure
+ * PreflightResult; the snipe path (bot.ts) logs D-ALERTS + skips on passed:false.
+ *
+ * Exported so bot.ts can call it at BOTH the V2 and V3 buy submit sites without
+ * duplicating the formula (the thin-wallet trap is identical on both paths).
+ */
+export async function checkEntryExitAffordability(chain: PreflightChain): Promise<PreflightResult> {
+    const sellGasBuffer = parseExitGateBuffer();
+    const sellGasLimit = chain.gas.maxGasLimit;
+    try {
+        // Fail-closed posture: both reads inside the try so a throw on EITHER
+        // refuses the snipe (T-21.2-GATE-RPCFAIL). Parallel for one round-trip.
+        const [balance, feeData] = await Promise.all([
+            chain.httpProvider.getBalance(chain.wallet.address),
+            chain.httpProvider.getFeeData(),
+        ]);
+
+        const fees = deriveFeeWei(feeData);
+        if (fees === null) {
+            // No usable fee data → cannot price the exit → fail closed.
+            return {
+                chain: chain.name,
+                check: 'entry-exit-affordability',
+                passed: false,
+                reason: `entry-exit-affordability: getFeeData returned no maxFeePerGas/gasPrice — cannot price the guaranteed exit; refusing snipe (fail-closed) — see ${EXIT_GATE_DOC}`,
+                details: { feeData: { maxFeePerGas: feeData.maxFeePerGas?.toString() ?? null, gasPrice: feeData.gasPrice?.toString() ?? null } },
+            };
+        }
+        const { baseFeeWei, maxBuyFeeWei } = fees;
+
+        const snipeValue = ethers.parseEther(chain.snipeAmount);
+        // Worst-case BUY gas: the most the buy can pay (maxFeePerGas / gasPrice).
+        const worstCaseBuyGas = sellGasLimit * maxBuyFeeWei;
+        // Worst-case GUARANTEED PUBLIC sell gas (Finding A — normal-priced, + approval).
+        const worstCasePublicSellGas = computeWorstCasePublicExitGas({
+            baseFeeWei,
+            sellGasLimit,
+            approvalGasLimit: EXIT_GATE_APPROVAL_GAS_LIMIT,
+            sellGasBuffer,
+        });
+        // Per-chain fixed cushion (same parseEther(gasBuffer) idiom as checkWalletBalance).
+        const cushion = ethers.parseEther(chain.gasBuffer);
+
+        const floor = snipeValue + worstCaseBuyGas + worstCasePublicSellGas + cushion;
+        const passed = balance >= floor;
+
+        return {
+            chain: chain.name,
+            check: 'entry-exit-affordability',
+            passed,
+            reason: passed
+                ? undefined
+                : `entry-exit-affordability: wallet cannot guarantee an exit — balance ${ethers.formatEther(balance)} < floor ${ethers.formatEther(floor)} ${chain.nativeCurrency} (snipe ${ethers.formatEther(snipeValue)} + worstCaseBuyGas ${ethers.formatEther(worstCaseBuyGas)} + worstCasePublicSellGas ${ethers.formatEther(worstCasePublicSellGas)} + cushion ${ethers.formatEther(cushion)}); refusing snipe — top up the wallet or lower the snipe amount, see ${EXIT_GATE_DOC}`,
+            details: {
+                balance: ethers.formatEther(balance),
+                floor: ethers.formatEther(floor),
+                snipeValue: ethers.formatEther(snipeValue),
+                worstCaseBuyGas: ethers.formatEther(worstCaseBuyGas),
+                worstCasePublicSellGas: ethers.formatEther(worstCasePublicSellGas),
+                cushion: ethers.formatEther(cushion),
+                baseFeeWei: baseFeeWei.toString(),
+                maxBuyFeeWei: maxBuyFeeWei.toString(),
+                sellGasLimit: sellGasLimit.toString(),
+                approvalGasLimit: EXIT_GATE_APPROVAL_GAS_LIMIT.toString(),
+                sellGasBuffer,
+                chainNativeCurrency: chain.nativeCurrency,
+            },
+        };
+    } catch (err) {
+        // FAIL CLOSED (T-21.2-GATE-RPCFAIL): any RPC error refuses the snipe
+        // rather than risk an unexitable entry. Mirrors checkWalletBalance:181-193.
+        return {
+            chain: chain.name,
+            check: 'entry-exit-affordability',
+            passed: false,
+            reason: `entry-exit-affordability check threw: ${(err as Error).message} — refusing snipe (fail-closed; never enter what you cannot prove you can exit) — see ${EXIT_GATE_DOC}`,
+            details: {
+                err: (err as Error).message,
+                snipeAmount: chain.snipeAmount,
+                sellGasLimit: sellGasLimit.toString(),
                 gasBuffer: chain.gasBuffer,
             },
         };
