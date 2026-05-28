@@ -285,9 +285,9 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 **Plans**: 10 plans
 
   **Wave 1** *(foundations; no deps; fully parallel — zero file overlap):*
-  - [ ] 21.2-01-PLAN.md — per-wallet `withNonceLock(address, op)` nonce authority (composes WITH the re-fetch-'latest' scheme; NOT ethers NonceManager) [STOP-THE-LINE-04-C]
-  - [ ] 21.2-02-PLAN.md — `withTimeout(op, ms, label)` Promise.race RPC-timeout helper + Finding B env knobs (RPC_TIMEOUT_MS / WATCHDOG_BUDGET_MS / SIGINT_GRACE_MS) [STOP-THE-LINE-04-B]
-  - [ ] 21.2-03-PLAN.md — DB schema v6→v7 additive ALTER-guard: `exit_failure_count` + `exit_status` on `exit_state` (idempotent; existing rows survive) [STOP-THE-LINE-04-D]
+  - [x] 21.2-01-PLAN.md — per-wallet `withNonceLock(address, op)` nonce authority (composes WITH the re-fetch-'latest' scheme; NOT ethers NonceManager) [STOP-THE-LINE-04-C] *(W1 ✓ 2026-05-28; 5/5 serialization tests, mutation-verified, no NonceManager; commits f37f9f7/d71e2ad)*
+  - [x] 21.2-02-PLAN.md — `withTimeout(op, ms, label)` Promise.race RPC-timeout helper + Finding B env knobs (RPC_TIMEOUT_MS / WATCHDOG_BUDGET_MS / SIGINT_GRACE_MS) [STOP-THE-LINE-04-B] *(W1 ✓ 2026-05-28; 4/4 fake-timer tests, knobs in .env.example; commits a8148c9/531b645/3fff3e9)*
+  - [x] 21.2-03-PLAN.md — DB schema v6→v7 additive ALTER-guard: `exit_failure_count` + `exit_status` on `exit_state` (idempotent; existing rows survive) [STOP-THE-LINE-04-D] *(W1 ✓ 2026-05-28; 8/8 migration tests, prod data/bot.db → v7 in place, held LADYS row survived; commits 46244e0/0806e50)*
 
   **Wave 2** *(after foundations):*
   - [ ] 21.2-04-PLAN.md — independent sell-leg priority-fee ceiling (`MEV_SELL_MAX_PRIORITY_FEE_GWEI`, still affordability-clamped) + retarget `reserveSellGas` to the guaranteed public exit + Finding A env knobs [STOP-THE-LINE-04-A] (depends 21.2-02 for config.ts ordering)
@@ -336,7 +336,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07 retry validated STL-02 fix live but surfaced STOP-THE-LINE-04 → blocked on 21.2; 21-07/08 operator-gated) | - |
 | 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Complete (verifier 10/10; +deep-review fix CR-01/WR-01; full gate GREEN — unit 614/integration 216/fork 39, tsc ×3 clean; 1 by-design human-UAT = 21-07 real-relay, operator-gated) | 2026-05-27 |
-| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 0/10 | Planned (10 plans, 5 waves; STOP-THE-LINE-04-A/B/C/D formalized; plan-checker PASSED all 12 dimensions; decision-coverage 16/16; Nyquist nyquist_compliant:true; ready to execute) — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | - |
+| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 3/10 | In Progress (Wave 1 ✓ 2026-05-28: withNonceLock + withTimeout + DB v6→v7 exit_failed_held migration; gate GREEN unit 631/integration 216/tsc ×3; +pre-wave test-hardening for the operator .env MEV ceiling=13 leaking into CR-01 tests) — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
