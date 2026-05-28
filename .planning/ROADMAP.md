@@ -273,6 +273,43 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
   - **D-V3-ONLY-SCOPE [AMENDED 2026-05-26]:** the V3-only fence was PARTIALLY LIFTED — the V2 `hasHighTransferTaxForChain` tax-call removal (bot.ts:303) is now IN scope as STOP-THE-LINE-03 (research confirmed it fires a real amountOutMin=0 buy with broken NaN math, not the "V2 works" premise); with both call sites gone the dead function/import/tokenSafety.ts:482/test are deleted. The fence STILL holds for the REST of the V2 capture flow — only the broken tax call is removed; the bot.ts:253 honeypot roundtrip, buy/sell submit, and exit path are untouched
   - **D-FORK-REHEARSAL-21.1:** the fork rehearsal proves the passthrough reconciliation + buy→register→exit wiring; the Flashbots false-negative path is unit-proven and validated for real ONLY on the Phase-21 21-07 retry
 
+### Phase 21.2: Calm-Gas Sell Inclusion + Exit-Engine Robustness (INSERTED)
+**Goal**: The four STOP-THE-LINE-04 defects surfaced during the Phase 21 / Plan 21-07 real-capital LADYS roundtrip are fixed so the 21-07 retry can resume — a Flashbots EXIT lands at calm gas on a thin wallet (independent sell-leg ceiling + reason-aware public-mempool fallback, guarded against double-sell + gated by a buy-time entry affordability check), a MEV ceiling-hit never wedges the event loop (watchdog + two-stage SIGINT + RPC timeouts), one exit's retries never starve other positions' polling (decoupled serial worker + bot-wide per-wallet nonce authority + priority queue), and a failed exit never strips anti-rug protection from a still-held position (balance-is-truth teardown + keep-monitoring + re-arm poll timer + exit_failed_held persistence). Authoritative goal: 21.2-CONTEXT.md § Phase Boundary
+**Depends on**: Phase 21 Waves 1-2 (which surfaced STOP-THE-LINE-04 via the 21-07 retry). BLOCKS Phase 21 Wave 4 (21-07 real-capital capture) and therefore Phase 21 close (D-STOP-THE-LINE). Builds on 21.1 (D-RECONCILE-RECEIPT, D-NONCE-SAFE-RETRY, D-FEE-ESCALATION, D-SHARED-HELPER)
+**Requirements**: STOP-THE-LINE-04-A (calm-gas exit inclusion + entry gate + no-double-sell), STOP-THE-LINE-04-B (freeze / kill-safety), STOP-THE-LINE-04-C (poll decoupling + bot-wide nonce authority), STOP-THE-LINE-04-D (failed-exit position protection) — formalized as REQUIREMENTS.md rows 2026-05-28; full diagnosis in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-04-calm-gas-sell-inclusion-exit-robustness.md`
+**Success Criteria** (what must be TRUE):
+  1. **Finding A resolved:** the exit leg bids on an INDEPENDENT `MEV_SELL_MAX_PRIORITY_FEE_GWEI` ceiling (still affordability-clamped, never overspending); on reason-aware non-inclusion it falls back to a guaranteed nonce-locked public-mempool sell (`swapExactTokensForETHSupportingFeeOnTransferTokens`), with `reconcileInclusion` + re-fetched-balance guards that make a double-sell impossible (LADYS regression green); a hard buy-time entry gate refuses any snipe the wallet can't guarantee a public exit from. Live calm-gas inclusion + private→public transition close ONLY on the 21-07 retry (D-EVIDENCE-BAR)
+  2. **Finding B resolved:** a MEV ceiling-hit / hung submit never wedges the loop — every provider call is `withTimeout`-bounded, a watchdog aborts a budget-overrunning submit via `Promise.race` and keeps the bot alive, and a two-stage SIGINT (REPLACING the single-stage `gracefulShutdown`) forces exit on a second signal OR a grace-timeout. Proven by fake-timer unit tests
+  3. **Finding C resolved:** a poll tick that detects a trigger ENQUEUES and returns immediately (`exit.poll.cycle overruns:false`); a single serial `ExitWorker` drains a priority queue (anti-rug first) one sell at a time; EVERY signing tx routes through ONE per-wallet `withNonceLock` authority (no nonce-collision bot-wide). Proven by serial-drain / priority / per-position-lock / nonce-serialization unit tests + fork end-to-end
+  4. **Finding D resolved:** the `executeFullSell` catch gates teardown on a re-fetched on-chain `balanceOf` — a failed still-held exit KEEPS anti-rug + re-arms the poll timer + persists `exit_failed_held` (schema v7); a genuine close still tears down; routine retries are bounded (anti-rug always fires); `executePartialSell` posture verified; the canonical `antiRugReason.test.ts` Test 6 is INVERTED. Proven unit + fork SIGTERM-restart-resume
+**Plans**: 10 plans
+
+  **Wave 1** *(foundations; no deps; fully parallel — zero file overlap):*
+  - [ ] 21.2-01-PLAN.md — per-wallet `withNonceLock(address, op)` nonce authority (composes WITH the re-fetch-'latest' scheme; NOT ethers NonceManager) [STOP-THE-LINE-04-C]
+  - [ ] 21.2-02-PLAN.md — `withTimeout(op, ms, label)` Promise.race RPC-timeout helper + Finding B env knobs (RPC_TIMEOUT_MS / WATCHDOG_BUDGET_MS / SIGINT_GRACE_MS) [STOP-THE-LINE-04-B]
+  - [ ] 21.2-03-PLAN.md — DB schema v6→v7 additive ALTER-guard: `exit_failure_count` + `exit_status` on `exit_state` (idempotent; existing rows survive) [STOP-THE-LINE-04-D]
+
+  **Wave 2** *(after foundations):*
+  - [ ] 21.2-04-PLAN.md — independent sell-leg priority-fee ceiling (`MEV_SELL_MAX_PRIORITY_FEE_GWEI`, still affordability-clamped) + retarget `reserveSellGas` to the guaranteed public exit + Finding A env knobs [STOP-THE-LINE-04-A] (depends 21.2-02 for config.ts ordering)
+  - [ ] 21.2-05-PLAN.md — serial `ExitWorker` + priority queue + per-position lock; poll ticks enqueue + return (overruns:false); worker submit nonce-locked [STOP-THE-LINE-04-C] (depends 21.2-01)
+
+  **Wave 3** *(exitEngine ladder + the buy-time gate):*
+  - [ ] 21.2-06-PLAN.md — `executeFullSell` inclusion ladder: reason-aware private escalate → no-double-sell guard (reconcileInclusion + re-fetched balance) → nonce-locked public-mempool fallback (LADYS regression) [STOP-THE-LINE-04-A] (depends 21.2-01/04/05)
+  - [ ] 21.2-08-PLAN.md — hard buy-time entry affordability gate: refuse a snipe unless the wallet can afford the worst-case GUARANTEED public exit + buffer; fail-closed on RPC error [STOP-THE-LINE-04-A] (depends 21.2-04)
+
+  **Wave 4** *(the Finding-D catch rewrite + the Finding-B liveness net):*
+  - [ ] 21.2-07-PLAN.md — balance-truth teardown (failed-still-held keeps anti-rug + re-arms poll timer + persists exit_failed_held) + bounded routine retries (N=5) + executePartialSell verification + INVERT antiRugReason Test 6 + anti-rug sell nonce-locked [STOP-THE-LINE-04-D] (depends 21.2-03/05/06)
+  - [ ] 21.2-09-PLAN.md — watchdog (Promise.race abort + keep-alive) + two-stage SIGINT REPLACING the single-stage gracefulShutdown (no two competing force-exit timers) [STOP-THE-LINE-04-B] (depends 21.2-02/05/08)
+
+  **Wave 5** *(fork rehearsal + evidence-bar gate; depends on the exit-engine + bot changes):*
+  - [ ] 21.2-10-PLAN.md — fork-rehearse the surrounding buy→register→monitor→exit wiring + exit_failed_held restart-resume (passthrough, no relay) + operator D-EVIDENCE-BAR acknowledgement before the 21-07 retry resumes [STOP-THE-LINE-04-A, STOP-THE-LINE-04-C, STOP-THE-LINE-04-D] (depends 21.2-06/07/09)
+
+  **Cross-cutting constraints:**
+  - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code / simplest" is NOT a tiebreaker
+  - **D-STOP-THE-LINE:** any NEW bug surfaced during execution escalates to a fresh STOP-THE-LINE / decimal phase — NOT fix-in-flight, NOT file-and-defer
+  - **D-FORK-REHEARSAL + D-EVIDENCE-BAR:** the fork rehearsal (no Flashbots relay) proves the surrounding wiring; the private→public transition + calm-gas inclusion are mock/fork-only and close ONLY on the 21-07 real-capital retry artifacts (Etherscan hash / DB amount_out / pino excerpt)
+  - **D-ENV-EXAMPLE / D-ALERTS / D-ROLLBACK:** every new env var lands in .env.example with a default + 1-line desc; structured pino + Telegram on every failure/fallback/ceiling-hit/watchdog-abort with a remediation pointer; no escape-hatch flags (the public fallback is an engine path, not a bypass flag)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -299,7 +336,7 @@ Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 | 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
 | 21. Exit-Engine Live-Runtime Hardening | v6.17 | 6/8 | In Progress (21-07 retry validated STL-02 fix live but surfaced STOP-THE-LINE-04 → blocked on 21.2; 21-07/08 operator-gated) | - |
 | 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Complete (verifier 10/10; +deep-review fix CR-01/WR-01; full gate GREEN — unit 614/integration 216/fork 39, tsc ×3 clean; 1 by-design human-UAT = 21-07 real-relay, operator-gated) | 2026-05-27 |
-| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 0/? | Planned — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | - |
+| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 0/10 | Planned (10 plans, 5 waves; STOP-THE-LINE-04-A/B/C/D formalized; plan-checker pending) — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | - |
 
 ---
 *Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
