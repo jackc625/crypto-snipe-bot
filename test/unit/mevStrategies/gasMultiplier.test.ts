@@ -3,11 +3,24 @@
 // MevStrategy.sendTransaction actually reaches the populated TransactionRequest
 // before submission. The pre-Gap-1 code discarded the multiplier via `void
 // gasMultiplier;` in src/exitEngine.ts; this test guards against regression.
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { applyGasMultiplier } from '../../../src/utils/mevStrategies/types';
 import { PassthroughMevStrategy } from '../../../src/utils/mevStrategies/passthrough';
 import { BloxrouteMevStrategy } from '../../../src/utils/mevStrategies/bloxroute';
+
+// Pin the MEV fee ceiling/step to their documented defaults (ceiling = 5 gwei,
+// step = 1 gwei) so the CR-01 clamp assertions below are hermetic regardless of
+// the operator's .env — which may raise MEV_MAX_PRIORITY_FEE_GWEI above 5
+// (dotenv.config() loads it into process.env at import). Without this pin the
+// clamp correctly targets the operator's real ceiling and the 5-gwei asserts fail.
+beforeEach(() => {
+    vi.stubEnv('MEV_MAX_PRIORITY_FEE_GWEI', '5');
+    vi.stubEnv('MEV_PRIORITY_FEE_STEP_GWEI', '1');
+});
+afterEach(() => {
+    vi.unstubAllEnvs();
+});
 
 // -----------------------------------------------------------------------------
 // applyGasMultiplier helper — pure unit tests

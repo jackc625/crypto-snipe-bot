@@ -175,12 +175,22 @@ function recordingSubmit(
 const SAVED_ENV: Record<string, string | undefined> = {
     MEV_CONFIRM_WINDOW_MS: process.env.MEV_CONFIRM_WINDOW_MS,
     MEV_CONFIRM_POLL_MS: process.env.MEV_CONFIRM_POLL_MS,
+    // Snapshot the fee ceiling/step too: the operator's .env may raise
+    // MEV_MAX_PRIORITY_FEE_GWEI above 5 (dotenv loads it into process.env at
+    // import), which would defeat the hardcoded CEILING_WEI = 5 gwei asserts.
+    MEV_MAX_PRIORITY_FEE_GWEI: process.env.MEV_MAX_PRIORITY_FEE_GWEI,
+    MEV_PRIORITY_FEE_STEP_GWEI: process.env.MEV_PRIORITY_FEE_STEP_GWEI,
 };
 
 beforeEach(() => {
     // Tiny confirm-window/poll so the bounded reconcile loop returns fast.
     process.env.MEV_CONFIRM_WINDOW_MS = '60';
     process.env.MEV_CONFIRM_POLL_MS = '10';
+    // Pin the fee ceiling/step to the documented CR-01 defaults so the
+    // observable-fee clamp assertions are hermetic regardless of the operator's
+    // .env (restored from SAVED_ENV in afterEach).
+    process.env.MEV_MAX_PRIORITY_FEE_GWEI = '5';
+    process.env.MEV_PRIORITY_FEE_STEP_GWEI = '1';
     logInfo.mockReset();
     logWarn.mockReset();
     logError.mockReset();
