@@ -171,6 +171,15 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'MEV_MAX_PRIORITY_FEE_GWEI', required: false, description: 'Hard absolute ceiling on escalated maxPriorityFeePerGas (gwei); load-bearing safety cap (default: 5)' },
     { name: 'MEV_PRIORITY_FEE_STEP_GWEI', required: false, description: 'Per-retry priority-fee escalation step (gwei), clamped to the ceiling + affordability bound (default: 1)' },
     { name: 'MEV_RESERVE_SELL_GAS', required: false, description: 'When true, the affordability bound always reserves sellGasLimit x fee so the exit leg can submit (default: true)' },
+
+    // --- Exit-engine robustness (Phase 21.2, Finding B layer 3 — STOP-THE-LINE-04-B) ---
+    // GLOBAL (non-chain-prefixed) liveness knobs. CODE-read config, NOT secrets —
+    // never log their values as secrets. Read via the never-NaN/never-negative
+    // parsePositiveInt discipline (reconciliation.ts:564). Registered here so plan
+    // 21.2-09 (watchdog + two-stage SIGINT) consumes them without re-touching config.ts.
+    { name: 'RPC_TIMEOUT_MS', required: false, description: 'Per-provider/RPC-call wall-clock timeout (ms); Promise.race frees a hung call. Finding B. (default: 15000)' },
+    { name: 'WATCHDOG_BUDGET_MS', required: false, description: 'Watchdog wall-clock budget per submit/cycle (ms); must exceed one 45s confirm-window + margin. Finding B. (default: 60000)' },
+    { name: 'SIGINT_GRACE_MS', required: false, description: 'Two-stage SIGINT grace period (ms) before force-exit. Finding B. (default: 8000)' },
 ];
 
 function validateEnvVars(): void {
