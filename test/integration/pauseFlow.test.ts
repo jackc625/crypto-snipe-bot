@@ -293,6 +293,12 @@ vi.mock('../../src/utils/exitManager', () => ({
 
 vi.mock('../../src/exitEngine', () => ({
     executeFullSell: vi.fn(),
+    // Phase 21.2-09: bot.ts now imports setExitWorkerWatchdog from ./exitEngine
+    // (alongside startExitMonitor/resumeExitMonitor). Mocked here so importing
+    // bot.ts never throws on a missing export.
+    startExitMonitor: vi.fn().mockResolvedValue(undefined),
+    resumeExitMonitor: vi.fn().mockResolvedValue(undefined),
+    setExitWorkerWatchdog: vi.fn(),
     exitConfig: {
         trailingStopPct: 15,
         stopLossPct: 25,
@@ -631,6 +637,11 @@ describe('startMultiChainBot D-PAUSED-RESTART positive observable', () => {
         vi.doMock('../../src/exitEngine', () => ({
             startExitMonitor: startExitMonitorSpy,
             resumeExitMonitor: resumeExitMonitorSpy,
+            // Phase 21.2-09: bot.ts imports setExitWorkerWatchdog from
+            // ./exitEngine and calls it during startMultiChainBot wiring; without
+            // it here the dynamic import('../../src/bot') below throws on a
+            // missing export. No-op spy keeps the watchdog-arm side-effect inert.
+            setExitWorkerWatchdog: vi.fn(),
         }));
         // Safety-bank: all checks pass so CP1 is the gate that catches the pause.
         vi.doMock('../../src/utils/tokenSafety', () => ({

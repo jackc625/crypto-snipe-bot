@@ -7,6 +7,16 @@ scope (SCOPE BOUNDARY rule). Logged here, NOT fixed in-flight.
 
 ## D-09-01 — Two stale exitEngine test files missing the 21.2-07 `markExitFailedHeld` mock
 
+- **STATUS: RESOLVED** (Wave 4 post-merge TEST-HARNESS repair). Fixed exactly as
+  recommended below: added `markExitFailedHeld: { run: vi.fn() }` to the stale db
+  mocks, completed the `exitManager` mock surface (`hasExitMonitorTimer`,
+  `tryEnqueuePosition`, `releasePositionQueue`) added by 21.2-07, and modeled the
+  genuine close by having the post-sell `balanceOf` re-fetch return 0 (≤ dust) in
+  the two affected `exitEngineSell.test.ts` cases. Also completed the
+  `exitEngine` mock in `test/integration/pauseFlow.test.ts` with
+  `setExitWorkerWatchdog` (export added by 21.2-09). TEST FILES ONLY — no `src/`
+  change; the balance-truth / keep-monitoring source logic was confirmed correct.
+  Full suites green: unit 678/678, integration 216/216; tsc clean (bot + main).
 - **Discovered during:** 21.2-09 execution (full `--project unit` regression run).
 - **Symptom:** 3 failing unit tests across 2 files:
   - `test/unit/exitEngineSell.test.ts` — "records non-null amountOut/gasCost/block…" and

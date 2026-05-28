@@ -36,6 +36,9 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
             upsertExitState: { run: vi.fn() },
             getExitState: { get: vi.fn() },
             deleteExitState: { run: deleteExitStateRun },
+            // Phase 21.2-07: balance-truth teardown persists a still-held failed
+            // exit via markExitFailedHeld; the symbol must exist on the mock.
+            markExitFailedHeld: { run: vi.fn() },
             getTradeIdForPendingToken: { get: vi.fn() },
         }));
 
@@ -71,6 +74,12 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
             releaseSellLock: vi.fn(),
             registerExitMonitor: vi.fn(),
             clearAllTimersForToken: clearAllTimersForTokenMock,
+            // Phase 21.2-07: keepMonitoringFailedHeld reads hasExitMonitorTimer;
+            // true = "timer still armed" so the control/zero-balance paths under
+            // test keep their behavior. Per-position queue helpers also imported.
+            hasExitMonitorTimer: vi.fn().mockReturnValue(true),
+            tryEnqueuePosition: vi.fn().mockReturnValue(true),
+            releasePositionQueue: vi.fn(),
         }));
 
         vi.doMock('../../src/utils/notifier', () => ({
@@ -223,6 +232,9 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
             upsertExitState: { run: vi.fn() },
             getExitState: { get: vi.fn() },
             deleteExitState: { run: deleteExitStateRun },
+            // Phase 21.2-07: balance-truth teardown persists a still-held failed
+            // exit via markExitFailedHeld; the symbol must exist on the mock.
+            markExitFailedHeld: { run: vi.fn() },
             getTradeIdForPendingToken: { get: vi.fn() },
         }));
         vi.doMock('../../src/utils/logger', () => ({
@@ -246,6 +258,12 @@ describe('executeFullSell — zero balance stops monitoring (FIX-08)', () => {
             releaseSellLock: vi.fn(),
             registerExitMonitor: vi.fn(),
             clearAllTimersForToken: clearAllTimersForTokenMock,
+            // Phase 21.2-07: keepMonitoringFailedHeld reads hasExitMonitorTimer;
+            // true = "timer still armed" so the control/zero-balance paths under
+            // test keep their behavior. Per-position queue helpers also imported.
+            hasExitMonitorTimer: vi.fn().mockReturnValue(true),
+            tryEnqueuePosition: vi.fn().mockReturnValue(true),
+            releasePositionQueue: vi.fn(),
         }));
         vi.doMock('../../src/utils/notifier', () => ({
             sendCtxAlert: vi.fn().mockResolvedValue(undefined),

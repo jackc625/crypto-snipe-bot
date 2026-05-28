@@ -22,6 +22,9 @@ vi.mock('../../src/utils/db', () => ({
     upsertExitState: { run: vi.fn() },
     getExitState: { get: vi.fn() },
     deleteExitState: { run: deleteExitStateRun },
+    // Phase 21.2-07: executeFullSell's balance-truth teardown persists a
+    // still-held failed exit via markExitFailedHeld instead of deleteExitState.
+    markExitFailedHeld: { run: vi.fn() },
     getTradeIdForPendingToken: { get: vi.fn() },
 }));
 
@@ -57,6 +60,13 @@ vi.mock('../../src/utils/exitManager', () => ({
     releaseSellLock: vi.fn(),
     registerExitMonitor: vi.fn(),
     clearAllTimersForToken: vi.fn(),
+    // Phase 21.2-07: executeFullSell's re-arm predicate (keepMonitoringFailedHeld)
+    // reads hasExitMonitorTimer; return true so the happy-path full sells under
+    // test report "timer still armed" and do not change behavior here. The
+    // per-position queue helpers are also imported at module top.
+    hasExitMonitorTimer: vi.fn().mockReturnValue(true),
+    tryEnqueuePosition: vi.fn().mockReturnValue(true),
+    releasePositionQueue: vi.fn(),
 }));
 
 vi.mock('../../src/utils/notifier', () => ({
@@ -180,6 +190,12 @@ describe('executeFullSell — receipt decoding integration', () => {
             gasCost: '300000000000000',
             blockNumber: 12345,
         });
+        // Phase 21.2-07 (D-BALANCE-IS-TRUTH): executeFullSell now re-fetches
+        // balanceOf AFTER the sell and lets it — not the submit report — decide
+        // teardown. Model a GENUINE close: read #1 (initial) = full balance so
+        // the sell proceeds; read #2 (post-sell) = 0 so balanceOf confirms the
+        // position closed and the success path returns true.
+        setBalanceSequence([1000000000000000000n, 0n]);
 
         const ok = await executeFullSell(
             mockCtx,
@@ -334,6 +350,10 @@ describe('Phase 7 EXIT-01: executeFullSell accepts reason="stop-loss" discrimina
             gasCost: '200000000000000',
             blockNumber: 88888,
         });
+        // Phase 21.2-07 (D-BALANCE-IS-TRUTH): model a GENUINE close so the
+        // post-sell balanceOf re-fetch confirms the position closed (read #1 =
+        // full balance → sell proceeds; read #2 = 0 → success path returns true).
+        setBalanceSequence([1000000000000000000n, 0n]);
 
         // Drive executeFullSell directly with reason='stop-loss' (matches src/exitEngine.ts:758 call shape).
         // This validates the call shape; the upstream polling logic that computes the threshold
