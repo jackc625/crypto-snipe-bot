@@ -33,6 +33,61 @@ export function releaseSellLock(chainOrToken: string, tokenAddress?: string): vo
     sellingTokens.delete(key);
 }
 
+// ── Per-position queued/in-flight lock (Phase 21.2 / Finding C) ──────────
+// SIBLING of the sell-lock Map above, NOT a replacement. The sell-lock is
+// acquired INSIDE executeFullSell for the brief window of a single submit; it
+// is released the moment that submit settles. The serial ExitWorker, however,
+// needs a lock that spans the ENTIRE lifetime a position is "owned" by the
+// worker — from the instant a poll tick enqueues it, through the queue wait,
+// through the (possibly multi-attempt) drain, until the sell fully settles.
+// Without this wider lock the SAME position could be enqueued by a later poll
+// tick while its first enqueue is still queued/in-flight → a re-entrant
+// self-sell (double-spend class). Same single-threaded check-and-set atomicity
+// reasoning as the sell-lock Map: the get/set on this Map is synchronous within
+// one event-loop tick, so two concurrent poll ticks for the same position
+// cannot both observe an unlocked state.
+//
+// Keyed identically ("chain:tokenAddress" composite, lowercased) so it lines up
+// with the sell-lock / timer-registry / nonce-authority keying conventions.
+
+const queuedPositions = new Map<string, boolean>();
+
+function positionKey(chainName: string, tokenAddress: string): string {
+    return `${chainName}:${tokenAddress.toLowerCase()}`;
+}
+
+/**
+ * Acquire the per-position worker lock for {chain, token}. Returns true if the
+ * caller now OWNS the position (it was free); false if it is already
+ * queued/in-flight (the caller must skip — no re-entrant self-sell). The lock
+ * is held across the whole enqueue→drain→settle lifetime and released via
+ * {@link releasePositionQueue}.
+ */
+export function tryEnqueuePosition(chainName: string, tokenAddress: string): boolean {
+    const key = positionKey(chainName, tokenAddress);
+    if (queuedPositions.get(key)) return false;
+    queuedPositions.set(key, true);
+    return true;
+}
+
+/**
+ * Release the per-position worker lock for {chain, token} after the sell
+ * settles, so a future GENUINE re-trigger can enqueue the position again.
+ */
+export function releasePositionQueue(chainName: string, tokenAddress: string): void {
+    queuedPositions.delete(positionKey(chainName, tokenAddress));
+}
+
+/**
+ * Test-only: clear both the sell-lock and per-position-queue Maps so each test
+ * starts from a clean state (underscore prefix signals test-only — mirrors
+ * `_resetNonceChainsForTesting` in nonceAuthority.ts).
+ */
+export function _resetSellLocksForTesting(): void {
+    sellingTokens.clear();
+    queuedPositions.clear();
+}
+
 // ── Timer registry ───────────────────────────────────────────────────
 // Tracks all active setInterval/setTimeout handles keyed by token address.
 // Multi-chain: keys are "chain:tokenAddress" composites.

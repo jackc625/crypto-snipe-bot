@@ -8,7 +8,8 @@ import { CONFIG } from './config';
 import { logger } from './utils/logger';
 import type { ChainContext, DexConfig, DexConfigV2, DexConfigV3 } from './chainRegistry';
 import { ROUTER_ABI, ERC20_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from './utils/abis';
-import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimersForToken } from './utils/exitManager';
+import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimersForToken, tryEnqueuePosition, releasePositionQueue } from './utils/exitManager';
+import { withNonceLock } from './utils/nonceAuthority';
 import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState } from './utils/db';
 import { sendCtxAlert } from './utils/notifier';
 import { sendTxWithRetry } from './utils/txManager';
@@ -574,6 +575,201 @@ export async function executeFullSell(
     } finally {
         releaseSellLock(ctx.chain.name, tokenAddress);
     }
+}
+
+// ---------------------------------------------------------------------------
+// ExitWorker — serial priority-queue drainer (Phase 21.2 / Finding C)
+// D-DECOUPLE-SERIAL-WORKER + D-EXIT-PRIORITY
+// ---------------------------------------------------------------------------
+//
+// THE PROBLEM (Finding C): the 4-attempt sell reconciliation used to run
+// synchronously INSIDE pollExitStrategy, blocking the WHOLE poll cycle for
+// ~222s (exit.poll.cycle overruns:true). With multiple open positions, NONE
+// were polled or exited during that window — one exit's retries starved every
+// other position's monitoring.
+//
+// THE FIX: a poll tick that detects a trigger ENQUEUES {tradeId, reason,
+// priority} and returns 'continue' IMMEDIATELY (cadence preserved). A SINGLE
+// serial ExitWorker drains a priority queue, submitting ONE sell at a time:
+//   * serial-by-construction → nonce-safe for the single wallet (no two submits
+//     ever contend for the nonce). The drain ALSO wraps each submit in
+//     withNonceLock(ctx.wallet.address, ...) (21.2-01) so the authority layer
+//     enforces it even if a future caller enqueues from elsewhere.
+//   * a per-position lock (tryEnqueuePosition/releasePositionQueue in
+//     exitManager.ts) prevents the SAME position being enqueued/sold twice
+//     (no re-entrant self-sell).
+//
+// Priority (reason → rank): anti-rug(0) > urgency-market-sell(1) =
+// stop-loss(1) > trailing-stop(2). A late-arriving anti-rug jumps ahead of an
+// already-queued trailing stop. (partial-sell stays on the poll tick — it is
+// non-blocking and tier-bounded — so rank 3 is reserved but unused here.)
+//
+// This plan ships the worker + queue + per-position lock + poll-tick
+// conversion. It does NOT change WHAT executeFullSell does on submit — the
+// inclusion ladder (21.2-06) and the balance-truth catch (21.2-07) build on
+// this same drain path, sequenced after.
+
+/** Exit reasons the worker can submit (mirrors executeFullSell's reason union). */
+export type ExitReason = 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug';
+
+/** A queued exit: everything the drain loop needs to call executeFullSell. */
+export interface ExitWorkItem {
+    ctx: ChainContext;
+    dex: DexConfig;
+    chain?: string;            // optional convenience; ctx.chain.name is canonical
+    tokenAddress: string;
+    feeTier: number | null;
+    tradeId: number;
+    reason: ExitReason;
+    reasonDetail: string;
+    priority?: number;         // explicit override; otherwise derived from reason
+}
+
+/**
+ * reason → priority rank (lower = drained first). A late anti-rug (0) jumps an
+ * already-queued trailing-stop (2). urgency and stop-loss share rank 1.
+ */
+function reasonRank(reason: ExitReason): number {
+    switch (reason) {
+        case 'anti-rug': return 0;
+        case 'urgency-market-sell': return 1;
+        case 'stop-loss': return 1;
+        case 'trailing-stop': return 2;
+        default: return 3;
+    }
+}
+
+/**
+ * The signature of the sell executor the worker drives. Production binds this to
+ * the real `executeFullSell`; tests substitute a controllable executor via
+ * `_setSellExecutorForTesting` to observe serialization/priority/lock effects
+ * without driving the full MEV submit path.
+ */
+type SellExecutor = (item: ExitWorkItem) => Promise<boolean>;
+
+const realSellExecutor: SellExecutor = (i) =>
+    executeFullSell(i.ctx, i.dex, i.tokenAddress, i.feeTier, i.reason, i.tradeId, i.reasonDetail);
+
+class ExitWorker {
+    /** Priority queue kept sorted ascending by rank; stable within a rank (FIFO). */
+    private readonly queue: { item: ExitWorkItem; rank: number; seq: number }[] = [];
+    private running = false;
+    private seq = 0;
+    private executor: SellExecutor = realSellExecutor;
+
+    /** Test seam — substitute the sell executor. */
+    setExecutor(fn: SellExecutor): void {
+        this.executor = fn;
+    }
+
+    /** Test seam — reset to a clean state between tests. */
+    reset(): void {
+        this.queue.length = 0;
+        this.running = false;
+        this.seq = 0;
+        this.executor = realSellExecutor;
+    }
+
+    /**
+     * Enqueue an exit. Skips (returns false) if this position is already
+     * queued/in-flight (per-position lock). Otherwise inserts by priority and
+     * kicks the drain loop if idle. Returns true if the item was enqueued.
+     */
+    enqueue(item: ExitWorkItem): boolean {
+        const chain = item.ctx.chain.name;
+        // Per-position lock: held across the ENTIRE enqueue→drain→settle lifetime
+        // (released in the drain loop's finally) so a later poll tick cannot
+        // re-enqueue the same position → no re-entrant self-sell.
+        if (!tryEnqueuePosition(chain, item.tokenAddress)) {
+            item.ctx.log.info(
+                { token: item.tokenAddress, reason: item.reason, op: 'exit.worker.skip-duplicate' },
+                'Position already queued/in-flight, skipping duplicate enqueue',
+            );
+            return false;
+        }
+
+        const rank = item.priority ?? reasonRank(item.reason);
+        const entry = { item, rank, seq: this.seq++ };
+        // Insert maintaining ascending rank, FIFO within a rank (stable).
+        let i = this.queue.length;
+        while (i > 0 && this.queue[i - 1].rank > rank) i--;
+        this.queue.splice(i, 0, entry);
+
+        item.ctx.log.info(
+            { token: item.tokenAddress, reason: item.reason, rank, queueDepth: this.queue.length, op: 'exit.worker.enqueued' },
+            'Exit enqueued',
+        );
+
+        if (!this.running) {
+            // Kick the drain loop. We deliberately do NOT await it here — the
+            // caller (a poll tick) must return immediately (Finding C).
+            void this.drain();
+        }
+        return true;
+    }
+
+    /**
+     * Drain loop: dequeue the highest-priority item, submit ONE sell (wrapped in
+     * the per-wallet nonce lock), release the per-position lock, then continue —
+     * strictly one sell at a time. A failed/thrown submit never breaks the loop;
+     * the per-position lock is always released in finally.
+     */
+    private async drain(): Promise<void> {
+        if (this.running) return;
+        this.running = true;
+        try {
+            while (this.queue.length > 0) {
+                const { item } = this.queue.shift()!;
+                const chain = item.ctx.chain.name;
+                try {
+                    // Serial-by-construction is already nonce-safe; the explicit
+                    // withNonceLock is the authority-layer guarantee (D-NONCE-
+                    // AUTHORITY-ALL) so the invariant holds regardless of caller.
+                    await withNonceLock(item.ctx.wallet.address, () => this.executor(item));
+                } catch (e) {
+                    item.ctx.log.error(
+                        { err: e, token: item.tokenAddress, reason: item.reason, op: 'exit.worker.submit-failed' },
+                        'Exit worker submit failed (loop continues)',
+                    );
+                } finally {
+                    // Release the per-position lock AFTER the sell fully settles
+                    // so a future genuine re-trigger can enqueue again.
+                    releasePositionQueue(chain, item.tokenAddress);
+                }
+            }
+        } finally {
+            this.running = false;
+            // A late enqueue that arrived after the while-condition saw an empty
+            // queue but before running flipped false would otherwise stall; re-
+            // check and restart the loop if anything slipped in.
+            if (this.queue.length > 0) void this.drain();
+        }
+    }
+}
+
+const exitWorker = new ExitWorker();
+
+/**
+ * Enqueue an exit for the serial worker (Finding C). A poll tick that detects a
+ * trigger calls this and returns 'continue' immediately — it NEVER awaits the
+ * sell inline. The worker drains by priority (anti-rug first), one nonce-locked
+ * sell at a time, with a per-position lock preventing re-entrant self-sell.
+ *
+ * @returns true if the exit was enqueued; false if skipped as a duplicate
+ *          (position already queued/in-flight).
+ */
+export function enqueueExit(item: ExitWorkItem): boolean {
+    return exitWorker.enqueue(item);
+}
+
+/** Test-only: substitute the worker's sell executor (observability seam). */
+export function _setSellExecutorForTesting(fn: (item: ExitWorkItem) => Promise<boolean>): void {
+    exitWorker.setExecutor(fn);
+}
+
+/** Test-only: reset the worker to a clean state between tests. */
+export function _resetExitWorkerForTesting(): void {
+    exitWorker.reset();
 }
 
 /**
