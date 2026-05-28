@@ -108,12 +108,17 @@ const SELL_GAS_LIMIT = 300_000n;
 // vi.resetModules(). buildReconcileConfig is the single point env vars are parsed
 // into the helper config, so asserting its output proves the var CONTROLS behavior
 // (D-04 observable effect), not mere presence.
-async function loadReconcileConfig() {
+//
+// `leg` selects which priority-fee ceiling feeds maxPriorityFeeCeilingWei:
+//   'buy'  → MEV_MAX_PRIORITY_FEE_GWEI      (default 5, unchanged)
+//   'sell' → MEV_SELL_MAX_PRIORITY_FEE_GWEI (default 25, Finding A independent ceiling)
+// The default (no leg) is 'buy' so the 3 existing strategy callers are unaffected.
+async function loadReconcileConfig(leg?: 'buy' | 'sell') {
     const { CONFIG } = await import('../../../src/config');
     expect(CONFIG).toBeDefined(); // config imported cleanly (var registered, no exit)
     expect(mockExit).not.toHaveBeenCalled();
     const { buildReconcileConfig } = await import('../../../src/utils/mevStrategies/reconciliation');
-    return buildReconcileConfig(process.env, SELL_GAS_LIMIT);
+    return buildReconcileConfig(process.env, SELL_GAS_LIMIT, 3, leg);
 }
 
 // =============================================================================
@@ -194,5 +199,186 @@ describe('MEV_RESERVE_SELL_GAS env var', () => {
         delete process.env.MEV_RESERVE_SELL_GAS;
         const cfg = await loadReconcileConfig();
         expect(cfg.reserveSellGas).toBe(true);
+    });
+});
+
+// =============================================================================
+// Phase 21.2 Plan 04 / Finding A — independent SELL-leg priority-fee ceiling
+// (MEV_SELL_MAX_PRIORITY_FEE_GWEI, default 25) decoupled from the BUY ceiling
+// (MEV_MAX_PRIORITY_FEE_GWEI, default 5), and the reserve retargeted to the
+// GUARANTEED public-exit gas (normal-priced) instead of the private CEILING
+// priority fee. CRITICAL invariant (Pitfall 5): the higher sell ceiling raises
+// the ceiling INPUT only — computeAffordablePriorityFee's affordability bound
+// STILL clamps the final bid (try harder privately, NEVER overspend).
+//
+// These hermetic env pins (MEV_MAX_PRIORITY_FEE_GWEI=5 / sell=25) keep the
+// assertions independent of the operator's real .env (mirrors the pre-wave
+// hardening in inclusionReconciliation.test.ts / gasMultiplier.test.ts).
+// =============================================================================
+
+describe('MEV_SELL_MAX_PRIORITY_FEE_GWEI env var (Finding A — independent sell ceiling)', () => {
+    it('Test 1 — sell leg uses the SELL ceiling (25 gwei) when MEV_SELL_MAX_PRIORITY_FEE_GWEI=25', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25');
+        setEnv('MEV_MAX_PRIORITY_FEE_GWEI', '5'); // pin the buy ceiling for hermeticity
+        const cfg = await loadReconcileConfig('sell');
+        // The sell leg reads its OWN ceiling, NOT the 5-gwei buy ceiling (the Finding A trap).
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).not.toBe(parseUnits('5', 'gwei'));
+    });
+
+    it('Test 5 — sell ceiling defaults to 25 gwei when MEV_SELL_MAX_PRIORITY_FEE_GWEI is unset', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_SELL_MAX_PRIORITY_FEE_GWEI;
+        const cfg = await loadReconcileConfig('sell');
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+    });
+
+    it('respects an operator override of the sell ceiling (e.g. 40 gwei)', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '40');
+        const cfg = await loadReconcileConfig('sell');
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('40', 'gwei'));
+    });
+});
+
+describe('BUY leg unchanged (no Finding A regression)', () => {
+    it('Test 2 — buy leg still reads MEV_MAX_PRIORITY_FEE_GWEI (default 5), ignoring the sell ceiling', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI; // default 5
+        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25'); // must NOT leak into the buy leg
+        const cfg = await loadReconcileConfig('buy');
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
+    });
+
+    it('the default leg (no leg arg) is the BUY leg — the 3 existing strategy callers stay on 5 gwei', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI; // default 5
+        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25');
+        const cfg = await loadReconcileConfig(); // no leg → 'buy'
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
+    });
+});
+
+describe('Test 3 — affordability bound STILL binds at a 10x market rate (try harder, never overspend)', () => {
+    it('clamps a 25-gwei sell ceiling down to the affordable 8-gwei bound', async () => {
+        const { parseUnits, parseEther } = await import('ethers');
+        const { computeAffordablePriorityFee } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        // Sell ceiling = 25 gwei; desired (escalated/market) fee absurdly high (10x).
+        const sellCeilingWei = parseUnits('25', 'gwei');
+        const baseFeeWei = parseUnits('2', 'gwei');
+        const buyGasLimit = 200_000n;
+        const sellGasLimit = 300_000n;
+        const snipeValueWei = 0n;
+
+        // Construct a wallet balance whose affordability bound is EXACTLY 8 gwei so
+        // the clamp (min(ceiling, bound)) must return 8 gwei, NOT the 25 ceiling and
+        // NOT the absurd 10x desired. With reserveSellGas the internal reserve is the
+        // GUARANTEED public exit (sellGasLimit × baseFee×buffer) — NO private ceiling.
+        const SELL_GAS_BASEFEE_BUFFER = 150n; // 1.5x, fractional-bigint /100n
+        const bufferedSellBaseFee = (baseFeeWei * SELL_GAS_BASEFEE_BUFFER) / 100n;
+        const reservedSellGas = sellGasLimit * bufferedSellBaseFee; // public-exit reserve (no ceiling)
+        const wantBoundWei = parseUnits('8', 'gwei');
+        // headroom = bound × buyGasLimit; walletBalance = headroom + snipe + reserve + buyGasLimit×baseFee
+        const headroom = wantBoundWei * buyGasLimit;
+        const walletBalanceWei = headroom + snipeValueWei + reservedSellGas + buyGasLimit * baseFeeWei;
+
+        const result = computeAffordablePriorityFee({
+            desiredPriorityFeeWei: parseUnits('250', 'gwei'), // 10x the 25-gwei ceiling
+            ceilingWei: sellCeilingWei,
+            walletBalanceWei,
+            snipeValueWei,
+            baseFeeWei,
+            buyGasLimit,
+            sellGasLimit,
+            reserveSellGas: true,
+        });
+
+        expect(result.affordable).toBe(true);
+        // The affordability bound — NOT the 25-gwei ceiling, NOT the 250-gwei desire — wins.
+        expect(result.affordabilityBoundWei).toBe(wantBoundWei);
+        expect(result.priorityFeeWei).toBe(wantBoundWei);
+        // Hard proof of "never overspend": the submitted fee is below BOTH the
+        // sell ceiling and the 10x market desire.
+        expect(result.priorityFeeWei < sellCeilingWei).toBe(true);
+        expect(result.priorityFeeWei < parseUnits('250', 'gwei')).toBe(true);
+        // Sanity: parseEther import exercised (keeps the helper honest about wei math).
+        void parseEther;
+    });
+});
+
+describe('Test 4 — reserve targets the GUARANTEED public exit, NOT the private ceiling', () => {
+    it('computePublicExitReserveWei = sellGasLimit × baseFee×buffer (+ approval), with NO private priority-fee ceiling term', async () => {
+        const { parseUnits } = await import('ethers');
+        const { computePublicExitReserveWei, SELL_GAS_BASEFEE_BUFFER } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        const baseFeeWei = parseUnits('20', 'gwei');
+        const sellGasLimit = 300_000n;
+        const ceilingWei = parseUnits('25', 'gwei'); // the private ceiling — must NOT appear in the reserve
+
+        // The public-exit reserve is a NORMAL-PRICED tx: sellGasLimit × (baseFee × buffer).
+        // applyGasMultiplier does fee × round(buffer×100) / 100n (no float drift).
+        const bufferedSellBaseFee = (baseFeeWei * BigInt(Math.round(SELL_GAS_BASEFEE_BUFFER * 100))) / 100n;
+        const expectedPublicExit = sellGasLimit * bufferedSellBaseFee;
+
+        const reserve = computePublicExitReserveWei({ baseFeeWei, sellGasLimit });
+        expect(reserve).toBe(expectedPublicExit);
+
+        // Proof it does NOT use the private-ceiling math (the over-reserving Finding A bug):
+        const privateCeilingReserve = sellGasLimit * (bufferedSellBaseFee + ceilingWei);
+        expect(reserve).not.toBe(privateCeilingReserve);
+        expect(reserve < privateCeilingReserve).toBe(true);
+    });
+
+    it('includes a one-time approval gas leg when approvalGasLimit is supplied (entry-gate use)', async () => {
+        const { parseUnits } = await import('ethers');
+        const { computePublicExitReserveWei, SELL_GAS_BASEFEE_BUFFER } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        const baseFeeWei = parseUnits('20', 'gwei');
+        const sellGasLimit = 300_000n;
+        const approvalGasLimit = 50_000n;
+
+        const bufferedSellBaseFee = (baseFeeWei * BigInt(Math.round(SELL_GAS_BASEFEE_BUFFER * 100))) / 100n;
+        const expected = (sellGasLimit + approvalGasLimit) * bufferedSellBaseFee;
+
+        const reserve = computePublicExitReserveWei({ baseFeeWei, sellGasLimit, approvalGasLimit });
+        expect(reserve).toBe(expected);
+    });
+
+    it('computeAffordablePriorityFee internally reserves the public-exit gas (more headroom than the old ceiling reserve)', async () => {
+        const { parseUnits } = await import('ethers');
+        const { computeAffordablePriorityFee, computePublicExitReserveWei } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        const ceilingWei = parseUnits('25', 'gwei');
+        const baseFeeWei = parseUnits('20', 'gwei');
+        const buyGasLimit = 200_000n;
+        const sellGasLimit = 300_000n;
+        const snipeValueWei = 0n;
+        const walletBalanceWei = parseUnits('1', 'ether');
+
+        const result = computeAffordablePriorityFee({
+            desiredPriorityFeeWei: parseUnits('1000', 'gwei'), // absurd → bound binds
+            ceilingWei,
+            walletBalanceWei,
+            snipeValueWei,
+            baseFeeWei,
+            buyGasLimit,
+            sellGasLimit,
+            reserveSellGas: true,
+        });
+
+        // The affordability bound must be computed against the PUBLIC-exit reserve.
+        const publicReserve = computePublicExitReserveWei({ baseFeeWei, sellGasLimit });
+        const expectedBound = (walletBalanceWei - snipeValueWei - publicReserve - buyGasLimit * baseFeeWei) / buyGasLimit;
+        expect(result.affordabilityBoundWei).toBe(expectedBound);
     });
 });
