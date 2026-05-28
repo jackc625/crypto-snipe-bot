@@ -1131,6 +1131,21 @@ function reasonRank(reason: ExitReason): number {
  */
 type SellExecutor = (item: ExitWorkItem) => Promise<boolean>;
 
+/**
+ * The watchdog wrapper the drain loop applies around each per-item submit
+ * (Phase 21.2-09 / Finding B, D-WATCHDOG-ABORT). It receives the work item (so
+ * it can use the item's own ctx/log for a per-chain alert) and a thunk that
+ * runs the (nonce-locked) submit. A budget-overrunning submit is freed via
+ * `Promise.race` and the wrapper resolves (e.g. to `false`) so the drain loop
+ * KEEPS the bot alive moving to the next queued exit; the stuck position stays
+ * held + monitored (21.2-07). The default below is identity (no bounding) so the
+ * worker is fully functional even before bot.ts installs the real watchdog and
+ * so the worker's own unit tests are unaffected.
+ */
+export type ExitWatchdog = (item: ExitWorkItem, op: () => Promise<boolean>) => Promise<boolean>;
+
+const identityWatchdog: ExitWatchdog = (_item, op) => op();
+
 const realSellExecutor: SellExecutor = (i) =>
     executeFullSell(i.ctx, i.dex, i.tokenAddress, i.feeTier, i.reason, i.tradeId, i.reasonDetail);
 
@@ -1140,10 +1155,22 @@ class ExitWorker {
     private running = false;
     private seq = 0;
     private executor: SellExecutor = realSellExecutor;
+    /** Liveness net around each submit (D-WATCHDOG-ABORT); identity until wired. */
+    private watchdog: ExitWatchdog = identityWatchdog;
 
     /** Test seam — substitute the sell executor. */
     setExecutor(fn: SellExecutor): void {
         this.executor = fn;
+    }
+
+    /**
+     * Install the wall-clock watchdog wrapper applied around each submit
+     * (bot.ts owns the policy: budget, Promise.race abort, alert). Process-level
+     * liveness is a bot-orchestrator concern (RESEARCH responsibility map), so
+     * the worker only exposes the seam; it does not own the budget/alerting.
+     */
+    setWatchdog(fn: ExitWatchdog): void {
+        this.watchdog = fn;
     }
 
     /** Test seam — reset to a clean state between tests. */
@@ -1152,6 +1179,7 @@ class ExitWorker {
         this.running = false;
         this.seq = 0;
         this.executor = realSellExecutor;
+        this.watchdog = identityWatchdog;
     }
 
     /**
@@ -1209,7 +1237,23 @@ class ExitWorker {
                     // Serial-by-construction is already nonce-safe; the explicit
                     // withNonceLock is the authority-layer guarantee (D-NONCE-
                     // AUTHORITY-ALL) so the invariant holds regardless of caller.
-                    await withNonceLock(item.ctx.wallet.address, () => this.executor(item));
+                    //
+                    // CRITICAL ordering (D-WATCHDOG-ABORT + RESEARCH Pitfall 6): the
+                    // watchdog is wrapped INSIDE the nonce lock — withNonceLock(addr,
+                    // () => watchdog(item, () => executor(item))) — NOT outside it.
+                    // withNonceLock chains the NEXT op behind the prior op's
+                    // settlement; if the watchdog sat OUTSIDE, a hung executor would
+                    // free the drain loop but leave the hung promise as the nonce
+                    // chain's tail, so the next wallet submit would block behind it
+                    // forever (the watchdog would not actually keep the bot alive
+                    // for same-wallet exits). With the watchdog INSIDE, the bounded
+                    // submit is what occupies the nonce chain: a budget overrun
+                    // resolves the watchdog (to false) → the nonce chain advances →
+                    // the next queued exit proceeds. Identity watchdog until bot.ts
+                    // installs the real one, so the worker is correct standalone.
+                    await withNonceLock(item.ctx.wallet.address, () =>
+                        this.watchdog(item, () => this.executor(item)),
+                    );
                 } catch (e) {
                     item.ctx.log.error(
                         { err: e, token: item.tokenAddress, reason: item.reason, op: 'exit.worker.submit-failed' },
@@ -1249,6 +1293,23 @@ export function enqueueExit(item: ExitWorkItem): boolean {
 /** Test-only: substitute the worker's sell executor (observability seam). */
 export function _setSellExecutorForTesting(fn: (item: ExitWorkItem) => Promise<boolean>): void {
     exitWorker.setExecutor(fn);
+}
+
+/**
+ * Install the wall-clock watchdog wrapper applied around each worker submit
+ * (Phase 21.2-09 / Finding B, D-WATCHDOG-ABORT). bot.ts owns the policy (budget,
+ * Promise.race abort, Telegram alert) and installs it once at startup; the
+ * worker only holds the seam. Default behavior (before install) is identity —
+ * the worker is fully functional unbounded, the watchdog only ADDS the liveness
+ * net.
+ */
+export function setExitWorkerWatchdog(fn: ExitWatchdog): void {
+    exitWorker.setWatchdog(fn);
+}
+
+/** Test-only: install a watchdog wrapper for observability tests. */
+export function _setExitWatchdogForTesting(fn: ExitWatchdog): void {
+    exitWorker.setWatchdog(fn);
 }
 
 /** Test-only: reset the worker to a clean state between tests. */

@@ -64,7 +64,14 @@ import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
 import {
     clearAllTimers,
 } from "./utils/exitManager";
-import { startExitMonitor, resumeExitMonitor } from './exitEngine';
+import { startExitMonitor, resumeExitMonitor, setExitWorkerWatchdog } from './exitEngine';
+// Finding B layer 1 (D-WATCHDOG-ABORT): the watchdog is a self-contained liveness
+// primitive in its own helper module (kept out of the heavy bot.ts import graph so
+// it is independently unit-testable). bot.ts owns the budget knob + install call
+// and re-exports the factory for callers/tests.
+import { makeExitWatchdog } from './utils/exitWatchdog';
+export { makeExitWatchdog } from './utils/exitWatchdog';
+export type { ExitWatchdogOptions } from './utils/exitWatchdog';
 import {
     ChainConfig,
     DexConfig,
@@ -1247,7 +1254,13 @@ export async function startMultiChainBot(): Promise<void> {
         mainLog.error({ err }, 'Unexpected error starting Telegram listener');
     }
 
-    // 8. Shutdown handler (D-20: includes telegram disconnect)
+    // 8a. Exit-worker watchdog (Finding B layer 1, D-WATCHDOG-ABORT) — bound each
+    // serial-worker submit by WATCHDOG_BUDGET_MS so no single hung submit parks
+    // the loop; on overrun it frees the worker + alerts + keeps the bot alive.
+    installExitWatchdog();
+
+    // 8b. Shutdown handler (D-20: includes telegram disconnect; Finding B layer 2
+    // two-stage SIGINT)
     initMultiChainShutdownHandler(contexts, apiServer, telegramHandle);
 
     mainLog.info({ chains: contexts.map(c => c.chain.name) }, 'Multi-chain bot fully started');
@@ -1447,6 +1460,43 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
         }
         await startChainAntiRugListener(ctx);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Exit-worker watchdog (Phase 21.2-09, Finding B layer 1)
+// D-WATCHDOG-ABORT + RESEARCH Pitfall 6 + threats T-21.2-HANGSUBMIT /
+// T-21.2-ABORT-NOOP.
+// ---------------------------------------------------------------------------
+//
+// WHY: even with the serial worker (21.2-05) moving the long `bundle.wait()` OFF
+// the poll tick, ONE submit can still hang for minutes (the verified 5-min
+// block-event-driven Flashbots wait). The watchdog bounds EACH submit by a
+// wall-clock budget. ethers v6 has NO reliable per-call abort (#4122), so an
+// AbortSignal the watchdog "relies on" is a no-op (T-21.2-ABORT-NOOP). The lever
+// that actually works is `Promise.race([op, rejectAfter(budget)])` (Pitfall 6):
+// it frees the AWAITING code path (the drain loop) deterministically — it does
+// NOT cancel the underlying socket, but freeing the loop is what we need. On
+// overrun the watchdog logs a dotted `op` + Telegram-alerts (D-ALERTS) with a
+// remediation pointer and resolves to `false` so the drain loop KEEPS the bot
+// alive moving to the next queued exit. The stuck position stays held + monitored
+// (21.2-07 D-FAILED-EXIT-KEEP-MONITORING) and is retried on a later poll tick.
+//
+// Each work item carries its own ctx, so the per-chain alert is correct without
+// the watchdog holding any global state. The factory itself lives in
+// src/utils/exitWatchdog.ts (re-exported above); bot.ts owns the budget knob +
+// the install call below.
+
+/**
+ * Install the exit-worker watchdog from the WATCHDOG_BUDGET_MS env knob (21.2-02;
+ * default 60000ms, RESEARCH A3 — must exceed one 45s confirm-window + margin).
+ * Parsed defensively so a bad env value falls back, not to zero.
+ */
+function installExitWatchdog(): void {
+    const raw = process.env.WATCHDOG_BUDGET_MS;
+    const parsed = raw === undefined || raw === '' ? NaN : Number.parseInt(raw, 10);
+    const WATCHDOG_BUDGET_MS = Number.isFinite(parsed) && parsed > 0 ? parsed : 60000;
+    setExitWorkerWatchdog(makeExitWatchdog({ budgetMs: WATCHDOG_BUDGET_MS }));
+    log.info({ op: 'watchdog.installed', budgetMs: WATCHDOG_BUDGET_MS }, 'Exit-worker watchdog armed');
 }
 
 // ---------------------------------------------------------------------------
