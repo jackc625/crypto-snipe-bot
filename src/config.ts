@@ -180,6 +180,17 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     { name: 'RPC_TIMEOUT_MS', required: false, description: 'Per-provider/RPC-call wall-clock timeout (ms); Promise.race frees a hung call. Finding B. (default: 15000)' },
     { name: 'WATCHDOG_BUDGET_MS', required: false, description: 'Watchdog wall-clock budget per submit/cycle (ms); must exceed one 45s confirm-window + margin. Finding B. (default: 60000)' },
     { name: 'SIGINT_GRACE_MS', required: false, description: 'Two-stage SIGINT grace period (ms) before force-exit. Finding B. (default: 8000)' },
+
+    // --- Calm-gas sell inclusion (Phase 21.2, Finding A — STOP-THE-LINE-04-A) ---
+    // GLOBAL (non-chain-prefixed) sell-leg inclusion knobs. CODE-read config, NOT
+    // secrets — never log their values as secrets. Read via the never-NaN /
+    // never-negative parse helpers in consuming code (reconciliation.ts:642). All
+    // four Finding A knobs are co-located here so 21.2-06 (inclusion ladder) and
+    // 21.2-08 (entry affordability gate) consume them WITHOUT re-touching config.ts.
+    { name: 'MEV_SELL_MAX_PRIORITY_FEE_GWEI', required: false, description: 'Independent SELL-leg priority-fee ceiling (gwei), decoupled from the buy ceiling, still affordability-clamped. Finding A. (default: 25)' },
+    { name: 'MEV_SELL_COINBASE_BRIBE_ENABLED', required: false, description: 'Encode a coinbase bribe in the exit bundle. Default OFF — the public fallback is the guaranteed lever. Finding A. (default: false)' },
+    { name: 'EXIT_GATE_SELL_GAS_BUFFER', required: false, description: 'Multiplier on base fee when reserving worst-case public-exit gas for the buy-time affordability gate. Finding A. (default: 2.0)' },
+    { name: 'MEV_SELL_FALLBACK_ATTEMPTS', required: false, description: 'Routine (non-anti-rug) private sell attempts before the public-mempool fallback; anti-rug uses 0-1. Finding A. (default: 2)' },
 ];
 
 function validateEnvVars(): void {
