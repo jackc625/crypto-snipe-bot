@@ -39,8 +39,10 @@ import { applyGasMultiplier } from './types';
 import { logger } from '../logger';
 
 /** Multiplier padding the reserved sell base-fee so a modest base-fee rise
- *  between the buy and the eventual sell does not strand the exit (1.5×). */
-const SELL_GAS_BASEFEE_BUFFER = 1.5;
+ *  between the buy and the eventual sell does not strand the exit (1.5×).
+ *  Exported so the entry-gate (21.2-08) and the config tests can compute the
+ *  identical GUARANTEED public-exit reserve via {@link computePublicExitReserveWei}. */
+export const SELL_GAS_BASEFEE_BUFFER = 1.5;
 
 const log = logger.child({ module: 'mev-reconciliation' });
 
@@ -53,8 +55,15 @@ export const MEV_RECONCILE_DEFAULTS = {
   confirmWindowMs: 45_000,
   /** Poll interval (ms) within the confirm-window. */
   pollMs: 4_000,
-  /** Hard absolute ceiling on escalated maxPriorityFeePerGas (gwei). Load-bearing safety cap. */
+  /** Hard absolute ceiling on escalated maxPriorityFeePerGas (gwei). Load-bearing safety cap.
+   *  This is the BUY ceiling (MEV_MAX_PRIORITY_FEE_GWEI). */
   maxPriorityFeeGwei: 5,
+  /** Independent SELL-leg priority-fee ceiling (gwei), decoupled from the buy ceiling
+   *  (Finding A, MEV_SELL_MAX_PRIORITY_FEE_GWEI). A calm-gas thin-wallet exit may bid
+   *  HARDER privately than the 5-gwei buy cap — but the affordability bound STILL clamps
+   *  the final bid (Pitfall 5: "try harder, never overspend"); the public fallback (21.2-06)
+   *  is the guaranteed inclusion lever, not an over-bid private one. */
+  sellMaxPriorityFeeGwei: 25,
   /** Per-retry priority-fee escalation step (gwei), clamped to the ceiling + affordability bound. */
   priorityFeeStepGwei: 1,
   /** When true, the affordability bound always reserves sellGasLimit × fee so the exit leg can submit. */
@@ -116,18 +125,38 @@ export interface ReconcileOutcome {
  * boolean: only the literal `'false'` (case-insensitive) disables the reserve;
  * unset/anything-else keeps the safe default `true`.
  *
+ * `leg` (Finding A) selects which priority-fee ceiling feeds
+ * `maxPriorityFeeCeilingWei`:
+ *   - `'buy'`  → `MEV_MAX_PRIORITY_FEE_GWEI`      (default 5) — the existing buy cap.
+ *   - `'sell'` → `MEV_SELL_MAX_PRIORITY_FEE_GWEI` (default 25) — the INDEPENDENT sell
+ *     ceiling so a calm-gas thin-wallet exit can bid harder privately. CRITICAL: the
+ *     higher ceiling raises the ceiling INPUT only — `computeAffordablePriorityFee`'s
+ *     affordability bound STILL clamps the final bid (Pitfall 5: try harder, never
+ *     overspend; the public fallback in 21.2-06 is the guaranteed lever).
+ * Defaults to `'buy'` so the 3 existing strategy callers
+ * (`buildReconcileConfig(process.env, sellGasLimit, maxRetries)`) are unchanged.
+ *
  * @param env       env-like map (defaults to process.env).
  * @param sellGasLimit the per-chain sell gas limit (ctx.chain.gas.maxGasLimit).
  * @param maxRetries  retry budget (defaults to 3, matching the strategy default).
+ * @param leg         'buy' (default) or 'sell' — selects the priority-fee ceiling.
  */
 export function buildReconcileConfig(
   env: Record<string, string | undefined> = process.env,
   sellGasLimit: bigint,
-  maxRetries = 3
+  maxRetries = 3,
+  leg: 'buy' | 'sell' = 'buy'
 ): ReconcileConfig {
   const confirmWindowMs = parsePositiveInt(env.MEV_CONFIRM_WINDOW_MS, MEV_RECONCILE_DEFAULTS.confirmWindowMs);
   const pollMs = parsePositiveInt(env.MEV_CONFIRM_POLL_MS, MEV_RECONCILE_DEFAULTS.pollMs);
-  const maxPriorityFeeGwei = parsePositiveNumber(env.MEV_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.maxPriorityFeeGwei);
+  // Finding A: the sell leg reads its OWN independent ceiling
+  // (MEV_SELL_MAX_PRIORITY_FEE_GWEI, default 25); the buy leg keeps
+  // MEV_MAX_PRIORITY_FEE_GWEI (default 5). Both parsed via the same never-NaN /
+  // never-negative parsePositiveNumber + gweiToWei helpers (no float drift).
+  const ceilingGwei =
+    leg === 'sell'
+      ? parsePositiveNumber(env.MEV_SELL_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.sellMaxPriorityFeeGwei)
+      : parsePositiveNumber(env.MEV_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.maxPriorityFeeGwei);
   const priorityFeeStepGwei = parsePositiveNumber(env.MEV_PRIORITY_FEE_STEP_GWEI, MEV_RECONCILE_DEFAULTS.priorityFeeStepGwei);
   const reserveSellGas = parseBoolDefaultTrue(env.MEV_RESERVE_SELL_GAS);
 
@@ -135,7 +164,7 @@ export function buildReconcileConfig(
     confirmWindowMs,
     pollMs,
     maxRetries,
-    maxPriorityFeeCeilingWei: gweiToWei(maxPriorityFeeGwei),
+    maxPriorityFeeCeilingWei: gweiToWei(ceilingGwei),
     priorityFeeStepWei: gweiToWei(priorityFeeStepGwei),
     reserveSellGas,
     sellGasLimit,
@@ -148,7 +177,11 @@ export function buildReconcileConfig(
 // this buy, the wallet still holds enough to pay the eventual sell gas.
 //
 //   snipeValue + buyGasLimit×(baseFee + priorityFee) + reservedSellGas <= walletBalance
-//   reservedSellGas = sellGasLimit × (baseFee×sellGasBuffer + priorityFeeCeiling)   (when reserveSellGas)
+//   reservedSellGas = computePublicExitReserveWei = sellGasLimit × (baseFee×sellGasBuffer)  (when reserveSellGas)
+//
+// Finding A: the reserve targets the GUARANTEED PUBLIC exit (normal-priced), NOT the
+// private priority-fee CEILING (the pre-Finding-A `+ priorityFeeCeiling` term that
+// over-reserved AND mis-targeted). The ceiling now only clamps the SUBMITTED bid.
 //
 // Solve for the max affordable priorityFee, then clamp the desired (escalated)
 // fee to min(absolute ceiling, affordabilityBound). A negative/zero affordable
@@ -183,14 +216,50 @@ export interface AffordabilityResult {
   affordabilityBoundWei: bigint;
 }
 
+/** Inputs for the GUARANTEED-public-exit gas reserve (Finding A retarget). */
+export interface PublicExitReserveInputs {
+  /** baseFee from provider.getFeeData() (maxFeePerGas - maxPriorityFeePerGas, or gasPrice). */
+  baseFeeWei: bigint;
+  /** Gas limit reserved for the eventual sell (ctx.chain.gas.maxGasLimit). */
+  sellGasLimit: bigint;
+  /** Optional one-time ERC-20 approval gas limit for the public exit (entry-gate / 21.2-08
+   *  use). Defaults to 0n — the private MEV strategies already hold their approval. */
+  approvalGasLimit?: bigint;
+}
+
+/**
+ * The GUARANTEED public-exit gas reserve (Finding A / D-EXIT-AFFORDABILITY-GATE).
+ *
+ * The exit's GUARANTEED inclusion path is the PUBLIC mempool sell — a NORMAL-PRICED
+ * tx (base fee × a modest buffer, no high private priority fee). So the affordability
+ * reserve must target THAT, not the private CEILING priority fee. Reserving the
+ * private ceiling (the pre-Finding-A bug) both OVER-reserves (refusing affordable
+ * buys) and MIS-targets (it is not what the guaranteed exit actually costs).
+ *
+ *   reserve = (sellGasLimit + approvalGasLimit) × (baseFee × SELL_GAS_BASEFEE_BUFFER)
+ *
+ * The base-fee buffer pads a modest base-fee rise between buy and sell. All scaling
+ * uses the shared fractional-bigint `applyGasMultiplier` helper (no float drift,
+ * banned-v5-pattern-safe). This is the single source of truth the entry gate (21.2-08)
+ * reuses so the buy-time gate and the runtime reserve agree.
+ */
+export function computePublicExitReserveWei(inputs: PublicExitReserveInputs): bigint {
+  const { baseFeeWei, sellGasLimit, approvalGasLimit = 0n } = inputs;
+  // Normal-priced public exit: base fee × buffer (NO private priority-fee ceiling term).
+  const bufferedSellBaseFee = (applyGasMultiplier(baseFeeWei, SELL_GAS_BASEFEE_BUFFER) ?? baseFeeWei) as bigint;
+  // A public sell may need a one-time approval; reserve its gas at the same normal price.
+  return (sellGasLimit + approvalGasLimit) * bufferedSellBaseFee;
+}
+
 /**
  * Compute the affordable, clamped maxPriorityFeePerGas. Exported so the
  * stranded-exit harm-prevention test (#5) can assert the clamp + the
  * attempt-0-unaffordable detection directly.
  *
- * `sellGasBuffer` (1.5×) pads the reserved sell base-fee so a modest base-fee
- * rise between buy and sell does not strand the exit; the priority-fee ceiling
- * is reserved in full for the sell.
+ * The reserve (`computePublicExitReserveWei`) targets the GUARANTEED public exit
+ * (`SELL_GAS_BASEFEE_BUFFER` × base fee, a normal-priced tx) — NOT the private
+ * priority-fee ceiling (Finding A retarget). The buffer pads a modest base-fee
+ * rise between buy and sell so the public exit does not get stranded.
  */
 export function computeAffordablePriorityFee(inputs: AffordabilityInputs): AffordabilityResult {
   const {
@@ -207,13 +276,16 @@ export function computeAffordablePriorityFee(inputs: AffordabilityInputs): Affor
   // First clamp the desired fee to the operator's absolute hard ceiling.
   const ceilingClamped = desiredPriorityFeeWei > ceilingWei ? ceilingWei : desiredPriorityFeeWei;
 
-  // Reserve enough for the eventual sell: sellGasLimit × (baseFee×buffer + priorityFeeCeiling).
-  // The sell reserve uses the CEILING priority fee (the worst case the exit may
-  // need to escalate to), and a base-fee buffer applied via the shared
-  // fractional-bigint `applyGasMultiplier` helper (do NOT reimplement fee math).
-  const bufferedSellBaseFee = (applyGasMultiplier(baseFeeWei, SELL_GAS_BASEFEE_BUFFER) ?? baseFeeWei) as bigint;
+  // Reserve enough for the eventual sell. Finding A (D-EXIT-AFFORDABILITY-GATE):
+  // the GUARANTEED exit is the PUBLIC-mempool sell — a normal-priced tx (base fee ×
+  // buffer, NO high private priority fee). So the reserve targets THAT, via the
+  // shared single-source-of-truth helper. The pre-Finding-A reserve used the private
+  // CEILING priority fee (`+ ceilingWei`), which both OVER-reserved (refusing
+  // affordable buys / re-opening the thin-wallet trap) AND mis-targeted (the ceiling
+  // is not what the guaranteed exit actually costs). `ceilingWei` no longer feeds the
+  // reserve — it only clamps the SUBMITTED bid below.
   const reservedSellGas = reserveSellGas
-    ? sellGasLimit * (bufferedSellBaseFee + ceilingWei)
+    ? computePublicExitReserveWei({ baseFeeWei, sellGasLimit })
     : 0n;
 
   // affordabilityBound: the max priorityFee such that
