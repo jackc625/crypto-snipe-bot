@@ -992,8 +992,18 @@ async function pollExitStrategy(
                 effectivePct,
             });
             ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.trailing-stop' }, 'Trailing stop triggered');
-            await executeFullSell(ctx, dex, tokenAddress, feeTier, 'trailing-stop', state.tradeId, detail);
-            return 'exited';
+            // Finding C: ENQUEUE + return immediately — never await the sell on
+            // the poll critical path. The serial ExitWorker drains it (priority
+            // anti-rug>urgency=stop-loss>trailing) one nonce-locked sell at a
+            // time; the per-position lock skips a duplicate enqueue if this
+            // position is already queued/in-flight. We return 'continue' (NOT
+            // 'exited') so the interval stays armed — the position keeps polling
+            // until a GENUINE close tears it down (worker/teardown, 21.2-07).
+            enqueueExit({
+                ctx, dex, tokenAddress, feeTier,
+                tradeId: state.tradeId, reason: 'trailing-stop', reasonDetail: detail,
+            });
+            return 'continue';
         }
     } else if (priceMultiple >= 2.0) {
         // D-01: Activate trailing stop at 2x
@@ -1012,8 +1022,12 @@ async function pollExitStrategy(
                 priceMultiple,
             });
             ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.stop-loss' }, 'Fixed stop-loss triggered');
-            await executeFullSell(ctx, dex, tokenAddress, feeTier, 'stop-loss', state.tradeId, detail);
-            return 'exited';
+            // Finding C: enqueue + return 'continue' (see trailing-stop note).
+            enqueueExit({
+                ctx, dex, tokenAddress, feeTier,
+                tradeId: state.tradeId, reason: 'stop-loss', reasonDetail: detail,
+            });
+            return 'continue';
         }
     }
 
@@ -1026,8 +1040,12 @@ async function pollExitStrategy(
             priceMultiple,
         });
         ctx.log.info({ token: tokenAddress, detail, op: 'exit.trigger.urgency' }, 'Urgency hard exit at 30min deadline');
-        await executeFullSell(ctx, dex, tokenAddress, feeTier, 'urgency-market-sell', state.tradeId, detail);
-        return 'exited';
+        // Finding C: enqueue + return 'continue' (see trailing-stop note).
+        enqueueExit({
+            ctx, dex, tokenAddress, feeTier,
+            tradeId: state.tradeId, reason: 'urgency-market-sell', reasonDetail: detail,
+        });
+        return 'continue';
     }
 
     // Step 8: Persist state to DB for restart resilience (D-23)
@@ -1128,6 +1146,16 @@ export async function startExitMonitor(
                 budgetMs: exitConfig.pollIntervalMs,
                 overruns: durationMs > exitConfig.pollIntervalMs,
             }, 'Exit poll cycle');
+            // Finding C: a trigger now ENQUEUES on the serial worker and returns
+            // 'continue' — so the interval STAYS ARMED (the position keeps
+            // polling; the per-position lock prevents a duplicate re-enqueue
+            // while the sell is queued/in-flight). The interval is cleared ONLY
+            // on a GENUINE close, which becomes the worker's/teardown's job in
+            // 21.2-07 (balance-is-truth catch). The 'exited' guard is retained as
+            // the seam that genuine-close path will drive; on the current
+            // contract pollExitStrategy returns 'continue' on every trigger so
+            // this no longer fires on a sell submission (no more poll-loop
+            // starvation — overruns stays false).
             if (result === 'exited') {
                 clearInterval(interval);
             }
@@ -1218,6 +1246,16 @@ export async function resumeExitMonitor(
                 budgetMs: exitConfig.pollIntervalMs,
                 overruns: durationMs > exitConfig.pollIntervalMs,
             }, 'Exit poll cycle');
+            // Finding C: a trigger now ENQUEUES on the serial worker and returns
+            // 'continue' — so the interval STAYS ARMED (the position keeps
+            // polling; the per-position lock prevents a duplicate re-enqueue
+            // while the sell is queued/in-flight). The interval is cleared ONLY
+            // on a GENUINE close, which becomes the worker's/teardown's job in
+            // 21.2-07 (balance-is-truth catch). The 'exited' guard is retained as
+            // the seam that genuine-close path will drive; on the current
+            // contract pollExitStrategy returns 'continue' on every trigger so
+            // this no longer fires on a sell submission (no more poll-loop
+            // starvation — overruns stays false).
             if (result === 'exited') {
                 clearInterval(interval);
             }

@@ -63,12 +63,27 @@ vi.mock('../../../src/config', () => ({
 }));
 
 const registerExitMonitorMock = vi.fn();
+// Per-position lock: real-enough behavior (first acquire wins) so the
+// enqueue-and-return tests below exercise the worker's lock without a real Map.
+const tryEnqueuePositionMock = vi.fn().mockReturnValue(true);
+const releasePositionQueueMock = vi.fn();
 vi.mock('../../../src/utils/exitManager', () => ({
     tryAcquireSellLock: vi.fn().mockReturnValue(true),
     releaseSellLock: vi.fn(),
     clearAllTimersForToken: vi.fn(),
     registerExitMonitor: registerExitMonitorMock,
+    tryEnqueuePosition: tryEnqueuePositionMock,
+    releasePositionQueue: releasePositionQueueMock,
 }));
+
+// withNonceLock: pass-through that still serializes (Finding C worker wraps the
+// submit in it). Kept real so the drain semantics are exercised end-to-end.
+vi.mock('../../../src/utils/nonceAuthority', async () => {
+    const actual = await vi.importActual<typeof import('../../../src/utils/nonceAuthority')>(
+        '../../../src/utils/nonceAuthority',
+    );
+    return { ...actual };
+});
 
 vi.mock('../../../src/utils/notifier', () => ({ sendCtxAlert: vi.fn() }));
 vi.mock('../../../src/utils/txManager', () => ({ sendTxWithRetry: vi.fn().mockResolvedValue('0xtxhash') }));
@@ -78,15 +93,19 @@ vi.mock('../../../src/utils/receiptDecoder', () => ({
 vi.mock('../../../src/anti-rug/detector', () => ({ unregisterAntiRugPosition: vi.fn() }));
 
 // ethers Contract mock with a controllable price (getAmountsOut) so queryPrice
-// returns a number and the poll cycle runs to the telemetry log without exiting.
+// returns a number and the poll cycle runs to the telemetry log. The price is
+// read from a mutable module var so a test can drop it below the stop-loss
+// threshold to FORCE a trigger (entry=1000, stopLoss=25% → trigger at <=750).
+const priceState = { amountOut: 1000n };
 vi.mock('ethers', async () => {
     const actual = await vi.importActual<typeof import('ethers')>('ethers');
     function MockContract(this: Record<string, unknown>) {
         this.balanceOf = () => Promise.resolve(1_000_000_000_000_000_000n);
         this.allowance = () => Promise.resolve(0n);
         this.approve = () => Promise.resolve({ wait: () => Promise.resolve(null) });
-        // price == entry so no trigger fires; cycle returns 'continue'
-        this.getAmountsOut = () => Promise.resolve([0n, 1000n]);
+        // price == entry (default) so no trigger fires; a test sets priceState
+        // below to force a stop-loss trigger.
+        this.getAmountsOut = () => Promise.resolve([0n, priceState.amountOut]);
         this.interface = { encodeFunctionData: () => '0xdeadbeef' };
     }
     return { ...actual, Contract: MockContract };
@@ -151,6 +170,9 @@ beforeEach(() => {
     upsertExitStateRun.mockReset();
     getExitStateGet.mockReset().mockReturnValue({ ...STATE_ROW });
     registerExitMonitorMock.mockReset();
+    tryEnqueuePositionMock.mockReset().mockReturnValue(true);
+    releasePositionQueueMock.mockReset();
+    priceState.amountOut = 1000n; // default: no trigger
     vi.useFakeTimers();
 });
 
@@ -266,5 +288,160 @@ describe('EXIT-LIVE-01 — startExitMonitor poll-cycle telemetry (both bodies wr
         expect(typeof telemetry!.durationMs).toBe('number');
         expect(telemetry!.budgetMs).toBe(5000);
         expect(typeof telemetry!.overruns).toBe('boolean');
+    });
+});
+
+// -----------------------------------------------------------------------------
+// Tests — Finding C: trigger ticks ENQUEUE + return 'continue' (Task 2)
+// -----------------------------------------------------------------------------
+//
+// With priceState dropped below the stop-loss threshold (entry=1000,
+// stopLoss=25% → trigger at currentPrice<=750), the poll tick detects a
+// stop-loss trigger. Post-decoupling it must ENQUEUE on the serial worker and
+// return 'continue' (NOT 'exited') — never awaiting the sell inline. We inject a
+// controllable sell executor into the worker so the (slow) submit runs OFF the
+// poll critical path; the poll-cycle telemetry must therefore report
+// overruns:false even when that submit is slow.
+
+// Find the exit.worker.enqueued log object on a ctx.log spy (proves enqueue).
+function workerEnqueuedLog(log: CtxLog): Record<string, unknown> | undefined {
+    for (const call of log.info.mock.calls) {
+        const arg = call[0];
+        if (arg && typeof arg === 'object' && arg.op === 'exit.worker.enqueued') return arg;
+    }
+    return undefined;
+}
+
+describe('Finding C — poll trigger enqueues and returns (overruns stays false)', () => {
+    it('Test 1: a stop-loss trigger ENQUEUES on the worker and returns continue (no inline await; interval not cleared)', async () => {
+        priceState.amountOut = 500n; // < 750 → stop-loss trigger
+
+        let executorStarted = false;
+        let resolveSell: (() => void) | undefined;
+        const sellExecutor = vi.fn(() => new Promise<boolean>((res) => {
+            executorStarted = true;
+            resolveSell = () => res(true);
+        }));
+
+        perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+        const mod = await import('../../../src/exitEngine');
+        mod._resetExitWorkerForTesting?.();
+        mod._setSellExecutorForTesting(sellExecutor);
+
+        const { ctx, log } = buildCtx();
+        await mod.resumeExitMonitor(
+            ctx as Parameters<typeof mod.resumeExitMonitor>[0],
+            V2_DEX as unknown as Parameters<typeof mod.resumeExitMonitor>[1],
+            '0xToken00000000000000000000000000000000T40',
+            null,
+            '0.01',
+            400,
+        );
+
+        await vi.advanceTimersByTimeAsync(5000);
+
+        // Enqueue happened (per-position lock acquired + worker enqueued log).
+        expect(tryEnqueuePositionMock).toHaveBeenCalled();
+        const enq = workerEnqueuedLog(log);
+        expect(enq).toBeDefined();
+        expect(enq!.reason).toBe('stop-loss');
+
+        // The worker (off the poll tick) started the sell — proves it was
+        // enqueued-and-drained, not awaited inline on the poll cycle.
+        expect(executorStarted).toBe(true);
+
+        // Interval NOT cleared on a trigger: registerExitMonitor armed a timer
+        // and the poll body returned 'continue' (no clearInterval). We assert the
+        // timer is still registered (drives Test 3's invariant too).
+        expect(registerExitMonitorMock).toHaveBeenCalled();
+
+        resolveSell?.();
+        await vi.advanceTimersByTimeAsync(0);
+        mod._resetExitWorkerForTesting?.();
+    });
+
+    it('Test 2: exit.poll.cycle reports overruns:false even with a SLOW worker sell (cycle does not block on it)', async () => {
+        priceState.amountOut = 500n; // stop-loss trigger
+
+        // A sell that never resolves within the cycle — if the poll AWAITED it
+        // inline, durationMs would be huge and overruns would be true. The worker
+        // runs it off-tick, so the cycle stays fast.
+        const sellExecutor = vi.fn(() => new Promise<boolean>(() => { /* never resolves */ }));
+
+        // The cycle measures performance.now() before/after pollExitStrategy. With
+        // enqueue-and-return, that delta is tiny → force [t0=0, t1=10] (10ms).
+        let i = 0;
+        const seq = [0, 10];
+        perfSpy = vi.spyOn(performance, 'now').mockImplementation(() => {
+            const v = seq[Math.min(i, seq.length - 1)];
+            i += 1;
+            return v;
+        });
+
+        const mod = await import('../../../src/exitEngine');
+        mod._resetExitWorkerForTesting?.();
+        mod._setSellExecutorForTesting(sellExecutor);
+
+        const { ctx, log } = buildCtx();
+        await mod.resumeExitMonitor(
+            ctx as Parameters<typeof mod.resumeExitMonitor>[0],
+            V2_DEX as unknown as Parameters<typeof mod.resumeExitMonitor>[1],
+            '0xToken00000000000000000000000000000000T41',
+            null,
+            '0.01',
+            401,
+        );
+
+        await vi.advanceTimersByTimeAsync(5000);
+
+        const telemetry = pollCycleLog(log);
+        expect(telemetry).toBeDefined();
+        expect(telemetry!.durationMs).toBe(10);
+        expect(telemetry!.overruns).toBe(false); // 10ms << 5000ms budget
+        expect(telemetry!.budgetMs).toBe(5000);
+
+        mod._resetExitWorkerForTesting?.();
+    });
+
+    it('Test 3: the interval stays ARMED on a trigger (not cleared on enqueue)', async () => {
+        priceState.amountOut = 500n; // stop-loss trigger
+
+        let resolveSell: (() => void) | undefined;
+        const sellExecutor = vi.fn(() => new Promise<boolean>((res) => { resolveSell = () => res(true); }));
+
+        perfSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+        const mod = await import('../../../src/exitEngine');
+        mod._resetExitWorkerForTesting?.();
+        mod._setSellExecutorForTesting(sellExecutor);
+
+        const { ctx, log } = buildCtx();
+        await mod.resumeExitMonitor(
+            ctx as Parameters<typeof mod.resumeExitMonitor>[0],
+            V2_DEX as unknown as Parameters<typeof mod.resumeExitMonitor>[1],
+            '0xToken00000000000000000000000000000000T42',
+            null,
+            '0.01',
+            402,
+        );
+
+        // Drive TWO poll periods. If the trigger had cleared the interval, the
+        // SECOND cycle would never emit telemetry. With enqueue-and-return the
+        // timer stays armed → a second cycle runs and emits another log.
+        await vi.advanceTimersByTimeAsync(5000);
+        const firstCount = log.info.mock.calls.filter(
+            (c) => c[0] && typeof c[0] === 'object' && c[0].op === 'exit.poll.cycle',
+        ).length;
+        await vi.advanceTimersByTimeAsync(5000);
+        const secondCount = log.info.mock.calls.filter(
+            (c) => c[0] && typeof c[0] === 'object' && c[0].op === 'exit.poll.cycle',
+        ).length;
+
+        expect(firstCount).toBeGreaterThanOrEqual(1);
+        // Timer still armed → at least one MORE cycle ran after the trigger.
+        expect(secondCount).toBeGreaterThan(firstCount);
+
+        resolveSell?.();
+        await vi.advanceTimersByTimeAsync(0);
+        mod._resetExitWorkerForTesting?.();
     });
 });
