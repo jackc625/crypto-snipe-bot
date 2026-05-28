@@ -1450,66 +1450,173 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
 }
 
 // ---------------------------------------------------------------------------
-// Multi-chain shutdown handler
+// Two-stage SIGINT / SIGTERM shutdown (Phase 21.2-09, Finding B layer 2)
+// D-SIGINT-TWO-STAGE + RESEARCH Candidate Escalation #3.
 // ---------------------------------------------------------------------------
+//
+// WHY (the Finding B symptom): the OLD single-stage `gracefulShutdown` armed a
+// single 5s `.unref()` force-exit timer and ran cleanup + `process.exit(0)`
+// inline. On a PARKED event loop (a synchronous `bundle.wait()` await chain that
+// blocked the loop for ~222s) the listener is QUEUED but never executes, and the
+// 5s timer competes with the SAME parked loop — so Ctrl+C does nothing until
+// `taskkill`. That single competing timer IS the symptom (T-21.2-DOUBLE-TIMER).
+//
+// THE FIX (REPLACE, not augment — never two competing force-exit timers):
+//   * FIRST signal  → begin graceful shutdown (set `shuttingDown`, run the
+//     injected cleanup body — exit_state is already persisted each cycle so the
+//     flush is a no-op; in-flight submits are abandoned best-effort, which is
+//     SAFE because D-PERSIST-FAILED-HELD restart-resumes them and
+//     D-NONCE-AUTHORITY-ALL makes the nonce recoverable) AND arm a SINGLE
+//     force-exit `setTimeout(...).unref()` over SIGINT_GRACE_MS. The `.unref()`
+//     means the grace timer can never itself keep the process alive.
+//   * SECOND signal OR the grace timeout → `process.exit()` immediately.
+//
+// The state machine below is a PURE factory (no module-level side effects, no
+// provider/DB access) so it is unit-testable with a mocked `process.exit` and
+// fake timers (test/unit/bot/twoStageSigint.test.ts). The real cleanup body is
+// injected by `initMultiChainShutdownHandler`.
+
+/** Minimal logger surface the two-stage handler needs (matches pino child). */
+interface ShutdownLog {
+    info: (obj: Record<string, unknown>, msg?: string) => void;
+    warn: (obj: Record<string, unknown>, msg?: string) => void;
+    error: (obj: Record<string, unknown> | string, msg?: string) => void;
+}
+
+export interface TwoStageShutdownOptions {
+    log: ShutdownLog;
+    /** Force-exit grace budget (ms) before the armed `.unref()`'d timer fires. */
+    graceMs: number;
+    /**
+     * Graceful cleanup body — invoked exactly once, on the FIRST signal only.
+     * It owns stopping timers, tearing down providers, closing the DB, and (on a
+     * clean completion) calling `process.exit(0)` itself. If it parks/hangs, the
+     * armed grace timer forces the exit instead.
+     */
+    cleanup: () => void;
+}
+
+export interface TwoStageShutdown {
+    /** Process one delivered signal through the two-stage state machine. */
+    stage: (signal: string) => void;
+    /** Register the handler on SIGINT + SIGTERM (one path, both signals). */
+    install: () => void;
+    /** Test/inspection accessor: has the first signal already begun shutdown? */
+    isShuttingDown: () => boolean;
+}
+
+/**
+ * Build the two-stage SIGINT/SIGTERM state machine. The FIRST signal arms ONE
+ * `.unref()`'d grace force-exit timer and runs the injected cleanup; a SECOND
+ * signal OR the grace timeout forces an immediate `process.exit()`. There is
+ * exactly ONE force-exit path — the old competing 5s timer is gone.
+ */
+export function createTwoStageShutdown(opts: TwoStageShutdownOptions): TwoStageShutdown {
+    const { log: shutdownLog, graceMs, cleanup } = opts;
+    let shuttingDown = false;
+
+    function stage(signal: string): void {
+        // SECOND signal (or any signal after the first): hard stop, no waiting.
+        // 130 = 128 + SIGINT(2), the conventional exit code for Ctrl+C.
+        if (shuttingDown) {
+            shutdownLog.error({ signal }, 'Second signal — forcing immediate exit');
+            process.exit(130);
+            return;
+        }
+
+        shuttingDown = true;
+        shutdownLog.info(
+            { signal, graceMs },
+            'Graceful shutdown begun (two-stage SIGINT) — send the signal again to force-exit now',
+        );
+
+        // Arm the SINGLE force-exit timer FIRST, BEFORE running cleanup, so even
+        // if the cleanup body itself parks the loop the grace timer is already
+        // scheduled. `.unref()` so it never keeps the process alive on its own
+        // (mirrors withTimeout.ts and the prior force-exit posture).
+        const graceTimer = setTimeout(() => {
+            shutdownLog.error({ graceMs }, 'Grace timeout elapsed — forcing exit');
+            process.exit(1);
+        }, graceMs);
+        if (graceTimer.unref) graceTimer.unref();
+
+        // Run the graceful cleanup body. It may call process.exit(0) on a clean
+        // completion; if it throws or parks, the armed grace timer above is the
+        // safety net (and a second signal forces exit immediately).
+        try {
+            cleanup();
+        } catch (e) {
+            shutdownLog.error(
+                { err: e instanceof Error ? e.message : String(e) },
+                'Error during graceful shutdown cleanup — grace timer will force exit',
+            );
+        }
+    }
+
+    function install(): void {
+        process.on('SIGINT', () => stage('SIGINT'));
+        process.on('SIGTERM', () => stage('SIGTERM'));
+    }
+
+    return { stage, install, isShuttingDown: () => shuttingDown };
+}
 
 function initMultiChainShutdownHandler(
     contexts: ChainContext[],
     apiServer?: { close: () => void },
     telegramHandle?: TelegramListenerHandle,
 ): void {
-    let shuttingDown = false;
+    // SIGINT_GRACE_MS (21.2-02 env knob): two-stage SIGINT grace before the
+    // single armed force-exit timer fires. Default 8000ms (RESEARCH A4). Parsed
+    // defensively (never NaN/negative) so a bad env value falls back, not zeros.
+    const graceRaw = process.env.SIGINT_GRACE_MS;
+    const graceParsed = graceRaw === undefined || graceRaw === '' ? NaN : Number.parseInt(graceRaw, 10);
+    const SIGINT_GRACE_MS = Number.isFinite(graceParsed) && graceParsed > 0 ? graceParsed : 8000;
 
-    function gracefulShutdown(signal: string): void {
-        if (shuttingDown) return;
-        shuttingDown = true;
+    const shutdown = createTwoStageShutdown({
+        log,
+        graceMs: SIGINT_GRACE_MS,
+        cleanup: () => {
+            log.info({ op: 'shutdown.cleanup' }, 'Shutdown signal received, cleaning up all chains');
 
-        // Safety net: force exit after 5 seconds if graceful shutdown hangs
-        setTimeout(() => {
-            log.error('Force exit after 5s timeout');
-            process.exit(1);
-        }, 5000).unref();
+            // Close API server first (stop accepting requests before providers go down)
+            if (apiServer) {
+                log.info({ op: 'shutdown.api' }, 'Closing API server...');
+                apiServer.close();
+            }
 
-        log.info({ signal }, 'Shutdown signal received, cleaning up all chains');
+            // Disconnect Telegram client (D-20)
+            if (telegramHandle?.client) {
+                telegramHandle.client.disconnect().catch(e => {
+                    log.warn({ err: e }, 'Error disconnecting Telegram client');
+                });
+            }
 
-        // Close API server first (stop accepting requests before providers go down)
-        if (apiServer) {
-            log.info('Closing API server...');
-            apiServer.close();
-        }
+            // Clear all timers across all chains
+            clearAllTimers();
 
-        // Disconnect Telegram client (D-20)
-        if (telegramHandle?.client) {
-            telegramHandle.client.disconnect().catch(e => {
-                log.warn({ err: e }, 'Error disconnecting Telegram client');
-            });
-        }
-
-        // Clear all timers across all chains
-        clearAllTimers();
-
-        // Remove all factory listeners and destroy WebSocket providers
-        for (const ctx of contexts) {
-            if (ctx.wsProvider) {
-                try {
-                    ctx.wsProvider.removeAllListeners();
-                    ctx.wsProvider.destroy();
-                } catch (e) {
-                    ctx.log.warn({ err: e }, 'Error destroying WebSocket provider during shutdown');
+            // Remove all factory listeners and destroy WebSocket providers
+            for (const ctx of contexts) {
+                if (ctx.wsProvider) {
+                    try {
+                        ctx.wsProvider.removeAllListeners();
+                        ctx.wsProvider.destroy();
+                    } catch (e) {
+                        ctx.log.warn({ err: e }, 'Error destroying WebSocket provider during shutdown');
+                    }
                 }
             }
-        }
 
-        // Close database
-        const { closeDb } = require('./utils/db');
-        closeDb();
+            // Close database
+            const { closeDb } = require('./utils/db');
+            closeDb();
 
-        log.info('Multi-chain shutdown cleanup complete, exiting');
-        process.exit(0);
-    }
+            log.info({ op: 'shutdown.complete' }, 'Multi-chain shutdown cleanup complete, exiting');
+            process.exit(0);
+        },
+    });
 
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    shutdown.install();
 }
 
 // ---------------------------------------------------------------------------
