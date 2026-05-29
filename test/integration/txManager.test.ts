@@ -110,8 +110,11 @@ describe('sendTxWithRetry (multi-chain path)', () => {
         // Phase 19 Gap-1 closure: sendTransaction now takes a 5th gasMultiplier
         // arg. When no multiplier is passed at the sendTxWithRetry layer it
         // arrives as `undefined` at the strategy (== no elevation, raw feeData).
+        // Phase 21.2-12 (CR-02): a 6th optional BroadcastHandle out-param now
+        // exists; this direct sendTxWithRetry call passes none, so it arrives as
+        // `undefined` at the strategy (only escalatePrivateSell supplies a handle).
         expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
-            expect.any(Object), expect.anything(), expect.anything(), 5, undefined,
+            expect.any(Object), expect.anything(), expect.anything(), 5, undefined, undefined,
         );
     });
 
@@ -123,7 +126,7 @@ describe('sendTxWithRetry (multi-chain path)', () => {
         await sendTxWithRetry(txBuilder, ctx);
 
         expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
-            expect.any(Object), expect.anything(), expect.anything(), 3, undefined,
+            expect.any(Object), expect.anything(), expect.anything(), 3, undefined, undefined,
         );
     });
 
@@ -138,7 +141,7 @@ describe('sendTxWithRetry (multi-chain path)', () => {
         await sendTxWithRetry(txBuilder, ctx, undefined, undefined, undefined, 2.0);
 
         expect(mockStrategy.sendTransaction).toHaveBeenCalledWith(
-            expect.any(Object), expect.anything(), expect.anything(), 3, 2.0,
+            expect.any(Object), expect.anything(), expect.anything(), 3, 2.0, undefined,
         );
     });
 
