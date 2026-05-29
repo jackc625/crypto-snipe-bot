@@ -1131,10 +1131,21 @@ export async function executeFullSell(
 //     exitManager.ts) prevents the SAME position being enqueued/sold twice
 //     (no re-entrant self-sell).
 //
-// Priority (reason → rank): anti-rug(0) > urgency-market-sell(1) =
-// stop-loss(1) > trailing-stop(2). A late-arriving anti-rug jumps ahead of an
-// already-queued trailing stop. (partial-sell stays on the poll tick — it is
-// non-blocking and tier-bounded — so rank 3 is reserved but unused here.)
+// Priority (reason → rank): urgency-market-sell(1) = stop-loss(1) >
+// trailing-stop(2). The queue orders the THREE ROUTINE triggers against each
+// other (urgency/stop-loss before trailing).
+//
+// WR-03 (21.2-13) — ANTI-RUG IS NOT QUEUED. The anti-rug exit runs on a DIRECT,
+// wall-clock-BOUNDED path (anti-rug/exitTrigger.ts → bounded executeFullSell),
+// NOT through this worker — deliberately, for immediacy (a rug is happening NOW;
+// routing it behind possibly-queued routine exits would delay the most
+// time-critical exit). Rank 0 is therefore RESERVED but NOT EXERCISED in
+// production: nothing enqueues an 'anti-rug' item, so the "late anti-rug jumps the
+// queue" pre-emption never occurs. (Earlier comments claimed it did — corrected
+// here to match the code.) WR-02 bounds the direct anti-rug path with the same
+// WATCHDOG_BUDGET_MS the worker watchdog uses, so it is liveness-bounded WITHOUT
+// being queued. partial-sell is decoupled to a dedicated non-blocking submit
+// (WR-06) — also not via this worker — so rank 3 is likewise reserved/unused here.
 //
 // This plan ships the worker + queue + per-position lock + poll-tick
 // conversion. It does NOT change WHAT executeFullSell does on submit — the
@@ -1158,12 +1169,19 @@ export interface ExitWorkItem {
 }
 
 /**
- * reason → priority rank (lower = drained first). A late anti-rug (0) jumps an
- * already-queued trailing-stop (2). urgency and stop-loss share rank 1.
+ * reason → priority rank (lower = drained first). urgency and stop-loss share
+ * rank 1; trailing-stop is rank 2 (drained after them).
+ *
+ * WR-03 (21.2-13): rank 0 ('anti-rug') is RESERVED but NOT EXERCISED — the
+ * anti-rug exit runs on the direct, wall-clock-bounded path (exitTrigger.ts), NOT
+ * through this worker, so nothing ever enqueues an 'anti-rug' item. The mapping
+ * is kept here (single source of truth for ExitReason → rank) for completeness
+ * and so that IF a future plan chose to enqueue anti-rug it would pre-empt
+ * correctly; today the queue only ever ranks the three routine triggers.
  */
 function reasonRank(reason: ExitReason): number {
     switch (reason) {
-        case 'anti-rug': return 0;
+        case 'anti-rug': return 0;   // reserved — anti-rug is NOT queued (WR-03)
         case 'urgency-market-sell': return 1;
         case 'stop-loss': return 1;
         case 'trailing-stop': return 2;

@@ -59,8 +59,26 @@ import { sendCtxAlert } from '../utils/notifier';
 import { broadcast } from '../api/ws/broadcaster';
 import { logger } from '../utils/logger';
 import { isCircuitBreakerTripped, incrementCircuitBreaker } from './circuitBreaker';
+import { withTimeout } from '../utils/withTimeout';
 
 const log = logger.child({ module: 'antiRug:exitTrigger' });
+
+/**
+ * WR-02 (21.2-13): wall-clock budget that bounds the DIRECT anti-rug
+ * executeFullSell call so a stalled bundle.wait()/RPC can never wedge the single
+ * Node event loop (T-21.2-HANGSUBMIT, Finding B). Reads the same WATCHDOG_BUDGET_MS
+ * knob the serial-worker watchdog uses (default 60000ms — must exceed one 45s
+ * confirm-window + margin), parsed defensively so a bad value falls back, not to
+ * zero. The anti-rug exit deliberately stays on the DIRECT path (immediacy: a rug
+ * is happening NOW; routing it behind possibly-queued routine exits would delay
+ * the most time-critical exit), so the worker watchdog does not cover it — this
+ * bound does.
+ */
+function antiRugBudgetMs(): number {
+    const raw = process.env.WATCHDOG_BUDGET_MS;
+    const parsed = raw === undefined || raw === '' ? NaN : Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 60000;
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -234,16 +252,48 @@ export async function triggerAntiRugExit(
         'Anti-rug exit dispatched to executeFullSell',
     );
 
-    // (b) Bridge to executeFullSell with reason='anti-rug'.
-    const success = await executeFullSell(
-        ctx,
-        dex,
-        tokenAddress,
-        feeTier,
-        'anti-rug',
-        tradeId,
-        reasonDetail,
-    );
+    // (b) Bridge to executeFullSell with reason='anti-rug', WALL-CLOCK-BOUNDED
+    // (WR-02 / Finding B). The direct path gives the rug exit immediacy, but a
+    // stalled bundle.wait()/RPC must NEVER wedge the single event loop — so the
+    // call races a budget timer (WATCHDOG_BUDGET_MS). On overrun we FREE the
+    // awaiting path (the underlying ethers call cannot be cancelled — #4122 — but
+    // freeing the loop is the lever we need) and treat it as a FAILED exit:
+    // returns false, the position stays held + monitored (21.2-07
+    // D-FAILED-EXIT-KEEP-MONITORING) and retries on a later poll/anti-rug cycle.
+    let success: boolean;
+    try {
+        success = await withTimeout(
+            () => executeFullSell(ctx, dex, tokenAddress, feeTier, 'anti-rug', tradeId, reasonDetail),
+            antiRugBudgetMs(),
+            `anti-rug executeFullSell ${tokenAddress}`,
+        );
+    } catch (err) {
+        // withTimeout rejects with a real Error on overrun (NEVER a bare string).
+        // A genuine throw from executeFullSell also lands here — both are a failed
+        // exit for circuit-breaker accounting (a consumed trigger slot) and leave
+        // the position held + monitored.
+        success = false;
+        log.error(
+            {
+                chain,
+                tradeId,
+                token: tokenAddress,
+                budgetMs: antiRugBudgetMs(),
+                err: err instanceof Error ? err.message : String(err),
+                op: 'antirug.exit.bounded-abort',
+            },
+            'Anti-rug exit exceeded the wall-clock budget (or threw) — freeing the loop; ' +
+                'position stays held + monitored and will retry (anti-rug always still fires)',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[ANTI-RUG EXIT] Watchdog abort:* exit for \`${tokenAddress}\` exceeded ${antiRugBudgetMs()}ms ` +
+                '(or failed). Bot stays alive; the position is still held + monitored and will retry. ' +
+                'Check RPC/relay health.',
+        ).catch((alertErr: unknown) => {
+            log.warn({ err: alertErr, chain, op: 'antirug.exit.bounded-abort.alert-failed' }, 'Bounded-abort alert failed');
+        });
+    }
 
     // (c) Broadcast exit-fired update for the dashboard.
     // CR-06: `success` is now declared on the frontend
