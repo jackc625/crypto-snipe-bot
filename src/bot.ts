@@ -382,6 +382,72 @@ function emitSnipeFailClean(
 }
 
 // ---------------------------------------------------------------------------
+// armPositionMonitoring — the SINGLE shared register->monitor helper for a
+// landed V2 position (Phase 21.3 / Plan 21.3-05, STOP-THE-LINE-06).
+//
+// Extracted VERBATIM from the snipe handler's inline register->monitor block
+// (handleNewPairForChain :908-947) so the V2 snipe handler AND
+// executeDeliberateBuy share ONE wiring and can NEVER drift again. A landed buy
+// — snipe OR deliberate — MUST arm the exit monitor (startExitMonitor) AND
+// register anti-rug protection (snapshotLpBaseline + registerAntiRugPosition) or
+// the held position is left UNMONITORED / RUG-UNPROTECTED (the LADYS-class harm
+// v6.17 exists to prevent).
+//
+// ORDERING (preserved from the snipe): startExitMonitor is awaited BEFORE the
+// snapshotLpBaseline/registerAntiRugPosition try/catch, so an anti-rug baseline
+// failure NEVER costs the exit monitor — the exit monitor stays armed even when
+// the baseline snapshot throws (the catch logs op:'antirug.baseline-snapshot-
+// failed' and SKIPS the register, leaving the position anti-rug-UNMONITORED but
+// still exit-monitored).
+//
+// feeTier is null (V2 only). The CR-03 `await registerAntiRugPosition` is
+// preserved verbatim: without the await its rejection becomes an unhandled
+// promise rejection that bypasses the surrounding try/catch — the documented
+// op:'antirug.baseline-snapshot-failed' log never fires and the position appears
+// registered when it is not.
+// ---------------------------------------------------------------------------
+async function armPositionMonitoring(
+    ctx: ChainContext,
+    dex: DexConfigV2,
+    tokenAddress: string,
+    pairAddress: string,
+    tradeId: number,
+    originalTokenAmount: bigint,
+    buyAmountNative: string,
+): Promise<void> {
+    await startExitMonitor(ctx, dex, tokenAddress, null, buyAmountNative, tradeId, originalTokenAmount);
+
+    // Phase 19 / Plan 19-05 — parallel anti-rug attach. snapshotLpBaseline
+    // writes the V2 reserves baseline; registerAntiRugPosition hooks the
+    // position into the per-chain anti-rug WS dispatch table. On baseline
+    // failure, the catch logs op='antirug.baseline-snapshot-failed' and
+    // SKIPS the register — the position is left UNMONITORED for anti-rug
+    // (operator-visible via the dashboard's per-position state badge per
+    // UI-SPEC) but the standard exit monitor remains active.
+    try {
+        await snapshotLpBaseline(ctx, dex, tradeId, pairAddress, null);
+        // CR-03: registerAntiRugPosition is async (awaits
+        // startChainAntiRugListener → backfillSinceLastSeen which
+        // performs RPC + DB writes). Without await, rejections
+        // become unhandled promise rejections and bypass the
+        // surrounding try/catch — the documented
+        // op='antirug.baseline-snapshot-failed' log path never
+        // fires and the position appears registered when it isn't.
+        await registerAntiRugPosition(ctx, dex, tokenAddress, pairAddress, tradeId, null);
+    } catch (err) {
+        ctx.log.error(
+            {
+                err,
+                op: 'antirug.baseline-snapshot-failed',
+                tradeId,
+                pair: pairAddress,
+            },
+            'Anti-rug baseline snapshot failed; position UNMONITORED',
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // executeDeliberateBuy — the EXPLICIT deliberate/capture buy engine path
 // (Phase 21.3 / Plan 21.3-03, STOP-THE-LINE-05-B/C; D-DELIBERATE-EXPLICIT-ONLY +
 // D-DELIBERATE-PRIVATE-FIRST + D-NO-DOUBLE-BUY + D-NONCE-AUTHORITY-ALL).
@@ -912,36 +978,16 @@ export async function handleNewPairForChain(
         // Get trade ID for exit state linkage
         const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
         if (tradeRow) {
-            await startExitMonitor(ctx, dex, targetToken, null, ctx.chain.snipeAmount, tradeRow.id, originalTokenAmount);
-
-            // Phase 19 / Plan 19-05 — parallel anti-rug attach. snapshotLpBaseline
-            // writes the V2 reserves baseline; registerAntiRugPosition hooks the
-            // position into the per-chain anti-rug WS dispatch table. On baseline
-            // failure, the catch logs op='antirug.baseline-snapshot-failed' and
-            // SKIPS the register — the position is left UNMONITORED for anti-rug
-            // (operator-visible via the dashboard's per-position state badge per
-            // UI-SPEC) but the standard exit monitor remains active.
-            try {
-                await snapshotLpBaseline(ctx, dex, tradeRow.id, pairAddress, null);
-                // CR-03: registerAntiRugPosition is async (awaits
-                // startChainAntiRugListener → backfillSinceLastSeen which
-                // performs RPC + DB writes). Without await, rejections
-                // become unhandled promise rejections and bypass the
-                // surrounding try/catch — the documented
-                // op='antirug.baseline-snapshot-failed' log path never
-                // fires and the position appears registered when it isn't.
-                await registerAntiRugPosition(ctx, dex, targetToken, pairAddress, tradeRow.id, null);
-            } catch (err) {
-                ctx.log.error(
-                    {
-                        err,
-                        op: 'antirug.baseline-snapshot-failed',
-                        tradeId: tradeRow.id,
-                        pair: pairAddress,
-                    },
-                    'Anti-rug baseline snapshot failed; position UNMONITORED',
-                );
-            }
+            // Phase 21.3 / Plan 21.3-05 (STOP-THE-LINE-06): the register->monitor
+            // wiring now lives in the SINGLE shared armPositionMonitoring helper,
+            // called BY BOTH this snipe handler AND executeDeliberateBuy so they can
+            // never drift again. The behavior is byte-equivalent to the previous
+            // inline block: startExitMonitor(ctx, dex, token, feeTier=null,
+            // snipeAmount, tradeId, originalTokenAmount) FIRST, then the
+            // snapshotLpBaseline + (CR-03 awaited) registerAntiRugPosition pair under
+            // the op:'antirug.baseline-snapshot-failed' try/catch — the exit monitor
+            // stays armed even if the anti-rug baseline fails.
+            await armPositionMonitoring(ctx, dex, targetToken, pairAddress, tradeRow.id, originalTokenAmount, ctx.chain.snipeAmount);
         } else {
             ctx.log.error({ token: targetToken }, 'Could not find trade ID for exit monitor');
         }

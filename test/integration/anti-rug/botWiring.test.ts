@@ -343,30 +343,49 @@ const botSource = readFileSync(
 
 describe('Phase 19 — bot.ts wiring + resumeAntiRugMonitoring', () => {
     describe('Source-text wiring guards (Tests 22-26)', () => {
-        it('Test 22: V2 buy-success branch calls snapshotLpBaseline BEFORE registerAntiRugPosition', () => {
-            // Locate the V2 handler body — `handleNewPairForChain`.
-            const v2HandlerMatch = botSource.match(
-                /export async function handleNewPairForChain[\s\S]*?\n}\n/,
+        it('Test 22: the shared armPositionMonitoring helper calls snapshotLpBaseline BEFORE registerAntiRugPosition', () => {
+            // Phase 21.3 / Plan 21.3-05 (STOP-THE-LINE-06): the V2 register->monitor
+            // wiring was EXTRACTED from handleNewPairForChain into the SINGLE shared
+            // `armPositionMonitoring` helper (called by BOTH the snipe handler AND
+            // executeDeliberateBuy so they cannot drift). The snapshot-before-register
+            // ordering invariant (baseline must exist before the detector loads it)
+            // now lives in the helper body — assert it there.
+            const helperMatch = botSource.match(
+                /async function armPositionMonitoring[\s\S]*?\n}\n/,
             );
-            expect(v2HandlerMatch).toBeTruthy();
-            const v2Body = v2HandlerMatch![0];
+            expect(helperMatch, 'armPositionMonitoring shared helper must exist').toBeTruthy();
+            const helperBody = helperMatch![0];
 
-            const snapIdx = v2Body.indexOf('snapshotLpBaseline');
-            const regIdx = v2Body.indexOf('registerAntiRugPosition');
+            const snapIdx = helperBody.indexOf('snapshotLpBaseline');
+            const regIdx = helperBody.indexOf('registerAntiRugPosition');
             expect(snapIdx).toBeGreaterThan(-1);
             expect(regIdx).toBeGreaterThan(-1);
             expect(snapIdx).toBeLessThan(regIdx);
-        });
 
-        it('Test 23: V2 buy-success branch calls registerAntiRugPosition (parallel to startExitMonitor)', () => {
+            // And the V2 snipe handler arms monitoring via the shared helper (no
+            // longer inline) — the extraction is behavior-preserving, not dropped.
             const v2HandlerMatch = botSource.match(
                 /export async function handleNewPairForChain[\s\S]*?\n}\n/,
             );
             expect(v2HandlerMatch).toBeTruthy();
-            const v2Body = v2HandlerMatch![0];
+            expect(v2HandlerMatch![0]).toContain('armPositionMonitoring');
+        });
 
-            expect(v2Body).toContain('startExitMonitor');
-            expect(v2Body).toContain('registerAntiRugPosition');
+        it('Test 23: the shared armPositionMonitoring helper calls registerAntiRugPosition parallel to startExitMonitor', () => {
+            // The exit monitor is armed FIRST (startExitMonitor) so an anti-rug
+            // baseline failure never costs the exit monitor — the snapshot+register
+            // pair runs under the try/catch AFTER. Both call sites (snipe + deliberate)
+            // route through this one helper.
+            const helperMatch = botSource.match(
+                /async function armPositionMonitoring[\s\S]*?\n}\n/,
+            );
+            expect(helperMatch, 'armPositionMonitoring shared helper must exist').toBeTruthy();
+            const helperBody = helperMatch![0];
+
+            expect(helperBody).toContain('startExitMonitor');
+            expect(helperBody).toContain('registerAntiRugPosition');
+            // startExitMonitor is awaited BEFORE the snapshot/register try/catch.
+            expect(helperBody.indexOf('startExitMonitor')).toBeLessThan(helperBody.indexOf('snapshotLpBaseline'));
         });
 
         it('Test 24: V3 buy-success branch calls snapshotLpBaseline + registerAntiRugPosition with feeTier', () => {
