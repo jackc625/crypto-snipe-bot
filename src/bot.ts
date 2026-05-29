@@ -60,8 +60,15 @@ import { broadcast } from "./api/ws/broadcaster";
 import { logger } from "./utils/logger";
 import { getProvider, getWallet, getWsProvider, removeWsProvider } from "./utils/provider";
 import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
-import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
+import { sendTxWithRetry, createMevStrategy, escalatePrivateBuy } from "./utils/txManager";
 import type { TransactionRequest } from "ethers";
+// Phase 21.3 / Plan 21.3-03 (STOP-THE-LINE-05-B/C): the deliberate buy's
+// no-double-buy guard reconciles the REAL broadcast hash via reconcileInclusion +
+// buildReconcileConfig('buy') (the independent higher buy ceiling + confirm window
+// from plan 01). The public leg's fee-on-transfer-safe minOut reuses the
+// single-source computePublicMinOut from the exit ladder (no new slippage math).
+import { reconcileInclusion, buildReconcileConfig } from "./utils/mevStrategies/reconciliation";
+import { computePublicMinOut } from "./exitEngine";
 // Phase 21.2 Plan 21.2-13 / WR-01 (D-NONCE-AUTHORITY-ALL): the buy entry path
 // joins the bot-wide per-wallet nonce authority. Every signing submit — buys,
 // sells, anti-rug, public fallback, approvals, partial sells — routes through
@@ -241,9 +248,21 @@ async function maybeApproveForChain(ctx: ChainContext, tokenContract: Contract, 
 // is a single-level acquire (the CR-01 re-entrant-deadlock class does not apply).
 // sendTxWithRetry still owns nonce-safe retry (re-fetch 'latest' per attempt); the
 // lock only guarantees no two same-wallet submits run concurrently.
+// Phase 21.3 / Plan 21.3-03 (STOP-THE-LINE-05-B/D, D-BUY-INCLUSION-PRIVATE-FIRST):
+// `mode` distinguishes a genuine SNIPE (private-only, fail-clean — the V2/V3
+// pair-event sites pass 'snipe' explicitly) from an explicitly-invoked DELIBERATE
+// buy (operator-run scripts/deliberate-buy.ts → executeDeliberateBuy, the ONLY
+// caller that may go public). It defaults to 'snipe' so the snipe call sites are
+// byte-for-byte unchanged. submitBuyTx itself does NOT branch on mode — both modes
+// route through the SAME nonce-locked private submit; mode only changes the gating
+// (the affordability reserve) and what the CALLER does on a throw (a snipe fails
+// clean; the deliberate path runs the no-double-buy guard + public fallback).
+export type BuyMode = 'snipe' | 'deliberate';
+
 export async function submitBuyTx(
     ctx: ChainContext,
     txBuilder: () => Promise<TransactionRequest>,
+    _mode: BuyMode = 'snipe',
 ): Promise<string> {
     return withNonceLock(ctx.wallet.address, () => sendTxWithRetry(txBuilder, ctx));
 }
@@ -266,15 +285,20 @@ export async function submitBuyTx(
 //
 // Returns true when the snipe may proceed, false when it must be refused.
 // ---------------------------------------------------------------------------
-async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: string): Promise<boolean> {
+async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: string, mode: BuyMode = 'snipe'): Promise<boolean> {
     // checkEntryExitAffordability consumes a PreflightChain (the chain config plus
     // its live httpProvider + wallet) — exactly the fields ChainContext already
     // holds. Reuse them rather than reconstruct (no duplicated formula).
+    // Phase 21.3 / Plan 21.3-03 (D-BUY-AFFORDABILITY-EXTEND): thread `mode` into the
+    // mode-aware gate (plan 02). A deliberate buy reserves its OWN worst-case
+    // public-fallback buy gas; a genuine snipe (default 'snipe') reserves ZERO
+    // public-buy gas it will never use — the snipe floor is byte-for-byte the 21.2
+    // floor. mode defaults to 'snipe' so the snipe call sites are unchanged.
     const result = await checkEntryExitAffordability({
         ...ctx.chain,
         httpProvider: ctx.httpProvider,
         wallet: ctx.wallet,
-    });
+    }, mode);
     if (result.passed) {
         return true;
     }
@@ -284,16 +308,308 @@ async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: str
             op: 'entry.exit-affordability.refused',
             token: targetToken,
             chain: ctx.chain.name,
+            mode,
             reason: result.reason,
             details: result.details,
         },
-        'Entry REFUSED: wallet cannot guarantee an exit (worst-case public sell + buffer) — skipping snipe',
+        'Entry REFUSED: wallet cannot guarantee an exit (worst-case public sell + buffer) — skipping buy',
     );
     await sendCtxAlert(
         ctx,
         `*Entry REFUSED* for \`${targetToken}\` — wallet cannot guarantee an exit (worst-case public sell + buffer). ${sanitizeReason(result.reason ?? 'unaffordable')}`,
     );
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Never-NaN env parse helpers (mirror the reconciliation.ts / exitEngine.ts
+// idiom). Local to the buy seam; deliberate-buy private budget + public slippage.
+// ---------------------------------------------------------------------------
+function parsePositiveIntDefault(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parsePositiveNumberDefault(raw: string | undefined, fallback: number): number {
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Snipe fail-clean structured alert — STOP-THE-LINE-05-D / D-SNIPE-FAIL-CLEAN +
+// D-ALERTS (Phase 21.3 / Plan 21.3-03).
+//
+// A genuine snipe that exhausts hardened private inclusion FAILS CLEAN — snipes
+// NEVER auto-go-public (front-run protection preserved; the deliberate/operator
+// path is the manual escape). The trade row is written ONLY after a returned hash,
+// so a throw is structurally zero-spend / no-trades-row; this surfaces the hard
+// structured alert. The per-builder getBundleStatsV2 inclusion telemetry is logged
+// inside the strategy (op:'flashbots.bundle.stats') on every attempt — it is NOT
+// threaded out through the strategy's throw, so we point the operator at those
+// structured log entries via `statsRef` rather than fabricate a summary we do not
+// hold. CRITICAL (T-21.3-03-06): the payload carries ONLY public values — token,
+// chain, attempts, the error MESSAGE — NEVER the FLASHBOTS_AUTH_KEY or a signed raw
+// tx.
+// ---------------------------------------------------------------------------
+function emitSnipeFailClean(
+    ctx: ChainContext,
+    token: string,
+    poolType: 'v2' | 'v3',
+    feeTier: number | null,
+    err: unknown,
+): void {
+    // The genuine snipe path passes no explicit retries → default 3 → 4 attempts
+    // (sendTxWithRetry). This is the documented snipe submission budget.
+    const attempts = 4;
+    const reason = err instanceof Error ? err.message : String(err);
+    ctx.log.error(
+        {
+            op: 'buy.snipe.fail-clean',
+            token,
+            chain: ctx.chain.name,
+            poolType,
+            feeTier,
+            attempts,
+            // Per-builder inclusion telemetry is in the strategy's structured logs.
+            statsRef: 'op:flashbots.bundle.stats',
+            reason,
+            remediation: 're-attempt as a deliberate buy (scripts/deliberate-buy.ts) if the token is worth public exposure; or raise MEV_BUY_MAX_PRIORITY_FEE_GWEI / inspect per-builder coverage in the op:flashbots.bundle.stats logs',
+        },
+        'Snipe FAILED CLEAN: hardened private inclusion exhausted — zero ETH spent, no trades row; snipes never auto-go-public',
+    );
+}
+
+// ---------------------------------------------------------------------------
+// executeDeliberateBuy — the EXPLICIT deliberate/capture buy engine path
+// (Phase 21.3 / Plan 21.3-03, STOP-THE-LINE-05-B/C; D-DELIBERATE-EXPLICIT-ONLY +
+// D-DELIBERATE-PRIVATE-FIRST + D-NO-DOUBLE-BUY + D-NONCE-AUTHORITY-ALL).
+//
+// THE ONLY buy path that may reach the PUBLIC mempool. Reachable ONLY from the
+// operator-run scripts/deliberate-buy.ts (NO heuristic, NO flag on the snipe path —
+// D-DELIBERATE-EXPLICIT-ONLY). It tries hardened-private FIRST (escalatePrivateBuy,
+// budget DELIBERATE_BUY_PRIVATE_ATTEMPTS), then — only if the private leg genuinely
+// did not land AND the stricter no-double-buy guard clears — the fee-on-transfer-safe
+// public buy.
+//
+// The no-double-buy guard mirrors exitEngine.ts:902-979 INVERTED. A double-BUY
+// spends real ETH twice for one intent (UNrecoverable — worse than a double-sell),
+// so the guard biases even harder toward "do not broadcast when in doubt":
+//   structural half  : the single per-wallet nonce (withNonceLock) makes two
+//                       same-nonce txs impossible (D-NONCE-AUTHORITY-ALL).
+//   procedural half  : reconcile the REAL broadcast hash (BroadcastHandle, NEVER a
+//                       pre-signed phantom — CR-02). included → ABORT (private landed
+//                       late, record the real hash); landed-not-ours / inconclusive →
+//                       FAIL-CLOSED (do NOT broadcast). reverted / not-landed → the
+//                       STRICTER chain-is-truth defense-in-depth: before broadcasting
+//                       ALSO require balanceOf(token) == 0 (no tokens already received)
+//                       AND the nonce was NOT consumed
+//                       (getTransactionCount('latest') == submittedNonce). The sell
+//                       guard checks balance only; the buy checks BOTH.
+//
+// Returns the real on-chain tx hash on a landed buy (private or public), or null
+// when the buy was correctly NOT broadcast (fail-closed / private landed but already
+// recorded / nothing to do). The operator script renders the outcome.
+// ---------------------------------------------------------------------------
+export async function executeDeliberateBuy(
+    ctx: ChainContext,
+    targetToken: string,
+    amountInWei: bigint,
+    dex: DexConfigV2,
+): Promise<string | null> {
+    // (0) Mode-aware affordability gate (D-BUY-AFFORDABILITY-EXTEND): a deliberate
+    // buy MUST be able to afford its OWN public-fallback buy gas. Refuse → return.
+    if (!(await enforceEntryExitAffordability(ctx, targetToken, 'deliberate'))) {
+        return null;
+    }
+
+    const router = new Contract(dex.routerAddress, ROUTER_ABI, ctx.wallet);
+    const path = [ctx.chain.wethAddress, targetToken];
+
+    // (1) Build the PRIVATE buy tx (swapExactETHForTokens — the standard private
+    // snipe buy shape). Quote → slippage-adjusted minOut. Reuse computePublicMinOut
+    // (the single-source slippage helper) so the private and public legs agree.
+    let privMinOut: bigint = 0n;
+    try {
+        const slippagePct = parsePositiveNumberDefault(process.env.DELIBERATE_BUY_SLIPPAGE_PCT, CONFIG.slippagePercent || 5);
+        const amounts: bigint[] = await router.getAmountsOut(amountInWei, path);
+        privMinOut = computePublicMinOut(amounts[1], slippagePct);
+    } catch {
+        ctx.log.warn({ token: targetToken, op: 'buy.deliberate.quote-failed' }, 'Deliberate buy: failed to quote private minOut, defaulting to 0');
+    }
+    const privDeadline = Math.floor(Date.now() / 1000) + 60;
+    const privBuyTxBuilder = () => ctx.wallet.populateTransaction({
+        to: dex.routerAddress,
+        data: router.interface.encodeFunctionData('swapExactETHForTokens', [privMinOut, path, ctx.wallet.address, privDeadline]),
+        value: amountInWei,
+    });
+
+    // (1) HARDENED-PRIVATE FIRST (D-DELIBERATE-PRIVATE-FIRST). escalatePrivateBuy
+    // normalizes not-landed into a structured result (it does NOT throw) so the
+    // deliberate ladder can fall through to the no-double-buy guard. The budget is
+    // DELIBERATE_BUY_PRIVATE_ATTEMPTS (default 2 → 2 private submissions). The
+    // strategy's submit is nonce-safe; the WHOLE private leg runs under withNonceLock
+    // so it serializes with every other same-wallet submit (D-NONCE-AUTHORITY-ALL).
+    const attempts = parsePositiveIntDefault(process.env.DELIBERATE_BUY_PRIVATE_ATTEMPTS, 2);
+    const priv = await withNonceLock(ctx.wallet.address, () => escalatePrivateBuy(privBuyTxBuilder, ctx, attempts));
+
+    if (priv.landed && priv.txHash) {
+        // The private bundle landed (possibly late-reconciled by 21.1). Done — record
+        // the real hash. No public buy.
+        ctx.log.info({ token: targetToken, txHash: priv.txHash, op: 'buy.deliberate.private-landed' }, 'Deliberate buy: private bundle landed');
+        recordDeliberateBuy(ctx, targetToken, dex, amountInWei, priv.txHash);
+        return priv.txHash;
+    }
+
+    // (2) NO-DOUBLE-BUY GUARD before going public (D-NO-DOUBLE-BUY). Mirror
+    // exitEngine.ts:902-979, INVERTED. Reconcile the REAL broadcast handle.
+    let publicBuyAllowed = false;
+    if (priv.lastSignedHash && priv.lastNonce != null) {
+        const rcfg = buildReconcileConfig(process.env, ctx.chain.gas.maxGasLimit, attempts, 'buy');
+        const recon = await reconcileInclusion(
+            priv.lastSignedHash, priv.lastNonce, ctx.wallet, ctx.httpProvider, rcfg.confirmWindowMs, rcfg.pollMs,
+        );
+        if (recon.outcome === 'included') {
+            // The private bundle landed LATE → ABORT the public buy (record the real
+            // reconciled hash). A double-spend of ETH is the unrecoverable harm.
+            const landedHash = recon.hash ?? priv.lastSignedHash;
+            ctx.log.info(
+                { token: targetToken, txHash: landedHash, op: 'buy.fallback.aborted.late-land' },
+                'No-double-buy guard: the private buy landed late — aborting the public buy',
+            );
+            await sendCtxAlert(
+                ctx,
+                `*[DELIBERATE BUY GUARD]* private buy landed late (reconciled) — public buy ABORTED to prevent a double-SPEND of ETH for \`${targetToken}\`.`,
+            );
+            recordDeliberateBuy(ctx, targetToken, dex, amountInWei, landedHash);
+            return landedHash;
+        }
+        if (recon.outcome === 'landed-not-ours' || recon.outcome === 'reverted') {
+            // reverted → the private buy mined-but-reverted (status 0): NO public
+            // resubmit (a same-intent retry could double-spend if the revert was
+            // transient at the node). landed-not-ours → the nonce was consumed but our
+            // hash has no receipt — we CANNOT prove the private buy did NOT land.
+            // FAIL-CLOSED for both: do NOT broadcast the public buy.
+            ctx.log.warn(
+                { token: targetToken, signedTxHash: priv.lastSignedHash, submittedNonce: priv.lastNonce, outcome: recon.outcome, op: 'buy.fallback.failsafe.inconclusive' },
+                'No-double-buy guard: private inclusion INCONCLUSIVE — failing CLOSED, NOT running the public buy (avoid double-SPEND)',
+            );
+            await sendCtxAlert(
+                ctx,
+                `*[DELIBERATE BUY GUARD]* private buy inclusion is INCONCLUSIVE (${recon.outcome}) for \`${targetToken}\` — public buy DEFERRED to avoid a double-SPEND of ETH. Remediation: inspect whether the private buy landed before re-attempting.`,
+            );
+            return null;
+        }
+        // recon.outcome === 'not-landed' → fall through to the stricter chain-is-truth
+        // defense-in-depth below.
+    }
+
+    // (2b) STRICTER chain-is-truth defense-in-depth (the buy inversion of the sell's
+    // balanceOf check). Before the public buy ALSO require:
+    //   balanceOf(targetToken) == 0   (no tokens already received → the private buy
+    //                                   did NOT land)
+    //   AND getTransactionCount('latest') == priv.lastNonce  (the submitted nonce was
+    //                                   NOT consumed → no same-nonce tx landed)
+    // The sell guard checks balance only; the buy checks BOTH (a double-BUY is the
+    // unrecoverable harm). If EITHER fails → ABORT fail-closed.
+    const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
+    const heldBalance: bigint = await tokenContract.balanceOf(ctx.wallet.address);
+    const latestNonce = await ctx.httpProvider.getTransactionCount(ctx.wallet.address, 'latest');
+    const nonceConsumed = priv.lastNonce != null && latestNonce !== priv.lastNonce;
+
+    if (heldBalance !== 0n || nonceConsumed) {
+        ctx.log.warn(
+            {
+                token: targetToken,
+                heldBalance: heldBalance.toString(),
+                latestNonce,
+                submittedNonce: priv.lastNonce ?? null,
+                nonceConsumed,
+                op: 'buy.fallback.aborted.chain-truth',
+            },
+            'No-double-buy guard: chain-is-truth check failed (tokens already received OR nonce consumed) — aborting the public buy',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[DELIBERATE BUY GUARD]* chain-is-truth ABORT for \`${targetToken}\` — ` +
+            `${heldBalance !== 0n ? 'tokens already received (balanceOf != 0)' : 'nonce was consumed (a same-nonce tx landed)'}; ` +
+            `public buy NOT broadcast (avoid double-SPEND).`,
+        );
+        return null;
+    }
+    publicBuyAllowed = true;
+
+    if (!publicBuyAllowed) {
+        // Defensive: unreachable given the branches above, but never fall through to
+        // a broadcast on an unexpected state (fail-closed).
+        return null;
+    }
+
+    // (3) PUBLIC-MEMPOOL FEE-ON-TRANSFER-SAFE BUY (the manual escape; nonce-locked).
+    // ETH value sent — NO approve (a buy spends ETH). Fresh quote → slippage minOut
+    // via the single-source helper + the 21.3-00 FoT BUY ABI fragment.
+    const slippagePct = parsePositiveNumberDefault(process.env.DELIBERATE_BUY_SLIPPAGE_PCT, CONFIG.slippagePercent || 5);
+    const amountsOut: bigint[] = await router.getAmountsOut(amountInWei, path);
+    const expectedOut = amountsOut[1];
+    const minOut = computePublicMinOut(expectedOut, slippagePct);
+    const deadline = Math.floor(Date.now() / 1000) + 600;
+
+    ctx.log.info(
+        {
+            token: targetToken, amountIn: amountInWei.toString(),
+            expectedOut: expectedOut.toString(), minOut: minOut.toString(), slippagePct,
+            op: 'buy.fallback.public.submit',
+        },
+        'Deliberate public-mempool buy (private inclusion did not land; no-double-buy guard cleared)',
+    );
+    await sendCtxAlert(
+        ctx,
+        `*[DELIBERATE BUY → PUBLIC]* private inclusion did not land — buying \`${targetToken}\` on the public mempool (slippage ${slippagePct}%).`,
+    );
+
+    const txHash = await withNonceLock(ctx.wallet.address, async () => {
+        const stx = await router.swapExactETHForTokensSupportingFeeOnTransferTokens(
+            minOut, path, ctx.wallet.address, deadline, { value: amountInWei },
+        );
+        const rec = await stx.wait();
+        ctx.log.info(
+            { token: targetToken, txHash: stx.hash, blockNumber: rec?.blockNumber, op: 'buy.fallback.public.mined' },
+            'Deliberate public-mempool buy mined',
+        );
+        return stx.hash as string;
+    });
+
+    recordDeliberateBuy(ctx, targetToken, dex, amountInWei, txHash);
+    return txHash;
+}
+
+// Record a successful deliberate buy in the trades audit trail. Kept separate so
+// every landed-buy branch (private / late-land / public) records identically.
+function recordDeliberateBuy(
+    ctx: ChainContext,
+    targetToken: string,
+    dex: DexConfigV2,
+    amountInWei: bigint,
+    txHash: string,
+): void {
+    recordSnipe(ctx.chain.name);
+    insertTrade.run({
+        token: targetToken.toLowerCase(),
+        chain: ctx.chain.name,
+        action: 'buy',
+        txHash: txHash ?? 'mev_bundle',
+        block: null,
+        timestamp: Math.floor(Date.now() / 1000),
+        amountIn: ethers.formatEther(amountInWei),
+        amountOut: null,
+        gasCost: null,
+        priceAtAction: null,
+        status: 'pending',
+        poolType: 'v2',
+        feeTier: null,
+        dexName: dex.name,
+    });
 }
 
 
@@ -511,7 +827,10 @@ export async function handleNewPairForChain(
     // sell + buffer). Fails CLOSED on RPC error inside the gate; on a refuse it
     // alerts (D-ALERTS) and we SKIP the buy. This is the thin-wallet trap (Finding
     // A) made impossible to ENTER.
-    if (!(await enforceEntryExitAffordability(ctx, targetToken))) {
+    // Phase 21.3 / Plan 21.3-03 (D-BUY-AFFORDABILITY-EXTEND): the pair-event snipe
+    // path is mode 'snipe' — it reserves ZERO public-buy gas it will never use (a
+    // genuine snipe NEVER auto-goes-public; D-BUY-INCLUSION-PRIVATE-FIRST).
+    if (!(await enforceEntryExitAffordability(ctx, targetToken, 'snipe'))) {
         return;
     }
 
@@ -523,6 +842,11 @@ export async function handleNewPairForChain(
         // position-tracking auditability the LADYS false-negative destroyed.
         // WR-01 (21.2-13): the buy submit routes through withNonceLock via
         // submitBuyTx so it serializes with every other same-wallet signing site.
+        // Phase 21.3 / Plan 21.3-03 (D-BUY-INCLUSION-PRIVATE-FIRST): mode 'snipe' —
+        // private-only. The hardened multi-builder private inclusion (plan 01) is the
+        // ONLY lever; a snipe NEVER reaches a public buy. On a genuine not-landed /
+        // ceiling-hit the strategy THROWS → the catch below fails clean (no trades
+        // row, zero spend) + a structured op:'buy.snipe.fail-clean' alert.
         const realHash = await submitBuyTx(
             ctx,
             () => ctx.wallet.populateTransaction({
@@ -535,6 +859,7 @@ export async function handleNewPairForChain(
                 ]),
                 value: amountIn,
             }),
+            'snipe',
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 — post-MEV-submit audit log.
@@ -621,7 +946,17 @@ export async function handleNewPairForChain(
             ctx.log.error({ token: targetToken }, 'Could not find trade ID for exit monitor');
         }
     } catch (e) {
-        ctx.log.error({ err: e, token: targetToken }, 'TX failed');
+        // Phase 21.3 / Plan 21.3-03 (STOP-THE-LINE-05-D, D-SNIPE-FAIL-CLEAN + D-ALERTS):
+        // a genuine snipe that exhausts the hardened private inclusion (multi-builder
+        // fanout across N blocks still not included, or the buy ceiling is hit) FAILS
+        // CLEAN — snipes NEVER auto-go-public (front-run protection preserved). The
+        // trade row is written ONLY after a returned hash, so the throw means zero ETH
+        // spent + NO trades row (structurally true). This adds the STRUCTURED fail-clean
+        // alert: per-builder inclusion telemetry lives in the strategy's
+        // op:'flashbots.bundle.stats' pino entries (NOT surfaced through the throw — see
+        // statsRef); the payload carries only public values (NO FLASHBOTS_AUTH_KEY / no
+        // signed raw tx).
+        emitSnipeFailClean(ctx, targetToken, 'v2', null, e);
         updateTradeStatus.run('failed', targetToken.toLowerCase(), ctx.chain.name);
         await sendCtxAlert(ctx, `*TX failed* for \`${symbol}\``);
     }
@@ -847,7 +1182,10 @@ export async function handleNewV3PoolForChain(
         // thin-wallet trap is the same on both paths, so the gate (single source of
         // truth in preflight.checkEntryExitAffordability) guards BOTH. Fails CLOSED
         // on RPC error; on a refuse it alerts (D-ALERTS) and SKIPS the buy.
-        if (!(await enforceEntryExitAffordability(ctx, targetToken))) {
+        // Phase 21.3 / Plan 21.3-03 (D-BUY-AFFORDABILITY-EXTEND): the V3 pair-event
+        // snipe path is mode 'snipe' — identical posture to V2; reserves ZERO
+        // public-buy gas (a snipe never auto-goes-public; D-BUY-INCLUSION-PRIVATE-FIRST).
+        if (!(await enforceEntryExitAffordability(ctx, targetToken, 'snipe'))) {
             return;
         }
 
@@ -858,6 +1196,9 @@ export async function handleNewV3PoolForChain(
         // WR-01 (21.2-13): the V3 buy submit routes through withNonceLock via
         // submitBuyTx (identical posture to V2) so it serializes with every other
         // same-wallet signing site.
+        // Phase 21.3 / Plan 21.3-03 (D-BUY-INCLUSION-PRIVATE-FIRST): mode 'snipe' —
+        // private-only. A snipe NEVER reaches a public buy; on a not-landed/ceiling-hit
+        // throw the catch fails clean (no trades row, zero spend) + the fail-clean alert.
         const realHash = await submitBuyTx(
             ctx,
             () => ctx.wallet.populateTransaction({
@@ -865,6 +1206,7 @@ export async function handleNewV3PoolForChain(
                 data: v3Router.interface.encodeFunctionData('multicall', [deadline, [swapData]]),
                 value: amountIn,  // Pitfall 5: send ETH value since tokenIn is WETH
             }),
+            'snipe',
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 (V3 path) — audit log only
@@ -936,7 +1278,11 @@ export async function handleNewV3PoolForChain(
             ctx.log.error({ token: targetToken }, 'Could not find V3 trade ID for exit monitor');
         }
     } catch (e) {
-        ctx.log.error({ err: e, token: targetToken, feeTier }, 'V3 TX failed');
+        // Phase 21.3 / Plan 21.3-03 (STOP-THE-LINE-05-D, D-SNIPE-FAIL-CLEAN + D-ALERTS):
+        // a genuine V3 snipe that exhausts hardened private inclusion FAILS CLEAN
+        // (identical posture to V2) — zero ETH spent, NO trades row, structured
+        // op:'buy.snipe.fail-clean' alert. The snipe never auto-goes-public.
+        emitSnipeFailClean(ctx, targetToken, 'v3', feeTier, e);
         updateTradeStatus.run('failed', targetToken.toLowerCase(), ctx.chain.name);
         await sendCtxAlert(ctx, `*V3 TX failed* for \`${symbol}\``);
     }
