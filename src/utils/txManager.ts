@@ -213,3 +213,108 @@ export async function escalatePrivateSell(
         return { landed: false, lastSignedHash: broadcast.signedTxHash, lastNonce: broadcast.submittedNonce };
     }
 }
+
+// ---------------------------------------------------------------------------
+// escalatePrivateBuy -- the PRIVATE leg of the deliberate buy inclusion ladder
+// (Phase 21.3 / Plan 21.3-03, STOP-THE-LINE-05-B/C, D-DELIBERATE-PRIVATE-FIRST +
+// D-NO-DOUBLE-BUY). The EXACT byte-for-byte mirror of escalatePrivateSell above,
+// inverted to the buy direction.
+// ---------------------------------------------------------------------------
+
+/**
+ * Structured outcome of a private-escalation BUY attempt for the deliberate
+ * inclusion ladder. The buy mirror of {@link PrivateSellResult}: it normalizes
+ * BOTH the landed and the genuinely-not-landed paths into a structured result so
+ * the deliberate path can fall through to the no-double-buy guard + public-mempool
+ * fallback WITHOUT treating a not-landed bundle as a hard error.
+ *   - `landed:true`  → the private bundle was included (possibly late-reconciled by
+ *      21.1's receipt+nonce probe); `txHash` is the REAL on-chain hash.
+ *   - `landed:false` → the private bundle genuinely did not land within the budget;
+ *      `lastSignedHash` + `lastNonce` are the ACTUALLY-BROADCAST signed-tx hash + the
+ *      submitted nonce of the LAST attempt (the strategy's real broadcast handle —
+ *      NOT a throwaway local pre-sign), so the no-double-buy guard can re-run
+ *      `reconcileInclusion` on the tx that ACTUALLY hit the chain before any public
+ *      buy (CR-02 lesson). A double-BUY spends real ETH twice (UNrecoverable), so the
+ *      buy guard is STRICTER than the sell: it ALSO requires balanceOf(token)==0 AND
+ *      nonce-not-consumed before broadcasting the public buy.
+ *
+ * NOTE: the genuine SNIPE path (submitBuyTx, no explicit retries → default 3 → 4
+ * attempts, private-only, fail-clean) is UNCHANGED — only the explicitly-invoked
+ * deliberate path (scripts/deliberate-buy.ts → executeDeliberateBuy) calls this.
+ */
+export interface PrivateBuyResult {
+    landed: boolean;
+    /** Real on-chain hash when landed:true. */
+    txHash?: string;
+    /** ACTUALLY-BROADCAST signed-tx hash of the last attempt (for the no-double-buy guard). */
+    lastSignedHash?: string;
+    /** ACTUALLY-SUBMITTED nonce of the last attempt (for the no-double-buy guard). */
+    lastNonce?: number;
+}
+
+/**
+ * Run the PRIVATE escalation leg of the deliberate buy inclusion ladder and
+ * normalize the outcome to {@link PrivateBuyResult}. The exact mirror of
+ * {@link escalatePrivateSell}.
+ *
+ * CR-02 fix (carried to the buy leg): the no-double-buy handle
+ * (`lastSignedHash`/`lastNonce`) is the tx the strategy ACTUALLY BROADCAST —
+ * captured via a {@link BroadcastHandle} side-channel the strategy populates after
+ * every submit — NOT a throwaway tx pre-signed here. NO local pre-sign: a re-built
+ * tx has a different keccak256 hash and `reconcileInclusion` would forever probe a
+ * phantom hash (its receipt always null → the guard could never abort the public
+ * buy → double-spend window). The strategy stays the SOLE broadcaster; the
+ * side-channel only SURFACES what it sent.
+ *
+ * The deliberate buy uses NORMAL escalation (no gasMultiplier — the multiplier slot
+ * stays undefined; that hook is the anti-rug exit's, not the buy's).
+ *
+ * @param attempts the deliberate private-attempt BUDGET = the number of private
+ *                 SUBMISSIONS to make before the public fallback
+ *                 (DELIBERATE_BUY_PRIVATE_ATTEMPTS, default 2). WR-05 budget→maxRetries
+ *                 mapping: the shared reconciliation loop runs `attempt = 0 .. maxRetries`
+ *                 INCLUSIVE → maxRetries+1 submissions, so `maxRetries = budget - 1`
+ *                 (budget 2 → maxRetries 1 → 2 submissions). The shared loop bound is
+ *                 UNCHANGED, so the genuine snipe path (no explicit retries → default 3
+ *                 → 4 attempts) is unaffected.
+ */
+export async function escalatePrivateBuy(
+    txBuilder: () => Promise<TransactionRequest>,
+    ctx: ChainContext,
+    attempts: number,
+): Promise<PrivateBuyResult> {
+    // The side-channel the strategy populates with the ACTUALLY-BROADCAST signed-
+    // tx hash + submitted nonce of its LAST attempt — even when it throws (genuine
+    // not-landed / ceiling-hit). This is the stable, ON-CHAIN handle the
+    // no-double-buy guard probes (CR-02). NO local pre-sign.
+    const broadcast: BroadcastHandle = {};
+
+    // WR-05: budget (submissions) → maxRetries. The deliberate budget defaults to 2
+    // → maxRetries 1 → 2 private submissions. A budget of 0 maps to -1, which the
+    // WR-04-fixed sendTxWithRetry honors verbatim (NOT promoted to 3): no private
+    // submission is made and the deliberate ladder goes straight to the no-double-buy
+    // guard + public fallback.
+    const maxRetries = attempts - 1;
+
+    try {
+        // The strategy owns nonce-safe retry + receipt+nonce reconciliation; it
+        // returns the REAL hash even on a late land (so `landed:true` already covers
+        // late inclusion at the strategy layer). It also writes the broadcast handle
+        // even on this success path. NO gasMultiplier (normal escalation).
+        const txHash = await sendTxWithRetry(txBuilder, ctx, maxRetries, undefined, undefined, undefined, broadcast);
+        return { landed: true, txHash };
+    } catch (e) {
+        // Genuine not-landed / ceiling-hit (the strategy threw). This is NOT a hard
+        // error for the deliberate ladder — the no-double-buy-guarded public fallback
+        // is the manual escape. PRESERVE the bare-string guard (Flashbots bundle.wait()
+        // rejects with a string, not an Error — Finding B root cause). The broadcast
+        // handle holds the LAST attempt's real hash + nonce (or stays empty if the
+        // strategy threw BEFORE its first submit, e.g. attempt-0 unaffordable — in which
+        // case the guard falls back to the stricter balanceOf+nonce chain-is-truth check).
+        ctx.log.warn(
+            { err: e instanceof Error ? e.message : String(e), op: 'buy.private.not-landed' },
+            'Private deliberate-buy escalation did not land within the budget — proceeding to the no-double-buy guard + public fallback',
+        );
+        return { landed: false, lastSignedHash: broadcast.signedTxHash, lastNonce: broadcast.submittedNonce };
+    }
+}
