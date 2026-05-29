@@ -96,7 +96,16 @@ export async function sendTxWithRetry(
     // ctx.chain.mevStrategy); the `gasMultiplier` slot is the Phase 19 /
     // D-RACE-TELEMETRY hook for elevating anti-rug exit gas.
     const ctx = providerOrCtx as ChainContext;
-    const retries = (typeof walletOrRetries === 'number' ? walletOrRetries : maxRetries) || 3;
+    // WR-04 (21.2-13): honor an EXPLICIT numeric retry budget — including 0 (and a
+    // negative, which the sell ladder uses to mean "zero private attempts → go
+    // straight to the public fallback"). The old `… || 3` treated 0 as falsy and
+    // silently promoted it to 3 (→ up to 4 submissions), defeating an operator's
+    // (or the anti-rug path's) "no/one quick private attempt" budget and delaying
+    // the guaranteed public exit. Only when NO explicit budget is supplied (buys:
+    // walletOrRetries + maxRetries both undefined) does the default 3 apply — so
+    // BUY retry behavior is unchanged (4 attempts).
+    const explicitRetries = typeof walletOrRetries === 'number' ? walletOrRetries : maxRetries;
+    const retries = explicitRetries ?? 3;
     const strategy = createMevStrategy(ctx.chain);
 
     ctx.log.info({ chain: ctx.chain.name, strategy: strategy.name, gasMultiplier: gasMultiplier ?? 1.0 }, 'Dispatching TX via MEV strategy');
@@ -150,10 +159,18 @@ export interface PrivateSellResult {
  * fallback → double-sell window). The strategy is still the SOLE broadcaster
  * (no double-submit) — the side-channel only SURFACES what it sent.
  *
- * @param attempts reason-aware private-attempt budget (anti-rug → 0-1; routine →
- *                 MEV_SELL_FALLBACK_ATTEMPTS). Passed to the strategy as its
- *                 maxRetries so a not-landed bundle exhausts cleanly and returns
- *                 `landed:false` rather than spinning.
+ * @param attempts reason-aware private-attempt BUDGET = the number of private
+ *                 SUBMISSIONS to make before the public fallback (anti-rug → 1;
+ *                 routine → MEV_SELL_FALLBACK_ATTEMPTS, default 2; 0 → go straight
+ *                 to public). WR-05 (21.2-13): the shared reconciliation loop runs
+ *                 `attempt = 0 .. maxRetries` INCLUSIVE → maxRetries+1 submissions,
+ *                 so the budget→maxRetries mapping is `maxRetries = budget - 1`
+ *                 (budget 1 → maxRetries 0 → 1 submission; budget 2 → maxRetries 1
+ *                 → 2 submissions; budget 0 → maxRetries -1 → the loop body never
+ *                 runs → 0 submissions). This makes the OBSERVED private-submission
+ *                 count equal the documented budget. The shared loop bound is
+ *                 UNCHANGED (so buys, which pass no explicit retries → default 3 →
+ *                 4 attempts, are unaffected); only the sell-side mapping moved.
  */
 export async function escalatePrivateSell(
     txBuilder: () => Promise<TransactionRequest>,
@@ -167,12 +184,19 @@ export async function escalatePrivateSell(
     // no-double-sell guard probes (CR-02). NO local pre-sign.
     const broadcast: BroadcastHandle = {};
 
+    // WR-05: budget (submissions) → maxRetries. A budget of 0 maps to -1, which
+    // the WR-04-fixed sendTxWithRetry honors verbatim (NOT promoted to 3): the
+    // shared loop's `attempt <= cfg.maxRetries` is then false at attempt 0, so no
+    // private submission is made and the ladder goes straight to the public
+    // fallback (the guaranteed exit).
+    const maxRetries = attempts - 1;
+
     try {
         // The strategy owns nonce-safe retry + receipt+nonce reconciliation; it
         // returns the REAL hash even on a late land (so `landed:true` already
         // covers the LADYS late-inclusion at the strategy layer). It also writes
         // the broadcast handle even on this success path.
-        const txHash = await sendTxWithRetry(txBuilder, ctx, attempts, undefined, undefined, gasMultiplier, broadcast);
+        const txHash = await sendTxWithRetry(txBuilder, ctx, maxRetries, undefined, undefined, gasMultiplier, broadcast);
         return { landed: true, txHash };
     } catch (e) {
         // Genuine not-landed / ceiling-hit (the strategy threw). This is NOT a

@@ -890,8 +890,13 @@ describe('D-RECORD-REAL-HASH — buy row records the real hash', () => {
         // surviving on a success path.
         const botSrc = fs.readFileSync(BOT_SRC, 'utf8');
 
-        // (1) realHash is captured off the buy submit.
-        expect(/const\s+realHash\s*=\s*await\s+sendTxWithRetry\(/.test(botSrc)).toBe(true);
+        // (1) realHash is captured off the buy submit. Post-WR-01 (21.2-13) the call
+        // site is the `submitBuyTx` nonce-locked seam (which wraps withNonceLock(...
+        // => sendTxWithRetry(...))); accept either the seam or a direct call so the
+        // assertion binds the OBSERVABLE (realHash captured off the buy submit).
+        expect(/const\s+realHash\s*=\s*await\s+(submitBuyTx|sendTxWithRetry)\(/.test(botSrc)).toBe(true);
+        // WR-01: the seam routes the buy submit through the per-wallet nonce authority.
+        expect(/withNonceLock\(ctx\.wallet\.address,\s*\(\)\s*=>\s*sendTxWithRetry\(/.test(botSrc)).toBe(true);
 
         // (2) >=2 inserts persist realHash (V2 + V3).
         const realHashInserts = (botSrc.match(/txHash:\s*realHash\s*\?\?\s*'mev_bundle'/g) || []).length;
