@@ -144,6 +144,14 @@ const DASHBOARD_API_KEY_PLACEHOLDER = 'your-secret-dashboard-api-key-here';
 // point of Finding A: the always-available exit must always be affordable.
 const EXIT_GATE_SELL_GAS_BUFFER_DEFAULT = 2.0;
 
+// 21.3-02 / STOP-THE-LINE-05-C / D-BUY-AFFORDABILITY-EXTEND: the base-fee
+// multiplier on a DELIBERATE buy's worst-case PUBLIC-FALLBACK buy gas reserve.
+// A deliberate buy may broadcast a normal-priced public buy if the private
+// submission misses; the entry gate (deliberate mode only) reserves that gas so
+// the deliberate path never strands its own fallback. Registered required:false
+// in config.ts / .env.example (21.3-00); default mirrors the sell-gate buffer (2.0).
+const DELIBERATE_BUY_GAS_BUFFER_DEFAULT = 2.0;
+
 // One-time ERC-20 approval gas the public exit may need (the private MEV strategy
 // already holds its approval, but the guaranteed PUBLIC fallback the gate prices
 // against may have to approve first). A standard ERC-20 approve is ~46k gas; we
@@ -285,6 +293,17 @@ function parseExitGateBuffer(): number {
     return Number.isFinite(n) && n > 0 ? n : EXIT_GATE_SELL_GAS_BUFFER_DEFAULT;
 }
 
+/** Parse DELIBERATE_BUY_GAS_BUFFER from env — never NaN, never ≤0 (same
+ *  parsePositiveNumber discipline as parseExitGateBuffer). The base-fee
+ *  multiplier on the DELIBERATE buy's worst-case public-fallback gas reserve
+ *  (registered required:false in config.ts / .env.example in 21.3-00, default 2.0). */
+function parseDeliberateBuyBuffer(): number {
+    const raw = process.env.DELIBERATE_BUY_GAS_BUFFER;
+    if (raw === undefined || raw === '') return DELIBERATE_BUY_GAS_BUFFER_DEFAULT;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : DELIBERATE_BUY_GAS_BUFFER_DEFAULT;
+}
+
 /**
  * Derive the wei base fee from a getFeeData() result. EIP-1559 chains expose
  * maxFeePerGas + maxPriorityFeePerGas (baseFee = maxFee - priority); legacy chains
@@ -331,8 +350,27 @@ function deriveFeeWei(feeData: {
  *
  * Exported so bot.ts can call it at BOTH the V2 and V3 buy submit sites without
  * duplicating the formula (the thin-wallet trap is identical on both paths).
+ *
+ * 21.3-02 / STOP-THE-LINE-05-C / D-BUY-AFFORDABILITY-EXTEND — MODE-AWARE:
+ *   - mode='snipe' (DEFAULT): a genuine snipe has NO public fallback, so it
+ *     reserves ZERO public-buy gas it will never use. The floor is BYTE-FOR-BYTE
+ *     the 21.2 floor (snipeValue + worstCaseBuyGas + worstCasePublicSellGas +
+ *     cushion). Defaulting to 'snipe' keeps every existing call site unchanged
+ *     until plan 03 threads the deliberate mode through.
+ *   - mode='deliberate': a deliberate buy's worst case INCLUDES a public broadcast
+ *     (the private-first submission may miss → public fallback). The gate adds a
+ *     worstCasePublicBuyGas term so the deliberate path never strands its own
+ *     fallback. That term REUSES computeWorstCasePublicExitGas with
+ *     approvalGasLimit:0n (a buy spends ETH — no ERC-20 approve) and the
+ *     DELIBERATE_BUY_GAS_BUFFER multiplier (default 2.0). The deliberate floor is
+ *     therefore strictly GREATER than the snipe floor for the same balance/fee.
+ *
+ * The fail-closed-on-RPC-error posture is preserved for BOTH modes.
  */
-export async function checkEntryExitAffordability(chain: PreflightChain): Promise<PreflightResult> {
+export async function checkEntryExitAffordability(
+    chain: PreflightChain,
+    mode: 'snipe' | 'deliberate' = 'snipe',
+): Promise<PreflightResult> {
     const sellGasBuffer = parseExitGateBuffer();
     const sellGasLimit = chain.gas.maxGasLimit;
     try {
@@ -350,8 +388,8 @@ export async function checkEntryExitAffordability(chain: PreflightChain): Promis
                 chain: chain.name,
                 check: 'entry-exit-affordability',
                 passed: false,
-                reason: `entry-exit-affordability: getFeeData returned no maxFeePerGas/gasPrice — cannot price the guaranteed exit; refusing snipe (fail-closed) — see ${EXIT_GATE_DOC}`,
-                details: { feeData: { maxFeePerGas: feeData.maxFeePerGas?.toString() ?? null, gasPrice: feeData.gasPrice?.toString() ?? null } },
+                reason: `entry-exit-affordability (${mode}): getFeeData returned no maxFeePerGas/gasPrice — cannot price the guaranteed exit; refusing buy (fail-closed) — see ${EXIT_GATE_DOC}`,
+                details: { mode, feeData: { maxFeePerGas: feeData.maxFeePerGas?.toString() ?? null, gasPrice: feeData.gasPrice?.toString() ?? null } },
             };
         }
         const { baseFeeWei, maxBuyFeeWei } = fees;
@@ -366,10 +404,24 @@ export async function checkEntryExitAffordability(chain: PreflightChain): Promis
             approvalGasLimit: EXIT_GATE_APPROVAL_GAS_LIMIT,
             sellGasBuffer,
         });
+        // 21.3-02 / D-BUY-AFFORDABILITY-EXTEND — MODE-AWARE public-BUY-gas reserve:
+        //   - deliberate: reserve the deliberate buy's OWN worst-case public-fallback
+        //     gas, REUSING the single-source-of-truth helper with approvalGasLimit:0n
+        //     (a buy spends ETH — no ERC-20 approve) + DELIBERATE_BUY_GAS_BUFFER.
+        //   - snipe: ZERO — a genuine snipe has no public fallback to reserve for.
+        const worstCasePublicBuyGas =
+            mode === 'deliberate'
+                ? computeWorstCasePublicExitGas({
+                      baseFeeWei,
+                      sellGasLimit, // the buy gas limit == chain.gas.maxGasLimit (same limit)
+                      approvalGasLimit: 0n, // a buy needs no approve — spends ETH directly
+                      sellGasBuffer: parseDeliberateBuyBuffer(),
+                  })
+                : 0n;
         // Per-chain fixed cushion (same parseEther(gasBuffer) idiom as checkWalletBalance).
         const cushion = ethers.parseEther(chain.gasBuffer);
 
-        const floor = snipeValue + worstCaseBuyGas + worstCasePublicSellGas + cushion;
+        const floor = snipeValue + worstCaseBuyGas + worstCasePublicSellGas + worstCasePublicBuyGas + cushion;
         const passed = balance >= floor;
 
         return {
@@ -378,13 +430,15 @@ export async function checkEntryExitAffordability(chain: PreflightChain): Promis
             passed,
             reason: passed
                 ? undefined
-                : `entry-exit-affordability: wallet cannot guarantee an exit — balance ${ethers.formatEther(balance)} < floor ${ethers.formatEther(floor)} ${chain.nativeCurrency} (snipe ${ethers.formatEther(snipeValue)} + worstCaseBuyGas ${ethers.formatEther(worstCaseBuyGas)} + worstCasePublicSellGas ${ethers.formatEther(worstCasePublicSellGas)} + cushion ${ethers.formatEther(cushion)}); refusing snipe — top up the wallet or lower the snipe amount, see ${EXIT_GATE_DOC}`,
+                : `entry-exit-affordability (${mode}): wallet cannot guarantee an exit — balance ${ethers.formatEther(balance)} < floor ${ethers.formatEther(floor)} ${chain.nativeCurrency} (snipe ${ethers.formatEther(snipeValue)} + worstCaseBuyGas ${ethers.formatEther(worstCaseBuyGas)} + worstCasePublicSellGas ${ethers.formatEther(worstCasePublicSellGas)} + worstCasePublicBuyGas ${ethers.formatEther(worstCasePublicBuyGas)} + cushion ${ethers.formatEther(cushion)}); refusing buy — top up the wallet or lower the snipe amount, see ${EXIT_GATE_DOC}`,
             details: {
+                mode,
                 balance: ethers.formatEther(balance),
                 floor: ethers.formatEther(floor),
                 snipeValue: ethers.formatEther(snipeValue),
                 worstCaseBuyGas: ethers.formatEther(worstCaseBuyGas),
                 worstCasePublicSellGas: ethers.formatEther(worstCasePublicSellGas),
+                worstCasePublicBuyGas: ethers.formatEther(worstCasePublicBuyGas),
                 cushion: ethers.formatEther(cushion),
                 baseFeeWei: baseFeeWei.toString(),
                 maxBuyFeeWei: maxBuyFeeWei.toString(),
@@ -401,8 +455,9 @@ export async function checkEntryExitAffordability(chain: PreflightChain): Promis
             chain: chain.name,
             check: 'entry-exit-affordability',
             passed: false,
-            reason: `entry-exit-affordability check threw: ${(err as Error).message} — refusing snipe (fail-closed; never enter what you cannot prove you can exit) — see ${EXIT_GATE_DOC}`,
+            reason: `entry-exit-affordability (${mode}) check threw: ${(err as Error).message} — refusing buy (fail-closed; never enter what you cannot prove you can exit) — see ${EXIT_GATE_DOC}`,
             details: {
+                mode,
                 err: (err as Error).message,
                 snipeAmount: chain.snipeAmount,
                 sellGasLimit: sellGasLimit.toString(),

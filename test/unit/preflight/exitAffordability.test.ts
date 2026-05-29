@@ -124,6 +124,8 @@ const ORIGINAL_ENV = { ...process.env };
 
 // EXIT_GATE_SELL_GAS_BUFFER default per config.ts / .env.example.
 const EXIT_GATE_BUFFER_DEFAULT = 2.0;
+// DELIBERATE_BUY_GAS_BUFFER default per config.ts / .env.example (21.3-00).
+const DELIBERATE_BUY_BUFFER_DEFAULT = 2.0;
 
 describe('checkEntryExitAffordability (buy-time entry gate)', () => {
     beforeEach(() => {
@@ -152,6 +154,16 @@ describe('checkEntryExitAffordability (buy-time entry gate)', () => {
         const sellGas = chain.gas.maxGasLimit * bufferedBaseFee + approvalGas;
         const cushion = ethers.parseEther(chain.gasBuffer);
         return snipeValue + buyGas + sellGas + cushion;
+    }
+
+    // -- the extra DELIBERATE-mode public-BUY reserve term (D-BUY-AFFORDABILITY-EXTEND) --
+    // = buyGasLimit × (baseFee × DELIBERATE_BUY_GAS_BUFFER), approvalGas = 0n (a buy
+    //   spends ETH, no ERC-20 approve). Reuses the SAME computeWorstCasePublicExitGas
+    //   shape the gate's sell term uses, just with approvalGasLimit:0n.
+    function deliberateBuyReserveWei(chain: MockChain, buffer = DELIBERATE_BUY_BUFFER_DEFAULT): bigint {
+        const bufferedBaseFee = (BASE_FEE_WEI * BigInt(Math.round(buffer * 100))) / 100n;
+        // approvalGasLimit: 0n  → ONLY the buy gas limit is reserved.
+        return chain.gas.maxGasLimit * bufferedBaseFee;
     }
 
     it('Test 1 (refuse thin): balance below the floor REFUSES the snipe (passed:false) + structured payload', async () => {
@@ -267,5 +279,123 @@ describe('checkEntryExitAffordability (buy-time entry gate)', () => {
         chain.httpProvider.getBalance.mockResolvedValue(floor - 1n);
         const below = await checkEntryExitAffordability(chain as never);
         expect(below.passed).toBe(false);
+    });
+
+    // -----------------------------------------------------------------------
+    // 21.3-02 / STOP-THE-LINE-05-C / D-BUY-AFFORDABILITY-EXTEND:
+    // the gate is MODE-AWARE. A DELIBERATE buy reserves its OWN worst-case
+    // public-fallback buy gas (it HAS a public fallback it might broadcast). A
+    // genuine SNIPE has no public fallback, so it reserves ZERO public-buy gas.
+    // -----------------------------------------------------------------------
+    describe('mode-aware public-BUY reserve (deliberate reserves, snipe exempt)', () => {
+        it('Test 5 (deliberate reserves / snipe exempt): SAME balance/fee PASSES snipe but FAILS deliberate (the extra reserve is real)', async () => {
+            const chain = makeMockChain();
+            // Fund EXACTLY at the snipe floor — passes snipe, but the deliberate
+            // floor is strictly higher (snipe floor + the public-buy reserve), so
+            // the SAME balance must FAIL deliberate mode.
+            const snipeFloor = expectedFloorWei(chain);
+            chain.httpProvider.getBalance.mockResolvedValue(snipeFloor);
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            // Default mode is 'snipe' → passes at the snipe floor.
+            const asSnipeDefault = await checkEntryExitAffordability(chain as never);
+            expect(asSnipeDefault.passed).toBe(true);
+
+            // Explicit 'snipe' → identical to the default.
+            const asSnipe = await checkEntryExitAffordability(chain as never, 'snipe');
+            expect(asSnipe.passed).toBe(true);
+
+            // 'deliberate' → the extra public-buy reserve raises the floor above the
+            // balance → the SAME balance/fee now REFUSES.
+            const asDeliberate = await checkEntryExitAffordability(chain as never, 'deliberate');
+            expect(asDeliberate.passed).toBe(false);
+            expect(asDeliberate.check).toBe('entry-exit-affordability');
+            expect(asDeliberate.reason).toMatch(/exit|afford|floor|buy/i);
+        });
+
+        it('Test 6 (term surfaced): deliberate details.worstCasePublicBuyGas > 0, snipe term is 0', async () => {
+            const chain = makeMockChain();
+            // Fund generously so BOTH modes pass — we only inspect the surfaced term.
+            chain.httpProvider.getBalance.mockResolvedValue(
+                expectedFloorWei(chain) + ethers.parseEther('10'),
+            );
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            const snipe = await checkEntryExitAffordability(chain as never, 'snipe');
+            expect(snipe.passed).toBe(true);
+            // Snipe reserves ZERO public-buy gas (the term it will never use).
+            const snipeTerm = ethers.parseEther(String(snipe.details?.worstCasePublicBuyGas ?? '0'));
+            expect(snipeTerm).toBe(0n);
+            expect(snipe.details?.mode).toBe('snipe');
+
+            const deliberate = await checkEntryExitAffordability(chain as never, 'deliberate');
+            expect(deliberate.passed).toBe(true);
+            // Deliberate reserves a strictly-positive public-buy gas term.
+            expect(deliberate.details?.worstCasePublicBuyGas).toBeDefined();
+            const delibTerm = ethers.parseEther(String(deliberate.details?.worstCasePublicBuyGas));
+            expect(delibTerm > 0n).toBe(true);
+            expect(deliberate.details?.mode).toBe('deliberate');
+            // The surfaced term equals the single-source-of-truth reserve (approvalGas:0n).
+            expect(delibTerm).toBe(deliberateBuyReserveWei(chain));
+        });
+
+        it('Test 7 (buffer controls the reserve): a larger DELIBERATE_BUY_GAS_BUFFER raises the deliberate floor', async () => {
+            const chain = makeMockChain();
+            // Fund at exactly the default-buffer deliberate floor → passes at default.
+            const delibFloorDefault = expectedFloorWei(chain) + deliberateBuyReserveWei(chain, DELIBERATE_BUY_BUFFER_DEFAULT);
+            chain.httpProvider.getBalance.mockResolvedValue(delibFloorDefault);
+
+            // At the default buffer the balance is exactly at the deliberate floor → passes.
+            {
+                const { checkEntryExitAffordability } = await import('../../../src/preflight');
+                const atDefault = await checkEntryExitAffordability(chain as never, 'deliberate');
+                expect(atDefault.passed).toBe(true);
+            }
+
+            // Raise the buffer → the public-buy reserve grows → the SAME balance now FAILS.
+            process.env.DELIBERATE_BUY_GAS_BUFFER = '3.0';
+            {
+                const { checkEntryExitAffordability } = await import('../../../src/preflight');
+                const atHigher = await checkEntryExitAffordability(chain as never, 'deliberate');
+                expect(atHigher.passed).toBe(false);
+                // The surfaced term grew with the buffer (3.0 vs 2.0).
+                const grownTerm = ethers.parseEther(String(atHigher.details?.worstCasePublicBuyGas));
+                expect(grownTerm).toBe(deliberateBuyReserveWei(chain, 3.0));
+                expect(grownTerm > deliberateBuyReserveWei(chain, DELIBERATE_BUY_BUFFER_DEFAULT)).toBe(true);
+            }
+        });
+
+        it('Test 8 (no snipe regression): the snipe-mode floor is BYTE-FOR-BYTE the pre-21.3 floor (snipe + buyGas + publicSell + cushion)', async () => {
+            const chain = makeMockChain();
+            const snipeFloor = expectedFloorWei(chain);
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            // Exactly at the pre-21.3 snipe floor → passes (boundary unchanged).
+            chain.httpProvider.getBalance.mockResolvedValue(snipeFloor);
+            const atFloor = await checkEntryExitAffordability(chain as never, 'snipe');
+            expect(atFloor.passed).toBe(true);
+            // The surfaced snipe floor equals the pre-21.3 floor exactly.
+            expect(ethers.parseEther(String(atFloor.details?.floor))).toBe(snipeFloor);
+
+            // One wei below the pre-21.3 floor → refuses (boundary unchanged).
+            chain.httpProvider.getBalance.mockResolvedValue(snipeFloor - 1n);
+            const below = await checkEntryExitAffordability(chain as never, 'snipe');
+            expect(below.passed).toBe(false);
+        });
+
+        it('Test 9 (fail-closed preserved in deliberate): a balance fetch that throws REFUSES in deliberate mode too', async () => {
+            const chain = makeMockChain();
+            chain.httpProvider.getBalance.mockRejectedValue(new Error('RPC down'));
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+            const result = await checkEntryExitAffordability(chain as never, 'deliberate');
+
+            expect(result.passed).toBe(false);
+            expect(result.reason).toMatch(/threw|RPC|fail/i);
+            expect(result.details?.err).toBeDefined();
+        });
     });
 });
