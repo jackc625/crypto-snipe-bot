@@ -3,6 +3,19 @@
 // Flashbots (ETH), bloXroute (BSC), passthrough (Base/Arbitrum).
 import type { TransactionRequest, JsonRpcProvider, Wallet } from 'ethers';
 
+/**
+ * Optional side-channel a caller passes to {@link MevStrategy.sendTransaction}
+ * (Phase 21.2-12 / CR-02). The strategy writes the ACTUALLY-BROADCAST signed-tx
+ * hash + submitted nonce here (even on a throw), so the exit ladder's
+ * no-double-sell guard can reconcile the REAL broadcast tx rather than a
+ * throwaway locally pre-signed one. The return value (Promise<string>) is
+ * UNCHANGED so all existing callers/tests are unaffected.
+ */
+export interface BroadcastHandle {
+  signedTxHash?: string;
+  submittedNonce?: number;
+}
+
 export interface MevStrategy {
   readonly name: string;
 
@@ -24,6 +37,9 @@ export interface MevStrategy {
    * anti-rug exit's gas relative to the chain's standard rate when the buyer
    * is racing a rug-puller's tx in the same block.
    *
+   * `broadcast` (optional): a side-channel the strategy populates with the
+   * ACTUALLY-BROADCAST signed-tx hash + submitted nonce (Phase 21.2-12 / CR-02).
+   *
    * @returns Transaction hash or bundle identifier string
    */
   sendTransaction(
@@ -31,7 +47,8 @@ export interface MevStrategy {
     wallet: Wallet,
     provider: JsonRpcProvider,
     maxRetries?: number,
-    gasMultiplier?: number
+    gasMultiplier?: number,
+    broadcast?: BroadcastHandle
   ): Promise<string>;
 }
 

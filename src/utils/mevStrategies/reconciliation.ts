@@ -115,6 +115,23 @@ export interface ReconcileOutcome {
 }
 
 /**
+ * Optional side-channel for {@link submitWithReconciliation} (Phase 21.2-12 /
+ * CR-02). The helper's RETURN value stays the bare landed hash (unchanged for
+ * every existing caller + test), but a caller that needs the ACTUALLY-BROADCAST
+ * tx handle even on a THROW (genuine not-landed / ceiling-hit) passes one of
+ * these: the helper writes the LAST attempt's broadcast signed-tx hash + the
+ * submitted nonce into it after every submit. The exit ladder's no-double-sell
+ * guard (escalatePrivateSell → exitEngine guard 2a) reads these to reconcile the
+ * REAL broadcast tx — NOT a throwaway locally pre-signed tx (the CR-02 bug).
+ */
+export interface BroadcastHandle {
+  /** The signed-tx hash of the last attempt the strategy actually broadcast. */
+  signedTxHash?: string;
+  /** The nonce that last attempt submitted. */
+  submittedNonce?: number;
+}
+
+/**
  * Build a {@link ReconcileConfig} from the process env (or any env-like map),
  * applying the RESEARCH §Q7 generous-but-safe defaults. This is the single
  * place env vars are parsed into the helper config — the config tests assert
@@ -432,7 +449,8 @@ export async function submitWithReconciliation(
     chainPriorityWei: bigint;
   },
   logSink: ReconcileLogger = log,
-  alert: (msg: string) => Promise<void> = async () => {}
+  alert: (msg: string) => Promise<void> = async () => {},
+  broadcast?: BroadcastHandle
 ): Promise<string> {
   // The nonce the PREVIOUS attempt submitted (so we can detect advancement).
   let prevSubmittedNonce: number | null = null;
@@ -522,6 +540,14 @@ export async function submitWithReconciliation(
     const result = await submit(a);
     prevSubmittedNonce = result.submittedNonce;
     prevSignedTxHash = result.signedTxHash;
+    // CR-02 (21.2-12): record the ACTUALLY-BROADCAST handle of this attempt into
+    // the caller's side-channel so the no-double-sell guard reconciles the REAL
+    // broadcast tx — even if a later attempt throws (ceiling-hit / not-landed),
+    // the last broadcast attempt's hash + nonce remain available to the caller.
+    if (broadcast) {
+      broadcast.signedTxHash = result.signedTxHash;
+      broadcast.submittedNonce = result.submittedNonce;
+    }
 
     if (result.nativeConfirmed) {
       // The strategy's own native confirm succeeded; it preserves its own

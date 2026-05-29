@@ -15,7 +15,7 @@
 // path (a local fork has no Flashbots relay). The `MevStrategy.sendTransaction`
 // signature is UNCHANGED.
 import { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
-import type { MevStrategy } from './types';
+import type { MevStrategy, BroadcastHandle } from './types';
 import { applyGasMultiplier } from './types';
 import {
   submitWithReconciliation,
@@ -46,7 +46,8 @@ export class PassthroughMevStrategy implements MevStrategy {
     wallet: Wallet,
     provider: JsonRpcProvider,
     maxRetries = 3,
-    gasMultiplier?: number
+    gasMultiplier?: number,
+    broadcast?: BroadcastHandle
   ): Promise<string> {
     const chainId = (await provider.getNetwork()).chainId;
     const feeData = await provider.getFeeData();
@@ -157,7 +158,10 @@ export class PassthroughMevStrategy implements MevStrategy {
       provider,
       cfg,
       { walletBalanceWei, baseFeeWei, snipeValueWei, buyGasLimit, chainPriorityWei },
-      { info: log.info.bind(log), warn: log.warn.bind(log), error: log.error.bind(log) }
+      { info: log.info.bind(log), warn: log.warn.bind(log), error: log.error.bind(log) },
+      undefined,
+      // CR-02 (21.2-12): surface the ACTUALLY-BROADCAST hash + nonce to the caller.
+      broadcast
     );
   }
 }

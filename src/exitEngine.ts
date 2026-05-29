@@ -864,10 +864,28 @@ export async function executeFullSell(
             ctx.log.info({ token: tokenAddress, reason, txHash, op: 'exit.full.private-landed' }, 'Private exit bundle landed');
         } else {
             // (2) NO-DOUBLE-SELL GUARD before going public (D-FALLBACK-NO-DOUBLE-SELL).
-            // (2a) Reconcile the last private attempt (receipt + nonce — the proven
-            // 21.1 probe). If it actually landed late (the LADYS / STOP-THE-LINE-02
-            // false-negative class), ABORT the public fallback and treat it as a
-            // landed sell. A bounded window/poll from the sell-leg reconcile config.
+            // (2a) Reconcile the last private attempt against chain state. CR-02 fix
+            // (21.2-12): priv.lastSignedHash/lastNonce are now the ACTUALLY-BROADCAST
+            // tx the strategy sent (surfaced via the BroadcastHandle side-channel) —
+            // NOT a throwaway local pre-sign — so reconcileInclusion probes a hash
+            // that REALLY hit the chain and can actually detect a late land.
+            //   * 'included'        → the private bundle landed late (the LADYS /
+            //                         STOP-THE-LINE-02 false-negative class). ABORT the
+            //                         public fallback and treat it as a landed sell.
+            //   * 'landed-not-ours' → the nonce was consumed but our hash has no
+            //                         receipt yet — we CANNOT prove our private sell
+            //                         did NOT land. FAIL SAFE toward not-selling-twice
+            //                         (CR-02 interim mitigation): do NOT run the public
+            //                         fallback on the optimistic balanceOf snapshot;
+            //                         keep monitoring (balanceOf truth re-decides
+            //                         teardown). A double-sell is the unrecoverable
+            //                         harm; a delayed retry is recoverable.
+            //   * 'reverted'/'not-landed' → fall through to the balanceOf-truth guard
+            //                         (2b): the sell genuinely did not consume the
+            //                         tokens, so the re-fetched held balance is the
+            //                         authoritative amount to sell.
+            // A bounded window/poll from the sell-leg reconcile config.
+            let privateInclusionInconclusive = false;
             if (priv.lastSignedHash && priv.lastNonce != null) {
                 const rcfg = buildReconcileConfig(process.env, ctx.chain.gas.maxGasLimit, attempts, 'sell');
                 const recon = await reconcileInclusion(
@@ -884,7 +902,32 @@ export async function executeFullSell(
                         `*[EXIT GUARD]* ${reason}: private bundle landed late (reconciled) — public fallback ABORTED ` +
                         `to prevent a double-sell.`,
                     );
+                } else if (recon.outcome === 'landed-not-ours') {
+                    // The submitted nonce was consumed but our broadcast hash has no
+                    // receipt. We cannot prove the private sell did NOT land →
+                    // FAIL SAFE: do NOT run the public fallback (a double-sell is the
+                    // unrecoverable harm). Keep the position held + monitored; the
+                    // next poll (or anti-rug) re-evaluates against balanceOf truth.
+                    privateInclusionInconclusive = true;
+                    ctx.log.warn(
+                        { token: tokenAddress, reason, signedTxHash: priv.lastSignedHash, submittedNonce: priv.lastNonce, op: 'exit.fallback.failsafe.inconclusive' },
+                        'No-double-sell guard: private inclusion INCONCLUSIVE (landed-not-ours) — failing SAFE, NOT running the public fallback (avoid double-sell)',
+                    );
+                    await sendCtxAlert(
+                        ctx,
+                        `*[EXIT GUARD]* ${reason}: private inclusion is INCONCLUSIVE (nonce consumed, our receipt not visible) — ` +
+                        `public fallback DEFERRED to avoid a double-sell. Position stays held + monitored; it will retry on the next ` +
+                        `poll cycle (anti-rug always still fires). Remediation: inspect whether the private sell landed.`,
+                    );
                 }
+            }
+
+            // CR-02 fail-safe: an inconclusive private inclusion must NOT proceed to
+            // the public fallback on the optimistic balanceOf snapshot. Return WITHOUT
+            // tearing down — the position is kept held + monitored (balanceOf truth on
+            // the next cycle re-decides). This is the recoverable direction.
+            if (privateInclusionInconclusive) {
+                return false;
             }
 
             // (2b) If still not resolved, balanceOf is the authoritative truth.
