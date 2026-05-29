@@ -49,7 +49,7 @@ import { sanitizeReason } from "./utils/honeypot/sanitize";
 import { BLOCKLIST } from "./utils/blocklist";
 import { sendTelegramAlert } from "./utils/notifier";
 import { sendCtxAlert } from "./utils/notifier";
-import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken, getPauseState, setPauseState, forceWalCheckpoint } from "./utils/db";
+import { db, insertTrade, isTokenSniped, updateTradeStatus, getTradeIdForPendingToken, getPauseState, setPauseState, forceWalCheckpoint, getResumeExitMonitorTrades, getResumeAntiRugTrades } from "./utils/db";
 // Phase 20 / OPS-LIVE-01 + OPS-LIVE-02 — preflight is called before chain-context
 // creation; checkWalletBalance is reused inside the mid-run setInterval so the
 // floor formula lives in one place (D-BALANCE-FLOOR / W4 fix per Plan 20-02).
@@ -1270,10 +1270,26 @@ export async function startMultiChainBot(): Promise<void> {
 // Resume monitoring for pending trades across all chains
 // ---------------------------------------------------------------------------
 
-function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
-    const pendingTrades = db.prepare(
-        'SELECT DISTINCT token, chain, pool_type, fee_tier, id FROM trades WHERE status = ? AND action = ?'
-    ).all('pending', 'buy') as { token: string; chain: string; pool_type: string; fee_tier: number | null; id: number }[];
+export function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
+    // Phase 21.2-11 / STOP-THE-LINE-04-D / S-1: the restart-resume set is the UNION
+    // of (a) healthy open buys (status='pending' AND action='buy') and (b) every
+    // position whose exit_state row is stamped 'exit_failed_held' — REGARDLESS of
+    // its trades.status (the balance-truth catch stamps a still-held failed exit
+    // 'failed' for operator visibility, exitEngine.ts:1054). Before this fix the
+    // scan filtered 'pending' only, so a catch-path exit_failed_held row was
+    // SILENTLY DROPPED on reboot (no exit monitor) — the LADYS-class harm surviving
+    // a restart (T-21.2-DROPRUG). getResumeExitMonitorTrades carries an
+    // `is_failed_held` discriminator so each resumed failed-held position is logged
+    // (D-ALERTS). The balanceOf guard below stays the SOURCE OF TRUTH: a genuinely-
+    // closed position (balance ~0) is left closed, never resurrected (T-21.2-RESURRECT).
+    const pendingTrades = getResumeExitMonitorTrades.all() as {
+        token: string;
+        chain: string;
+        pool_type: string;
+        fee_tier: number | null;
+        id: number;
+        is_failed_held: number;
+    }[];
 
     for (const trade of pendingTrades) {
         const { token, chain: chainName } = trade;
@@ -1281,6 +1297,17 @@ function resumeMultiChainMonitoring(contexts: ChainContext[]): void {
         if (!ctx) {
             log.warn({ token, chain: chainName }, 'No active context for chain, skipping resume');
             continue;
+        }
+
+        if (trade.is_failed_held) {
+            // D-ALERTS (Phase 21.2-11 / S-1): a failed-still-held position is being
+            // re-entered into monitoring across a reboot. This is the crown-jewel
+            // restart-resume — surface it on a distinct dotted op so the operator
+            // sees that rug-exposed, exit-failed positions survived the restart.
+            ctx.log.info(
+                { token, poolType: trade.pool_type, tradeId: trade.id, op: 'exit.failed-held.resumed' },
+                'Resuming exit monitor for an exit_failed_held position (still-held failed exit re-armed across restart)',
+            );
         }
 
         ctx.log.info({ token, poolType: trade.pool_type, tradeId: trade.id }, 'Resuming exit monitor for pending token');
@@ -1383,20 +1410,47 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
         }
     }
 
-    // Step 2 — scan trades INNER JOIN lp_baseline for open positions.
-    const openTrades = db.prepare(`
-        SELECT t.id, t.token, t.chain, t.pool_type, t.fee_tier, b.pair_or_pool_address
-        FROM trades t
-        INNER JOIN lp_baseline b ON b.trade_id = t.id
-        WHERE t.status = 'pending' AND t.action = 'buy'
-    `).all() as Array<{
+    // Step 2 — scan trades INNER JOIN lp_baseline for the restart-resume set.
+    //
+    // Phase 21.2-11 / STOP-THE-LINE-04-D / S-1: the set is the UNION of healthy
+    // open buys (status='pending') AND every exit_failed_held position — regardless
+    // of its trades.status='failed' (the balance-truth catch stamp, exitEngine.ts:
+    // 1054). Before this fix the scan filtered 'pending' only, so a still-held
+    // failed exit LOST its anti-rug re-registration on reboot — the exact LADYS-
+    // class harm (T-21.2-DROPRUG) surviving a restart. getResumeAntiRugTrades still
+    // INNER JOINs lp_baseline (the registerAntiRugPosition precondition), so an
+    // exit_failed_held position that lacks a baseline row is naturally excluded —
+    // that is the pre-Phase-19 gap, which we LOG below (not silently drop).
+    const openTrades = getResumeAntiRugTrades.all() as Array<{
         id: number;
         token: string;
         chain: string;
         pool_type: 'v2' | 'v3';
         fee_tier: number | null;
         pair_or_pool_address: string;
+        is_failed_held: number;
     }>;
+
+    // The exit_failed_held trade_ids that DID survive the lp_baseline INNER JOIN
+    // (so we can log which failed-held positions are re-registered, and detect
+    // which were EXCLUDED for lacking a baseline — the pre-Phase-19 gap).
+    const resumedFailedHeldIds = new Set(
+        openTrades.filter((t) => t.is_failed_held).map((t) => t.id),
+    );
+    // Any exit_failed_held row absent from the lp_baseline-joined set lacks a
+    // baseline → registerAntiRugPosition's loadLpBaseline precondition is unmet.
+    // Log it (operator-visible) rather than letting the INNER JOIN drop it silently.
+    const failedHeldIdsNeedingResume = (
+        getResumeExitMonitorTrades.all() as Array<{ id: number; is_failed_held: number }>
+    ).filter((t) => t.is_failed_held).map((t) => t.id);
+    for (const fhId of failedHeldIdsNeedingResume) {
+        if (!resumedFailedHeldIds.has(fhId)) {
+            log.warn(
+                { tradeId: fhId, op: 'antirug.resume.failed-held-no-baseline' },
+                'exit_failed_held position has no lp_baseline row — cannot re-register anti-rug on restart (pre-Phase-19 gap); left unmonitored',
+            );
+        }
+    }
 
     // Step 3 — re-register each open position into the per-chain anti-rug
     // dispatch table. CR-04: skip positions on chains that failed verify.
@@ -1433,6 +1487,16 @@ export async function resumeAntiRugMonitoring(contexts: ChainContext[]): Promise
                 'Cannot resume anti-rug — no matching DEX for trade pool_type',
             );
             continue;
+        }
+        if (trade.is_failed_held) {
+            // D-ALERTS (Phase 21.2-11 / S-1): re-registering anti-rug for a
+            // failed-still-held position across a reboot — the crown-jewel
+            // invariant (a still-held exit-failed position never loses rug
+            // protection just because the process died).
+            ctx.log.info(
+                { tradeId: trade.id, token: trade.token, op: 'exit.failed-held.resumed' },
+                'Re-registering anti-rug for an exit_failed_held position across restart',
+            );
         }
         await registerAntiRugPosition(
             ctx,

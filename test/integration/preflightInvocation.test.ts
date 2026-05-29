@@ -38,6 +38,10 @@ const dbStmtRunMock = vi.fn();
 const dbStmtGetMock = vi.fn();
 const dbStmtAllMock = vi.fn();
 const dbPrepareMock = vi.fn();
+// Phase 21.2-11 / S-1: the restart-resume scans read these exported statements;
+// re-armed in beforeEach (mockReset:true wipes the .mockReturnValue otherwise).
+const resumeExitMonitorAllMock = vi.fn();
+const resumeAntiRugAllMock = vi.fn();
 
 // Call-order witness so we can prove preflight runs BETWEEN buildChainRegistry
 // and the first createChainContext call. Each spy pushes its label on every
@@ -91,6 +95,10 @@ vi.doMock('../../src/utils/db', () => {
         getPauseState: { get: getPauseStateGetMock },
         setPauseState: { run: setPauseStateRunMock },
         clearPauseState: { run: vi.fn() },
+        // Phase 21.2-11 / S-1: the boot-time restart-resume scans read these
+        // pre-prepared exported statements (no open positions here → empty set).
+        getResumeExitMonitorTrades: { all: resumeExitMonitorAllMock },
+        getResumeAntiRugTrades: { all: resumeAntiRugAllMock },
     };
 });
 
@@ -177,6 +185,8 @@ function rearmAllMocks() {
     dbStmtGetMock.mockReset().mockReturnValue({ paused: 0 });
     dbStmtAllMock.mockReset().mockReturnValue([]);
     dbPrepareMock.mockReset().mockReturnValue({ run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock });
+    resumeExitMonitorAllMock.mockReset().mockReturnValue([]);
+    resumeAntiRugAllMock.mockReset().mockReturnValue([]);
 
     preflightMock.mockReset().mockImplementation(async () => {
         callOrder.push('preflight');

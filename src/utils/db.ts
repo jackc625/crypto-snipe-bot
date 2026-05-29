@@ -561,6 +561,64 @@ const getStaleTradesQuery = db.prepare(
     `SELECT id, token, chain, timestamp FROM trades WHERE status = 'pending' AND action = 'buy' AND timestamp < ?`
 );
 
+// --- Restart-Resume Scan (Phase 21.2 / Plan 21.2-11 / STOP-THE-LINE-04-D / S-1) ---
+//
+// THE BUG THIS CLOSES (finding S-1, surfaced by the 21.2-10 fork-rehearsal gate):
+// 21.2-07 persists a failed-still-held position as exit_state.exit_status=
+// 'exit_failed_held' (markExitFailedHeld, db.ts:540) and KEEPS anti-rug + re-arms
+// the poll timer AT RUNTIME — but the balance-truth catch stamps trades.status=
+// 'failed' for operator visibility (exitEngine.ts:1054). The two reboot scans
+// previously filtered `status='pending' AND action='buy'` ONLY (and exit_status
+// was READ nowhere on restart), so a catch-path exit_failed_held row was SILENTLY
+// DROPPED on reboot: no exit monitor, no anti-rug — the LADYS-class harm
+// (T-21.2-DROPRUG) surviving a restart. The DESIGN always intended a restart to
+// resume it (db.ts:529 "so the row re-enters monitoring + re-registers anti-rug");
+// only the READ side was missing. These two statements ARE that read side.
+//
+// D-QUALITY-FIRST: we read the DISTINCT `exit_failed_held` lifecycle marker rather
+// than collapsing the catch path back to 'pending' — preserving the operator-
+// visible trades.status='failed' (a failed-still-held position is NOT a healthy
+// open buy; the operator must still see it as failed) while the resume set unions
+// it back into monitoring by its durable identity.
+//
+// The set is the UNION of (a) the pre-existing healthy open-buy scan and (b) every
+// trade whose exit_state row is stamped `exit_failed_held`, REGARDLESS of
+// trades.status. exit_state.trade_id is a PRIMARY KEY → at most one exit_state row
+// per trade, so the LEFT JOIN yields exactly one row per trade (DISTINCT is a
+// belt-and-suspenders guard). `is_failed_held` is the discriminator the resume
+// loop logs on (D-ALERTS op:'exit.failed-held.resumed'); COALESCE(...,0) because a
+// LEFT JOIN miss makes `e.exit_status` NULL and `NULL = 'x'` is NULL in SQLite.
+// The literal MUST stay exactly 'exit_failed_held' (the markExitFailedHeld
+// contract at db.ts:537 + the 21.2-10 fork restart-resume test).
+//
+// getResumeExitMonitorTrades — drives resumeMultiChainMonitoring (re-arm the poll
+// loop via resumeExitMonitor; the balanceOf guard stays the source of truth so a
+// genuinely-closed position is never resurrected).
+const getResumeExitMonitorTrades = db.prepare(`
+    SELECT DISTINCT t.token, t.chain, t.pool_type, t.fee_tier, t.id,
+        COALESCE(e.exit_status = 'exit_failed_held', 0) AS is_failed_held
+    FROM trades t
+    LEFT JOIN exit_state e ON e.trade_id = t.id
+    WHERE (t.status = 'pending' AND t.action = 'buy')
+       OR e.exit_status = 'exit_failed_held'
+`);
+
+// getResumeAntiRugTrades — drives resumeAntiRugMonitoring. SAME union, but INNER
+// JOIN lp_baseline (the anti-rug register precondition: registerAntiRugPosition
+// needs the baseline row). The INNER JOIN naturally excludes any position lacking
+// a baseline row — for an exit_failed_held position that is the pre-Phase-19 gap,
+// which resumeAntiRugMonitoring logs (NOT silently drops) before this query, so
+// the exclusion is operator-visible rather than invisible.
+const getResumeAntiRugTrades = db.prepare(`
+    SELECT DISTINCT t.id, t.token, t.chain, t.pool_type, t.fee_tier, b.pair_or_pool_address,
+        COALESCE(e.exit_status = 'exit_failed_held', 0) AS is_failed_held
+    FROM trades t
+    INNER JOIN lp_baseline b ON b.trade_id = t.id
+    LEFT JOIN exit_state e ON e.trade_id = t.id
+    WHERE (t.status = 'pending' AND t.action = 'buy')
+       OR e.exit_status = 'exit_failed_held'
+`);
+
 // --- Anti-Rug Prepared Statements (Phase 19 / ANTIRUG-04 / ANTIRUG-16) ---
 //
 // upsertLpBaseline: insert or refresh the LP-baseline snapshot for a trade.
@@ -697,6 +755,9 @@ export {
     getTradeIdForPendingToken,
     // WR-06: cached query for preflight checkStaleData
     getStaleTradesQuery,
+    // Phase 21.2 / Plan 21.2-11 / STOP-THE-LINE-04-D / S-1 — restart-resume read side
+    getResumeExitMonitorTrades,
+    getResumeAntiRugTrades,
     // Phase 19 / ANTIRUG-04 / ANTIRUG-16
     upsertLpBaseline,
     getLpBaseline,

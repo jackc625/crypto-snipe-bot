@@ -103,12 +103,23 @@ const prepareSpy = vi.fn().mockImplementation((_sql: string) => ({
     run: vi.fn(),
 }));
 
+// Phase 21.2-11 / S-1: the restart-resume scans now read pre-prepared, exported
+// statements from db.ts (getResumeAntiRugTrades / getResumeExitMonitorTrades)
+// — the higher-quality cached-statement idiom (surfaces SQL errors at module
+// load, single test surface) — instead of an inline db.prepare in bot.ts. These
+// mocks back the new exports so the runtime resume tests inject rows through the
+// statement the production code now actually calls.
+const resumeAntiRugAllMock = vi.fn().mockReturnValue([]);
+const resumeExitMonitorAllMock = vi.fn().mockReturnValue([]);
+
 vi.mock('../../../src/utils/db', () => ({
     db: { prepare: prepareSpy },
     insertTrade: { run: vi.fn() },
     isTokenSniped: { get: vi.fn().mockReturnValue(undefined) },
     updateTradeStatus: { run: vi.fn() },
     getTradeIdForPendingToken: { get: vi.fn() },
+    getResumeAntiRugTrades: { all: resumeAntiRugAllMock },
+    getResumeExitMonitorTrades: { all: resumeExitMonitorAllMock },
     closeDb: vi.fn(),
     getOpenPositionCount: { get: vi.fn() },
     getTotalExposure: { get: vi.fn() },
@@ -310,6 +321,8 @@ beforeEach(() => {
     verifyAllowlistAtStartupMock.mockClear().mockResolvedValue(undefined);
     snapshotLpBaselineMock.mockClear().mockResolvedValue(undefined);
     allMock.mockReset().mockReturnValue([]);
+    resumeAntiRugAllMock.mockReset().mockReturnValue([]);
+    resumeExitMonitorAllMock.mockReset().mockReturnValue([]);
     // mockReset:true (per vitest.config.ts) wipes implementations between
     // tests — re-set prepareSpy's factory so db.prepare(sql).all() works.
     prepareSpy.mockClear().mockImplementation((_sql: string) => ({
@@ -417,17 +430,15 @@ describe('Phase 19 — bot.ts wiring + resumeAntiRugMonitoring', () => {
                     pair_or_pool_address: '0xPool02',
                 },
             ];
-            allMock.mockReturnValue(rows);
+            resumeAntiRugAllMock.mockReturnValue(rows);
 
             await resumeAntiRugMonitoring([ethCtx as unknown as Parameters<typeof resumeAntiRugMonitoring>[0][number]]);
 
-            // Verify the JOIN query went through `db.prepare`.
-            expect(prepareSpy).toHaveBeenCalled();
-            const sqlCalls = prepareSpy.mock.calls.map(c => c[0] as string);
-            const joinSqlCalled = sqlCalls.some(sql =>
-                sql.includes('trades') && sql.includes('lp_baseline') && /INNER\s+JOIN/i.test(sql),
-            );
-            expect(joinSqlCalled).toBe(true);
+            // Phase 21.2-11 / S-1: the anti-rug restart-resume now reads the
+            // pre-prepared, exported getResumeAntiRugTrades statement (the
+            // higher-quality cached-statement idiom) rather than an inline
+            // db.prepare. Verify the production scan went through that statement.
+            expect(resumeAntiRugAllMock).toHaveBeenCalled();
 
             // Both rows registered.
             expect(registerAntiRugPositionMock).toHaveBeenCalledTimes(2);
@@ -492,8 +503,8 @@ describe('Phase 19 — bot.ts wiring + resumeAntiRugMonitoring', () => {
             const ethCtx = buildChainCtx('eth');
             // Inject only rows that have lp_baseline (the INNER JOIN naturally
             // excludes trades without a baseline row — the test simulates the
-            // post-JOIN result).
-            allMock.mockReturnValue([
+            // post-JOIN result returned by getResumeAntiRugTrades).
+            resumeAntiRugAllMock.mockReturnValue([
                 {
                     id: 100,
                     token: '0xToken00000000000000000000000000000000T0H',
@@ -501,23 +512,31 @@ describe('Phase 19 — bot.ts wiring + resumeAntiRugMonitoring', () => {
                     pool_type: 'v2',
                     fee_tier: null,
                     pair_or_pool_address: '0xPairH',
+                    is_failed_held: 0,
                 },
             ]);
 
             await resumeAntiRugMonitoring([ethCtx as Parameters<typeof resumeAntiRugMonitoring>[0][number]]);
 
-            // Trade 100 (with baseline) registered; pre-Phase-19 ones are
-            // implicitly excluded by the SQL JOIN, which we verify by inspecting
-            // the SQL string used.
+            // Trade 100 (with baseline) registered; pre-Phase-19 trades (no
+            // baseline) are excluded by getResumeAntiRugTrades' INNER JOIN
+            // lp_baseline — verified against the production SQL literal below.
             expect(registerAntiRugPositionMock).toHaveBeenCalledTimes(1);
-            const sqlCalls = prepareSpy.mock.calls.map(c => c[0] as string);
-            const joinSql = sqlCalls.find(sql =>
-                sql.includes('trades') && sql.includes('lp_baseline'),
+            // The production statement is an INNER JOIN on lp_baseline, asserted
+            // against the actual SQL in src/utils/db.ts (the statement source of
+            // truth) rather than an inline db.prepare call that no longer exists.
+            const dbSource = readFileSync(
+                resolve(__dirname, '../../../src/utils/db.ts'),
+                'utf8',
+            ).replace(/\r\n/g, '\n');
+            const resumeAntiRugStmtMatch = dbSource.match(
+                /getResumeAntiRugTrades\s*=\s*db\.prepare\(`([\s\S]*?)`\)/,
             );
-            expect(joinSql).toBeTruthy();
-            // The query is an INNER JOIN — pre-Phase-19 trades (no baseline)
-            // are filtered out.
-            expect(joinSql).toMatch(/INNER\s+JOIN/i);
+            expect(resumeAntiRugStmtMatch, 'getResumeAntiRugTrades statement must exist in db.ts').toBeTruthy();
+            const resumeAntiRugSql = resumeAntiRugStmtMatch![1];
+            expect(resumeAntiRugSql).toMatch(/INNER\s+JOIN\s+lp_baseline/i);
+            // And it unions the exit_failed_held restart-resume set (S-1 fix).
+            expect(resumeAntiRugSql).toContain('exit_failed_held');
         });
     });
 });

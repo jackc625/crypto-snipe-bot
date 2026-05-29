@@ -540,9 +540,9 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
     }, 120000);
 
     // =====================================================================
-    // TEST 3 (Phase 21.2 / Plan 21.2-10 / STOP-THE-LINE-04-D / D-PERSIST-FAILED-HELD)
-    // —— a SIGTERM-restart RESUMES an `exit_failed_held` row into monitoring
-    //    + re-registers anti-rug (the crown-jewel restart-resume invariant).
+    // TEST 3 (Phase 21.2 / Plans 21.2-10 + 21.2-11 / STOP-THE-LINE-04-D / S-1 /
+    // D-PERSIST-FAILED-HELD) —— a restart RESUMES an `exit_failed_held` row into
+    //    monitoring + re-registers anti-rug (the crown-jewel restart-resume invariant).
     //
     // THE CONTRACT (RESEARCH.md:469 + 21.2-07-SUMMARY.md:166): on a reboot, a
     // still-held FAILED exit (`exit_status='exit_failed_held'`, persisted by
@@ -551,10 +551,18 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
     // protection the LADYS harm proved was missing: a still-held position that
     // failed its exit must NOT lose rug coverage just because the process died.
     //
-    // FIDELITY — this test drives the REAL reboot-resume MECHANISM (the actual
-    // scan predicate the bot uses) + the REAL engine reload path (resumeExitMonitor
-    // + registerAntiRugPosition), so it proves the contract through the production
-    // code, not a privileged hand-call that would mask a scan gap.
+    // S-1 CLOSED (Plan 21.2-11): 21.2-10 PROVED this contract was UNWIRED — the
+    // reboot scans filtered `status='pending'` only, dropping the trades.status=
+    // 'failed' failed-held row (D.1 then asserted that gap as `false`). 21.2-11
+    // wired the READ side (getResumeExitMonitorTrades / getResumeAntiRugTrades union
+    // the exit_failed_held set back in by exit_status), so D.1 below is FLIPPED to
+    // prove the fix against the EXACT production statements.
+    //
+    // FIDELITY — this test drives the REAL reboot-resume MECHANISM (the exact
+    // production prepared statements the bot's scans drive off) + the REAL engine
+    // reload path (resumeExitMonitor + registerAntiRugPosition), so it proves the
+    // contract through the production code, not a privileged hand-call that would
+    // mask a scan gap.
     //
     // ROBUSTNESS — like TEST 1 (the deterministic gate), the position + its disk
     // state are established via the engine's OWN write statements (insertTrade +
@@ -686,93 +694,75 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
 
         // =================================================================
         // STEP D — the reboot-resume. Split into TWO sub-steps that, together,
-        // separate "does the resume WIRING work" (D.2, the engine contract this
-        // plan rehearses) from "does the bot's reboot SCAN actually select this
-        // row" (D.1, the production gate). They diverge — see STOP-THE-LINE below.
+        // separate "does the bot's reboot SCAN actually select this row" (D.1, the
+        // production gate) from "does the resume WIRING work end-to-end" (D.2).
+        //
+        // Phase 21.2-11 / S-1 CLOSED: the gap the 21.2-10 rehearsal CONFIRMED — that
+        // the pending-only reboot scans dropped the failed-held row — is now FIXED.
+        // The two reboot scans read getResumeExitMonitorTrades / getResumeAntiRugTrades
+        // (src/utils/db.ts), which UNION the exit_failed_held set back in by exit_status,
+        // regardless of trades.status='failed'. D.1 below PROVES it against the EXACT
+        // production statements (the same prepared statements bot.ts now calls), bound
+        // to this isolated DB via dbMod — flipped from the 21.2-10 documenting
+        // assertion to a real proof.
         // =================================================================
 
         // -----------------------------------------------------------------
-        // !!! STOP-THE-LINE-04-D / D-PERSIST-FAILED-HELD — CONFIRMED SOURCE GAP !!!
+        // D.1 — the PRODUCTION reboot scans now RE-ENTER the failed-held row.
         //
-        // The DESIGN (RESEARCH.md:469 + 21.2-07-SUMMARY.md:166) promises: "on
-        // restart, resumeExitMonitor re-enters exit_failed_held rows into monitoring
-        // + re-registers anti-rug." The DB even carries exit_status for this purpose
-        // (db.ts:529 comment). BUT the production reboot scans only ever filter
-        // `trades.status = 'pending'`:
-        //   - resumeMultiChainMonitoring  bot.ts:1275  WHERE status = 'pending'
-        //   - resumeAntiRugMonitoring     bot.ts:1391  WHERE t.status = 'pending'
-        // and the balance-truth CATCH stamps a still-held failed exit
-        // `trades.status = 'failed'` (exitEngine.ts:1054). NOTHING in src/ ever READS
-        // `exit_status` — it is written by markExitFailedHeld and never consumed.
-        // => a catch-path exit_failed_held row (trades.status='failed') is SILENTLY
-        //    DROPPED on reboot: NOT re-monitored, anti-rug NOT re-registered — the
-        //    exact LADYS-class harm the crown-jewel invariant exists to prevent,
-        //    surviving across a process restart.
-        //
-        // D.1 below PROVES the gap against the EXACT production predicate (it must
-        // FAIL to find the row — `false`). It is asserted as the CURRENT (broken)
-        // behavior so the suite stays honest+green; a future fix (add
-        // `OR e.exit_status='exit_failed_held'` to BOTH scans, and stop flipping
-        // trades.status to a value the scan excludes) will FLIP this to true. This is
-        // surfaced to the operator in the SUMMARY ## STOP-THE-LINE + the executor
-        // return — NOT fixed-in-flight, NOT file-and-deferred.
+        // These are the EXACT prepared statements the bot's reboot scans drive off
+        // (resumeMultiChainMonitoring -> getResumeExitMonitorTrades;
+        // resumeAntiRugMonitoring -> getResumeAntiRugTrades), imported from the
+        // production module and bound to this test's isolated DB. Before 21.2-11 they
+        // were a `status='pending'`-only filter that DROPPED a trades.status='failed'
+        // failed-held row (the CONFIRMED LADYS-class gap); now they union
+        // `exit_status='exit_failed_held'` so the row survives the reboot scan.
         // -----------------------------------------------------------------
-        const PROD_PENDING_ONLY = "WHERE t.chain = 'eth' AND t.action = 'buy' AND t.status = 'pending'";
         const prodExitScanHit = (
-            readDb
-                .prepare(`SELECT t.id FROM trades t ${PROD_PENDING_ONLY}`)
-                .all() as Array<{ id: number }>
-        ).some((r) => r.id === tradeId);
+            dbMod.getResumeExitMonitorTrades.all() as Array<{ id: number; is_failed_held: number }>
+        ).some((r) => r.id === tradeId && r.is_failed_held === 1);
         const prodAntiRugScanHit = (
-            readDb
-                .prepare(
-                    `SELECT t.id FROM trades t INNER JOIN lp_baseline b ON b.trade_id = t.id ${PROD_PENDING_ONLY}`,
-                )
-                .all() as Array<{ id: number }>
-        ).some((r) => r.id === tradeId);
-        // CONFIRMED-BUG ASSERTION: the production reboot scans DROP the failed-held
-        // row today (trades.status='failed' is excluded by the pending-only filter).
-        // When this gap is fixed these two expectations FLIP to true and this block
-        // must be re-pointed at the contract.
+            dbMod.getResumeAntiRugTrades.all() as Array<{ id: number; is_failed_held: number }>
+        ).some((r) => r.id === tradeId && r.is_failed_held === 1);
+        // FIXED-BEHAVIOR ASSERTION (S-1 closed): BOTH production reboot scans now
+        // re-enter the failed-held row (flagged is_failed_held=1) despite
+        // trades.status='failed'. This is the 21.2-10 D.1 placeholder flipped from
+        // `false` (documenting the gap) to `true` (proving the fix).
         expect(
             prodExitScanHit,
-            'STOP-THE-LINE-04-D: production resumeMultiChainMonitoring scan (status=pending only) currently DROPS the exit_failed_held row',
-        ).toBe(false);
+            'STOP-THE-LINE-04-D (S-1 fixed): production resumeMultiChainMonitoring scan MUST re-enter the exit_failed_held row',
+        ).toBe(true);
         expect(
             prodAntiRugScanHit,
-            'STOP-THE-LINE-04-D: production resumeAntiRugMonitoring scan (status=pending only) currently DROPS the exit_failed_held row',
-        ).toBe(false);
+            'STOP-THE-LINE-04-D (S-1 fixed): production resumeAntiRugMonitoring scan MUST re-enter the exit_failed_held row',
+        ).toBe(true);
 
         // -----------------------------------------------------------------
-        // D.2 — the engine-level resume WIRING this plan rehearses. GIVEN the
-        // failed-held row (as a correct reboot scan WOULD hand it in — by exit_status
-        // / trade_id, the durable identity that survives the restart), the engine's
-        // OWN reload path must (a) re-arm the routine poll timer via the REAL
-        // resumeExitMonitor (getExitState -> deserializeExitState -> setInterval) and
-        // (b) re-register anti-rug via the REAL registerAntiRugPosition (loadLpBaseline
-        // -> positionRegistry). This proves the keep-monitoring state is genuinely
-        // RESUMABLE from disk — the surrounding wiring works end-to-end the moment the
-        // scan gap above is closed.
-        const resumeRows = readDb
-            .prepare(
-                `SELECT t.id, t.token, t.pool_type, t.fee_tier, b.pair_or_pool_address
-                 FROM trades t
-                 INNER JOIN lp_baseline b ON b.trade_id = t.id
-                 INNER JOIN exit_state e ON e.trade_id = t.id
-                 WHERE t.chain = 'eth' AND t.action = 'buy' AND e.exit_status = 'exit_failed_held'`,
-            )
-            .all() as Array<{
+        // D.2 — the engine-level resume WIRING, driven by the SAME production scan
+        // statement the bot uses (getResumeAntiRugTrades). GIVEN the failed-held row
+        // the production scan now hands back (by exit_status / trade_id, the durable
+        // identity that survives the restart), the engine's OWN reload path must
+        // (a) re-arm the routine poll timer via the REAL resumeExitMonitor
+        // (getExitState -> deserializeExitState -> setInterval) and (b) re-register
+        // anti-rug via the REAL registerAntiRugPosition (loadLpBaseline ->
+        // positionRegistry). This proves the keep-monitoring state is genuinely
+        // RESUMABLE from disk end-to-end through the production scan.
+        const resumeRows = (
+            dbMod.getResumeAntiRugTrades.all() as Array<{
                 id: number;
                 token: string;
                 pool_type: 'v2' | 'v3';
                 fee_tier: number | null;
                 pair_or_pool_address: string;
-            }>;
-        // The exit_status-keyed scan (what a CORRECT reboot must use) DOES find the
-        // row — proving the durable identity to resume from is present on disk.
+                is_failed_held: number;
+            }>
+        ).filter((r) => r.id === tradeId);
+        // The production anti-rug scan DOES find the failed-held row — proving the
+        // durable identity to resume from is present on disk AND selected by the
+        // production predicate.
         expect(
-            resumeRows.some((r) => r.id === tradeId),
-            'an exit_status-keyed reboot scan (the correct predicate) MUST find the exit_failed_held row',
+            resumeRows.some((r) => r.id === tradeId && r.is_failed_held === 1),
+            'the production getResumeAntiRugTrades scan MUST find the exit_failed_held row (flagged is_failed_held)',
         ).toBe(true);
         for (const r of resumeRows) {
             const rdex = ctx.chain.dexes.find((d: { dexType: string }) => d.dexType === r.pool_type);

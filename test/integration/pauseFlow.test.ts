@@ -278,6 +278,11 @@ vi.mock('../../src/utils/db', () => ({
     setPauseState: { run: setPauseStateRunSpy },
     clearPauseState: { run: clearPauseStateRunSpy },
     forceWalCheckpoint: vi.fn(),
+    // Phase 21.2-11 / S-1: resumeMultiChainMonitoring / resumeAntiRugMonitoring read
+    // these pre-prepared exported statements on boot. No seeded open/failed-held
+    // positions in this pause-restart test → empty resume set.
+    getResumeExitMonitorTrades: { all: vi.fn().mockReturnValue([]) },
+    getResumeAntiRugTrades: { all: vi.fn().mockReturnValue([]) },
 }));
 
 vi.mock('../../src/api/ws/broadcaster', () => ({
@@ -593,6 +598,10 @@ describe('startMultiChainBot D-PAUSED-RESTART positive observable', () => {
                 getPauseState: { get: getPauseStateSpy },
                 setPauseState: { run: vi.fn() },
                 clearPauseState: { run: vi.fn() },
+                // Phase 21.2-11 / S-1: boot-time restart-resume scans read these
+                // exported statements (no seeded positions → empty resume set).
+                getResumeExitMonitorTrades: { all: vi.fn().mockReturnValue([]) },
+                getResumeAntiRugTrades: { all: vi.fn().mockReturnValue([]) },
             };
         });
         vi.doMock('../../src/anti-rug/detector', () => ({

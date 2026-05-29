@@ -39,6 +39,10 @@ const dbStmtRunMock = vi.fn();
 const dbStmtGetMock = vi.fn();
 const dbStmtAllMock = vi.fn();
 const dbPrepareMock = vi.fn();
+// Phase 21.2-11 / S-1: the restart-resume scans read these exported statements;
+// re-armed in beforeEach (mockReset:true wipes the .mockReturnValue otherwise).
+const resumeExitMonitorAllMock = vi.fn();
+const resumeAntiRugAllMock = vi.fn();
 
 // ---- Mocks (must be registered BEFORE the dynamic import) ----
 
@@ -88,6 +92,10 @@ vi.doMock('../../src/utils/db', () => {
         setPauseState: { run: setPauseStateRunMock },
         clearPauseState: { run: vi.fn() },
         forceWalCheckpoint: vi.fn(),
+        // Phase 21.2-11 / S-1: the restart-resume scans read these pre-prepared
+        // exported statements (no open positions in this test → empty set).
+        getResumeExitMonitorTrades: { all: resumeExitMonitorAllMock },
+        getResumeAntiRugTrades: { all: resumeAntiRugAllMock },
     };
 });
 
@@ -170,6 +178,8 @@ function rearmAllMocks() {
     dbStmtGetMock.mockReset().mockReturnValue({ paused: 0 });
     dbStmtAllMock.mockReset().mockReturnValue([]);
     dbPrepareMock.mockReset().mockReturnValue({ run: dbStmtRunMock, get: dbStmtGetMock, all: dbStmtAllMock });
+    resumeExitMonitorAllMock.mockReset().mockReturnValue([]);
+    resumeAntiRugAllMock.mockReset().mockReturnValue([]);
 
     preflightMock.mockReset().mockResolvedValue(undefined);
     checkWalletBalanceMock.mockReset();
