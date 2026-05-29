@@ -388,11 +388,17 @@ describe('Phase 21.3 — landed deliberate buy ARMS monitoring (STOP-THE-LINE-06
         expect(registerAntiRugPositionMock).toHaveBeenCalledTimes(1);
     });
 
-    it('(d1) chain-truth ABORT (balanceOf != 0, no broadcast) ARMS NOTHING — no position was opened', async () => {
+    it('(d1) chain-truth ABORT (balanceOf delta != 0, no broadcast) ARMS NOTHING — no position was opened', async () => {
         reconcileImpl = () => ({ outcome: 'not-landed' });
-        // tokens already received → the private buy DID land elsewhere; the guard
-        // ABORTS the public buy fail-closed. NO recordDeliberateBuy on this branch.
-        balanceOfImpl = () => 5_000_000n;
+        // WR-02 (21.3-06): the trip is the DELTA. The snapshot (call #1) sees 0; the
+        // chain-truth check (call #2) sees 5M → THIS buy's tokens arrived (the private
+        // buy DID land) → the guard ABORTS the public buy fail-closed. NO
+        // recordDeliberateBuy on this branch.
+        let balCalls = 0;
+        balanceOfImpl = () => {
+            balCalls += 1;
+            return balCalls <= 1 ? 0n : 5_000_000n;
+        };
         latestNonceValue = SUBMITTED_NONCE;
 
         const { executeDeliberateBuy } = await import('../../../src/bot');

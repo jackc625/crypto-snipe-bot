@@ -249,20 +249,20 @@ async function maybeApproveForChain(ctx: ChainContext, tokenContract: Contract, 
 // sendTxWithRetry still owns nonce-safe retry (re-fetch 'latest' per attempt); the
 // lock only guarantees no two same-wallet submits run concurrently.
 // Phase 21.3 / Plan 21.3-03 (STOP-THE-LINE-05-B/D, D-BUY-INCLUSION-PRIVATE-FIRST):
-// `mode` distinguishes a genuine SNIPE (private-only, fail-clean — the V2/V3
-// pair-event sites pass 'snipe' explicitly) from an explicitly-invoked DELIBERATE
-// buy (operator-run scripts/deliberate-buy.ts → executeDeliberateBuy, the ONLY
-// caller that may go public). It defaults to 'snipe' so the snipe call sites are
-// byte-for-byte unchanged. submitBuyTx itself does NOT branch on mode — both modes
-// route through the SAME nonce-locked private submit; mode only changes the gating
-// (the affordability reserve) and what the CALLER does on a throw (a snipe fails
-// clean; the deliberate path runs the no-double-buy guard + public fallback).
+// the SNIPE vs DELIBERATE distinction lives entirely in the CALLER — the gating
+// (enforceEntryExitAffordability's `mode`) and what the caller does on a throw (a
+// snipe fails clean; the deliberate path runs the no-double-buy guard + public
+// fallback). submitBuyTx does NOT branch on mode — both modes route through the
+// SAME nonce-locked private submit.
+// IN-01 (21.3-06): the former `_mode` parameter was dead (`_`-prefixed, never read)
+// and implied a behavioral switch that did not exist. Dropped, along with its two
+// snipe call-site arguments. `BuyMode` is retained — it is the type of
+// enforceEntryExitAffordability's `mode`, which IS load-bearing.
 export type BuyMode = 'snipe' | 'deliberate';
 
 export async function submitBuyTx(
     ctx: ChainContext,
     txBuilder: () => Promise<TransactionRequest>,
-    _mode: BuyMode = 'snipe',
 ): Promise<string> {
     return withNonceLock(ctx.wallet.address, () => sendTxWithRetry(txBuilder, ctx));
 }
@@ -501,6 +501,26 @@ export async function executeDeliberateBuy(
     const router = new Contract(dex.routerAddress, ROUTER_ABI, ctx.wallet);
     const path = [ctx.chain.wethAddress, targetToken];
 
+    // (0b) WR-02 (21.3-06): snapshot the held token balance BEFORE any submit, so the
+    // no-double-buy chain-truth check (2b) can compare a DELTA (tokens received by
+    // THIS buy) rather than an absolute balanceOf==0. An already-held token (a prior
+    // partial position, an airdrop, dust) must NOT permanently block the public
+    // fallback when the nonce proves the private buy did not land. Fail-closed posture:
+    // if the snapshot read throws (RPC blip), treat the baseline as unknown — re-throw
+    // is not desired (the gate already passed); we record 0n and the chain-truth check
+    // then compares against the live balance (the conservative absolute behavior),
+    // which is the safe direction (more likely to ABORT, never to over-broadcast).
+    let heldBalanceBefore: bigint = 0n;
+    try {
+        const preTokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
+        heldBalanceBefore = await preTokenContract.balanceOf(ctx.wallet.address);
+    } catch (err) {
+        ctx.log.warn(
+            { err, token: targetToken, op: 'buy.deliberate.baseline-balance-failed' },
+            'Deliberate buy: pre-buy balanceOf snapshot failed — chain-truth will compare against an assumed-0 baseline (conservative / fail-closed)',
+        );
+    }
+
     // (1) Build the PRIVATE buy tx (swapExactETHForTokens — the standard private
     // snipe buy shape). Quote → slippage-adjusted minOut. Reuse computePublicMinOut
     // (the single-source slippage helper) so the private and public legs agree.
@@ -510,7 +530,16 @@ export async function executeDeliberateBuy(
         const amounts: bigint[] = await router.getAmountsOut(amountInWei, path);
         privMinOut = computePublicMinOut(amounts[1], slippagePct);
     } catch {
-        ctx.log.warn({ token: targetToken, op: 'buy.deliberate.quote-failed' }, 'Deliberate buy: failed to quote private minOut, defaulting to 0');
+        // IN-03 (21.3-06): on a private-quote failure privMinOut stays 0n (accept any
+        // output). This is acceptable ONLY because the PRIVATE leg routes through
+        // Flashbots/private builders (un-sandwichable) — it disables slippage
+        // protection against a bad pool state but NOT against a front-run, which the
+        // private routing already precludes. The PUBLIC leg below NEVER does this: it
+        // recomputes its own minOut and fails CLOSED on a quote failure (WR-03).
+        ctx.log.warn(
+            { token: targetToken, op: 'buy.deliberate.quote-failed' },
+            'Deliberate buy: failed to quote PRIVATE minOut, defaulting to 0 — applies ONLY to the private (un-sandwichable) leg; the public leg recomputes its own minOut and fails closed on a quote failure',
+        );
     }
     const privDeadline = Math.floor(Date.now() / 1000) + 60;
     const privBuyTxBuilder = () => ctx.wallet.populateTransaction({
@@ -539,7 +568,11 @@ export async function executeDeliberateBuy(
 
     // (2) NO-DOUBLE-BUY GUARD before going public (D-NO-DOUBLE-BUY). Mirror
     // exitEngine.ts:902-979, INVERTED. Reconcile the REAL broadcast handle.
-    let publicBuyAllowed = false;
+    // IN-02 (21.3-06): the former `publicBuyAllowed` sentinel + its unreachable
+    // `if (!publicBuyAllowed) return null` guard were dead code (every abort path
+    // returns first; it was only ever set true). Removed — each branch below either
+    // returns (fail-closed / recorded) or falls through to the broadcast, so the
+    // fail-closed posture is enforced by the explicit returns, not a sentinel.
     if (priv.lastSignedHash && priv.lastNonce != null) {
         const rcfg = buildReconcileConfig(process.env, ctx.chain.gas.maxGasLimit, attempts, 'buy');
         const recon = await reconcileInclusion(
@@ -583,42 +616,48 @@ export async function executeDeliberateBuy(
 
     // (2b) STRICTER chain-is-truth defense-in-depth (the buy inversion of the sell's
     // balanceOf check). Before the public buy ALSO require:
-    //   balanceOf(targetToken) == 0   (no tokens already received → the private buy
-    //                                   did NOT land)
+    //   WR-02 (21.3-06): the balanceOf DELTA (heldBalanceNow - heldBalanceBefore) == 0
+    //                    (no tokens received by THIS buy → the private buy did NOT
+    //                    land). Comparing the DELTA — not an absolute balanceOf==0 —
+    //                    lets a deliberate buy of an ALREADY-HELD token (a prior
+    //                    partial position, airdrop, dust) still use the public fallback
+    //                    when the nonce proves the private buy did not land. The
+    //                    absolute check wrongly tripped on any non-zero starting
+    //                    balance, permanently (and confusingly) blocking a legitimate
+    //                    deliberate buy.
     //   AND getTransactionCount('latest') == priv.lastNonce  (the submitted nonce was
-    //                                   NOT consumed → no same-nonce tx landed)
+    //                    NOT consumed → no same-nonce tx landed)
     // The sell guard checks balance only; the buy checks BOTH (a double-BUY is the
     // unrecoverable harm). If EITHER fails → ABORT fail-closed.
     const tokenContract = new Contract(targetToken, ERC20_ABI, ctx.httpProvider);
-    const heldBalance: bigint = await tokenContract.balanceOf(ctx.wallet.address);
+    const heldBalanceNow: bigint = await tokenContract.balanceOf(ctx.wallet.address);
+    const tokensReceived = heldBalanceNow - heldBalanceBefore;
     const latestNonce = await ctx.httpProvider.getTransactionCount(ctx.wallet.address, 'latest');
     const nonceConsumed = priv.lastNonce != null && latestNonce !== priv.lastNonce;
 
-    if (heldBalance !== 0n || nonceConsumed) {
+    // Fail-closed on EITHER: any tokens received by THIS buy (delta != 0 — note a
+    // NEGATIVE delta, e.g. a concurrent manual sell, is also treated as a trip since
+    // it proves chain state changed under us) OR a consumed nonce.
+    if (tokensReceived !== 0n || nonceConsumed) {
         ctx.log.warn(
             {
                 token: targetToken,
-                heldBalance: heldBalance.toString(),
+                heldBalanceBefore: heldBalanceBefore.toString(),
+                heldBalanceNow: heldBalanceNow.toString(),
+                tokensReceived: tokensReceived.toString(),
                 latestNonce,
                 submittedNonce: priv.lastNonce ?? null,
                 nonceConsumed,
                 op: 'buy.fallback.aborted.chain-truth',
             },
-            'No-double-buy guard: chain-is-truth check failed (tokens already received OR nonce consumed) — aborting the public buy',
+            'No-double-buy guard: chain-is-truth check failed (this buy received tokens OR nonce consumed) — aborting the public buy',
         );
         await sendCtxAlert(
             ctx,
             `*[DELIBERATE BUY GUARD]* chain-is-truth ABORT for \`${targetToken}\` — ` +
-            `${heldBalance !== 0n ? 'tokens already received (balanceOf != 0)' : 'nonce was consumed (a same-nonce tx landed)'}; ` +
+            `${tokensReceived !== 0n ? 'this buy received tokens (balanceOf delta != 0)' : 'nonce was consumed (a same-nonce tx landed)'}; ` +
             `public buy NOT broadcast (avoid double-SPEND).`,
         );
-        return null;
-    }
-    publicBuyAllowed = true;
-
-    if (!publicBuyAllowed) {
-        // Defensive: unreachable given the branches above, but never fall through to
-        // a broadcast on an unexpected state (fail-closed).
         return null;
     }
 
@@ -662,8 +701,32 @@ export async function executeDeliberateBuy(
     // ETH value sent — NO approve (a buy spends ETH). Fresh quote → slippage minOut
     // via the single-source helper + the 21.3-00 FoT BUY ABI fragment.
     const slippagePct = parsePositiveNumberDefault(process.env.DELIBERATE_BUY_SLIPPAGE_PCT, CONFIG.slippagePercent || 5);
-    const amountsOut: bigint[] = await router.getAmountsOut(amountInWei, path);
-    const expectedOut = amountsOut[1];
+    // WR-03 (21.3-06): GUARD the public quote. getAmountsOut can revert (e.g. the pair
+    // was removed mid-flight) or return a short/empty array; an unguarded amountsOut[1]
+    // then crashes uncaught inside computePublicMinOut (bigint TypeError) AFTER the
+    // no-double-buy guard cleared but BEFORE the broadcast. Fail CLOSED with a
+    // structured op:'buy.fallback.quote-failed' alert + return null (no swap), rather
+    // than an ungraceful crash on a recoverable condition. The private quote (above)
+    // is already wrapped; this restores parity.
+    let expectedOut: bigint;
+    try {
+        const amountsOut: bigint[] = await router.getAmountsOut(amountInWei, path);
+        if (!Array.isArray(amountsOut) || amountsOut.length < 2 || amountsOut[1] == null) {
+            throw new Error(`getAmountsOut returned a malformed/short array (length ${Array.isArray(amountsOut) ? amountsOut.length : 'n/a'})`);
+        }
+        expectedOut = amountsOut[1];
+    } catch (err) {
+        ctx.log.error(
+            { err, token: targetToken, amountIn: amountInWei.toString(), op: 'buy.fallback.quote-failed' },
+            'Deliberate public buy ABORTED: public getAmountsOut quote failed (revert / malformed array) — failing closed, NOT broadcasting',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[DELIBERATE BUY → PUBLIC ABORTED]* public price quote (getAmountsOut) failed for \`${targetToken}\` ` +
+            `(pair removed mid-flight or RPC error) — public buy NOT broadcast (fail-closed). ${sanitizeReason((err as Error).message)}`,
+        );
+        return null;
+    }
     const minOut = computePublicMinOut(expectedOut, slippagePct);
     const deadline = Math.floor(Date.now() / 1000) + 600;
 
@@ -1046,7 +1109,6 @@ export async function handleNewPairForChain(
                 ]),
                 value: amountIn,
             }),
-            'snipe',
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 — post-MEV-submit audit log.
@@ -1373,7 +1435,6 @@ export async function handleNewV3PoolForChain(
                 data: v3Router.interface.encodeFunctionData('multicall', [deadline, [swapData]]),
                 value: amountIn,  // Pitfall 5: send ETH value since tokenIn is WETH
             }),
-            'snipe',
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 (V3 path) — audit log only
