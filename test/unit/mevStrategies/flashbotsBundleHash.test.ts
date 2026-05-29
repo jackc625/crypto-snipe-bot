@@ -17,6 +17,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 
+// Phase 21.3-01: the strategy's submit closure now also performs a RAW
+// eth_sendBundle multi-builder fanout via ethers v6 `FetchRequest` (the library
+// drops the `builders` field). Mock ONLY FetchRequest so this test stays hermetic
+// (no real relay call); importActual keeps Wallet/JsonRpcProvider/id/parseUnits real
+// so the auth signing still exercises the real keccak + Wallet.
+vi.mock('ethers', async () => {
+    const actual = await vi.importActual<typeof import('ethers')>('ethers');
+    class MockFetchRequest {
+        url: string;
+        body: string | Uint8Array | null = null;
+        private headers: Record<string, string> = {};
+        constructor(url: string) {
+            this.url = url;
+        }
+        setHeader(key: string, value: string): void {
+            this.headers[key.toLowerCase()] = value;
+        }
+        async send(): Promise<unknown> {
+            return {
+                statusCode: 200,
+                assertOk(): void {
+                    /* ok */
+                },
+                bodyJson: { result: { bundleHash: STUB_BUNDLE_HASH } },
+            };
+        }
+    }
+    return { ...actual, FetchRequest: MockFetchRequest };
+});
+
 // Capture the module child-logger's .info calls.
 const logInfo = vi.fn();
 const logWarn = vi.fn();

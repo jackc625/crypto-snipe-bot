@@ -14,7 +14,7 @@
 // (simulate-before-submit + sendBundle) and supplies it. The
 // `MevStrategy.sendTransaction` signature is UNCHANGED — the helper is an
 // implementation detail behind it.
-import { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
+import { JsonRpcProvider, Wallet, TransactionRequest, FetchRequest, id } from 'ethers';
 import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
 import type { MevStrategy, BroadcastHandle } from './types';
 import { applyGasMultiplier } from './types';
@@ -27,6 +27,87 @@ import {
 import { logger } from '../logger';
 
 const log = logger.child({ module: 'mev-flashbots' });
+
+/** Default builder name-tags for the raw `eth_sendBundle` `builders` fanout
+ *  (D-PRIVATE-INCLUSION-HARDEN mech 1). Byte-matches the MEV_BUILDERS default
+ *  registered in config.ts / .env.example. Casing matters (`Titan`,
+ *  `beaverbuild.org`, lowercase `flashbots`). This is PRIVATE builder-to-builder
+ *  routing, NOT public-mempool exposure (research Pitfall 3). */
+const DEFAULT_MEV_BUILDERS =
+  'flashbots,f1b.io,rsync,beaverbuild.org,builder0x69,Titan,EigenPhi,Gambit Labs,payload,Loki,JetBuilder,tbuilder,bobthebuilder,BTCS,bloXroute,Blockbeelder,Quasar,Eureka,Bombora';
+
+/** Parse a comma-separated MEV_BUILDERS list: trim each, drop empties; fall back
+ *  to the verified default registry when unset/empty so the fanout is never empty
+ *  (D-PRIVATE-INCLUSION-HARDEN — a non-empty `builders` array is the fix). */
+function parseBuilders(raw: string | undefined): string[] {
+  const source = raw === undefined || raw.trim() === '' ? DEFAULT_MEV_BUILDERS : raw;
+  const builders = source
+    .split(',')
+    .map((b) => b.trim())
+    .filter((b) => b.length > 0);
+  // Defensive: an entirely-malformed override (e.g. all commas) falls back to the default.
+  return builders.length > 0 ? builders : DEFAULT_MEV_BUILDERS.split(',').map((b) => b.trim());
+}
+
+/** Never-NaN/never-negative positive-int parse, clamped to [min, max]. Used for
+ *  MEV_BUY_TARGET_BLOCKS (default 3, clamp 1..8) so a malformed/over-broad value
+ *  can never produce 0 targets or an unbounded fanout. */
+function parsePositiveIntClamped(raw: string | undefined, fallback: number, min: number, max: number): number {
+  let n = fallback;
+  if (raw !== undefined && raw.trim() !== '') {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed > 0) n = parsed;
+  }
+  if (n < min) n = min;
+  if (n > max) n = max;
+  return n;
+}
+
+/**
+ * Multi-builder fanout via a RAW `eth_sendBundle` JSON-RPC call (research Pattern 1).
+ *
+ * LANDMINE (research §Q2 / Pitfall 1): the installed
+ * `@flashbots/ethers-provider-bundle@1.0.0` SILENTLY DROPS the `builders` field
+ * from `sendBundle`/`sendRawBundle`. So the multi-builder fix CANNOT go through the
+ * library — it is this raw signed `eth_sendBundle` body carrying the `builders`
+ * array, reusing the library's exact `X-Flashbots-Signature` scheme
+ * (`address:signMessage(id(body))`, verified against the lib at index.js:793-797).
+ *
+ * This is still PRIVATE builder-to-builder routing — `builders` widens which
+ * private builders receive the bundle, it does NOT broadcast to the public mempool
+ * (D-BUY-INCLUSION-PRIVATE-FIRST + research Pitfall 3).
+ *
+ * @param signedTxs the bundle signed ONCE per attempt (Pitfall 2) — the SAME bytes
+ *                  are reused across every target block to preserve the
+ *                  deterministic reconcile hash.
+ */
+async function rawSendBundle(
+  relayUrl: string,
+  authSigner: Wallet,
+  signedTxs: string[],
+  targetBlock: number,
+  builders: string[]
+): Promise<{ bundleHash?: string; error?: { message: string; code: number } }> {
+  const params = {
+    txs: signedTxs,
+    blockNumber: `0x${targetBlock.toString(16)}`,
+    builders, // ← the field the library omits (eth_sendBundle v2 param)
+  };
+  const body = JSON.stringify({ method: 'eth_sendBundle', params: [params], id: 1, jsonrpc: '2.0' });
+  const req = new FetchRequest(relayUrl);
+  req.setHeader('Content-Type', 'application/json');
+  // SAME auth scheme the library uses (index.js:796): address:signMessage(id(body)).
+  req.setHeader(
+    'X-Flashbots-Signature',
+    `${await authSigner.getAddress()}:${await authSigner.signMessage(id(body))}`
+  );
+  req.body = body;
+  const resp = await req.send();
+  resp.assertOk();
+  const json = resp.bodyJson as { result?: { bundleHash?: string }; error?: { message: string; code: number } };
+  if (json?.error) return { error: json.error };
+  return { bundleHash: json?.result?.bundleHash };
+}
 
 export class FlashbotsMevStrategy implements MevStrategy {
   readonly name = 'flashbots';
@@ -140,8 +221,15 @@ export class FlashbotsMevStrategy implements MevStrategy {
       // reverting tx is never escalated-and-resubmitted. flashbotsProvider.simulate
       // (eth_callBundle) is the relay-level simulate; a revert here signals failure
       // so the helper fails cleanly rather than broadcasting a doomed tx.
+      //
+      // Pitfall 2: signBundle is called ONCE per attempt — the SAME `signedBundle`
+      // bytes are reused for the simulate, the raw multi-block fanout, AND the
+      // library sendBundle. Re-signing per block would re-fetch the nonce and break
+      // the deterministic reconcile hash. signedBundle is hoisted out of the
+      // try so the multi-builder loop below can reuse the identical bytes.
+      let signedBundle: string[];
       try {
-        const signedBundle = await flashbotsProvider.signBundle([
+        signedBundle = await flashbotsProvider.signBundle([
           { signer: wallet, transaction: populatedTx },
         ]);
         const sim = await flashbotsProvider.simulate(signedBundle, targetBlock);
@@ -162,6 +250,27 @@ export class FlashbotsMevStrategy implements MevStrategy {
         throw simErr;
       }
 
+      // D-PRIVATE-INCLUSION-HARDEN mech 1 + 2: MULTI-BUILDER fanout via a RAW
+      // eth_sendBundle (the library drops `builders` — Pitfall 1) + MULTI-BLOCK
+      // targeting (the SAME signed bytes to block+1 .. block+MEV_BUY_TARGET_BLOCKS).
+      // This widens private builder coverage so a calm-gas bundle is eligible in
+      // each of N consecutive slots regardless of which builder wins. Still PRIVATE
+      // builder-to-builder routing — never the public mempool (Pitfall 3).
+      const builders = parseBuilders(process.env.MEV_BUILDERS);
+      const targetBlocks = parsePositiveIntClamped(process.env.MEV_BUY_TARGET_BLOCKS, 3, 1, 8);
+      for (let i = 0; i < targetBlocks; i++) {
+        const tb = targetBlock + i; // targetBlock is already head+1
+        const res = await rawSendBundle(this.relayUrl, authSigner, signedBundle, tb, builders);
+        if (res.error) {
+          throw new Error(`Flashbots eth_sendBundle error (block ${tb}): ${res.error.message}`);
+        }
+      }
+
+      // The library sendBundle on block+1 is KEPT as the native-confirm signal +
+      // the deterministic real-hash / nonce source (bundle.wait + bundleHash +
+      // bundleTransactions). The raw fanout above is the actual multi-builder
+      // submit; this single library call does NOT carry `builders` (it can't), it
+      // only obtains the FlashbotsTransactionResponse the reconcile machinery needs.
       const bundle = await flashbotsProvider.sendBundle(
         [{ signer: wallet, transaction: populatedTx }],
         targetBlock
@@ -199,6 +308,43 @@ export class FlashbotsMevStrategy implements MevStrategy {
           { op: 'flashbots.bundle.included', bundleHash: bundle.bundleHash, minedTxHash: realHash, block: targetBlock },
           'Flashbots bundle mapping'
         );
+      }
+
+      // D-PRIVATE-INCLUSION-HARDEN mech (telemetry) + STOP-THE-LINE-05-D /
+      // D-EVIDENCE-BUY-INCLUSION: per-builder inclusion telemetry. Always query
+      // getBundleStatsV2 (RESEARCH OQ#2 "always log stats") to PROVE the root cause
+      // and confirm multi-builder inclusion live:
+      //   consideredByBuildersAt empty (or only BuilderNet) while the winning block
+      //     came from beaverbuild/Titan → "never seen by the winner" = builder coverage.
+      //   consideredByBuildersAt populated but sealedByBuildersAt empty → "seen, not
+      //     sealed" = pricing/timing.
+      // T-21.3-01-03 (Information disclosure): log ONLY public, on-chain-resolvable
+      // values (pubkeys + booleans) — NEVER the auth key or the signed raw tx
+      // (mirrors the flashbots.bundle.included T-21-01-03 discipline above). Best-
+      // effort: a stats-query failure must not fail the submit/reconcile path.
+      if (bundle.bundleHash) {
+        try {
+          const stats = await flashbotsProvider.getBundleStatsV2(bundle.bundleHash, targetBlock);
+          if (stats && !('error' in stats)) {
+            log.info(
+              {
+                op: 'flashbots.bundle.stats',
+                bundleHash: bundle.bundleHash,
+                targetBlock,
+                isSimulated: stats.isSimulated,
+                isHighPriority: stats.isHighPriority,
+                consideredByBuilders: stats.consideredByBuildersAt.map((p) => p.pubkey),
+                sealedByBuilders: stats.sealedByBuildersAt.map((p) => p.pubkey),
+              },
+              'Per-builder bundle inclusion telemetry'
+            );
+          }
+        } catch (statsErr) {
+          log.warn(
+            { op: 'flashbots.bundle.stats.error', bundleHash: bundle.bundleHash, targetBlock, err: statsErr },
+            'getBundleStatsV2 query failed — telemetry only, submit/reconcile unaffected'
+          );
+        }
       }
 
       // nativeConfirmed ONLY on a true BundleIncluded(0). For 1 (block passed) and
