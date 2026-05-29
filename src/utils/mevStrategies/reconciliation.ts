@@ -56,8 +56,17 @@ export const MEV_RECONCILE_DEFAULTS = {
   /** Poll interval (ms) within the confirm-window. */
   pollMs: 4_000,
   /** Hard absolute ceiling on escalated maxPriorityFeePerGas (gwei). Load-bearing safety cap.
-   *  This is the BUY ceiling (MEV_MAX_PRIORITY_FEE_GWEI). */
+   *  This is the LEGACY buy cap (MEV_MAX_PRIORITY_FEE_GWEI) — kept as the documented
+   *  backward-compat floor reference; the buy LEG now reads its own
+   *  buyMaxPriorityFeeGwei ceiling below (21.3 / D-PRIVATE-INCLUSION-HARDEN mech 3). */
   maxPriorityFeeGwei: 5,
+  /** Independent higher BUY-leg priority-fee ceiling (gwei, MEV_BUY_MAX_PRIORITY_FEE_GWEI),
+   *  decoupled from BOTH the legacy MEV_MAX_PRIORITY_FEE_GWEI (default 5) and the sell
+   *  ceiling. 21.3 / D-PRIVATE-INCLUSION-HARDEN mech 3: at a 0.25-gwei base fee a buy that
+   *  must land needs more priority-fee HEADROOM than the legacy 5-gwei cap, but this raises
+   *  the ceiling INPUT only — computeAffordablePriorityFee STILL clamps the bid to
+   *  min(ceiling, affordabilityBound) (Pitfall 5 / CR-01: try harder, never overspend). */
+  buyMaxPriorityFeeGwei: 25,
   /** Independent SELL-leg priority-fee ceiling (gwei), decoupled from the buy ceiling
    *  (Finding A, MEV_SELL_MAX_PRIORITY_FEE_GWEI). A calm-gas thin-wallet exit may bid
    *  HARDER privately than the 5-gwei buy cap — but the affordability bound STILL clamps
@@ -142,12 +151,16 @@ export interface BroadcastHandle {
  * boolean: only the literal `'false'` (case-insensitive) disables the reserve;
  * unset/anything-else keeps the safe default `true`.
  *
- * `leg` (Finding A) selects which priority-fee ceiling feeds
- * `maxPriorityFeeCeilingWei`:
- *   - `'buy'`  → `MEV_MAX_PRIORITY_FEE_GWEI`      (default 5) — the existing buy cap.
+ * `leg` (Finding A + 21.3 D-PRIVATE-INCLUSION-HARDEN mech 3) selects which
+ * priority-fee ceiling feeds `maxPriorityFeeCeilingWei`:
+ *   - `'buy'`  → `MEV_BUY_MAX_PRIORITY_FEE_GWEI`  (default 25) — the INDEPENDENT higher
+ *     buy ceiling (21.3). At calm gas a buy that must land needs more headroom than the
+ *     legacy 5-gwei cap; this is the buy analog of how 'sell' got its own ceiling. The
+ *     legacy `MEV_MAX_PRIORITY_FEE_GWEI` (default 5) is kept as the documented
+ *     backward-compat floor reference and is no longer the buy ceiling.
  *   - `'sell'` → `MEV_SELL_MAX_PRIORITY_FEE_GWEI` (default 25) — the INDEPENDENT sell
- *     ceiling so a calm-gas thin-wallet exit can bid harder privately. CRITICAL: the
- *     higher ceiling raises the ceiling INPUT only — `computeAffordablePriorityFee`'s
+ *     ceiling so a calm-gas thin-wallet exit can bid harder privately. CRITICAL (both
+ *     legs): the higher ceiling raises the ceiling INPUT only — `computeAffordablePriorityFee`'s
  *     affordability bound STILL clamps the final bid (Pitfall 5: try harder, never
  *     overspend; the public fallback in 21.2-06 is the guaranteed lever).
  * Defaults to `'buy'` so the 3 existing strategy callers
@@ -166,14 +179,18 @@ export function buildReconcileConfig(
 ): ReconcileConfig {
   const confirmWindowMs = parsePositiveInt(env.MEV_CONFIRM_WINDOW_MS, MEV_RECONCILE_DEFAULTS.confirmWindowMs);
   const pollMs = parsePositiveInt(env.MEV_CONFIRM_POLL_MS, MEV_RECONCILE_DEFAULTS.pollMs);
-  // Finding A: the sell leg reads its OWN independent ceiling
-  // (MEV_SELL_MAX_PRIORITY_FEE_GWEI, default 25); the buy leg keeps
-  // MEV_MAX_PRIORITY_FEE_GWEI (default 5). Both parsed via the same never-NaN /
-  // never-negative parsePositiveNumber + gweiToWei helpers (no float drift).
+  // Each leg reads its OWN independent ceiling:
+  //   sell → MEV_SELL_MAX_PRIORITY_FEE_GWEI (default 25, Finding A)
+  //   buy  → MEV_BUY_MAX_PRIORITY_FEE_GWEI  (default 25, 21.3 D-PRIVATE-INCLUSION-HARDEN
+  //          mech 3) — INDEPENDENT of the legacy MEV_MAX_PRIORITY_FEE_GWEI (default 5,
+  //          kept as the backward-compat floor reference) and of the sell ceiling.
+  // Both parsed via the same never-NaN / never-negative parsePositiveNumber +
+  // gweiToWei helpers (no float drift). This raises the ceiling INPUT only — the
+  // affordability clamp in computeAffordablePriorityFee STILL binds (Pitfall 5).
   const ceilingGwei =
     leg === 'sell'
       ? parsePositiveNumber(env.MEV_SELL_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.sellMaxPriorityFeeGwei)
-      : parsePositiveNumber(env.MEV_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.maxPriorityFeeGwei);
+      : parsePositiveNumber(env.MEV_BUY_MAX_PRIORITY_FEE_GWEI, MEV_RECONCILE_DEFAULTS.buyMaxPriorityFeeGwei);
   const priorityFeeStepGwei = parsePositiveNumber(env.MEV_PRIORITY_FEE_STEP_GWEI, MEV_RECONCILE_DEFAULTS.priorityFeeStepGwei);
   const reserveSellGas = parseBoolDefaultTrue(env.MEV_RESERVE_SELL_GAS);
 

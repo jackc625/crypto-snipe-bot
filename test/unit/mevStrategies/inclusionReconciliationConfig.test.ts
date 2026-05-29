@@ -155,20 +155,26 @@ describe('MEV_CONFIRM_POLL_MS env var', () => {
     });
 });
 
-describe('MEV_MAX_PRIORITY_FEE_GWEI env var', () => {
-    it('controls the hard ceiling (wei) on escalated maxPriorityFeePerGas (override)', async () => {
+describe('Buy-leg priority-fee ceiling (default leg)', () => {
+    // 21.3 D-PRIVATE-INCLUSION-HARDEN mech 3: the buy leg now reads its own
+    // independent ceiling MEV_BUY_MAX_PRIORITY_FEE_GWEI (default 25). The legacy
+    // MEV_MAX_PRIORITY_FEE_GWEI is no longer the buy ceiling (kept only as a
+    // documented backward-compat floor reference). Detailed buy-ceiling cases live
+    // in the dedicated MEV_BUY_MAX_PRIORITY_FEE_GWEI describe below; these two keep
+    // the original "controls the parsed wei ceiling" contract on the default leg.
+    it('controls the hard ceiling (wei) on escalated maxPriorityFeePerGas (override via MEV_BUY_MAX_PRIORITY_FEE_GWEI)', async () => {
         const { parseUnits } = await import('ethers');
-        setEnv('MEV_MAX_PRIORITY_FEE_GWEI', '9');
+        setEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', '9');
         const cfg = await loadReconcileConfig();
         // The parsed gwei ceiling becomes the load-bearing wei cap the fee escalation clamps to.
         expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('9', 'gwei'));
     });
 
-    it('defaults to 5 gwei when MEV_MAX_PRIORITY_FEE_GWEI is unset', async () => {
+    it('defaults to 25 gwei when MEV_BUY_MAX_PRIORITY_FEE_GWEI is unset (the 21.3 raised default)', async () => {
         const { parseUnits } = await import('ethers');
-        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI;
+        delete process.env.MEV_BUY_MAX_PRIORITY_FEE_GWEI;
         const cfg = await loadReconcileConfig();
-        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
     });
 });
 
@@ -242,21 +248,106 @@ describe('MEV_SELL_MAX_PRIORITY_FEE_GWEI env var (Finding A — independent sell
     });
 });
 
-describe('BUY leg unchanged (no Finding A regression)', () => {
-    it('Test 2 — buy leg still reads MEV_MAX_PRIORITY_FEE_GWEI (default 5), ignoring the sell ceiling', async () => {
+// =============================================================================
+// Phase 21.3 Plan 01 / D-PRIVATE-INCLUSION-HARDEN mech 3 — the BUY leg now reads
+// its OWN independent ceiling MEV_BUY_MAX_PRIORITY_FEE_GWEI (default 25), decoupled
+// from BOTH the legacy MEV_MAX_PRIORITY_FEE_GWEI (default 5, backward-compat floor
+// reference) and the sell ceiling. CRITICAL invariant (Pitfall 5 / CR-01): the
+// higher buy ceiling raises the ceiling INPUT only — computeAffordablePriorityFee's
+// affordability bound STILL clamps the final bid (try harder, never overspend).
+// =============================================================================
+
+describe('MEV_BUY_MAX_PRIORITY_FEE_GWEI env var (21.3 — independent higher buy ceiling)', () => {
+    it('(a) buy ceiling defaults to 25 gwei when MEV_BUY_MAX_PRIORITY_FEE_GWEI is unset', async () => {
         const { parseUnits } = await import('ethers');
-        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI; // default 5
-        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25'); // must NOT leak into the buy leg
+        delete process.env.MEV_BUY_MAX_PRIORITY_FEE_GWEI;
+        setEnv('MEV_MAX_PRIORITY_FEE_GWEI', '5'); // legacy floor pinned — must NOT be the ceiling
         const cfg = await loadReconcileConfig('buy');
-        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+        // The new default is the INDEPENDENT 25, NOT the legacy 5-gwei cap (the 21.3 trap).
+        expect(cfg.maxPriorityFeeCeilingWei).not.toBe(parseUnits('5', 'gwei'));
     });
 
-    it('the default leg (no leg arg) is the BUY leg — the 3 existing strategy callers stay on 5 gwei', async () => {
+    it('(b) respects an operator override of the buy ceiling (MEV_BUY_MAX_PRIORITY_FEE_GWEI=40)', async () => {
         const { parseUnits } = await import('ethers');
-        delete process.env.MEV_MAX_PRIORITY_FEE_GWEI; // default 5
+        setEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', '40');
+        const cfg = await loadReconcileConfig('buy');
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('40', 'gwei'));
+    });
+
+    it('(c) a malformed/negative MEV_BUY_MAX_PRIORITY_FEE_GWEI falls back to 25 (never-NaN/never-negative)', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', '-7'); // negative → rejected by parsePositiveNumber
+        const cfgNeg = await loadReconcileConfig('buy');
+        expect(cfgNeg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+
+        setEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', 'not-a-number'); // NaN → rejected
+        const cfgNaN = await loadReconcileConfig('buy');
+        expect(cfgNaN.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+    });
+
+    it('the default leg (no leg arg) is the BUY leg — the 3 existing strategy callers read the 25-gwei buy ceiling', async () => {
+        const { parseUnits } = await import('ethers');
+        delete process.env.MEV_BUY_MAX_PRIORITY_FEE_GWEI; // default 25
         setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25');
         const cfg = await loadReconcileConfig(); // no leg → 'buy'
-        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('5', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('25', 'gwei'));
+    });
+
+    it('the buy ceiling is INDEPENDENT of the legacy MEV_MAX_PRIORITY_FEE_GWEI and the sell ceiling', async () => {
+        const { parseUnits } = await import('ethers');
+        setEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', '30');
+        setEnv('MEV_MAX_PRIORITY_FEE_GWEI', '5'); // legacy floor — must NOT leak into the buy ceiling
+        setEnv('MEV_SELL_MAX_PRIORITY_FEE_GWEI', '25'); // sell ceiling — must NOT leak either
+        const cfg = await loadReconcileConfig('buy');
+        expect(cfg.maxPriorityFeeCeilingWei).toBe(parseUnits('30', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).not.toBe(parseUnits('5', 'gwei'));
+        expect(cfg.maxPriorityFeeCeilingWei).not.toBe(parseUnits('25', 'gwei'));
+    });
+});
+
+describe('(d) the affordability clamp STILL binds on a thin wallet (the buy raise is INPUT-only — CR-01 not regressed)', () => {
+    it('submitted fee = the affordability bound, NOT the raised 25-gwei buy ceiling', async () => {
+        const { parseUnits } = await import('ethers');
+        const { computeAffordablePriorityFee } = await import(
+            '../../../src/utils/mevStrategies/reconciliation'
+        );
+
+        // Buy ceiling = 25 gwei (the new raised default). Desired fee absurdly high.
+        const buyCeilingWei = parseUnits('25', 'gwei');
+        const baseFeeWei = parseUnits('2', 'gwei');
+        const buyGasLimit = 200_000n;
+        const sellGasLimit = 300_000n;
+        const snipeValueWei = 0n;
+
+        // Construct a THIN wallet whose affordability bound is EXACTLY 6 gwei so the
+        // clamp (min(ceiling, bound)) must return 6 gwei, NOT the raised 25 ceiling.
+        // Reserve = GUARANTEED public exit (sellGasLimit × baseFee×buffer), NO ceiling.
+        const SELL_GAS_BASEFEE_BUFFER = 150n; // 1.5x, fractional-bigint /100n
+        const bufferedSellBaseFee = (baseFeeWei * SELL_GAS_BASEFEE_BUFFER) / 100n;
+        const reservedSellGas = sellGasLimit * bufferedSellBaseFee;
+        const wantBoundWei = parseUnits('6', 'gwei');
+        const headroom = wantBoundWei * buyGasLimit;
+        const walletBalanceWei = headroom + snipeValueWei + reservedSellGas + buyGasLimit * baseFeeWei;
+
+        const result = computeAffordablePriorityFee({
+            desiredPriorityFeeWei: parseUnits('250', 'gwei'), // 10x the 25-gwei ceiling
+            ceilingWei: buyCeilingWei,
+            walletBalanceWei,
+            snipeValueWei,
+            baseFeeWei,
+            buyGasLimit,
+            sellGasLimit,
+            reserveSellGas: true,
+        });
+
+        expect(result.affordable).toBe(true);
+        // The affordability bound — NOT the raised 25-gwei buy ceiling — wins.
+        expect(result.affordabilityBoundWei).toBe(wantBoundWei);
+        expect(result.priorityFeeWei).toBe(wantBoundWei);
+        // Hard proof of "never overspend": the submitted fee is below the raised ceiling.
+        expect(result.priorityFeeWei < buyCeilingWei).toBe(true);
+        expect(result.priorityFeeWei).not.toBe(buyCeilingWei);
     });
 });
 

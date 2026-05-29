@@ -9,13 +9,19 @@ import { applyGasMultiplier } from '../../../src/utils/mevStrategies/types';
 import { PassthroughMevStrategy } from '../../../src/utils/mevStrategies/passthrough';
 import { BloxrouteMevStrategy } from '../../../src/utils/mevStrategies/bloxroute';
 
-// Pin the MEV fee ceiling/step to their documented defaults (ceiling = 5 gwei,
-// step = 1 gwei) so the CR-01 clamp assertions below are hermetic regardless of
-// the operator's .env — which may raise MEV_MAX_PRIORITY_FEE_GWEI above 5
-// (dotenv.config() loads it into process.env at import). Without this pin the
-// clamp correctly targets the operator's real ceiling and the 5-gwei asserts fail.
+// Pin the MEV fee ceiling/step to a hermetic 5-gwei ceiling so the CR-01 clamp
+// assertions below are independent of the operator's .env (dotenv.config() loads
+// it into process.env at import). The buy-path strategies (passthrough/bloXroute)
+// call buildReconcileConfig with the default 'buy' leg, which reads
+// MEV_BUY_MAX_PRIORITY_FEE_GWEI (21.3 default 25); pin it to 5 here so these tests
+// keep exercising the 5-gwei-ceiling clamp scenario. The LEGACY
+// MEV_MAX_PRIORITY_FEE_GWEI is no longer the buy ceiling but is pinned too for
+// belt-and-suspenders hermeticity. The CR-01 invariant under test is UNCHANGED:
+// the clamp (min(ceiling, affordabilityBound)) is the final authority and the
+// strategies use the clamped fee DIRECTLY (no second max() vs the unclamped rate).
 beforeEach(() => {
     vi.stubEnv('MEV_MAX_PRIORITY_FEE_GWEI', '5');
+    vi.stubEnv('MEV_BUY_MAX_PRIORITY_FEE_GWEI', '5');
     vi.stubEnv('MEV_PRIORITY_FEE_STEP_GWEI', '1');
 });
 afterEach(() => {
