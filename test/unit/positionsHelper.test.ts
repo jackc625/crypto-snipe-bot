@@ -85,6 +85,44 @@ describe('buildPositionsWithLivePrices', () => {
         expect(queryPrice).toHaveBeenCalledOnce();
     });
 
+    it('quotes the HELD token amount (not the ETH cost) and shows Entry as the cost basis — 21.4 regression', async () => {
+        // Regression for the 21-07 dashboard defect: queryPrice was called with
+        // parseEther(buy_cost) (an ETH value used as a token amount) → a meaningless
+        // ~4053-wei micro-quote → the dashboard rendered "Current 0.0000" + a full-loss
+        // P&L, and "Entry" as the engine's pseudo-reference (e.g. 4053). The fix quotes the
+        // ACTUAL held token amount and shows Entry as the ETH cost basis.
+        (getPnL as any).mockReturnValue([{
+            buy_id: 1, token: '0xtoken', chain: 'eth', buy_cost: '0.001', buy_gas: '0.0001',
+            sell_revenue: 0, sell_gas: 0, realized_pnl: 0, buy_time: 1000,
+            sell_time: null, sell_count: 0, pool_type: 'v2', fee_tier: null, buy_status: 'pending',
+        }]);
+        (getTradeIdForPendingToken as any).get.mockReturnValue({ id: 1 });
+        const HELD = '245215490550933374669867436'; // real LADYS held amount from the live capture
+        (getExitState as any).get.mockReturnValue({
+            trade_id: 1, entry_price: 4053, high_water_mark: 4053,
+            trailing_activated: 0, partial_tiers_completed: '[]',
+            original_token_amount: HELD, urgency_start_ts: Date.now(), volatility_samples: '[]',
+        });
+        // queryPrice returns the real liquidation value (WETH wei) for the held balance
+        (queryPrice as any).mockResolvedValue(993814525259157);
+
+        const positions = await buildPositionsWithLivePrices([mockCtx('eth')]);
+
+        // Called with the HELD token amount — NOT parseEther('0.001') === 1e15 (the old bug)
+        expect(queryPrice).toHaveBeenCalledWith(
+            expect.anything(), expect.anything(), '0xtoken', null, BigInt(HELD),
+        );
+        expect(queryPrice).not.toHaveBeenCalledWith(
+            expect.anything(), expect.anything(), '0xtoken', null, 1000000000000000n,
+        );
+        // currentPrice is the real liquidation value (~0.000994 ETH), not ~0
+        expect(positions[0].currentPrice as number).toBeGreaterThan(0);
+        expect(positions[0].currentPrice).toBeCloseTo(0.000994, 6);
+        // "Entry" is the ETH cost basis (0.001) — consistent unit with currentPrice,
+        // NOT the engine's pseudo-reference (4053)
+        expect(positions[0].entryPrice).toBeCloseTo(0.001, 9);
+    });
+
     it('falls back to highWaterMark with priceStale when queryPrice returns null', async () => {
         (getPnL as any).mockReturnValue([{
             buy_id: 1, token: '0xtoken', chain: 'eth', buy_cost: '0.01', buy_gas: '0.001',

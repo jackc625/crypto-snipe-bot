@@ -108,12 +108,29 @@ export async function buildPositionsWithLivePrices(contexts: ChainContext[]): Pr
             priceStale = true;
         }
 
-        if (ctx && dex && trade.buy_cost) {
+        // Phase 21.4 display fix: quote the ACTUAL held token amount (originalTokenAmount)
+        // so currentPrice is the position's real liquidation value in WETH wei. The prior
+        // code passed parseEther(buy_cost) — an ETH value in wei — as queryPrice's
+        // token-amount arg, producing a fixed ~4053-wei micro-quote that rendered
+        // "Current 0.0000" + a full-loss P&L on the dashboard. The engine's exit triggers
+        // are UNAFFECTED: they call queryPrice as a self-cancelling ratio internally
+        // (exitEngine.ts); this is a display-only correction. NOTE: originalTokenAmount is
+        // the bought amount, so after partial sells it can slightly overstate the remaining
+        // holding (acceptable for an informational dashboard; an on-chain balanceOf would
+        // be exact if precision is ever needed).
+        if (ctx && dex) {
             try {
-                const buyAmountWei = ethers.parseEther(trade.buy_cost);
-                currentPrice = await queryPrice(ctx, dex, trade.token, trade.fee_tier, buyAmountWei);
+                // Held amount: the exit-state original token amount; fall back to the
+                // (imperfect) buy-cost reference only when no exit_state row exists — rare,
+                // since post-21.3 every landed buy arms an exit monitor.
+                const quoteAmountWei = exitState
+                    ? BigInt(exitState.originalTokenAmount)
+                    : (trade.buy_cost ? ethers.parseEther(trade.buy_cost) : null);
+                if (quoteAmountWei !== null && quoteAmountWei > 0n) {
+                    currentPrice = await queryPrice(ctx, dex, trade.token, trade.fee_tier, quoteAmountWei);
+                }
             } catch {
-                // queryPrice catches its own errors, but wrap ethers.parseEther too
+                // queryPrice catches its own errors; guard BigInt()/parseEther here too
             }
         }
 
@@ -135,9 +152,10 @@ export async function buildPositionsWithLivePrices(contexts: ChainContext[]): Pr
             tradeId,
             token: trade.token,
             chain: trade.chain,
-            entryPrice: exitState
-                ? ((getExitState.get(tradeId!) as ExitStateRow | undefined)?.entry_price ?? null)
-                : null,
+            // Phase 21.4: "Entry" is the ETH cost basis — a consistent ETH unit with the
+            // liquidation-value currentPrice below. (Previously the engine's internal price
+            // reference, which the dashboard mis-rendered as e.g. "4053 ETH" via formatEth.)
+            entryPrice: trade.buy_cost ? parseFloat(trade.buy_cost) : null,
             currentPrice: currentPrice !== null ? currentPrice / 1e18 : null,
             priceStale,
             unrealizedPnl,
