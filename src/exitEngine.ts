@@ -1520,6 +1520,69 @@ export async function executePartialSell(
     }
 }
 
+// ---------------------------------------------------------------------------
+// dispatchPartialSell — NON-BLOCKING partial-sell dispatch (Phase 21.2-13 / WR-06)
+// ---------------------------------------------------------------------------
+//
+// WR-06: executePartialSell was `await`ed INLINE on the poll tick. It calls
+// sendTxWithRetry → submitWithReconciliation, which polls a bounded confirm window
+// (default 45s) PER attempt, so a partial-sell trigger BLOCKED that position's
+// poll cycle (and serialized on withNonceLock) for tens of seconds — reintroducing
+// the overruns:true poll-loop starvation Finding C removed, for partial sells.
+//
+// THE FIX (mirrors the full-sell triggers' enqueue-and-return): the poll tick
+// calls this and RETURNS 'continue' immediately — it never awaits the confirm
+// window inline. executePartialSell runs OFF the poll critical path. Its OWN
+// guarantees are unchanged and make this safe:
+//   * the per-token sell lock (tryAcquireSellLock, acquired at entry / released in
+//     finally) is held for the whole submit, so a later poll tick that re-detects
+//     the same unfilled tier is SKIPPED while this is in flight (no duplicate
+//     partial; no re-entrant self-sell).
+//   * it clamps to the RE-FETCHED on-chain balance (sell only what is held) and
+//     nonce-locks the submit (D-NONCE-AUTHORITY-ALL).
+//   * on success it mutates the SHARED state.completedTierIndices + records the
+//     trade row; the next poll tick persists the updated tiers (and stops
+//     re-detecting them). On failure it leaves the position OPEN (Pitfall 6).
+//
+// The detached promise is given a `.catch` so a rejection can never become an
+// unhandled-rejection that crashes the process (the awaited path inside already
+// try/catches; this is belt-and-suspenders for the detach boundary).
+export function dispatchPartialSell(
+    ctx: ChainContext,
+    dex: DexConfig,
+    tokenAddress: string,
+    feeTier: number | null,
+    sellAmount: bigint,
+    tiers: { tier: PartialTier; index: number }[],
+    state: ExitStateData,
+    currentMultiple: number,
+): void {
+    void executePartialSell(ctx, dex, tokenAddress, feeTier, sellAmount, tiers, state, currentMultiple)
+        .then((success) => {
+            if (success) {
+                ctx.log.info(
+                    {
+                        token: tokenAddress,
+                        tiers: tiers.map((t) => `${t.tier.multiple}x`).join(','),
+                        priceMultiple: currentMultiple.toFixed(2),
+                        op: 'exit.partial.dispatched.completed',
+                    },
+                    'Partial sell completed (off the poll tick)',
+                );
+                // Persist the tier completions the partial mutated onto `state` so a
+                // restart resumes with them recorded (the poll tick that fired this
+                // already returned; persist here on completion).
+                upsertExitState.run(serializeExitState(state));
+            }
+        })
+        .catch((e: unknown) => {
+            ctx.log.error(
+                { err: e, token: tokenAddress, op: 'exit.partial.dispatched.error' },
+                'Detached partial sell rejected (position left open, will retry next cycle)',
+            );
+        });
+}
+
 /**
  * Format detailed exit reason for Telegram notification.
  * Per D-26: includes strategy context.
@@ -1589,21 +1652,24 @@ async function pollExitStrategy(
     if (exitConfig.partialSellTiers.length > 0) {
         const unfilledTiers = getUnfilledTiers(exitConfig.partialSellTiers, state.completedTierIndices, priceMultiple);
         if (unfilledTiers.length > 0) {
-            // D-08: Combine all missed tiers into single transaction
+            // D-08: Combine all missed tiers into single transaction.
+            // WR-06 (21.2-13): DECOUPLED from the poll tick. Previously this was
+            // `await executePartialSell(...)` — which blocked the whole poll cycle
+            // for the bounded confirm window (default 45s/attempt) and serialized on
+            // withNonceLock (overruns:true starvation). Now we dispatch it OFF the
+            // tick (dispatchPartialSell) — the tick does NOT await the confirm
+            // window. We fall THROUGH to the trailing/stop-loss/urgency checks (so
+            // the same-tick evaluation order is unchanged), but the partial submit
+            // itself runs off the critical path. The per-token sell lock prevents a
+            // duplicate partial while this is in flight (and makes a same-tick full
+            // sell that enqueues simply fail to acquire and no-op); tier completions
+            // are persisted on the dispatched promise's completion (and by a later
+            // poll tick's step-8 persist).
             const sellAmount = calculatePartialSellAmount(state.originalTokenAmount, unfilledTiers);
-            const success = await executePartialSell(
+            dispatchPartialSell(
                 ctx, dex, tokenAddress, feeTier,
                 sellAmount, unfilledTiers, state, priceMultiple,
             );
-            if (success) {
-                ctx.log.info({
-                    token: tokenAddress,
-                    tiers: unfilledTiers.map(t => `${t.tier.multiple}x`).join(','),
-                    priceMultiple: priceMultiple.toFixed(2),
-                }, 'Partial sell completed');
-            }
-            // Persist updated tier completions
-            upsertExitState.run(serializeExitState(state));
         }
     }
 
