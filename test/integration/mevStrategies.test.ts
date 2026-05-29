@@ -26,6 +26,33 @@ vi.mock('../../src/config', () => ({
     CONFIG: { network: 'mainnet' },
 }));
 
+// Phase 21.3-01: the Flashbots submit closure now also performs a RAW eth_sendBundle
+// multi-builder fanout via ethers v6 FetchRequest (the library silently drops the
+// `builders` field — Pitfall 1). These tests mock the @flashbots library `sendBundle`
+// (still the asserted native-confirm + deterministic-hash source) but not the raw relay
+// HTTP call — so mock ONLY FetchRequest to make the raw fanout succeed hermetically.
+// importActual keeps Wallet/id real so the auth signing still exercises the real keccak +
+// Wallet. No assertion changes: the library-sendBundle path the tests assert runs after
+// the raw loop and is unchanged — this only un-blocks reaching it (no real relay call).
+vi.mock('ethers', async () => {
+    const actual = await vi.importActual<typeof import('ethers')>('ethers');
+    class MockFetchRequest {
+        url: string;
+        body: string | Uint8Array | null = null;
+        private headers: Record<string, string> = {};
+        constructor(url: string) { this.url = url; }
+        setHeader(key: string, value: string): void { this.headers[key.toLowerCase()] = value; }
+        async send(): Promise<unknown> {
+            return {
+                statusCode: 200,
+                assertOk(): void { /* ok */ },
+                bodyJson: { result: { bundleHash: '0x' + 'ab'.repeat(32) } },
+            };
+        }
+    }
+    return { ...actual, FetchRequest: MockFetchRequest };
+});
+
 // ---------------------------------------------------------------------------
 // Imports
 // ---------------------------------------------------------------------------
