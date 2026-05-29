@@ -462,7 +462,12 @@ export function privateAttemptBudget(reason: FullSellReason): number {
  * while liquidity drains. A sandwiched sell beats a stranded position (T-21.2-SANDWICH).
  */
 export function fallbackSlippagePct(reason: FullSellReason): number {
-    const routine = parsePositiveNumberEnv(undefined, CONFIG.slippagePercent || 5);
+    // IN-02 (21.2-13): simplified from the opaque
+    // `parsePositiveNumberEnv(undefined, CONFIG.slippagePercent || 5)` — with a
+    // `undefined` raw that parse ALWAYS returned the fallback, so it read as if it
+    // parsed an env var when it did not. This is just the configured exit slippage
+    // (defaulting to 5%) written plainly.
+    const routine = CONFIG.slippagePercent || 5;
     if (reason !== 'anti-rug') return routine;
     const antiRug = parsePositiveNumberEnv(process.env.MEV_SELL_ANTIRUG_SLIPPAGE_PCT, 15);
     // Never narrower than the 10% mainnet-proven floor (recover-sell-ladys.ts) and
@@ -475,10 +480,19 @@ export function fallbackSlippagePct(reason: FullSellReason): number {
  * reason-aware slippage percent. BigInt-only (no float drift): minOut =
  * expectedOut × (100 - slippagePct) / 100.
  */
-function computePublicMinOut(expectedOut: bigint, slippagePct: number): bigint {
-    // Round slippage to an integer percent for exact bigint math (matches the
+export function computePublicMinOut(expectedOut: bigint, slippagePct: number): bigint {
+    // IN-03 (21.2-13): defensive UPPER clamp. A misconfigured slippage > 100% would
+    // make `100 - slippagePct` negative → keepPct clamped to 0 → minOut = 0 (accept
+    // ANY output, including a fully-sandwiched near-zero — an unbounded-loss public
+    // sell on a typo). Cap EFFECTIVE slippage at 99% so minOut always keeps at
+    // least 1% of the quote (a real, if wide, floor). The anti-rug widening
+    // (fallbackSlippagePct: max(antiRug,10,routine)) and the never-negative env
+    // parse make >100% hard to hit operationally, but this prevents the no-floor
+    // case entirely. Lower bound 0 is retained (a 0%/negative slippage → keep 100%).
+    const effectiveSlippage = Math.min(Math.max(0, slippagePct), 99);
+    // Round to an integer percent for exact bigint math (matches the
     // recover-sell-ladys.ts `* 90n / 100n` idiom; 5% → ×95/100, 15% → ×85/100).
-    const keepPct = BigInt(Math.max(0, Math.round(100 - slippagePct)));
+    const keepPct = BigInt(Math.max(1, Math.round(100 - effectiveSlippage)));
     return (expectedOut * keepPct) / 100n;
 }
 

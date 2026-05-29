@@ -188,7 +188,7 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     // four Finding A knobs are co-located here so 21.2-06 (inclusion ladder) and
     // 21.2-08 (entry affordability gate) consume them WITHOUT re-touching config.ts.
     { name: 'MEV_SELL_MAX_PRIORITY_FEE_GWEI', required: false, description: 'Independent SELL-leg priority-fee ceiling (gwei), decoupled from the buy ceiling, still affordability-clamped. Finding A. (default: 25)' },
-    { name: 'MEV_SELL_COINBASE_BRIBE_ENABLED', required: false, description: 'Encode a coinbase bribe in the exit bundle. Default OFF — the public fallback is the guaranteed lever. Finding A. (default: false)' },
+    { name: 'MEV_SELL_COINBASE_BRIBE_ENABLED', required: false, description: 'RESERVED / NOT-YET-WIRED (IN-01, 21.2-13): a coinbase-bribe exit bundle is not implemented — this knob is read NOWHERE in src/ and has NO effect today. The public-mempool fallback is the guaranteed inclusion lever (Finding A). Left registered for a future plan; do not rely on it. (default: false)' },
     { name: 'EXIT_GATE_SELL_GAS_BUFFER', required: false, description: 'Multiplier on base fee when reserving worst-case public-exit gas for the buy-time affordability gate. Finding A. (default: 2.0)' },
     { name: 'MEV_SELL_FALLBACK_ATTEMPTS', required: false, description: 'Routine (non-anti-rug) private sell attempts before the public-mempool fallback; anti-rug uses 0-1. Finding A. (default: 2)' },
     { name: 'MEV_SELL_ANTIRUG_SLIPPAGE_PCT', required: false, description: 'WIDER public-fallback slippage (%) for anti-rug exits to maximize landing while liquidity drains; routine fallbacks reuse the configured exit slippage. Finding A. (default: 15)' },
