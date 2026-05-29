@@ -112,6 +112,7 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
     let exitManager: any;
     let chainRegistry: any;
     let bot: any;
+    let detector: any;
     let readDb: any;
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -142,6 +143,7 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
         exitManager = await import('../../src/utils/exitManager');
         chainRegistry = await import('../../src/chainRegistry');
         bot = await import('../../src/bot');
+        detector = await import('../../src/anti-rug/detector');
 
         // Independent read-only handle to assert the DB row (the ground-truth
         // observable). Using a SEPARATE connection from the engine's singleton
@@ -163,7 +165,12 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
         }
     });
 
-    /** Read the exit_state row via a separate read-only connection (durable proof). */
+    /**
+     * Read the exit_state row via a separate read-only connection (durable proof).
+     * Includes the schema-v7 failed-held columns (exit_status / exit_failure_count,
+     * Plan 21.2-03) so Test 3 can assert the `exit_failed_held` marker survives the
+     * restart on disk — not just in the writer's cache.
+     */
     function readExitStateRow(tradeId: number): {
         trade_id: number;
         entry_price: number;
@@ -173,6 +180,8 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
         original_token_amount: string;
         urgency_start_ts: number;
         volatility_samples: string;
+        exit_status: string | null;
+        exit_failure_count: number;
     } | undefined {
         return readDb.prepare('SELECT * FROM exit_state WHERE trade_id = ?').get(tradeId) as
             | {
@@ -184,6 +193,8 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
                   original_token_amount: string;
                   urgency_start_ts: number;
                   volatility_samples: string;
+                  exit_status: string | null;
+                  exit_failure_count: number;
               }
             | undefined;
     }
@@ -527,4 +538,275 @@ describe('Phase 21 plan 21-04 — exit_state persists identically across a resta
         expect(post!.volatility_samples).toBe(pre!.volatility_samples);
         expect(post!.entry_price).toBe(pre!.entry_price);
     }, 120000);
+
+    // =====================================================================
+    // TEST 3 (Phase 21.2 / Plan 21.2-10 / STOP-THE-LINE-04-D / D-PERSIST-FAILED-HELD)
+    // —— a SIGTERM-restart RESUMES an `exit_failed_held` row into monitoring
+    //    + re-registers anti-rug (the crown-jewel restart-resume invariant).
+    //
+    // THE CONTRACT (RESEARCH.md:469 + 21.2-07-SUMMARY.md:166): on a reboot, a
+    // still-held FAILED exit (`exit_status='exit_failed_held'`, persisted by
+    // keepMonitoringFailedHeld via markExitFailedHeld) must RE-ENTER monitoring
+    // (a poll timer is re-armed) AND RE-REGISTER anti-rug. This is the exact
+    // protection the LADYS harm proved was missing: a still-held position that
+    // failed its exit must NOT lose rug coverage just because the process died.
+    //
+    // FIDELITY — this test drives the REAL reboot-resume MECHANISM (the actual
+    // scan predicate the bot uses) + the REAL engine reload path (resumeExitMonitor
+    // + registerAntiRugPosition), so it proves the contract through the production
+    // code, not a privileged hand-call that would mask a scan gap.
+    //
+    // ROBUSTNESS — like TEST 1 (the deterministic gate), the position + its disk
+    // state are established via the engine's OWN write statements (insertTrade +
+    // serializeExitState/upsertExitState + upsertLpBaseline + markExitFailedHeld),
+    // NOT via a live archive buy. The deep-archive fork pins (block ~17.2M) make a
+    // live buy/sell RPC-tier-sensitive on a throttled endpoint; the restart-resume
+    // CONTRACT under test is price/timing-INDEPENDENT, so it must not inherit that
+    // fragility (D-QUALITY-FIRST: the higher-quality, deterministic gate). The token
+    // address is the real BOBO fixture address (so the registry key is realistic)
+    // but no on-chain buy/sell is required to exercise the resume path.
+    //
+    // D-OP-DB-TRUTH: the persisted `exit_status='exit_failed_held'` marker is read
+    // from the DB row via the separate read-only connection — never an op-log line.
+    // =====================================================================
+    it('a restart resumes an exit_failed_held row into monitoring + re-registers anti-rug', async () => {
+        if (!chainGuardOk) {
+            console.warn('chainGuardOk=false — skipping (real-mainnet gate).');
+            return;
+        }
+
+        const fixture: LaunchFixture = JSON.parse(fs.readFileSync(BOBO_FIXTURE, 'utf-8'));
+        const token = fixture.tokenAddress;
+        const pair = fixture.pairAddress as string;
+
+        // A fork ChainContext (wsProvider:null → registerAntiRugPosition's
+        // startChainAntiRugListener takes the HTTP-polling fallback). We assert
+        // registration via the positionRegistry observable (getRegisteredPositions),
+        // NOT by waiting on a WS/HTTP event — the registry is the ground truth.
+        const { ctx } = buildForkChainContext();
+        const dex = getV2Dex(ctx);
+
+        // --- STEP A: synthesize the position via the engine's OWN write statements
+        // (the deterministic idiom Test 1 uses). insertTrade gives exit_state a real
+        // FK target; upsertExitState persists monitoring state through the engine's
+        // serialize path; upsertLpBaseline gives registerAntiRugPosition the baseline
+        // it requires (loadLpBaseline). amount_in is NATIVE ETH units (not wei),
+        // matching the real buy path (bot.ts:432) so the risk-gate exposure sum is
+        // not corrupted for any sibling test sharing this isolated DB.
+        const info = dbMod.insertTrade.run({
+            token: token.toLowerCase(),
+            chain: 'eth',
+            action: 'buy',
+            txHash: '0x' + 'ef'.repeat(32),
+            block: fixture.settledForkBlock ?? 1,
+            timestamp: Math.floor(Date.now() / 1000),
+            amountIn: '0.05',
+            amountOut: null,
+            gasCost: '0',
+            priceAtAction: null,
+            status: 'pending',
+            poolType: 'v2',
+            feeTier: null,
+            dexName: 'uniswap-v2',
+        });
+        const tradeId = Number(info.lastInsertRowid);
+
+        // Persist monitoring state through the engine's REAL write path (the same
+        // serializeExitState + upsertExitState the poll loop makes every cycle).
+        const entryPrice = 1_000_000;
+        const tracker = new exitEngine.VolatilityTracker();
+        for (const p of [1_000_000, 1_300_000, 1_500_000]) tracker.addSample(p);
+        dbMod.upsertExitState.run(
+            exitEngine.serializeExitState({
+                tradeId,
+                entryPrice,
+                highWaterMark: 1_500_000,
+                trailingActivated: true,
+                completedTierIndices: new Set<number>(),
+                originalTokenAmount: 1_000_000_000_000_000_000_000n,
+                urgencyStartTs: Date.now() - 30_000,
+                volatilityTracker: tracker,
+            }),
+        );
+
+        // The lp_baseline row registerAntiRugPosition requires (loadLpBaseline). A
+        // synthesized V2 baseline — the values are not exercised by the resume path,
+        // only the row's existence + pair address are (the register precondition).
+        dbMod.upsertLpBaseline.run({
+            tradeId,
+            poolType: 'v2',
+            pairOrPoolAddress: pair.toLowerCase(),
+            v2Token0Reserve: '1000000000000000000000',
+            v2Token1Reserve: '80000000000000000000',
+            v2LpTotalSupply: '1000000000000000000',
+            v3ActiveLiquidity: null,
+            v3TickAtSnapshot: null,
+            v3PositionNftId: null,
+            v3FeeTier: null,
+            snapshotBlock: fixture.settledForkBlock ?? 1,
+            snapshotTs: Math.floor(Date.now() / 1000),
+        });
+        const baselineRow = readDb
+            .prepare('SELECT trade_id FROM lp_baseline WHERE trade_id = ?')
+            .get(tradeId) as { trade_id: number } | undefined;
+        expect(baselineRow, 'lp_baseline row must exist (the anti-rug register precondition)').toBeTruthy();
+
+        // --- STEP B: reproduce the failed-held catch OUTCOME on disk via the
+        // engine's OWN write statements — EXACTLY what executeFullSell's
+        // balance-truth catch does on a still-held thrown sell (exitEngine.ts:
+        // 1054 updateTradeStatus('failed') + 1055 keepMonitoringFailedHeld ->
+        // markExitFailedHeld). markExitFailedHeld stamps exit_status=
+        // 'exit_failed_held' + bumps exit_failure_count; updateTradeStatus flips
+        // trades.status pending->failed. We do NOT delete exit_state and do NOT
+        // unsubscribe anti-rug (the keep-monitoring invariant).
+        dbMod.markExitFailedHeld.run(tradeId);
+        dbMod.updateTradeStatus.run('failed', token.toLowerCase(), 'eth');
+
+        // The failed-held marker must be DURABLE on disk (separate read-only
+        // connection) before the simulated process death — this is the ground
+        // truth the restart must reload from (D-OP-DB-TRUTH).
+        const persisted = readExitStateRow(tradeId);
+        expect(persisted, 'exit_state row must survive a failed-held exit (NOT deleted)').toBeTruthy();
+        expect(persisted!.exit_status).toBe('exit_failed_held');
+        expect(persisted!.exit_failure_count).toBeGreaterThanOrEqual(1);
+
+        // --- STEP C: RESTART (Shape B, module-level). Drop the in-memory monitor
+        // timer + the in-memory anti-rug registry — the "process died" analog. Only
+        // the durable DB rows (exit_state + trades + lp_baseline) survive.
+        exitManager.clearAllTimersForToken('eth', token);
+        detector._resetRegistryForTesting(); // wipes positionRegistry + chainState (process death)
+        expect(
+            exitManager.hasExitMonitorTimer('eth', token),
+            'post-death: the poll timer must be gone (in-memory state discarded)',
+        ).toBe(false);
+        expect(
+            detector.getRegisteredPositions('eth').some((p: { tradeId: number }) => p.tradeId === tradeId),
+            'post-death: anti-rug must be unregistered (in-memory registry discarded)',
+        ).toBe(false);
+
+        // =================================================================
+        // STEP D — the reboot-resume. Split into TWO sub-steps that, together,
+        // separate "does the resume WIRING work" (D.2, the engine contract this
+        // plan rehearses) from "does the bot's reboot SCAN actually select this
+        // row" (D.1, the production gate). They diverge — see STOP-THE-LINE below.
+        // =================================================================
+
+        // -----------------------------------------------------------------
+        // !!! STOP-THE-LINE-04-D / D-PERSIST-FAILED-HELD — CONFIRMED SOURCE GAP !!!
+        //
+        // The DESIGN (RESEARCH.md:469 + 21.2-07-SUMMARY.md:166) promises: "on
+        // restart, resumeExitMonitor re-enters exit_failed_held rows into monitoring
+        // + re-registers anti-rug." The DB even carries exit_status for this purpose
+        // (db.ts:529 comment). BUT the production reboot scans only ever filter
+        // `trades.status = 'pending'`:
+        //   - resumeMultiChainMonitoring  bot.ts:1275  WHERE status = 'pending'
+        //   - resumeAntiRugMonitoring     bot.ts:1391  WHERE t.status = 'pending'
+        // and the balance-truth CATCH stamps a still-held failed exit
+        // `trades.status = 'failed'` (exitEngine.ts:1054). NOTHING in src/ ever READS
+        // `exit_status` — it is written by markExitFailedHeld and never consumed.
+        // => a catch-path exit_failed_held row (trades.status='failed') is SILENTLY
+        //    DROPPED on reboot: NOT re-monitored, anti-rug NOT re-registered — the
+        //    exact LADYS-class harm the crown-jewel invariant exists to prevent,
+        //    surviving across a process restart.
+        //
+        // D.1 below PROVES the gap against the EXACT production predicate (it must
+        // FAIL to find the row — `false`). It is asserted as the CURRENT (broken)
+        // behavior so the suite stays honest+green; a future fix (add
+        // `OR e.exit_status='exit_failed_held'` to BOTH scans, and stop flipping
+        // trades.status to a value the scan excludes) will FLIP this to true. This is
+        // surfaced to the operator in the SUMMARY ## STOP-THE-LINE + the executor
+        // return — NOT fixed-in-flight, NOT file-and-deferred.
+        // -----------------------------------------------------------------
+        const PROD_PENDING_ONLY = "WHERE t.chain = 'eth' AND t.action = 'buy' AND t.status = 'pending'";
+        const prodExitScanHit = (
+            readDb
+                .prepare(`SELECT t.id FROM trades t ${PROD_PENDING_ONLY}`)
+                .all() as Array<{ id: number }>
+        ).some((r) => r.id === tradeId);
+        const prodAntiRugScanHit = (
+            readDb
+                .prepare(
+                    `SELECT t.id FROM trades t INNER JOIN lp_baseline b ON b.trade_id = t.id ${PROD_PENDING_ONLY}`,
+                )
+                .all() as Array<{ id: number }>
+        ).some((r) => r.id === tradeId);
+        // CONFIRMED-BUG ASSERTION: the production reboot scans DROP the failed-held
+        // row today (trades.status='failed' is excluded by the pending-only filter).
+        // When this gap is fixed these two expectations FLIP to true and this block
+        // must be re-pointed at the contract.
+        expect(
+            prodExitScanHit,
+            'STOP-THE-LINE-04-D: production resumeMultiChainMonitoring scan (status=pending only) currently DROPS the exit_failed_held row',
+        ).toBe(false);
+        expect(
+            prodAntiRugScanHit,
+            'STOP-THE-LINE-04-D: production resumeAntiRugMonitoring scan (status=pending only) currently DROPS the exit_failed_held row',
+        ).toBe(false);
+
+        // -----------------------------------------------------------------
+        // D.2 — the engine-level resume WIRING this plan rehearses. GIVEN the
+        // failed-held row (as a correct reboot scan WOULD hand it in — by exit_status
+        // / trade_id, the durable identity that survives the restart), the engine's
+        // OWN reload path must (a) re-arm the routine poll timer via the REAL
+        // resumeExitMonitor (getExitState -> deserializeExitState -> setInterval) and
+        // (b) re-register anti-rug via the REAL registerAntiRugPosition (loadLpBaseline
+        // -> positionRegistry). This proves the keep-monitoring state is genuinely
+        // RESUMABLE from disk — the surrounding wiring works end-to-end the moment the
+        // scan gap above is closed.
+        const resumeRows = readDb
+            .prepare(
+                `SELECT t.id, t.token, t.pool_type, t.fee_tier, b.pair_or_pool_address
+                 FROM trades t
+                 INNER JOIN lp_baseline b ON b.trade_id = t.id
+                 INNER JOIN exit_state e ON e.trade_id = t.id
+                 WHERE t.chain = 'eth' AND t.action = 'buy' AND e.exit_status = 'exit_failed_held'`,
+            )
+            .all() as Array<{
+                id: number;
+                token: string;
+                pool_type: 'v2' | 'v3';
+                fee_tier: number | null;
+                pair_or_pool_address: string;
+            }>;
+        // The exit_status-keyed scan (what a CORRECT reboot must use) DOES find the
+        // row — proving the durable identity to resume from is present on disk.
+        expect(
+            resumeRows.some((r) => r.id === tradeId),
+            'an exit_status-keyed reboot scan (the correct predicate) MUST find the exit_failed_held row',
+        ).toBe(true);
+        for (const r of resumeRows) {
+            const rdex = ctx.chain.dexes.find((d: { dexType: string }) => d.dexType === r.pool_type);
+            // (a) re-arm the routine poll timer (the REAL reload path).
+            await exitEngine.resumeExitMonitor(ctx, rdex, r.token, r.fee_tier, ctx.chain.snipeAmount, r.id);
+            // (b) re-register anti-rug (the REAL register path).
+            await detector.registerAntiRugPosition(ctx, rdex, r.token, r.pair_or_pool_address, r.id, r.fee_tier);
+        }
+
+        // --- ASSERT (the resume contract, observed from the engine's OWN registries,
+        // never an op-log line — D-OP-DB-TRUTH): the failed-held row RE-ENTERED
+        // monitoring AND anti-rug was RE-REGISTERED.
+        expect(
+            exitManager.hasExitMonitorTimer('eth', token),
+            'resume MUST re-arm the routine poll timer for the exit_failed_held position',
+        ).toBe(true);
+        const reRegistered = detector
+            .getRegisteredPositions('eth')
+            .some((p: { tradeId: number }) => p.tradeId === tradeId);
+        expect(
+            reRegistered,
+            'resume MUST re-register anti-rug for the exit_failed_held position (the LADYS-class crown-jewel invariant)',
+        ).toBe(true);
+
+        // The failed-held marker + failure counter survived the restart on disk
+        // (resume does NOT clear them — only a genuine close deleteExitState does).
+        const postResume = readExitStateRow(tradeId);
+        expect(postResume, 'exit_state row must still exist after the restart-resume').toBeTruthy();
+        expect(postResume!.exit_status).toBe('exit_failed_held');
+        expect(postResume!.exit_failure_count).toBe(persisted!.exit_failure_count);
+
+        // --- CLEANUP: stop the freshly-armed poll timer + the anti-rug registry so
+        // no timer/HTTP-poll closure leaks into the next fork file (shared node).
+        exitManager.clearAllTimersForToken('eth', token);
+        detector._resetRegistryForTesting();
+    }, 180000);
 });

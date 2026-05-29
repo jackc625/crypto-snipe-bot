@@ -145,6 +145,7 @@ describe('Phase 21 plan 21-06 — fork rehearsal of the live-capture sequence (D
     let bot: any;
     let exitManager: any;
     let chainRegistry: any;
+    let detector: any;
     let readDb: any;
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -177,6 +178,7 @@ describe('Phase 21 plan 21-06 — fork rehearsal of the live-capture sequence (D
         bot = await import('../../src/bot');
         exitManager = await import('../../src/utils/exitManager');
         chainRegistry = await import('../../src/chainRegistry');
+        detector = await import('../../src/anti-rug/detector');
 
         // Independent read-only handle to assert the DB row (the ground-truth
         // observable). A SEPARATE connection from the engine's singleton proves
@@ -480,6 +482,72 @@ describe('Phase 21 plan 21-06 — fork rehearsal of the live-capture sequence (D
         // remains the source of truth, the op is the filter.
         const decoded = opLog.find((e) => e.op === 'exit.receipt.decoded');
         expect(String(decoded?.fields.amountOut)).toBe(sellRows[0].amount_out);
+
+        // FINDING C (decoupled serial ExitWorker, 21.2-05 / D-DECOUPLE-SERIAL-WORKER).
+        // The stop-loss trigger ENQUEUES on the serial worker and returns 'continue'
+        // immediately; the SINGLE worker then drains the queue and submits the sell.
+        // exit.worker.enqueued proves the exit travelled through the decoupled
+        // worker path (the poll tick did NOT submit inline) — i.e. the buy→monitor→
+        // trigger→ExitWorker-drain→executeFullSell wiring ran end-to-end on a fork.
+        expect(
+            ops,
+            'the stop-loss trigger must have ENQUEUED on the serial ExitWorker (decoupled worker drain, Finding C)',
+        ).toContain('exit.worker.enqueued');
+
+        // FINDING D balance-truth teardown decision (21.2-07 / D-BALANCE-IS-TRUTH).
+        // After the sell, executeFullSell re-fetches balanceOf and lets IT — not the
+        // submit report — decide teardown: <= dust → teardownGenuineClose (delete
+        // exit_state + unsubscribe anti-rug); > dust → keepMonitoringFailedHeld. Here
+        // the whale dumped the ENTIRE token bag and the bot sold its full balance, so
+        // the fork-only wallet's residual balance is dust → the GENUINE-CLOSE branch
+        // must have run. We assert the OBSERVABLE EFFECTS of that decision from the
+        // DB + the engine's registries (D-OP-DB-TRUTH), not from an op-log line:
+        //   (a) the on-chain balanceOf is at/near zero (the input to the decision),
+        //   (b) the exit_state row was DELETED (teardownGenuineClose ran, not
+        //       keepMonitoringFailedHeld which would have KEPT the row + stamped
+        //       exit_failed_held),
+        //   (c) anti-rug is no longer registered for this trade (genuine-close
+        //       unsubscribe — the correct D-TERMINATION application).
+        const buyId = (
+            readDb
+                .prepare("SELECT id FROM trades WHERE token = ? AND action = 'buy' ORDER BY id DESC LIMIT 1")
+                .get(token.toLowerCase()) as { id: number }
+        ).id;
+        const residualBalance: bigint = await erc20.balanceOf(wallet.address);
+        const exitStateAfter = readDb
+            .prepare('SELECT trade_id, exit_status FROM exit_state WHERE trade_id = ?')
+            .get(buyId) as { trade_id: number; exit_status: string | null } | undefined;
+        if (residualBalance === 0n) {
+            // Genuine close: the balance-truth decision tore the position down.
+            expect(
+                exitStateAfter,
+                'balance-truth GENUINE-CLOSE: a fully-sold position (balanceOf 0) must have its exit_state DELETED by teardownGenuineClose',
+            ).toBeFalsy();
+            expect(
+                detector.getRegisteredPositions('eth').some((p: { tradeId: number }) => p.tradeId === buyId),
+                'balance-truth GENUINE-CLOSE: anti-rug must be unsubscribed after a genuine full close',
+            ).toBe(false);
+        } else {
+            // STILL-HELD (a fee-on-transfer remainder etc.): the balance-truth
+            // decision must have taken the keep-monitoring branch and persisted
+            // exit_failed_held — NEVER a silent teardown of a still-held position.
+            // Either disposition is a VALID balance-truth outcome; what is asserted
+            // is that the decision was driven by balanceOf, not the submit report.
+            expect(
+                exitStateAfter,
+                'balance-truth STILL-HELD: a residual balance must KEEP the exit_state row (keepMonitoringFailedHeld), never silently torn down',
+            ).toBeTruthy();
+            expect(
+                exitStateAfter!.exit_status,
+                'balance-truth STILL-HELD: a residual balance must be stamped exit_failed_held (keep anti-rug + re-arm timer)',
+            ).toBe('exit_failed_held');
+            // A still-held position keeps the routine poll timer armed; stop it so
+            // the timer does not leak into the next fork file (shared node).
+            exitManager.clearAllTimersForToken('eth', token);
+        }
+        // Reset the anti-rug registry so no leftover registration / HTTP-poll closure
+        // leaks into the next fork file (shared node).
+        detector._resetRegistryForTesting();
 
         // EXPLICIT NON-CLOSURE (D-EVIDENCE-BAR): this fork rehearsal closes NO
         // requirement. The fork has no Flashbots relay (mevStrategy:'passthrough'
