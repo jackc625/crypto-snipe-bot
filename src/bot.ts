@@ -61,6 +61,13 @@ import { logger } from "./utils/logger";
 import { getProvider, getWallet, getWsProvider, removeWsProvider } from "./utils/provider";
 import { FACTORY_ABI, ROUTER_ABI, ERC20_ABI, PAIR_ABI, V3_FACTORY_ABI, V3_POOL_ABI, V3_SWAP_ROUTER_ABI, V3_QUOTER_V2_ABI } from "./utils/abis";
 import { sendTxWithRetry, createMevStrategy } from "./utils/txManager";
+import type { TransactionRequest } from "ethers";
+// Phase 21.2 Plan 21.2-13 / WR-01 (D-NONCE-AUTHORITY-ALL): the buy entry path
+// joins the bot-wide per-wallet nonce authority. Every signing submit — buys,
+// sells, anti-rug, public fallback, approvals, partial sells — routes through
+// withNonceLock so a buy and a concurrent same-wallet sell/anti-rug can never
+// fetch getTransactionCount('latest') and sign against the SAME nonce.
+import { withNonceLock } from "./utils/nonceAuthority";
 import {
     clearAllTimers,
 } from "./utils/exitManager";
@@ -200,12 +207,45 @@ async function checkMinLiquidity(
     }
 }
 
-// Chain-aware maybeApprove for multi-chain path
+// Chain-aware maybeApprove for multi-chain path.
+// WR-01 (21.2-13, D-NONCE-AUTHORITY-ALL): the approve() is a signing tx, so it
+// routes through withNonceLock(ctx.wallet.address) — it must serialize with every
+// other same-wallet signing site (buy submit / sell / anti-rug / partial). The
+// allowance READ stays outside the lock (no signing); only the approve is locked.
 async function maybeApproveForChain(ctx: ChainContext, tokenContract: Contract, amount: bigint, routerAddress: string) {
     const currentAllowance = await tokenContract.allowance(ctx.wallet.address, routerAddress);
     if (currentAllowance < amount) {
-        await tokenContract.approve(routerAddress, amount);
+        await withNonceLock(ctx.wallet.address, async () => {
+            await tokenContract.approve(routerAddress, amount);
+        });
     }
+}
+
+// ---------------------------------------------------------------------------
+// submitBuyTx — the nonce-locked BUY-submit seam (Phase 21.2-13 / WR-01)
+// ---------------------------------------------------------------------------
+//
+// D-NONCE-AUTHORITY-ALL: the buy entry path was the one signing submit that
+// bypassed the per-wallet nonce authority (the V2 + V3 swap submits called
+// sendTxWithRetry directly, OUTSIDE any lock). A buy and a concurrent same-wallet
+// sell/anti-rug (different tokens) could both fetch getTransactionCount('latest')
+// before either landed and sign two txs against ONE nonce — the cross-submit
+// collision the lock exists to close. The strategy's per-attempt stop-on-advance
+// only catches advancement on the NEXT attempt, not the initial collision.
+//
+// Both buy sites now call this helper. It wraps the submit in
+// withNonceLock(ctx.wallet.address, …), mirroring the sell-side idiom
+// (executePublicFallbackSell / executePartialSell). NO DOUBLE-LOCK: the buy sites
+// (handleNewPairForChain / handleNewV3PoolForChain — the top-level pair/pool event
+// handlers) are NOT nested inside any other same-wallet withNonceLock hold, so this
+// is a single-level acquire (the CR-01 re-entrant-deadlock class does not apply).
+// sendTxWithRetry still owns nonce-safe retry (re-fetch 'latest' per attempt); the
+// lock only guarantees no two same-wallet submits run concurrently.
+export async function submitBuyTx(
+    ctx: ChainContext,
+    txBuilder: () => Promise<TransactionRequest>,
+): Promise<string> {
+    return withNonceLock(ctx.wallet.address, () => sendTxWithRetry(txBuilder, ctx));
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +521,10 @@ export async function handleNewPairForChain(
         // post-21.1-05 sendTxWithRetry's type is Promise<string>) so the buy row
         // records it instead of the 'mev_bundle' placeholder — restoring the
         // position-tracking auditability the LADYS false-negative destroyed.
-        const realHash = await sendTxWithRetry(
+        // WR-01 (21.2-13): the buy submit routes through withNonceLock via
+        // submitBuyTx so it serializes with every other same-wallet signing site.
+        const realHash = await submitBuyTx(
+            ctx,
             () => ctx.wallet.populateTransaction({
                 to: dex.routerAddress,
                 data: dexRouter.interface.encodeFunctionData("swapExactETHForTokens", [
@@ -492,7 +535,6 @@ export async function handleNewPairForChain(
                 ]),
                 value: amountIn,
             }),
-            ctx
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 — post-MEV-submit audit log.
@@ -813,13 +855,16 @@ export async function handleNewV3PoolForChain(
         // returns so the V3 buy row records it instead of the 'mev_bundle'
         // placeholder (see the V2 analog above; CONTEXT names both bot.ts:429 V2
         // and :728 V3 for consistent landed-buy auditability).
-        const realHash = await sendTxWithRetry(
+        // WR-01 (21.2-13): the V3 buy submit routes through withNonceLock via
+        // submitBuyTx (identical posture to V2) so it serializes with every other
+        // same-wallet signing site.
+        const realHash = await submitBuyTx(
+            ctx,
             () => ctx.wallet.populateTransaction({
                 to: dex.swapRouterAddress,
                 data: v3Router.interface.encodeFunctionData('multicall', [deadline, [swapData]]),
                 value: amountIn,  // Pitfall 5: send ETH value since tokenIn is WETH
             }),
-            ctx
         );
 
         // Phase 20 / OPS-LIVE-08 D-KILLSWITCH-CP3 (V3 path) — audit log only
