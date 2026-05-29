@@ -13,7 +13,12 @@ export const ROUTER_ABI = [
     "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) payable returns (uint[] memory)",
     "function getAmountsOut(uint amountIn, address[] calldata path) view returns (uint[] memory)",
     "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) returns (uint[] memory)",
-    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)"
+    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)",
+    // BUY-side fee-on-transfer-safe variant (Phase 21.3, STOP-THE-LINE-05-B): the
+    // inverse of the sell FoT fn above — payable (ETH sent as value), NO return
+    // array (FoT variants return nothing), no approve needed for a buy. Consumed by
+    // the deliberate public buy path (plan 21.3-03).
+    "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin, address[] path, address to, uint deadline) payable"
 ];
 
 // -- ERC20 --
