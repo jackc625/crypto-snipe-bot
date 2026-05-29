@@ -370,6 +370,13 @@ function deriveFeeWei(feeData: {
 export async function checkEntryExitAffordability(
     chain: PreflightChain,
     mode: 'snipe' | 'deliberate' = 'snipe',
+    // 21.3-06 / CR-01: the ACTUAL buy value to price the floor against. A deliberate
+    // buy's spend (scripts/deliberate-buy.ts → an arbitrary parseEther(amountArg))
+    // can be MUCH larger than chain.snipeAmount; pricing the floor on snipeAmount
+    // (the pre-CR-01 bug) lets a too-large deliberate buy PASS and then strand its
+    // own exit. Defaults to parseEther(chain.snipeAmount) so the snipe call sites
+    // (which pass nothing) are BYTE-FOR-BYTE unchanged.
+    buyValueWei?: bigint,
 ): Promise<PreflightResult> {
     const sellGasBuffer = parseExitGateBuffer();
     const sellGasLimit = chain.gas.maxGasLimit;
@@ -394,7 +401,11 @@ export async function checkEntryExitAffordability(
         }
         const { baseFeeWei, maxBuyFeeWei } = fees;
 
-        const snipeValue = ethers.parseEther(chain.snipeAmount);
+        // 21.3-06 / CR-01: price the floor against the REAL buy value. buyValueWei is
+        // the operator's actual deliberate spend (threaded from executeDeliberateBuy);
+        // when omitted (every snipe call site) it defaults to parseEther(chain.snipeAmount)
+        // so the snipe floor is byte-for-byte the pre-21.3-06 value.
+        const snipeValue = buyValueWei ?? ethers.parseEther(chain.snipeAmount);
         // Worst-case BUY gas: the most the buy can pay (maxFeePerGas / gasPrice).
         const worstCaseBuyGas = sellGasLimit * maxBuyFeeWei;
         // Worst-case GUARANTEED PUBLIC sell gas (Finding A — normal-priced, + approval).

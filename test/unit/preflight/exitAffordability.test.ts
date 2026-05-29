@@ -398,4 +398,85 @@ describe('checkEntryExitAffordability (buy-time entry gate)', () => {
             expect(result.details?.err).toBeDefined();
         });
     });
+
+    // -----------------------------------------------------------------------
+    // 21.3-06 / CR-01: the gate prices the REAL deliberate amount (buyValueWei),
+    // NOT chain.snipeAmount. A deliberate buy LARGER than snipeAmount that the
+    // wallet covers at the snipe floor but NOT at the deliberate floor MUST be
+    // REFUSED — otherwise it can enter a position it cannot exit.
+    //
+    // RED proof: against pre-fix code the gate ignores buyValueWei and always
+    // prices snipeValue = parseEther(chain.snipeAmount), so a balance that covers
+    // the snipe floor wrongly PASSES even when the real (larger) deliberate spend
+    // strands the exit. These tests diverge buyValueWei from snipeAmount (the
+    // exact divergence the existing tests never exercised).
+    // -----------------------------------------------------------------------
+    describe('CR-01 — the gate prices the REAL buyValueWei (deliberate), not snipeAmount', () => {
+        // Floor that uses an arbitrary buyValueWei as the snipeValue term (and the
+        // deliberate public-buy reserve). Mirrors the gate's deliberate math.
+        function floorWithBuyValueWei(chain: MockChain, buyValueWei: bigint, includeDeliberateReserve: boolean): bigint {
+            const buyGas = chain.gas.maxGasLimit * MAX_FEE_WEI;
+            const bufferedBaseFee = (BASE_FEE_WEI * BigInt(Math.round(EXIT_GATE_BUFFER_DEFAULT * 100))) / 100n;
+            const approvalGas = 60_000n * bufferedBaseFee;
+            const sellGas = chain.gas.maxGasLimit * bufferedBaseFee + approvalGas;
+            const cushion = ethers.parseEther(chain.gasBuffer);
+            const delibReserve = includeDeliberateReserve ? deliberateBuyReserveWei(chain) : 0n;
+            return buyValueWei + buyGas + sellGas + cushion + delibReserve;
+        }
+
+        it('Test 10 (CR-01 core): a deliberate buyValueWei > snipeAmount that the wallet covers at the SNIPE floor but NOT at the DELIBERATE floor is REFUSED', async () => {
+            const chain = makeMockChain(); // snipeAmount '0.003'
+            const snipeValue = ethers.parseEther(chain.snipeAmount);
+            // A deliberate spend 10x the snipe amount.
+            const deliberateAmount = snipeValue * 10n;
+
+            // Fund EXACTLY at the deliberate floor priced on snipeAmount (i.e. the
+            // pre-fix gate's floor) PLUS the deliberate reserve — i.e. the wallet
+            // covers everything the pre-fix gate prices (which used snipeValue), but
+            // NOT the extra (deliberateAmount - snipeValue) the real spend needs.
+            const preFixDeliberateFloor = floorWithBuyValueWei(chain, snipeValue, true);
+            chain.httpProvider.getBalance.mockResolvedValue(preFixDeliberateFloor);
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            // With the REAL deliberate amount threaded, the floor rises by
+            // (deliberateAmount - snipeValue) → the SAME balance must REFUSE.
+            const result = await checkEntryExitAffordability(chain as never, 'deliberate', deliberateAmount);
+            expect(result.passed).toBe(false);
+            // The surfaced snipeValue term must equal the REAL deliberate amount, not snipeAmount.
+            expect(ethers.parseEther(String(result.details?.snipeValue))).toBe(deliberateAmount);
+        });
+
+        it('Test 11 (CR-01 same wallet passes at the smaller snipe amount): the SAME wallet/fee PASSES when priced at the snipe amount', async () => {
+            const chain = makeMockChain();
+            const snipeValue = ethers.parseEther(chain.snipeAmount);
+            const deliberateAmount = snipeValue * 10n;
+            const preFixDeliberateFloor = floorWithBuyValueWei(chain, snipeValue, true);
+            chain.httpProvider.getBalance.mockResolvedValue(preFixDeliberateFloor);
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            // Priced at the snipe amount (buyValueWei = snipeValue), the same balance PASSES.
+            const atSnipeAmount = await checkEntryExitAffordability(chain as never, 'deliberate', snipeValue);
+            expect(atSnipeAmount.passed).toBe(true);
+        });
+
+        it('Test 12 (CR-01 default unchanged): buyValueWei omitted defaults to parseEther(snipeAmount) — snipe floor byte-for-byte unchanged', async () => {
+            const chain = makeMockChain();
+            const snipeFloor = expectedFloorWei(chain);
+
+            const { checkEntryExitAffordability } = await import('../../../src/preflight');
+
+            // No buyValueWei → snipe floor uses parseEther(snipeAmount) exactly.
+            chain.httpProvider.getBalance.mockResolvedValue(snipeFloor);
+            const atFloor = await checkEntryExitAffordability(chain as never, 'snipe');
+            expect(atFloor.passed).toBe(true);
+            expect(ethers.parseEther(String(atFloor.details?.snipeValue))).toBe(ethers.parseEther(chain.snipeAmount));
+
+            // Explicit undefined buyValueWei behaves identically to omitting it.
+            const atFloorExplicit = await checkEntryExitAffordability(chain as never, 'snipe', undefined);
+            expect(atFloorExplicit.passed).toBe(true);
+            expect(ethers.parseEther(String(atFloorExplicit.details?.snipeValue))).toBe(ethers.parseEther(chain.snipeAmount));
+        });
+    });
 });

@@ -285,7 +285,7 @@ export async function submitBuyTx(
 //
 // Returns true when the snipe may proceed, false when it must be refused.
 // ---------------------------------------------------------------------------
-async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: string, mode: BuyMode = 'snipe'): Promise<boolean> {
+async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: string, mode: BuyMode = 'snipe', buyValueWei?: bigint): Promise<boolean> {
     // checkEntryExitAffordability consumes a PreflightChain (the chain config plus
     // its live httpProvider + wallet) — exactly the fields ChainContext already
     // holds. Reuse them rather than reconstruct (no duplicated formula).
@@ -294,11 +294,15 @@ async function enforceEntryExitAffordability(ctx: ChainContext, targetToken: str
     // public-fallback buy gas; a genuine snipe (default 'snipe') reserves ZERO
     // public-buy gas it will never use — the snipe floor is byte-for-byte the 21.2
     // floor. mode defaults to 'snipe' so the snipe call sites are unchanged.
+    // Phase 21.3 / Plan 21.3-06 (CR-01): thread `buyValueWei` so the gate prices the
+    // floor against the OPERATOR'S REAL deliberate spend, not chain.snipeAmount. The
+    // snipe call sites pass NOTHING → buyValueWei undefined → the gate defaults to
+    // parseEther(chain.snipeAmount) → byte-for-byte the pre-21.3-06 snipe floor.
     const result = await checkEntryExitAffordability({
         ...ctx.chain,
         httpProvider: ctx.httpProvider,
         wallet: ctx.wallet,
-    }, mode);
+    }, mode, buyValueWei);
     if (result.passed) {
         return true;
     }
@@ -486,7 +490,11 @@ export async function executeDeliberateBuy(
 ): Promise<string | null> {
     // (0) Mode-aware affordability gate (D-BUY-AFFORDABILITY-EXTEND): a deliberate
     // buy MUST be able to afford its OWN public-fallback buy gas. Refuse → return.
-    if (!(await enforceEntryExitAffordability(ctx, targetToken, 'deliberate'))) {
+    // 21.3-06 / CR-01: thread the REAL amountInWei (the operator's deliberate spend,
+    // typically LARGER than chain.snipeAmount) so the gate prices the floor against
+    // what is actually being spent — a deliberate buy the wallet cannot also afford
+    // to EXIT is REFUSED ("never enter what you cannot exit" holds on this path too).
+    if (!(await enforceEntryExitAffordability(ctx, targetToken, 'deliberate', amountInWei))) {
         return null;
     }
 
@@ -611,6 +619,42 @@ export async function executeDeliberateBuy(
     if (!publicBuyAllowed) {
         // Defensive: unreachable given the branches above, but never fall through to
         // a broadcast on an unexpected state (fail-closed).
+        return null;
+    }
+
+    // (2c) HI-01 — PRE-BROADCAST LIVE AFFORDABILITY RE-CHECK (21.3-06).
+    // The public leg is a direct router.swap that does NOT pass through
+    // submitWithReconciliation / computeAffordablePriorityFee, so nothing re-validates
+    // that — after this amountInWei spend at the LIVE base fee — the wallet still holds
+    // the guaranteed-public-exit reserve. The step-0 gate priced the LIVE state at gate
+    // time; the base fee may have risen or the private leg may have escalated gas since.
+    // Re-run the SAME single-source-of-truth gate (checkEntryExitAffordability — it
+    // internally reuses computeWorstCasePublicExitGas; we do NOT hand-roll a new reserve)
+    // against the LIVE balance + the REAL amountInWei (mode 'deliberate'). FAIL CLOSED on
+    // refusal — never enter a public buy that strands the exit (the only path that
+    // actually broadcasts fresh ETH into a position).
+    const reCheck = await checkEntryExitAffordability(
+        { ...ctx.chain, httpProvider: ctx.httpProvider, wallet: ctx.wallet },
+        'deliberate',
+        amountInWei,
+    );
+    if (!reCheck.passed) {
+        ctx.log.error(
+            {
+                op: 'buy.fallback.affordability.refused',
+                token: targetToken,
+                amountIn: amountInWei.toString(),
+                reason: reCheck.reason,
+                details: reCheck.details,
+            },
+            'Deliberate public buy ABORTED: pre-broadcast live affordability re-check failed (a base-fee rise / gas escalation since the gate would strand the exit) — failing closed',
+        );
+        await sendCtxAlert(
+            ctx,
+            `*[DELIBERATE BUY → PUBLIC ABORTED]* live affordability re-check failed for \`${targetToken}\` ` +
+            `(a base-fee rise since the entry gate would strand the guaranteed exit) — public buy NOT broadcast (fail-closed). ` +
+            `${sanitizeReason(reCheck.reason ?? 'unaffordable')}`,
+        );
         return null;
     }
 
