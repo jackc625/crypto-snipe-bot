@@ -202,6 +202,30 @@ const REQUIRED_ENV_VARS: EnvVarSpec[] = [
     // them WITHOUT re-touching config.ts.
     { name: 'EXIT_DUST_THRESHOLD_BPS', required: false, description: 'Dust threshold (basis points of the original token amount) at/under which a re-fetched balanceOf is treated as a GENUINE close → teardown; above it the position is STILL HELD → keep anti-rug + re-arm the poll timer. Relative + a tiny absolute floor. Finding D. (default: 1 = 0.01%)' },
     { name: 'EXIT_ROUTINE_MAX_FAILURES', required: false, description: 'Consecutive ROUTINE (non-anti-rug) failed-exit count after which routine retries pause + hard-alert; anti-rug emergency exits ALWAYS bypass the pause and fire. Finding D. (default: 5)' },
+
+    // --- Calm-gas BUY inclusion (Phase 21.3, STOP-THE-LINE-05-A/B/C/D) ---
+    // Per D-ENV-EXAMPLE [USER-BINDING]: every var here also lives in .env.example
+    // with the SAME default + a 1-line inline-comment description (defaults match
+    // byte-for-byte). GLOBAL (non-chain-prefixed) submission-mechanism knobs, CODE-
+    // read config, NOT secrets — never log their values as secrets; FLASHBOTS_AUTH_KEY
+    // is unchanged and never co-located here. All required: false — the bot runs
+    // unchanged with every var unset (generous, never-NaN/never-negative parse via the
+    // parsePositiveNumber/parsePositiveInt helpers in the consuming code). REGISTRATION
+    // ONLY here (file-ownership discipline so plans 01/02/03 consume config WITHOUT
+    // re-touching config.ts); no parsing logic lives in this block.
+    // Root cause (RESEARCH): a staticCall-valid buy that Flashbots won't include at
+    // calm gas is builder COVERAGE, not underpricing (at a 0.25-gwei base fee a 13-gwei
+    // bundle is wildly profitable) → the protection-preserving fix is multi-builder
+    // builders-field fanout + multi-block targeting + an independent higher (still
+    // affordability-clamped) buy ceiling. Snipes stay PRIVATE; only the explicitly-
+    // invoked deliberate/capture path falls back private-first → public.
+    { name: 'MEV_BUILDERS', required: false, description: 'Per D-PRIVATE-INCLUSION-HARDEN multi-builder fanout: comma-separated registered builder name-tags for the raw eth_sendBundle `builders` field (private builder-to-builder routing, NOT public-mempool exposure). beaverbuild.org + Titan must always be present. (default: flashbots,f1b.io,rsync,beaverbuild.org,builder0x69,Titan,EigenPhi,Gambit Labs,payload,Loki,JetBuilder,tbuilder,bobthebuilder,BTCS,bloXroute,Blockbeelder,Quasar,Eureka,Bombora)' },
+    { name: 'MEV_BUY_TARGET_BLOCKS', required: false, description: 'Per D-PRIVATE-INCLUSION-HARDEN multi-block targeting: number of consecutive blocks (block+1 .. block+N) the SAME signed-once bundle is targeted at, to widen builder coverage. (default: 3)' },
+    { name: 'MEV_BUY_MAX_PRIORITY_FEE_GWEI', required: false, description: 'Per D-PRIVATE-INCLUSION-HARDEN higher BUY-leg priority-fee ceiling (gwei), INDEPENDENT of MEV_MAX_PRIORITY_FEE_GWEI (the default-5 backward-compat floor) and of MEV_SELL_MAX_PRIORITY_FEE_GWEI; still affordability-clamped (try harder, never overspend). (default: 25)' },
+    { name: 'DELIBERATE_BUY_PRIVATE_ATTEMPTS', required: false, description: 'Per D-DELIBERATE-PRIVATE-FIRST: private submission budget for the explicit deliberate/capture buy before the public fallback (maps to maxRetries = budget - 1). (default: 2)' },
+    { name: 'DELIBERATE_BUY_SLIPPAGE_PCT', required: false, description: 'Per D-DELIBERATE-PRIVATE-FIRST public leg: slippage (%) for the deliberate public buy; reuses the configured buy slippage (CONFIG.slippagePercent). (default: 5)' },
+    { name: 'DELIBERATE_BUY_GAS_BUFFER', required: false, description: 'Per D-BUY-AFFORDABILITY-EXTEND mode-aware reserve: multiplier on base fee when reserving worst-case deliberate-buy gas for the entry-affordability gate. (default: 2.0)' },
+    { name: 'MEV_BUY_COINBASE_BRIBE_ENABLED', required: false, description: 'RESERVED / NOT-YET-WIRED (D-QUALITY-FIRST §Q5): a coinbase-bribe buy bundle is not implemented — this knob is read NOWHERE in src/ and has NO effect today. Multi-builder fanout is the guaranteed-private inclusion lever. Left registered for a future plan; do not rely on it. (default: false)' },
 ];
 
 function validateEnvVars(): void {
