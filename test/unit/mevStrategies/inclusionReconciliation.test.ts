@@ -92,6 +92,36 @@ vi.mock('@flashbots/ethers-provider-bundle', () => ({
     },
 }));
 
+// Phase 21.3-01: the flashbots submit closure now also performs a RAW
+// eth_sendBundle multi-builder fanout via ethers v6 `FetchRequest` (the library
+// drops the `builders` field). Mock ONLY FetchRequest so these tests stay
+// hermetic (no real relay call); importActual keeps Wallet/JsonRpcProvider/id/
+// parseUnits/keccak256/parseEther real so the auth signing + hash math still run.
+vi.mock('ethers', async () => {
+    const actual = await vi.importActual<typeof import('ethers')>('ethers');
+    class MockFetchRequest {
+        url: string;
+        body: string | Uint8Array | null = null;
+        private headers: Record<string, string> = {};
+        constructor(url: string) {
+            this.url = url;
+        }
+        setHeader(key: string, value: string): void {
+            this.headers[key.toLowerCase()] = value;
+        }
+        async send(): Promise<unknown> {
+            return {
+                statusCode: 200,
+                assertOk(): void {
+                    /* ok */
+                },
+                bodyJson: { result: { bundleHash: STUB_BUNDLE_HASH } },
+            };
+        }
+    }
+    return { ...actual, FetchRequest: MockFetchRequest };
+});
+
 // Capture the module child-logger's calls so GREEN waves can assert the
 // reconciliation op: fields (e.g. op:'mev.reconcile.included').
 const logInfo = vi.fn();
@@ -178,7 +208,10 @@ const SAVED_ENV: Record<string, string | undefined> = {
     // Snapshot the fee ceiling/step too: the operator's .env may raise
     // MEV_MAX_PRIORITY_FEE_GWEI above 5 (dotenv loads it into process.env at
     // import), which would defeat the hardcoded CEILING_WEI = 5 gwei asserts.
+    // 21.3-01: the buy leg now reads MEV_BUY_MAX_PRIORITY_FEE_GWEI (default 25);
+    // snapshot it too so we can pin it to 5 for the hermetic CR-01 buy-ceiling asserts.
     MEV_MAX_PRIORITY_FEE_GWEI: process.env.MEV_MAX_PRIORITY_FEE_GWEI,
+    MEV_BUY_MAX_PRIORITY_FEE_GWEI: process.env.MEV_BUY_MAX_PRIORITY_FEE_GWEI,
     MEV_PRIORITY_FEE_STEP_GWEI: process.env.MEV_PRIORITY_FEE_STEP_GWEI,
 };
 
@@ -188,8 +221,12 @@ beforeEach(() => {
     process.env.MEV_CONFIRM_POLL_MS = '10';
     // Pin the fee ceiling/step to the documented CR-01 defaults so the
     // observable-fee clamp assertions are hermetic regardless of the operator's
-    // .env (restored from SAVED_ENV in afterEach).
+    // .env (restored from SAVED_ENV in afterEach). 21.3-01: the buy leg reads
+    // MEV_BUY_MAX_PRIORITY_FEE_GWEI (default 25) — pin it to 5 so the buy-path CR-01
+    // clamp assertions keep exercising the documented 5-gwei ceiling scenario. The
+    // legacy MEV_MAX_PRIORITY_FEE_GWEI is pinned too for belt-and-suspenders.
     process.env.MEV_MAX_PRIORITY_FEE_GWEI = '5';
+    process.env.MEV_BUY_MAX_PRIORITY_FEE_GWEI = '5';
     process.env.MEV_PRIORITY_FEE_STEP_GWEI = '1';
     logInfo.mockReset();
     logWarn.mockReset();
