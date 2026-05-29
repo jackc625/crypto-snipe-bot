@@ -250,27 +250,16 @@ export class FlashbotsMevStrategy implements MevStrategy {
         throw simErr;
       }
 
-      // D-PRIVATE-INCLUSION-HARDEN mech 1 + 2: MULTI-BUILDER fanout via a RAW
-      // eth_sendBundle (the library drops `builders` — Pitfall 1) + MULTI-BLOCK
-      // targeting (the SAME signed bytes to block+1 .. block+MEV_BUY_TARGET_BLOCKS).
-      // This widens private builder coverage so a calm-gas bundle is eligible in
-      // each of N consecutive slots regardless of which builder wins. Still PRIVATE
-      // builder-to-builder routing — never the public mempool (Pitfall 3).
-      const builders = parseBuilders(process.env.MEV_BUILDERS);
-      const targetBlocks = parsePositiveIntClamped(process.env.MEV_BUY_TARGET_BLOCKS, 3, 1, 8);
-      for (let i = 0; i < targetBlocks; i++) {
-        const tb = targetBlock + i; // targetBlock is already head+1
-        const res = await rawSendBundle(this.relayUrl, authSigner, signedBundle, tb, builders);
-        if (res.error) {
-          throw new Error(`Flashbots eth_sendBundle error (block ${tb}): ${res.error.message}`);
-        }
-      }
-
-      // The library sendBundle on block+1 is KEPT as the native-confirm signal +
-      // the deterministic real-hash / nonce source (bundle.wait + bundleHash +
-      // bundleTransactions). The raw fanout above is the actual multi-builder
-      // submit; this single library call does NOT carry `builders` (it can't), it
-      // only obtains the FlashbotsTransactionResponse the reconcile machinery needs.
+      // The library sendBundle on block+1 is the native-confirm signal + the
+      // deterministic real-hash / nonce source (bundle.wait + bundleHash +
+      // bundleTransactions). WR-01 (21.3-06): this MUST run BEFORE the raw
+      // multi-builder fanout so the deterministic reconcile hash is obtained and the
+      // BroadcastHandle is written FIRST. Pre-WR-01 the raw fanout ran first and the
+      // hash was produced only after it; a mid-fanout relay error (e.g. a transient
+      // 5xx on block+2) threw BEFORE the hash was ever written, orphaning a bundle
+      // that may have landed at block+1 → the LADYS false-negative this phase kills.
+      // This single library call does NOT carry `builders` (it can't); it only
+      // obtains the FlashbotsTransactionResponse the reconcile machinery needs.
       const bundle = await flashbotsProvider.sendBundle(
         [{ signer: wallet, transaction: populatedTx }],
         targetBlock
@@ -289,6 +278,35 @@ export class FlashbotsMevStrategy implements MevStrategy {
         throw new Error(`Flashbots bundle response missing bundleTransactions[0].hash for block ${targetBlock}`);
       }
       const submittedNonce = bundle.bundleTransactions[0].nonce ?? a.nonce;
+
+      // WR-01 (21.3-06): write the reconcile hash + submitted nonce into the caller's
+      // BroadcastHandle NOW — BEFORE the raw fanout below can throw. submitWithReconciliation
+      // also writes it from this attempt's SubmitResult on the normal path, but on a
+      // mid-fanout throw the closure never returns a SubmitResult, so writing here is
+      // what guarantees the no-double-buy / reconcile machinery still has a hash to
+      // probe a landed bundle. (CR-02 side-channel — never a pre-signed phantom.)
+      if (broadcast) {
+        broadcast.signedTxHash = realHash;
+        broadcast.submittedNonce = submittedNonce;
+      }
+
+      // D-PRIVATE-INCLUSION-HARDEN mech 1 + 2: MULTI-BUILDER fanout via a RAW
+      // eth_sendBundle (the library drops `builders` — Pitfall 1) + MULTI-BLOCK
+      // targeting (the SAME signed bytes to block+1 .. block+MEV_BUY_TARGET_BLOCKS).
+      // This widens private builder coverage so a calm-gas bundle is eligible in
+      // each of N consecutive slots regardless of which builder wins. Still PRIVATE
+      // builder-to-builder routing — never the public mempool (Pitfall 3).
+      // Runs AFTER the reconcile hash is captured (WR-01): a mid-fanout relay error
+      // now throws with the BroadcastHandle already populated.
+      const builders = parseBuilders(process.env.MEV_BUILDERS);
+      const targetBlocks = parsePositiveIntClamped(process.env.MEV_BUY_TARGET_BLOCKS, 3, 1, 8);
+      for (let i = 0; i < targetBlocks; i++) {
+        const tb = targetBlock + i; // targetBlock is already head+1
+        const res = await rawSendBundle(this.relayUrl, authSigner, signedBundle, tb, builders);
+        if (res.error) {
+          throw new Error(`Flashbots eth_sendBundle error (block ${tb}): ${res.error.message}`);
+        }
+      }
 
       // bundle.wait() resolves a FlashbotsBundleResolution:
       //   0 = BundleIncluded         → natively confirmed.
