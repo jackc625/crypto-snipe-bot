@@ -386,5 +386,39 @@ describe('Phase 21.2 / CR-02 — the no-double-sell guard reconciles the BROADCA
         expect(swapFeeOnTransferMock).not.toHaveBeenCalled();
         // The position is NOT torn down as a genuine close on an inconclusive result.
         expect(result).toBe(false);
+        // NF-01 (21.2-14): the inconclusive branch must KEEP-MONITOR a still-held
+        // position (persist exit_failed_held + re-arm the poll timer), NOT bare-return.
+        // The pre-fix `return false` skipped keepMonitoringFailedHeld → the position
+        // was stranded at runtime and dropped on restart (regressing S-1). balanceOf
+        // (1M) > dust ⇒ keepMonitoringFailedHeld ran ⇒ markExitFailedHeld was called.
+        // This assertion FAILS against the pre-fix bare-return.
+        expect(markExitFailedHeldRun).toHaveBeenCalledWith(302);
+    });
+
+    it('NF-01: an ANTI-RUG inconclusive exit KEEPS monitoring (persists exit_failed_held), never strands the position', async () => {
+        const { executeFullSell } = await import('../../../src/exitEngine');
+
+        reconcileInclusionMock.mockImplementation(async (hash: string, nonce: number) => {
+            reconcileCalls.push({ hash, nonce });
+            if (hash === BROADCAST_HASH_H) return { outcome: 'landed-not-ours' };
+            return { outcome: 'not-landed' };
+        });
+        // Still held after the inconclusive private anti-rug attempt.
+        balanceSequence = [1_000_000n, 1_000_000n, 1_000_000n];
+        balanceCallCount = 0;
+
+        const result = await executeFullSell(
+            buildCtx(),
+            V2_DEX as unknown as Parameters<typeof executeFullSell>[1],
+            TOKEN, null, 'anti-rug', 302, 'anti-rug exit',
+        );
+
+        // No public fallback on an inconclusive result (no double-sell).
+        expect(swapFeeOnTransferMock).not.toHaveBeenCalled();
+        expect(result).toBe(false);
+        // Crown-jewel invariant: a still-held FAILED anti-rug exit persists
+        // exit_failed_held (restart-resumable) and must NOT unsubscribe anti-rug.
+        expect(markExitFailedHeldRun).toHaveBeenCalledWith(302);
+        expect(unregisterAntiRugPositionMock).not.toHaveBeenCalled();
     });
 });

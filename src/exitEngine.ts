@@ -936,11 +936,27 @@ export async function executeFullSell(
                 }
             }
 
-            // CR-02 fail-safe: an inconclusive private inclusion must NOT proceed to
-            // the public fallback on the optimistic balanceOf snapshot. Return WITHOUT
-            // tearing down — the position is kept held + monitored (balanceOf truth on
-            // the next cycle re-decides). This is the recoverable direction.
+            // CR-02 fail-safe (NF-01): an inconclusive private inclusion must NOT
+            // proceed to the public fallback (a double-sell is the unrecoverable harm).
+            // But do NOT bare-return — for an anti-rug exit the poll timer was cleared
+            // BEFORE the sell (exitTrigger) and is never re-armed by a bare return, and
+            // exit_failed_held is never persisted, so the still-held position would be
+            // stranded at runtime AND dropped on restart (regressing S-1 / T-21.2-DROPRUG).
+            // Apply the SAME balanceOf-truth teardown as the still-held/catch paths:
+            // genuine close → tear down; still held → keep anti-rug + RE-ARM the poll
+            // timer + persist exit_failed_held. The public fallback stays skipped either way.
             if (privateInclusionInconclusive) {
+                const heldNow: bigint = await token.balanceOf(ctx.wallet.address);
+                const dustNow = computeDustThreshold(readOriginalTokenAmount(tradeId));
+                if (heldNow <= dustNow) {
+                    // The nonce-consuming tx actually closed the position (our private
+                    // sell landed after all) — tear down as a genuine close.
+                    teardownGenuineClose(ctx, tokenAddress, tradeId);
+                    return true;
+                }
+                // Still held → KEEP anti-rug + re-arm the poll timer + persist
+                // exit_failed_held (restart-resumable), exactly like the still-held path.
+                await keepMonitoringFailedHeld(ctx, dex, tokenAddress, feeTier, reason, tradeId, heldNow);
                 return false;
             }
 
@@ -1516,6 +1532,11 @@ export async function executePartialSell(
         for (const { index } of tiers) {
             state.completedTierIndices.add(index);
         }
+        // NF-03: persist the completed tiers SYNCHRONOUSLY here — in the same
+        // continuation as the on-chain confirm + the in-memory mutation above —
+        // so a crash before the detached dispatcher's `.then` (or the next poll
+        // tick's step-8 persist) cannot re-sell an already-completed tier on restart.
+        upsertExitState.run(serializeExitState(state));
 
         const totalPctSold = tiers.reduce((sum, t) => sum + t.tier.percent, 0);
         const remainingPct = 100 - Array.from(state.completedTierIndices).reduce((sum, i) => {
@@ -1662,28 +1683,23 @@ async function pollExitStrategy(
     }
     state.volatilityTracker.addSample(currentPrice);
 
-    // Step 3: Check partial sell tiers (D-06 through D-11)
+    // Step 3: Detect partial sell tiers (D-06 through D-11). WR-06: the partial
+    // submit runs OFF the poll critical path (dispatchPartialSell, never awaited
+    // inline). NF-02: only DETECT here and DEFER the dispatch to the END of the
+    // tick (after the full-exit checks). Each full-exit trigger (trailing/stop/
+    // urgency) ENQUEUES + returns 'continue' BEFORE the deferred dispatch, so a
+    // same-tick full exit PREEMPTS the partial (a full exit makes the partial moot
+    // — it must not be silently no-op'd by the partial holding the per-token
+    // sell-lock, which was the prior same-tick behavior).
+    let pendingPartial: { sellAmount: bigint; unfilledTiers: { tier: PartialTier; index: number }[] } | null = null;
     if (exitConfig.partialSellTiers.length > 0) {
         const unfilledTiers = getUnfilledTiers(exitConfig.partialSellTiers, state.completedTierIndices, priceMultiple);
         if (unfilledTiers.length > 0) {
-            // D-08: Combine all missed tiers into single transaction.
-            // WR-06 (21.2-13): DECOUPLED from the poll tick. Previously this was
-            // `await executePartialSell(...)` — which blocked the whole poll cycle
-            // for the bounded confirm window (default 45s/attempt) and serialized on
-            // withNonceLock (overruns:true starvation). Now we dispatch it OFF the
-            // tick (dispatchPartialSell) — the tick does NOT await the confirm
-            // window. We fall THROUGH to the trailing/stop-loss/urgency checks (so
-            // the same-tick evaluation order is unchanged), but the partial submit
-            // itself runs off the critical path. The per-token sell lock prevents a
-            // duplicate partial while this is in flight (and makes a same-tick full
-            // sell that enqueues simply fail to acquire and no-op); tier completions
-            // are persisted on the dispatched promise's completion (and by a later
-            // poll tick's step-8 persist).
-            const sellAmount = calculatePartialSellAmount(state.originalTokenAmount, unfilledTiers);
-            dispatchPartialSell(
-                ctx, dex, tokenAddress, feeTier,
-                sellAmount, unfilledTiers, state, priceMultiple,
-            );
+            // D-08: combine all missed tiers into a single transaction.
+            pendingPartial = {
+                sellAmount: calculatePartialSellAmount(state.originalTokenAmount, unfilledTiers),
+                unfilledTiers,
+            };
         }
     }
 
@@ -1760,6 +1776,17 @@ async function pollExitStrategy(
             tradeId: state.tradeId, reason: 'urgency-market-sell', reasonDetail: detail,
         });
         return 'continue';
+    }
+
+    // NF-02: dispatch the partial NOW — reaching here means NO full exit fired this
+    // tick (each full-exit trigger returns 'continue' on fire), so the partial is
+    // not preempted. Runs OFF the poll critical path (WR-06); the per-token
+    // sell-lock still prevents a duplicate partial while one is in flight.
+    if (pendingPartial) {
+        dispatchPartialSell(
+            ctx, dex, tokenAddress, feeTier,
+            pendingPartial.sellAmount, pendingPartial.unfilledTiers, state, priceMultiple,
+        );
     }
 
     // Step 8: Persist state to DB for restart resilience (D-23)

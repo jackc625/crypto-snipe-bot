@@ -419,7 +419,10 @@ describe('Phase 10 partial-sell: row insertion records non-null amountOut from d
             completedTierIndices: new Set<number>(),
             originalTokenAmount: '1000000000000000000',
             urgencyStartTs: Date.now(),
-            volatilitySamples: [],
+            // NF-03 (21.2-14): executePartialSell now persists synchronously via
+            // serializeExitState, which reads volatilityTracker.toJSON(); supply a
+            // minimal stub so the persist does not throw in this loose-cast mock.
+            volatilityTracker: { toJSON: () => '[]' },
         } as any;
 
         // Construct a minimal `tiers: { tier: PartialTier, index: number }[]` argument.
