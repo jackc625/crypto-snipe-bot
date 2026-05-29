@@ -524,7 +524,8 @@ export async function executeDeliberateBuy(
         // The private bundle landed (possibly late-reconciled by 21.1). Done — record
         // the real hash. No public buy.
         ctx.log.info({ token: targetToken, txHash: priv.txHash, op: 'buy.deliberate.private-landed' }, 'Deliberate buy: private bundle landed');
-        recordDeliberateBuy(ctx, targetToken, dex, amountInWei, priv.txHash);
+        // STOP-THE-LINE-06: record AND arm monitoring for the landed position.
+        await recordAndArmDeliberateBuy(ctx, targetToken, dex, amountInWei, priv.txHash);
         return priv.txHash;
     }
 
@@ -548,7 +549,8 @@ export async function executeDeliberateBuy(
                 ctx,
                 `*[DELIBERATE BUY GUARD]* private buy landed late (reconciled) — public buy ABORTED to prevent a double-SPEND of ETH for \`${targetToken}\`.`,
             );
-            recordDeliberateBuy(ctx, targetToken, dex, amountInWei, landedHash);
+            // STOP-THE-LINE-06: record AND arm monitoring for the late-landed position.
+            await recordAndArmDeliberateBuy(ctx, targetToken, dex, amountInWei, landedHash);
             return landedHash;
         }
         if (recon.outcome === 'landed-not-ours' || recon.outcome === 'reverted') {
@@ -646,7 +648,8 @@ export async function executeDeliberateBuy(
         return stx.hash as string;
     });
 
-    recordDeliberateBuy(ctx, targetToken, dex, amountInWei, txHash);
+    // STOP-THE-LINE-06: record AND arm monitoring for the public-landed position.
+    await recordAndArmDeliberateBuy(ctx, targetToken, dex, amountInWei, txHash);
     return txHash;
 }
 
@@ -676,6 +679,80 @@ function recordDeliberateBuy(
         feeTier: null,
         dexName: dex.name,
     });
+}
+
+// ---------------------------------------------------------------------------
+// recordAndArmDeliberateBuy — record a landed deliberate buy AND arm monitoring
+// (Phase 21.3 / Plan 21.3-05, STOP-THE-LINE-06).
+//
+// Closes the gap where a landed deliberate buy was recorded but left UNMONITORED
+// (no exit monitor) and RUG-UNPROTECTED (no anti-rug registration / no
+// lp_baseline → silently dropped from getResumeAntiRugTrades' INNER JOIN on
+// restart). EVERY landed deliberate branch (private-landed, late-land-included,
+// public-fallback) routes through here so a held deliberate position gets the
+// SAME register->monitor wiring the snipe handler uses (the shared
+// armPositionMonitoring helper) — they cannot drift again.
+//
+// Steps (mirror the snipe handler's post-buy block):
+//   1. recordDeliberateBuy — write the trades row (so getTradeIdForPendingToken
+//      can resolve the just-inserted id).
+//   2. originalTokenAmount = post-buy balanceOf (token amount received) — the
+//      partial-sell denominator the exit monitor needs (D-07).
+//   3. resolve tradeId via getTradeIdForPendingToken (the same lookup the snipe
+//      handler uses).
+//   4. resolve the V2 pair via the dex factory getPair(weth, token) (the
+//      codebase pattern, e.g. alphaDrop.ts / pairDiscovery.ts) — the
+//      pair address snapshotLpBaseline + registerAntiRugPosition need.
+//   5. tradeId resolved → arm via the shared helper (the exit monitor is armed
+//      FIRST so an anti-rug baseline failure never costs it); else log the same
+//      'Could not find trade ID' error the snipe handler logs.
+//
+// The buyAmountNative passed to the monitor is ethers.formatEther(amountInWei)
+// (the DELIBERATE buy size), mirroring the snipe's ctx.chain.snipeAmount.
+// ---------------------------------------------------------------------------
+async function recordAndArmDeliberateBuy(
+    ctx: ChainContext,
+    targetToken: string,
+    dex: DexConfigV2,
+    amountInWei: bigint,
+    txHash: string,
+): Promise<void> {
+    recordDeliberateBuy(ctx, targetToken, dex, amountInWei, txHash);
+
+    // Post-buy token balance (D-07: original buy amount needed for partial sells).
+    const exitTokenContract = new Contract(targetToken, ERC20_ABI, ctx.wallet);
+    const originalTokenAmount: bigint = await exitTokenContract.balanceOf(ctx.wallet.address);
+
+    // Resolve the just-inserted trade row (same lookup the snipe handler uses).
+    const tradeRow = getTradeIdForPendingToken.get(targetToken.toLowerCase(), ctx.chain.name) as { id: number } | undefined;
+    if (!tradeRow) {
+        ctx.log.error({ token: targetToken }, 'Could not find trade ID for exit monitor');
+        return;
+    }
+
+    // Resolve the V2 pair address via the dex factory (the codebase pattern —
+    // FACTORY_ABI getPair(weth, token), e.g. alphaDrop.ts / pairDiscovery.ts).
+    // The pair is an ANTI-RUG input (snapshotLpBaseline + registerAntiRugPosition
+    // need it); the exit monitor does NOT. If getPair throws (RPC blip), resolve to
+    // '' — armPositionMonitoring arms the exit monitor FIRST, then snapshotLpBaseline
+    // fails inside its try/catch → logs op:'antirug.baseline-snapshot-failed' and
+    // SKIPS the register, leaving the exit monitor ARMED (the same posture as the
+    // snipe when the baseline RPC fails; T-21.3-05-05). We do NOT let a pair-resolve
+    // failure cost the exit monitor of a held position.
+    let pairAddress = '';
+    try {
+        const factory = new Contract(dex.factoryAddress, FACTORY_ABI, ctx.httpProvider);
+        pairAddress = await factory.getPair(ctx.chain.wethAddress, targetToken);
+    } catch (err) {
+        ctx.log.error(
+            { err, op: 'buy.deliberate.pair-resolve-failed', token: targetToken, tradeId: tradeRow.id },
+            'Deliberate buy: failed to resolve V2 pair for anti-rug; arming exit monitor, anti-rug baseline will be skipped',
+        );
+    }
+
+    await armPositionMonitoring(
+        ctx, dex, targetToken, pairAddress, tradeRow.id, originalTokenAmount, ethers.formatEther(amountInWei),
+    );
 }
 
 

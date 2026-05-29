@@ -328,17 +328,22 @@ describe('Phase 21.3 — landed deliberate buy ARMS monitoring (STOP-THE-LINE-06
     });
 
     it('(b) private-landed buy ARMS the same monitoring trio', async () => {
-        // The private bundle lands on the first attempt (the strategy reconcile
-        // returns included for the broadcast hash) → priv.landed.
-        reconcileImpl = (hash: string) =>
-            hash === BROADCAST_HASH_H
-                ? { outcome: 'included', hash: BROADCAST_HASH_H, receipt: { status: 1 } }
-                : { outcome: 'not-landed' };
-        // private bundle landed → the arming helper reads balanceOf = POST_BUY_BALANCE.
+        // The private bundle lands on the first attempt: the strategy's broadcast
+        // wait() RESOLVES (status 1) → sendTxWithRetry resolves → escalatePrivateBuy
+        // returns { landed:true, txHash:H } → the private-landed branch
+        // (executeDeliberateBuy :457) records + arms WITHOUT touching the no-double-buy
+        // guard or the public buy.
+        reconcileImpl = () => ({ outcome: 'not-landed' });
         balanceOfImpl = () => POST_BUY_BALANCE;
 
         const { executeDeliberateBuy } = await import('../../../src/bot');
         const ctx = buildCtx() as unknown as Parameters<typeof executeDeliberateBuy>[0];
+        // Make the broadcast wait RESOLVE so the private leg lands (landed:true).
+        (ctx.wallet as unknown as { sendTransaction: ReturnType<typeof vi.fn> }).sendTransaction =
+            vi.fn().mockResolvedValue({
+                hash: BROADCAST_HASH_H,
+                wait: vi.fn().mockResolvedValue({ status: 1, blockNumber: 18_000_055, hash: BROADCAST_HASH_H }),
+            });
 
         const result = await executeDeliberateBuy(ctx, TOKEN, AMOUNT_IN, V2_DEX as never);
 
@@ -355,22 +360,15 @@ describe('Phase 21.3 — landed deliberate buy ARMS monitoring (STOP-THE-LINE-06
     });
 
     it('(c) late-land included buy (no-double-buy guard reconciles included) ARMS the same monitoring trio', async () => {
-        // The private leg does NOT land within its attempt budget, but the guard's
-        // reconcile of the broadcast hash returns 'included' (late land) → ABORT the
-        // public buy, record the real hash, AND arm monitoring for the held position.
-        let probeCount = 0;
-        reconcileImpl = (hash: string) => {
-            if (hash === BROADCAST_HASH_H) {
-                probeCount += 1;
-                // First probe (the strategy's internal reconcile) → not-landed so the
-                // private leg surfaces lastSignedHash; second probe (the guard 2a) →
-                // included (late land).
-                return probeCount >= 2
-                    ? { outcome: 'included', hash: BROADCAST_HASH_H, receipt: { status: 1 } }
-                    : { outcome: 'not-landed' };
-            }
-            return { outcome: 'not-landed' };
-        };
+        // The private leg does NOT land within its attempt budget (the passthrough
+        // strategy's wait() rejects → escalatePrivateBuy returns landed:false +
+        // surfaces lastSignedHash=H). The no-double-buy guard 2a then reconciles H and
+        // gets 'included' (late land) → ABORT the public buy, record the real hash,
+        // AND arm monitoring for the held position.
+        reconcileImpl = (hash: string) =>
+            hash === BROADCAST_HASH_H
+                ? { outcome: 'included', hash: BROADCAST_HASH_H, receipt: { status: 1 } }
+                : { outcome: 'not-landed' };
         // Late-land: the guard reconcile returns 'included' BEFORE the chain-truth
         // balanceOf guard, so the only balanceOf read is the post-record arming read.
         balanceOfImpl = () => POST_BUY_BALANCE;
