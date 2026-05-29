@@ -1076,9 +1076,14 @@ export async function executeFullSell(
 // priority} and returns 'continue' IMMEDIATELY (cadence preserved). A SINGLE
 // serial ExitWorker drains a priority queue, submitting ONE sell at a time:
 //   * serial-by-construction → nonce-safe for the single wallet (no two submits
-//     ever contend for the nonce). The drain ALSO wraps each submit in
-//     withNonceLock(ctx.wallet.address, ...) (21.2-01) so the authority layer
-//     enforces it even if a future caller enqueues from elsewhere.
+//     ever contend for the nonce). SINGLE-LEVEL LOCKING (21.2-12 / CR-01 fix):
+//     the drain does NOT wrap the submit in an OUTER withNonceLock — that caused
+//     a re-entrant deadlock against executeFullSell's own per-signing-site locks
+//     (a non-reentrant promise-chain mutex; the inner acquire chained behind the
+//     still-pending outer run, which could not settle until the inner resolved).
+//     The authority layer is enforced WHERE the signing happens — every signing
+//     site inside executeFullSell (approval, public fallback, partial submit) is
+//     individually wrapped in withNonceLock(ctx.wallet.address, ...).
 //   * a per-position lock (tryEnqueuePosition/releasePositionQueue in
 //     exitManager.ts) prevents the SAME position being enqueued/sold twice
 //     (no re-entrant self-sell).
@@ -1221,10 +1226,10 @@ class ExitWorker {
     }
 
     /**
-     * Drain loop: dequeue the highest-priority item, submit ONE sell (wrapped in
-     * the per-wallet nonce lock), release the per-position lock, then continue —
-     * strictly one sell at a time. A failed/thrown submit never breaks the loop;
-     * the per-position lock is always released in finally.
+     * Drain loop: dequeue the highest-priority item, submit ONE sell (bounded by
+     * the watchdog), release the per-position lock, then continue — strictly one
+     * sell at a time. A failed/thrown submit never breaks the loop; the
+     * per-position lock is always released in finally.
      */
     private async drain(): Promise<void> {
         if (this.running) return;
@@ -1234,26 +1239,37 @@ class ExitWorker {
                 const { item } = this.queue.shift()!;
                 const chain = item.ctx.chain.name;
                 try {
-                    // Serial-by-construction is already nonce-safe; the explicit
-                    // withNonceLock is the authority-layer guarantee (D-NONCE-
-                    // AUTHORITY-ALL) so the invariant holds regardless of caller.
+                    // SINGLE-LEVEL LOCKING (Phase 21.2-12 / CR-01 fix). The worker
+                    // does NOT wrap the executor in withNonceLock. executeFullSell
+                    // (the default executor) already routes EVERY one of its signing
+                    // sites — the private-leg approval (exitEngine.ts:826/829), the
+                    // public-fallback approval + swap (executePublicFallbackSell:
+                    // 529/538), and executePartialSell's approval + submit — through
+                    // withNonceLock(ctx.wallet.address, ...) INTERNALLY. The serial
+                    // drain is additionally nonce-safe by construction (one submit at
+                    // a time), so the per-wallet authority invariant holds without an
+                    // OUTER lock here.
                     //
-                    // CRITICAL ordering (D-WATCHDOG-ABORT + RESEARCH Pitfall 6): the
-                    // watchdog is wrapped INSIDE the nonce lock — withNonceLock(addr,
-                    // () => watchdog(item, () => executor(item))) — NOT outside it.
-                    // withNonceLock chains the NEXT op behind the prior op's
-                    // settlement; if the watchdog sat OUTSIDE, a hung executor would
-                    // free the drain loop but leave the hung promise as the nonce
-                    // chain's tail, so the next wallet submit would block behind it
-                    // forever (the watchdog would not actually keep the bot alive
-                    // for same-wallet exits). With the watchdog INSIDE, the bounded
-                    // submit is what occupies the nonce chain: a budget overrun
-                    // resolves the watchdog (to false) → the nonce chain advances →
-                    // the next queued exit proceeds. Identity watchdog until bot.ts
-                    // installs the real one, so the worker is correct standalone.
-                    await withNonceLock(item.ctx.wallet.address, () =>
-                        this.watchdog(item, () => this.executor(item)),
-                    );
+                    // WHY DOUBLE-LOCKING DEADLOCKS (the CR-01 regression this fixes):
+                    // withNonceLock is a NON-REENTRANT promise-chain mutex
+                    // (nonceAuthority.ts). If the drain took the wallet's lock for the
+                    // WHOLE submit, executeFullSell's inner acquire of the SAME wallet
+                    // lock (for its approval / fallback) would chain `.then(op)` behind
+                    // the still-pending OUTER run promise — but that outer promise
+                    // cannot settle until executeFullSell returns, which is itself
+                    // awaiting the inner op → PERMANENT DEADLOCK on every worker-driven
+                    // routine exit. The watchdog would free the drain loop, but the
+                    // orphaned executeFullSell would never reach its
+                    // finally{releaseSellLock}, stranding the per-token sell-lock and
+                    // blocking even the DIRECT anti-rug emergency exit for that token.
+                    //
+                    // The watchdog stays at the worker level (so the whole submit is
+                    // wall-clock-bounded — D-WATCHDOG-ABORT) but OUTSIDE any nonce
+                    // lock. A budget overrun frees the drain loop; the next queued
+                    // exit's own internal locks serialize it correctly. Identity
+                    // watchdog until bot.ts installs the real one, so the worker is
+                    // correct standalone.
+                    await this.watchdog(item, () => this.executor(item));
                 } catch (e) {
                     item.ctx.log.error(
                         { err: e, token: item.tokenAddress, reason: item.reason, op: 'exit.worker.submit-failed' },

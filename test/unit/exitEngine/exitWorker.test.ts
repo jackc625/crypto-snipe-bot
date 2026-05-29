@@ -18,9 +18,12 @@
 //     executor is invoked only ONCE for it (no re-entrant self-sell); the lock
 //     releases after the sell settles so a future genuine re-trigger can enqueue
 //     again.
-//   Test 4 (nonce wrap): the worker's executeFullSell call is routed through
-//     withNonceLock(ctx.wallet.address, ...) — asserted via a spy that the lock
-//     wraps the submit (and is keyed by the wallet address).
+//   Test 4 (single-level locking — CR-01): the worker does NOT wrap the submit
+//     in an OUTER withNonceLock. executeFullSell (the real executor) routes each
+//     of its OWN signing sites through withNonceLock internally; an outer
+//     worker-level lock would re-entrant-deadlock against those inner acquires
+//     (the CR-01 regression, 21.2-12). With a fake executor (no inner signing)
+//     the worker therefore makes ZERO withNonceLock acquisitions of its own.
 //
 // The worker calls the module's real `executeFullSell` in production; for these
 // timing/observability tests we substitute a controllable executor via the
@@ -280,16 +283,27 @@ describe('ExitWorker — per-position lock (Test 3)', () => {
     });
 });
 
-describe('ExitWorker — nonce wrap (Test 4)', () => {
-    it('routes the worker submit through withNonceLock keyed by the wallet address', async () => {
+describe('ExitWorker — single-level locking (Test 4, CR-01)', () => {
+    it('does NOT wrap the submit in an OUTER withNonceLock (the re-entrant-deadlock fix)', async () => {
+        // CR-01 (21.2-12): an outer worker-level withNonceLock around the whole
+        // submit deadlocks against executeFullSell's OWN per-signing-site locks
+        // (withNonceLock is a non-reentrant promise-chain mutex). The fix is
+        // single-level locking — the worker leaves locking to executeFullSell's
+        // internal signing sites. With a FAKE executor (which does no signing),
+        // the worker makes ZERO withNonceLock acquisitions of its own. The genuine
+        // per-wallet serialization for the REAL executor is proven end-to-end by
+        // exitWorkerRealPath.test.ts (which drives the real executeFullSell + the
+        // real withNonceLock and asserts no deadlock).
         const { executor, records } = makeControllableExecutor();
         mod._setSellExecutorForTesting(executor);
 
         mod.enqueueExit(item({ tokenAddress: '0x1230000000000000000000000000000000000007', reason: 'anti-rug', tradeId: 7 }));
         await flush();
 
-        expect(withNonceLockCalls.length).toBeGreaterThanOrEqual(1);
-        expect(withNonceLockCalls[0].toLowerCase()).toBe(WALLET.toLowerCase());
+        // No outer lock: the worker added none of its own around the fake submit.
+        expect(withNonceLockCalls.length).toBe(0);
+        // The submit still ran (serial-by-construction); the worker remains live.
+        expect(executor).toHaveBeenCalledTimes(1);
 
         records[0].resolve(true);
         await flush();
