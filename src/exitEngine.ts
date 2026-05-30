@@ -12,7 +12,7 @@ import { tryAcquireSellLock, releaseSellLock, registerExitMonitor, clearAllTimer
 import { withNonceLock } from './utils/nonceAuthority';
 import { insertTrade, updateTradeStatus, upsertExitState, getExitState, deleteExitState, markExitFailedHeld } from './utils/db';
 import { sendCtxAlert } from './utils/notifier';
-import { sendTxWithRetry, escalatePrivateSell } from './utils/txManager';
+import { sendTxWithRetry, escalatePrivateSell, type PrivateSellResult } from './utils/txManager';
 import { reconcileInclusion, buildReconcileConfig } from './utils/mevStrategies/reconciliation';
 import { decodeReceipt } from './utils/receiptDecoder';
 // Phase 19 / Plan 19-05 — terminate the anti-rug position subscription on
@@ -758,6 +758,37 @@ async function keepMonitoringFailedHeld(
 }
 
 /**
+ * Submit the PRIVATE-escalation sell leg under the per-wallet nonce authority.
+ *
+ * D-NONCE-AUTHORITY-ALL (Phase 21.2 Finding C): EVERY signing site must serialize
+ * on `withNonceLock`. The CR-01 deadlock fix (21.2-12) removed the ExitWorker's
+ * OUTER lock on the explicit premise that each signing site inside executeFullSell
+ * is INDIVIDUALLY wrapped (see the worker comment near line 1158) — but the
+ * private-sell submission at the inclusion-ladder step (1) was the one site never
+ * wrapped, so a concurrent same-wallet buy (locked via bot.ts `submitBuyTx` /
+ * `escalatePrivateBuy`) and this sell (unlocked) could both fetch
+ * getTransactionCount('latest') and sign against ONE nonce — the cross-submit
+ * collision the lock exists to close (v6.17 milestone audit INT-NONCE-SELL).
+ *
+ * This seam is that wrap — the exact mirror of the buy seam `submitBuyTx`
+ * (bot.ts:558 wraps `escalatePrivateBuy` identically). It is single-level and
+ * non-nested: the approvals earlier in executeFullSell acquire+RELEASE their own
+ * `withNonceLock` before this runs, and the ExitWorker deliberately adds no outer
+ * lock, so this acquisition is NON-reentrant and deadlock-safe (it does NOT
+ * reintroduce the CR-01 re-entrant deadlock). Exported so the REAL withNonceLock
+ * boundary is regression-testable (sellNonceLock.test.ts), mirroring
+ * buyNonceLock.test.ts.
+ */
+export function submitPrivateSell(
+    ctx: ChainContext,
+    txBuilder: () => Promise<TransactionRequest>,
+    attempts: number,
+    gasMultiplier?: number,
+): Promise<PrivateSellResult> {
+    return withNonceLock(ctx.wallet.address, () => escalatePrivateSell(txBuilder, ctx, attempts, gasMultiplier));
+}
+
+/**
  * Execute a full sell of remaining token balance.
  * Per D-05: sell entire remaining balance after partial sells.
  *
@@ -870,7 +901,12 @@ export async function executeFullSell(
         // result (it does NOT throw) so the ladder can fall through to the public
         // fallback — the GUARANTEED inclusion lever (D-EXIT-INCLUSION).
         const attempts = privateAttemptBudget(reason);
-        const priv = await escalatePrivateSell(txBuilder, ctx, attempts, gasMultiplier);
+        // INT-NONCE-SELL fix (v6.17 milestone audit): submit the private sell
+        // through the per-wallet nonce lock (submitPrivateSell), mirroring the buy
+        // seam. Previously this called escalatePrivateSell directly — the ONE
+        // signing site executeFullSell left outside withNonceLock after the CR-01
+        // worker fix removed the outer lock (D-NONCE-AUTHORITY-ALL).
+        const priv = await submitPrivateSell(ctx, txBuilder, attempts, gasMultiplier);
 
         if (priv.landed && priv.txHash) {
             // The private bundle landed (possibly late-reconciled by 21.1). Done.
