@@ -5,11 +5,14 @@
 A production-ready multi-chain MEV sniper bot that detects new token listings
 on decentralized exchanges (Uniswap V2/V3 and forks like PancakeSwap,
 SushiSwap) across ETH, BSC, Base, and Arbitrum. It validates token safety
-through a multi-stage pipeline, executes snipes with per-chain MEV protection
-(Flashbots / bloXroute / passthrough), manages positions through a unified
-exit engine with trailing stops, partial sells, and age-weighted urgency, and
-surfaces everything through a real-time web dashboard with chain controls and
-emergency sell.
+through a multi-stage pipeline — including an on-chain `HoneypotChecker.sol`
+round-trip simulation — executes snipes with per-chain MEV protection
+(Flashbots / bloXroute / passthrough) hardened for guaranteed inclusion at calm
+gas, monitors open positions for liquidity-removal rugs with a frontrun-exit,
+manages positions through a unified exit engine with trailing stops, partial
+sells, and age-weighted urgency, and surfaces everything through a real-time web
+dashboard with chain controls and emergency sell. A fail-fast preflight and a
+SQLite-persisted kill-switch gate going live with real money.
 
 ## Core Value
 
@@ -17,38 +20,54 @@ Reliably detect, validate, and profitably snipe new token listings across
 multiple EVM chains with proper risk management — the bot must never lose
 money to preventable bugs, race conditions, or security flaws.
 
-## Current State (v6.16 — shipped 2026-04-14)
+## Current State (v6.17 — shipped 2026-05-29, ETH-first)
 
-- 16 phases, 55 plans, 48/48 v1 requirements satisfied
-- SQLite-backed state with WAL and full trade audit trail
-- ethers v6 with native BigInt arithmetic throughout
-- Multi-chain orchestrator with per-chain MEV strategies and concurrent listeners
-- Unified exit engine (single 5s poll loop per position) with trailing stops, partial sells, volatility adaptation, age-weighted urgency
-- 5-rule portfolio risk gate (position size, daily loss, max open, cooldown, exposure cap)
-- Express + React dashboard with real-time positions, P&L charts, trade history, chain controls, emergency sell, WebSocket push
-- 343/343 tests passing across unit, integration, and mainnet fork suites
-- GitHub Actions CI
+- 24 phases total (17–21 + inserted 21.1/21.2/21.3 this milestone); 68/70 v6.17 requirements satisfied (2 deferred to next milestone)
+- **Live-proven on Ethereum mainnet** — a real-capital buy→monitor→sell roundtrip closed all 6 deferred v6.16 human-verification items with on-chain artifacts (sell `0xcc7997bb…619bc605`, `amount_out = 993814525259157`)
+- On-chain `HoneypotChecker.sol` (V2+V3) deployed + Etherscan-verified on ETH; broken sell-sims deleted; fail-closed `HoneypotResult` discriminated union
+- Anti-rug runtime monitoring (single-listener-per-chain WS, multi-signal AND-chain, circuit breaker, 7-day dry-run default)
+- Hardened MEV submission — calm-gas guaranteed inclusion (multi-builder fanout for buys, independent sell ceiling + public-mempool fallback for sells), bot-wide per-wallet nonce authority, watchdog + two-stage SIGINT, failed-exit position protection
+- `src/preflight.ts` fail-fast + SQLite-persisted multi-stage kill-switch + `npm run preflight|pause|resume`
+- 759/759 unit + 216 integration + mainnet-fork suites green; tsc clean ×3; GitHub Actions CI
+- **Shipped config: `ENABLED_CHAINS=eth`** — BSC/Base/Arbitrum fail-closed (refuse to boot without a deployed checker address)
 
-## Current Milestone: v6.17 Defensive Hardening for Live Mainnet
+## Next Milestone: Planning
+
+v6.17 shipped ETH-first. The next milestone is not yet scoped. Two committed
+carry-forward items lead the backlog:
+
+- **Multi-chain rollout** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (**HONEY-04**, plan 18-08 + contractual re-audit; redeploy ETH with the 18-REVIEW-FIX Solidity hardening) and resolve the BSC/Base/Arb V3 anti-rug allowlists (**ANTIRUG-15**).
+- Then candidate offensive/quality work: CHAIN-05 fully-dynamic capital allocation, DETECT-01 mempool/block-0 sniping, OPS-V2-01 synthetic-monitor canary-trade watchdog.
+
+Run `/gsd-new-milestone` to scope it (questioning → research → requirements → roadmap).
+
+<details>
+<summary>v6.17 milestone goals (shipped — archived)</summary>
 
 **Goal:** Make the bot safe to run with real money on live mainnet by rebuilding the broken pre-buy safety stack, adding anti-rug runtime monitoring, validating exit-engine behavior on live data, hardening the going-live path, and closing v6.16 tech debt.
 
-**Target features:**
+Delivered ETH-first across phases 17–21 (+ 21.1/21.2/21.3). The pre-buy safety
+stack was rebuilt as an on-chain checker (Option D), the V2/V3 sell-sim footguns
+were deleted, anti-rug runtime monitoring shipped, the full buy→monitor→exit
+lifecycle was hardened against calm-gas non-inclusion / nonce collisions /
+event-loop freeze / failed-exit position loss, and the 6 deferred v6.16
+verification items closed with real-mainnet artifacts. Multi-chain deploy
+(HONEY-04) + V3 allowlist (ANTIRUG-15) deferred to the next milestone.
 
-- **Pre-buy safety stack rebuild** — Fix V2 sell-sim (currently passes `balance=0` to router; hard-blocks every snipe) and V3 sell-sim (silent vacuous pass: zero honeypot detection while reporting success). Audit all 8+ gates in `tokenSafety.ts` for similar `amountIn=0` / vacuous-pass bugs. Architecture decision (on-chain checker contract / `eth_simulateV1` with state overrides / hosted simulation) deferred to research phase.
-- **Anti-rug runtime monitoring (DETECT-02)** — Detect liquidity-removal events on open positions post-buy and trigger frontrun-exits.
-- **Exit engine live-runtime hardening** — Resolve the 6 deferred human-verification items from v6.16 close as real code/test work: live exit poll cycle + state persistence across restart, real sell `amount_out` non-null, real Flashbots tx hash on mainnet, dashboard WebSocket position updates in browser, live price/Telegram/chain restart warnings, bot-startup SQLite + `.bot-state.json` migration on real boot.
-- **Going-live ops hardening** — Wallet balance pre-flight check at startup, stale-data warnings, env-validation messaging upgrades. Formalize `GOING-LIVE.md` runbook into versioned docs.
-- **Tech debt cleanup** — Retroactive Nyquist validation on 9 phases (01, 02, 03, 05, 06, 07, 08, 09, 10), 37 unfinished exit-engine `.todo` test stubs, 6 TS annotation errors in dashboard API routes, dead-code/diagnostic-log cleanup from v6.16 close audit.
-
-**Key context:**
-
-- Bot is live on mainnet today with ~0.0124 ETH funded; cannot snipe any V2 token currently due to broken sell-sim. Real money at stake.
-- Owner explicitly rejected vacuous-pass / "trust third-party APIs alone" shortcuts.
-- See `HONEYPOT-SIM-BRIEFING.md` for the bug write-up and four candidate fix architectures (A: vacuous pass — rejected; B: getAmountsOut — no honeypot detection; C: `eth_call` state overrides; D: deploy on-chain checker contract). Final pick during research/discuss-phase.
-- Phase numbering continues from 17 (v6.16 ended at 16). Defensive only — CHAIN-05 dynamic capital and DETECT-01 mempool sniping deferred to a future offensive milestone.
+</details>
 
 ## Requirements
+
+### Validated (v6.17)
+
+68/70 v6.17 requirements shipped (ETH-first) and archived in [milestones/v6.17-REQUIREMENTS.md](milestones/v6.17-REQUIREMENTS.md). HONEY-04 + ANTIRUG-15 (multi-chain) carried forward.
+
+- ✓ DEBT-01..06 — tech-debt cleanup + CI baseline (disproved stale v6.16 `.todo`/TS counts) + 9-phase retroactive Nyquist — v6.17
+- ✓ HONEY-01..03, 05..12 — on-chain `HoneypotChecker.sol` (V2+V3, ETH-deployed) + fail-closed discriminated-union result + multi-amount tax probe + bytecode scan; broken sell-sims deleted — v6.17
+- ✓ ANTIRUG-01..14, 16 — single-listener-per-chain anti-rug WS monitoring with multi-signal AND-chain, circuit breaker, 7-day dry-run, reconnect/backfill — v6.17
+- ✓ OPS-LIVE-01..13 — `src/preflight.ts` fail-fast + SQLite-persisted multi-stage kill-switch + CLI wrappers + versioned runbook — v6.17
+- ✓ EXIT-LIVE-01..11 — 6 deferred v6.16 items closed with real-mainnet artifacts; dotted `op`-field log taxonomy; real-launch fork fixtures + `ALLOW_REAL_MAINNET` gate — v6.17
+- ✓ STOP-THE-LINE-01..06 (incl. 04-A/B/C/D, 05-A/B/C/D) — V3 tax-gate + Flashbots reconciliation; calm-gas sell+buy inclusion; bot-wide nonce authority; failed-exit position protection — v6.17 (phases 21.1/21.2/21.3)
 
 ### Validated (v6.16)
 
@@ -67,13 +86,10 @@ All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md
 
 ### Active
 
-<!-- v6.17 scope — full requirements with REQ-IDs in REQUIREMENTS.md. -->
+_v6.17 shipped 2026-05-29 (ETH-first). No milestone is currently scoped — run `/gsd-new-milestone`. Committed carry-forward, leading the backlog:_
 
-v6.17 Defensive Hardening for Live Mainnet — categories: Pre-buy safety (HONEY/SAFETY), Anti-rug (ANTIRUG), Exit live-runtime (EXIT-LIVE), Going-live ops (OPS-LIVE), Tech debt (DEBT). See `.planning/REQUIREMENTS.md`.
-
-**Phase 17 (DEBT) closed 2026-04-30** — DEBT-01..06 all satisfied. Wave-0 CI baseline confirmed the v6.16 close audit's 37/.todo and 6/TS-error claims were stale (actual: 0/0). 7 retroactive harm-prevention tests + 2 inline VALIDATION.md augmentations close DEBT-05. `getTradesByToken` deleted from `src/utils/db.ts`. `.github/workflows/test.yml` locks the verified-empty baseline as evergreen via `.todo` ban + `tsc --noEmit` × 3 invariant guards.
-
-**Phase 20 (OPS-LIVE) closed 2026-05-25** — OPS-LIVE-01..13 all verified at code-level (verifier 13/13 must-haves pass; status `human_needed` pending 4 live-bot/browser items tracked in `20-HUMAN-UAT.md`). Ships: `src/preflight.ts` dual-shape API (preflight + preflightDryRun) with 7 startup-time fail-fast checks (wallet floor, RPC chainId+block-age, MEV health, honeypot-checker code-at-address, cross-env rules, anti-rug 7-day live-gate, stale-data); D-PAUSED-RESTART pause_state SQLite persistence (schema v5→v6) with API (`/api/controls/pause|resume`) + CLI (`npm run pause`/`resume`/`preflight`) + dashboard PauseBanner (WebSocket push); 6 V2/V3 multi-stage killswitch checkpoints in `bot.ts` (CP1/CP2/CP3 × V2/V3) + mid-run wallet setInterval; consolidated runbook at `docs/operations/going-live.md` + root-doc CI guard. Code review flagged 4 Critical issues (CR-01..CR-04) deferred to `/gsd:code-review 20 --fix` before live mainnet UAT. Anti-rug live-gate ready for 7-day dry-run timer (per-chain `<CHAIN>_ANTIRUG_LIVE_EXECUTE=true` graduation requires the floor).
+- [ ] **HONEY-04** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (plan 18-08; contractual re-audit when it ships; redeploy ETH with the 18-REVIEW-FIX Solidity hardening).
+- [ ] **ANTIRUG-15** — resolve BSC/Base/Arb V3 anti-rug allowlists (ETH already resolved).
 
 ### Future
 
@@ -97,28 +113,37 @@ v6.17 Defensive Hardening for Live Mainnet — categories: Pre-buy safety (HONEY
 
 ## Context
 
-v6.16 shipped 2026-04-14 after 26 days of development (2026-03-19 → 2026-04-13).
-379 files changed, +87,015 / -71 lines across 395 conventional commits.
-Test suite: 343/343 passing across 31 files covering unit, integration, and
-mainnet-fork scenarios. GitHub Actions CI runs test:unit and test:integration;
-fork tests excluded since they require RPC access.
+v6.17 shipped 2026-05-29 after 45 days (2026-04-14 → 2026-05-29), ETH-first.
+491 commits; ~170 code files changed (+45,384 / −661 in src/test/scripts), the
+rest generated artifacts (contract builds, Ignition deployments, lockfiles) and
+planning docs (~69,500 lines). Test suite: 759 unit + 216 integration + mainnet-
+fork suites green; tsc clean ×3. GitHub Actions CI runs test:unit and
+test:integration; fork tests excluded (require RPC access).
 
-The bot currently runs against configured mainnets (ETH, BSC, Base, Arbitrum)
-and Sepolia testnet with deployed test contracts (FakeToken, UniswapV2Factory,
-UniswapV2Router02). Entry points: blockchain event listeners (`src/bot.ts`
-via `startMultiChainBot`) and the Telegram alpha listener
-(`src/telegramListener.ts`). Storage is SQLite-based; the .bot-state.json
-auto-migration runs on first startup of Phase 3+ code. Dashboard is served
-from the same process as the bot via Express on the configured port.
+The bot is **live-proven on Ethereum mainnet** — a real-capital roundtrip on the
+prod wallet closed the 6 deferred v6.16 verification items (capital cost ≈ $1,
+wallet flat, no stranded state). DB schema is at `PRAGMA user_version = 7`.
+Shipped config is `ENABLED_CHAINS=eth`; BSC/Base/Arbitrum are wired but
+fail-closed (refuse to boot without a deployed `HoneypotChecker` address) pending
+HONEY-04. Entry points: blockchain event listeners (`src/bot.ts` via
+`startMultiChainBot`; start with `npx ts-node src/bot.ts`) and the Telegram alpha
+listener (`src/telegramListener.ts`). `npm run preflight` is the read-only
+cold-start readiness check (there is no dry-run boot mode). Storage is SQLite
+(WAL); dashboard is served from the bot process via Express.
 
-### Known Tech Debt (v6.16 close)
+_v6.16 reference: shipped 2026-04-14 after 26 days; 379 files, +87,015 / −71 across 395 commits; 343/343 tests._
 
-- 9 phases need retroactive Nyquist validation via `/gsd-validate-phase {N}`
-- Phase 7: 37 `.todo` exit engine test stubs remain unfilled
-- Phase 8: 6 TypeScript annotation errors in API route files (runtime correct)
-- Phase 1: diagnostic console.log lines in telegramListener.ts (55, 61)
-- Phase 16: `getTradesByToken` unused local const in db.ts:215
-- See `milestones/v6.16-MILESTONE-AUDIT.md` for full list
+### Known Tech Debt (v6.17 close)
+
+- **HONEY-04 / ANTIRUG-15** — BSC/Base/Arb multi-chain deploy + V3 allowlists deferred to next milestone (fail-closed; contractual re-audit when 18-08 ships).
+- ETH `HoneypotChecker` (`0x8243dBeA…13eD`) runs pre-18-REVIEW-FIX bytecode (immutable; hardening reaches chains via 18-08's fresh deploy).
+- V3 exit has no public-mempool fallback (fail-loud, position kept held+monitored, anti-rug still fires) — V2-only guaranteed public exit.
+- V3 snipe handler inlines arm logic instead of the shared `armPositionMonitoring` helper (behavior-equivalent; drift risk).
+- Two RESERVED-but-unimplemented coinbase-bribe knobs (`MEV_SELL_/MEV_BUY_COINBASE_BRIBE_ENABLED`).
+- Phase 20 WR-01/WR-02 (CORS scheme-blind / 500-not-403) — non-blocking, local-only default; Telegram listener WR-09 allow-all default to tighten later.
+- Phase 17 VALIDATION `nyquist_compliant: partial` (within-phase inline-doc validations on 02/09); optional `/gsd-validate-phase 17` for strict closure.
+- No standalone `21-VERIFICATION.md` (substance via VERIFICATION-EVIDENCE + VALIDATION + SECURITY).
+- See `milestones/v6.17-MILESTONE-AUDIT.md` for the full reconciliation.
 
 ## Constraints
 
@@ -149,6 +174,14 @@ from the same process as the bot via Express on the configured port.
 | Gap-closure phases (10-16) over milestone-delay | Ship the audit fixes atomically rather than pushing v6.16 | ✓ Good |
 | Both Flashbots + private RPCs | Different chains have different MEV protection options | ✓ Good (Phase 04) |
 | Dynamic capital allocation | Smarter than fixed per-chain budgets — allocate on opportunity quality | ⚠️ Revisit (fixed budgets shipped; dynamic deferred to next milestone) |
+| On-chain `HoneypotChecker.sol` (Option D) over vacuous-pass / `getAmountsOut` / `eth_simulateV1` | Owner-mandated defense-in-depth; only a real round-trip exercises the token's `_transfer` hook | ✓ Good (Phase 18) |
+| Discriminated-union `HoneypotResult` with fail-closed `unknown` | Make a vacuous-pass regression unrepresentable in the type system | ✓ Good (Phase 18) |
+| Single-listener-per-chain anti-rug WS (not per-position) | Avoids WS subscription-cap leaks at scale | ✓ Good (Phase 19) |
+| Bot-wide per-wallet `withNonceLock` authority (composes with re-fetch-`latest`; not ethers `NonceManager`) | Eliminates the nonce-collision/double-spend class across every signing path | ✓ Good (Phase 21.2; INT-NONCE-SELL gap on the private-sell site fixed at close) |
+| Snipes stay PRIVATE — no auto public-mempool fallback for genuine snipe buys | Public exposure forfeits the front-run/sandwich protection the snipe uses Flashbots for | ✓ Good (Phase 21.3; explicit operator deliberate path is the manual escape) |
+| D-EVIDENCE-BAR — fork pass never closes a deferred item | Real money needs a resolvable on-chain artifact, not a green fork test | ✓ Good (Phase 21; 6/6 items closed with live artifacts) |
+| Quality gates (deep code-review + fork rehearsal) over green-suite trust | The unit suite repeatedly masked capital-safety bugs by mocking the mechanism under test | ✓ Good (caught CR/S-1/INT-NONCE across 21.1/21.2/21.3 + audit) |
+| Ship v6.17 ETH-first; defer multi-chain deploy | Get real money safe on ETH now; BSC/Base/Arb fail-closed until HONEY-04 | ✓ Good (operator decision 2026-05-29) |
 
 ## Evolution
 
@@ -168,4 +201,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 — Phase 17 (DEBT) complete: DEBT-01..06 closed; CI invariant baseline locked*
+*Last updated: 2026-05-29 after v6.17 milestone (Defensive Hardening for Live Mainnet, shipped ETH-first)*

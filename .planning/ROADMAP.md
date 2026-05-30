@@ -3,390 +3,76 @@
 ## Overview
 
 Production-ready multi-chain MEV sniper bot with Uniswap V2/V3 support,
-intelligent exit strategies, portfolio risk management, SQLite audit trail,
-and real-time web dashboard across ETH, BSC, Base, and Arbitrum.
+intelligent exit strategies, portfolio risk management, on-chain honeypot
+detection, anti-rug runtime monitoring, SQLite audit trail, and a real-time web
+dashboard across ETH, BSC, Base, and Arbitrum. Live-proven on Ethereum mainnet.
 
 ## Milestones
 
-- âœ… **v6.16 Production-Ready Multi-Chain MEV Sniper** â€” Phases 1-16 (shipped 2026-04-14) â€” [archive](milestones/v6.16-ROADMAP.md)
-- ðŸš§ **v6.17 Defensive Hardening for Live Mainnet** â€” Phases 17-21 (planning)
+- ✅ **v6.16 Production-Ready Multi-Chain MEV Sniper** — Phases 1–16 (shipped 2026-04-14) — [archive](milestones/v6.16-ROADMAP.md)
+- ✅ **v6.17 Defensive Hardening for Live Mainnet** — Phases 17–21 + 21.1/21.2/21.3 (shipped 2026-05-29, ETH-first) — [archive](milestones/v6.17-ROADMAP.md)
+- 📋 **Next milestone** — not yet scoped; run `/gsd-new-milestone`. Leading carry-forward: multi-chain rollout (HONEY-04 BSC/Base/Arb honeypot deploy + ANTIRUG-15 V3 allowlists).
 
 ## Phases
 
 <details>
-<summary>âœ… v6.16 Production-Ready Multi-Chain MEV Sniper (Phases 1-16) â€” SHIPPED 2026-04-14</summary>
+<summary>✅ v6.16 Production-Ready Multi-Chain MEV Sniper (Phases 1–16) — SHIPPED 2026-04-14</summary>
 
-- [x] Phase 1: Bug Fixes & Hardening (4/4 plans)
-- [x] Phase 2: ethers v6 Migration (2/2 plans)
-- [x] Phase 3: SQLite Storage & Code Quality (4/4 plans)
-- [x] Phase 4: Multi-Chain Architecture (5/5 plans)
-- [x] Phase 5: Uniswap V3 Integration (4/4 plans)
-- [x] Phase 6: Risk Management (2/2 plans)
-- [x] Phase 7: Smart Exit Strategies (4/4 plans) â€” completed 2026-03-26
-- [x] Phase 8: Monitoring & Web Dashboard (6/6 plans)
-- [x] Phase 9: Testing Infrastructure (5/5 plans) â€” completed 2026-03-28
-- [x] Phase 10: partial_sell Revenue Fix (2/2 plans) â€” completed 2026-03-30
-- [x] Phase 11: Dashboard Accuracy & Bot Wiring (7/7 plans) â€” completed 2026-04-05
-- [x] Phase 12: Integration Gap Fixes (3/3 plans) â€” completed 2026-04-06
-- [x] Phase 13: Config Env-Var Correctness (1/1 plan) â€” completed 2026-04-06
-- [x] Phase 14: Sell Revenue Receipt Decoding (2/2 plans) â€” completed 2026-04-07
-- [x] Phase 15: Chain-Scoped Dedup & Dashboard Env (2/2 plans) â€” completed 2026-04-13
-- [x] Phase 16: Dashboard Type Alignment & Dead Code Cleanup (2/2 plans) â€” completed 2026-04-13
+- [x] Phase 1: Bug Fixes & Hardening (4/4)
+- [x] Phase 2: ethers v6 Migration (2/2)
+- [x] Phase 3: SQLite Storage & Code Quality (4/4)
+- [x] Phase 4: Multi-Chain Architecture (5/5)
+- [x] Phase 5: Uniswap V3 Integration (4/4)
+- [x] Phase 6: Risk Management (2/2)
+- [x] Phase 7: Smart Exit Strategies (4/4)
+- [x] Phase 8: Monitoring & Web Dashboard (6/6)
+- [x] Phase 9: Testing Infrastructure (5/5)
+- [x] Phase 10: partial_sell Revenue Fix (2/2)
+- [x] Phase 11: Dashboard Accuracy & Bot Wiring (7/7)
+- [x] Phase 12: Integration Gap Fixes (3/3)
+- [x] Phase 13: Config Env-Var Correctness (1/1)
+- [x] Phase 14: Sell Revenue Receipt Decoding (2/2)
+- [x] Phase 15: Chain-Scoped Dedup & Dashboard Env (2/2)
+- [x] Phase 16: Dashboard Type Alignment & Dead Code Cleanup (2/2)
 
 Full archive: [milestones/v6.16-ROADMAP.md](milestones/v6.16-ROADMAP.md)
 
 </details>
 
-### ðŸš§ v6.17 Defensive Hardening for Live Mainnet (Phases 17-21) â€” PLANNING
+<details>
+<summary>✅ v6.17 Defensive Hardening for Live Mainnet (Phases 17–21 + 21.1/21.2/21.3) — SHIPPED 2026-05-29 (ETH-first)</summary>
 
-- [x] **Phase 17: Tech Debt Cleanup & Audit Baseline** â€” CI-verified baseline of `.todo`/TS-error counts, fills/skips remaining stubs, retroactive Nyquist on 9 phases, diagnostic-log cleanup *(completed 2026-04-30)*
-- [ ] **Phase 18: Honeypot Detection Rebuild** â€” Deploy `HoneypotChecker.sol` (Option D) on 4 chains; replace broken V2/V3 sell-sim gates; discriminated-union `HoneypotResult`; multi-amount tax probe; safety-bank audit
-- [x] **Phase 19: Anti-Rug Runtime Monitoring** â€” Single-listener-per-chain LP-removal detector; multi-signal trigger with allowlist + confirm-after-N-blocks; bridge to `executeFullSell` with elevated gas; 7-day dry-run mode
- (completed 2026-05-24)
-- [x] **Phase 20: Going-Live Ops Hardening** â€” Fail-closed preflight (wallet/RPC/MEV/checker code-at-address); cross-variable env validation; multi-stage kill-switch with SQLite-persisted pause; `npm run preflight/pause/resume`; runbook formalization
- (completed 2026-05-24)
-- [ ] **Phase 21: Exit-Engine Live-Runtime Hardening** â€” Real-mainnet verification artifacts (Etherscan tx hashes, dashboard screenshots, log excerpts) for all 6 deferred v6.16 items; chainId guard + `ALLOW_REAL_MAINNET=1` test infrastructure; `op`-field log enrichment
-- [x] **Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED)** — STOP-THE-LINE-01 (every V3 buy aborts: `bot.ts:610` passes the V3 SwapRouter to the V2-only `hasHighTransferTaxForChain`) + STOP-THE-LINE-02 (CRITICAL — Flashbots `bundle.wait()` false-negative reported a landed LADYS buy as failed → untracked/unmonitored position) + STOP-THE-LINE-03 (the mirror V2 `hasHighTransferTaxForChain` call at `bot.ts:303` fires a REAL `amountOutMin=0` buy with broken NaN tax math on every V2 snipe — promoted into scope 2026-05-26); all blocked the 21-07 live capture → RESOLVED, phase complete 2026-05-27 (21-07 now unblocked, operator-gated)
-- [ ] **Phase 21.2: Calm-Gas Sell Inclusion + Exit-Engine Robustness (INSERTED)** — the 21-07 retry (2026-05-27) validated the STOP-THE-LINE-02 fix live (buy landed → reconciled → registered → monitored) but surfaced **STOP-THE-LINE-04**: (A) the Flashbots **sell** can't land at calm gas on a thin wallet (4 attempts → 13-gwei ceiling-hit → `exit.full.failed`; the buy landed only by first-attempt luck) → EXIT-LIVE-03/04/05 blocked; (B) reproducible event-loop **freeze** on MEV ceiling-hit (Ctrl+C dead, needs force-kill); (C) sell reconciliation **blocks the exit poll loop ~222s**; (D) anti-rug **unregisters a still-held position** after a failed exit (capital-safety, verify). Blocks 21-07/08 + Phase 21 close (D-STOP-THE-LINE)
-- [ ] **Phase 21.3: Buy-Leg Calm-Gas Flashbots Inclusion + Guaranteed-Inclusion Fallback (INSERTED)** — **STOP-THE-LINE-05** (21-07 retry 2026-05-29): a **VALID** LADYS buy could not land via Flashbots at calm gas (4 attempts → 13-gwei ceiling-hit at a 0.25-gwei base fee; read-only `staticCall` proves the swap valid → pure **non-inclusion**, not a revert; capital safe — byte-identical wallet balance, no trades row). 21.2 made the **sell** leg resilient (independent ceiling + guaranteed nonce-locked public-mempool fallback) but the **buy** leg is still Flashbots-only with no fallback (it landed before only by first-attempt luck). Make a valid buy **always** land **without** weakening genuine snipe front-run/sandwich protection. Blocks 21-07/08 + Phase 21 close (D-STOP-THE-LINE)
+- [x] Phase 17: Tech Debt Cleanup & Audit Baseline (3/3) — completed 2026-04-30
+- [~] Phase 18: Honeypot Detection Rebuild (10/11) — 18-08 (BSC/Base/Arb deploy → HONEY-04) deferred to next milestone
+- [x] Phase 19: Anti-Rug Runtime Monitoring (10/10) — completed 2026-05-24
+- [x] Phase 20: Going-Live Ops Hardening (12/12) — completed 2026-05-26
+- [x] Phase 21: Exit-Engine Live-Runtime Hardening (8/8) — completed 2026-05-29 (live real-capital roundtrip closed all 6 deferred v6.16 items)
+- [x] Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (6/6) — completed 2026-05-27
+- [x] Phase 21.2: Calm-Gas Sell Inclusion + Exit-Engine Robustness (13/13) — completed 2026-05-28
+- [x] Phase 21.3: Buy-Leg Calm-Gas Flashbots Inclusion + Guaranteed-Inclusion Fallback (7/7) — completed 2026-05-29
 
-## Phase Details
+**Result:** 69 plans complete · 68/70 requirements satisfied · 1 deferred (HONEY-04) · 1 partial-deferred (ANTIRUG-15). Capital-safety blocker INT-NONCE-SELL fixed inline at close.
 
-### Phase 17: Tech Debt Cleanup & Audit Baseline
-**Goal**: Operator can trust the v6.17 audit baseline â€” every claim of done in v6.16 close is verified by CI artifact (not a doc number), every retroactively-validated phase has one production-relevant assertion, and remaining stubs/errors are addressed via real fixes (not suppression)
-**Depends on**: Nothing (Phase 17 is the foundation; CI-discovery pass settles disputed `.todo`/TS status before substantive work)
-**Requirements**: DEBT-01, DEBT-02, DEBT-03, DEBT-04, DEBT-05, DEBT-06
-**Success Criteria** (what must be TRUE):
-  1. `find test/ -name '*.todo*' -print` and `npx tsc --noEmit` artifacts are committed in `.planning/milestones/v6.17-debt-baseline.md` so the operator (and future audits) can see the actual counts of `.todo` stubs and TS annotation errors as ground truth â€” not the disputed 37/6 numbers from the v6.16 close audit
-  2. After Phase 17 completes, `npx tsc --noEmit` exits clean across all tsconfig projects with zero `as any` suppressions added in this phase, and `find test/ -name '*.todo*'` either returns empty or each remaining hit has been converted to `.skip` with an explicit reason
-  3. Each of the 9 retroactively-validated phases (01, 02, 03, 05, 06, 07, 08, 09, 10) produces one production-relevant assertion documented in its `VALIDATION.md` â€” answering "does this prevent the harm we said it would?" â€” explicitly excluding FIX-04 and V3-03 which are addressed via fresh implementation in Phase 18 and validated there
-  4. The diagnostic `console.log` lines at `src/telegramListener.ts:55,61` and the `getTradesByToken` unused const at `src/utils/db.ts:215` no longer appear in the codebase as called out; logs preserved as `log.debug` where appropriate, deleted where not
-**Plans**: 3 plans
+Full archive: [milestones/v6.17-ROADMAP.md](milestones/v6.17-ROADMAP.md) · Live-capture evidence: [milestones/v6.17-VERIFICATION-EVIDENCE.md](milestones/v6.17-VERIFICATION-EVIDENCE.md)
 
-  **Wave 0** *(no dependencies; produces ground-truth baseline doc)*
-  - [x] 17-01-baseline-and-close-evidence-PLAN.md â€” Wave-0 CI-output baseline doc + DEBT-03/04 conditional close-out (Branch A verified-empty / Branch B remaining work) [DEBT-01, DEBT-02, DEBT-03 cond, DEBT-04 cond]
+</details>
 
-  **Wave 1** *(blocked on Wave 0; both plans run in parallel after 17-01 commits)*
-  - [x] 17-02-retroactive-nyquist-PLAN.md â€” Hybrid 7+2 retroactive Nyquist: 7 new harm-prevention tests across phases 01/03/05/06/07/08/10 + 2 inline VALIDATION.md augmentations (phases 02/09); D-07 stop-the-line applies [DEBT-05]
-  - [x] 17-03-cleanup-and-ci-invariants-PLAN.md â€” Verify-then-act sweep: delete getTradesByToken from src/utils/db.ts; append .todo ban + tsc x 3 tsconfigs as evergreen CI guards [DEBT-06 + DEBT-01..04 invariant lock]
+### 📋 Next milestone (planning)
 
-  **Cross-cutting constraints** *(invariants spanning multiple plans):*
-  - **D-07 stop-the-line:** any retroactive harm-prevention test (Plan 17-02) revealing a real production bug BLOCKS Phase 17 close â€” surface to user, treat as DEBT-07 / decimal phase 17.1; NOT fix-in-flight, NOT file-and-defer
-  - **D-11 verify-then-act:** Plans 17-01 and 17-03 both gate any modification on a fresh-checkout verification step before acting (pre-scout findings are informational, not authoritative)
-  - **D-04 observable-effect rigor:** every new test in 17-02 must assert at least one concrete observable effect (DB row, mock-call args, structured pino log, transaction submit/block) â€” no `expect(true).toBe(true)` style hollow fills
+Not yet scoped. Run `/gsd-new-milestone` (questioning → research → requirements → roadmap). Committed carry-forward leads the backlog:
 
-### Phase 18: Honeypot Detection Rebuild
-**Goal**: The bot can again snipe new tokens â€” V2 and V3 â€” on live mainnet without the broken sell-sim hard-blocking every attempt; honeypots that the v6.16 vacuous-pass let through are now caught locally (not just by third-party APIs); and the architecture (discriminated-union `HoneypotResult`, fail-closed `unknown` verdict) makes a vacuous-pass regression unrepresentable in the type system
-**Depends on**: Phase 17 (clean audit baseline; FIX-04/V3-03 validated at fresh implementation here, not retroactively)
-**Requirements**: HONEY-01, HONEY-02, HONEY-03, HONEY-04, HONEY-05, HONEY-06, HONEY-07, HONEY-08, HONEY-09, HONEY-10, HONEY-11, HONEY-12
-**Success Criteria** (what must be TRUE):
-  1. The bot snipes a real V2 token on Ethereum mainnet â€” the new `simulateHoneypotRoundtrip(...)` call at `bot.ts:220-226` returns `verdict: 'safe'` with `evidence.buyTaxBps` and `evidence.sellTaxBps` populated as numerical bps, the buy lands, and an Etherscan tx hash is captured. The "balance=0 hard-block" footgun no longer fires on legitimate launches
-  2. A known honeypot token (committed as test fixture) gets `verdict: 'unsafe'` from the new dispatch â€” both for V2 (replacing the broken sell-sim) and V3 (replacing the silent vacuous-pass) â€” and the bot skips the buy with a structured pino log line containing the revert reason and a Telegram alert pointing at the token address
-  3. `HoneypotChecker.sol` is deployed and Etherscan/BscScan-verified at the addresses recorded in `chainRegistry.ts` `CHAIN_TEMPLATES['eth'|'bsc'|'base'|'arb'].honeypotChecker.deployedAddress` for all 4 enabled chains, with the Slither + Mythril audit report committed in `.planning/milestones/v6.17-honeypot-checker-audit.md` (any flagged issues triaged with documented disposition)
-  4. The multi-amount tax probe (1% / 50% / 100% of `snipeAmount`) catches an amount-varying-tax fixture token in the test suite â€” a token that returns 0% tax on small probes and >25% tax on production-sized swaps no longer passes the gate
-  5. The `safetyBank` audit (HONEY-11) findings are committed in `.planning/milestones/v6.17-safety-bank-audit.md` â€” every gate in `tokenSafety.ts` (buy-sim, tax check, max-wallet, blacklist, liquidity-sufficiency, metadata, transfer-tax, blocklist) has a documented "exercised the underlying behavior" assertion or has been fixed to add one; no other `amountIn=0` family bugs remain undocumented
-**Plans**: 11 plans (iter-2 plan-checker revision: +18-00 wave-0 + 18-10 wiring split)
-
-  **Wave 0** *(pre-wave; closes Blocker #2 chicken-and-egg):*
-  - [x] 18-00-PLAN.md â€” REQUIREMENTS.md HONEY-12 row [HONEY-12]
-
-  **Wave 1** *(after 18-00; parallel):*
-  - [x] 18-01-PLAN.md â€” contrived Honeypot.sol 5-mode fixture (4 standard + amount-tiered per Warning #6) + 3 real-mainnet honeypot fixtures (2 V2 + 1 V3 per Blocker #1) [HONEY-12]
-  - [x] 18-02-PLAN.md â€” HoneypotChecker.sol with checkV2 + checkV3 (~160-190 LOC per Blocker #1) + Ignition module + types.ts + abi.ts + dispatch index.ts + simulator.ts stub + checkerContract.ts placeholder with Warning #9 sentinel [HONEY-01, HONEY-05, HONEY-06]
-  - [x] 18-03-PLAN.md â€” bytecodeScan.ts HONEY-12 + scripts/check-mythril-report.ts severity gate [HONEY-12, HONEY-02 tooling]
-  - [x] 18-04-PLAN.md â€” HONEY-11 safetyBank audit: 8 per-gate regression tests + isBlacklistedTokenForChain fail-closed retrofit + audit milestone doc [HONEY-11]
-
-  **Wave 2** *(after Wave 1):*
-  - [x] 18-05-PLAN.md â€” Slither + Mythril audit covering BOTH checkV2 + checkV3 (Blocker #1) + audit milestone doc + CI gates on contracts/** [HONEY-02] (autonomous: false)
-  - [x] 18-06-PLAN.md â€” chainRegistry.ts honeypotChecker field + tax thresholds + hardhat.config.ts deploy networks + scripts/deploy-honeypot-checker.ts CLI [HONEY-05]
-
-  **Wave 3** *(after audit clean + chainRegistry wired):*
-  - [x] 18-07-PLAN.md â€” ETH mainnet deploy + Etherscan verify (V2 + V3) + integration test + COMMIT ETH LITERAL INTO src/chainRegistry.ts (Blocker #3) + auto-grep audit precheck (Blocker #4) + 2-3 day observation window [HONEY-03] (autonomous: false)
-
-  **Wave 5** *(parallel after observation window closes):*
-  - [ ] 18-08-PLAN.md â€” BSC + Base + Arbitrum batch deploy + verify + 3 integration tests + 3 chainRegistry.ts per-chain literal commits (Blocker #3) [HONEY-04] (autonomous: false)
-  - [x] 18-09-PLAN.md â€” checkerContract.ts V2 + V3 wrappers (Blocker #1) + multi-amount probe + tax thresholds + DELETE broken sell-sims (D-ROLLBACK) + fork/integration/unit tests + Warning #9 sentinel removal [HONEY-07, HONEY-08, HONEY-09, HONEY-10]
-
-  **Wave 6** *(after 18-09 wrapper layer; Warning #8 density split):*
-  - [x] 18-10-PLAN.md â€” bot.ts V2 + V3 in-place gate replacement (V3 feeTier passthrough per Blocker #1) + parallel-bank HONEY-12 on both paths + D-ALERTS tiered alert format + V2/V3 integration tests asserting active V3 unsafe + V3 safe paths [HONEY-07, HONEY-08, HONEY-12]
-
-  **Cross-cutting constraints:**
-  - **D-STOP-THE-LINE:** any audit finding revealing a bug worse than V2/V3 sell-sims BLOCKS Phase 18 close; escalates to HONEY-13+ / decimal phase 18.1
-  - **D-AUDIT-TIMING:** wave 5/6 closes only after (a) 18-07 ETH deploy live + (b) 18-04 + 18-05 audit-discovered fixes merged; depends_on in 18-09 STRUCTURALLY enforces dep on [18-04, 18-05, 18-07] per iter-2 Blocker #4
-  - **D-ROLLBACK:** plan 18-09 DELETES broken simulateSellForChain + simulateSellV3ForChain entirely; no legacy fallback flag retained
-
-### Phase 19: Anti-Rug Runtime Monitoring
-**Goal**: When liquidity is removed from a pool the bot has an open position in, the bot fires a frontrun-exit through the existing `executeFullSell` path with elevated gas â€” within 1-2 confirmation blocks of the LP-removal event, with multi-signal logic (>50% LP removed AND destination not in allowlist AND reserves below sell-threshold) that does not cascade into panic-sells on legitimate V2â†’V3 migrations, lock-contract transfers, or normal multisig rebalances
-**Depends on**: Phase 18 (HONEY establishes the `ChainConfig` extension pattern that ANTIRUG reuses for its own per-chain config; ANTIRUG bridges to `executeFullSell` whose reason union is extended here)
-**Requirements**: ANTIRUG-01, ANTIRUG-02, ANTIRUG-03, ANTIRUG-04, ANTIRUG-05, ANTIRUG-06, ANTIRUG-07, ANTIRUG-08, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11, ANTIRUG-12, ANTIRUG-13, ANTIRUG-14, ANTIRUG-15, ANTIRUG-16
-**Success Criteria** (what must be TRUE):
-  1. On a contrived-fork rug-pull scenario (real captured rug-pull replayed against a fork), the bot exits the rugged position via `executeFullSell` with `reason: 'anti-rug'` and a 2.0Ã— gas multiplier within N blocks of the LP-removal event firing â€” the sell lock, receipt decoding, DB cleanup, and Telegram alert all execute through the existing v6.16 sell pipeline (no parallel exit path)
-  2. A V2â†’V3 migration test (LP burn coinciding with V3 pool creation for the same token pair) does NOT trigger the exit because the destination is in the allowlist and/or reserves do not drop below sell-threshold â€” the multi-signal logic (>50% removed AND not-allowlisted AND reserves drop) prevents the cascading-panic-sell pattern. Lock-contract transfers (Unicrypt, TeamFinance, PinkLock canonical addresses per chain) likewise do NOT trigger exits
-  3. Default deploy is dry-run mode (`ANTIRUG_LIVE_EXECUTE=false`) â€” the bot logs structured "would-have-sold" pino events on detection without executing, so the operator can compare against actual outcomes for 7 days before flipping the env-flag to live execution. Live-execution requires the explicit env flag
-  4. WebSocket disconnect-and-reconnect on the LP-removal listener restores monitoring without losing events â€” heartbeat ping/pong on `WebSocketProvider` detects silent failures, automatic reconnect re-subscribes the active filters, and `getLogs` over `(lastSeenBlock, currentBlock)` backfills the disconnect window. A simulated WS-kill in the test suite proves the bot does not silently miss events
-  5. The per-chain circuit breaker disables anti-rug for that chain after N triggers in a configurable window (default 3 in 1h) â€” operator can manually reset via the dashboard, and the dashboard surfaces "anti-rug halted on chain X" prominently. A misbehaving event-stream cannot trigger N panic-sells in a row
-**Plans**: 10 plans (revision iteration 1: 19-04 split into 19-04a/b/c per Warning 6; 19-02 + 19-05 + 19-06 + 19-08 also revised per Blockers 1-4 + Warnings 5-11 + Infos 12-13)
-
-  **Wave 1** *(foundation; parallel-safe - no inter-plan file overlap):*
-  - [x] 19-01-PLAN.md - Schema migration v4 to v5 (lp_baseline + chain_state) + db.ts prepared statements [ANTIRUG-04] *(completed 2026-05-24)*
-  - [x] 19-02-PLAN.md - ChainConfig.antiRug field + per-chain envs + .env.example + REQUIRED_ENV_VARS + hardcoded V2+V3 allowlists; + operator checkpoint for TeamFinance V3 + PinkLock V3 (Blocker 4) [ANTIRUG-06, ANTIRUG-07, ANTIRUG-09, ANTIRUG-10, ANTIRUG-11]
-
-  **Wave 2** *(after Wave 1; foundation modules + detector registry skeleton):*
-  - [x] 19-03-PLAN.md - anti-rug/types.ts + events.ts + allowlist.ts (verify+lookup+merge) + lpBaseline.ts (snapshot+load+clear) [ANTIRUG-04, ANTIRUG-06, ANTIRUG-15, ANTIRUG-16]
-  - [x] 19-04a-PLAN.md - anti-rug/detector.ts skeleton: position registry + WS subscription pattern + topic filter union + getLogsForBackfill primitive (Warning 6 split) [ANTIRUG-01, 02, 03, 13]
-
-  **Wave 3** *(after Wave 2; multi-signal evaluator):*
-  - [x] 19-04b-PLAN.md - anti-rug/detector.ts: multi-signal AND chain evaluator (V2 + V3 + V3 Burn-without-Collect grace window per Blocker 2 resolution (a)) + confirm-after-N-blocks gate (Warning 6 split) [ANTIRUG-05, 07, 14] *(completed 2026-05-24)*
-
-  **Wave 4** *(after Wave 3; lifecycle layer — sequential after evaluator due to same-file modifications):*
-  - [x] 19-04c-PLAN.md - anti-rug/detector.ts: heartbeat + reconnect + backfill + HTTP polling fallback + tiered D-VIS-WS-HEALTH alerts (Warning 6 split + Warning 9 added tests) [ANTIRUG-11, 12]
-
-  **Wave 5** *(after Wave 4; exit pipeline + bot.ts wiring):*
-  - [x] 19-05-PLAN.md - exitEngine reason union + elevated-gas + cleanup hook (Task 1a per Warning 7); exitTrigger bridge + raceTelemetry (Task 1b); bot.ts V2+V3 buy-success attach + resumeAntiRugMonitoring (Task 2); + Warning 11 ring buffer size note [ANTIRUG-08, ANTIRUG-09, ANTIRUG-10]
-
-  **Wave 6** *(after Wave 5; parallel - dashboard + tests):*
-  - [x] 19-06-PLAN.md - API routes (/circuit-breaker/:chain/reset, /events/:chain) + 5 display-only dashboard components (Task 2a per Warning 8) + 3 interactive components + PositionTable column + Overview mounting (Task 2b); + useWebSocket switch (Task 1); + Info 12 plumbing note [ANTIRUG-09, ANTIRUG-10]
-  - [x] 19-07-PLAN.md - RugPull.sol fixture + HORSE V2 fixture + V3 candidate skeleton + fork test (5 RugPull modes + HORSE replay) + end-to-end multi-signal integration test; + Blocker 2 grace-window deterministic test propagation + Info 13 HORSE address resolution directive [ANTIRUG-01, 02, 03, 05, 08, 13, 14]
-
-  **Wave 7** *(after Wave 6; operator-facing docs):*
-  - [x] 19-08-PLAN.md - docs/operations/anti-rug-rollout.md (D-OPERATOR-HANDOFF [USER-BINDING]) + anti-rug-tuning.md (D-TUNE-PROTOCOL) + README.md anti-rug section; + Warning 10 revision_path on operator checkpoint + Warning 5 env-count 7-to-9 callout + Blocker 4 V3 allowlist follow-through [ANTIRUG-10]
-
-**Cross-cutting constraints:**
-  - **D-V3-COVERAGE:** Phase 19 ships full V3-aware monitoring per CONTEXT.md (NOT log-only; NOT deferred). Researcher proposed ANTIRUG-13..16 as V3-specific requirement rows.
-  - **D-LIVE-GATE:** Default deploy is dry-run; per-chain live-flip requires 7-day floor AND 0 confirmed false-positives per CONTEXT.md.
-  - **D-OPERATOR-HANDOFF [USER-BINDING]:** Phase 19 cannot ship without docs/operations/anti-rug-rollout.md per CONTEXT.md non-negotiable.
-  - **D-ENV-EXAMPLE [USER-BINDING]:** Every new env var lands in .env.example with default + 1-line description per CONTEXT.md non-negotiable.
-  - **D-STOP-THE-LINE:** Any fork test revealing a production bug BLOCKS Phase 19 close (escalates to ANTIRUG-13+ or decimal phase 19.1).
-
-### Phase 20: Going-Live Ops Hardening
-**Goal**: The bot refuses to start in any internally-inconsistent or unsafe state â€” undercut wallet, mismatched chainId, missing checker code-at-address, `MEV_STRATEGY=flashbots` without `FLASHBOTS_AUTH_KEY`, etc. â€” with operator-facing error messages that point to the runbook; the operator can run `npm run preflight` to verify readiness without starting the bot, and `npm run pause`/`npm run resume` to operate the kill-switch from the CLI; the runbook is in versioned docs and the multi-stage kill-switch cannot result in a position opening 30s after pause
-**Depends on**: Phase 18 (preflight verifies `chainRegistry[chain].honeypotChecker.deployedAddress` via `getCode` â€” needs the field to exist with a real deployed address)
-**Requirements**: OPS-LIVE-01, OPS-LIVE-02, OPS-LIVE-03, OPS-LIVE-04, OPS-LIVE-05, OPS-LIVE-06, OPS-LIVE-07, OPS-LIVE-08, OPS-LIVE-09, OPS-LIVE-10, OPS-LIVE-11, OPS-LIVE-12, OPS-LIVE-13
-**Success Criteria** (what must be TRUE):
-  1. `MEV_STRATEGY=flashbots` set with `FLASHBOTS_AUTH_KEY` unset causes the bot to exit non-zero at startup with a structured pino fatal log line that names the offending pair AND points to `docs/operations/going-live.md` â€” the cross-variable env validator catches this combo, refuses to start, and never reaches chain-context creation. The same is true for `ENABLED_CHAINS` including `bsc` without `BLOXROUTE_AUTH_HEADER`, and for the `TELEGRAM_API_ID` 5-tuple
-  2. Wallet balance below per-chain `maxCapital` causes a FATAL non-zero exit at startup (never warn-and-continue) â€” and an undercut detected by the periodic re-check (default every 5 minutes) during operation halts new buys with a Telegram alert. `getCode` against `chainRegistry[chain].honeypotChecker.deployedAddress` returning `0x` likewise FATAL-exits with a "run `npx ts-node scripts/deploy-honeypot-checker.ts <chain>`" message
-  3. Operator runs `npm run preflight` from a fresh terminal â€” script executes all OPS-LIVE-02..05 checks, prints structured per-chain pass/fail output, and exits non-zero on any FATAL â€” without starting the bot. Operator runs `npm run pause` and dashboard reflects pause state; operator runs `npm run resume` and dashboard reflects resume â€” both wrap the existing dashboard endpoints with `DASHBOARD_API_KEY` from `.env`
-  4. Operator presses pause via dashboard while a snipe is mid-flight in `handleNewPairForChain` â€” the multi-stage kill-switch re-check at post-safety-bank, post-bundle-build, and post-MEV-submit aborts the in-flight execution. Pause state survives a full bot restart (loaded from SQLite at boot), so an operator-pressed pause cannot result in a position opening after the bot reboots
-  5. `GOING-LIVE.md` no longer exists at the repo root â€” moved to `docs/operations/going-live.md` (atomic with the root-file delete in the same PR), README links to the new path, and a CI guard fails the build if `GOING-LIVE.md` reappears at the repo root. `HONEYPOT-SIM-BRIEFING.md` is either moved to `docs/decisions/honeypot-sim-rebuild.md` (preserved as decision record) or deleted â€” disposition documented during HONEY plan-phase and resolved in this phase
-**Plans**: 8 plans (Wave 0 Nyquist baseline + 7 implementation waves)
-
-  **Wave 0** *(no dependencies; produces Nyquist test stub baseline before any implementation):*
-  - [x] 20-00-PLAN.md — 14 vitest test stubs across test/unit/preflight/, test/unit/db/, and test/integration/ for all OPS-LIVE-NN requirements; every it.skip names the concrete observable per D-04 [OPS-LIVE-01..11] (completed 2026-05-24)
-
-  **Wave 1** *(after Wave 0; parallel-safe foundation):*
-  - [x] 20-01-PLAN.md — Schema migration v5→v6 (pause_state table + antirug_dry_run_started column on chain_state) + 5 new prepared statements + REQUIREMENTS.md row reword for OPS-LIVE-02 (D-BALANCE-FLOOR) + OPS-LIVE-06 (D-STALE-THRESHOLDS) [OPS-LIVE-02, OPS-LIVE-06, OPS-LIVE-09] *(completed 2026-05-24)*
-
-  **Wave 2** *(after Wave 1; preflight module + chainRegistry extension):*
-  - [x] 20-02-PLAN.md — src/preflight.ts (preflight + preflightDryRun dual-shape API, 7 check functions, cross-env validator, anti-rug 7-day live-gate, stale-data) + chainRegistry.ts defaultGasBuffer + defaultBlockAgeToleranceSec per chain + config.ts REQUIRED_ENV_VARS (12 new envs) + .env.example per D-ENV-EXAMPLE [OPS-LIVE-02, OPS-LIVE-03, OPS-LIVE-04, OPS-LIVE-05, OPS-LIVE-06, OPS-LIVE-07] *(completed 2026-05-24)*
-
-  **Wave 3** *(after Wave 2; bot.ts wiring + anti-rug timestamp):*
-  - [x] 20-03-PLAN.md — src/anti-rug/detector.ts: insert setAntirugDryRunStarted.run() at startChainAntiRugListener first-time-start path (D-ANTIRUG-LIVE-GATE-CODE source for Plan 20-02 7-day floor check) [OPS-LIVE-07]
-  - [x] 20-04-PLAN.md — src/bot.ts: preflight() call at line 880 + chainId-block removal + 3 V2 killswitch checkpoints + 3 V3 killswitch checkpoints + mid-run wallet setInterval (D-MID-RUN-CHECK + D-KILLSWITCH-CP1/CP2/CP3 + D-PREFLIGHT-FLOW + D-ROLLBACK) [OPS-LIVE-01, OPS-LIVE-02, OPS-LIVE-08]
-
-  **Wave 4** *(after Wave 3; dashboard endpoints + CLI scripts + banner):*
-  - [x] 20-05-PLAN.md — src/api/routes/controls.ts (POST /pause + POST /resume + GET /pause with sanitized reason + WS broadcast) + scripts/preflight.ts + scripts/pause.ts + scripts/resume.ts + package.json wiring [OPS-LIVE-09, OPS-LIVE-10, OPS-LIVE-11]
-  - [x] 20-06-PLAN.md — dashboard/src/components/PauseBanner.tsx full-bleed red banner (bg-loss text-white per CB banner analog) + WebSocketContext + useWebSocket extension for pause_state_change WS event + initial state hydration via GET /api/controls/pause + Resume button (D-PAUSE-UI) [OPS-LIVE-09]
-
-  **Wave 5** *(after Wave 4; runbook + CI guard + docs):*
-  - [x] 20-07-PLAN.md — git mv GOING-LIVE.md → docs/operations/going-live.md + git rm HONEYPOT-SIM-BRIEFING.md + README.md link update + .github/workflows/test.yml CI guard step + docs/operations/going-live.md content authoring (5 sections per D-OPERATOR-HANDOFF) [OPS-LIVE-12, OPS-LIVE-13]
-
-  **Wave 6 — Gap closure (live UAT 20-HUMAN-UAT.md)** *(major-first; 08/09/10 parallel, no file overlap):*
-  - [x] 20-08-PLAN.md — [major] CORS same-origin fix (src/api/server.ts compares Origin host:port to request Host) + [major/security] DASHBOARD_API_KEY placeholder/empty/short FATAL in preflight validateCrossEnvRules [OPS-LIVE-07, OPS-LIVE-09, OPS-LIVE-10]
-  - [x] 20-09-PLAN.md — [major] pause/resume CLI default URL derived from DASHBOARD_HOST:DASHBOARD_PORT (fixes :3000 vs :8080 ECONNREFUSED crash) + clear connection errors + config.ts DASHBOARD_URL doc fix [OPS-LIVE-11]
-  - [x] 20-10-PLAN.md — [cosmetic] restyle PauseBanner + CircuitBreakerBanner to the dashboard card idiom (bg-surface-light border-loss border-l-4 rounded-lg) + update pauseBanner.test.ts Test 6 [OPS-LIVE-09]
-
-  **Wave 7 — Gap closure docs** *(after Wave 6; documents the Wave-6 behavior):*
-  - [x] 20-11-PLAN.md — .env.example DASHBOARD_ALLOWED_ORIGINS + DASHBOARD_URL=127.0.0.1:8080 + config.ts DASHBOARD_ALLOWED_ORIGINS entry + going-live.md dashboard-rebuild step / strong-key FATAL / CLI URL+CORS docs [OPS-LIVE-07, OPS-LIVE-11, OPS-LIVE-12] (commits c7372ca, c006483)
-
-  **Cross-cutting constraints:**
-  - **D-ENV-EXAMPLE [USER-BINDING]:** every new env var introduced in Phase 20 lands in .env.example with default + 1-line description (Plan 20-02 owns the registration)
-  - **D-OPERATOR-HANDOFF [USER-BINDING]:** docs/operations/going-live.md IS the operator handoff doc at phase close (Plan 20-07 authors all 5 sections)
-  - **D-STOP-THE-LINE:** any preflight discovery revealing a production bug (e.g., a chain config silently broken because preflight wasn't catching it) BLOCKS Phase 20 close; treated as OPS-LIVE-14+ / decimal phase 20.1
-  - **D-ROLLBACK:** no legacy fallback flags; preflight is always-on; no SKIP_PREFLIGHT=true escape hatch; if preflight is buggy, operator git-reverts the preflight commit
-  - **D-ALERTS:** structured pino + Telegram alerts for every FATAL preflight failure with: chain name, failed check, specific reason, remediation pointer to docs/operations/going-live.md
-  - **D-04 observable-effect rigor:** every new preflight check test asserts a concrete observable effect (process.exit code, pino log line content, SQLite row written, Telegram alert sent) — no expect(true).toBe(true) hollow fills
-
-### Phase 21: Exit-Engine Live-Runtime Hardening
-**Goal**: The 6 deferred human-verification items from v6.16 close are CLOSED with real-mainnet artifacts â€” Etherscan tx hashes, dashboard screenshots, pino log excerpts, DB row excerpts â€” committed in `.planning/milestones/v6.17-VERIFICATION-EVIDENCE.md`. "Test passing on a fork" is no longer accepted as closure for any of these items. Future regressions in the exit engine are caught earlier via real-launch fork fixtures and `op`-field log enrichment
-**Depends on**: Phase 20 (verification artifacts exercise the new HONEY/ANTIRUG/OPS-LIVE surface â€” preflight, kill-switch, env validation must be in place when the artifacts are captured); also depends on Phase 19 because anti-rug emits log lines under the same `op`-field convention being established here
-**Requirements**: EXIT-LIVE-01, EXIT-LIVE-02, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05, EXIT-LIVE-06, EXIT-LIVE-07, EXIT-LIVE-08, EXIT-LIVE-09, EXIT-LIVE-10, EXIT-LIVE-11
-**Success Criteria** (what must be TRUE):
-  1. `.planning/milestones/v6.17-VERIFICATION-EVIDENCE.md` is committed with real-mainnet artifacts for all 6 deferred v6.16 items: (a) live exit-poll cycle telemetry showing budget-vs-actual against the 5s budget on real RPC, (b) automated state-persistence-across-restart Vitest fork test that kills bot mid-cycle and verifies `exit_state` table reflects the same poll position pre/post restart, (c) Etherscan tx hash + DB row excerpt + pino log proving `amount_out` non-null on a live mainnet sell, (d) Flashbots bundle-hash-to-mined-tx-hash mapping, (e) browser screenshot showing dashboard WebSocket position updates in real time, (f) pino log excerpts of chain-restart warnings firing on a real RPC drop, plus the SQLite + `.bot-state.json` migration log on a fresh-clone first boot
-  2. `scripts/capture-launch.ts` is committed and at least 3 captured-real-launch JSON fixtures live in `test/fork/fixtures/realLaunches/` â€” replaying any of them against `handleNewPairForChain` in a fork test exercises the full validation â†’ buy â†’ exit-monitor â†’ sell lifecycle with realistic transfer hooks, gas costs, and event ordering
-  3. Test infrastructure refuses to send real-mainnet transactions without explicit gating â€” chainId guard + `ALLOW_REAL_MAINNET=1` env-gate decorator means a fork test running with `chainId === 1` (mainnet) without the gate fails loudly. CI never sets the gate. A dedicated test wallet (NOT the operator's prod wallet) is used for any real-mainnet test
-  4. Every exit-engine code path logs with an `op` field (`op: 'exit-poll-cycle'`, `op: 'partial-sell-trigger'`, `op: 'flashbots-submit'`, etc.) â€” operator can filter logs by `op:exit.full.executed` during real-mainnet runs and see only confirmed exit transactions, not "code path executed" telemetry. The ground-truth metric for "exit happened" is the DB-receipt-decoded `amount_out`, NOT an instrumented try/catch metric
-**Plans**: 8 plans (5 waves)
-
-  **Wave 1** *(autonomous foundation; parallel-safe, no file overlap):*
-  - [x] 21-01-PLAN.md — exitEngine.ts op-field enrichment (dotted exit.*) + poll-cycle telemetry + flashbots.ts bundleHash->minedTxHash log [EXIT-LIVE-01, EXIT-LIVE-04, EXIT-LIVE-10]
-  - [x] 21-02-PLAN.md — test-safety gate: global chainId===1 tripwire in setup.ts + requireRealMainnetGate decorator + fork-only test key + .env.example vars [EXIT-LIVE-08]
-  - [x] 21-05-PLAN.md — REQUIREMENTS reword (EXIT-LIVE-01 dotted / 07 PRAGMA user_version / 06 WS-listener) + HONEY-07/08 reconciliation + going-live.md live-capture runbook [EXIT-LIVE-01, EXIT-LIVE-06, EXIT-LIVE-07]
-
-  **Wave 2** *(autonomous; after Wave 1 gate helper; parallel-safe):*
-  - [x] 21-03-PLAN.md — scripts/capture-launch.ts archive recorder + 3 realLaunches fixtures (V2+V3, varied exits) + realLaunchReplay.fork.test.ts driving the REAL handler [EXIT-LIVE-09] *(⚠ surfaced D-STOP-THE-LINE V3-buy blocker → phase 21.1; V2 legs green)*
-  - [x] 21-04-PLAN.md — exitStatePersistence.fork.test.ts: SIGTERM-restart, asserts identical exit_state strategy columns [EXIT-LIVE-02] *(module-level restart per D-TEST-WALLET-FORKONLY; columns durable)*
-
-  **Wave 3** *(autonomous; the hard gate before any real run):*
-  - [x] 21-06-PLAN.md — captureRehearsal.fork.test.ts: fork rehearsal of the exact buy->tight-exit->poll-fires-sell->amount_out sequence, green end-to-end (D-FORK-REHEARSAL) *(GREEN on V2 token LADYS; non-null amount_out via decodeReceipt; 21-07 unblocked)* [rehearsal gate - closes no requirement; validates the EXIT-LIVE-03 mechanism + EXIT-LIVE-04 Flashbots call path; a fork has no relay so 03/04 close on the 21-07 real run]
-
-  **Wave 4** *(OPERATOR-GATED real capital; autonomous: false):*
-  - [x] 21-07-PLAN.md — one controlled real-mainnet ETH buy+sell roundtrip: captures sell amount_out + Etherscan hash, Flashbots bundle->mined mapping, dashboard WS screenshot, live poll telemetry [EXIT-LIVE-01, EXIT-LIVE-03, EXIT-LIVE-04, EXIT-LIVE-05] (autonomous: false) *(⚠ retry 2026-05-27: buy landed + EXIT-LIVE-01 telemetry captured + STOP-THE-LINE-02 fix validated live; but the Flashbots SELL hit the calm-gas inclusion wall → EXIT-LIVE-03/04/05 NOT captured; surfaced STOP-THE-LINE-04 → BLOCKED on phase 21.2 [RESOLVED — 21.2 complete 2026-05-28]; ⚠ retry 2026-05-29 [post-21.2]: the BUY can't land via Flashbots at calm gas (13-gwei ceiling-hit; pure non-inclusion) → surfaced STOP-THE-LINE-05 → phase 21.3 [RESOLVED — 21.3 complete 2026-05-29]; ✓ retry 2026-05-29 [post-21.3]: buy LANDED via multi-builder fanout (STOP-THE-LINE-05 resolved live) + sell fired via the engine's OWN urgency-market-sell trigger, landed PRIVATE at calm gas → EXIT-LIVE-01/03/04/05 ALL captured (sell 0xcc7997bb…, amount_out 993814525259157); 21.2 sell leg + 21.1 reconcile validated live. **CAPTURE COMPLETE**)*
-
-  **Wave 5** *(operator-confirmed captures + consolidation; autonomous: false):*
-  - [x] 21-08-PLAN.md — induced-RPC-drop warning (06) + fresh-clone migration log/user_version=7 (07; plan said 6, but 21.2-03 advanced the schema to 7) captures + v6.17-VERIFICATION-EVIDENCE.md consolidation [EXIT-LIVE-06, EXIT-LIVE-07, EXIT-LIVE-11] (autonomous: false) *(✓ COMPLETE 2026-05-29: real detector antirug.ws.disconnected→reconnected on an induced rawWs.terminate(); fresh-DB migration v1→v7 + PRAGMA user_version=7; EXIT-LIVE-11 evidence doc consolidates all 6 deferred items — EXIT-LIVE-02 the SOLE fork-only closure authorized by ROADMAP sc-1(b))*
-
-  **Cross-cutting constraints:**
-  - **D-EVIDENCE-BAR:** a fork-test pass alone NEVER closes any of the 6 deferred items — each needs a resolvable real-mainnet artifact (Etherscan hash / DB amount_out row / pino excerpt / timestamped screenshot) in v6.17-VERIFICATION-EVIDENCE.md
-  - **D-OP-DB-TRUTH:** the ground truth for "an exit happened" is the DB receipt-decoded trades.amount_out + the on-chain receipt, NEVER an op log line or instrumented metric
-  - **D-STOP-THE-LINE:** any bug surfaced during a capture or fixture replay BLOCKS phase close and escalates to a new requirement / decimal phase 21.1 — not fix-in-flight, not file-and-defer
-  - **D-TEST-WALLET-FORKONLY:** the automated suite uses a fork-only throwaway key with zero real ETH; the prod PRIVATE_KEY is NEVER imported into any test; ALLOW_REAL_MAINNET is never set in CI
-  - **D-ENV-EXAMPLE [USER-BINDING]:** ALLOW_REAL_MAINNET, TEST_WALLET_PRIVATE_KEY, CAPTURE_ARCHIVE_RPC_URL land in .env.example with defaults + 1-line descriptions (Plan 02)
-
-### Phase 21.1: V3-Buy Tax-Gate + Flashbots Inclusion Fix (INSERTED — urgent)
-**Goal**: The two STOP-THE-LINE blockers surfaced during Phase 21's live-capture work are fixed so the 21-07 real-mainnet roundtrip can proceed — (1) the funded bot can again snipe Uniswap **V3** tokens (the V3 buy path no longer aborts at a V2-only transfer-tax gate), and (2) the Flashbots submit path never reports a buy/sell that actually landed on-chain as failed (a bundle that mined is reconciled against chain state and the position is registered + monitored), with a retry loop that cannot double-spend
-**Depends on**: Phase 21 Waves 1-2 (which surfaced these bugs via the 21-03 regression net + the 21-07 live attempt). BLOCKS Phase 21 Wave 4 (21-07 real-capital capture) and therefore Phase 21 close (D-STOP-THE-LINE)
-**Requirements**: STOP-THE-LINE-01 (V3-buy tax-gate), STOP-THE-LINE-02 (Flashbots false-negative inclusion), STOP-THE-LINE-03 (V2-buy tax-call real-buy removal — the mirror of -01; added 2026-05-26 per D-V2-TAX-REMOVE) — full diagnoses in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-01-v3-buy-tax-gate.md` and `21-STOP-THE-LINE-02-flashbots-false-negative.md`; formalize as REQUIREMENTS.md rows at plan-phase
-**Success Criteria** (what must be TRUE):
-  1. **STOP-THE-LINE-01 resolved:** a benign Uniswap V3 token passes the bot's transfer-tax safety gate on the V3 buy path (`src/bot.ts:~610-617`, today routed into the V2-only `hasHighTransferTaxForChain` at `tokenSafety.ts:482`) and the buy proceeds, while a real high-tax/honeypot V3 token still fails closed — proven by a unit/fork test. `test/fork/realLaunchReplay.fork.test.ts` is updated so the `eth-v3-trailing.json` fixture asserts the full validation→buy→exit→sell lifecycle instead of today's blocked-at-gate observable
-  2. **STOP-THE-LINE-02 resolved (inclusion reconciliation):** when `FlashbotsMevStrategy.sendTransaction` (`src/utils/mevStrategies/flashbots.ts:~52-120`) gets a non-`BundleIncluded` `bundle.wait()` result, it reconciles against chain state — `getTransactionCount(wallet,'latest')` and/or the bundle tx-hash receipt — and a bundle that actually mined is returned as the real on-chain hash so the trade is recorded, the position registered, and the exit monitor started. A regression test replays the live LADYS scenario (`wait()` says "not included" but the nonce advanced / receipt exists) and asserts success, not failure
-  3. **Retry path is nonce-safe:** the submit retry loop re-fetches the nonce each attempt and never resubmits a nonce that may already be mined; a test proves a misreported-but-landed attempt-0 cannot trigger a second real buy (no double-spend)
-  4. **Verified before the 21-07 retry:** both fixes are green in the test suite (unit + fork) before any real-capital re-attempt; because `executeFullSell` (`src/exitEngine.ts`) submits through the same `sendTransaction`, the sell leg inherits the inclusion-reconciliation fix so a captured sell `amount_out` / Flashbots bundle artifact cannot be a false-negative
-**Plans**: 6 plans
-
-  **Wave 0** *(no deps; Nyquist stubs + REQ formalization):*
-  - [x] 21.1-01-PLAN.md — REQUIREMENTS.md STOP-THE-LINE-01/02/03 rows (all ACTIVE; -03 = V2 tax-call removal, promoted from deferred 2026-05-26) + Nyquist it.skip stubs for the reconciliation + config-var tests + the V2-unsafe-real-buy assertion [STOP-THE-LINE-01, STOP-THE-LINE-02, STOP-THE-LINE-03]
-
-  **Wave 1** *(parallel; foundation + the independent V3 fix):*
-  - [x] 21.1-02-PLAN.md — shared reconciliation.ts helper (nonce-safe retry + receipt-primary reconciliation + bounded confirm-window + sell-gas-reserving fee escalation) + 5 MEV env vars in config.ts/.env.example [STOP-THE-LINE-02]
-  - [x] 21.1-03-PLAN.md — remove the V2-only tax call from BOTH the V2 and V3 banks (+delete the now-dead `hasHighTransferTaxForChain` function/import/test) + flip the V3 fork fixture to the full buy→exit→sell lifecycle (+ dumpV3Pool price-mover) [STOP-THE-LINE-01, STOP-THE-LINE-03]
-
-  **Wave 2** *(after the helper + stubs):*
-  - [x] 21.1-04-PLAN.md — wire all 3 MEV strategies (flashbots/bloXroute/passthrough) through submitWithReconciliation + flip per-strategy misreport-but-landed / mined-but-reverted / nonce-safe / sell-leg tests green [STOP-THE-LINE-02]
-
-  **Wave 3** *(after strategy wiring):*
-  - [x] 21.1-05-PLAN.md — delete the dead legacy sendTxWithRetry branch (D-DELETE-LEGACY) + record the real tx hash on the buy row (D-RECORD-REAL-HASH, V2+V3) [STOP-THE-LINE-02]
-
-  **Wave 4** *(pre-21-07 gate; depends on everything):*
-  - [x] 21.1-06-PLAN.md — full-suite + mainnet-fork rehearsal (passthrough path) before the 21-07 real-capital retry; records the Flashbots-is-21-07 caveat [STOP-THE-LINE-01, STOP-THE-LINE-02]
-
-  **Cross-cutting constraints:**
-  - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code" is NOT a tiebreaker
-  - **D-V3-ONLY-SCOPE [AMENDED 2026-05-26]:** the V3-only fence was PARTIALLY LIFTED — the V2 `hasHighTransferTaxForChain` tax-call removal (bot.ts:303) is now IN scope as STOP-THE-LINE-03 (research confirmed it fires a real amountOutMin=0 buy with broken NaN math, not the "V2 works" premise); with both call sites gone the dead function/import/tokenSafety.ts:482/test are deleted. The fence STILL holds for the REST of the V2 capture flow — only the broken tax call is removed; the bot.ts:253 honeypot roundtrip, buy/sell submit, and exit path are untouched
-  - **D-FORK-REHEARSAL-21.1:** the fork rehearsal proves the passthrough reconciliation + buy→register→exit wiring; the Flashbots false-negative path is unit-proven and validated for real ONLY on the Phase-21 21-07 retry
-
-### Phase 21.2: Calm-Gas Sell Inclusion + Exit-Engine Robustness (INSERTED)
-**Goal**: The four STOP-THE-LINE-04 defects surfaced during the Phase 21 / Plan 21-07 real-capital LADYS roundtrip are fixed so the 21-07 retry can resume — a Flashbots EXIT lands at calm gas on a thin wallet (independent sell-leg ceiling + reason-aware public-mempool fallback, guarded against double-sell + gated by a buy-time entry affordability check), a MEV ceiling-hit never wedges the event loop (watchdog + two-stage SIGINT + RPC timeouts), one exit's retries never starve other positions' polling (decoupled serial worker + bot-wide per-wallet nonce authority + priority queue), and a failed exit never strips anti-rug protection from a still-held position (balance-is-truth teardown + keep-monitoring + re-arm poll timer + exit_failed_held persistence). Authoritative goal: 21.2-CONTEXT.md § Phase Boundary
-**Depends on**: Phase 21 Waves 1-2 (which surfaced STOP-THE-LINE-04 via the 21-07 retry). BLOCKS Phase 21 Wave 4 (21-07 real-capital capture) and therefore Phase 21 close (D-STOP-THE-LINE). Builds on 21.1 (D-RECONCILE-RECEIPT, D-NONCE-SAFE-RETRY, D-FEE-ESCALATION, D-SHARED-HELPER)
-**Requirements**: STOP-THE-LINE-04-A (calm-gas exit inclusion + entry gate + no-double-sell), STOP-THE-LINE-04-B (freeze / kill-safety), STOP-THE-LINE-04-C (poll decoupling + bot-wide nonce authority), STOP-THE-LINE-04-D (failed-exit position protection) — formalized as REQUIREMENTS.md rows 2026-05-28; full diagnosis in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-04-calm-gas-sell-inclusion-exit-robustness.md`
-**Success Criteria** (what must be TRUE):
-  1. **Finding A resolved:** the exit leg bids on an INDEPENDENT `MEV_SELL_MAX_PRIORITY_FEE_GWEI` ceiling (still affordability-clamped, never overspending); on reason-aware non-inclusion it falls back to a guaranteed nonce-locked public-mempool sell (`swapExactTokensForETHSupportingFeeOnTransferTokens`), with `reconcileInclusion` + re-fetched-balance guards that make a double-sell impossible (LADYS regression green); a hard buy-time entry gate refuses any snipe the wallet can't guarantee a public exit from. Live calm-gas inclusion + private→public transition close ONLY on the 21-07 retry (D-EVIDENCE-BAR)
-  2. **Finding B resolved:** a MEV ceiling-hit / hung submit never wedges the loop — every provider call is `withTimeout`-bounded, a watchdog aborts a budget-overrunning submit via `Promise.race` and keeps the bot alive, and a two-stage SIGINT (REPLACING the single-stage `gracefulShutdown`) forces exit on a second signal OR a grace-timeout. Proven by fake-timer unit tests
-  3. **Finding C resolved:** a poll tick that detects a trigger ENQUEUES and returns immediately (`exit.poll.cycle overruns:false`); a single serial `ExitWorker` drains a priority queue (anti-rug first) one sell at a time; EVERY signing tx routes through ONE per-wallet `withNonceLock` authority (no nonce-collision bot-wide). Proven by serial-drain / priority / per-position-lock / nonce-serialization unit tests + fork end-to-end
-  4. **Finding D resolved:** the `executeFullSell` catch gates teardown on a re-fetched on-chain `balanceOf` — a failed still-held exit KEEPS anti-rug + re-arms the poll timer + persists `exit_failed_held` (schema v7); a genuine close still tears down; routine retries are bounded (anti-rug always fires); `executePartialSell` posture verified; the canonical `antiRugReason.test.ts` Test 6 is INVERTED. Proven unit + fork SIGTERM-restart-resume
-**Plans**: 10 plans
-
-  **Wave 1** *(foundations; no deps; fully parallel — zero file overlap):*
-  - [x] 21.2-01-PLAN.md — per-wallet `withNonceLock(address, op)` nonce authority (composes WITH the re-fetch-'latest' scheme; NOT ethers NonceManager) [STOP-THE-LINE-04-C] *(W1 ✓ 2026-05-28; 5/5 serialization tests, mutation-verified, no NonceManager; commits f37f9f7/d71e2ad)*
-  - [x] 21.2-02-PLAN.md — `withTimeout(op, ms, label)` Promise.race RPC-timeout helper + Finding B env knobs (RPC_TIMEOUT_MS / WATCHDOG_BUDGET_MS / SIGINT_GRACE_MS) [STOP-THE-LINE-04-B] *(W1 ✓ 2026-05-28; 4/4 fake-timer tests, knobs in .env.example; commits a8148c9/531b645/3fff3e9)*
-  - [x] 21.2-03-PLAN.md — DB schema v6→v7 additive ALTER-guard: `exit_failure_count` + `exit_status` on `exit_state` (idempotent; existing rows survive) [STOP-THE-LINE-04-D] *(W1 ✓ 2026-05-28; 8/8 migration tests, prod data/bot.db → v7 in place, held LADYS row survived; commits 46244e0/0806e50)*
-
-  **Wave 2** *(after foundations):*
-  - [x] 21.2-04-PLAN.md — independent sell-leg priority-fee ceiling (`MEV_SELL_MAX_PRIORITY_FEE_GWEI`, still affordability-clamped) + retarget `reserveSellGas` to the guaranteed public exit + Finding A env knobs [STOP-THE-LINE-04-A] (depends 21.2-02 for config.ts ordering) *(W2 ✓ 2026-05-28; leg-aware buildReconcileConfig sell ceiling=25/buy=5, computePublicExitReserveWei, 4 knobs in .env.example, CR-01 clamp preserved; commits 3de9e7b/dcf3195/fb7e833)*
-  - [x] 21.2-05-PLAN.md — serial `ExitWorker` + priority queue + per-position lock; poll ticks enqueue + return (overruns:false); worker submit nonce-locked [STOP-THE-LINE-04-C] (depends 21.2-01) *(W2 ✓ 2026-05-28; ExitWorker singleton priority drain anti-rug>urgency>trailing, per-position lock, withNonceLock-wrapped, 3 poll sites enqueue+return; exitWorker 4/4 + pollTelemetry 8/8 + exitEngine 30/30; commits e9b0d6f/523d58a)*
-
-  **Wave 3** *(exitEngine ladder + the buy-time gate):*
-  - [x] 21.2-06-PLAN.md — `executeFullSell` inclusion ladder: reason-aware private escalate → no-double-sell guard (reconcileInclusion + re-fetched balance) → nonce-locked public-mempool fallback (LADYS regression) [STOP-THE-LINE-04-A] (depends 21.2-01/04/05) *(W3 ✓ 2026-05-28; escalatePrivateSell pre-signs for the guard w/o broadcast, dual reconcile+balanceOf no-double-sell, V2 public fallback nonce-locked + V3 held-loud; ladder 6/6 incl LADYS canonical; commit 1161a70)*
-  - [x] 21.2-08-PLAN.md — hard buy-time entry affordability gate: refuse a snipe unless the wallet can afford the worst-case GUARANTEED public exit + buffer; fail-closed on RPC error [STOP-THE-LINE-04-A] (depends 21.2-04) *(W3 ✓ 2026-05-28; checkEntryExitAffordability fail-closed, wired BOTH V2 & V3 buy sites + D-ALERTS; 7/7 gate tests; commit 9b9f809. Post-merge: 4 pre-existing buy-path integration mocks lacked chain.gas.maxGasLimit/getFeeData → repaired test-only in 5196de6)*
-
-  **Wave 4** *(the Finding-D catch rewrite + the Finding-B liveness net):*
-  - [x] 21.2-07-PLAN.md — balance-truth teardown (failed-still-held keeps anti-rug + re-arms poll timer + persists exit_failed_held) + bounded routine retries (N=5) + executePartialSell verification + INVERT antiRugReason Test 6 + anti-rug sell nonce-locked [STOP-THE-LINE-04-D] (depends 21.2-03/05/06) *(W4 ✓ 2026-05-28; catch+success gated on re-fetched balanceOf; keepMonitoringFailedHeld vs teardownGenuineClose; EXIT_DUST_THRESHOLD_BPS/EXIT_ROUTINE_MAX_FAILURES=5; Test 6 INVERTED to assert keep-monitoring [was encoding the LADYS bug]; executePartialSell nonce-locked; 16/16 + exitEngine/anti-rug 121/121; commits 0926ef4/ab6dd0e)*
-  - [x] 21.2-09-PLAN.md — watchdog (Promise.race abort + keep-alive) + two-stage SIGINT REPLACING the single-stage gracefulShutdown (no two competing force-exit timers) [STOP-THE-LINE-04-B] (depends 21.2-02/05/08) *(W4 ✓ 2026-05-28; gracefulShutdown + its 5s force-timer removed [grep-proven]; createTwoStageShutdown single force-exit path; exitWatchdog wraps the worker submit INSIDE withNonceLock [advances nonce chain on abort]; twoStageSigint 5/5 + watchdog 5/5; commits c99f63a/36f0a34. Post-merge: stale Wave-4 mocks completed test-only in 3e52561)*
-
-  **Wave 5** *(fork rehearsal + evidence-bar gate; depends on the exit-engine + bot changes):*
-  - [x] 21.2-10-PLAN.md — fork-rehearse the surrounding buy→register→monitor→exit wiring + exit_failed_held restart-resume (passthrough, no relay) + operator D-EVIDENCE-BAR acknowledgement before the 21-07 retry resumes [STOP-THE-LINE-04-A, STOP-THE-LINE-04-C, STOP-THE-LINE-04-D] (depends 21.2-06/07/09) *(✓ 2026-05-28; Task 1 fork rehearsal [commits 36ab78f/4ddba44; exitStatePersistence 3/3] SURFACED capital-safety gap S-1 → fixed in 21.2-11; Task 2 D-EVIDENCE-BAR operator-ACKNOWLEDGED 2026-05-28. captureRehearsal env-throttled assertion pre-existing [Alchemy]. Live calm-gas items close only on the operator-gated 21-07 retry.)*
-
-  **Wave 6** *(gap closure — S-1, surfaced by the 21.2-10 fork-rehearsal verification gate; operator-approved fix-within-phase 2026-05-28):*
-  - [x] 21.2-11-PLAN.md — CONFIRMED capital-safety gap S-1: 21.2-07 PERSISTS exit_failed_held + keeps anti-rug AT RUNTIME but stamps trades.status='failed', and BOTH reboot scans (resumeMultiChainMonitoring bot.ts:1275 + resumeAntiRugMonitoring bot.ts:1391) read only status='pending' → a failed-still-held position is DROPPED on restart (no monitor, no anti-rug = LADYS-class harm surviving a reboot). Wire the restart-resume READ side: both scans re-enter exit_failed_held rows (re-monitor + re-register anti-rug); balanceOf guard prevents resurrecting a closed one; unit + fork SIGTERM-restart-resume proof [STOP-THE-LINE-04-D] (depends 21.2-07/10) — delivers STOP-THE-LINE-04-D's restart-resume must-have that was not actually wired *(W6 ✓ 2026-05-28; getResumeExitMonitorTrades/getResumeAntiRugTrades LEFT-JOIN exit_state union pending-buy OR exit_failed_held; both bot.ts scans re-enter + D-ALERTS; distinct 'failed' status preserved; 6/6 unit + fork Test 3 D.1 flipped to real proof [3/3]; gate GREEN unit 684/integration 216/tsc ×3; commits 5760359/b7bef98. S-1 CLOSED.)*
-
-  **Wave 7** *(gap closure — 2 CRITICALs from the phase deep code-review 21.2-REVIEW.md, both confirmed + masked-in-CI; operator-approved fix-within-phase 2026-05-28):*
-  - [x] 21.2-12-PLAN.md *(W7 ✓ 2026-05-28; CR-01 fixed: worker drain no longer double-locks [single-level locking, watchdog outside the nonce lock] — exitWorkerRealPath 2/2; CR-02 fixed: BroadcastHandle out-param threads the REAL broadcast hash/nonce through all 3 strategies + reconcile-the-real-tx + landed-not-ours fail-safe — noDoubleSellReconcile 3/3; both new tests VERIFIED to fail against pre-fix code; gate GREEN unit 689/integration 216/tsc ×3; commits 096d8ff/5f8bc6d/77eaaf3)* — CR-01 re-entrant withNonceLock DEADLOCK: the worker wraps executeFullSell in withNonceLock(wallet) (exitEngine.ts:1254) which re-acquires the same non-reentrant lock for its approval/fallback (826/829/529/538) → every worker-driven exit deadlocks + the orphaned call never releases the sell-lock → anti-rug for that token is ALSO stranded. CR-02 no-double-sell guard probes a PHANTOM hash: escalatePrivateSell pre-signs a throwaway tx (no fee-escalation) but the strategy broadcasts a DIFFERENT tx → reconcileInclusion probes a never-broadcast hash (always null) → step 2a never aborts the public fallback → double-sell window. FIX: single-level locking (no double-lock) + reconcile the actually-broadcast hash/nonce + fail-safe on inconclusive; mandate REAL-PATH regression tests (the bugs were masked by mocking the mechanism under test) [STOP-THE-LINE-04-A, STOP-THE-LINE-04-C] (depends 21.2-05/06)
-
-  **Wave 8** *(gap closure — the 6 WARNINGs + cheap INFOs from 21.2-REVIEW.md; operator-approved highest-quality scope 2026-05-28):*
-  - [ ] 21.2-13-PLAN.md — verify+fix the 6 review warnings: WR-01 buys/buy-approval bypass withNonceLock (join the bot-wide nonce authority); WR-02 anti-rug exit never watchdog-bounded (+ WR-03 dead priority-queue comment) → bound it + reconcile docs; WR-04 attempts=0 promoted to 3 via `||3` → honor 0; WR-05 off-by-one private-attempt budget (anti-rug 2 not 1, routine 3 not 2) → exact budget; WR-06 partial sell blocks the poll tick → decouple. Plus cheap INs (IN-01 reserved-knob desc, IN-02 simplify, IN-03 slippage>100% minOut=0 clamp; IN-04 evaluate dust default). Real-path tests; no regression of the 21.2-12 criticals or the 21.1 clamp [STOP-THE-LINE-04-A/B/C] (depends 21.2-12)
-
-  **Cross-cutting constraints:**
-  - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code / simplest" is NOT a tiebreaker
-  - **D-STOP-THE-LINE:** any NEW bug surfaced during execution escalates to a fresh STOP-THE-LINE / decimal phase — NOT fix-in-flight, NOT file-and-defer
-  - **D-FORK-REHEARSAL + D-EVIDENCE-BAR:** the fork rehearsal (no Flashbots relay) proves the surrounding wiring; the private→public transition + calm-gas inclusion are mock/fork-only and close ONLY on the 21-07 real-capital retry artifacts (Etherscan hash / DB amount_out / pino excerpt)
-  - **D-ENV-EXAMPLE / D-ALERTS / D-ROLLBACK:** every new env var lands in .env.example with a default + 1-line desc; structured pino + Telegram on every failure/fallback/ceiling-hit/watchdog-abort with a remediation pointer; no escape-hatch flags (the public fallback is an engine path, not a bypass flag)
-
-### Phase 21.3: Buy-Leg Calm-Gas Flashbots Inclusion + Guaranteed-Inclusion Fallback (INSERTED)
-**Goal**: STOP-THE-LINE-05, surfaced during the Phase 21 / Plan 21-07 real-capital retry (2026-05-29) — a **valid** LADYS buy could not land via Flashbots at calm gas (4 attempts → 13-gwei priority-fee ceiling-hit at a 0.25-gwei base fee; read-only `staticCall` returns ~242.38M LADYS even at the bot's 5% slippage → pure **non-inclusion**, not a reverting swap; capital safe — wallet ETH balance byte-identical, `LADYS balanceOf = 0`, no `trades` row, 21.1 nonce-safe retry correct). Phase 21.2 made the **sell/exit** leg resilient to exactly this (independent `MEV_SELL_MAX_PRIORITY_FEE_GWEI` ceiling + a guaranteed nonce-locked public-mempool fallback `swapExactTokensForETHSupportingFeeOnTransferTokens`, with no-double-sell guards) but left the **buy** leg Flashbots-only with no fallback — it landed in the prior attempt only by first-attempt luck. This phase makes a valid buy **always** land — extend the 21.2 `submitWithReconciliation` resilience pattern to the buy leg — **without** weakening the genuine snipe front-run/sandwich protection that is the reason a fresh-launch buy uses Flashbots in the first place. Unblocks the 21-07 capture, which only needs a deliberate established-token buy to land reliably (the buy is a means to obtain a position; all capture evidence is the SELL leg).
-**Depends on**: Phase 21 Waves 1-2 + the 21-07 real-capital retry (which surfaced STOP-THE-LINE-05). Builds on Phase 21.2 Finding-A (independent priority-fee ceiling + guaranteed public-mempool fallback + `reconcileInclusion`/re-fetched-balance no-double-spend guards + buy-time entry affordability gate) and 21.1 (D-RECONCILE-RECEIPT, D-NONCE-SAFE-RETRY). BLOCKS Phase 21 Wave 4 (21-07 real-capital capture) and therefore Phase 21 close (D-STOP-THE-LINE).
-**Requirements**: STOP-THE-LINE-05 (buy-leg calm-gas Flashbots inclusion + guaranteed-inclusion fallback that does not weaken snipe MEV protection) — full diagnosis in `.planning/phases/21-exit-engine-live-runtime-hardening/21-STOP-THE-LINE-05-buy-leg-calm-gas-flashbots-inclusion.md`. To be formalized as a REQUIREMENTS.md row during discuss/plan.
-**Requirements (formalized)**: STOP-THE-LINE-05-A (harden PRIVATE buy inclusion: multi-builder raw eth_sendBundle fanout + multi-block targeting + independent higher buy ceiling; snipes stay private), STOP-THE-LINE-05-B (deliberate/capture public-capable buy path, explicit-invocation only, private-first then public), STOP-THE-LINE-05-C (capital-safety: no-double-BUY reconcile-before-broadcast + mode-aware entry-affordability gate), STOP-THE-LINE-05-D (per-builder getBundleStatsV2 telemetry + snipe fail-clean-on-exhaustion + D-ALERTS) — formalized as REQUIREMENTS.md rows 2026-05-29 (umbrella token STOP-THE-LINE-05 = union of -A/B/C/D). Research-pinned mechanism note: the installed @flashbots/ethers-provider-bundle@1.0.0 SILENTLY DROPS the `builders` field, so multi-builder fanout MUST be a raw eth_sendBundle JSON-RPC call reusing the library's signBundle + X-Flashbots-Signature auth (RESEARCH section Q2).
-**Success Criteria** (what must be TRUE):
-  1. **Valid snipe buy lands PRIVATELY:** a `staticCall`-valid buy that Flashbots won't include at calm gas now lands via hardened private inclusion — multi-builder fanout (the raw eth_sendBundle WIRE BODY carries a non-empty `builders` array = MEV_BUILDERS; a call-count test is BLIND to the dropped-field trap) + multi-block targeting (same signed bytes to block+1..block+MEV_BUY_TARGET_BLOCKS=3) + the independent MEV_BUY_MAX_PRIORITY_FEE_GWEI=25 ceiling (raised INPUT only; the affordability clamp STILL binds). Genuine snipes NEVER auto-go-public (front-run protection preserved — D-BUY-INCLUSION-PRIVATE-FIRST). LIVE inclusion is operator-gated (opportunistic getBundleStatsV2 telemetry on the next real snipe — D-EVIDENCE-BUY-INCLUSION).
-  2. **Deliberate path is explicit + private-first:** a public-capable buy is reachable ONLY from the operator-run scripts/deliberate-buy.ts (no heuristic — D-DELIBERATE-EXPLICIT-ONLY); it tries hardened-private FIRST then the fee-on-transfer-safe public buy swapExactETHForTokensSupportingFeeOnTransferTokens (nonce-locked). scripts/capture-launch.ts stays READ-ONLY.
-  3. **No double-BUY (highest stakes):** the single per-wallet nonce makes a double-SPEND structurally impossible; before any public buy the guard reconciles the REAL BroadcastHandle hash (never a phantom) and ABORTS fail-closed on included/landed-not-ours/inconclusive — STRICTER than the sell (also requires balanceOf(token)==0 AND nonce-not-consumed). The entry-affordability gate is mode-aware (deliberate reserves its own public-fallback gas; snipe reserves none).
-  4. **Snipe fail-clean + telemetry:** a snipe that exhausts private inclusion fails clean (zero ETH spent, no trades row) with a hard structured pino + Telegram alert (token, attempts, per-builder stats, reason, remediation); per-builder getBundleStatsV2 telemetry logs op:flashbots.bundle.stats with no secrets. No coinbase bribe (mirrors the 21.2 sell verdict).
-  5. **Live close on the 21-07 retry only:** the LIVE deliberate-public-buy landing + LIVE multi-builder inclusion close ONLY on the Phase-21 21-07 real-capital retry artifacts + next-snipe telemetry (D-EVIDENCE-BAR); the fork (no relay) proves the surrounding buy then register then monitor wiring. The 21-07 retry then also finally exercises the unproven 21.2 SELL leg live.
-**Plans**: 7 plans (Wave 0 foundation + 2 parallel Wave-1 + Wave-2 integration + Wave-3 fork+checkpoint + Wave-4 STOP-THE-LINE-06 gap-closure + Wave-5 code-review gap-closure)
-
-  **Wave 0** *(no deps; foundation — env knobs + ABI fragment + Nyquist stubs; REQUIREMENTS rows formalized by the planner):*
-  - [x] 21.3-00-PLAN.md — register all new env knobs in config.ts + .env.example (MEV_BUILDERS / MEV_BUY_TARGET_BLOCKS / MEV_BUY_MAX_PRIORITY_FEE_GWEI / DELIBERATE_BUY_PRIVATE_ATTEMPTS / DELIBERATE_BUY_SLIPPAGE_PCT / DELIBERATE_BUY_GAS_BUFFER + RESERVED MEV_BUY_COINBASE_BRIBE_ENABLED) + add the fee-on-transfer-safe BUY fragment to ROUTER_ABI + 4 Nyquist it.skip stub files [STOP-THE-LINE-05-A/B/C/D]
-
-  **Wave 1** *(after Wave 0; parallel — zero file overlap):*
-  - [x] 21.3-01-PLAN.md — multi-builder raw eth_sendBundle fanout (the library drops `builders` then raw RPC + X-Flashbots-Signature) + multi-block targeting (sign once, same bytes to N blocks) + getBundleStatsV2 telemetry (flashbots.ts) + independent MEV_BUY_MAX_PRIORITY_FEE_GWEI buy ceiling on buildReconcileConfig('buy') (reconciliation.ts) [STOP-THE-LINE-05-A, STOP-THE-LINE-05-D]
-  - [x] 21.3-02-PLAN.md — mode-aware entry-affordability gate: deliberate reserves its own public-fallback buy gas (computeWorstCasePublicExitGas, approvalGasLimit:0n, DELIBERATE_BUY_GAS_BUFFER); snipe reserves zero (preflight.ts) [STOP-THE-LINE-05-C]
-
-  **Wave 2** *(after Waves 0+1; integration):*
-  - [x] 21.3-03-PLAN.md — escalatePrivateBuy (mirror escalatePrivateSell, txManager.ts) + bot.ts mode threading + the inverted no-double-buy guard (reconcile the REAL broadcast hash; included/landed-not-ours/inconclusive abort; stricter balanceOf+nonce) + snipe fail-clean stats alert + the exported executeDeliberateBuy + scripts/deliberate-buy.ts (the explicit operator entry point; capture-launch.ts stays READ-ONLY) [STOP-THE-LINE-05-B, STOP-THE-LINE-05-C, STOP-THE-LINE-05-D]
-
-  **Wave 4** *(gap-closure — STOP-THE-LINE-06, surfaced by the 21.3-04 fork-rehearsal gate; operator chose fix-within-phase; runs BEFORE 21.3-04 can pass):*
-  - [x] 21.3-05-PLAN.md — STOP-THE-LINE-06 (CONFIRMED capital-safety): executeDeliberateBuy lands a buy but never arms the exit monitor / anti-rug (snapshotLpBaseline + registerAntiRugPosition + startExitMonitor) → a landed deliberate position was UNMONITORED + rug-unprotected + silently dropped from the anti-rug restart-resume (no lp_baseline row). Fix: extract a shared armPositionMonitoring helper from the snipe handler, refactor the V2 snipe handler to use it (behavior-preserving), and arm it on every landed deliberate-buy branch (RED-proven) [STOP-THE-LINE-05-B] (gap_closure)
-
-  **Wave 5** *(code-review gap-closure — the deep gsd-code-review surfaced 1 Critical + 1 High + 3 Warn capital-safety findings the green suite + verifier missed; operator chose fix-within-phase RED-proven):*
-  - [x] 21.3-06-PLAN.md — CR-01 (deliberate gate validated chain.snipeAmount not the operator's amountInWei → unexitable-position risk) + HI-01 (public leg pre-broadcast affordability re-check) + WR-01 (capture reconcile hash before the raw fanout → no LADYS false-negative) + WR-02 (balanceOf delta not absolute) + WR-03 (guard the public quote) + IN-01/02/03 cleanups; each RED-proven [STOP-THE-LINE-05-B/C/D] (gap_closure)
-
-  **Wave 3** *(pre-21-07 gate; depends on everything incl. 21.3-05; autonomous:false):*
-  - [x] 21.3-04-PLAN.md — deliberateBuyReplay fork wiring proof (buy then register then monitor; no relay then private falls to public) + the D-EVIDENCE-BAR operator checkpoint before the 21-07 retry resumes [STOP-THE-LINE-05-A/B/C/D] (autonomous: false) — fork 2/2 GREEN (real hash + trades row + anti-rug registered + exit monitor armed); operator ACKNOWLEDGED D-EVIDENCE-BAR 2026-05-29
-
-  **Cross-cutting constraints (inherited):**
-  - **D-QUALITY-FIRST [USER-BINDING]:** at every choice pick the better+safer+higher-quality option regardless of LOC; "minimal surface / least code / simplest" is NOT a tiebreaker
-  - **D-STOP-THE-LINE:** any NEW bug surfaced during execution escalates to a fresh STOP-THE-LINE / decimal phase — NOT fix-in-flight, NOT file-and-defer
-  - **D-EVIDENCE-BAR:** the calm-gas live behaviour closes ONLY on the 21-07 real-capital retry artifacts (Etherscan hash / DB / pino excerpt); fork/mock proves wiring only
-  - **D-ENV-EXAMPLE / D-ALERTS / D-ROLLBACK:** every new env var lands in .env.example with a default + 1-line desc; structured pino + Telegram on every failure/fallback/ceiling-hit; the public fallback is an engine path, not a bypass flag
+- [ ] Multi-chain rollout — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (HONEY-04, plan 18-08 + contractual re-audit; redeploy ETH with 18-REVIEW-FIX hardening) + BSC/Base/Arb V3 anti-rug allowlists (ANTIRUG-15).
+- [ ] Candidates: CHAIN-05 fully-dynamic capital allocation · DETECT-01 mempool/block-0 sniping · OPS-V2-01 synthetic-monitor canary-trade watchdog.
 
 ## Progress
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1. Bug Fixes & Hardening | v6.16 | 4/4 | Complete | 2026-03-20 |
-| 2. ethers v6 Migration | v6.16 | 2/2 | Complete | 2026-03-21 |
-| 3. SQLite Storage & Code Quality | v6.16 | 4/4 | Complete | 2026-03-22 |
-| 4. Multi-Chain Architecture | v6.16 | 5/5 | Complete | 2026-03-24 |
-| 5. Uniswap V3 Integration | v6.16 | 4/4 | Complete | 2026-03-25 |
-| 6. Risk Management | v6.16 | 2/2 | Complete | 2026-03-25 |
-| 7. Smart Exit Strategies | v6.16 | 4/4 | Complete | 2026-03-26 |
-| 8. Monitoring & Web Dashboard | v6.16 | 6/6 | Complete | 2026-03-28 |
-| 9. Testing Infrastructure | v6.16 | 5/5 | Complete | 2026-03-28 |
-| 10. partial_sell Revenue Fix | v6.16 | 2/2 | Complete | 2026-03-30 |
-| 11. Dashboard Accuracy & Bot Wiring | v6.16 | 7/7 | Complete | 2026-04-05 |
-| 12. Integration Gap Fixes | v6.16 | 3/3 | Complete | 2026-04-06 |
-| 13. Config Env-Var Correctness | v6.16 | 1/1 | Complete | 2026-04-06 |
-| 14. Sell Revenue Receipt Decoding | v6.16 | 2/2 | Complete | 2026-04-07 |
-| 15. Chain-Scoped Dedup & Dashboard Env | v6.16 | 2/2 | Complete | 2026-04-13 |
-| 16. Dashboard Type Alignment & Dead Code Cleanup | v6.16 | 2/2 | Complete | 2026-04-13 |
-| 17. Tech Debt Cleanup & Audit Baseline | v6.17 | 3/3 | Complete | 2026-04-30 |
-| 18. Honeypot Detection Rebuild | v6.17 | 10/11 | In Progress|  |
-| 19. Anti-Rug Runtime Monitoring | v6.17 | 10/10 | Complete   | 2026-05-24 |
-| 20. Going-Live Ops Hardening | v6.17 | 12/12 | Complete    | 2026-05-26 |
-| 21. Exit-Engine Live-Runtime Hardening | v6.17 | 8/8 | Complete (2026-05-29: the 21-07 real-capital roundtrip captured all 6 deferred v6.16 items LIVE — buy via the 21.3 multi-builder fanout [STOP-THE-LINE-05 resolved], sell via the engine's own urgency-market-sell landing PRIVATE at calm gas [sell 0xcc7997bb, amount_out 993814525259157]; 21-08 captured EXIT-LIVE-06/07 + consolidated EXIT-LIVE-11 [EXIT-LIVE-02 fork-only per sc-1(b)]; 21.2 sell leg + 21.1 reconcile validated live; residual cosmetic dashboard display defect → 21.4, non-blocking) | 2026-05-29 |
-| 21.1. V3-Buy Tax-Gate + Flashbots Inclusion Fix | v6.17 | 6/6 | Complete (verifier 10/10; +deep-review fix CR-01/WR-01; full gate GREEN — unit 614/integration 216/fork 39, tsc ×3 clean; 1 by-design human-UAT = 21-07 real-relay, operator-gated) | 2026-05-27 |
-| 21.2. Calm-Gas Sell Inclusion + Exit-Engine Robustness | v6.17 | 13/13 | Complete (all 4 STOP-THE-LINE-04 findings delivered + fork-rehearsed; verifier 4/4 criteria + 42/42 must-haves; D-EVIDENCE-BAR operator-acknowledged 2026-05-28. The gates EARNED their keep: the 21.2-10 fork-rehearsal SURFACED capital-safety gap S-1 [failed-still-held dropped on restart → fixed in 21.2-11]; the deep code-review SURFACED 2 CRITICALs the green suite missed [CR-01 worker re-entrant-lock deadlock + CR-02 no-double-sell phantom-hash → fixed in 21.2-12] + 6 warnings [→ 21.2-13]; the re-review SURFACED 3 fix-introduced findings [NF-01 HIGH + NF-02/03 → fixed in 21.2-14]. Final gate GREEN: unit 710 / integration 216 / fork exitStatePersistence 3/3 / tsc ×3 clean. By-design operator-gated: live calm-gas Flashbots inclusion + private→public transition [EXIT-LIVE-03/04/05] close ONLY on the Phase-21 21-07 real-capital retry [D-EVIDENCE-BAR]. captureRehearsal fork assertion env-throttled [pre-existing, Alchemy]) — STOP-THE-LINE-04 (Flashbots sell non-inclusion at calm gas + freeze-on-ceiling-hit + 222s poll-block + anti-rug-unregister-of-held-position) | 2026-05-28 |
-| 21.3. Buy-Leg Calm-Gas Flashbots Inclusion + Guaranteed-Inclusion Fallback | v6.17 | 7/7 | Complete (verifier 12/12 must-haves [3 by-design operator-gated, D-EVIDENCE-BAR acknowledged 2026-05-29]; the gates EARNED their keep: the 21.3-04 fork-rehearsal gate SURFACED STOP-THE-LINE-06 [executeDeliberateBuy left a landed position unmonitored/rug-unprotected → fixed in 21.3-05 via a shared armPositionMonitoring helper, RED-proven]; the deep gsd-code-review SURFACED 1 Critical [CR-01: deliberate gate priced chain.snipeAmount not the operator's amountInWei → unexitable-position risk on the 21-07 path] + 1 High [HI-01: no pre-broadcast public re-check] + 3 Warn [WR-01 reconcile-hash-after-fanout LADYS false-negative; WR-02 absolute-balanceOf; WR-03 unguarded quote] the green suite + verifier MISSED → all fixed RED-proven in 21.3-06; the re-review [21.3-REVIEW-2.md] confirmed all 5 closed with NO fix-introduced findings [0 Crit/High/Warn]. Also fixed a post-merge flashbots INTEGRATION harness gap [test-only, 0b31e06]. Final gate GREEN: unit 755/755, integration 216/216, fork deliberateBuyReplay 2/2, tsc ×2, preflight 6/6. BY-DESIGN operator-gated [D-EVIDENCE-BAR]: LIVE deliberate-public landing + LIVE multi-builder inclusion + the unblocked 21.2 sell leg close on the Phase-21 21-07 real-capital retry + next-snipe getBundleStatsV2 telemetry → 21.3-HUMAN-UAT.md) | 2026-05-29 W0+W1+W2 done; W3 21.3-04 fork-rehearsal gate SURFACED STOP-THE-LINE-06 — a CONFIRMED capital-safety gap: executeDeliberateBuy lands a buy but never arms the exit monitor / anti-rug, leaving a deliberate position unmonitored + rug-unprotected [falsified 21.3-04 must_have #1]; operator chose fix-within-phase → W4 gap plan 21.3-05 CLOSED it 2026-05-29: extracted a shared armPositionMonitoring helper [snipe handler + executeDeliberateBuy both call it, can't drift], RED-proven, all 3 landed deliberate branches now arm startExitMonitor + lp_baseline + anti-rug; full unit 739/739, snipe botWiring regression 10/10, tsc ×2 clean. W3 21.3-04 then re-ran GREEN: deliberateBuyReplay fork proof 2/2 (real hash + trades row + anti-rug registered + exit monitor armed via the shared helper); operator ACKNOWLEDGED D-EVIDENCE-BAR. Post-merge: a full-suite verification surfaced 7 stale flashbots INTEGRATION harnesses (mevStrategies/txManager mocked the library sendBundle but not the 21.3-01 raw eth_sendBundle FetchRequest path; unit-only gates had missed them) → reconciled test-only (no assertion/prod change; no-double-spend coverage restored), integration back to 216/216 (commit 0b31e06). Full green: unit 739/739, integration 216/216, fork deliberateBuyReplay 2/2, tsc ×2, preflight 6/6. LIVE deliberate-public landing + multi-builder inclusion + the 21.2 sell leg remain operator-gated to the 21-07 retry (D-EVIDENCE-BAR). Pending: phase verification + close. W0 21.3-00 foundation: 6 buy-inclusion env knobs + RESERVED bribe knob + FoT BUY ABI fragment + 4 Nyquist it.skip stubs. W1 21.3-01: multi-builder raw eth_sendBundle fanout + multi-block targeting + getBundleStatsV2 telemetry [flashbots.ts] + independent MEV_BUY_MAX_PRIORITY_FEE_GWEI ceiling [reconciliation.ts; CR-01 clamp NOT regressed] ∥ 21.3-02: mode-aware entry-affordability gate [preflight.ts; deliberate reserves public-buy gas via computeWorstCasePublicExitGas approvalGasLimit:0n, snipe byte-unchanged]. W2 21.3-03 integration done 2026-05-29: escalatePrivateBuy [txManager.ts, mirror of the sell, BroadcastHandle no-pre-sign] + executeDeliberateBuy [bot.ts, the ONLY public-buy site] with the inverted no-double-buy guard [reconciles the REAL broadcast hash; included/landed-not-ours/reverted→fail-closed; not-landed→stricter chain-truth balanceOf==0 AND nonce-not-consumed] + snipe fail-clean stats alert [zero spend, no trades row] + scripts/deliberate-buy.ts [operator-only; capture-launch.ts stays READ-ONLY]. Gate GREEN: full unit 733 pass/0 skip, tsc ×2 clean, no-double-SELL regression green. Remaining: W3 21.3-04 fork+checkpoint (autonomous:false). 5 plans / 4 waves; STOP-THE-LINE-05-A/B/C/D formalized in REQUIREMENTS.md. Buy fix = hardened PRIVATE inclusion: multi-builder raw eth_sendBundle fanout [the library drops `builders` then raw RPC] + multi-block targeting + independent buy ceiling; snipes stay private + fail clean; explicit operator deliberate path goes private-first then public; no-double-BUY reconcile + mode-aware affordability gate; per-builder getBundleStatsV2 telemetry. LIVE deliberate-public landing + multi-builder inclusion operator-gated to the 21-07 retry + next-snipe telemetry [D-EVIDENCE-BAR]. Next: /gsd-execute-phase 21.3) | - |
+| Milestone | Phases | Status | Shipped |
+|-----------|--------|--------|---------|
+| v6.16 Production-Ready Multi-Chain MEV Sniper | 1–16 (55 plans) | ✅ Complete | 2026-04-14 |
+| v6.17 Defensive Hardening for Live Mainnet | 17–21 + 21.1/21.2/21.3 (69 plans) | ✅ Complete (ETH-first) | 2026-05-29 |
+| Next milestone | TBD | 📋 Planning | — |
+
+Per-phase detail for shipped milestones lives in the `milestones/` archives.
 
 ---
-*Last updated: 2026-05-29 — Phase 21.3 PLANNED via /gsd-plan-phase 21.3: STOP-THE-LINE-05-A/B/C/D formalized in REQUIREMENTS.md (umbrella STOP-THE-LINE-05 = union); 5 plans across 4 waves authored (00 foundation + 01/02 parallel + 03 integration + 04 fork+checkpoint); VALIDATION.md Per-Task Verification Map + Wave-0 populated (nyquist_compliant:true). Buy fix = hardened PRIVATE inclusion (multi-builder raw eth_sendBundle fanout — the installed library drops the `builders` field, so a raw RPC reusing signBundle + X-Flashbots-Signature — + multi-block targeting + independent MEV_BUY_MAX_PRIORITY_FEE_GWEI ceiling); snipes stay private + fail clean; explicit operator deliberate path (scripts/deliberate-buy.ts) goes private-first then public with an inverted no-double-buy guard + mode-aware affordability gate. LIVE items operator-gated to the 21-07 retry (D-EVIDENCE-BAR). orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete).*
-*Last updated: 2026-05-24 — Phase 20 plan 20-00 complete: 14 Wave-0 vitest test stubs (37 unit + 29 integration = 66 it.skip) shipped covering OPS-LIVE-01..11 + schema v5→v6 migration; D-04 observable-effect rigor preserved (concrete pino fields / process.exit codes / SQLite rows / broadcast events in every reason string); D-09 .todo ban CI guard preserved (0 .todo matches); full unit suite 487 passed + 37 skipped; full integration suite 169 passed + 29 skipped; tsc clean ×3. Plans 20-02..05 unblocked — implementation plans flip skip→it per per-file ownership map in 20-00-SUMMARY.md.*
+*Last updated: 2026-05-29 — v6.17 milestone closed (ETH-first); ROADMAP collapsed to milestone groupings, full phase detail archived in milestones/v6.17-ROADMAP.md. orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete — they corrupt this shape).*

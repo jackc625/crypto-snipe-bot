@@ -72,3 +72,54 @@ Deferred pending live-network validation:
 - Audit: [milestones/v6.16-MILESTONE-AUDIT.md](milestones/v6.16-MILESTONE-AUDIT.md)
 
 ---
+
+## v6.17 — Defensive Hardening for Live Mainnet
+
+**Shipped:** 2026-05-29 (ETH-first — `ENABLED_CHAINS=eth`)
+**Timeline:** 2026-04-14 → 2026-05-29 (45 days)
+**Scope:** 8 phases (17–21 + inserted 21.1/21.2/21.3) · 69 plans completed (1 deferred) · ~170 code files (+45,384 / −661 in src/test/scripts) · 491 commits
+**Git range:** `c848f8c` → `daf8f4e` (tag `v6.17`)
+**Requirements:** 68/70 satisfied · 1 deferred (HONEY-04) · 1 partial-deferred (ANTIRUG-15)
+
+### Delivered
+
+Made the bot safe to run with real money on live **Ethereum** mainnet. Rebuilt
+the broken pre-buy safety stack (on-chain `HoneypotChecker.sol`), added anti-rug
+runtime monitoring, hardened the full buy→monitor→exit lifecycle against
+calm-gas non-inclusion / nonce collisions / event-loop freeze / failed-exit
+position loss, formalized the going-live ops path, and **closed the 6 deferred
+v6.16 human-verification items with real-mainnet artifacts** via a live
+real-capital roundtrip.
+
+### Key Accomplishments
+
+1. **Pre-buy safety stack rebuilt** — deployed Etherscan-verified on-chain `HoneypotChecker.sol` (V2+V3) at `0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD`; deleted the broken V2/V3 sell-sims; discriminated-union `HoneypotResult` with fail-closed `unknown` makes a vacuous-pass regression unrepresentable. Slither + Mythril clean.
+2. **Anti-rug runtime monitoring (DETECT-02)** — single-listener-per-chain WS detector with multi-signal AND-chain logic (V2 + V3), allowlist + confirm-after-N-blocks, per-chain circuit breaker, 7-day dry-run default, WS heartbeat + reconnect + backfill.
+3. **Going-live ops hardening** — `src/preflight.ts` fail-fast (wallet floor, RPC chainId/block-age, MEV health, checker code-at-address, cross-env rules); SQLite-persisted multi-stage kill-switch; `npm run preflight|pause|resume`; consolidated runbook + CI guards.
+4. **Exit-engine live-runtime hardening** — closed all 6 deferred v6.16 items with ground-truth artifacts (Etherscan hash, DB `amount_out`, pino excerpts, dashboard screenshot). Sell tx `0xcc7997bb…619bc605`, `amount_out = 993814525259157`. Dotted `op`-field log taxonomy; real-launch fork fixtures + `ALLOW_REAL_MAINNET` test gate.
+5. **Three STOP-THE-LINE decimal phases (21.1/21.2/21.3)** — fixed the V3 tax-gate + Flashbots false-negative reconciliation; calm-gas sell inclusion + bot-wide nonce authority + watchdog/two-stage-SIGINT + failed-exit position protection; calm-gas buy inclusion via hardened-private multi-builder fanout (snipes never go public). Each surfaced by — and gated by — real-capital live-capture attempts.
+6. **Tech debt closed (Phase 17)** — CI baseline disproved the stale "37 `.todo` / 6 TS-error" v6.16 claims (actual 0/0); 9-phase retroactive Nyquist; evergreen CI invariant guards.
+
+### Quality-Gate Track Record
+
+The deep code-review + fork-rehearsal gates repeatedly caught **capital-safety bugs the green unit suite missed** (masked by mocking the mechanism under test): 21.1 CR-01 (fee-ceiling bypass), 21.2 S-1/CR-01/CR-02/NF-01, 21.3 STOP-THE-LINE-06/CR-01, and the milestone-audit **INT-NONCE-SELL** (private sell bypassed `withNonceLock` — fixed inline at close, RED-proven, full unit 759/759). Real-path integration checks + RED-proven tests are the reliable defense; the green suite alone is not.
+
+### Known Deferred / Carried Forward
+
+- **HONEY-04** — BSC/Base/Arb `HoneypotChecker.sol` deploy (plan 18-08, operator-deferred 2026-05-22; contractual re-audit trigger preserved; fail-closed — those chains refuse to boot).
+- **ANTIRUG-15** — BSC/Base/Arb V3 anti-rug allowlists (ETH resolved). Tied to the same multi-chain rollout.
+- ETH `HoneypotChecker` runs pre-18-REVIEW-FIX bytecode (immutable; hardening reaches chains via 18-08's fresh deploy).
+- V3 exit has no public-mempool fallback (fail-loud, held + monitored, anti-rug fires).
+- Two RESERVED coinbase-bribe knobs (sell + buy) unimplemented.
+
+### Archives
+
+- Roadmap: [milestones/v6.17-ROADMAP.md](milestones/v6.17-ROADMAP.md)
+- Requirements: [milestones/v6.17-REQUIREMENTS.md](milestones/v6.17-REQUIREMENTS.md)
+- Audit: [milestones/v6.17-MILESTONE-AUDIT.md](milestones/v6.17-MILESTONE-AUDIT.md)
+- Live-capture evidence: [milestones/v6.17-VERIFICATION-EVIDENCE.md](milestones/v6.17-VERIFICATION-EVIDENCE.md)
+- Honeypot-checker audit: [milestones/v6.17-honeypot-checker-audit.md](milestones/v6.17-honeypot-checker-audit.md)
+- Safety-bank audit: [milestones/v6.17-safety-bank-audit.md](milestones/v6.17-safety-bank-audit.md)
+- Debt baseline: [milestones/v6.17-debt-baseline.md](milestones/v6.17-debt-baseline.md)
+
+---
