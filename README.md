@@ -137,7 +137,7 @@ These are the architectural decisions that read well in interviews:
 
 - **Capability-split deploy key.** `DEPLOY_PRIVATE_KEY` is a deliberately-scoped wallet that exists only to deploy the checker contract. The bot wallet's `PRIVATE_KEY` cannot push a new checker. If the bot wallet leaks, the attacker drains positions but cannot deploy a malicious checker at the trusted address.
 
-- **Restart-survivable exit state machine.** The unified exit engine writes the full `ExitStateData` row to `exit_state` every poll cycle. On boot, `resumeMultiChainMonitoring` reconstructs every exit monitor by reading the open trades back out of SQLite, calling `getExitState(trade_id)`, and continuing from the persisted high-water mark, completed tiers, and volatility samples. The bot wears its own state correctly even after a SIGKILL.
+- **Restart-survivable exit state machine.** The unified exit engine writes the full `ExitStateData` row to `exit_state` every poll cycle. On boot, `resumeMultiChainMonitoring` reconstructs every exit monitor by reading the open trades back out of SQLite, calling `getExitState(trade_id)`, and continuing from the persisted high-water mark, completed tiers, and volatility samples. The `balanceOf` guard is the source of truth: a position whose balance is ~0 is left closed and never resurrected, while a still-held position stamped `exit_failed_held` is re-armed regardless of its `trades.status`.
 
 - **Per-token sell mutex.** Composite `chain:token` key with check-and-set in a single event-loop tick. This eliminates the case where two interval callbacks both decide to sell in the same tick — which single-threaded JavaScript otherwise allows when both callbacks resolve their awaits at the same `process.nextTick` boundary.
 
@@ -370,13 +370,15 @@ The Telegram listener is a separate MTProto user-account client (not the outboun
 
 ### Restart and Resume Flow
 
-The single most important reliability property of the bot is that exit monitors survive a crash. The `resumeMultiChainMonitoring(contexts)` function runs as part of the boot sequence in `src/bot.ts:836-880`. It queries `trades WHERE status='pending' AND action='buy'` to get every open position, then for each pending row:
+The single most important reliability property of the bot is that exit monitors survive a restart. The `resumeMultiChainMonitoring(contexts)` function runs as part of the boot sequence in `src/bot.ts:836-880`. It queries `trades WHERE status='pending' AND action='buy'` to get every open position, then for each pending row:
 
 - Looks up the current wallet balance of the position's token via `erc20.balanceOf(wallet.address)`.
 - If the balance is non-zero, calls `resumeExitMonitor(...)` which reads the persisted `exit_state` row keyed by `trade_id`, deserializes the volatility samples, the completed tiers, the high-water mark, and the urgency anchor, then opens a fresh 5s `setInterval` continuing from exactly that state.
 - If the balance is zero, marks the row `failed` (the position was sold while the bot was down, or the buy itself never settled).
 
-The implication is operational: the operator can SIGKILL the bot, restart from a fresh process, and the exit engine resumes every position at its persisted high-water mark, completed-tier set, and volatility window. The bot's view of "where each position is on its exit curve" is durable. This is the single most-tested property of the runtime — the integration suite includes `exitMonitor.test.ts` and the v6.16 acceptance criteria included restart-survives behavior tests across every exit branch.
+The implication is operational: the operator can stop the bot, restart from a fresh process, and the exit engine resumes every position at its persisted high-water mark, completed-tier set, and volatility window. This is among the most-tested properties of the runtime — the integration suite includes `exitMonitor.test.ts` and the v6.16 acceptance criteria included restart-survives behavior tests across every exit branch.
+
+One scope note, because an earlier version of this section overstated it: those tests perform a module-level restart, not an OS signal. The acceptance criteria deliberately exclude an uncatchable kill — at `synchronous=NORMAL` a hard kill races the WAL flush, so the last write before a `SIGKILL` is not guaranteed durable (see `src/utils/db.ts`). Resume after a hard kill has been observed once in practice; it is not a tested guarantee.
 
 The mirror image is the dashboard's "stop chain" and "start chain" flow. Stopping a chain removes its WebSocket listeners but **keeps** its providers and exit monitors alive — open positions continue to be monitored and sold. Restarting a chain runs the `onRestart(ctx)` closure built by the orchestrator: re-attach WebSocket, re-run MEV health check, re-attach DEX listeners. Warnings (e.g. WebSocket reconnect failed, MEV strategy unhealthy) are surfaced through a returned array and rendered on the chain's status card on the dashboard.
 
