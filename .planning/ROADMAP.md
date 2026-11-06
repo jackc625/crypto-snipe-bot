@@ -144,22 +144,21 @@ Config granularity `fine` applies to plan sizing, not phase count.
 **Plans**: 29 plans in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
 
 Plans:
+**Wave 1**
 - [ ] 22-01-PLAN.md — SAFE-01 local backup: backup-state.ts with fixture self-check, verified dated backup + archive, phase-start SHA
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 22-02-PLAN.md — betterleaks v1.10.0 provenance (operator check), D-22 exact-value checker, secret scan of the backup
-- [ ] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
 - [ ] 22-04-PLAN.md — audit register tooling (PROTOCOL, slices, check/render) and the D-23 pre-phase records, OD-21 card
 - [ ] 22-05-PLAN.md — SAFE-02 setup-layer rails (one CommonJS module), sentinel env with fork-mode shell keys, vitest wiring, npm test re-scope (no Vitest run)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
 - [ ] 22-06-PLAN.md — forensic two-image report on a backup copy of the live DB; register and escalate test-origin rows
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 22-07-PLAN.md — OD-21: commit ignition/deployments, blob hashes equal the manifest, scoped ignore rules
 - [ ] 22-08-PLAN.md — first railed Vitest run: verify-prod-untouched wrapper, spawnRailedChild, setup-layer rail tests + RED proofs
-- [ ] 22-09-PLAN.md — SAFE-05 DB guards: repo-root anchoring, VITEST src tripwire, read-only version probe, refuse-to-create, npm run db:init
-- [ ] 22-10-PLAN.md — notifier refusal via the catch path (D-04 amended) and VITEST-gated dotenv sites, with RED proofs
-- [ ] 22-11-PLAN.md — spawn sites onto spawnRailedChild, AST spawn gate, shell-only fork RPC resolver in globalSetup and every fork worker
-- [ ] 22-12-PLAN.md — SAFE-03 duplicate-load guards (epoch registry) on the four singletons + casing flag in every tsconfig
-- [ ] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
-- [ ] 22-14-PLAN.md — SAFE-06 vi.mock specifier gate (TS AST) + CI step
-- [ ] 22-15-PLAN.md — full railed npm test green with recorded edits; AC-19 proof; RED-proof index
-- [ ] 22-16-PLAN.md — SAFE-07 capture-baselines.ts (isolated pre-rail export) and committed before-baselines
 - [ ] 22-17-PLAN.md — audit BUY/detection slice (RC-01/02/04/05/09/16/20/24, OD-6/15/16)
 - [ ] 22-18-PLAN.md — audit EXIT slice (RC-03/07/08/15/21, OD-14)
 - [ ] 22-19-PLAN.md — audit ANTIRUG slice (RC-13, OD-9)
@@ -170,9 +169,41 @@ Plans:
 - [ ] 22-24-PLAN.md — audit integration/fork tests, helpers, fixtures (RC-28)
 - [ ] 22-25-PLAN.md — audit scripts, contracts tooling and root configs (RC-27, out-of-process signers)
 - [ ] 22-26-PLAN.md — full-history secret scan and signing-site census (N)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 22-09-PLAN.md — SAFE-05 DB guards: repo-root anchoring, VITEST src tripwire, read-only version probe, refuse-to-create, npm run db:init
 - [ ] 22-27-PLAN.md — codex/agy code-only second opinion on the money slices (operator one-way decision) + union merge
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 22-10-PLAN.md — notifier refusal via the catch path (D-04 amended) and VITEST-gated dotenv sites, with RED proofs
 - [ ] 22-28-PLAN.md — consolidation: RC map, duplicates, 20x5 matrix, thresholds, OD-26+ numbering, rendered register
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 22-11-PLAN.md — spawn sites onto spawnRailedChild, AST spawn gate, shell-only fork RPC resolver in globalSetup and every fork worker
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 22-12-PLAN.md — SAFE-03 duplicate-load guards (epoch registry) on the four singletons + casing flag in every tsconfig
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 22-14-PLAN.md — SAFE-06 vi.mock specifier gate (TS AST) + CI step
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [ ] 22-15-PLAN.md — full railed npm test green with recorded edits; AC-19 proof; RED-proof index
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [ ] 22-16-PLAN.md — SAFE-07 capture-baselines.ts (isolated pre-rail export) and committed before-baselines
+
+**Wave 13** *(blocked on Wave 12 completion)*
 - [ ] 22-29-PLAN.md — re-audit of rail diffs, new-file ledger, phase-end NAC and Ignition checks, fork obligations, final check and render
+
+**Cross-cutting constraints:** <!-- gsd:generated -->
+- D-21: Node 22.16.0 for every command
+- AC-33 / NAC-13: commits change nothing outside .planning/ and fix nothing
+- D-16: immediate-tier items stop at once; S1 entries are presented together at the area checkpoint; AC-33 / NAC-13: nothing outside .planning/ changes and nothing is fixed
+- P9 anti-anchoring: evidence only from code at audit_base_sha or command output
 
 ### Phase 23: Test Safety Net (Harness, Triage, Characterization)
 **Goal**: A real-path test harness exists, and every research candidate has been proven (RED) or disproven (NOT-A-BUG) on it. Current trading behavior, known bugs included and tagged, is then locked by a golden-master decision trace. From then on, every mechanical commit is provably behavior-neutral, and every behavior change can be traced to a decision. The phase is test-only: no change to `src/` behavior.
