@@ -31,15 +31,31 @@ money to preventable bugs, race conditions, or security flaws.
 - 759/759 unit + 216 integration + mainnet-fork suites green; tsc clean ×3; GitHub Actions CI
 - **Shipped config: `ENABLED_CHAINS=eth`** — BSC/Base/Arbitrum fail-closed (refuse to boot without a deployed checker address)
 
-## Next Milestone: Planning
+## Current Milestone: v7.0 Full Audit & Modernization
 
-v6.17 shipped ETH-first. The next milestone is not yet scoped. Two committed
-carry-forward items lead the backlog:
+**Goal:** Bring the codebase up to a modern quality bar — a fresh-eyes
+adversarial audit followed by a deep cleanup of structure, bugs, code quality,
+tests, dependencies, tooling, and CI — without changing trading behavior except
+by explicit operator decision, then re-prove it with a live mainnet roundtrip
+before the bot trades again.
 
-- **Multi-chain rollout** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (**HONEY-04**, plan 18-08 + contractual re-audit; redeploy ETH with the 18-REVIEW-FIX Solidity hardening) and resolve the BSC/Base/Arb V3 anti-rug allowlists (**ANTIRUG-15**).
-- Then candidate offensive/quality work: CHAIN-05 fully-dynamic capital allocation, DETECT-01 mempool/block-0 sniping, OPS-V2-01 synthetic-monitor canary-trade watchdog.
+**Target features:**
+- **Full audit** — adversarial review of `src/`, `dashboard/`, tests, scripts, and tooling producing a findings register; covers correctness bugs *and* questionable design (thresholds, race windows, fragile patterns). Behavior-changing findings surface as explicit operator decisions.
+- **Deep restructure** — split `bot.ts` (2,361 lines) / `anti-rug/detector.ts` (2,295) / `exitEngine.ts` (2,045) into focused modules; reorganize `src/` by domain (detection, safety, execution, exit, anti-rug, api); dissolve the `utils/` grab-bag. Behavior locked first by characterization tests.
+- **Code quality** — zero ESLint errors under type-checked rules (baseline: 350 errors / 22 warnings, incl. 26 floating + 16 misused promises); eliminate unsafe `any`, dead code, unused vars.
+- **Bug fixes** — every confirmed bug fixed in-milestone; capital-safety findings get D-STOP-THE-LINE treatment with RED-proven real-path tests (never auto-deferred).
+- **Dependency + tooling modernization** — all majors to latest (Hardhat 3, TypeScript 7, Vitest 5, ESLint 10, chai 6, better-sqlite3 13, …); replace `ts-node`; add a formatter; drop `--legacy-peer-deps`; clear all prod `npm audit` vulns (baseline: 11 prod, 1 critical / 67 total).
+- **Test-suite quality** — rewrite tests that mock the mechanism under test into real-path tests; prune dead/duplicate tests.
+- **CI hardening** — gates fail on lint error, format drift, prod-dep vuln, type error, and a coverage floor on money paths (buy / exit / anti-rug / nonce). Zero baseline, no allowlists.
+- **Dashboard, scripts, contracts tooling, repo hygiene** — same audit + cleanup; untrack `.DS_Store`/`.idea`, remove stale root files, fix `package.json` metadata.
+- **Docs** — current architecture / module map + README for a fast cold start.
+- **Re-proven live** — fork rehearsal + one small real-capital buy→monitor→sell on ETH mainnet after the restructure, before the bot goes back on.
 
-Run `/gsd-new-milestone` to scope it (questioning → research → requirements → roadmap).
+**Milestone constraints:**
+- Bot stays **off** (no live trading) until the milestone closes.
+- `ENABLED_CHAINS=eth` unchanged. Multi-chain (HONEY-04 / ANTIRUG-15) deferred to the next milestone, built on the cleaned codebase + Hardhat 3.
+- `HoneypotChecker.sol` contract source is out of scope (tooling only); its redeploy belongs to HONEY-04.
+- Trading behavior is preserved by default; any behavior change is an explicit, logged operator decision.
 
 <details>
 <summary>v6.17 milestone goals (shipped — archived)</summary>
@@ -84,16 +100,28 @@ All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md
 - ✓ MON-01, DASH-01..04 — health endpoint, dashboard positions / trades / risk / controls — v6.16
 - ✓ TEST-01..05 — unit, integration, and mainnet-fork test coverage — v6.16
 
-### Active
+### Active (v7.0 — Full Audit & Modernization)
 
-_v6.17 shipped 2026-05-29 (ETH-first). No milestone is currently scoped — run `/gsd-new-milestone`. Committed carry-forward, leading the backlog:_
+_Scoped requirements with REQ-IDs live in [REQUIREMENTS.md](REQUIREMENTS.md)._
 
-- [ ] **HONEY-04** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (plan 18-08; contractual re-audit when it ships; redeploy ETH with the 18-REVIEW-FIX Solidity hardening).
-- [ ] **ANTIRUG-15** — resolve BSC/Base/Arb V3 anti-rug allowlists (ETH already resolved).
+- [ ] Full adversarial audit of the codebase with a findings register (correctness + design)
+- [ ] Behavior locked by characterization tests before any structural change
+- [ ] Deep restructure: oversized files split, `src/` organized by domain, `utils/` dissolved
+- [ ] Zero ESLint errors under type-checked rules; no floating/misused promises
+- [ ] All confirmed bugs fixed; capital-safety findings RED-proven on the real path
+- [ ] All dependencies + tooling at latest majors; zero prod `npm audit` vulns; no `--legacy-peer-deps`
+- [ ] Mock-the-mechanism tests rewritten as real-path tests; dead tests pruned
+- [ ] Strict CI gates (lint, format, audit, types, money-path coverage floor)
+- [ ] Dashboard, scripts, contracts tooling, and repo hygiene cleaned
+- [ ] Architecture doc + README current
+- [ ] Live ETH mainnet roundtrip re-proven post-restructure
 
 ### Future
 
-<!-- Deferred to a future offensive milestone, not abandoned. -->
+<!-- Deferred to a future milestone, not abandoned. -->
+
+- **HONEY-04 multi-chain checker deploy** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (plan 18-08; contractual re-audit when it ships; redeploy ETH with the 18-REVIEW-FIX Solidity hardening). Deferred past v7.0 so it lands on the cleaned codebase + Hardhat 3.
+- **ANTIRUG-15** — resolve BSC/Base/Arb V3 anti-rug allowlists (ETH already resolved). Tied to HONEY-04.
 
 - **CHAIN-05 dynamic capital allocation** — fully-dynamic opportunity-quality-weighted allocation (fixed per-chain budgets shipped in v6.16; completes CHAIN-05)
 - **DETECT-01 mempool / block-0 sniping** — upgrade from block-mode to mempool pending-liquidity monitoring
@@ -182,6 +210,12 @@ _v6.16 reference: shipped 2026-04-14 after 26 days; 379 files, +87,015 / −71 a
 | D-EVIDENCE-BAR — fork pass never closes a deferred item | Real money needs a resolvable on-chain artifact, not a green fork test | ✓ Good (Phase 21; 6/6 items closed with live artifacts) |
 | Quality gates (deep code-review + fork rehearsal) over green-suite trust | The unit suite repeatedly masked capital-safety bugs by mocking the mechanism under test | ✓ Good (caught CR/S-1/INT-NONCE across 21.1/21.2/21.3 + audit) |
 | Ship v6.17 ETH-first; defer multi-chain deploy | Get real money safe on ETH now; BSC/Base/Arb fail-closed until HONEY-04 | ✓ Good (operator decision 2026-05-29) |
+| v7.0 is audit + cleanup only; multi-chain deferred again | Don't mix a mainnet contract deploy with a deep refactor; HONEY-04 lands on the cleaned codebase + Hardhat 3 | — Pending (operator decision 2026-11-06) |
+| Bot stays off for all of v7.0 | Frees deep money-path refactors; a fork rehearsal + live roundtrip is the re-entry gate | — Pending (operator decision 2026-11-06) |
+| Deep restructure over targeted splits | 2,000+ line files and a `utils/` grab-bag are the main source of sloppiness; characterization tests lock behavior first | — Pending (operator decision 2026-11-06) |
+| All dependencies to latest majors | Five months cold, 11 prod vulns; modernize once instead of piecemeal; research verifies compatibility | — Pending (operator decision 2026-11-06) |
+| Audit covers design, not just correctness; behavior changes are explicit operator decisions | Fresh-eyes review should question thresholds and race windows, but trading behavior must never change silently inside a refactor | — Pending (operator decision 2026-11-06) |
+| Version as v7.0 (major) | Restructure + toolchain overhaul marks a new generation of the codebase | — Pending (operator decision 2026-11-06) |
 
 ## Evolution
 
@@ -201,4 +235,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 after v6.17 milestone (Defensive Hardening for Live Mainnet, shipped ETH-first)*
+*Last updated: 2026-11-06 at v7.0 milestone start (Full Audit & Modernization)*
