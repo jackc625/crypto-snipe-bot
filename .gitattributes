@@ -1,0 +1,2 @@
+# GSD intel files are hash-tracked (.last-refresh.json); keep LF so checkouts do not fake drift
+.planning/intel/** text eol=lf
