@@ -80,7 +80,7 @@ npx tsc --noEmit
 
 ## Branch conventions
 
-The default branch is `master`. The `Tests` CI workflow (`.github/workflows/test.yml`) triggers on pushes and pull requests targeting both `main` and `master`, so either is accepted as a base branch.
+The default branch is `main` (renamed from `master` on 2026-11-06). The `Tests` CI workflow (`.github/workflows/test.yml`) triggers on pushes and pull requests targeting both `main` and `master`, so either is accepted as a base branch.
 
 No branch-naming convention is documented in the repository. No `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, or `.github/PULL_REQUEST_TEMPLATE.md` exists at the time of writing. <!-- VERIFY: any team-internal branch-naming or commit-message conventions maintained outside this repository -->
 
