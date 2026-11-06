@@ -148,13 +148,13 @@ Plans:
 - [ ] 22-02-PLAN.md — betterleaks v1.10.0 provenance (operator check), D-22 exact-value checker, secret scan of the backup
 - [ ] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
 - [ ] 22-04-PLAN.md — audit register tooling (PROTOCOL, slices, check/render) and the D-23 pre-phase records, OD-21 card
-- [ ] 22-05-PLAN.md — SAFE-02 setup-layer rails (one CommonJS module), sentinel env, vitest wiring, npm test re-scope (no Vitest run)
+- [ ] 22-05-PLAN.md — SAFE-02 setup-layer rails (one CommonJS module), sentinel env with fork-mode shell keys, vitest wiring, npm test re-scope (no Vitest run)
 - [ ] 22-06-PLAN.md — forensic two-image report on a backup copy of the live DB; register and escalate test-origin rows
 - [ ] 22-07-PLAN.md — OD-21: commit ignition/deployments, blob hashes equal the manifest, scoped ignore rules
 - [ ] 22-08-PLAN.md — first railed Vitest run: verify-prod-untouched wrapper, spawnRailedChild, setup-layer rail tests + RED proofs
 - [ ] 22-09-PLAN.md — SAFE-05 DB guards: repo-root anchoring, VITEST src tripwire, read-only version probe, refuse-to-create, npm run db:init
 - [ ] 22-10-PLAN.md — notifier refusal via the catch path (D-04 amended) and VITEST-gated dotenv sites, with RED proofs
-- [ ] 22-11-PLAN.md — spawn sites onto spawnRailedChild, AST spawn gate, shell-only fork RPC resolver
+- [ ] 22-11-PLAN.md — spawn sites onto spawnRailedChild, AST spawn gate, shell-only fork RPC resolver in globalSetup and every fork worker
 - [ ] 22-12-PLAN.md — SAFE-03 duplicate-load guards (epoch registry) on the four singletons + casing flag in every tsconfig
 - [ ] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
 - [ ] 22-14-PLAN.md — SAFE-06 vi.mock specifier gate (TS AST) + CI step
@@ -172,7 +172,7 @@ Plans:
 - [ ] 22-26-PLAN.md — full-history secret scan and signing-site census (N)
 - [ ] 22-27-PLAN.md — codex/agy code-only second opinion on the money slices (operator one-way decision) + union merge
 - [ ] 22-28-PLAN.md — consolidation: RC map, duplicates, 20x5 matrix, thresholds, OD-26+ numbering, rendered register
-- [ ] 22-29-PLAN.md — re-audit of rail diffs, new-file ledger, phase-end NAC checks, final check and render
+- [ ] 22-29-PLAN.md — re-audit of rail diffs, new-file ledger, phase-end NAC and Ignition checks, fork obligations, final check and render
 
 ### Phase 23: Test Safety Net (Harness, Triage, Characterization)
 **Goal**: A real-path test harness exists, and every research candidate has been proven (RED) or disproven (NOT-A-BUG) on it. Current trading behavior, known bugs included and tagged, is then locked by a golden-master decision trace. From then on, every mechanical commit is provably behavior-neutral, and every behavior change can be traced to a decision. The phase is test-only: no change to `src/` behavior.
