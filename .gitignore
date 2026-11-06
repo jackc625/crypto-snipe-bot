@@ -69,3 +69,10 @@ dashboard/src/**/*.js
 
 # GSD research fetch cache (local, regenerated)
 .planning/research/.cache/
+
+# graphify build output — derived from source, rebuild with /gsd-graphify build.
+# graphify-out/ is graphify's raw output; .planning/graphs/ is GSD's copy
+# (graph.json, graph.html, GRAPH_REPORT.md, local diff snapshot). Not tracked:
+# it churns heavily per rebuild and conflicts across per-phase branches.
+graphify-out/
+.planning/graphs/
