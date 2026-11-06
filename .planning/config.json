@@ -54,5 +54,17 @@
   "planner": {
     "stall_detection_enabled": false
   },
-  "context_window": 1000000
+  "context_window": 1000000,
+  "brave_search": true,
+  "firecrawl": true,
+  "exa_search": true,
+  "review": {
+    "models": {
+      "codex": "gpt-6.1-sol",
+      "agy": "gemini-4-argon-high"
+    },
+    "effort": {
+      "codex": "xhigh"
+    }
+  }
 }
