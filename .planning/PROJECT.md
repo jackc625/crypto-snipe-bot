@@ -49,12 +49,13 @@ before the bot trades again.
 - **CI hardening** — gates fail on lint error, format drift, prod-dep vuln, type error, and a coverage floor on money paths (buy / exit / anti-rug / nonce). Zero baseline, no allowlists.
 - **Dashboard, scripts, contracts tooling, repo hygiene** — same audit + cleanup; untrack `.DS_Store`/`.idea`, remove stale root files, fix `package.json` metadata.
 - **Docs** — current architecture / module map + README for a fast cold start.
-- **Re-proven live** — fork rehearsal + one small real-capital buy→monitor→sell on ETH mainnet after the restructure, before the bot goes back on.
+- **ETH checker redeploy** — after Hardhat 3: hardened `HoneypotChecker` (18-REVIEW-FIX + latest OpenZeppelin) rehearsed on Sepolia, deployed to ETH mainnet at a new address, Etherscan-verified + re-audited, then validated read-only via `eth_call` before the bot config switches to it (HONEY-13/14).
+- **Re-proven live** — fork rehearsal + one small real-capital buy→monitor→sell on ETH mainnet after the restructure and checker switch, before the bot goes back on.
 
 **Milestone constraints:**
 - Bot stays **off** (no live trading) until the milestone closes.
-- `ENABLED_CHAINS=eth` unchanged. Multi-chain (HONEY-04 / ANTIRUG-15) deferred to the next milestone, built on the cleaned codebase + Hardhat 3.
-- `HoneypotChecker.sol` contract source is out of scope (tooling only); its redeploy belongs to HONEY-04.
+- `ENABLED_CHAINS=eth` unchanged. BSC/Base/Arb rollout (HONEY-04 / ANTIRUG-15) deferred to the next milestone, built on the cleaned codebase + Hardhat 3.
+- `HoneypotChecker.sol` source changes are limited to the OpenZeppelin bump and any confirmed audit finding; the ETH redeploy follows the high-stakes-ops protocol (testnet rehearsal first, step-by-step verify, address checks).
 - Trading behavior is preserved by default; any behavior change is an explicit, logged operator decision.
 
 <details>
@@ -113,6 +114,7 @@ _Scoped requirements with REQ-IDs live in [REQUIREMENTS.md](REQUIREMENTS.md)._
 - [ ] Mock-the-mechanism tests rewritten as real-path tests; dead tests pruned
 - [ ] Strict CI gates (lint, format, audit, types, money-path coverage floor)
 - [ ] Dashboard, scripts, contracts tooling, and repo hygiene cleaned
+- [ ] Hardened ETH `HoneypotChecker` redeployed (Sepolia rehearsal → mainnet → verify → re-audit → read-only validation → config switch)
 - [ ] Architecture doc + README current
 - [ ] Live ETH mainnet roundtrip re-proven post-restructure
 
@@ -120,7 +122,7 @@ _Scoped requirements with REQ-IDs live in [REQUIREMENTS.md](REQUIREMENTS.md)._
 
 <!-- Deferred to a future milestone, not abandoned. -->
 
-- **HONEY-04 multi-chain checker deploy** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (plan 18-08; contractual re-audit when it ships; redeploy ETH with the 18-REVIEW-FIX Solidity hardening). Deferred past v7.0 so it lands on the cleaned codebase + Hardhat 3.
+- **HONEY-04 multi-chain checker deploy** — deploy `HoneypotChecker.sol` on BSC/Base/Arbitrum (plan 18-08; contractual re-audit when it ships). Deferred past v7.0 so it lands on the cleaned codebase + Hardhat 3. (The ETH-redeploy portion moved into v7.0 as HONEY-13/14.)
 - **ANTIRUG-15** — resolve BSC/Base/Arb V3 anti-rug allowlists (ETH already resolved). Tied to HONEY-04.
 
 - **CHAIN-05 dynamic capital allocation** — fully-dynamic opportunity-quality-weighted allocation (fixed per-chain budgets shipped in v6.16; completes CHAIN-05)
@@ -216,6 +218,10 @@ _v6.16 reference: shipped 2026-04-14 after 26 days; 379 files, +87,015 / −71 a
 | All dependencies to latest majors | Five months cold, 11 prod vulns; modernize once instead of piecemeal; research verifies compatibility | — Pending (operator decision 2026-11-06) |
 | Audit covers design, not just correctness; behavior changes are explicit operator decisions | Fresh-eyes review should question thresholds and race windows, but trading behavior must never change silently inside a refactor | — Pending (operator decision 2026-11-06) |
 | Version as v7.0 (major) | Restructure + toolchain overhaul marks a new generation of the codebase | — Pending (operator decision 2026-11-06) |
+| Pull the ETH checker redeploy into v7.0 (BSC/Base/Arb stay deferred) | Closes the pre-hardening-bytecode debt and makes "all latest" literal (OZ bump); read-only `eth_call` validation decouples checker risk from the final live roundtrip | — Pending (operator decision 2026-11-06) |
+| Convert the bot to ESM; contracts in their own package | Node type stripping needs `.ts` specifiers anyway (one codemod, before the restructure); isolating contracts keeps Hardhat 3's ESM requirement from coupling to the bot | — Pending (operator decision 2026-11-06) |
+| TS 7 for `tsc` + TS 6 alias for typescript-eslint | TS 7.0 has no compiler API until 7.1; typescript-eslint peer `<6.1` (issue #12518); collapse when supported | — Pending (research-verified 2026-11-06) |
+| Replace `@flashbots/ethers-provider-bundle` with an in-repo relay client | Unmaintained, sole cause of `--legacy-peer-deps`, loads a second ethers copy under ESM; late isolated money-path step with fork + live re-proof | — Pending (operator decision 2026-11-06) |
 
 ## Evolution
 

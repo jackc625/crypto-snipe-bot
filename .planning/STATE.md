@@ -11,7 +11,7 @@ progress:
   phases_shipped: 0        # hand-maintained; gsd-sdk counters unreliable for this shape
   plans_completed: 0
   requirements_satisfied: 0
-  requirements_total: 0    # set when REQUIREMENTS.md is defined
+  requirements_total: 99
 ---
 
 # Project State
