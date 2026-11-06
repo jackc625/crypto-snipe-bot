@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Full Audit & Modernization
 status: planning
-stopped_at: "v7.0 roadmap revised 2026-11-06 to 11 phases (22–32) at operator request — same scope + AUDIT-07 (S2–S4 closure), risk isolation at the wave/plan/commit level; 100/100 requirements mapped (REQUIREMENTS traceability filled). Awaiting operator approval, then /gsd-discuss-phase 22. First action of Phase 22 is the SAFE-01 backup of ignition/deployments/ + data/ before any npm install / Hardhat run / sweep / relocation. Bot OFF for the whole milestone. orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete — they corrupt this shape)."
+stopped_at: "v7.0 roadmap revised 2026-11-06 to 11 phases (22–32) at operator request — same scope + AUDIT-07 (S2–S4 closure), risk isolation at the wave/plan/commit level; 100/100 requirements mapped (REQUIREMENTS traceability filled). Awaiting operator approval, then /gsd-discuss-phase 22. First action of Phase 22 is the SAFE-01 backup of ignition/deployments/ + data/ before any npm install / Hardhat run / sweep / relocation. Bot OFF for the whole milestone."
 last_updated: 2026-11-06T18:02:18.000Z
-last_activity: "2026-11-06 — v7.0 roadmap revised to 11 phases (22–32; 100/100 requirements mapped incl. new AUDIT-07; REQUIREMENTS traceability updated). ROADMAP/STATE/REQUIREMENTS hand-edited (no gsd-sdk state.*/roadmap.*/phase.* commands)."
+last_activity: "2026-11-06 — v7.0 roadmap revised to 11 phases (22–32; 100/100 requirements mapped incl. new AUDIT-07; REQUIREMENTS traceability updated)."
 progress:
   milestone_status: planning
-  phases_shipped: 0        # hand-maintained; gsd-sdk counters unreliable for this shape
+  phases_shipped: 0
   plans_completed: 0
   requirements_satisfied: 0
   requirements_total: 100
@@ -55,8 +55,7 @@ None open.
 
 - **Bot is OFF for all of v7.0** — no live trading until the milestone's fork rehearsal + live roundtrip re-entry gate passes.
 - **Bot start:** `npx ts-node src/bot.ts` (entry point may change when `ts-node` is replaced this milestone — update this note). **Read-only cold-start check:** `npm run preflight` (there is no dry-run boot mode — never boot src/bot.ts to "test"). Stop the bot by force-killing the ts-node PID (npx swallows Ctrl+C on Windows+bash).
-- **No branching** — commit phase work straight to master; no worktrees.
-- **STATE/ROADMAP are hand-maintained** — orchestrator is the sole writer; do NOT run `gsd-sdk state.*`/`roadmap.*`/`phase.complete` (they corrupt this custom shape). Trust ROADMAP checkboxes/Progress, hand-verify.
+- **Per-phase branching** (changed 2026-11-06) — GSD creates `gsd/phase-{N}-{slug}` per phase; no worktrees.
 - **Green suite caveat** — the unit suite has repeatedly masked capital-safety/money-path bugs on this project by mocking the mechanism under test; rely on real-path integration checks + deep code-review + RED-proven tests for money-path changes.
 - **Behavior preservation** — v7.0 refactors must not change trading behavior; any behavior change is an explicit, logged operator decision.
 

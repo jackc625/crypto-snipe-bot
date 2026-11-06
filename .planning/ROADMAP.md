@@ -482,4 +482,4 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 Per-phase detail for shipped milestones lives in the `milestones/` archives.
 
 ---
-*Last updated: 2026-11-06 — v7.0 roadmap revised to 11 phases (22–32) at operator request (same scope + AUDIT-07; risk isolation at the wave/plan/commit level); 100/100 requirements mapped; v6.16/v6.17 groupings preserved. orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete — they corrupt this shape).*
+*Last updated: 2026-11-06 — v7.0 roadmap revised to 11 phases (22–32) at operator request (same scope + AUDIT-07; risk isolation at the wave/plan/commit level); 100/100 requirements mapped; v6.16/v6.17 groupings preserved.*

@@ -22,10 +22,11 @@
     "ai_integration_phase": true,
     "tdd_mode": false,
     "code_review": true,
-    "ui_review": true
+    "ui_review": true,
+    "compact_content": false
   },
   "git": {
-    "branching_strategy": "none",
+    "branching_strategy": "phase",
     "quick_branch_template": null,
     "create_tag": true
   },
@@ -37,6 +38,10 @@
     "enabled": true
   },
   "graphify": {
-    "enabled": true
+    "enabled": true,
+    "auto_update": false
+  },
+  "plan_review": {
+    "source_grounding": true
   }
 }
