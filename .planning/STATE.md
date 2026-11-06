@@ -55,7 +55,7 @@ None open.
 
 - **Bot is OFF for all of v7.0** — no live trading until the milestone's fork rehearsal + live roundtrip re-entry gate passes.
 - **Bot start:** `npx ts-node src/bot.ts` (entry point may change when `ts-node` is replaced this milestone — update this note). **Read-only cold-start check:** `npm run preflight` (there is no dry-run boot mode — never boot src/bot.ts to "test"). Stop the bot by force-killing the ts-node PID (npx swallows Ctrl+C on Windows+bash).
-- **Per-phase branching** (changed 2026-11-06) — GSD creates `gsd/phase-{N}-{slug}` per phase; no worktrees.
+- **Per-phase branching** (changed 2026-11-06) — GSD creates `phase-{N}-{slug}` per phase off `main` (default branch renamed from `master` 2026-11-06); no worktrees.
 - **Green suite caveat** — the unit suite has repeatedly masked capital-safety/money-path bugs on this project by mocking the mechanism under test; rely on real-path integration checks + deep code-review + RED-proven tests for money-path changes.
 - **Behavior preservation** — v7.0 refactors must not change trading behavior; any behavior change is an explicit, logged operator decision.
 
