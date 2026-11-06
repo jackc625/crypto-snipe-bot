@@ -25,6 +25,7 @@
 - [ ] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
 - [ ] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
 - [ ] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
+- [ ] **AUDIT-07**: Every confirmed S2–S4 finding in the register is fixed with a RED-then-GREEN test (real-path for money-path code) or closed by an explicit operator won't-fix decision before the re-entry gate — none deferred automatically (covers e.g. base-fee derivation, DEX-listener backfill/heartbeat, stale buy deadline, fee-on-transfer sell variant, reorg handling, `.wait()` error classification, non-transactional state changes, symbol/name injection, key/log redaction, when confirmed below S1).
 
 ### Characterization (CHAR)
 
@@ -189,16 +190,121 @@ Deferred past v7.0. Tracked but not in this roadmap.
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation.
+Which phases cover which requirements. Populated during roadmap creation (2026-11-06). Revised the same day to 11 phases (22–32) at operator request, with the same scope plus AUDIT-07. Each requirement maps to exactly one phase; see [ROADMAP.md](ROADMAP.md) for goals, waves, and success criteria.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SAFE-01 | Phase 22 | Pending |
+| SAFE-02 | Phase 22 | Pending |
+| SAFE-03 | Phase 22 | Pending |
+| SAFE-04 | Phase 22 | Pending |
+| SAFE-05 | Phase 22 | Pending |
+| SAFE-06 | Phase 22 | Pending |
+| SAFE-07 | Phase 22 | Pending |
+| AUDIT-01 | Phase 22 | Pending |
+| AUDIT-02 | Phase 23 | Pending |
+| AUDIT-03 | Phase 22 | Pending |
+| AUDIT-04 | Phase 22 | Pending |
+| AUDIT-05 | Phase 22 | Pending |
+| AUDIT-06 | Phase 23 | Pending |
+| AUDIT-07 | Phase 29 | Pending |
+| CHAR-01 | Phase 23 | Pending |
+| CHAR-02 | Phase 23 | Pending |
+| CHAR-03 | Phase 23 | Pending |
+| CHAR-04 | Phase 23 | Pending |
+| CHAR-05 | Phase 23 | Pending |
+| CHAR-06 | Phase 23 | Pending |
+| CAP-01 | Phase 24 | Pending |
+| CAP-02 | Phase 24 | Pending |
+| CAP-03 | Phase 24 | Pending |
+| CAP-04 | Phase 24 | Pending |
+| CAP-05 | Phase 24 | Pending |
+| CAP-06 | Phase 24 | Pending |
+| CAP-07 | Phase 24 | Pending |
+| CAP-08 | Phase 24 | Pending |
+| CAP-09 | Phase 24 | Pending |
+| CAP-10 | Phase 24 | Pending |
+| CAP-11 | Phase 24 | Pending |
+| CAP-12 | Phase 24 | Pending |
+| CAP-13 | Phase 24 | Pending |
+| CAP-14 | Phase 24 | Pending |
+| CAP-15 | Phase 24 | Pending |
+| CAP-16 | Phase 24 | Pending |
+| CAP-17 | Phase 24 | Pending |
+| CLEAN-01 | Phase 25 | Pending |
+| CLEAN-02 | Phase 25 | Pending |
+| CLEAN-03 | Phase 25 | Pending |
+| CLEAN-04 | Phase 25 | Pending |
+| CLEAN-05 | Phase 25 | Pending |
+| DEPS-01 | Phase 25 | Pending |
+| DEPS-02 | Phase 25 | Pending |
+| DEPS-03 | Phase 25 | Pending |
+| DEPS-04 | Phase 25 | Pending |
+| DEPS-05 | Phase 29 | Pending |
+| DEPS-06 | Phase 25 | Pending |
+| TOOL-01 | Phase 26 | Pending |
+| TOOL-02 | Phase 26 | Pending |
+| TOOL-03 | Phase 26 | Pending |
+| TOOL-04 | Phase 26 | Pending |
+| TOOL-05 | Phase 26 | Pending |
+| TOOL-06 | Phase 26 | Pending |
+| TOOL-07 | Phase 26 | Pending |
+| TOOL-08 | Phase 28 | Pending |
+| STRUCT-01 | Phase 27 | Pending |
+| STRUCT-02 | Phase 27 | Pending |
+| STRUCT-03 | Phase 27 | Pending |
+| STRUCT-04 | Phase 27 | Pending |
+| STRUCT-05 | Phase 27 | Pending |
+| STRUCT-06 | Phase 27 | Pending |
+| QUAL-01 | Phase 28 | Pending |
+| QUAL-02 | Phase 28 | Pending |
+| QUAL-03 | Phase 28 | Pending |
+| QUAL-04 | Phase 27 | Pending |
+| QUAL-05 | Phase 27 | Pending |
+| QUAL-06 | Phase 28 | Pending |
+| QUAL-07 | Phase 28 | Pending |
+| TEST-06 | Phase 28 | Pending |
+| TEST-07 | Phase 28 | Pending |
+| TEST-08 | Phase 28 | Pending |
+| TEST-09 | Phase 28 | Pending |
+| TEST-10 | Phase 28 | Pending |
+| TEST-11 | Phase 30 | Pending |
+| HH-01 | Phase 25 | Pending |
+| HH-02 | Phase 30 | Pending |
+| HH-03 | Phase 30 | Pending |
+| HH-04 | Phase 30 | Pending |
+| HH-05 | Phase 30 | Pending |
+| HONEY-13 | Phase 30 | Pending |
+| HONEY-14 | Phase 30 | Pending |
+| DASH-05 | Phase 29 | Pending |
+| DASH-06 | Phase 29 | Pending |
+| DASH-07 | Phase 29 | Pending |
+| DASH-08 | Phase 29 | Pending |
+| HYG-01 | Phase 25 | Pending |
+| HYG-02 | Phase 25 | Pending |
+| HYG-03 | Phase 29 | Pending |
+| CI-01 | Phase 31 | Pending |
+| CI-02 | Phase 31 | Pending |
+| CI-03 | Phase 31 | Pending |
+| CI-04 | Phase 26 | Pending |
+| DOCS-01 | Phase 31 | Pending |
+| DOCS-02 | Phase 31 | Pending |
+| DOCS-03 | Phase 31 | Pending |
+| DOCS-04 | Phase 31 | Pending |
+| LIVE-01 | Phase 32 | Pending |
+| LIVE-02 | Phase 32 | Pending |
+| LIVE-03 | Phase 32 | Pending |
 
 **Coverage:**
-- v1 requirements: 99 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 99 ⚠️
+- v1 requirements: 100 total
+- Mapped to phases: 100
+- Unmapped: 0 ✓
+
+**Mapping notes:**
+- AUDIT-07 was added on 2026-11-06 at operator request. It closes the gap where confirmed S2–S4 findings had no owning requirement (CAP-17 covers only S0/S1).
+- SAFE-07 (Phase 22): before-baselines are captured in Phase 22. The same capture script produces the after-baselines at milestone close.
+- CI-04 (Phase 26) sits with the toolchain rather than the blocking-gates phase, so the Node 26 matrix builds a green history before the OD-13 runtime decision. TOOL-08 (lefthook, Phase 28) lands once lint reaches zero.
 
 ---
 *Requirements defined: 2026-11-06*
-*Last updated: 2026-11-06 after initial definition*
+*Last updated: 2026-11-06 after roadmap revision (AUDIT-07 added; traceability 100/100 mapped to Phases 22–32)*

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v7.0
 milestone_name: Full Audit & Modernization
 status: planning
-stopped_at: "v7.0 started 2026-11-06 — defining requirements. Scope: full adversarial audit + deep restructure + code quality + bug fixes + all-deps-to-latest + test-suite quality + strict CI gates + dashboard/scripts/hygiene + docs + live ETH roundtrip re-proof. Bot OFF for the whole milestone. Multi-chain (HONEY-04/ANTIRUG-15) deferred to next milestone. orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete — they corrupt this shape)."
-last_updated: 2026-11-06T12:00:00.000Z
-last_activity: "2026-11-06 — Milestone v7.0 (Full Audit & Modernization) started via /gsd-new-milestone. PROJECT.md Current Milestone written; STATE.md hand-reset (no gsd-sdk state.milestone-switch — mis-parses this shape)."
+stopped_at: "v7.0 roadmap revised 2026-11-06 to 11 phases (22–32) at operator request — same scope + AUDIT-07 (S2–S4 closure), risk isolation at the wave/plan/commit level; 100/100 requirements mapped (REQUIREMENTS traceability filled). Awaiting operator approval, then /gsd-discuss-phase 22. First action of Phase 22 is the SAFE-01 backup of ignition/deployments/ + data/ before any npm install / Hardhat run / sweep / relocation. Bot OFF for the whole milestone. orchestrator SOLE writer of STATE/ROADMAP (hand-edited; NO gsd-sdk state.*/roadmap.*/phase.complete — they corrupt this shape)."
+last_updated: 2026-11-06T18:02:18.000Z
+last_activity: "2026-11-06 — v7.0 roadmap revised to 11 phases (22–32; 100/100 requirements mapped incl. new AUDIT-07; REQUIREMENTS traceability updated). ROADMAP/STATE/REQUIREMENTS hand-edited (no gsd-sdk state.*/roadmap.*/phase.* commands)."
 progress:
   milestone_status: planning
   phases_shipped: 0        # hand-maintained; gsd-sdk counters unreliable for this shape
   plans_completed: 0
   requirements_satisfied: 0
-  requirements_total: 99
+  requirements_total: 100
 ---
 
 # Project State
@@ -21,14 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management — never lose money to preventable bugs, race conditions, or security flaws.
-**Current focus:** v7.0 Full Audit & Modernization — defining requirements.
+**Current focus:** v7.0 Full Audit & Modernization — roadmap created; next: Phase 22 (Safety Rails & Audit)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 22 — Safety Rails & Audit (ready to discuss/plan)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-11-06 — Milestone v7.0 started
+Status: Roadmap created — awaiting operator approval, then `/gsd-discuss-phase 22`
+Last activity: 2026-11-06 — v7.0 roadmap revised to 11 phases (22–32)
+Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
 
