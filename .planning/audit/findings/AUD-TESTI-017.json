@@ -1,0 +1,110 @@
+{
+  "id": "AUD-TESTI-017",
+  "title": "The fork harness is not hermetic: globalSetup falls back to ALCHEMY_URL, the spawned Hardhat child inherits the parent environment and its config loads the real .env, plain `npm test` runs the fork project too, and the fork replays take risk caps, the stop-loss and alert credentials from the operator's .env and call live third-party safety APIs, so a fork result depends on the machine it ran on",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "test/fork/setup.ts",
+    "hardhat.config.ts",
+    "vitest.config.ts",
+    "package.json",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/setup.ts:8-11@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "rpcUrl = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL (the fallback CONTEXT says to drop)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/setup.ts:14-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "execSync(\"npx hardhat compile\") and spawn(\"npx\", [\"hardhat\", \"node\", \"--fork\", rpcUrl, ...], { shell: true }) with no env option: the child inherits the full parent environment"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:7-9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv.config() at config load: the Hardhat child reads the real .env (CONTRACTS slice owns this file)"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:96-101@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the hardhat network forks from ETH_FORK_RPC_URL || ALCHEMY_URL with no accounts override (default Hardhat accounts); the DEPLOY_PRIVATE_KEY networks at :51-95 are only used with --network, which setup.ts never passes"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv config() for every project, the fork project included"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:29-45@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the fork project includes test/fork/**/*.test.ts with globalSetup test/fork/setup.ts"
+    },
+    {
+      "type": "command",
+      "ref": "git show 23a64617dca167976adc4645fed0e2c69e384820:package.json (scripts)",
+      "note": "\"test\": \"vitest run --reporter=verbose\" names no project, so npm test also runs the fork globalSetup (spawns Hardhat against the configured fork RPC)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:36-39@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: the risk env is set \"so canSnipe ... passes ... the operator's live .env caps would otherwise block at the risk gate\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:74-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "only some exit and risk keys are overridden; every other key (Telegram, safety-API config, STOP_LOSS_PCT here) comes from the real .env"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/unicrypt.ts:19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isLiquidityLockedForChain (run by the real handlers the replays drive) calls the live Unicrypt API; honeypotIs.ts:16 and goplus.ts:33 likewise"
+    }
+  ],
+  "sibling_sites_checked": "All 23 test/fork files and the three config files at the base SHA. Every provider in the fork suite targets 127.0.0.1:8545 (grep JsonRpcProvider/WebSocketProvider over test/fork); the only process spawned is the Hardhat child in setup.ts (D-03 documented exemption). hardhat_reset calls (captureRehearsal:335, deliberateBuyReplay:259, exitStatePersistence:424, realLaunchReplay:258, honeypotChecker:272, antiRugDetector:785) send the fork RPC URL to the local node only.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: no signing or capital path (see the trace); the harness is non-hermetic, so a green or red fork run reflects the operator's .env and the live state of third-party APIs as much as the code. The real-.env exposure itself is the RC-19 rediscovery AUD-TESTI-011.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-011",
+    "AUD-TESTI-019",
+    "AUD-TESTI-024"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25 (fork harness, first fork execution): drop the ALCHEMY_URL fallback (CONTEXT Claude's-discretion item), spawn Hardhat with an explicit minimal env (fork URL only) and make hardhat.config.ts skip dotenv under the fork harness, scope `npm test` to unit + integration (AC-12), and give every fork replay an explicit, complete env and stubbed third-party safety APIs.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "traces": [
+    {
+      "scenario": "Could a fork run sign with the operator's real key against real mainnet (PROTOCOL rail judgment)?",
+      "steps": [
+        "Every fork test builds its provider on http://127.0.0.1:8545 (the node setup.ts spawned) and signs with Hardhat account #0 or #1 (realMainnetGate.ts:125-126, honeypotChecker.fork.test.ts:41-42, honeypotMultiAmount.fork.test.ts:54-55, snipeLifecycle.test.ts:12, antiRugDetector.fork.test.ts:208-209).",
+        "The fork tests that import src (captureRehearsal, deliberateBuyReplay, exitStatePersistence, realLaunchReplay) pass a hand-built ctx with that provider and wallet; they never call startMultiChainBot, createChainContext or getWallet, the only src sites that build a Wallet from PRIVATE_KEY (src/bot.ts:1705-1706, src/chainRegistry.ts:1067, src/utils/provider.ts:59).",
+        "The Hardhat child runs \"hardhat node\" on the hardhat network (default accounts, chainId 31337); the mainnet network entry that reads DEPLOY_PRIVATE_KEY (hardhat.config.ts:60-68) is used only with --network mainnet, which setup.ts never passes.",
+        "If port 8545 were already taken, the Hardhat child fails to bind and setup.ts:29-35 rejects on the stderr error, so no test reaches an unknown node."
+      ],
+      "outcome": "No: no path signs with the real key or sends to real mainnet. The real .env is read (exposure, AUD-TESTI-011) but not used for signing, so this is not a rail-class reach (D-16) and the run is not stopped."
+    }
+  ]
+}

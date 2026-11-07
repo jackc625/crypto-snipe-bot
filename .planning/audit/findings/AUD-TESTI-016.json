@@ -15,7 +15,8 @@
     "test/fixtures/mythril/sample-high.json",
     "test/fixtures/txManager.fixtures.ts",
     "test/integration/api/wsPush.test.ts",
-    "test/integration/killswitchCheckpoints.test.ts"
+    "test/integration/killswitchCheckpoints.test.ts",
+    "test/fork/teardown.ts"
   ],
   "evidence": [
     {
@@ -42,6 +43,11 @@
       "type": "code",
       "ref": "test/integration/api/wsPush.test.ts:235-247@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "chain_status_change case calls the mocked broadcast and asserts it was called"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/teardown.ts:1-3@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: teardown is handled by setup.ts; the file \"exists for documentation purposes\" and exports nothing (vitest.config.ts:36 names only setup.ts)"
     }
   ],
   "sibling_sites_checked": "Every file under test/fixtures and test/helpers checked for an importer at the base SHA (git grep on each export name): api.fixtures, exitEngine.fixtures, receipt.fixtures, tokenSafety.fixtures, mockProvider and testDb are used; chainConfig.ts and the Mythril samples are not; the two Solidity fixtures are compiled by hardhat.config.ts and used by the fork tests.",

@@ -18,13 +18,17 @@
   {
     "path": "test/fixtures/contracts/Honeypot.sol",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-    "findings": "none",
+    "findings": [
+      "AUD-TESTI-023"
+    ],
     "fixture_provenance": "synthetic"
   },
   {
     "path": "test/fixtures/contracts/RugPull.sol",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-    "findings": "none",
+    "findings": [
+      "AUD-TESTI-022"
+    ],
     "fixture_provenance": "synthetic"
   },
   {
@@ -70,6 +74,374 @@
       "AUD-TESTI-016"
     ],
     "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fork/antiRugDetector.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-022",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "Anti-rug detector on a fork: RugPull.sol modes 0-4 (V2 burn to EOA unsafe, to UNCX locker or dead allowlisted, V3 burn+collect unsafe, V3 burn-only held), and the real HORSE V2 rug replayed from its LP-removal receipt gives unsafe with all three signals.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine (executeFullSell resolves true)",
+        "src/utils/db",
+        "src/utils/provider",
+        "ethers Contract (scripted reserves, supply, liquidity, quote, balanceOf)"
+      ],
+      "mocked_mechanism_detail": "The chain reads the detector depends on are mocked; RugPull.sol is never deployed; logs are synthesised; only the HORSE receipt is read from the fork.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Signs nothing itself (Hardhat #0 constant declared). Every src dependency that could reach state is mocked. A tripped gate, missing fixture or failed hardhat_reset returns green (AUD-TESTI-021)."
+    }
+  },
+  {
+    "path": "test/fork/captureRehearsal.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "Rehearses the live capture on a fork: the real V2 handler buys LADYS, a tight STOP_LOSS_PCT plus a whale dump makes the engine's own poll loop fire a stop-loss full sell through the serial ExitWorker, the sell row has a decoded amount_out, and balance-truth teardown deletes exit_state and unregisters anti-rug.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path: real handler, real exit engine, real receiptDecoder, isolated temp DB (DB_PATH set before any src import). Before the rails src/config and src/utils/notifier load the real .env (Telegram alerts would post to the operator chat) and the safety bank calls live Unicrypt/GoPlus/honeypot.is (AUD-TESTI-011/-017). Signs with Hardhat #0 on the local node only. The second case is a typeof check (AUD-TESTI-025)."
+    }
+  },
+  {
+    "path": "test/fork/deliberateBuyReplay.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025",
+      "AUD-TESTI-027"
+    ],
+    "quality_label": {
+      "claims": "The real executeDeliberateBuy lands on a fork (passthrough leg), records a trades row with the real hash, registers anti-rug and arms the exit monitor.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path in-process; cannot observe that the production caller (scripts/deliberate-buy.ts) exits after the buy (AUD-TESTI-027 / AUD-BUY-001). Real .env loaded through src/config and the notifier before the rails (AUD-TESTI-011). Temp DB. The second case is a typeof check."
+    }
+  },
+  {
+    "path": "test/fork/exitStatePersistence.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-026"
+    ],
+    "quality_label": {
+      "claims": "exit_state reloads identically after a module-level restart (state written by serializeExitState and by the real poll loop), and an exit_failed_held row is found by the production resume statements and re-enters monitoring and anti-rug.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "Test 3 re-implements the resume loop (first dex of the type, ctx.chain.snipeAmount) instead of calling resumeMultiChainMonitoring / resumeAntiRugMonitoring, and sets failed-held through the statement directly.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "reloads identical high_water_mark / trailing_activated / partial_tiers_completed after a module-level restart",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "reloads identical columns when state was advanced by the REAL exit-monitor poll loop",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "a restart resumes an exit_failed_held row into monitoring + re-registers anti-rug",
+          "mocks_mechanism": "partial",
+          "hollow": "no",
+          "missing_observable": "which dex and probe amount production resume uses (AUD-EXIT-013/-015, AUD-ANTIRUG-011)"
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real SQL on an isolated temp DB (the strongest DB-real fork test). Real .env through src/config and the notifier before the rails (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-max-wallet.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-sell-revert.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-v3-honeypot.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v3-trailing.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/eth-v2-horse.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/helpers/realMainnetGate.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024"
+    ]
+  },
+  {
+    "path": "test/fork/honeypotChecker.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-021",
+      "AUD-TESTI-023",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "The deployed HoneypotChecker, through simulateViaContractV2/V3, never returns safe for Honeypot.sol modes 0-3 on real Uniswap V2, returns the expected verdict for the real V3 honeypot fixture, and fails closed on the V3 dispatch path.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "V2 mode 0 / V2 mode 3: verdict !== 'safe' when deployed against real Uniswap V2 on fork",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "V2 mode 1 / V2 mode 2: verdict !== 'safe' when deployed against real Uniswap V2 on fork",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a pool to probe: the LP add fails, so unsafe comes from the missing pool"
+        },
+        {
+          "name": "V3 honeypot fixture: forkBlockNumber resolved → verdict === unsafe; null → skip",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the fixture is unpinned, so the case returns green without running"
+        },
+        {
+          "name": "exercises simulateViaContractV3 dispatch — verdict !== safe for a Honeypot.sol mode-0 token",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a V3 pool: proves only \"no pool is unsafe\""
+        },
+        {
+          "name": "HONEYPOT_CHECKER_ABI Interface accepts the checker contract address",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real contracts and real checker on the fork; imports only the ABI and checkerContract (no config, DB or notifier). Hardhat #0 signer. Inline copy of the chainId predicate (AUD-TESTI-024)."
+    }
+  },
+  {
+    "path": "test/fork/honeypotMultiAmount.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-021",
+      "AUD-TESTI-023",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "D-AGGREGATION on the fork with Honeypot.sol mode 4: a threshold between the 1% and 50% probes makes the verdict not safe; a threshold above every probe gives safe with three probe results.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 7: amountTierThreshold between 1% and 50% probe sizes → 50%+100% probes revert → overall unsafe",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a pool: the 30-token threshold blocks the 100,000-token LP add"
+        },
+        {
+          "name": "Test 8 (tightened): amountTierThreshold ABOVE 100% probe → no probe reverts → overall safe",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Hardhat account #1 signer (known-public, AUD-TESTI-018). Stale parallelism comment (fileParallelism is false)."
+    }
+  },
+  {
+    "path": "test/fork/realLaunchReplay.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-019",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "Three real ETH launches (LADYS V2 partial-sell, BOBO V2 trailing-stop, PEPE V3 stop-loss) replayed through the real handlers: each buys and the exit monitor later writes a sell or partial_sell row with amount_out.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real handlers and exit engine on an isolated temp DB. Sets STOP_LOSS_PERCENT, which src never reads (AUD-TESTI-019); accepts any sell row, so the named exit path is unasserted; the risk caps it does not set come from the operator .env (its own comment, :36-39). Real .env through src/config and the notifier before the rails (AUD-TESTI-011). Uses the shared gate helper (:153)."
+    }
+  },
+  {
+    "path": "test/fork/realMainnetGate.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "requireRealMainnetGate throws for chainId 1 unless ALLOW_REAL_MAINNET is exactly \"1\" and passes for 31337; isHardhatFork returns the matching booleans; FORK_ONLY_TEST_KEY is the Hardhat #0 key.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "provider (stub getNetwork)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Pure predicate test with stub providers (the stub is the input, not the mechanism); restores ALLOW_REAL_MAINNET after each case. Lives in the fork project, so it only runs after globalSetup spawns Hardhat."
+    }
+  },
+  {
+    "path": "test/fork/setup.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-024"
+    ]
+  },
+  {
+    "path": "test/fork/snipeLifecycle.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "A snipe lifecycle on forked mainnet: deploy FakeToken, create a pair, add liquidity, buy, check price, sell, and end with no tokens and nearly the starting ETH.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Runs no bot code (manual router calls with amountOutMin 0); included in the fork project by the test/fork/**/*.test.ts glob although not named *.fork.test.ts; cases share state and depend on order; no per-file chainId gate."
+    }
+  },
+  {
+    "path": "test/fork/teardown.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ]
   },
   {
     "path": "test/helpers/mockProvider.ts",

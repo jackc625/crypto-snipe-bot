@@ -1,0 +1,366 @@
+{
+  "id": "AUD-TESTI-020",
+  "title": "Money-path coverage map: none of the 39 registered money-path S0/S1 findings would be caught on the real path by any integration or fork test; the real-path fork tests that exist prove buy landing, sell recording and the failed-held resume SQL, but every registered defect sits on a branch they mock, stub, skip or never drive",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C04",
+    "C07",
+    "C10",
+    "C11",
+    "C13",
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "test/fork/antiRugDetector.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "node over .planning/audit/findings/*.json (register read, no src import): every finding with severity S0 or S1, excluding the RAIL and TESTU test-infrastructure items",
+      "note": "39 money-path items: AUD-BUY-001 (S0) and 38 S1s across BUY, EXIT, ANTIRUG, TX, DB and API"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/captureRehearsal.fork.test.ts:402-484@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "real path proven: the real V2 handler buys, the engine's own poll loop fires the stop-loss, the sell row carries a decoded amount_out"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:502-565@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "real path proven: V2 and V3 handlers buy real tokens on a fork and some exit sells (path unasserted, AUD-TESTI-019)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/exitStatePersistence.fork.test.ts:721-738@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "real path proven: the production resume statements find an exit_failed_held row (the S-1 fix)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/deliberateBuyReplay.fork.test.ts:279-327@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "real path proven in-process only: executeDeliberateBuy lands and arms inside the test worker"
+    }
+  ],
+  "sibling_sites_checked": "All 27 integration and 23 fork files of the slice, read in full at the base SHA (fork files not executed), against the evidence of every registered S0/S1 money-path finding read from the register (findings JSON only, no SUMMARY or VERIFICATION doc). Unit tests are TESTU scope (22-23).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 by the rubric (test/infra drift that hides S0/S1); the S0 and S1s themselves are already registered and escalated in their own slices. The point of this entry is the map Phase 23 needs: zero of 39 are caught on the real path, five are encoded as expected behaviour, three sit on fork paths that run but do not assert them.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-003",
+    "AUD-TESTI-004",
+    "AUD-TESTI-005",
+    "AUD-TESTI-006",
+    "AUD-TESTI-007",
+    "AUD-TESTI-008",
+    "AUD-TESTI-010",
+    "AUD-TESTI-013",
+    "AUD-TESTI-019",
+    "AUD-TESTI-026",
+    "AUD-TESTI-027"
+  ],
+  "tags": [
+    "test-quality",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 23 (real-path triage): use this map as the work list; for each item build a RED real-path reproduction (fork or scripted-provider harness) before any fix. Phase 25 owns the first fork execution; Phase 28 rewrites the tests named in the sub-claims.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "escaped_regression": "Every registered item listed in the sub-claims is a regression that is live today with the integration and fork suites green; for example AUD-BUY-001: a deliberate buy run from scripts/deliberate-buy.ts lands and is left with no exit monitor and no anti-rug protection while deliberateBuyReplay passes.",
+  "sub_claims": [
+    {
+      "claim": "AUD-BUY-001 (S0, deliberate buy armed only inside the short-lived script): deliberateBuyReplay asserts the monitor and anti-rug registration exist right after executeDeliberateBuy returns, inside the long-lived Vitest worker; the production caller scripts/deliberate-buy.ts exits after the buy and no test runs it. The fork test passes on exactly the in-process arming the S0 says dies with the script.",
+      "evidence": [
+        "test/fork/deliberateBuyReplay.fork.test.ts:279-327@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-BUY-002 (landed buy treated as a clean failure): no integration or fork case throws after submission; killswitch, v2/v3HoneypotIntegration mock sendTxWithRetry and the fork handlers land cleanly.",
+      "evidence": [
+        "test/integration/killswitchCheckpoints.test.ts:157-160@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/captureRehearsal.fork.test.ts:402@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-003 (snipe minOut 0 when the quote fails): no test fails the pre-buy quote; integration mocks return fixed getAmountsOut, fork buys quote successfully.",
+      "evidence": [
+        "test/integration/killswitchCheckpoints.test.ts:333@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-004 (double-buy race): no test runs two handlers for one token concurrently.",
+      "evidence": [
+        "test/fork/realLaunchReplay.fork.test.ts:502@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-005 (no unhandledRejection handler): no test lets a rejection escape or checks that the process survives one.",
+      "evidence": [
+        "test/integration/wsReconnect.test.ts:232-252@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-006 (Telegram allowlist allow-all): no integration or fork test runs the Telegram listener.",
+      "evidence": [
+        "git grep -n telegramListener 23a64617dca167976adc4645fed0e2c69e384820 -- test/integration test/fork (mock factories only)"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-008 (DEX WebSocket reconnect): the reconnect cases compute backoff in the test (AUD-TESTI-013); no DEX reconnect runs.",
+      "evidence": [
+        "test/integration/wsReconnect.test.ts:123-166@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-010 (risk limits checked early, concurrent overspend): canSnipe is mocked in every integration buy test; the fork replays set permissive caps and run one buy at a time.",
+      "evidence": [
+        "test/integration/killswitchCheckpoints.test.ts:191-194@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/realLaunchReplay.fork.test.ts:79-83@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-011 (stop chain does not stop buying): the stop case asserts the stopped set only (AUD-TESTI-008).",
+      "evidence": [
+        "test/integration/api/chains.test.ts:151-164@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-BUY-025 (deliberate public buy wait with no timeout in the nonce lock): the fork deliberate buy uses passthrough with interval mining, so wait(3) always settles; a never-mined tx is not modelled.",
+      "evidence": [
+        "test/fork/deliberateBuyReplay.fork.test.ts:259-264@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-DB-001 (malformed risk settings disable the limits): the fork sets numeric caps; no test sets a non-numeric risk env.",
+      "evidence": [
+        "test/fork/realLaunchReplay.fork.test.ts:79-83@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-DB-002 (daily-loss and exposure compare decimal and wei): realLaunchReplay writes real decimal buy rows and wei sell rows for three fixtures into one temp DB, so the corrupted exposure and loss values exist, but the caps are 1000 / 99% and no test reads getTotalExposure or getDailyRealizedLoss after a sell.",
+      "evidence": [
+        "test/fork/realLaunchReplay.fork.test.ts:79-83@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/realLaunchReplay.fork.test.ts:466-571@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (path runs, defect not asserted)"
+    },
+    {
+      "claim": "AUD-DB-003 (failed-held positions excluded from the risk queries): exitStatePersistence Test 3 builds a failed-held position (trades.status failed) but asserts only the resume, never the risk queries.",
+      "evidence": [
+        "test/fork/exitStatePersistence.fork.test.ts:670-671@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (path runs, defect not asserted)"
+    },
+    {
+      "claim": "AUD-DB-004 (no DB row until the whole submission returns): no test interrupts between submit and the row write.",
+      "evidence": [
+        "test/fork/captureRehearsal.fork.test.ts:402-408@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-DB-007 (DB path resolves against cwd, empty DB created): every DB-using test sets an absolute temp DB_PATH.",
+      "evidence": [
+        "test/fork/captureRehearsal.fork.test.ts:81-82@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-001 (private sells accept any output): the fork uses passthrough (no private path) and integration sells are mocked.",
+      "evidence": [
+        "test/fork/captureRehearsal.fork.test.ts:219@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-002 (monitor never starts when the first quote fails): no test fails the first post-buy quote; the integration case passes {} and asserts null only (AUD-TESTI-010).",
+      "evidence": [
+        "test/integration/exitMonitor.test.ts:379-459@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-003 (the exit signal is not a price): the fork exits fire on pumps and dumps large enough that any ratio signal trips; no test asserts the quoted price.",
+      "evidence": [
+        "test/fork/realLaunchReplay.fork.test.ts:297-333@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (path runs, defect not asserted)"
+    },
+    {
+      "claim": "AUD-EXIT-007 (exits that return false not marked failed-held): no test makes an exit return false.",
+      "evidence": [
+        "test/integration/api/controls.test.ts:146-154@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-008 (dashboard sells sent as routine exits): controls.test pins urgency-market-sell (AUD-TESTI-007).",
+      "evidence": [
+        "test/integration/api/controls.test.ts:127-135@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-EXIT-009 (exit wait() with no timeout in the nonce lock): fork sells use passthrough with interval mining, so the wait settles.",
+      "evidence": [
+        "test/fork/captureRehearsal.fork.test.ts:342@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-013 (positions resumed or sold through the first dex of their type): every fork position is on uniswap-v2 / uniswap-v3 (the first dex of each type) and exitStatePersistence re-implements the first-dex lookup (AUD-TESTI-026).",
+      "evidence": [
+        "test/fork/exitStatePersistence.fork.test.ts:767-773@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-EXIT-014 (anti-rug exit refused behind the sell lock): the anti-rug tests mock executeFullSell and exitManager.",
+      "evidence": [
+        "test/fork/antiRugDetector.fork.test.ts:95-103@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-EXIT-015 (probe size not stored, resume uses the current snipe amount): the fork resumes pass \"0.05\" or ctx.chain.snipeAmount, equal to the buy amount, so the mismatch never arises; exitStatePersistence Test 3 passes ctx.chain.snipeAmount as production does.",
+      "evidence": [
+        "test/fork/exitStatePersistence.fork.test.ts:770@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-ANTIRUG-001 (three reconnect paths rewrite ctx.wsProvider): no test combines the anti-rug, DEX and dashboard reconnect paths on a real provider.",
+      "evidence": [
+        "test/integration/anti-rug/wsReconnectBackfill.test.ts:199-269@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-ANTIRUG-002 (refused reconnect kills the bot): reconnect failure is modelled as a constructor throw (AUD-TESTI-004).",
+      "evidence": [
+        "test/integration/anti-rug/wsReconnectBackfill.test.ts:211-215@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-ANTIRUG-003 (breaker counts dispatches, not rugs): every anti-rug test feeds one log per position (multiSignalEnd2End, antiRugDetector.fork).",
+      "evidence": [
+        "test/fork/antiRugDetector.fork.test.ts:567-737@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-ANTIRUG-004 (refused escape never retried): executeFullSell is mocked to resolve true in every anti-rug test.",
+      "evidence": [
+        "test/fork/antiRugDetector.fork.test.ts:100-103@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/integration/anti-rug/multiSignalEnd2End.test.ts:348@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-ANTIRUG-005 (backfill fires live exits): the backfill no-exit case swaps the evaluator for a double (AUD-TESTI-004).",
+      "evidence": [
+        "test/integration/anti-rug/wsReconnectBackfill.test.ts:758-770@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-ANTIRUG-011 (re-registered with the first dex of its type): single-dex fixtures and an unasserted dex argument (AUD-TESTI-006); the fork resume re-implements the same lookup (AUD-TESTI-026).",
+      "evidence": [
+        "test/integration/anti-rug/botWiring.test.ts:430-467@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/exitStatePersistence.fork.test.ts:767-773@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-API-001 (emergency/force sell skip still-held failed positions): the position SQL is stubbed (AUD-TESTI-007).",
+      "evidence": [
+        "test/integration/api/controls.test.ts:15-27@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-API-002 (stop chain removes the anti-rug subscription): the stop case requires removeAllListeners (AUD-TESTI-008).",
+      "evidence": [
+        "test/integration/api/chains.test.ts:151-164@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught (a test pins the defect as expected behaviour)"
+    },
+    {
+      "claim": "AUD-API-008 (malformed Host on an upgrade kills the process): wsPush mocks the upgrade handler; no test sends an Upgrade request.",
+      "evidence": [
+        "test/integration/api/wsPush.test.ts:40-42@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-001 (non-reentrant nonce lock): no integration test takes withNonceLock re-entrantly; the fork runs the real lock one operation at a time.",
+      "evidence": [
+        "test/fork/captureRehearsal.fork.test.ts:402-441@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-002 (never-settling wait inside the nonce lock): the passthrough timeout case fakes a rejection ethers cannot produce (AUD-TESTI-003); the fork uses interval mining.",
+      "evidence": [
+        "test/integration/mevStrategies.test.ts:409-439@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-003 (head-of-line blocking through private attempts): the fork has no relay (passthrough) and integration mocks the strategy.",
+      "evidence": [
+        "test/fork/deliberateBuyReplay.fork.test.ts:183@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-004 (duplicate module instance): no test loads the nonce authority twice.",
+      "evidence": [
+        "test/integration/txManager.test.ts:84-118@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-005 (no single-instance process lock): no test starts two bot processes.",
+      "evidence": [
+        "test/fork/setup.ts:16-19@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    },
+    {
+      "claim": "AUD-TX-009 (Flashbots bundle wait RPC hiccup crashes the bot): the Flashbots library is mocked in integration and the fork has no relay.",
+      "evidence": [
+        "test/integration/txManager.test.ts:258-262@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "not caught"
+    }
+  ]
+}

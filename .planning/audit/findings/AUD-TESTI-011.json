@@ -1,6 +1,6 @@
 {
   "id": "AUD-TESTI-011",
-  "title": "RC-19 test-file side for the integration suite: before the rails, preflightCli and pauseCli spawned ts-node children with the parent environment (the real .env), preflightCli's child opened and migrated the live DB and called mainnet RPCs, honeypotDeploy.eth called the operator's mainnet RPC directly, and eight files loaded src/config unmocked",
+  "title": "RC-19 test-file side for the integration and fork suites: before the rails, preflightCli and pauseCli spawned ts-node children with the parent environment (the real .env), preflightCli's child opened and migrated the live DB and called mainnet RPCs, honeypotDeploy.eth called the operator's mainnet RPC directly, eight integration files loaded src/config unmocked, and four fork replays loaded the real config and notifier (alerts to the operator chat, live safety APIs) while the Hardhat child read the real .env",
   "kind": "finding",
   "area": "test",
   "slice": "TESTI",
@@ -22,12 +22,19 @@
     "test/integration/v2HoneypotIntegration.test.ts",
     "test/integration/v3HoneypotIntegration.test.ts",
     "test/integration/v3LiquidityWait.test.ts",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "test/fork/setup.ts",
     "scripts/preflight.ts",
     "scripts/pause.ts",
     "src/utils/db.ts",
     "src/config.ts",
     "src/utils/notifier.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "hardhat.config.ts",
+    "src/utils/safetyProviders/unicrypt.ts"
   ],
   "evidence": [
     {
@@ -84,9 +91,34 @@
       "type": "command",
       "ref": "node scratchpad testi-tools/reach.js over the slice-files.ts --snapshot TESTI tree and a git archive of src at 23a6461 (static import graph; vi.mock / vi.doMock targets not traversed; text only, imports no src code)",
       "note": "per file, which of src/utils/db, src/config and src/utils/notifier are reached unmocked; the ledger rows with can_reach_real_state yes are this list plus the two spawning files and honeypotDeploy (importActual partial mocks and the spawned scripts checked by hand)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/captureRehearsal.fork.test.ts:178-181@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports src/bot, src/utils/exitManager, src/chainRegistry and src/anti-rug/detector with no mock: src/config and src/utils/notifier load the real .env (deliberateBuyReplay :143-146, exitStatePersistence :141-146, realLaunchReplay :169-171 the same)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/captureRehearsal.fork.test.ts:81-82@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH is pointed at a temp file before any src import, so the fork replays do not touch data/bot.db (same in the other three files)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/unicrypt.ts:19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real handlers the replays drive call live third-party safety APIs (Unicrypt here; honeypot.is and GoPlus alike)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/setup.ts:14-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the Hardhat child is spawned with the inherited parent env (shell: true); hardhat.config.ts:9 calls dotenv.config(), loading the real .env into the child (the D-03 documented exemption)"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:60-68@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only network entry that would sign with a real key (DEPLOY_PRIVATE_KEY) needs --network mainnet, which the fork harness never passes; see the AUD-TESTI-017 trace: no fork path signs with the real key"
     }
   ],
-  "sibling_sites_checked": "All 27 integration files at the base SHA. Spawn sites (git grep child_process / spawn / exec over test/integration): only preflightCli.test.ts:23,38 and pauseCli.test.ts:27,286. Non-loopback network: honeypotDeploy.eth.test.ts is the only integration file that constructs a provider on a real URL; every express/http server listens on 127.0.0.1:0 (auth, chains, controls, health, positions, risk, trades, wsPush, pauseCli, pauseFlow) and URL strings elsewhere (mevStrategies relay URLs, api.fixtures alchemy URL with key \"abc123\") are never contacted (FetchRequest and axios mocked). The live DB: no integration file imports src/utils/db unmocked in-process; the preflightCli child does. The fork-suite side is added in Task 2.",
+  "sibling_sites_checked": "All 27 integration and 23 fork files at the base SHA. Integration: spawn sites only preflightCli.test.ts:23,38 and pauseCli.test.ts:27,286; honeypotDeploy.eth.test.ts is the only integration file that constructs a provider on a real URL; every express/http server listens on 127.0.0.1:0; no integration file imports src/utils/db unmocked in-process (the preflightCli child does). Fork: the four replays (captureRehearsal, deliberateBuyReplay, exitStatePersistence, realLaunchReplay) import src unmocked with a temp DB_PATH; antiRugDetector mocks every state-reaching dependency; honeypotChecker / honeypotMultiAmount import only checkerContract and the ABI; snipeLifecycle and realMainnetGate.fork.test import no src. No fork path signs with PRIVATE_KEY or DEPLOY_PRIVATE_KEY or targets anything but 127.0.0.1:8545 for transactions (AUD-TESTI-017 trace), so there is no new rail-class reach (D-16).",
   "status": "candidate",
   "origin": "research-candidate",
   "rc": [

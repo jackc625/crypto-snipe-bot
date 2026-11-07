@@ -1,0 +1,88 @@
+{
+  "id": "AUD-TESTI-022",
+  "title": "The anti-rug \"fork\" test never uses the fork for the detector: it mocks the ethers Contract layer, never deploys RugPull.sol (contrary to its header), synthesises the event logs, and mocks the exit to succeed; only the HORSE case reads one real receipt from the fork, and even there the reserves the detector sees are test-controlled",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C14"
+  ],
+  "files": [
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fixtures/contracts/RugPull.sol"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:4-9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: RugPull.sol modes \"each deployed against a hardhat fork ... executeRug emits the configured V2/V3 event(s)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:131-179@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "vi.mock(\"ethers\") replaces Contract with a dispatcher returning test-controlled getReserves / totalSupply / liquidity / quote / balanceOf"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:561-565@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: the tests run \"without requiring an actual deploy + executeRug round-trip (which the Contract mocking precludes)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:575-581@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "synthetic RugPull and destination addresses; the log is built by makeV2BurnLog / makeV3CollectLog"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:95-103@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exitManager and executeFullSell (resolves true) mocked"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:803-823@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HORSE: the only real fork read is the LP-removal receipt (destination resolved from topic[2])"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:863-875@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HORSE: supply and reserves are then mocked to the drained values and the Burn log is re-synthesised"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:727-733@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mode 4: the held-burn assertion runs only if a test hook exists"
+    }
+  ],
+  "sibling_sites_checked": "Every place RugPull.sol is used: compiled by hardhat.config.ts:18-29; its artifact is loaded at antiRugDetector.fork.test.ts:464-470 and only asserted to have bytecode (:530-541); no ContractFactory deploy of it anywhere in the slice. The integration sibling with the same mocks is AUD-TESTI-005.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the fork-labelled anti-rug proof mocks the very chain reads the detector depends on and the exit it triggers, so it adds no real-path evidence and hides the registered anti-rug S1s (AUD-ANTIRUG-003/-004).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-005",
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-004",
+    "AUD-TESTI-021"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25/28: deploy RugPull.sol (or replay HORSE) on the fork with the real ethers Contract, let the detector read the fork's reserves and logs through a real provider subscription, and run a real (fork) exit so refusal and retry are observable.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "RugPull mode 0..4: detector responds correctly to mode-N event payload",
+    "HORSE V2 rug fixture: forkBlockNumber resolved → multi-signal unsafe; missing addresses → skipped per Wave-1 follow-up"
+  ],
+  "escaped_regression": "Change the V2 evaluator to read reserves from the wrong pair address (for example the token address): every mode case and the HORSE case stay green because the Contract mock returns the scripted reserves for any address."
+}

@@ -1,0 +1,71 @@
+{
+  "id": "AUD-TESTI-027",
+  "title": "The deliberate-buy fork wiring test proves the arming only inside the long-lived test worker, so the registered S0 (the operator script exits right after the buy and takes the monitor and anti-rug subscription with it) passes green; the passthrough leg also cannot show the private-to-public transition",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "scripts/deliberate-buy.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/deliberateBuyReplay.fork.test.ts:279@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "await bot.executeDeliberateBuy(ctx, token, amountInWei, dex) in the Vitest worker"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/deliberateBuyReplay.fork.test.ts:314-327@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "asserts detector registration and hasExitMonitorTimer while the same process is still alive"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the production caller; the script ends after the buy (AUD-BUY-001)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:820-863@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "recordAndArmDeliberateBuy arms in-process timers and listeners"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/deliberateBuyReplay.fork.test.ts:17-42@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the file itself states the fork cannot prove the private-to-public transition or live inclusion"
+    }
+  ],
+  "sibling_sites_checked": "The unit sibling AUD-TESTU-006 (in-process arming) and every other deliberate-buy test in the slice (none). No test runs scripts/deliberate-buy.ts.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a real-path fork test that, by construction, cannot observe the registered S0 AUD-BUY-001 and reads as proof that the deliberate buy is protected.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-001",
+    "AUD-TESTU-006",
+    "AUD-TESTI-020"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 23/25: run scripts/deliberate-buy.ts as a child on the fork and assert, after the child exits, which process monitors the position (RED today); keep this file as the in-process wiring check and say so in its title.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "deliberate buy LANDS on the fork and wires register -> monitor: real hash + trades row + anti-rug registered + exit monitor armed"
+  ],
+  "escaped_regression": "Today: a deliberate buy through scripts/deliberate-buy.ts lands and the script exits, leaving the position with no exit monitor and no anti-rug watch until the main bot restarts (AUD-BUY-001), while this test passes."
+}
