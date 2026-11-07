@@ -1,0 +1,61 @@
+{
+  "id": "AUD-API-009",
+  "title": "An authenticated WebSocket client that sends one invalid frame kills the bot process: dashboard sockets get only a 'close' listener, and the ws library emits 'error' on a protocol violation",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C11"
+  ],
+  "files": [
+    "src/api/ws/broadcaster.ts",
+    "src/api/ws/handler.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/ws/broadcaster.ts:14-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "addClient registers only ws.on('close'); no 'error' listener on any dashboard socket"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/ws/handler.ts:61-65@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every authenticated upgrade goes through addClient"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 1187-1206p node_modules/ws/lib/websocket.js (ws 8.20.0, installed)",
+      "note": "receiverOnError emits 'error' on the WebSocket for any invalid frame (unmasked client frame, bad opcode, oversized payload); an EventEmitter 'error' with no listener throws"
+    },
+    {
+      "type": "command",
+      "ref": "node ws-frame-crash.js <repo>/node_modules/ws (scratch folder outside the repo (Node 22.16.0 by absolute path; no src/ import, no .env, no data/, no live DB; loopback 127.0.0.1 only); WebSocketServer noServer with a connection callback that adds only a 'close' listener, as addClient does; raw client sends one unmasked text frame after the 101)",
+      "note": "output: server process EXITED code=1 :: RangeError: Invalid WebSocket frame: MASK must be set"
+    }
+  ],
+  "sibling_sites_checked": "Every server-side WebSocket in src/api (only the dashboard clients via addClient); the client-side anti-rug and DEX provider sockets with the same missing error listener are AUD-ANTIRUG-002. A browser WebSocket always sends valid masked frames, so this needs a non-browser client holding a valid session cookie (key holder, or a cookie taken from plain-http traffic, AUD-API-007).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 STRAND: the impact is the same process exit as AUD-API-008 (every exit monitor and anti-rug stop until a restart), but it needs a valid session first, which bounds who can trigger it.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-008",
+    "AUD-ANTIRUG-002",
+    "AUD-API-007"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Add ws.on('error', ...) that logs and terminates that socket in addClient (and a wss 'error' handler); same process-level policy decision as AUD-API-008 (OD-6). Phase 24 together with AUD-API-008.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

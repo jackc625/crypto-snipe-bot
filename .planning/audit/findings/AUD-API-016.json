@@ -1,0 +1,70 @@
+{
+  "id": "AUD-API-016",
+  "title": "The dashboard position value can be wrong: when the live quote fails the 'current price' falls back to the exit engine's high-water mark, which is a probe quote in different units, the no-exit-state fallback quotes the ETH cost as if it were a token amount, and after partial sells the full bought amount is quoted",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C01",
+    "C03"
+  ],
+  "files": [
+    "src/api/helpers/positions.ts",
+    "src/exitEngine.ts",
+    "dashboard/src/components/PositionTable.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:126-128@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "quote amount = exitState.originalTokenAmount, or ethers.parseEther(trade.buy_cost) (an ETH amount in wei) used as a raw token amount when there is no exit_state row"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:138-141@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "quote failure: currentPrice = exitState.highWaterMark, priceStale = true"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:146-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "unrealizedPnl = currentPrice / 1e18 + sell_revenue - buy_cost - sell_gas"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "currentPrice / 1e18 sent as the position value"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the code comment itself says originalTokenAmount overstates the holding after partial sells"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:163-171@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Current shows the value with a \"(stale)\" tag; P&L next to it has no stale tag"
+    }
+  ],
+  "sibling_sites_checked": "Every number the positions helper sends (positions.ts:151-170): entryPrice and buyCost are the stored ETH cost (decimal string, correct unit), currentPrice and unrealizedPnl as above, pnl = realized_pnl and sellRevenue are the mixed-unit SQL results of AUD-DB-002 (sub_claim 4, DB slice, linked not repeated), exitState.highWaterMark is the raw engine value. The meaning of the engine's high-water mark (a fixed probe quote, not a price) is AUD-EXIT-003. The rendering of these fields is audited in the DASH slice.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 misleading operator display: an operator deciding whether to force-sell can see a wrong current value and P&L (the stale tag is on the value only). No bot decision uses these numbers.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-002",
+    "AUD-EXIT-003"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "DB-01",
+  "recommendation": "Show \"unknown\" instead of a fallback in other units; quote the on-chain balanceOf amount; mark P&L stale together with the price. Fix together with the units decision (card DB-01). Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

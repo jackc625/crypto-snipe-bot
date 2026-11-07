@@ -1,0 +1,76 @@
+{
+  "id": "AUD-API-014",
+  "title": "API errors return raw internal error messages to the browser (the error middleware and the force-sell, emergency-sell, pause, resume, chain-start and circuit-breaker routes), which can carry SQLite, RPC or provider details",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "src/api/middleware/errorHandler.ts",
+    "src/api/routes/controls.ts",
+    "src/api/routes/antiRug.ts",
+    "src/api/routes/chains.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/middleware/errorHandler.ts:31-40@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "res.status(...).json({ error: err.message }) for every unhandled route error"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:113-118@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell 500: 'Force sell failed: ' + err.message"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:190-197@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell: per-position error: err.message in errors[]"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:220-225@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell 500 with err.message"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/antiRug.ts:70-75@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CB reset 500 with err.message"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:191-199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "start: 'Full restart failed: ' + err.message in warnings"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1831-1833@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onRestart warnings include 'MEV health check failed: ' + err.message and are returned to the browser"
+    }
+  ],
+  "sibling_sites_checked": "Every res.json/res.status with err.message in src/api (grep 'err.message\\|err instanceof Error' over the snapshot): controls.ts :116, :196, :223, :261, :281; antiRug.ts :73, :93; chains.ts :198 (via bot.ts :1832, :1841); errorHandler.ts :40. The routes that call RPC directly (chains GET, health, positions) catch provider errors and do not return them. Whether an ethers HTTP error (whose message includes info.requestUrl, so an RPC API key, per the AUD-DB-010 reproduction) can reach one of these responses depends on a throw escaping executeFullSell's own catch or the MEV health check; not proven here, hence candidate.",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 (candidate): the receiver is the authenticated operator, so the main risk is a provider URL or key travelling to the browser (and over plain http in remote mode, AUD-API-007); no path was proven at the base SHA.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-010",
+    "AUD-API-007"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Return a generic message with a correlation id and log the detail server-side through the redaction planned under card TX-04. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

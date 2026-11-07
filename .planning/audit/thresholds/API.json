@@ -1,0 +1,380 @@
+{
+  "rows": [
+    {
+      "hardcoded": true,
+      "flags": [
+        "no-in-flight-guard",
+        "shares-rpc-with-exits"
+      ],
+      "od_ref": null,
+      "id": "TH-API-01",
+      "name": "Dashboard position broadcast interval",
+      "env_key": null,
+      "current_value": "5000",
+      "definition_sites": [
+        "src/api/server.ts:186-205@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "setInterval period; skipped when no WebSocket client is connected",
+      "units": "ms",
+      "representation": "number literal",
+      "effective_unset": "n/a (literal)",
+      "effective_empty": "n/a (literal)",
+      "effective_non_numeric": "n/a (literal)",
+      "rationale": "comment: 'D-07, D-08: shared helper, every 5 seconds'",
+      "overlap": "Same 5 s cadence as the per-position exit poll (TH-EXIT row for the poll, AUD-EXIT-005); each cycle quotes every open position on the shared HTTP provider (AUD-API-012)",
+      "recommendation": "Self-rescheduling timer that skips while a cycle runs; reuse the exit monitor quotes (AUD-API-012)."
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "not-applied-to-websocket",
+        "no-revocation"
+      ],
+      "od_ref": null,
+      "id": "TH-API-02",
+      "name": "Dashboard session lifetime",
+      "env_key": null,
+      "current_value": "86400000",
+      "definition_sites": [
+        "src/api/middleware/auth.ts:14@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:66-71@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:83-93@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "Date.now() - createdAt > TTL -> session invalid; cookie maxAge = TTL",
+      "units": "ms (24 h)",
+      "representation": "number expression 24*60*60*1000",
+      "effective_unset": "n/a (literal)",
+      "effective_empty": "n/a (literal)",
+      "effective_non_numeric": "n/a (literal)",
+      "rationale": "comment: 24 hours",
+      "overlap": "Not enforced on open WebSockets (handler.ts:54 checks once at upgrade; AUD-API-007); no logout, so this is the only way a session ends besides a restart",
+      "recommendation": "Apply the TTL to open sockets and add a logout (AUD-API-007, card API-03)."
+    },
+    {
+      "hardcoded": true,
+      "flags": [],
+      "od_ref": null,
+      "id": "TH-API-03",
+      "name": "Expired-session cleanup interval",
+      "env_key": null,
+      "current_value": "3600000",
+      "definition_sites": [
+        "src/api/middleware/auth.ts:21-30@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "hourly sweep deleting sessions older than TH-API-02",
+      "units": "ms (1 h)",
+      "representation": "number expression 60*60*1000",
+      "effective_unset": "n/a (literal)",
+      "effective_empty": "n/a (literal)",
+      "effective_non_numeric": "n/a (literal)",
+      "rationale": "comment: prevent unbounded memory growth",
+      "overlap": "validateSession also deletes an expired session on use (auth.ts:87-90), so the sweep is memory hygiene only",
+      "recommendation": "None (correct as is)."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "display-duplicate-parser",
+        "excludes-failed-held"
+      ],
+      "od_ref": "OD-25",
+      "id": "TH-API-04",
+      "name": "Maximum open positions as shown by the dashboard",
+      "env_key": "MAX_OPEN_POSITIONS",
+      "current_value": "10",
+      "definition_sites": [
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "display only: positionLimit.max next to the pending-buy count",
+      "units": "positions (count)",
+      "representation": "risk.ts parseInt(x || \"10\", 10); chains.ts raw string with || \"10\"",
+      "effective_unset": "10 at both sites (same as riskManager)",
+      "effective_empty": "10 at both sites",
+      "effective_non_numeric": "risk.ts NaN -> JSON null; chains.ts the raw text; but preflight refuses a non-numeric value at boot, so the running bot never has one",
+      "rationale": "mirrors riskManager.ts:28",
+      "overlap": "TH-DB-01 (the enforcing row, which already lists these two sites); count excludes failed-held positions (AUD-API-001 sub_claim 5, AUD-DB-003)",
+      "recommendation": "Serve the effective value from riskManager (AUD-API-003, card OD-25)."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "display-duplicate-parser",
+        "nan-shown-as-null",
+        "mixed-units"
+      ],
+      "od_ref": "OD-25",
+      "id": "TH-API-05",
+      "name": "Maximum total exposure as shown by the dashboard",
+      "env_key": "MAX_TOTAL_EXPOSURE",
+      "current_value": "10.0",
+      "definition_sites": [
+        "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "display only: exposureLimit.max next to the mixed-unit exposure total",
+      "units": "native coin (ETH/BNB), but compared with a wei/decimal mixed total (AUD-DB-002)",
+      "representation": "risk.ts parseFloat(x || \"10.0\"); chains.ts raw string",
+      "effective_unset": "10.0",
+      "effective_empty": "10.0",
+      "effective_non_numeric": "risk.ts NaN -> null (riskManager NaN = cap off, AUD-DB-001); chains.ts raw text; \"5ETH\" -> 5 at both risk.ts and riskManager",
+      "rationale": "mirrors riskManager.ts:29",
+      "overlap": "TH-DB-02 (enforcing row)",
+      "recommendation": "Serve the effective value and an explicit invalid/off state from riskManager (AUD-API-003, OD-25)."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "display-duplicate-parser",
+        "unit-mismatch-in-display"
+      ],
+      "od_ref": "OD-25",
+      "id": "TH-API-06",
+      "name": "Daily loss percentage as shown by the dashboard",
+      "env_key": "DAILY_LOSS_PCT",
+      "current_value": "10",
+      "definition_sites": [
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "display only: dailyLoss.limitPct next to an absolute summed loss (AUD-API-017)",
+      "units": "percent of per-chain max capital (enforcement); shown against an absolute amount",
+      "representation": "risk.ts parseFloat(x || \"10\"); chains.ts raw string",
+      "effective_unset": "10",
+      "effective_empty": "10",
+      "effective_non_numeric": "risk.ts NaN -> null (riskManager NaN = breaker off, AUD-DB-001); chains.ts raw text",
+      "rationale": "mirrors riskManager.ts:30",
+      "overlap": "TH-DB-03 (enforcing row)",
+      "recommendation": "Return per-chain used and threshold in one unit (AUD-API-017, card DB-01) and the parsed value (OD-25)."
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "duplicate-of-engine-window",
+        "different-filter-basis"
+      ],
+      "od_ref": null,
+      "id": "TH-API-07",
+      "name": "Daily window for the dashboard loss and P&L figures",
+      "env_key": null,
+      "current_value": "86400000",
+      "definition_sites": [
+        "src/api/routes/risk.ts:91-92@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/health.ts:63@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "sell timestamp >= now - 24 h (risk /limits daily loss; /health dailyPnL by buy time)",
+      "units": "ms (24 h)",
+      "representation": "number literals 86400000 and 86_400_000",
+      "effective_unset": "n/a (literal)",
+      "effective_empty": "n/a (literal)",
+      "effective_non_numeric": "n/a (literal)",
+      "rationale": "mirrors the rolling 24 h window of the breaker",
+      "overlap": "Same window as the breaker in riskManager (TH-DB row for DAILY_LOSS window); /health filters by buy time (b.timestamp) while the breaker filters by sell time, so the two \"24 h\" figures cover different trades",
+      "recommendation": "Take the window and the figure from riskManager so display and breaker agree (AUD-API-017)."
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "missing-bound",
+        "serial-per-position"
+      ],
+      "od_ref": "API-02",
+      "id": "TH-API-08",
+      "name": "Time bound on a dashboard force-sell or emergency-sell request",
+      "env_key": null,
+      "current_value": "none (unbounded)",
+      "definition_sites": [
+        "src/api/routes/controls.ts:59-119@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:122-226@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/server.ts:46-47@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "none: the handler awaits executeFullSell per position with no timeout; Node http server defaults apply only to receiving the request (requestTimeout 300000 ms, headersTimeout 60000 ms; server.timeout 0)",
+      "units": "ms",
+      "representation": "absent",
+      "effective_unset": "unbounded",
+      "effective_empty": "unbounded",
+      "effective_non_numeric": "unbounded",
+      "rationale": "none stated",
+      "overlap": "The ExitWorker submit is bounded by WATCHDOG_BUDGET_MS (bot.ts:1876-1879, EXIT/TX rows) but dashboard sells bypass the worker; private attempt count per position is MEV_SELL_FALLBACK_ATTEMPTS (default 2) because the dashboard reason is routine (exitEngine.ts:453-456)",
+      "recommendation": "Bound each position by a wall-clock budget and run the sell as a job with progress (AUD-API-004, card API-02)."
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "missing-limit"
+      ],
+      "od_ref": "API-03",
+      "id": "TH-API-09",
+      "name": "Login attempt rate limit",
+      "env_key": null,
+      "current_value": "none (unlimited)",
+      "definition_sites": [
+        "src/api/middleware/auth.ts:40-59@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/auth.ts:13@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "none: every POST /api/auth/login is checked, a failure only logs warn",
+      "units": "attempts per time",
+      "representation": "absent",
+      "effective_unset": "unlimited",
+      "effective_empty": "unlimited",
+      "effective_non_numeric": "unlimited",
+      "rationale": "none stated",
+      "overlap": "Preflight requires DASHBOARD_API_KEY >= 16 characters (docs/operations/going-live.md:147), the only brake on guessing; reachable from a DNS-rebinding page (AUD-API-005)",
+      "recommendation": "Per-IP and global backoff (AUD-API-007, card API-03)."
+    }
+  ],
+  "discovery": {
+    "env_reads": [
+      {
+        "key": "MAX_OPEN_POSITIONS",
+        "sites": [
+          "src/api/routes/risk.ts:80",
+          "src/api/routes/chains.ts:88"
+        ],
+        "row_id": "TH-API-04"
+      },
+      {
+        "key": "MAX_TOTAL_EXPOSURE",
+        "sites": [
+          "src/api/routes/risk.ts:81",
+          "src/api/routes/chains.ts:89"
+        ],
+        "row_id": "TH-API-05"
+      },
+      {
+        "key": "DAILY_LOSS_PCT",
+        "sites": [
+          "src/api/routes/risk.ts:82",
+          "src/api/routes/chains.ts:90"
+        ],
+        "row_id": "TH-API-06"
+      },
+      {
+        "key": "DASHBOARD_ALLOWED_ORIGINS",
+        "sites": [
+          "src/api/server.ts:97"
+        ],
+        "excluded_reason": "list of origins, not a money or timing number (trust boundary: AUD-API-005)"
+      },
+      {
+        "key": "DASHBOARD_TRUST_PROXY_PROTO",
+        "sites": [
+          "src/api/server.ts:99"
+        ],
+        "excluded_reason": "boolean flag, not a number"
+      },
+      {
+        "key": "DASHBOARD_HOST",
+        "sites": [
+          "src/api/server.ts:208"
+        ],
+        "excluded_reason": "bind address, not a number (exposure context for AUD-API-008 / AUD-API-010)"
+      },
+      {
+        "key": "DASHBOARD_PORT",
+        "sites": [
+          "src/api/server.ts:209"
+        ],
+        "excluded_reason": "TCP port, not a money or timing number"
+      },
+      {
+        "key": "DASHBOARD_API_KEY",
+        "sites": [
+          "src/api/middleware/auth.ts:42"
+        ],
+        "excluded_reason": "credential, not a number (handling: AUD-API-007)"
+      },
+      {
+        "key": "NODE_ENV",
+        "sites": [
+          "src/api/middleware/auth.ts:64"
+        ],
+        "excluded_reason": "string mode switch for the cookie Secure flag, not a number (AUD-API-007)"
+      }
+    ],
+    "constants": [
+      {
+        "name": "broadcast interval 5000",
+        "sites": [
+          "src/api/server.ts:205"
+        ],
+        "row_id": "TH-API-01"
+      },
+      {
+        "name": "SESSION_TTL_MS 24 h",
+        "sites": [
+          "src/api/middleware/auth.ts:14"
+        ],
+        "row_id": "TH-API-02"
+      },
+      {
+        "name": "SESSION_CLEANUP_INTERVAL_MS 1 h",
+        "sites": [
+          "src/api/middleware/auth.ts:21"
+        ],
+        "row_id": "TH-API-03"
+      },
+      {
+        "name": "86400000 daily windows",
+        "sites": [
+          "src/api/routes/risk.ts:91",
+          "src/api/routes/health.ts:63"
+        ],
+        "row_id": "TH-API-07"
+      },
+      {
+        "name": "trades default window 7 days",
+        "sites": [
+          "src/api/routes/trades.ts:62",
+          "src/api/routes/trades.ts:139"
+        ],
+        "excluded_reason": "history filter default for display, no effect on trading (D-19 cosmetic)"
+      },
+      {
+        "name": "trades page size 25 / max 50",
+        "sites": [
+          "src/api/routes/trades.ts:58"
+        ],
+        "excluded_reason": "page size (D-19 cosmetic)"
+      },
+      {
+        "name": "P&L chart ranges 24h/7d/30d",
+        "sites": [
+          "src/api/routes/risk.ts:21-26"
+        ],
+        "excluded_reason": "chart range (display)"
+      },
+      {
+        "name": "1e18 divisor",
+        "sites": [
+          "src/api/helpers/positions.ts:146",
+          "src/api/helpers/positions.ts:159"
+        ],
+        "excluded_reason": "wei-to-native unit conversion for display (correct for 18-decimal wrappers; display units are AUD-API-016)"
+      },
+      {
+        "name": "rounding 1e4 / 1e8",
+        "sites": [
+          "src/api/routes/risk.ts:70",
+          "src/api/routes/risk.ts:107",
+          "src/api/routes/risk.ts:111"
+        ],
+        "excluded_reason": "display rounding"
+      },
+      {
+        "name": "pause reason clamp (sanitizeReason, 120 chars)",
+        "sites": [
+          "src/api/routes/controls.ts:249"
+        ],
+        "excluded_reason": "text length, not money or timing"
+      },
+      {
+        "name": "exitConfig.urgencyWindowMs used for urgencyPct",
+        "sites": [
+          "src/api/helpers/positions.ts:88"
+        ],
+        "excluded_reason": "reads the EXIT slice value (its own TH-EXIT row); no new number here"
+      }
+    ]
+  }
+}

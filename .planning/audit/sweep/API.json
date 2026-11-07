@@ -1,0 +1,126 @@
+{
+  "slice": "API",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-API-016",
+        "AUD-API-017"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for BigInt(|Number(|parseFloat|parseInt|/ 1e18|parseEther|toFixed: positions.ts mixes a wei Number (/1e18) with decimal-ETH and wei SQL sums and falls back to a probe value in other units (AUD-API-016); risk.ts divides an absolute amount by a percentage limit (AUD-API-017); the mixed-unit SQL itself is AUD-DB-002"
+    },
+    "C02": {
+      "result": [
+        "AUD-API-003"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for \\|\\| and \\?\\?: risk.ts:80-82 / chains.ts:88-90 env defaults (AUD-API-003); server.ts:97 / :208-209 DASHBOARD_* defaults (a non-numeric DASHBOARD_PORT throws at listen, fail-loud); health.ts:66 realized_pnl ?? 0 and positions.ts:74 ?? null are value-safe"
+    },
+    "C03": {
+      "result": [
+        "AUD-API-016",
+        "AUD-API-017"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for decimals|parseUnits|formatUnits|1e18|parseEther: no token-decimals math; positions.ts quotes parseEther(buy_cost) as a token amount (AUD-API-016); /1e18 on a WETH-wei quote is the right divisor for every enabled chain (all native wrappers have 18 decimals)"
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for slippage|minOut|amountOutMin: none in src/api; dashboard sells pass reason urgency-market-sell and the slippage is chosen inside executeFullSell (EXIT slice, AUD-EXIT-001)"
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for deadline|Date.now() + : no transaction deadlines are built in src/api"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for approve|allowance|ensureApproval: none in src/api (approvals happen inside executeFullSell, AUD-EXIT-004)"
+    },
+    "C07": {
+      "result": [
+        "AUD-API-004"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for withNonceLock|nonce|executeFullSell: dashboard sells call executeFullSell directly from the request, outside the ExitWorker queue, and wait on withNonceLock at every signing site (AUD-API-004); no nonce is read or set in src/api"
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for reorg|confirmations|blockNumber: chains.ts and health.ts read getBlockNumber for display only; no reorg-sensitive logic in src/api"
+    },
+    "C09": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for receipt|status === 1|wait(: none in src/api; receipt handling is inside executeFullSell (EXIT/TX slices)"
+    },
+    "C10": {
+      "result": [
+        "AUD-API-002"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for wsProvider|removeAllListeners|onRestart|reconnect: chains.ts:141 argument-less removeAllListeners on the shared provider and start re-running only DEX listeners (AUD-API-002, RC-12, card OD-11); health/chains read wsProvider !== null only; the dashboard client reconnect is audited in the DASH sweep"
+    },
+    "C11": {
+      "result": [
+        "AUD-API-008",
+        "AUD-API-009"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for async ( handlers, .catch, try, new URL(, on('error': an uncaught throw in the upgrade handler (AUD-API-008, reproduced) and a missing WebSocket 'error' listener (AUD-API-009, reproduced) end the process; express 5 forwards async route rejections to the error middleware; chains.ts fire-and-forget broadcasts have .catch; server.ts:186 interval has try/catch"
+    },
+    "C12": {
+      "result": [
+        "AUD-API-012"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for setInterval|setTimeout|clearInterval|unref: server.ts:186 async interval without an in-flight guard (AUD-API-012, RC-21 sibling); auth.ts:22 cleanup timer is synchronous and unref-ed; the broadcast interval is cleared in close()"
+    },
+    "C13": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for db.prepare|.run(|transaction|forceWalCheckpoint: controls.ts reads with two prepared SELECTs and writes pause/resume with one statement each plus a WAL checkpoint; no multi-statement write in src/api, so no transaction boundary to break (the status semantics of what is \"open\" are AUD-API-001)"
+    },
+    "C14": {
+      "result": [
+        "AUD-API-001",
+        "AUD-API-004",
+        "AUD-API-015"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for force-sell|emergency-sell|executeFullSell|status = ?: the sell controls cannot reach failed-held positions (AUD-API-001, ESC-PRE-04); in-request, non-idempotent, misreported sells (AUD-API-004); emergency sell does not stop entries (AUD-API-015)"
+    },
+    "C15": {
+      "result": [
+        "AUD-API-001",
+        "AUD-API-004"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for reads that decide later writes: emergency-sell decides 'open' from trades.status, which the exit engine rewrites to 'failed' for held positions (AUD-API-001), and acts on a row list captured at the start of a long loop (AUD-API-004)"
+    },
+    "C16": {
+      "result": "checked, none",
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for gasPrice|maxFeePerGas|gasMultiplier|gasLimit: none in src/api; dashboard sells use the routine fee path inside executeFullSell (TX/EXIT slices)"
+    },
+    "C17": {
+      "result": [
+        "AUD-API-007",
+        "AUD-API-014"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for DASHBOARD_API_KEY|timingSafeEqual|cookie|maskUrl|err.message: the key compare leaks length by timing and the cookie is never Secure (AUD-API-007); routes return raw error messages (AUD-API-014, candidate); chains.ts maskUrl sends only the RPC hostname (correct); no private key or token in src/api"
+    },
+    "C18": {
+      "result": [
+        "AUD-API-003",
+        "AUD-API-007",
+        "AUD-API-011"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for process.env: risk limits re-parsed for display (AUD-API-003), NODE_ENV decides the Secure flag (AUD-API-007), package.json path at import (AUD-API-011); DASHBOARD_ALLOWED_ORIGINS / DASHBOARD_TRUST_PROXY_PROTO read once at boot (documented, correct)"
+    },
+    "C19": {
+      "result": [
+        "AUD-API-005",
+        "AUD-API-006",
+        "AUD-API-007",
+        "AUD-API-008",
+        "AUD-API-010"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for cors|origin|host|authMiddleware|sameSite|upgrade|/health: Host-derived same-origin (AUD-API-005, reproduced); WebSocket without Origin check (AUD-API-006); session handling (AUD-API-007); unauthenticated crash (AUD-API-008, reproduced); public /health with money fields (AUD-API-010). CORS, CSRF, authentication and duplicate execution are separate entries (005, 006, 007, 004)"
+    },
+    "C20": {
+      "result": [
+        "AUD-API-013"
+      ],
+      "search": "grep over the API snapshot (slice-files.ts --snapshot API,DASH at 23a6461 (14 src/api files)) for broadcast(|message|symbol|telegram: notification text with the deployer-chosen symbol is forwarded raw and its severity guessed from keywords (AUD-API-013; Telegram leg AUD-BUY-022); src/api handles no inbound Telegram input (getTelegramStatus is a boolean)"
+    }
+  }
+}

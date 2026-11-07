@@ -1,0 +1,83 @@
+{
+  "id": "AUD-API-006",
+  "title": "CSRF: the state-changing HTTP routes are protected by the Origin check plus a SameSite=Strict cookie, but the WebSocket upgrade checks no Origin, so any same-site page (another port on the same host name) can open /ws with the operator's cookie and read the live feed",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C19"
+  ],
+  "files": [
+    "src/api/ws/handler.ts",
+    "src/api/server.ts",
+    "src/api/middleware/auth.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/ws/handler.ts:37-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "handleUpgrade checks the path and the session cookie only; Origin is never read"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:183@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "server.on('upgrade', ...) bypasses the express middleware chain, so the CORS/Origin gate (server.ts:100-144) never runs for /ws"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:66-71@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "cookie sameSite strict: not sent from a cross-site page, but SameSite treats every port of the same host name as the same site (http://127.0.0.1:3000 and http://127.0.0.1:8080; localhost:5173 and localhost:8080)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:118-143@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HTTP: a cross-origin Origin is rejected with 403 before any route runs (loopback repro in AUD-API-005: Origin http://127.0.0.1:3000 -> 403)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/ws/broadcaster.ts:39-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "what a hijacked socket receives: positions_update every 5 s, notifications (all Telegram alert texts), anti-rug events, pause and chain status"
+    }
+  ],
+  "sibling_sites_checked": "Every state-changing route (grep router.post over the snapshot): controls.ts force-sell, emergency-sell, pause, resume; chains.ts stop, start; antiRug.ts CB reset; auth.ts login. All are POST behind the Origin gate; no GET route changes state (the GET routes are read-only, trades export included). A form or fetch POST from another origin carries an Origin header in current browsers and is refused before the route; a cross-site page also lacks the Strict cookie. The WebSocket has no inbound message handler (no ws.on('message') in src/api), so a hijacked socket can read but not command; a browser cannot send the malformed frame that crashes the server (AUD-API-009). The configured DASHBOARD_ALLOWED_ORIGINS list (server.ts:133) intentionally opens HTTP to listed origins.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 EXPOSURE: read-only disclosure of the whole live trading feed to a page on the same host name (for example a local dev server or another local web app the operator opens), needing no credentials; no control path found for HTTP. Not run in a browser here (code reading).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-005",
+    "AUD-API-009"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-03",
+  "recommendation": "Check Origin on the WebSocket upgrade against the same allowlist as HTTP (and the Host allowlist from AUD-API-005); reject with 403. Card API-03. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "HTTP state-changing routes reject requests with a cross-origin Origin before the route runs (no HTTP CSRF gap found)",
+      "evidence": [
+        "src/api/server.ts:118-143@23a64617dca167976adc4645fed0e2c69e384820",
+        "node cors-host.js (AUD-API-005 repro)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The /ws upgrade accepts any Origin and a same-site page receives the Strict cookie",
+      "evidence": [
+        "src/api/ws/handler.ts:37-66@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/server.ts:183@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:66-71@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ]
+}

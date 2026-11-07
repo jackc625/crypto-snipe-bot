@@ -1,0 +1,39 @@
+{
+  "id": "OD-11",
+  "title": "H1/H2: one owner per chain for the WebSocket connection and its reconnects, which notifies its subscribers (DEX listeners, anti-rug), instead of three code paths that each rewrite ctx.wsProvider",
+  "area": "API",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: the dashboard stop/start, the per-DEX reconnect loops in bot.ts and the anti-rug reconnect each manage ctx.wsProvider on their own",
+      "behavior_impact": "none",
+      "risk": "Dashboard Stop silently removes the anti-rug rug-log subscription and Start does not restore it (AUD-API-002, RC-12); one reconnect can destroy or orphan another path's subscription, duplicate DEX listeners (double buys) and leak providers (AUD-ANTIRUG-001, RC-13; AUD-BUY-008, RC-20); a refused reconnect crashes the process (AUD-ANTIRUG-002). All S1 STRAND/OVERSPEND; the live re-entry gate stays blocked while any is open."
+    },
+    {
+      "id": "single-owner",
+      "name": "One per-chain connection owner: it alone creates, health-checks, reconnects (with backoff, error listener and backfill from the last seen block) and destroys the provider; DEX listeners and anti-rug register as subscribers and are re-attached by the owner after every reconnect; dashboard Stop/Start pause and resume only the chain's DEX subscribers",
+      "behavior_impact": "Stop no longer touches anti-rug; reconnects re-attach every subscriber exactly once and backfill missed blocks; a failed reconnect stays in the backoff loop instead of ending the process; behaviour of buys and exits otherwise unchanged.",
+      "risk": "A structural change in bot.ts, detector.ts and chains.ts on the money path; needs real-socket tests (refused connect, drop and resume, stop/start with a registered position) before it ships; backfill can replay events, so subscribers must be idempotent."
+    },
+    {
+      "id": "targeted-patches",
+      "name": "Keep three paths but patch them: Stop removes only the DEX factory listeners by handle, Start re-subscribes anti-rug, error listeners on every socket, one reconnect loop per chain instead of per DEX",
+      "behavior_impact": "Fixes the dashboard disarm and the crash; reconnect races between the remaining two writers (anti-rug and bot.ts) stay possible.",
+      "risk": "Leaves RC-13 partly open (two writers of ctx.wsProvider); more places to keep consistent later, including during the Phase 27 restructure."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Research recommendation (research SUMMARY OD-11): re-surface immediately (D-STOP-THE-LINE) and fix on the current layout, before any move; that corresponds to single-owner. As S1 capital findings, none of AUD-API-002, AUD-ANTIRUG-001, AUD-ANTIRUG-002 or AUD-BUY-008 can rest on the default.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides who owns each chain's WebSocket connection, what dashboard Stop/Start do to the anti-rug subscription, and how reconnects re-attach listeners and backfill.",
+  "findings": [
+    "AUD-API-002",
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-002",
+    "AUD-BUY-008"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion before Wave C (capital fixes, after the Phase 23 real-path proof); research asks to re-surface it immediately"
+}

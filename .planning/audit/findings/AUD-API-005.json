@@ -1,0 +1,103 @@
+{
+  "id": "AUD-API-005",
+  "title": "CORS: \"same origin\" is derived from the request's own Host header with no list of expected host names, so a DNS-rebinding page passes the CORS gate and can read /health and send unlimited login guesses from the operator's browser",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C19"
+  ],
+  "files": [
+    "src/api/server.ts",
+    "src/api/middleware/auth.ts",
+    "src/api/routes/health.ts",
+    "dashboard/vite.config.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:97-144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "per-request cors(): Origin absent -> allow (:122); Origin whose URL.origin equals scheme://<request Host header> -> allow (:101, :113, :126); allowlist (:133); otherwise 403 (:138-140)"
+    },
+    {
+      "type": "command",
+      "ref": "node cors-host.js <snapshot>/src/api/server.ts <repo>/node_modules (scratch folder outside the repo (Node 22.16.0 by absolute path; no src/ import, no .env, no data/, no live DB; loopback 127.0.0.1 only; audit-base snapshot from slice-files.ts --snapshot API,DASH); the exact text of server.ts:97-144 transpiled with the repo typescript and mounted in a bare express 5.2.1 app with cors 2.8.6, empty env = shipped defaults)",
+      "note": "output: Host=evil.example:8080 + Origin=http://evil.example:8080 -> 200 {\"reachedRoute\":true}; Host=127.0.0.1:8080 + Origin=http://evil.example:8080 -> 403; Host=127.0.0.1:8080 + Origin=http://127.0.0.1:3000 -> 403; no Origin -> 200"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:148-152@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "/health and /api/auth/login are mounted before authMiddleware (no session needed)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:40-59@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loginHandler: no attempt counter, delay or lockout; a failure only logs warn (:56)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:61-71@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a correct key sets the session cookie for whatever host the browser used, so a rebinding hostname gets its own valid session, which then passes authMiddleware (:101-110) for every control route"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/vite.config.ts:9-16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the dev proxy forwards without changeOrigin, so Host stays localhost:5173 and the same Host-match lets dev requests through; any Host allowlist must keep this working"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:75-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "default bind 127.0.0.1; 0.0.0.0 documented for remote access"
+    }
+  ],
+  "sibling_sites_checked": "Every request-origin decision in src/api: server.ts:97-144 (HTTP, this finding); ws/handler.ts:37-66 (WebSocket upgrade, no Origin check at all, AUD-API-006); no Host allowlist anywhere (grep 'host' over the snapshot: server.ts:101/:113/:208, handler.ts:43). Express trust proxy is off and X-Forwarded-Proto is honoured only with DASHBOARD_TRUST_PROXY_PROTO=1 (server.ts:99, :105-108), correct. A rebinding hostname does not receive the existing 127.0.0.1/localhost session cookie, so an already logged-in operator session is not reused (mitigating). Login without rate limit is also listed under authentication handling (AUD-API-007); /health content is AUD-API-010.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 EXPOSURE: the trust boundary (only the dashboard itself may drive the API from a browser) can be crossed by any web page the operator visits while the bot runs, without network access to the bot: the page reads /health (positions, exposure, 24 h P&L) and can guess the key at browser speed with no limit. Taking control (emergency-sell, resume, chain stop, CB reset) needs a correct key; preflight refuses keys shorter than 16 characters (docs/operations/going-live.md:147), so a random key makes that impractical, while a human-chosen 16-character phrase may not. Not S1 because control needs the key; the code half is proven on loopback, the browser half (rebinding) is not run here.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-006",
+    "AUD-API-007",
+    "AUD-API-010"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-03",
+  "recommendation": "Check the Host header against an allowlist (DASHBOARD_HOST:PORT, 127.0.0.1/localhost/[::1] on the configured port, any configured public name, the vite dev host) before CORS and reject others (421/403), and derive \"same origin\" from that configured list rather than from Host; add login rate limiting with backoff. Card API-03 (it changes which requests are accepted). Phase 29 unless the dashboard is exposed beyond 127.0.0.1 earlier.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "Any request whose Origin equals its own Host passes the CORS gate; there is no host allowlist",
+      "evidence": [
+        "src/api/server.ts:100-144@23a64617dca167976adc4645fed0e2c69e384820",
+        "node cors-host.js (loopback repro, output in evidence)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "A DNS-rebinding page can therefore read /health and POST login guesses without limit from the operator's browser",
+      "evidence": [
+        "src/api/server.ts:148-152@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:40-59@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "A correct guess yields a session for the rebinding hostname that passes authMiddleware on every control route",
+      "evidence": [
+        "src/api/middleware/auth.ts:61-71@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:101-110@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ]
+}

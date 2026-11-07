@@ -1,0 +1,43 @@
+{
+  "id": "API-02",
+  "title": "How should Emergency Sell All run: in the HTTP request one position after another (today), or as a bounded background job, and should it pause buying first?",
+  "area": "API",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: serial, unbounded, inside the request; no pause; no idempotency",
+      "behavior_impact": "none",
+      "risk": "One stuck position delays or blocks the rest with no progress shown; a second click runs a second loop; failures are reported as \"lock held\"; the bot keeps buying during and after the emergency (AUD-API-004, AUD-API-015)."
+    },
+    {
+      "id": "job-pause-first",
+      "name": "Set the global pause first, then run the sell-all as a single background job with an id (a second request returns the running job), a wall-clock budget per position and per-position progress and reasons",
+      "behavior_impact": "Pressing Emergency Sell All also stops new snipes until the operator resumes; the dashboard shows progress and the true outcome of every position.",
+      "risk": "The operator must remember to resume; the job runner is new code on the money path."
+    },
+    {
+      "id": "job-no-pause",
+      "name": "Background job with idempotency, budgets and progress as above, but buying continues (add a separate Pause button)",
+      "behavior_impact": "Emergency sell no longer stalls silently; entries continue unless the operator pauses.",
+      "risk": "New positions bought during the emergency stay open unless paused separately."
+    },
+    {
+      "id": "pause-only",
+      "name": "Only set the global pause before the existing loop (and add a Pause button); keep the in-request loop",
+      "behavior_impact": "Stops new entries during an emergency; the loop behaves as today.",
+      "risk": "Leaves the unbounded, non-idempotent, misreported loop (AUD-API-004)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Pick together with EXIT-07 (which reason and speed operator sells use) and the RC-10/RC-11 fixes; a job that pauses first matches what the dialog promises the operator.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); no S1 rests on this card alone (the stall cause is RC-10/RC-11).",
+  "behavior_impact": "Decides how the dashboard panic button sells, what it reports, and whether it stops new buys.",
+  "findings": [
+    "AUD-API-004",
+    "AUD-API-015"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof), together with EXIT-07"
+}

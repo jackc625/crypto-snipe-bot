@@ -1,0 +1,71 @@
+{
+  "id": "AUD-API-017",
+  "title": "/api/risk/limits reports the daily loss as an absolute amount summed over all chains next to a percentage limit, while the breaker compares each chain's loss against a per-chain ETH threshold, so the dashboard's daily-loss gauge cannot show how close the breaker is",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C01",
+    "C03"
+  ],
+  "files": [
+    "src/api/routes/risk.ts",
+    "src/riskManager.ts",
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/pages/RiskExposure.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/risk.ts:90-99@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "totalDailyLoss = sum over enabled chains of getDailyRealizedLoss.total_loss (an absolute, negative, mixed-unit amount, AUD-DB-002)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/risk.ts:110-113@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "returned as dailyLoss { used: <absolute>, limitPct: DAILY_LOSS_PCT }"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the breaker: per chain, total_loss <= -(maxCapital * DAILY_LOSS_PCT / 100)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:111-113@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "gauge percent = used / limitPct * 100 (an amount divided by a percentage)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:199-201@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "shown as \"<used>% / <limitPct>%\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/RiskExposure.tsx:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "shown as \"<used> / <limitPct>%\""
+    }
+  ],
+  "sibling_sites_checked": "All three fields of /limits (risk.ts:101-114): positionLimit (count vs count, right unit; excludes failed-held, AUD-API-001 sub_claim 5), exposureLimit (mixed-unit total, AUD-DB-002), dailyLoss (this finding). /exposure and /pnl return the mixed-unit SQL of AUD-DB-002 (linked).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 misleading display of a safety limit; the enforcement problems (units, failed-held) are AUD-DB-002 / AUD-DB-003.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-002",
+    "AUD-DB-003"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "DB-01",
+  "recommendation": "Return per-chain used and threshold in the same unit the breaker compares (and a percentage of it), from riskManager; render per chain. Depends on card DB-01 (risk accounting basis). Phase 29 after the Phase 24 units fix.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

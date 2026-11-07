@@ -1,0 +1,111 @@
+{
+  "id": "AUD-API-007",
+  "title": "Authentication and sessions: no login rate limit, the cookie is marked Secure only when NODE_ENV=production (which nothing sets), sessions cannot be revoked, WebSocket sessions are never re-checked after the 24 h expiry, and the length pre-check leaks the key length by timing",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17",
+    "C18",
+    "C19"
+  ],
+  "files": [
+    "src/api/middleware/auth.ts",
+    "src/api/routes/auth.ts",
+    "src/api/ws/handler.ts",
+    "src/api/server.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:40-59@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loginHandler: unlimited attempts; a failure only logs warn (:56) and answers 401 naming the env var (:57)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:51-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "apiKey.length !== expected.length returns before timingSafeEqual, so a wrong-length guess answers measurably faster than a right-length one (the \"key-length leak\" of research J1/J2)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:64-71@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "secure: process.env.NODE_ENV === 'production'"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n NODE_ENV 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts .env.example",
+      "note": "only src/api/middleware/auth.ts:64: nothing in the repo sets NODE_ENV, so the session cookie is never Secure and is sent over plain http to the bot port in the documented remote mode (DASHBOARD_HOST=0.0.0.0)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:148-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routes: health, login, the protected /api tree; there is no logout and no way to revoke a session other than its 24 h expiry or a bot restart (sessions is an in-memory Map, auth.ts:17)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/ws/handler.ts:54-65@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the WebSocket validates the cookie once at upgrade; the open socket keeps receiving every broadcast after the session expires (SESSION_TTL_MS is imported at :9 and never used)"
+    }
+  ],
+  "sibling_sites_checked": "All auth code paths: auth.ts loginHandler, validateSession (:83-93), authMiddleware (:101-110) and the cleanup timer (:21-30); routes/auth.ts (login mount only); ws/handler.ts (cookie parsing :18-29, validation :54). Every /api route sits behind authMiddleware (server.ts:162); /health is deliberately public (AUD-API-010). The login compare itself is constant-time for equal lengths (timingSafeEqual) and a session id is a v4 UUID (auth.ts:61), correct. A key with non-ASCII characters can make the byte lengths differ while the UTF-16 lengths match, so timingSafeEqual throws and the login answers 500 instead of 401 (express 5 catches it; cosmetic). The DNS-rebinding path that makes the missing rate limit reachable from a web page is AUD-API-005.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 EXPOSURE: each item weakens who can drive the money controls only in combination with something else (a guessable key, a network observer in remote mode, a stolen browser); with the default loopback bind and a random key of 16+ characters (enforced by preflight) none of them alone gives control.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-005",
+    "AUD-API-009"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-03",
+  "recommendation": "Add per-IP and global login backoff; set Secure from the actual scheme (or always when DASHBOARD_HOST is not loopback) instead of NODE_ENV; add a logout that deletes the server-side session; close WebSockets whose session has expired (timer or per-broadcast check); compare fixed-length digests (HMAC of both values) so length is not observable. Card API-03 (behaviour change for remote access). Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "no login rate limit or lockout",
+      "evidence": [
+        "src/api/middleware/auth.ts:40-59@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "cookie Secure depends on NODE_ENV, which nothing sets",
+      "evidence": [
+        "src/api/middleware/auth.ts:64-71@23a64617dca167976adc4645fed0e2c69e384820",
+        "git grep -n NODE_ENV at the base SHA"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "no logout or server-side session revocation",
+      "evidence": [
+        "src/api/server.ts:148-162@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/middleware/auth.ts:17@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "WebSocket sessions are not re-checked after expiry",
+      "evidence": [
+        "src/api/ws/handler.ts:54-65@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "key length observable by timing",
+      "evidence": [
+        "src/api/middleware/auth.ts:51-55@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ]
+}

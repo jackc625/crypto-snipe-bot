@@ -1,0 +1,52 @@
+{
+  "id": "AUD-API-010",
+  "title": "/health is unauthenticated and returns trading state (open position count, total exposure, 24 h P&L, chain and Telegram status, version), and every hit costs one RPC call per chain",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C19"
+  ],
+  "files": [
+    "src/api/routes/health.ts",
+    "src/api/server.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:148-149@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "app.use('/health', healthRoutes(...)) before authMiddleware"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/health.ts:78-90@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "response body: status, version, uptime, chains (connected, latestBlock, wsConnected), positions { open, totalExposure, dailyPnL }, telegramConnected, telegramError"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/health.ts:30-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each request calls ctx.httpProvider.getBlockNumber() for every chain, on the same HTTP provider the exit monitors use"
+    }
+  ],
+  "sibling_sites_checked": "All routes mounted outside authMiddleware (server.ts:148-152, :164-177): /health (this finding), /api/auth/login (needed), the static SPA and its catch-all (no data). Every other /api route requires a session. The wording of D-20 (health unauthenticated for monitoring) covers liveness, not the money fields. Reachable cross-origin by a DNS-rebinding page (AUD-API-005) and by any network peer in remote mode.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 EXPOSURE: discloses position count, exposure and daily P&L to anyone who can reach the port (or a rebinding page), and lets an unauthenticated client spend the shared RPC quota (one getBlockNumber per chain per request), which could rate-limit the exit quotes under a flood; no control path.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-005"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-03",
+  "recommendation": "Keep an unauthenticated liveness answer (status, chains connected) and move the position and P&L fields behind the session; cache the block-number probe for a few seconds. Card API-03. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

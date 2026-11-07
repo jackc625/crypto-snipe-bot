@@ -1,0 +1,156 @@
+{
+  "id": "AUD-API-004",
+  "title": "Section C SC-07: dashboard force-sell and emergency-sell run inside the HTTP request with no time bound, no idempotency and no progress; a double submit starts a second sell loop, and every \"false\" from executeFullSell is reported as \"sell already in progress / lock held\"",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C07",
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "src/api/routes/controls.ts",
+    "src/exitEngine.ts",
+    "src/bot.ts",
+    "dashboard/src/pages/ChainControls.tsx",
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/components/ConfirmDialog.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:122-226@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell awaits executeFullSell for each position one after another inside the request handler; the response is sent only after the last one"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:59-119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell awaits one executeFullSell inside the request"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:453-456@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "privateAttemptBudget: the dashboard reason 'urgency-market-sell' is routine, so each position gets MEV_SELL_FALLBACK_ATTEMPTS (default 2) private attempts plus the reconcile window before the public fallback; only 'anti-rug' gets 1"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1876-1879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the exit watchdog bounds only the ExitWorker submit; the dashboard calls executeFullSell directly and has no bound (RC-10 wait() with no timeout inside withNonceLock, AUD-EXIT-009 / AUD-TX-002, can park it forever)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1184-1199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the ExitWorker is the serial sell drainer; the dashboard sells bypass it and contend with it and with buys on withNonceLock at each signing site (:871, :874, :909)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:106-112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell: success false -> 409 'Sell already in progress for this position'"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:179-189@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell: success false -> failure 'Sell lock held by another operation'"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:824-835@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell returns false for a routine-paused position (:824-830) and for a held sell lock (:832-835)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:876-879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "and for an unknown dex type"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1037@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "and for a V3 position whose private sell did not land"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1110-1111@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "and after a \"successful\" sell that left the position still held; also :995-996 (inconclusive) and :1163-1167 (catch, still held)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:85-111@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Emergency Sell All closes its dialog at once (:86), shows no in-flight state and leaves the button enabled (:121-126), so a second click can start a second request while the first runs"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/ConfirmDialog.tsx:94-102@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the Force Sell confirm button stays enabled while its request is pending (disabled only for the CONFIRM text check)"
+    }
+  ],
+  "sibling_sites_checked": "Both money-moving dashboard routes (force-sell, emergency-sell) and their callers in the dashboard (Overview.tsx:75-99, ChainControls.tsx:85-111); the other POST routes (pause, resume, chain stop/start, circuit-breaker reset) are idempotent or refuse a repeat (stop/start answer 400 on a repeat; CB reset answers 409 when not tripped). Duplicate execution of the same tokens is prevented by the per-position sell lock (exitEngine.ts:832-835) and the balanceOf checks (:839-846, :1002-1015): a second loop that reaches an already-sold position finds a zero balance and tears down, it does not sell twice; a still-held failed position gets one more real attempt, which increments exit_failure_count (exitEngine.ts:700) towards the routine pause (AUD-EXIT-008). Clearing the exit timers before the sell is known to run (controls.ts:92, :167) is AUD-EXIT-007 and is linked, not repeated. The 409 mapping for the routine-paused case specifically is AUD-EXIT-008; this entry records that every false is mapped that way. Neither route pauses buying (AUD-API-015).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 LOSS: in an emergency the sell-all can be slow (routine attempt budget per position, one after another) and can stall entirely behind one position whose submit never settles, with no progress shown and no answer to the browser, and its report can say 'lock held / in progress' for positions that actually failed. The tokens are not sold twice (sell lock and balanceOf), so this is bounded; the never-settling wait and the head-of-line block that turn it into a stall are already S1 entries (RC-10 on ESC-PRE-02, RC-11 AUD-TX-003 on ESC-TX-01) and are not double-counted here.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-008",
+    "AUD-EXIT-007",
+    "AUD-EXIT-009",
+    "AUD-TX-002",
+    "AUD-TX-003",
+    "AUD-API-001",
+    "AUD-API-015"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-02",
+  "recommendation": "Run a dashboard sell as a server-side job with an id: refuse a second emergency job while one runs (idempotency), stream or poll per-position progress, bound each position by a wall-clock budget (as the worker watchdog does), and report the real reason for every position not sold. Disable the confirm buttons while a request is pending. Which reason and speed an operator sell should use is card EXIT-07 (AUD-EXIT-008); whether emergency sell should pause buying first is card API-02. Phase 24 with the RC-10/RC-11 fixes.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "emergency-sell is serial and unbounded inside the HTTP request; one stuck position delays or blocks every later one and the browser gets no answer",
+      "evidence": [
+        "src/api/routes/controls.ts:140-199@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1876-1879@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:453-456@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "no idempotency: a second POST runs a second loop over a list captured at its own start; locked positions are reported as failures while being sold, finished ones are retried (zero balance, harmless) and failed-held ones get another attempt",
+      "evidence": [
+        "src/api/routes/controls.ts:126@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:179-189@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:832-846@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/ChainControls.tsx:85-126@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "every false from executeFullSell (paused, unknown dex, V3 not landed, still held after failure) is reported as 'in progress' / 'lock held'",
+      "evidence": [
+        "src/api/routes/controls.ts:106-112@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:179-189@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:824-835@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:876-879@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1022-1037@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1110-1111@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "dashboard sells bypass the ExitWorker queue and wait on withNonceLock behind any buy or sell holding it",
+      "evidence": [
+        "src/exitEngine.ts:1184-1199@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:871@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

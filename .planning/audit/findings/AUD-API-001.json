@@ -1,0 +1,223 @@
+{
+  "id": "AUD-API-001",
+  "title": "Emergency-sell and force-sell skip still-held positions whose exit already failed",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "src/api/routes/controls.ts",
+    "src/exitEngine.ts",
+    "src/utils/db.ts",
+    "src/bot.ts",
+    "src/api/helpers/positions.ts",
+    "src/api/routes/trades.ts",
+    "src/api/routes/risk.ts",
+    "src/api/routes/health.ts",
+    "dashboard/src/pages/ChainControls.tsx",
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/components/PositionTable.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1112-1167@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell catch path: re-fetches balanceOf; when the position is STILL HELD (balance > dust, or the re-fetch failed and the -1n sentinel is used) it runs the still-held branch"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1163@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "updateTradeStatus.run('failed', token, chain): the buy row becomes trades.status = 'failed' while the tokens are still in the wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:325-327@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "updateTradeStatus: UPDATE trades SET status = ? WHERE token = ? AND chain = ? AND status = 'pending' (every pending row of that token and chain)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1164@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "then keepMonitoringFailedHeld(...)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:700@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "keepMonitoringFailedHeld: markExitFailedHeld.run(tradeId)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:540-545@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "markExitFailedHeld: UPDATE exit_state SET exit_status = 'exit_failed_held', exit_failure_count = exit_failure_count + 1"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:723-732@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the bot itself keeps the position alive: anti-rug kept, poll timer re-armed through resumeExitMonitor"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:51-56@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "prepared statements getPendingTrade / getAllPendingTrades: SELECT ... FROM trades WHERE [id = ? AND] status = ? AND action = ?"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:70-74@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell: getPendingTrade.get(tradeId, 'pending', 'buy'); no row -> 404 { error: 'Trade not found or already closed' }"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:126-131@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell: getAllPendingTrades.all('pending', 'buy'); empty -> { ok: true, sold: 0, failed: 0, message: 'No open positions to sell' }"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:140-219@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell loops only over the selected pending rows; when every selected sell succeeds it answers { ok: true, sold, failed: 0, errors: [] } with no word about rows it never selected"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeExitMonitorTrades: WHERE (t.status = 'pending' AND t.action = 'buy') OR e.exit_status = 'exit_failed_held' (restart-resume already includes failed-held positions)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1892-1911@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeMultiChainMonitoring uses getResumeExitMonitorTrades at :1904; the comment at :1893-1903 names exactly this class (a catch-path failed-held row dropped by a pending-only scan)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:55-56@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the dashboard position list (REST /api/positions and the 5 s positions_update broadcast) keeps only getPnL rows with buy_status === 'pending'"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:98-103@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the Emergency Sell All handler shows a message only when result.failed > 0; sold: 0 with \"No open positions to sell\" and a partial success both show nothing"
+    }
+  ],
+  "sibling_sites_checked": "Every API, dashboard and scripts site that selects or labels open positions, re-measured at the base SHA: (1) src/api/routes/controls.ts:51-56/:70/:126 force-sell and emergency-sell select status='pending' AND action='buy' only (this finding). (2) src/api/helpers/positions.ts:56 keeps buy_status === 'pending' only, and :73 getTradeIdForPendingToken (src/utils/db.ts:549-551, status='pending') resolves the trade id the same way: a failed-held position is absent from the dashboard Open Positions table, so no Force Sell button exists for it (sub_claim 3). (3) src/api/routes/trades.ts:103 labels buy_status !== 'pending' as 'closed', so trade history shows the still-held position as closed at a full loss (sub_claim 4; dashboard/src/components/TradeTable.tsx:189-194 renders that label). (4) src/api/routes/risk.ts:85 and :88 (getOpenPositionCount db.ts:420-422, getTotalExposure db.ts:425-438), src/api/routes/health.ts:59-60 and risk.ts:37 / health.ts:60 getPortfolioExposure (src/riskManager.ts:48-63, WHERE at :61): the dashboard position count, exposure total, exposure donut and /health leave failed-held positions out (sub_claim 5, display only; the enforcement side of the same statements is AUD-DB-003, DB slice, named not edited). (5) DB-slice siblings named by path only: src/riskManager.ts:61, src/utils/db.ts:421, :437, :550 and :561 (getStaleTradesQuery, used by preflight checkStaleData, so a failed-held position is also never reported as stale). (6) scripts/: git grep at the base SHA for FROM trades, status =, getPnL, getOpenPositionCount, getAllPendingTrades and exit_status under scripts/ finds no trade-status selection (scripts/recover-sell-ladys.ts and scripts/deliberate-buy.ts sign directly and do not read the trades table): none. (7) Contrast sites that DO include failed-held positions: getResumeExitMonitorTrades and getResumeAntiRugTrades (db.ts:597-620) used on restart (bot.ts:1904, :2063). Sub-case recorded for 22-28: a still-held failure that ends through the success-but-still-held path (exitEngine.ts:1110) or the inconclusive path (:995) keeps trades.status = 'pending', so it IS selected by both controls, but once its exit_failure_count reaches EXIT_ROUTINE_MAX_FAILURES the routine pause refuses the dashboard sell (AUD-EXIT-008); either way a failed-held position cannot be sold from the dashboard.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 STRAND: a failed exit on a position that is still held is a plausible, already-observed condition (the LADYS case this code was written for: a reverting or honeypot-like sell, an RPC or bundle error inside the sell). After it, the operator's two manual exits cannot reach the position: force-sell answers 404 'Trade not found or already closed' and emergency sell-all either says 'No open positions to sell' or reports success while the tokens stay in the wallet; the dashboard does not even list the position. The bot's own monitor and anti-rug are kept (exitEngine.ts:723-732), so it is not S0, but the human safety net that exists for exactly this moment is gone and is told nothing. The bot is OFF for all of v7.0, so there is no live exposure. Escalated early as ESC-PRE-04 (operator ruling 2026-11-06 'Escalate early + own in 22-22'); this entry is that record's resolution, not a second escalation.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-003",
+    "AUD-EXIT-008",
+    "AUD-EXIT-007",
+    "AUD-EXIT-013",
+    "AUD-API-004"
+  ],
+  "tags": [
+    "capital",
+    "d-stop-the-line",
+    "cross-class"
+  ],
+  "escalation_ref": "ESC-PRE-04",
+  "od_ref": "API-01",
+  "recommendation": "Select 'open' the way the bot's own recovery does: the dashboard sell controls, the position list and the open/closed label should use one shared definition of an open position (status='pending' buys UNION exit_state.exit_status='exit_failed_held', as getResumeExitMonitorTrades already does), with balanceOf as the final truth inside executeFullSell. Emergency sell must report every position it did not sell and why. Real-path test: drive a position through the catch path (a sell that throws while the balance stays) and assert that force-sell and emergency-sell both reach it. The behaviour change is card API-01, owned by the Phase 24 capital discussion (AUDIT-05); nothing is changed in Phase 22 (NAC-13).",
+  "reported_by": [
+    "codex-review",
+    "orchestrator-trace",
+    "claude-audit"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "pre_phase_key": "failed-held-sell-selection",
+  "traces": [
+    {
+      "scenario": "1. A still-held position whose exit throws (the catch path)",
+      "steps": [
+        "executeFullSell runs for the position (any reason: trailing-stop, stop-loss, urgency, anti-rug, or a dashboard sell) and something inside the try throws: a reverting public-fallback sell, an approval failure, a bundle or RPC error (src/exitEngine.ts:837-1111)",
+        "the catch re-fetches balanceOf; the tokens are still in the wallet (balance > dust), or the re-fetch fails and the -1n sentinel means \"assume held\" (src/exitEngine.ts:1126-1143)",
+        "updateTradeStatus.run('failed', ...) sets trades.status = 'failed' on every pending row of that token and chain (src/exitEngine.ts:1163; src/utils/db.ts:325-327)",
+        "keepMonitoringFailedHeld -> markExitFailedHeld sets exit_state.exit_status = 'exit_failed_held' and increments exit_failure_count (src/exitEngine.ts:700; src/utils/db.ts:540-545); anti-rug stays registered and the poll timer is re-armed (src/exitEngine.ts:723-732)"
+      ],
+      "outcome": "The position is still held and still monitored by the bot, but its buy row now says status='failed' and its exit_state says exit_failed_held."
+    },
+    {
+      "scenario": "2. The operator presses Emergency Sell All (POST /emergency-sell)",
+      "steps": [
+        "the route runs getAllPendingTrades.all('pending', 'buy') (src/api/routes/controls.ts:54-56, :126): the failed-held position is not selected because its status is 'failed'",
+        "if the failed-held positions are the only ones left, the answer is { ok: true, sold: 0, failed: 0, message: 'No open positions to sell' } (controls.ts:128-131)",
+        "if there is a mix, the loop sells the pending positions only (controls.ts:140-199) and, when those succeed, answers { ok: true, sold: n, failed: 0, errors: [] } (controls.ts:212-219); the skipped failed-held positions are not mentioned",
+        "the dashboard shows a message only when failed > 0 (dashboard/src/pages/ChainControls.tsx:98-103), so in both cases the operator sees no warning"
+      ],
+      "outcome": "Emergency sell reports 'No open positions to sell' (or a clean success) while the failed-held tokens stay in the wallet."
+    },
+    {
+      "scenario": "3. The operator tries POST /force-sell/:tradeId for that trade",
+      "steps": [
+        "the dashboard has no button for it: the Open Positions table is built from buy_status === pending rows only (src/api/helpers/positions.ts:56; dashboard/src/pages/Overview.tsx:162-170)",
+        "a direct request runs getPendingTrade.get(tradeId, 'pending', 'buy') (controls.ts:51-53, :70) and finds no row",
+        "the route answers 404 { error: 'Trade not found or already closed' } (controls.ts:71-74)"
+      ],
+      "outcome": "force-sell refuses the position as 'not found or already closed' although it is open on-chain."
+    },
+    {
+      "scenario": "4. Contrast: what the bot itself treats as open on restart",
+      "steps": [
+        "getResumeExitMonitorTrades selects (status = 'pending' AND action = 'buy') OR exit_state.exit_status = 'exit_failed_held' (src/utils/db.ts:597-604); getResumeAntiRugTrades does the same with the LP baseline (db.ts:612-620)",
+        "resumeMultiChainMonitoring uses it on every boot (src/bot.ts:1904), with a comment naming this exact class of drop (bot.ts:1893-1903)"
+      ],
+      "outcome": "The bot's own recovery counts a failed-held position as open; the operator's emergency controls and position list do not. The two definitions of 'open' disagree."
+    }
+  ],
+  "sub_claims": [
+    {
+      "claim": "force-sell answers 404 'Trade not found or already closed' for a failed-held position",
+      "evidence": [
+        "src/api/routes/controls.ts:51-53@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:70-74@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1163@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "emergency-sell does not select failed-held positions: 'No open positions to sell' when only those remain, a silent partial sale when mixed",
+      "evidence": [
+        "src/api/routes/controls.ts:54-56@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:126-131@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/controls.ts:203-219@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/ChainControls.tsx:98-103@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "API-owned display sibling: the dashboard Open Positions table and the positions_update broadcast omit failed-held positions (no Force Sell button, Open Positions count excludes them, the empty-state text says the bot 'has not entered any positions yet')",
+      "evidence": [
+        "src/api/helpers/positions.ts:55-56@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/helpers/positions.ts:73@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/Overview.tsx:63@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/components/PositionTable.tsx:24-33@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "API-owned display sibling: trade history labels a failed-held position 'closed' (buy_status !== 'pending') with realized_pnl = minus the whole buy cost",
+      "evidence": [
+        "src/api/routes/trades.ts:103@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:351-384@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/components/TradeTable.tsx:189-194@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "API-owned display sibling: /api/risk/limits position count, /api/risk/exposure totals and /health open count and exposure leave failed-held positions out (display; enforcement is AUD-DB-003)",
+      "evidence": [
+        "src/api/routes/risk.ts:85-88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:37@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/health.ts:59-60@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:420-438@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:48-63@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

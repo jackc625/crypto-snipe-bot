@@ -1,0 +1,126 @@
+{
+  "id": "AUD-API-002",
+  "title": "RC-12 dashboard \"Stop chain\" calls ctx.wsProvider.removeAllListeners(), which also removes the anti-rug rug-log subscription that shares the provider; \"Start\" only re-runs startDexListener, so anti-rug stays disarmed on that chain while the health indicator still shows connected",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "src/api/routes/chains.ts",
+    "src/bot.ts",
+    "src/anti-rug/detector.ts",
+    "dashboard/src/pages/ChainControls.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:136-142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "POST /:name/stop: stoppedChains.add, then ctx.wsProvider.removeAllListeners() with no event argument; the comment says the provider is kept for exit monitors"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 1159-1176p node_modules/ethers/lib.commonjs/providers/abstract-provider.js (ethers 6.16.0, the installed version)",
+      "note": "removeAllListeners() without an event stops every started subscriber and deletes every subscription tag: factory listeners, the anti-rug log filter and any in-flight V3 Mint wait alike"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:643-657@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the anti-rug dispatcher is installed with ctx.wsProvider.on(filter, dispatcher) on the same shared provider; state.activeFilter / activeDispatcher keep pointing at the now-removed subscription"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:678-679@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "state.wsProvider and healthState = 'connected' are set at subscribe time; nothing in the stop route changes them, so the dashboard WS-health indicator keeps showing connected"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:172-176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "POST /:name/start: stoppedChains.delete, then onRestart(ctx)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1808-1852@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onRestart: replaces the provider only if it is missing or destroyed (:1812-1821, not the case after a stop), runs a MEV health check, then startDexListener per DEX (:1836-1845); it never re-subscribes anti-rug"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:163-172@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an in-flight V3 Mint wait listens on the same provider; it is removed too and the 30 s timeout then drops that opportunity (no buy, harmless)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:175@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the Stop dialog tells the operator: \"Existing positions will continue being monitored by the exit engine.\" Anti-rug is not mentioned"
+    }
+  ],
+  "sibling_sites_checked": "Every removeAllListeners and provider re-subscription site at the base SHA (git grep -n removeAllListeners and \"wsProvider.on(\" over src/): chains.ts:141 (this finding, argument-less, shared provider), bot.ts:165/:172 (per-contract Mint, scoped, correct), bot.ts:2335 (shutdown, followed by destroy, correct). Re-subscription paths for the anti-rug filter: the detector subscribe path (detector.ts:643-657) runs on a new position registration and on the anti-rug reconnect (handleWsClose, detector.ts:916-944); onRestart (bot.ts:1808-1852) does neither. So after Stop the chain's held positions have no rug-log subscription until the next buy registers on that chain (Stop does not stop HTTP-polled buys, AUD-BUY-011), a WebSocket reconnect, or a bot restart; and no backfill covers the gap. The three-writer ownership problem of ctx.wsProvider (RC-13) is AUD-ANTIRUG-001, which records this same stop consequence from the anti-rug side; the DEX-listener side (duplicate listeners, no backfill, leaked providers) is AUD-BUY-008; Stop not stopping buys is AUD-BUY-011. This entry is the canonical RC-12 (H1) entry.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-12"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1 STRAND, equal to the research suggestion: one dashboard click that the UI describes as safe for open positions silently turns off the rug-pull exit for every position on that chain, and Start does not bring it back; the WS health indicator keeps showing connected, so the operator has no signal. A rug during that window is not detected (the routine stop-loss poll still runs, so not S0). The same mechanism was already shown to the operator as part of AUD-ANTIRUG-001 (ESC-ANTIRUG-01); it is presented again in the API batch as its own RC-12 item. Bot OFF, no live exposure.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-001",
+    "AUD-BUY-008",
+    "AUD-BUY-011",
+    "AUD-ANTIRUG-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-11",
+  "recommendation": "Never call an argument-less removeAllListeners on a shared provider. Under card OD-11 (one WebSocket owner per chain that notifies subscribers) Stop pauses only the chain's DEX factory subscribers by handle, anti-rug is never touched by Stop/Start, and Start resumes the same subscribers with a backfill from the last seen block. The Stop dialog text should say exactly what keeps running. Real-path test: Stop then Start a chain with a registered position and assert a rug log still reaches dispatchEvent. Phase 24 (capital), nothing changed in Phase 22.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "Stop removes the anti-rug log subscription with all other provider listeners",
+      "evidence": [
+        "src/api/routes/chains.ts:140-142@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:655@23a64617dca167976adc4645fed0e2c69e384820",
+        "sed -n 1159-1176p node_modules/ethers/lib.commonjs/providers/abstract-provider.js (ethers 6.16.0)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Start (onRestart) re-attaches only DEX listeners; anti-rug is re-subscribed only by a later position registration, a reconnect or a restart",
+      "evidence": [
+        "src/bot.ts:1812-1821@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1836-1845@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:643-657@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Nothing tells the operator: health stays connected and the Stop dialog says positions keep being monitored",
+      "evidence": [
+        "src/anti-rug/detector.ts:678-679@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/ChainControls.tsx:175@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "traces": [
+    {
+      "scenario": "Operator stops a WebSocket chain with one open position, later starts it again",
+      "steps": [
+        "POST /api/chains/eth/stop -> removeAllListeners() on ctx.wsProvider (chains.ts:141): the anti-rug filter subscription is stopped (eth_unsubscribe) and deleted",
+        "the position keeps its 5 s exit poll (HTTP provider); anti-rug state still says 'connected' (detector.ts:678-679)",
+        "POST /api/chains/eth/start -> onRestart: provider is not destroyed, so it is kept; startDexListener per DEX re-adds factory listeners only (bot.ts:1812-1845)",
+        "an LP removal on the held token emits a log that no subscriber receives; no backfill runs for the stopped window"
+      ],
+      "outcome": "The rug is not detected; the position is only protected by the routine stop-loss poll until a new position registers, the socket reconnects, or the bot restarts."
+    }
+  ]
+}

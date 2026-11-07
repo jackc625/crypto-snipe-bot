@@ -1,0 +1,65 @@
+{
+  "id": "AUD-API-015",
+  "title": "Emergency Sell All neither pauses nor stops buying, and the dashboard has no Pause button, so the bot keeps sniping during and after an emergency sell-all and any position bought meanwhile is left open",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "src/api/routes/controls.ts",
+    "dashboard/src/components/EmergencyConfirmDialog.tsx",
+    "dashboard/src/components/PauseBanner.tsx",
+    "dashboard/src/pages/ChainControls.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:122-226@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell never calls setPauseState and never stops a chain"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:234-264@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a POST /pause route exists"
+    },
+    {
+      "type": "command",
+      "ref": "grep -rn \"controls/pause\\|controls/resume\" <snapshot>/dashboard/src",
+      "note": "the dashboard only GETs /api/controls/pause (useWebSocket.ts:72) and POSTs /resume (PauseBanner.tsx:58); no dashboard control POSTs /pause"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/EmergencyConfirmDialog.tsx:14@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the dialog promises to \"market sell ALL open positions across ALL chains\"; nothing says buying continues"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:85-111@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the handler only POSTs /emergency-sell"
+    }
+  ],
+  "sibling_sites_checked": "Every dashboard control that could halt entries: chain Stop (does not stop buying, AUD-BUY-011), pause (no dashboard button; CLI scripts/pause.ts and the API route only), CB reset (anti-rug only). The pause flag is honoured by the buy handlers (AUD-BUY-011 evidence bot.ts:1034-1040, :1351-1357). Emergency-sell selects its rows once at the start (controls.ts:126), so a buy that lands during the loop is never in it.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 EXPOSURE: an emergency sell-all is pressed exactly when the operator wants out of the market, but new snipes keep being bought and stay open (and a long loop, AUD-API-004, widens the window). Bounded by the per-trade size and position limits; the operator can pause from the command line.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-004",
+    "AUD-BUY-011"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "API-02",
+  "recommendation": "Decide (card API-02) whether Emergency Sell All sets the global pause first (and says so), and add a Pause control to the dashboard. Phase 24 with the emergency-sell rework.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

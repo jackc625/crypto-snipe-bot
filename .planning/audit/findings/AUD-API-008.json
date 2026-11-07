@@ -1,0 +1,79 @@
+{
+  "id": "AUD-API-008",
+  "title": "One unauthenticated request with a malformed Host header and an Upgrade header kills the bot process: the WebSocket upgrade handler parses the Host with new URL() outside any try, and nothing catches the exception",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C11",
+    "C19"
+  ],
+  "files": [
+    "src/api/ws/handler.ts",
+    "src/api/server.ts",
+    ".env.example",
+    "docs/operations/going-live.md"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/ws/handler.ts:43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`) runs first, before the path and session checks, with no try/catch"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:183@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "server.on('upgrade', handleUpgrade(wss, sessions)): a synchronous throw in an 'upgrade' listener escapes Node's http server as an uncaught exception"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"uncaughtException\\|unhandledRejection\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no output: there is no process-level handler, so the exception ends the process (same fact as AUD-ANTIRUG-002 / AUD-BUY-005)"
+    },
+    {
+      "type": "command",
+      "ref": "node ws-host-crash.js <snapshot>/src/api/ws/handler.ts <host> (scratch folder outside the repo (Node 22.16.0 by absolute path; no src/ import, no .env, no data/, no live DB; loopback 127.0.0.1 only); the handler.ts:43 line read verbatim from the audit-base snapshot and run in a plain Node http 'upgrade' listener; raw TCP request GET /ws with Upgrade: websocket)",
+      "note": "output: Host \"127.0.0.1:8080\" -> 401, server alive; Host \"a b\" -> server process EXITED code=1 TypeError: Invalid URL; Host \"[\" -> EXITED code=1 Invalid URL; Host \"x:99999999\" -> EXITED code=1 Invalid URL"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:208-213@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "binds DASHBOARD_HOST (default 127.0.0.1) and DASHBOARD_PORT"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:75-76@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DASHBOARD_HOST=0.0.0.0 documented \"for remote access\""
+    },
+    {
+      "type": "code",
+      "ref": "docs/operations/going-live.md:153@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the recommended remote setup is DASHBOARD_HOST=0.0.0.0 behind a TLS proxy; the bot port itself then listens on every interface"
+    }
+  ],
+  "sibling_sites_checked": "Every Host/URL parse in src/api: server.ts:111-117 and :125-131 (inside try, correct), handler.ts:43 (this finding, no try); every synchronous code in the 'upgrade' path: parseCookies (:18-29, cannot throw on a string), validateSession (map lookup), wss.handleUpgrade (ws answers a bad handshake with 400 itself). Express routes are not affected (express 5 catches handler errors). A browser cannot send a malformed Host (it builds Host from the URL), so this needs a raw client: any local process at the default bind, any host that can reach the port in remote mode. A second, authenticated crash path on the same socket layer (an invalid frame on an open WebSocket) is AUD-API-009.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 STRAND: in the documented remote-access mode any host that can reach the dashboard port can stop the whole bot with one short request and no credentials; the process exit stops every exit monitor, the ExitWorker and anti-rug for all chains until a human restarts it, leaving every open position without an exit. Same impact class as AUD-ANTIRUG-002 (S1). At the default 127.0.0.1 bind only a local process can do it (S2-equivalent there). Not S0: it needs a hostile or broken client, and a restart resumes monitoring. Reproduced on loopback with the exact line from the base snapshot.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-002",
+    "AUD-BUY-005",
+    "AUD-API-009"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Parse the upgrade URL inside try/catch (or use url.parse on the path only) and answer 400; wrap the whole upgrade handler so any throw destroys only that socket. Decide the process-level uncaught-exception policy with card OD-6 (AUD-BUY-005). Real-path test: send the malformed request to a running server and assert it stays up. Phase 24 (a pure bug fix, no behaviour decision).",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}
