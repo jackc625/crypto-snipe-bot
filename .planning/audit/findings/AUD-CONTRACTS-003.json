@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "ci"
+  ],
+  "related": [
+    "AUD-CONTRACTS-002",
+    "AUD-ROOT-008"
+  ],
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "id": "AUD-CONTRACTS-003",
+  "title": "The Mythril severity gate passes when the report has no issues list or an empty one, without checking whether the analysis succeeded, so a Mythril run that failed but still wrote JSON reads as \"Mythril clean\"",
+  "severity": "S2",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "scripts/check-mythril-report.ts",
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/check-mythril-report.ts:16-21@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "documented behaviour: issues empty or missing -> \"Mythril clean\", exit 0"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/check-mythril-report.ts:41-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the report type reads only issues; the success and error fields of a Mythril JSON report are ignored"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/check-mythril-report.ts:71-86@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "issues ?? [] -> only Medium/High block -> otherwise exit 0"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:158-167@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "myth analyze ... -o json > reports/mythril-honeypot.json, then the gate reads that file"
+    }
+  ],
+  "sibling_sites_checked": "The slither job uses slither own --fail-medium exit code (test.yml:120-128), so it does not share this gap. The gate is the only consumer of the Mythril report. Whether Mythril 0.24.x exits 0 after printing an error report ({success: false, error, issues: []}) was not verified here: Mythril is not installed locally and nothing was installed (Phase 22 rule); if it exits non-zero the CI step fails first and the gap is limited to a malformed-but-parsable report.",
+  "status": "candidate",
+  "severity_rationale": "S2: CI drift that can hide an S0/S1 class defect: HoneypotChecker.sol is the on-chain honeypot test, and a regression there could let the bot buy tokens it cannot sell. The gate failing open needs a Mythril error that still exits 0, which is unverified, hence candidate.",
+  "recommendation": "Phase 30 (Hardhat 3 and checker redeploy) or Phase 31 (blocking CI gates): fail unless report.success === true and report.error is empty; prove it with a fixture report {success: false, error: \"x\", issues: []}; pin the Mythril version so the report shape is known."
+}

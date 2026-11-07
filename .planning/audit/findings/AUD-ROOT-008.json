@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [
+    "AUD-SCRIPTS-001",
+    "AUD-CONTRACTS-001",
+    "AUD-CONTRACTS-003"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-008",
+  "title": "README.md misdescribes the tooling that touches keys and gates: it says the sepolia network signs with PRIVATE_KEY, calls the two broken scripts Sepolia bootstrap helpers, says the Mythril gate fails on any Medium+ issue, and its counts (one fork file, 33 env variables) are stale",
+  "area": "scripts",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "README.md"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "README.md:114@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"the existing sepolia network entry continues to use PRIVATE_KEY\"; hardhat.config.ts:51-59 uses DEPLOY_PRIVATE_KEY"
+    },
+    {
+      "type": "code",
+      "ref": "README.md:457-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "FakeToken \"used for Sepolia bootstrap\"; addLiquidity.ts and deploySepoliaTest.ts \"are Sepolia bootstrap helpers\": both cannot load and would target ALCHEMY_URL (documented mainnet) with the bot key (AUD-SCRIPTS-001)"
+    },
+    {
+      "type": "code",
+      "ref": "README.md:144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Mythril gate \"exits non-zero on any new Medium or High issue\" (also :113, :433, :489): it exits 0 on an empty or missing issue list without checking success (AUD-CONTRACTS-003)"
+    },
+    {
+      "type": "code",
+      "ref": "README.md:474@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "fork project \"1 file\"; the base has 9 test/fork/*.test.ts files (git ls-tree)"
+    },
+    {
+      "type": "code",
+      "ref": "README.md:503@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\".env.example documents the 33 supported variables\"; the base .env.example has 145 keys"
+    }
+  ],
+  "sibling_sites_checked": "README sections on deploy, scripts, CI and env (:105-145, :200-230, :455-510). Runbooks under docs/ are out of this slice. Statements about src behaviour are left to the src slices.",
+  "status": "confirmed",
+  "severity_rationale": "S3, misleading: an operator following the README could run a \"Sepolia helper\" that actually targets mainnet with the trading wallet (today it cannot load), and could rely on a CI gate that can pass without analysis.",
+  "recommendation": "Phase 31 (docs): correct these statements after the Phase 29/30 changes (scripts removed or rebuilt, deploy key, Mythril gate), and generate counts instead of hand-writing them."
+}

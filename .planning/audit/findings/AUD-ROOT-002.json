@@ -1,0 +1,64 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "mitigation-planned-22-05"
+  ],
+  "related": [
+    "AUD-TESTI-017",
+    "AUD-RAIL-002"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-002",
+  "title": "npm test, test:all and test:coverage all run every Vitest project at the base, so the default test command and the coverage command start the fork project and its Hardhat node; the coverage exclude names a folder that does not exist and coverage never runs in CI",
+  "area": "test",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "package.json",
+    "vitest.config.ts",
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "package.json:9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"test\": \"vitest run --reporter=verbose\" (all projects)"
+    },
+    {
+      "type": "code",
+      "ref": "package.json:13-14@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "test:all is the same command; test:coverage adds --coverage, again all projects"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:29-46@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the fork project (globalSetup test/fork/setup.ts, which compiles and starts Hardhat) is part of the default project list"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:48-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "coverage over src/**/*.ts excluding src/dashboard/** (the dashboard lives in dashboard/, not src/), 70% thresholds"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:18-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CI runs test:unit and test:integration only; no coverage threshold is ever enforced"
+    }
+  ],
+  "sibling_sites_checked": "Every script in package.json (:8-17) and every project in vitest.config.ts. The fork-harness side (non-hermetic env, ALCHEMY_URL fallback) is AUD-TESTI-017; the dotenv config() in vitest.config.ts:2-4 is AUD-RAIL-002. Plan 22-05 re-scoped npm test and test:coverage to unit and integration (22-29 re-audits the package.json diff).",
+  "status": "confirmed",
+  "severity_rationale": "S3: a developer typing npm test at the base started Hardhat with the real .env (AUD-TESTI-017 mechanism) and a fork of mainnet; no signing, but the ordinary command reaches the network and real keys. Mitigated by 22-05.",
+  "recommendation": "Mitigated by plan 22-05 (npm test and test:coverage limited to unit + integration; test:all is the only all-project command); 22-29 re-audits it. Phase 28 sets real coverage floors (OD-23) and fixes the exclude path; Phase 31 makes coverage a CI gate."
+}

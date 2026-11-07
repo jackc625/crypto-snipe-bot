@@ -1,0 +1,71 @@
+{
+  "kind": "finding",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "section-c:SC-22"
+  ],
+  "related": [
+    "AUD-TX-009",
+    "AUD-CONTRACTS-002"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-001",
+  "title": "Section C SC-22: --legacy-peer-deps comes from @flashbots/ethers-provider-bundle 1.0.0 pinning ethers to exactly 6.7.1 while the repo uses 6.16.0; .npmrc turns peer checks off for every package, so other peer conflicts stay hidden and the library runs on an ethers version it never declared",
+  "area": "src",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "package.json",
+    "package-lock.json",
+    ".npmrc",
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "package.json:20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"@flashbots/ethers-provider-bundle\": \"1.0.0\""
+    },
+    {
+      "type": "code",
+      "ref": "package.json:28@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"ethers\": \"6.16.0\""
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"require(<snapshot>/package-lock.json).packages['node_modules/@flashbots/ethers-provider-bundle'].peerDependencies\" (ROOT snapshot at 23a6461)",
+      "note": "{\"ethers\":\"6.7.1\"}; the lock has a single node_modules/ethers at 6.16.0, so the library resolves the root copy"
+    },
+    {
+      "type": "code",
+      "ref": ".npmrc:1@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "legacy-peer-deps=true for every install"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "npm ci --legacy-peer-deps (also :93, :111, :144)"
+    }
+  ],
+  "sibling_sites_checked": "All peerDependencies in the base lockfile were not individually re-resolved (no npm install in Phase 22); the flashbots pin is the conflict named by the research hint and confirmed in the lock. The runtime use of the library (flashbots.ts) is the TX slice (AUD-TX-009 crash in its block listener).",
+  "status": "confirmed",
+  "severity_rationale": "S3: dependency hygiene that can hide a breaking peer mismatch on the money path (the Flashbots bundle client), but nothing fails today.",
+  "external_od_refs": [
+    {
+      "id": "OD-2",
+      "owner_phase": "29"
+    }
+  ],
+  "recommendation": "Phase 25: the interim npm overrides for ethers; Phase 29 (DEPS-05, OD-2): replace the library with the in-repo relay client, then delete .npmrc legacy-peer-deps and the CI flags so npm ci runs without them."
+}

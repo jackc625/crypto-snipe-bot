@@ -1,0 +1,154 @@
+[
+  {
+    "path": ".DS_Store",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".env.example",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-004",
+      "AUD-API-005",
+      "AUD-API-008",
+      "AUD-DB-007",
+      "AUD-DB-011",
+      "AUD-DB-014",
+      "AUD-DB-016",
+      "AUD-SCRIPTS-001",
+      "AUD-SCRIPTS-005",
+      "AUD-SCRIPTS-008"
+    ]
+  },
+  {
+    "path": ".gitattributes",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-OD21-001"
+    ]
+  },
+  {
+    "path": ".gitignore",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".graphifyignore",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": ".idea/.gitignore",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".idea/crypto-snipe-bot.iml",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".idea/modules.xml",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".idea/vcs.xml",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-005"
+    ]
+  },
+  {
+    "path": ".npmrc",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-001"
+    ]
+  },
+  {
+    "path": "README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-008",
+      "AUD-ROOT-007"
+    ]
+  },
+  {
+    "path": "eslint.config.mjs",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-006"
+    ]
+  },
+  {
+    "path": "ignition/.gitignore",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "package-lock.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-001"
+    ]
+  },
+  {
+    "path": "package.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-001",
+      "AUD-ROOT-002",
+      "AUD-ROOT-006",
+      "AUD-ROOT-007",
+      "AUD-SCRIPTS-007",
+      "AUD-TESTI-017"
+    ]
+  },
+  {
+    "path": "reports/.gitkeep",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "tsconfig.bot.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-003",
+      "AUD-TESTU-008",
+      "AUD-TX-004"
+    ]
+  },
+  {
+    "path": "tsconfig.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ROOT-003",
+      "AUD-ROOT-007",
+      "AUD-TESTU-008"
+    ]
+  },
+  {
+    "path": "vitest.config.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-RAIL-001",
+      "AUD-RAIL-002",
+      "AUD-ROOT-002",
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTU-001",
+      "AUD-TESTU-008"
+    ]
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [
+    "AUD-SCRIPTS-001",
+    "AUD-TESTU-008",
+    "AUD-TX-004"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-003",
+  "title": "No tsconfig includes scripts/ (or ignition/modules/ or test/), so the three CI type checks never compile the operator signing scripts; that is how the RC-27 scripts stayed broken unnoticed, and a signature change in src/bot.ts breaks deliberate-buy only when the operator runs it",
+  "area": "scripts",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "tsconfig.json",
+    "tsconfig.bot.json",
+    ".github/workflows/test.yml",
+    "scripts/deliberate-buy.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "tsconfig.json:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"include\": [\"src/**/*\", \"hardhat.config.ts\"]"
+    },
+    {
+      "type": "code",
+      "ref": "tsconfig.bot.json:12@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"include\": [\"src\"]; no forceConsistentCasingInFileNames and no isolatedModules, unlike tsconfig.json:8-9"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:46-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only type checks in CI use these two configs and the dashboard config"
+    }
+  ],
+  "sibling_sites_checked": "All three tsconfig files (dashboard/tsconfig.json is the DASH slice). ts-node type-checks a script when it is run (no transpile-only setting at the base), so a broken script fails before it signs; the gap is that nobody learns about it until then. The missing casing flag in tsconfig.bot.json is the RC-17 mitigation of plan 22-12 (AUD-TX-004); the test/ side is AUD-TESTU-008.",
+  "status": "confirmed",
+  "severity_rationale": "S3: fails safe at run time (ts-node refuses before main runs), but the operator finds out only when a manual signing script is needed.",
+  "recommendation": "Phase 26 (toolchain): add a tsconfig (or include entries) that covers scripts/ and ignition/modules/ and type-check it in CI; Phase 31 keeps it blocking."
+}

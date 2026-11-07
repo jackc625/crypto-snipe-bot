@@ -1,0 +1,78 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "ci"
+  ],
+  "related": [
+    "AUD-CONTRACTS-003",
+    "AUD-ROOT-001",
+    "AUD-ROOT-003"
+  ],
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "id": "AUD-CONTRACTS-002",
+  "title": "CI gates less than it appears: no lint, format, dependency audit, coverage, fork or secret-scan job; the contract audit jobs run only when contracts/** changes (not for the config, the Ignition module, the gate script or the workflow itself); actions are pinned to tags, slither and mythril install unpinned, and the workflow sets no token permissions",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:2-6@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "runs on push and pull_request to main/master only"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:17-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "npm ci --legacy-peer-deps, then unit and integration tests only"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:46-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tsc --noEmit on tsconfig.json, tsconfig.bot.json and dashboard/tsconfig.json: none of them includes scripts/ (AUD-ROOT-003)"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:75-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dorny/paths-filter@v3 (third-party action pinned by tag) with the single filter contracts/**"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:112-116@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pip install slither-analyzer (latest, unpinned)"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:145-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pip install mythril (latest, unpinned)"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:120-128@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "slither --exclude-informational --exclude-low --fail-medium on HoneypotChecker.sol only"
+    },
+    {
+      "type": "command",
+      "ref": "git show 23a64617dca167976adc4645fed0e2c69e384820:.github/workflows/test.yml | grep -n \"permissions\\|eslint\\|lint\\|audit\\|coverage\\|fork\\|gitleaks\\|betterleaks\\|prettier\"",
+      "note": "no permissions block, no lint, no npm audit, no coverage, no fork job, no secret scan, no formatter (the only match is the \"Hardhat compile\" step name)"
+    }
+  ],
+  "sibling_sites_checked": "The one workflow file at the base (.github/workflows/ holds only test.yml). Files whose changes can weaken the contract audit without triggering it: hardhat.config.ts (compiler version, sources override at :18-29), ignition/modules/HoneypotChecker.ts, scripts/check-mythril-report.ts (the gate itself), test/fixtures/contracts/**, and test.yml. The gate script failure mode is AUD-CONTRACTS-003; the --legacy-peer-deps cause is AUD-ROOT-001.",
+  "status": "confirmed",
+  "severity_rationale": "S3: the gaps let regressions in tooling and dependencies land unseen, but no gate here guards a live money path today (the bot is off and the contract is already deployed and audited).",
+  "recommendation": "Phase 26: pin actions by commit SHA and declare permissions: contents: read (ROADMAP Phase 26 criterion 4); widen the contract filter to hardhat.config.ts, ignition/modules/**, scripts/check-mythril-report.ts, test/fixtures/contracts/** and the workflow; pin slither and mythril versions. Phase 31: blocking lint, audit, coverage and secret-scan gates."
+}

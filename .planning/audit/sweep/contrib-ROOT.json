@@ -1,0 +1,21 @@
+{
+  "name": "ROOT",
+  "contributions": [
+    {
+      "class": "C01",
+      "area": "src",
+      "ids": [
+        "AUD-ROOT-006"
+      ],
+      "search": "ROOT snapshot read of eslint.config.mjs, package.json scripts and test.yml: the restrict-plus-operands BigInt/Number lint guard is configured but never run (AUD-ROOT-006)"
+    },
+    {
+      "class": "C18",
+      "area": "src",
+      "ids": [
+        "AUD-ROOT-004"
+      ],
+      "search": "comm of .env.example keys against literal process.env reads at the base plus per-key git grep -lw (AUD-ROOT-004)"
+    }
+  ]
+}

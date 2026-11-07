@@ -1,0 +1,64 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [
+    "AUD-SCRIPTS-010"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-005",
+  "title": "Tracked junk the .gitignore already excludes: .DS_Store and four .idea/ files (no secrets or run configurations in them)",
+  "area": "src",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    ".DS_Store",
+    ".idea/.gitignore",
+    ".idea/crypto-snipe-bot.iml",
+    ".idea/modules.xml",
+    ".idea/vcs.xml",
+    ".gitignore"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git ls-tree -r --name-only 23a64617dca167976adc4645fed0e2c69e384820 -- .idea .DS_Store",
+      "note": ".DS_Store and .idea/.gitignore, crypto-snipe-bot.iml, modules.xml, vcs.xml are tracked"
+    },
+    {
+      "type": "code",
+      "ref": ".gitignore:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": ".idea/ is ignored (rule added after the files were committed)"
+    },
+    {
+      "type": "code",
+      "ref": ".gitignore:62@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": ".DS_Store is ignored"
+    },
+    {
+      "type": "command",
+      "ref": "strings of the ROOT snapshot .DS_Store (6148 bytes)",
+      "note": "macOS Finder metadata naming only the entry \".idea\"; nothing sensitive"
+    },
+    {
+      "type": "code",
+      "ref": ".idea/crypto-snipe-bot.iml:1-11@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "module roots and excluded temp folders only; modules.xml and vcs.xml map the module and the Git root; .idea/.gitignore lists IDE-local files. No run configuration (nothing starts src/bot.ts) and no environment values"
+    }
+  ],
+  "sibling_sites_checked": "Every .idea path and every OS metadata file in the base tree (Thumbs.db: not tracked). The empty-file hook is AUD-SCRIPTS-010; reports/.gitkeep is an intentional placeholder.",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene (repo junk; the milestone baseline already lists it).",
+  "recommendation": "Phase 25 (repo-junk sweep): git rm --cached the five files; the existing ignore rules keep them out."
+}

@@ -1,0 +1,60 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-007",
+  "title": "package.json metadata does not describe how the project runs: main points at dist/index.js (no such entry), there is no start script and no engines field although the installed native SQLite module needs Node 22 (ABI 127), and build compiles hardhat.config.ts into dist/",
+  "area": "src",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "package.json",
+    "tsconfig.json",
+    "README.md"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "package.json:4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"main\": \"dist/index.js\"; there is no src/index.ts and dist/ is not tracked (git ls-tree at the base)"
+    },
+    {
+      "type": "code",
+      "ref": "package.json:7-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no start script; README.md:34 and :217 document npx ts-node src/bot.ts"
+    },
+    {
+      "type": "code",
+      "ref": "package.json:1-69@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no engines field; D-21 records that only Node 22.16.0 (ABI 127) loads the installed better-sqlite3, and Node 24 fails to load it (fails closed)"
+    },
+    {
+      "type": "code",
+      "ref": "package.json:8@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"build\": \"tsc\" with tsconfig.json, whose include adds hardhat.config.ts (tsconfig.json:15); nothing runs dist/"
+    }
+  ],
+  "sibling_sites_checked": "package.json at the base only; the start command changes with plan 22-13 (src/main.ts), re-audited in 22-29.",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene; a wrong Node version fails closed at load.",
+  "external_od_refs": [
+    {
+      "id": "OD-13",
+      "owner_phase": "25"
+    }
+  ],
+  "recommendation": "Phase 25: set main to the real entry (or remove it), add a start script for the lock-first entry (plan 22-13), and an engines field per OD-13."
+}
