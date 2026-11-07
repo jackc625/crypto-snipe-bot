@@ -1,0 +1,54 @@
+{
+  "id": "AUD-TESTU-023",
+  "title": "configEnvVar.test.ts mocks a module path that does not exist (vi.doMock(\"../../src/db\")), so the real src/utils/db loads when the case imports the exit engine (before the rails: the live DB)",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "test/unit/configEnvVar.test.ts",
+    "src/exitEngine.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/configEnvVar.test.ts:146-151@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "vi.doMock('../../src/db', ...) with statement names (insertExitState, updateExitState) that no longer exist"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:13@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exitEngine imports ./utils/db, which the mis-pathed mock does not intercept"
+    }
+  ],
+  "sibling_sites_checked": "mockspec.js resolved all 349 vi.mock / vi.doMock / vi.unmock / vi.doUnmock specifiers in the 84 files (308 relative) against the base-SHA tree: this is the only one that resolves to no file. The SAFE-06 specifier gate (22-11) is the rail for this class.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the case still asserts the right config value; the defect is a silent mock miss that let the real DB module load (the reach is counted in AUD-TESTU-001) and will be caught by the SAFE-06 gate.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTU-001"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: point the mock at ../../src/utils/db with the current statement names (the SAFE-06 gate should already flag it).",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct"
+  ],
+  "escaped_regression": "Any import-time write added to src/utils/db.ts runs during this case while it stays green, because the mock it relies on never applies."
+}

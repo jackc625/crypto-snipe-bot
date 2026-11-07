@@ -23,6 +23,19 @@
     "test/unit/anti-rug/dryRunTimestamp.test.ts",
     "test/unit/mevStrategies/inclusionReconciliation.test.ts",
     "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+    "test/unit/configEnvVar.test.ts",
+    "test/unit/db.test.ts",
+    "test/unit/positionsHelper.test.ts",
+    "test/unit/db/exitFailedHeldMigration.test.ts",
+    "test/unit/db/lpBaselineMigration.test.ts",
+    "test/unit/db/pauseStateMigration.test.ts",
+    "test/unit/safetyBank/checkHoneypotForChain.test.ts",
+    "test/unit/safetyBank/checkTokenMetadataForChain.test.ts",
+    "test/unit/safetyBank/hasMaxWalletOrTxLimitsForChain.test.ts",
+    "test/unit/safetyBank/isBlacklistedTokenForChain.test.ts",
+    "test/unit/safetyBank/isLiquidityLockedForChain.test.ts",
+    "test/unit/safetyBank/isLiquiditySufficientForChain.test.ts",
+    "test/unit/safetyBank/simulateSwapForChain.test.ts",
     "src/utils/db.ts",
     "src/config.ts",
     "src/utils/notifier.ts",
@@ -73,6 +86,21 @@
       "type": "command",
       "ref": "node scratchpad tools/reach.js over the slice-files.ts --snapshot TESTU tree and a git archive of src at 23a6461 (static import graph, vi.mock and vi.doMock targets not traversed)",
       "note": "lists, per test file, which of src/utils/db, src/config and src/utils/notifier are reached unmocked; the ledger rows with can_reach_real_state yes are exactly that list (importActual partial mocks checked by hand)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db.test.ts:7@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports normalizeLegacyMainnetRows and makeIsTokenSnipedStmt from src/utils/db with no mock and no DB_PATH override"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db/exitFailedHeldMigration.test.ts:254-277@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "production cases import src/utils/db; the file header says the module \"binds the real DB file via DB_PATH\" (lpBaselineMigration and pauseStateMigration have the same cases)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/configEnvVar.test.ts:146-151@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the db mock targets ../../src/db (does not exist), so importing src/exitEngine loads the real src/utils/db and notifier (AUD-TESTU-023)"
     }
   ],
   "sibling_sites_checked": "All 84 test/unit files at the base SHA, by static import graph (reach.js) plus reading every vi.mock / vi.doMock factory. db unmocked: bot/buyNonceLock, bot/twoStageSigint, configEnvVar, db.test, db/exitFailedHeldMigration, db/lpBaselineMigration, db/pauseStateMigration (the four db files point DB_PATH at a temp or :memory: path, see their rows). notifier unmocked: anti-rug/detectorEvaluator, anti-rug/detectorRegistry, bot/twoStageSigint, configEnvVar. config unmocked (real .env values in CONFIG): the rest of the rows marked yes. watchdog.test.ts loads the real notifier through vi.importActual but replaces both send functions, so it cannot post (labelled no). No unit test spawns a process, opens a non-loopback socket, uses worker_threads or dgram, or hard-codes a contacted real host (git grep over the snapshot for child_process, spawn, exec, fork, worker_threads, dgram, http.request, fetch(, new WebSocket, new JsonRpcProvider: the only hit is api/antiRug.test.ts:81-90, a 127.0.0.1 listener), so there is no new rail-class reach (D-16).",

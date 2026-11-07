@@ -1,0 +1,64 @@
+{
+  "id": "AUD-TESTU-020",
+  "title": "chainRestart.test.ts never runs any production code: it calls its own mocks of removeWsProvider, getWsProvider and the MEV health check and asserts what they were told to return, so the dashboard restart path (and the registered WebSocket reconnect defects) is untested",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "test/unit/chainRestart.test.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/chainRestart.test.ts:4-15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "provider and txManager are mocked and imported; no other src module is imported"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/chainRestart.test.ts:54-78@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"simulates full onRestart flow\": the flow is re-typed in the test body; the assertions read the mocks' configured return values"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1808-1852@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real onRestart (removeWsProvider, getWsProvider, MEV health check, DEX listener restart) is never invoked"
+    }
+  ],
+  "sibling_sites_checked": "Other unit tests of reconnect or restart: anti-rug/detectorRegistry and detectorEvaluator use a stub wsProvider with no events; no unit test drives src/bot.ts onRestart, startDexListener reconnect, or the anti-rug handleWsClose path.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: hollow and mechanism-replacing on a money-relevant path (restart rewires the rug-log subscription); the registered S1s AUD-ANTIRUG-001, AUD-BUY-008 and AUD-API-002 sit exactly in that path.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-001",
+    "AUD-BUY-008",
+    "AUD-API-002"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: delete the file or replace it with a test that calls the real onRestart against a fake provider and asserts the old provider is destroyed and the anti-rug subscription is re-established on the new one.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "reconnects WS provider when wsProvider is null",
+    "runs MEV health check and returns unhealthy warning",
+    "MEV health check returns healthy with no warnings",
+    "simulates full onRestart flow: WS reconnect + MEV check + DEX listener",
+    "collects warning when MEV health check throws"
+  ],
+  "escaped_regression": "Delete the removeWsProvider / getWsProvider calls from onRestart at src/bot.ts:1808-1852 (or leave the anti-rug subscription on the old provider, AUD-ANTIRUG-001): every case stays green because none of them runs bot.ts."
+}

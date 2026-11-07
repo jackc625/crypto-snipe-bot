@@ -1,0 +1,71 @@
+{
+  "id": "AUD-TESTU-021",
+  "title": "The Telegram allowlist tests require allow-all when both lists are empty and accept a message when only the sender or only the channel matches, so they encode the registered S1 (Telegram allowlist is allow-all unless both lists are set) as the required behaviour",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C18",
+    "C20"
+  ],
+  "files": [
+    "test/unit/telegramListener.test.ts",
+    "src/telegramListener.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/telegramListener.test.ts:133-163@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"allows message when sender is whitelisted (OR logic)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/telegramListener.test.ts:164-194@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"allows message when channel is whitelisted (OR logic)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/telegramListener.test.ts:195-227@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"allows all when both whitelist env vars are empty\""
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:53-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "empty lists mean allow (AUD-BUY-006)"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:77-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sender OR channel is enough"
+    }
+  ],
+  "sibling_sites_checked": "Other unit tests of inbound Telegram trust: none (preflight/crossEnvRules checks the five Telegram keys are set together, not the allowlist). alphaDrop is mocked here.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the test locks in the behaviour that lets any Telegram sender trigger a buy (the S1 AUD-BUY-006); fixing the defect will turn these cases red by design, which is the point to record for Phase 28.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-006"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28 (with the Phase 24 decision on AUD-BUY-006): rewrite the cases to the chosen rule (fail closed when the lists are empty, require the configured combination) and add a case that an unlisted sender in a listed channel is rejected if that is the decision.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "allows message when sender is whitelisted (OR logic)",
+    "allows message when channel is whitelisted (OR logic)",
+    "allows all when both whitelist env vars are empty"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-BUY-006): with TELEGRAM_ALLOWED_SENDERS and TELEGRAM_ALLOWED_CHANNELS empty every message is routed to the buy handler, and the third case requires exactly that."
+}

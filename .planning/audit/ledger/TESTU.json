@@ -192,6 +192,23 @@
     }
   },
   {
+    "path": "test/unit/api/antiRug.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The /api/anti-rug routes return 404 / 409 / 200 / 500 for circuit-breaker reset and list recent triggers, the router is mounted in server.ts, and the dashboard types carry the anti-rug fields.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/anti-rug/circuitBreaker",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Routes exercised over a real 127.0.0.1 HTTP listener (loopback only). Tests 6-8 are source-text checks of server.ts and the dashboard types (structural claims). Route auth is not in scope of this router test."
+    }
+  },
+  {
     "path": "test/unit/bot/buyNonceLock.test.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
@@ -471,6 +488,427 @@
         }
       ],
       "notes": "The notifier module is loaded through vi.importActual (its dotenv.config() runs) but both send functions are replaced, so no Telegram post is possible."
+    }
+  },
+  {
+    "path": "test/unit/bytecodeScan.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "isMutableTokenForChain flags any of the 19 mutable-tax selectors in the token bytecode (case-insensitive), returns not-mutable for clean or empty code, and fails closed (mutable, scan-failed) when getCode throws.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ctx.httpProvider.getCode (fake)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/chainRegistry.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "buildChainRegistry builds the four chain configs from env, the V2/V3 dex union and guards work, and the honeypot-checker overlay defaults, overrides and fails fatal on out-of-range tax thresholds.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/provider",
+        "process.exit (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real registry. Overwrites ENABLED_CHAINS, ETH_RPC_URL, FLASHBOTS_AUTH_KEY and PRIVATE_KEY (placeholders) in beforeEach and never restores them (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/chainRegistry/antiRugConfig.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "Each chain's antiRug config has the documented defaults, env overrides apply, out-of-range or NaN values exit fatally, the hard-coded V2/V3 locker allowlists hold the verified entries, and .env.example documents every key.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/provider",
+        "process.exit (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real registry; reads the non-secret .env.example template. Overwrites PRIVATE_KEY / FLASHBOTS_AUTH_KEY / ENABLED_CHAINS placeholders without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/chainRestart.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-020"
+    ],
+    "quality_label": {
+      "claims": "The dashboard chain-restart callback reconnects the WS provider, runs the MEV health check, collects warnings and restarts the DEX listener.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/provider",
+        "src/utils/txManager"
+      ],
+      "mocked_mechanism_detail": "No production code runs: the test calls its own mocks of removeWsProvider / getWsProvider / createMevStrategy and re-types the onRestart flow in the test body.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "Every assertion reads a value the test configured on its own mock."
+    }
+  },
+  {
+    "path": "test/unit/ci/rootFileGuard.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The CI workflow contains the \"Ban root-level operator-facing docs\" step, it tests absence of GOING-LIVE.md and HONEYPOT-SIM-BRIEFING.md with test ! -e, and it runs before the TypeScript checks.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Self-test of the YAML text: it does not fail on the violation itself (the CI step does), and does not claim to."
+    }
+  },
+  {
+    "path": "test/unit/codeQuality.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "src/ has no console.log / console.warn / console.error calls and no inline view-ABI strings outside utils/abis.ts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real filesystem scan of src/ (cwd-relative); a violation does fail it. The inline-ABI regex only matches double-quoted \"function ... view returns\" strings, so single-quoted inline ABIs pass (narrow guard, hygiene only)."
+    }
+  },
+  {
+    "path": "test/unit/configEnvVar.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-015",
+      "AUD-TESTU-023"
+    ],
+    "quality_label": {
+      "claims": "STOP_LOSS_PCT controls CONFIG.stopLossPercent and the exit config (default 25, non-numeric falls back), FLASHBOTS_AUTH_KEY is not globally required, and a missing or empty DASHBOARD_API_KEY exits fatally naming the key.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "dotenv",
+        "src/utils/logger",
+        "process.exit (spied)",
+        "src/utils/exitManager (one case)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config, and in the exit-config case src/exitEngine with the real src/utils/db and notifier (the db mock targets a path that does not exist, AUD-TESTU-023). Sets PRIVATE_KEY, TELEGRAM_* and DASHBOARD_API_KEY placeholders and deletes them afterwards without restoring the previous values (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/dashboard/anti-rug/displayComponents.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-022"
+    ],
+    "quality_label": {
+      "claims": "The anti-rug state badge, monitor tile and WS health indicator ship the UI-SPEC copy, colour tokens, click and tooltip behaviour.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "Source-text greps by design (no render harness); case names describe behaviour that is never executed (AUD-TESTU-022)."
+    }
+  },
+  {
+    "path": "test/unit/dashboard/anti-rug/interactiveComponents.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-022"
+    ],
+    "quality_label": {
+      "claims": "The circuit-breaker reset modal requires per-trigger acknowledgement and typed RESET before posting the reset, shows inline errors, and the banner and wiring follow the UI-SPEC.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "Source-text greps by design (AUD-TESTU-022)."
+    }
+  },
+  {
+    "path": "test/unit/dashboard/pauseBanner.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-022"
+    ],
+    "quality_label": {
+      "claims": "The pause banner renders only while paused, shows who paused and why, the Resume button posts /api/controls/resume without local state changes, and the WS context carries pauseState.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "Source-text greps by design (AUD-TESTU-022)."
+    }
+  },
+  {
+    "path": "test/unit/db.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-017",
+      "AUD-TESTU-018"
+    ],
+    "quality_label": {
+      "claims": "The SQLite layer keeps rows on rapid inserts, rolls back failed transactions, enforces constraints and foreign keys, has the expected schema, computes P&L / exposure / daily loss with partial sells, normalises legacy chain names, dedups per chain, and has no storage.ts left.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "test/helpers/testDb (createTestDb, in-memory, hand-written schema at v4)"
+      ],
+      "mocked_mechanism_detail": "The P&L, exposure and daily-loss cases run SQL copies re-typed in the test (:170-282) on fixture rows with decimal sell amounts; the schema cases check the helper's v4 schema, not production.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "concurrent writes / transactions / foreign keys (helper DB)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "tests SQLite itself on the helper schema"
+        },
+        {
+          "name": "Schema v4: user_version pragma returns 4",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "production schema version (7)"
+        },
+        {
+          "name": "schema validation (trades, exit_state columns)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "production columns"
+        },
+        {
+          "name": "P&L with partial sells (getPnL, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, getPnLChartData)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real db.ts statements on rows shaped like production writes (wei amount_out)"
+        },
+        {
+          "name": "legacy chain identifier normalization (real normalizeLegacyMainnetRows)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "chain-scoped dedup (real makeIsTokenSnipedStmt)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "DB-02: storage.ts deleted",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Phase 3 harm-prevention: atomic rollback",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "yes: imports src/utils/db unmocked with no DB_PATH override, so before the rails the module bound and migrated the live data/bot.db at import (AUD-RAIL-002 names this file). The real-path cases (normalizeLegacyMainnetRows, makeIsTokenSnipedStmt) run on the helper DB."
+    }
+  },
+  {
+    "path": "test/unit/db/exitFailedHeldMigration.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-019"
+    ],
+    "quality_label": {
+      "claims": "The v6 to v7 migration adds exit_failure_count and exit_status to exit_state idempotently, keeps existing rows, and the markExitFailedHeld statement round-trips.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "better-sqlite3 in-memory DB built by the test"
+      ],
+      "mocked_mechanism_detail": "The migration steps and the markExitFailedHeld SQL are replicas written in the test; the real migrateSchema runs only at module import, on whichever DB the module bound.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "production module integration (3 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "checks only exports and columns on an already-migrated DB; cannot see a broken upgrade step"
+        },
+        {
+          "name": "migration mechanics Tests 1-4",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real db.ts migration"
+        },
+        {
+          "name": "Test 5 (statement round-trip)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real markExitFailedHeld statement"
+        }
+      ],
+      "notes": "yes: imports src/utils/db unmocked with no DB_PATH override, so before the rails the module bound and migrated the live data/bot.db at import; the production cases read user_version and columns from that DB."
+    }
+  },
+  {
+    "path": "test/unit/db/lpBaselineMigration.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-019"
+    ],
+    "quality_label": {
+      "claims": "The v4 to v5 migration creates lp_baseline and chain_state idempotently with their constraints, index and upsert, and a v3 DB gets both the v4 and v5 steps.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "better-sqlite3 in-memory DB built by the test"
+      ],
+      "mocked_mechanism_detail": "A \"production migrateSchema() replica\" written in the test (citing db.ts:29-123, stale at the base SHA) is what runs.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "production module integration (2 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "exports and version floor only"
+        },
+        {
+          "name": "migration mechanics, round-trips, constraints, chain (Tests 1-10)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real db.ts migration"
+        }
+      ],
+      "notes": "yes: imports src/utils/db unmocked with no DB_PATH override, so before the rails the module bound and migrated the live data/bot.db at import."
+    }
+  },
+  {
+    "path": "test/unit/db/pauseStateMigration.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-019"
+    ],
+    "quality_label": {
+      "claims": "The v5 to v6 migration creates the single-row pause_state table with its seed, adds chain_state.antirug_dry_run_started idempotently, and the five new statements round-trip (COALESCE first-write-wins).",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "better-sqlite3 in-memory DB built by the test"
+      ],
+      "mocked_mechanism_detail": "Replica migration and the test's own copies of setPauseState / clearPauseState / setAntirugDryRunStarted SQL.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "production module integration (2 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "exports and version floor only"
+        },
+        {
+          "name": "migration mechanics Tests 1-5",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real db.ts migration"
+        },
+        {
+          "name": "prepared statement round-trip Tests 6-10",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real db.ts statements"
+        }
+      ],
+      "notes": "yes: imports src/utils/db unmocked with no DB_PATH override, so before the rails the module bound and migrated the live data/bot.db at import."
+    }
+  },
+  {
+    "path": "test/unit/ethersV5PatternsAbsent.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "No ethers v5 patterns (@ethersproject imports, providers namespace, callStatic, BigNumber, deployed(), ethers.utils) remain in src/ or scripts/.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real file scan; a violation fails it."
+    }
+  },
+  {
+    "path": "test/unit/ethersV6BigIntArithmetic.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "No BigNumber or v5 BigNumber methods remain in src/scripts, and getGasOptions returns bigint gas values scaled by the multiplier.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/config (vi.doMock per case)",
+        "provider getFeeData (fake)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/ethersV6ToolboxConfig.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "package.json pins ethers 6.16 and the v6 Hardhat toolbox with no @nomiclabs packages, hardhat.config.ts imports the toolbox, eslint has restrict-plus-operands, and tsconfig.bot.json targets ES2022.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static config-file assertions; real."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The exit engine pure functions (partial-sell target parsing, urgency multiplier, effective trailing %, unfilled tiers, partial-sell amount, volatility tracker, state serialisation) behave as specified.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Pure functions, real. The \"Fixtures\" case checks the test's own fixture factories (by name, not a src claim)."
     }
   },
   {
@@ -950,6 +1388,119 @@
     }
   },
   {
+    "path": "test/unit/exitEngineSell.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "executeFullSell and executePartialSell record the decoded receipt (amountOut, gasCost, block) into the trades row, record nulls on a no-new-tx close, and a stop-loss exit inserts a sell row.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "reconciliation",
+        "src/utils/nonceAuthority (pass-through)",
+        "src/utils/receiptDecoder",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The decoded values are the controlled input and the insert call is the observed behaviour (real wiring). withNonceLock is a pass-through here but the file makes no lock claim (sibling of AUD-TESTU-003)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngineZeroBalance.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "When the wallet holds zero of the token, executeFullSell returns true, marks the trade sold, clears timers and the exit state, and sends no sell and no new trade row.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "ethers Contract (vi.doMock)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/helpers.smoke.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-018"
+    ],
+    "quality_label": {
+      "claims": "The shared test helpers and fixtures load and export the expected functions, and createTestDb returns a working in-memory DB.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Helper smoke test; it also pins the helper schema at user_version 4 (AUD-TESTU-018)."
+    }
+  },
+  {
+    "path": "test/unit/honeypotDispatch.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "simulateHoneypotRoundtrip routes V2 and V3 dexes to the on-chain-contract simulators and returns unknown (no call) when the checker address is null.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/honeypot/checkerContract",
+        "src/utils/honeypot/simulator"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Routing is the claim; mocking the routed-to simulators is legitimate isolation."
+    }
+  },
+  {
+    "path": "test/unit/honeypotTaxThreshold.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The on-chain honeypot checker result is safe at a buy tax just under the threshold and unsafe (with the named reason) just over it, for V2 buy and sell tax and V3 sell tax.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "provider.call (fake revert data built with the real ABI)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real decode and threshold logic; the revert data is encoded with the production ABI."
+    }
+  },
+  {
+    "path": "test/unit/honeypotTypes.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-008"
+    ],
+    "quality_label": {
+      "claims": "The HoneypotResult union makes a vacuous safe verdict (empty evidence or missing tax fields) a compile error and narrows buyTaxBps to number.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "The header says the file fails to load if tsc fails; tsc never sees test/ and Vitest does not type-check, so the @ts-expect-error gates are dead and every runtime assertion reads the test's own literal (AUD-TESTU-008)."
+    }
+  },
+  {
     "path": "test/unit/mevStrategies/flashbotsBundleHash.test.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": "none",
@@ -1099,6 +1650,500 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (dotenv itself is mocked, but vitest.config.ts had already loaded the real .env). buildReconcileConfig is real, but the sell-leg claim holds on no live path (AUD-TESTU-011). Header still says every case is it.skip (AUD-TESTU-013). Env deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/positionsHelper.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "buildPositionsWithLivePrices prices each open position by quoting the held token amount, marks stale prices, filters closed trades, computes unrealized P&L on the net cost basis, and resolves the quoting dex from the trade's dex_name (first dex of the type for legacy rows with none).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db (getPnL, getExitState, getTradeIdForPendingToken)",
+        "src/exitEngine (queryPrice, exitConfig)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/chainRegistry and src/utils/provider). The positions helper is real; queryPrice is the controlled input and the arguments it is called with are asserted."
+    }
+  },
+  {
+    "path": "test/unit/preflight/antiRugLiveGate.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "checkAntiRugLiveGate blocks live anti-rug execution until the recorded dry-run start is at least 7 days old and never blocks dry-run mode.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real gate; the dry-run timestamp comes from a mocked getAntirugDryRunStarted (the statement itself is AUD-TESTU-010 scope). ETH_ANTIRUG_LIVE_EXECUTE set and deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/preflight/crossEnvRules.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "validateCrossEnvRules reports a missing Flashbots key on eth, a missing bloXroute header on bsc, an incomplete Telegram 5-tuple, a missing per-chain RPC URL, and a placeholder, empty or short DASHBOARD_API_KEY.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real validator; env snapshotted and restored per test."
+    }
+  },
+  {
+    "path": "test/unit/preflight/exitAffordability.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The buy-time entry/exit affordability gate refuses a snipe the wallet cannot exit (with exact bigint floor math), fails closed on RPC errors, reserves extra for deliberate buys, and prices the real deliberate amount.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real gate; env saved and restored."
+    }
+  },
+  {
+    "path": "test/unit/preflight/honeypotCheckerCode.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "checkHoneypotCheckerCode fails when the checker address has no code or is unset and passes with bytecode.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/preflight/mevHealth.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "checkMevHealth fails when the Flashbots or bloXroute health check is false, passes for passthrough without calling it, and passes when healthy.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/preflight/rpcHealth.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "checkRpcChainId fails on a chain-id mismatch and checkRpcBlockAge fails on a stale tip beyond the tolerance.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/preflight/staleData.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "checkStaleData warns and errors on open positions older than the warn and error thresholds and honours the env overrides.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real check over mocked trade rows; env saved and restored."
+    }
+  },
+  {
+    "path": "test/unit/preflight/walletBalance.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "checkWalletBalance enforces the per-chain floor snipeAmount x maxOpenPositions + gas buffer with exact parseEther precision and honours the overrides.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/txManager",
+        "src/utils/notifier",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real check; env saved and restored."
+    }
+  },
+  {
+    "path": "test/unit/provider.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "getProvider caches one JsonRpcProvider per network key and throws when no RPC URL is configured.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers (JsonRpcProvider class stub)",
+        "src/config"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/receiptDecoder.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "decodeReceipt extracts amountOut from the V2 WETH Withdrawal or the V3 WETH Transfer to the wallet, computes gas cost, retries a null receipt once, ignores spoofed and malformed logs, and returns nulls when nothing matches.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "provider.getTransactionReceipt (fake)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real decoder. It shows amountOut is a wei bigint string, the unit db.test.ts fixtures do not use (AUD-TESTU-017)."
+    }
+  },
+  {
+    "path": "test/unit/riskManager.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015",
+      "AUD-TESTU-017"
+    ],
+    "quality_label": {
+      "claims": "canSnipe blocks on position size, daily loss, max positions, cooldown and exposure cap, and getPortfolioExposure subtracts partial-sell proceeds.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "The risk statements (getTotalExposure, getDailyRealizedLoss, the per-chain exposure query) are vi.fn mocks fed decimal totals; the SQL that produces them is never run.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "returns {allowed:true} when all limits OK",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "returns {allowed:false, reason:\"position_size\"} when amount exceeds max",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "returns {allowed:false, reason:\"daily_loss_limit\"} when daily loss exceeded",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real daily-loss SQL on production-unit rows"
+        },
+        {
+          "name": "returns {allowed:false, reason:\"max_positions\"} when max positions reached",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "which positions the real count includes (failed-held excluded, AUD-DB-003)"
+        },
+        {
+          "name": "returns {allowed:false, reason:\"cooldown\"} when cooldown active",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "returns {allowed:false, reason:\"exposure_cap\"} when total exposure exceeded",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real exposure SQL"
+        },
+        {
+          "name": "getPortfolioExposure with partial sells",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real per-chain exposure SQL"
+        }
+      ],
+      "notes": "MAX_OPEN_POSITIONS, MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT, SNIPE_COOLDOWN_MS and MAX_POSITION_SIZE are set and never restored (AUD-TESTU-015). Only valid numbers are used, so AUD-DB-001 (malformed values switch the limits off) is outside its claims."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/checkHoneypotForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "checkHoneypotForChain never returns safe when the honeypot provider throws or returns a malformed response, and really calls the provider.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/checkTokenMetadataForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "checkTokenMetadataForChain never returns safe when symbol() throws or decimals() is out of range, and logs the check.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/hasMaxWalletOrTxLimitsForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "hasMaxWalletOrTxLimitsForChain never returns safe when totalSupply throws and flags an anti-bot limit below 1% of supply.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/isBlacklistedTokenForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "isBlacklistedTokenForChain never returns safe when getCode throws or returns empty code, and really reads the token code.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/isLiquidityLockedForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "isLiquidityLockedForChain never returns locked when the lock API and the burn fallback both fail or the API returns no locks.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/isLiquiditySufficientForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "isLiquiditySufficientForChain never returns sufficient when getReserves or token0 throws.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/safetyBank/simulateSwapForChain.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "simulateSwapForChain never returns success when the router staticCall reverts or the RPC fails, and really calls staticCall.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "ethers Contract / axios / retry (I/O edge)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through src/utils/tokenSafety). The gate function is real; the I/O edge is mocked to throw or return malformed data, and the observable-effect case checks the edge was really called."
+    }
+  },
+  {
+    "path": "test/unit/telegramListener.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-021"
+    ],
+    "quality_label": {
+      "claims": "startTelegramListener returns no client when credentials are missing or connect fails, enforces the sender/channel allowlist, and routes alpha drops only to chains where the token has code.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "telegram",
+        "telegram/sessions",
+        "telegram/events",
+        "src/alphaDrop",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real listener logic and env saved/restored by copying process.env. Three cases require the allow-all / OR allowlist behaviour that AUD-BUY-006 registers as an S1 (AUD-TESTU-021)."
+    }
+  },
+  {
+    "path": "test/unit/tokenSafety.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The token safety checks (honeypot API with staticCall fallback, blacklist selectors, liquidity lock with burn fallback, metadata, swap simulation, liquidity threshold, known-bad token, max wallet/tx limits) return the right verdicts on mocked responses.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "axios",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/provider",
+        "src/utils/retry",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Covers the legacy non-ForChain functions; the per-chain gates used by bot.ts are covered by safetyBank/*."
+    }
+  },
+  {
+    "path": "test/unit/utils/nonceAuthority.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "withNonceLock serializes same-wallet ops (in-flight counter <= 1), keeps different wallets independent, survives a rejecting op, passes the return value through and keys case-insensitively.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real mutex. Not claimed and not covered: re-entry on the same wallet (AUD-TX-001) and an op that never settles (AUD-TX-002) — both block the chain."
+    }
+  },
+  {
+    "path": "test/unit/utils/withTimeout.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "withTimeout rejects with a real Error after the budget on a never-resolving op, passes early values through, and clears its timer.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real wrapper; it frees the caller only (the op keeps running), which the liveness tests that build on it do not account for (AUD-TESTU-002)."
+    }
+  },
+  {
+    "path": "test/unit/v3Abis.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "The V3 factory, pool, swap router and quoter ABIs carry the events and functions the bot relies on, and every chain has a V3 dex with factory, router and quoter addresses (ETH addresses match Uniswap).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/provider"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ABI constants and registry. Sets ENABLED_CHAINS, ETH_RPC_URL, FLASHBOTS_AUTH_KEY and PRIVATE_KEY placeholders with no cleanup at all (AUD-TESTU-015)."
     }
   }
 ]

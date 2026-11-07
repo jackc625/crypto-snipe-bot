@@ -14,7 +14,13 @@
     "test/unit/exitEngine/failedExitBalanceTruth.test.ts",
     "test/unit/exitEngine/antiRugBounded.test.ts",
     "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
-    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts"
+    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+    "test/unit/configEnvVar.test.ts",
+    "test/unit/chainRegistry.test.ts",
+    "test/unit/chainRegistry/antiRugConfig.test.ts",
+    "test/unit/v3Abis.test.ts",
+    "test/unit/riskManager.test.ts",
+    "test/unit/preflight/antiRugLiveGate.test.ts"
   ],
   "evidence": [
     {
@@ -51,9 +57,29 @@
       "type": "command",
       "ref": "node scratchpad tools/envscan.js over the TESTU snapshot",
       "note": "per-file counts of env assignments, deletes and save/restore idioms"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/configEnvVar.test.ts:33-86@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sets PRIVATE_KEY, TELEGRAM_* and DASHBOARD_API_KEY placeholders and deletes them in afterEach (before the rails this deleted the real values for the rest of the worker)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/chainRegistry.test.ts:53-79@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "overwrites ENABLED_CHAINS, ETH_RPC_URL, FLASHBOTS_AUTH_KEY and PRIVATE_KEY; afterEach only deletes the honeypot keys"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/v3Abis.test.ts:42-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same overwrites with no cleanup at all"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/riskManager.test.ts:54-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "five risk-limit keys set in beforeEach, never restored"
     }
   ],
-  "sibling_sites_checked": "envscan.js over all 84 files: save-and-restore idioms (SAVED_ENV loops) in bot/deliberateBuy*, bot/noDoubleBuyReconcile, exitEngine/exitInclusionLadder, exitEngine/noDoubleSellReconcile, mevStrategies/inclusionReconciliation (correct). Delete-only or no cleanup: the files listed here plus the Task 2 files added to this finding.",
+  "sibling_sites_checked": "envscan.js over all 84 files: save-and-restore idioms (SAVED_ENV loops, process.env = { ...originalEnv }, snapshot/restore) in bot/deliberateBuy*, bot/noDoubleBuyReconcile, exitEngine/exitInclusionLadder, exitEngine/noDoubleSellReconcile, mevStrategies/inclusionReconciliation, telegramListener, preflight/crossEnvRules, preflight/exitAffordability, preflight/staleData, preflight/walletBalance (correct). Delete-only or no cleanup: attemptBudget, failedExitBalanceTruth, antiRugBounded, flashbotsMultiBuilder, inclusionReconciliationConfig, configEnvVar, chainRegistry, chainRegistry/antiRugConfig, v3Abis, riskManager, preflight/antiRugLiveGate.",
   "status": "confirmed",
   "origin": "independent",
   "rc": [],

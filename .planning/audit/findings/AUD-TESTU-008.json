@@ -12,7 +12,9 @@
     "vitest.config.ts",
     "tsconfig.json",
     "tsconfig.bot.json",
-    "src/anti-rug/types.ts"
+    "src/anti-rug/types.ts",
+    "test/unit/honeypotTypes.test.ts",
+    "src/utils/honeypot/types.ts"
   ],
   "evidence": [
     {
@@ -39,6 +41,16 @@
       "type": "code",
       "ref": "vitest.config.ts:6-19@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "no typecheck option: Vitest transpiles tests without type-checking, so an unused @ts-expect-error is never reported"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/honeypotTypes.test.ts:7-13@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"The test PASSING means tsc --noEmit passed ... tsc will fail and this test file will fail to load\" (neither is true)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/honeypotTypes.test.ts:19-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "four @ts-expect-error gates; every runtime assertion reads the test's own literal"
     }
   ],
   "sibling_sites_checked": "git grep @ts-expect-error over test/unit at the base SHA: anti-rug/types.test.ts:107 and :117, honeypotTypes.test.ts:20, :27, :46 (the HoneypotResult compile gate; labelled in Task 2). .github/workflows/test.yml runs tsc --noEmit only for tsconfig.json, tsconfig.bot.json and dashboard/tsconfig.json, none of which include test/.",
@@ -62,7 +74,10 @@
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
   "affected_cases": [
     "Test 4: RugEvaluation accepts { verdict:'unknown', reason } with NO signals field",
-    "Test 5: Vacuous { verdict:\"safe\" } without signals fails TypeScript compilation (vacuous-pass unrepresentable)"
+    "Test 5: Vacuous { verdict:\"safe\" } without signals fails TypeScript compilation (vacuous-pass unrepresentable)",
+    "honeypotTypes.test.ts: Test 1: literal { verdict: 'safe', evidence: {} } fails tsc --noEmit",
+    "honeypotTypes.test.ts: Test 2: literal { verdict: 'safe', evidence: { method: ... } } (missing tax fields) fails tsc --noEmit",
+    "honeypotTypes.test.ts: Test 4: literal { verdict: 'unsafe', evidence: { method: ... } } (missing reason) fails tsc --noEmit"
   ],
   "escaped_regression": "Make signals optional on the safe variant of RugEvaluation in src/anti-rug/types.ts: Test 5 stays green (the @ts-expect-error is never compiled and the runtime check reads the literal), and the src tsc step still passes."
 }
