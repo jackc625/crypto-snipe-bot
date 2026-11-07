@@ -3,7 +3,7 @@
   "area": "src",
   "slice": "DB",
   "duplicate_of": null,
-  "escalation_ref": null,
+  "escalation_ref": "ESC-DB-01",
   "reported_by": [
     "claude (22-21 executor)"
   ],
