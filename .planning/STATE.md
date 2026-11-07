@@ -4,17 +4,17 @@ milestone: v7.0
 milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
-status: planning
-stopped_at: Phase 22 context gathered
-last_updated: "2026-11-06T22:30:43.637Z"
+status: executing
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-11-07T00:53:38.161Z"
 last_activity: 2026-11-06
-last_activity_desc: v7.0 roadmap revised to 11 phases (22–32)
-state_head: ceb908aae926f87943b8720d2aef6d2833aba782
+last_activity_desc: Phase 22 execution started
+state_head: b15aa91adfef4dccd95d613a4252b17643d1f32c
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management — never lose money to preventable bugs, race conditions, or security flaws.
-**Current focus:** v7.0 Full Audit & Modernization — roadmap created; next: Phase 22 (Safety Rails & Audit)
+**Current focus:** Phase 22 — Safety Rails & Audit
 
 ## Current Position
 
-Phase: 22 (Safety Rails & Audit) — READY TO EXECUTE
-Plan: 0/29 complete (13 waves; first is 22-01, the SAFE-01 backup)
-Status: Planned, cross-AI reviewed (22-REVIEWS.md, Codex only; Antigravity dropped on quota), replanned with --reviews and checker-verified; next is `/gsd-execute-phase 22`. Run on Node 22.16.0 by absolute path (CONTEXT D-21); the global Node 24 cannot load better-sqlite3.
-Last activity: 2026-11-06 — Phase 22 replanned from review feedback (all 29 plans revised; 1 revision iteration; verification passed). New D-STOP-THE-LINE record ESC-PRE-04: dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24).
+Phase: 22 (Safety Rails & Audit) — EXECUTING
+Plan: 2 of 29
+Status: Ready to execute
+Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
@@ -70,9 +70,20 @@ None open.
 
 ---
 *STATE.md hand-reset to the v7.0 milestone start on 2026-11-06. Prior milestone history preserved in git and the `milestones/` archives.*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 22 P01 | 16min | 2 tasks | 4 files |
 
 ## Session
 
-**Last session:** 2026-11-06T19:43:42.075Z
-**Stopped at:** Phase 22 context gathered
-**Resume file:** .planning/phases/22-safety-rails-audit/22-CONTEXT.md
+**Last session:** 2026-11-07T00:53:38.104Z
+**Stopped at:** Completed 22-01-PLAN.md
+**Resume file:** None
+
+## Decisions
+
+- [Phase 22]: 22-01: Ignition artifact rule observed on disk - each future id X in deployed_addresses.json has artifacts/X.json AND artifacts/X.dbg.json; backup-state.ts requires both
+- [Phase 22]: 22-01: SAFE-01 local backup verified at C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06 (17 PRESENT); archive crypto-snipe-bot-state-2026-11-06.tar.gz sha256 4c8e9ab6a70b93a4d408046bebe916d29c95f93cacb47d0b50abcddfb07a1d1a is the file 22-03 uploads
+- [Phase 22]: 22-01: phase_start_sha = 23a64617dca167976adc4645fed0e2c69e384820 (committed first, df33999); backup-tool commit 3f380bf
