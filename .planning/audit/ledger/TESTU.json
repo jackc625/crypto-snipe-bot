@@ -1,0 +1,1104 @@
+[
+  {
+    "path": "test/unit/anti-rug/allowlist.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "verifyAllowlistAtStartup checks getCode on every non-dead allowlist entry and exits on an EOA; isAddressAllowlisted matches case-insensitively; mergeAllowlist keeps order and provenance.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "process.exit (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/circuitBreaker.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The per-chain circuit breaker trips after N triggers inside the rolling window, broadcasts and alerts, keeps a bounded ring of recent triggers, isolates chains and resets on demand.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real module; fake timers restored. That the breaker counts dispatches rather than rugs (AUD-ANTIRUG-003) is not claimed here."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/detectorEvaluator.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-013"
+    ],
+    "quality_label": {
+      "claims": "The anti-rug evaluator only returns unsafe when all three signals trip (V2 and V3), honours the allowlist and the V3 Burn-without-Collect grace window, re-checks after the confirm blocks, and returns unknown (never safe) on RPC errors.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/anti-rug/exitTrigger",
+        "src/utils/db",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config and src/utils/notifier (sendCtxAlert, used by detector.ts:94 on WS-health paths) are unmocked, so before the rails an alert path could post to Telegram with the real token. Evaluator logic real. Test 10d has a conditional expect(true) fallback (AUD-TESTU-013). The WS provider is a stub without error events, so AUD-ANTIRUG-001/-002 are outside its claims."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/detectorRegistry.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "The detector registry stores, unregisters and dispatches positions by pair address, builds the union topic and address filters, and chunks backfill getLogs.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/utils/db",
+        "evaluateRugSignals (test shim)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config and src/utils/notifier unmocked (same as detectorEvaluator). The evaluator shim is legitimate: the claims are routing and filter shape, not evaluation."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/dryRunTimestamp.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-010"
+    ],
+    "quality_label": {
+      "claims": "The first startChainAntiRugListener call per chain records the dry-run start time, later calls never overwrite it (COALESCE), and chains are isolated.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/anti-rug/allowlist",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/provider"
+      ],
+      "mocked_mechanism_detail": "src/utils/db is replaced by an in-memory DB with statements re-typed in the test; the COALESCE statement under test is the copy, not db.ts:702-707.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). The copy cites db.ts:565-572, already stale at the base SHA (AUD-TESTU-010)."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/exitTrigger.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "triggerAntiRugExit honours dry-run and the tripped circuit breaker, clears timers before executeFullSell with reason anti-rug and a formatted detail, counts success and failure toward the breaker, and broadcasts the state.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine",
+        "src/anti-rug/circuitBreaker"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "executeFullSell is the downstream boundary; asserting its call and arguments is the bridge behaviour."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/lpBaseline.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "snapshotLpBaseline writes the V2 reserves or V3 liquidity row (lowercased address, block, timestamp) and propagates RPC errors; loadLpBaseline and clearLpBaseline map rows and counts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/db (statement spies)",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The row passed to the statement is the module behaviour; the SQL itself is db.ts scope."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/raceTelemetry.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "measureDetectionLatency returns end minus start.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Trivial pure function."
+    }
+  },
+  {
+    "path": "test/unit/anti-rug/types.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-008"
+    ],
+    "quality_label": {
+      "claims": "The RugEvaluation union makes a vacuous safe verdict unrepresentable (compile gate), and the event topic hashes, DEAD_ADDRESS and monitor-state union match their canonical values.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Tests 1-4: RugEvaluation accepts each variant",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the runtime assertions read the test's own literal objects; only a type check could fail them"
+        },
+        {
+          "name": "Test 5: vacuous safe fails TypeScript compilation",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the @ts-expect-error is never compiled (no tsconfig includes test/, Vitest does not type-check)"
+        },
+        {
+          "name": "Tests 6-11: topic hashes, DEAD_ADDRESS, state union",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "File-level hollow is no because Tests 6-11 compare real constants; the compile-gate half is dead (AUD-TESTU-008)."
+    }
+  },
+  {
+    "path": "test/unit/bot/buyNonceLock.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-004"
+    ],
+    "quality_label": {
+      "claims": "The buy submit seam submitBuyTx runs sendTxWithRetry inside the real per-wallet withNonceLock, so a buy and a concurrent same-wallet sell never interleave.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/txManager (sendTxWithRetry, createMevStrategy)",
+        "src/utils/logger",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: imports src/bot, which loads src/utils/db and src/config unmocked (before the rails: the live data/bot.db opened and migrated at import, real .env values in CONFIG). The real lock is used (good), but only the seam is driven: the V2/V3 buy sites are never shown to call it (AUD-TESTU-004). sendTxWithRetry resolves at once, so a never-settling wait inside the lock is out of scope."
+    }
+  },
+  {
+    "path": "test/unit/bot/deliberateBuyAffordability.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "A deliberate buy whose real amount (larger than the snipe amount) the wallet cannot cover is refused at the real entry/exit affordability gate, and a base-fee rise before the public broadcast aborts it.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/riskManager",
+        "src/utils/logger",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/txManager (escalatePrivateBuy only)",
+        "src/preflight (preflight, preflightDryRun only)",
+        "reconciliation (reconcileInclusion only)",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). checkEntryExitAffordability is real and the amounts diverge on purpose; assertions observe the gate outcome (no private submit, no swap, no row). Env keys saved and restored (SAVED_ENV)."
+    }
+  },
+  {
+    "path": "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-006"
+    ],
+    "quality_label": {
+      "claims": "A landed deliberate buy (public fallback, private, or late-landed) arms the exit monitor, the LP baseline snapshot and anti-rug registration with the right trade id, pair and amount; no-broadcast branches arm nothing.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/riskManager",
+        "src/utils/logger",
+        "src/preflight",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/exitEngine (startExitMonitor only)",
+        "src/anti-rug/lpBaseline",
+        "src/anti-rug/detector",
+        "reconciliation (reconcileInclusion only)",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). The arming calls are spies; asserting they are called with the right arguments is the behaviour of the wiring (not hollow). Missing observable: the monitor runs in the script process that exits right after the buy (AUD-BUY-001, S0) and startExitMonitor can return without arming (AUD-EXIT-002) — AUD-TESTU-006."
+    }
+  },
+  {
+    "path": "test/unit/bot/exitFailedHeldResume.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-005"
+    ],
+    "quality_label": {
+      "claims": "After a restart, a still-held exit_failed_held position (trades.status failed) is re-entered into exit monitoring and anti-rug, a genuinely closed one is not, and normal pending buys resume as before.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/exitEngine",
+        "src/anti-rug/detector",
+        "src/anti-rug/allowlist",
+        "src/anti-rug/lpBaseline",
+        "src/utils/tokenSafety",
+        "src/utils/honeypot",
+        "src/utils/notifier",
+        "src/utils/provider",
+        "src/utils/txManager",
+        "src/utils/exitManager",
+        "src/chainRegistry (partial)",
+        "src/riskManager",
+        "src/api/server",
+        "src/api/ws/broadcaster",
+        "src/telegramListener",
+        "src/utils/gasManager",
+        "src/preflight",
+        "src/config",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "The two SQL statements that are the S-1 fix (getResumeExitMonitorTrades / getResumeAntiRugTrades, db.ts:597 and :612) are vi.fn mocks returning rows the test writes; the union that decides which positions come back is never run.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test A (re-monitor)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real SQL union; the dex (call[1]) and amount (call[4]) the position is resumed with"
+        },
+        {
+          "name": "Test B (re-register anti-rug)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real SQL union; the dex the position is registered on"
+        },
+        {
+          "name": "Test C (no resurrection)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test D (no regression — exit monitor)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real SQL; dex and amount"
+        },
+        {
+          "name": "Test D (no regression — anti-rug)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real SQL: \"a closed/sold one is not in the scan\" is asserted by not putting it in the mocked rows"
+        },
+        {
+          "name": "logs op:exit.failed-held.resumed",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "Every side-effecting import is mocked. The bot-side loop and the balanceOf guard are real."
+    }
+  },
+  {
+    "path": "test/unit/bot/noDoubleBuyReconcile.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "The deliberate-buy no-double-buy guard reconciles the hash the strategy really broadcast and never sends the public buy when the private buy landed, is inconclusive, received tokens, or consumed the nonce.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/riskManager",
+        "src/utils/logger",
+        "src/preflight (gate mocked to pass)",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "reconciliation (reconcileInclusion only)",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). Real escalatePrivateBuy, sendTxWithRetry, passthrough strategy and submitWithReconciliation; reconcileInclusion is the controlled outcome source. Deliberate path only (the snipe sites are not covered)."
+    }
+  },
+  {
+    "path": "test/unit/bot/snipeFailClean.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-014"
+    ],
+    "quality_label": {
+      "claims": "A snipe whose private submit is exhausted (ceiling hit) fails clean: zero ETH spent, no trades row, no monitor, and a structured fail-clean alert without secrets.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/tokenSafety",
+        "src/utils/honeypot",
+        "src/utils/notifier",
+        "src/utils/db",
+        "src/utils/provider",
+        "src/utils/txManager",
+        "reconciliation",
+        "src/exitEngine",
+        "src/anti-rug/*",
+        "src/api/ws/broadcaster",
+        "src/riskManager",
+        "src/preflight",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "sendTxWithRetry is a mock that throws; whether anything was broadcast or landed (the fact that makes \"zero ETH spent\" true) is neither modelled nor observed.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (db and notifier are vi.doMock-ed). The case pins the bot.ts:1177 catch that the registered S1 AUD-BUY-002 describes (AUD-TESTU-014)."
+    }
+  },
+  {
+    "path": "test/unit/bot/twoStageSigint.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001"
+    ],
+    "quality_label": {
+      "claims": "The two-stage SIGINT handler runs cleanup once on the first signal, force-exits 130 on the second, force-exits 1 when the grace timer expires, arms exactly one timer, and the old single-stage handler is gone from bot.ts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "process.exit (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/bot is imported with no mocks at all, so src/utils/db, src/config and the notifier load unmocked (before the rails the live DB was opened and migrated at import; AUD-RAIL-002 names this file). The pure state machine is real; Test 4b is a source-text check of bot.ts."
+    }
+  },
+  {
+    "path": "test/unit/bot/watchdog.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-002"
+    ],
+    "quality_label": {
+      "claims": "The exit-worker watchdog frees the drain loop after the budget (resolves false, alerts), passes fast results through without leaking a timer, and the worker then processes the next queued exit.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/notifier (send functions only, rest importActual)",
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector"
+      ],
+      "mocked_mechanism_detail": "Test 2 replaces the sell executor (_setSellExecutorForTesting) with a bare promise, so the real executeFullSell and its withNonceLock never run.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "frees the awaiting path (resolves false) after WATCHDOG_BUDGET_MS via Promise.race",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "passes a submit value straight through when it settles before the budget",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "leaks no timer after a fast submit (finally clearTimeout)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "emits op:watchdog.abort pino log + sendCtxAlert with a remediation pointer",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "processes the next queued exit after the first submit is watchdog-aborted",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "whether the second same-wallet exit can sign while the hung first one holds the wallet nonce lock"
+        }
+      ],
+      "notes": "The notifier module is loaded through vi.importActual (its dotenv.config() runs) but both send functions are replaced, so no Telegram post is possible."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/antiRugBounded.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-002",
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "The direct anti-rug exit is bounded by the wall-clock budget: a stalled sell is freed (resolves false), still counts toward the circuit breaker, and a fast sell passes through.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/exitEngine (executeFullSell)",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/logger",
+        "src/anti-rug/circuitBreaker"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The bound (withTimeout) is real. Missing observable: the hung sell keeps running and holding the wallet lock, and nothing re-attempts the escape (AUD-TESTU-002). WATCHDOG_BUDGET_MS set and deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/antiRugReason.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-003",
+      "AUD-TESTU-012"
+    ],
+    "quality_label": {
+      "claims": "executeFullSell accepts the anti-rug reason, uses the anti-rug gas multiplier, unsubscribes anti-rug only when the position closes, keeps it on a still-held failure, and routes the anti-rug submit through withNonceLock.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "src/utils/nonceAuthority (pass-through)",
+        "reconciliation"
+      ],
+      "mocked_mechanism_detail": "withNonceLock is a pass-through (addr, op) => op() while Test 9 claims the submit runs inside it; the gas-multiplier wiring (Tests 1-3, 3b) and Test 7 are regexes over exitEngine.ts text instead of observed behaviour.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 1: the reason parameter type includes anti-rug",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "source text only"
+        },
+        {
+          "name": "Test 2: when reason=anti-rug, gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the fee actually submitted"
+        },
+        {
+          "name": "Test 3: when reason !== anti-rug, gasMultiplier is undefined",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the fee actually submitted"
+        },
+        {
+          "name": "Test 3b: gasMultiplier is threaded into the private escalation",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the call site at exitEngine.ts:909 (the regex is satisfied by the seam at :788)"
+        },
+        {
+          "name": "Test 4: full-close success path calls unsubscribeAntiRug after deleteExitState.run",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 5: zero-balance branch ALSO calls unsubscribeAntiRug",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 6 (INVERTED — Finding D): a failed exit on a STILL-HELD position KEEPS anti-rug",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 7: executePartialSell does NOT call unsubscribeAntiRug",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "source text only (Test 8 covers the behaviour)"
+        },
+        {
+          "name": "Test 8 (Finding D verification): a FAILED executePartialSell leaves the position open",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 9 (D-NONCE-AUTHORITY-ALL): the anti-rug-triggered exit submit routes through withNonceLock",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "which site took the lock: calls[0] is the approval lock, so the private submit can be unlocked"
+        }
+      ],
+      "notes": "All side-effecting imports mocked."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/attemptBudget.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "The private-attempt budget equals the documented count (anti-rug 1, routine 2, 0 straight to public) and an explicit 0 retries is honoured while the buy default stays 4 attempts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "test/helpers/mockProvider"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real submitWithReconciliation loop and passthrough strategy; counts real submissions. Env keys set and deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/computePublicMinOut.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "computePublicMinOut never yields minOut 0: slippage is clamped to 99% (and negative slippage to 0%).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/config",
+        "src/utils/logger",
+        "src/utils/db",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/anti-rug/detector"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Pure function, real. The private-sell minOut (AUD-EXIT-001, amountOutMin 0) is a different code path and not claimed here."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/exitInclusionLadder.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-003"
+    ],
+    "quality_label": {
+      "claims": "executeFullSell escalates privately with reason-aware attempts, aborts the public fallback when the private sell landed late, sells only the re-fetched balance, uses wider anti-rug slippage, and runs every submit inside withNonceLock.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "reconciliation (reconcileInclusion only)",
+        "src/utils/nonceAuthority (pass-through)"
+      ],
+      "mocked_mechanism_detail": "Test 6 claims the swap and approvals run inside withNonceLock while the lock is a recording pass-through; it asserts a call count (>= 3) that stays true with a site unlocked.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 1 (LADYS no-double-sell — CANONICAL)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 2 (sell-only-held)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 3 (abort on zero balance)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 4 (reason-aware attempts)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 5 (reason-aware slippage)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 6 (nonce-wrapped)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "lock membership per site (approval, private sell, public approval, swap)"
+        }
+      ],
+      "notes": "Env keys saved and restored (SAVED_ENV)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/exitWorker.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The ExitWorker drains one sell at a time, dequeues anti-rug first, skips a duplicate enqueue of an in-flight position and releases it after settle, and adds no outer withNonceLock.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "src/utils/nonceAuthority (recording spy over the real lock)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The worker is the code under test and is real; the executor seam replacing executeFullSell is legitimate isolation for these claims. The real-executor counterpart is exitWorkerRealPath.test.ts."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A real worker -> executeFullSell -> approval exit resolves with the real withNonceLock (no CR-01 re-entrant deadlock) and releases the sell lock.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/notifier",
+        "src/utils/txManager (escalatePrivateSell not landed)",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real path for its claim. Every approve/swap wait() resolves at once, so a never-settling wait inside the lock (AUD-EXIT-009) is outside what it can see (not claimed)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/failedExitBalanceTruth.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015",
+      "AUD-TESTU-016"
+    ],
+    "quality_label": {
+      "claims": "A failed exit on a still-held position keeps anti-rug, persists exit_failed_held and re-arms the poll timer; a closed one tears down; routine retries pause after N failures while anti-rug still fires; the dust boundary is exact.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "src/utils/nonceAuthority (pass-through)",
+        "reconciliation"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The balance-truth catch is real; markExitFailedHeld and registerExitMonitor are the observed boundary calls. Only the thrown-error failure is driven (AUD-TESTU-016). Env keys set/deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/noDoubleSellReconcile.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The no-double-sell guard reconciles the hash the strategy really broadcast, aborts the public fallback when that bundle landed late, and fails safe (failed-held, anti-rug kept) on an inconclusive result.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "reconciliation (reconcileInclusion only)",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real escalatePrivateSell, sendTxWithRetry, passthrough strategy and real withNonceLock. Env keys saved and restored."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/opEnrichment.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-007"
+    ],
+    "quality_label": {
+      "claims": "Every meaningful exit-engine path emits a structured dotted exit.* op (full/partial submitted, executed, failed, triggers, monitor started/resumed, zero-balance cleanup, receipt decoded).",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "src/utils/nonceAuthority",
+        "reconciliation"
+      ],
+      "mocked_mechanism_detail": "The case named \"startExitMonitor emits exit.monitor.started\" never produces a quote, so it only asserts the op is absent on the failed-first-quote early return.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "full-sell success emits exit.full.submitted, exit.full.executed, exit.receipt.decoded",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "full-sell failure emits exit.full.failed on the catch path",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "zero-balance cleanup emits exit.cleanup.zero-balance",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "partial-sell success emits exit.partial.submitted, exit.partial.executed",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "partial-sell failure emits exit.partial.failed on the catch path",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "startExitMonitor emits exit.monitor.started",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "exit.monitor.started is never observed; the case pins the AUD-EXIT-002 early return as expected"
+        },
+        {
+          "name": "resumeExitMonitor with persisted DB state emits exit.monitor.resumed",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "stop-loss / trailing / urgency trigger ops",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "Logging-presence tests by design (D-OP-DB-TRUTH says so in the header)."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/partialSellDecoupled.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A partial-sell trigger with a slow submit does not block the poll tick (the cycle log is emitted, overruns false) and the interval stays armed.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/nonceAuthority (real via importActual)",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "performance.now (deterministic sequence)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Discriminating observable is that the cycle log exists at all against a never-resolving submit; the durationMs / overruns values come from the mocked clock and are tautological on their own."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/pollTelemetry.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Each exit poll cycle (both setInterval bodies) emits one exit.poll.cycle log with positions 1, durationMs, budgetMs and overruns; a trigger enqueues on the worker and returns without blocking the cycle.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/exitManager",
+        "src/utils/nonceAuthority (real)",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "ethers Contract",
+        "performance.now"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Telemetry tests; the executor seam is used only for the non-blocking claim."
+    }
+  },
+  {
+    "path": "test/unit/exitEngine/sellNonceLock.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-004"
+    ],
+    "quality_label": {
+      "claims": "The private-sell seam submitPrivateSell runs escalatePrivateSell inside the real per-wallet withNonceLock, so a private sell and a same-wallet buy never interleave.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "src/utils/notifier",
+        "src/utils/receiptDecoder",
+        "src/anti-rug/detector",
+        "src/utils/txManager (escalatePrivateSell payload)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real lock, seam only: executeFullSell is never run, so the call site at exitEngine.ts:909 is not pinned (AUD-TESTU-004)."
+    }
+  },
+  {
+    "path": "test/unit/mevStrategies/flashbotsBundleHash.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "An included Flashbots bundle logs both the bundle hash and the mined tx hash (distinct) with the target block, and never the signed raw tx.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers FetchRequest",
+        "src/utils/logger",
+        "@flashbots/ethers-provider-bundle"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The library is mocked (legitimate: the claim is the strategy's logging). A library throw inside its own block listener (AUD-TX-009) is outside its claims."
+    }
+  },
+  {
+    "path": "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "The raw eth_sendBundle fanout sends a non-empty builders list, the same signed bytes to N ascending blocks, logs public bundle stats only, and captures the reconcile hash before a mid-fanout relay error.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers FetchRequest (wire capture)",
+        "@flashbots/ethers-provider-bundle",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Asserts the wire body (not a call count). The Flashbots auth signer is the known-public Hardhat #0 key (not a secret). MEV_* env keys set/deleted without restoring (AUD-TESTU-015)."
+    }
+  },
+  {
+    "path": "test/unit/mevStrategies/gasMultiplier.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "applyGasMultiplier scales fees in bigint math, and the passthrough and bloXroute strategies apply the multiplier but clamp the bid to the ceiling (CR-01).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "bloXroute axios.post (spy)",
+        "test wallet stubs"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real strategies. Ceiling env keys are pinned for hermeticity. Covers the strategy half only; the exitEngine-to-strategy wiring is AUD-TESTU-012."
+    }
+  },
+  {
+    "path": "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-004",
+      "AUD-TESTU-009",
+      "AUD-TESTU-013"
+    ],
+    "quality_label": {
+      "claims": "All three MEV strategies treat a landed-but-misreported tx as landed, never resubmit on a consumed nonce, throw on a reverted receipt, clamp the fee to the affordability ceiling, the sell leg inherits this, buy rows record the real hash, and the V2 safety bank fires no real buy.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "@flashbots/ethers-provider-bundle",
+        "ethers FetchRequest",
+        "src/utils/logger",
+        "test/helpers/mockProvider"
+      ],
+      "mocked_mechanism_detail": "The D-RECORD-REAL-HASH case defines its own persistBuyRow inside the test and asserts on it; the bot.ts inserts are only checked by text patterns.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "false-negative-loses-position (4 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "double-spend (3 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "mined-but-reverted false-success (2 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "stranded-exit and CR-01 ceiling clamp (5 cases)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "sell-leg inherits (SC4)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "D-RECORD-REAL-HASH: buy success path records trades.tx_hash === real hash",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "any src code: the wiring is a copy inside the test"
+        },
+        {
+          "name": "D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "insert reachability on a landed buy; the regex accepts a direct sendTxWithRetry call"
+        },
+        {
+          "name": "V2-unsafe-real-buy (STOP-THE-LINE-03)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (through tokenSafety). Header still says every case is it.skip (AUD-TESTU-013). Hardhat #0 used as the Flashbots auth key (known-public). Env saved and restored."
+    }
+  },
+  {
+    "path": "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTU-001",
+      "AUD-TESTU-011",
+      "AUD-TESTU-013",
+      "AUD-TESTU-015"
+    ],
+    "quality_label": {
+      "claims": "Each MEV reconciliation env var controls behaviour with the documented default, the buy and sell legs read independent ceilings, malformed values fall back safely, and the affordability clamp still binds.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "dotenv",
+        "src/utils/logger",
+        "process.exit (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env) (dotenv itself is mocked, but vitest.config.ts had already loaded the real .env). buildReconcileConfig is real, but the sell-leg claim holds on no live path (AUD-TESTU-011). Header still says every case is it.skip (AUD-TESTU-013). Env deleted without restoring (AUD-TESTU-015)."
+    }
+  }
+]

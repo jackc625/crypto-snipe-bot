@@ -1,0 +1,107 @@
+{
+  "id": "AUD-TESTU-001",
+  "title": "RC-19 test-file side: unit test files that, before the rails, imported src/utils/db, src/config or the notifier unmocked, so they opened and migrated the live DB, read the real .env values or could post to Telegram",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C13",
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "test/unit/bot/buyNonceLock.test.ts",
+    "test/unit/bot/deliberateBuyAffordability.test.ts",
+    "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+    "test/unit/bot/noDoubleBuyReconcile.test.ts",
+    "test/unit/bot/snipeFailClean.test.ts",
+    "test/unit/bot/twoStageSigint.test.ts",
+    "test/unit/anti-rug/detectorEvaluator.test.ts",
+    "test/unit/anti-rug/detectorRegistry.test.ts",
+    "test/unit/anti-rug/dryRunTimestamp.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+    "src/utils/db.ts",
+    "src/config.ts",
+    "src/utils/notifier.ts",
+    "vitest.config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/bot/twoStageSigint.test.ts:34@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "static import of src/bot with no vi.mock at all: src/bot imports src/utils/db (src/bot.ts:52), src/config (:2) and the notifier (:50-51) unmocked"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/buyNonceLock.test.ts:37-49@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mocks txManager, logger, notifier and broadcaster only; the dynamic import of src/bot at :67 loads src/utils/db and src/config unmocked"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bot.ts imports src/utils/db at module load"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9-17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH falls back to cwd/data/bot.db and new Database(DB_PATH) runs at import (the AUD-RAIL-002 mechanism)"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv.config() at import: CONFIG is built from the real .env values (vitest.config.ts:2-4 had already loaded them into process.env)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:6-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv.config() and TELEGRAM_API built from the real TELEGRAM_BOT_TOKEN at import; sendTelegramAlert posts with axios"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/detectorEvaluator.test.ts:118-130@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the test itself documents the reach: without the db mock every startChainAntiRugListener call \"writes to the production data/bot.db singleton\"; the notifier and config stay unmocked (detector.ts:94 imports sendCtxAlert)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:94@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "detector imports the real sendCtxAlert; detectorEvaluator and detectorRegistry do not mock src/utils/notifier"
+    },
+    {
+      "type": "command",
+      "ref": "node scratchpad tools/reach.js over the slice-files.ts --snapshot TESTU tree and a git archive of src at 23a6461 (static import graph, vi.mock and vi.doMock targets not traversed)",
+      "note": "lists, per test file, which of src/utils/db, src/config and src/utils/notifier are reached unmocked; the ledger rows with can_reach_real_state yes are exactly that list (importActual partial mocks checked by hand)"
+    }
+  ],
+  "sibling_sites_checked": "All 84 test/unit files at the base SHA, by static import graph (reach.js) plus reading every vi.mock / vi.doMock factory. db unmocked: bot/buyNonceLock, bot/twoStageSigint, configEnvVar, db.test, db/exitFailedHeldMigration, db/lpBaselineMigration, db/pauseStateMigration (the four db files point DB_PATH at a temp or :memory: path, see their rows). notifier unmocked: anti-rug/detectorEvaluator, anti-rug/detectorRegistry, bot/twoStageSigint, configEnvVar. config unmocked (real .env values in CONFIG): the rest of the rows marked yes. watchdog.test.ts loads the real notifier through vi.importActual but replaces both send functions, so it cannot post (labelled no). No unit test spawns a process, opens a non-loopback socket, uses worker_threads or dgram, or hard-codes a contacted real host (git grep over the snapshot for child_process, spawn, exec, fork, worker_threads, dgram, http.request, fetch(, new WebSocket, new JsonRpcProvider: the only hit is api/antiRug.test.ts:81-90, a 127.0.0.1 listener), so there is no new rail-class reach (D-16).",
+  "status": "candidate",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-19"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "Same severity and capital class as the canonical RC-19 entry AUD-RAIL-002 (S1 EXPOSURE): this is its test-file side, which AUD-RAIL-002 left for the TESTU audit to enumerate. Not a new escalation: it is linked to ESC-PRE-03 as a rediscovery (never escalated twice, PROTOCOL section 4). The SAFE-02 rails (22-05, 22-07..22-10) now block every listed reach; 22-29 re-audits them, so it stays a candidate.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-RAIL-002",
+    "AUD-RAIL-001"
+  ],
+  "tags": [
+    "test-quality",
+    "rediscovery"
+  ],
+  "escalation_ref": "ESC-PRE-03",
+  "od_ref": null,
+  "recommendation": "Keep the rails as the guard (no change in Phase 22). Phase 28: give every test that needs the database an explicit temp DB through the test helper, mock src/config with an explicit fixture instead of letting it read process.env, and mock the notifier in every file whose code under test can alert.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "every case in the files listed under files"
+  ],
+  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect itself. Example of what stays green while it happens: a change to src/utils/db.ts:9-24 that writes to the DB at import (for example a new migration step) runs against data/bot.db whenever bot/twoStageSigint.test.ts or bot/buyNonceLock.test.ts loads src/bot before the rails, and both tests still pass."
+}

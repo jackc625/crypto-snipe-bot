@@ -1,0 +1,79 @@
+{
+  "id": "AUD-TESTU-004",
+  "title": "The real-lock buy and sell nonce tests prove only the submitBuyTx / submitPrivateSell seams; nothing in the unit suite pins that the V2 and V3 buy sites and the private sell site call the seam, so a site that bypasses the lock stays green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07"
+  ],
+  "files": [
+    "test/unit/bot/buyNonceLock.test.ts",
+    "test/unit/exitEngine/sellNonceLock.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+    "src/bot.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/bot/buyNonceLock.test.ts:93-124@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "drives mod.submitBuyTx directly; never runs handleNewPairForChain or handleNewV3PoolForChain"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/sellNonceLock.test.ts:110-141@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "drives mod.submitPrivateSell directly; never runs executeFullSell"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:263-267@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the seam: withNonceLock(ctx.wallet.address, () => sendTxWithRetry(...))"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1100@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 snipe buy site calls submitBuyTx"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1431@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 snipe buy site calls submitBuyTx"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliation.test.ts:920-959@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only source check accepts either submitBuyTx or a direct sendTxWithRetry call (/const realHash = await (submitBuyTx|sendTxWithRetry)\\(/) and finds the withNonceLock line in the seam definition itself"
+    }
+  ],
+  "sibling_sites_checked": "All unit tests that reach the buy or sell submit: bot/snipeFailClean (mocks sendTxWithRetry; a direct call would still be \"attempted\"), bot/noDoubleBuyReconcile, bot/deliberateBuy* (deliberate path, not the snipe sites), exitEngine/exitInclusionLadder and antiRugReason (lock mocked, AUD-TESTU-003), exitWorkerRealPath and noDoubleSellReconcile (real lock, but a bypass does not deadlock or change their observables).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the hidden defect is the S1 nonce-collision class the seams were added for (WR-01, INT-NONCE-SELL); the tests are real-path for the seam but blind to the call-site wiring that the bug was about.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTU-003",
+    "AUD-TX-001"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive handleNewPairForChain / handleNewV3PoolForChain and executeFullSell with the real lock held from outside and assert that no submit body starts until it is released.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "buyNonceLock.test.ts: a buy submit and a same-wallet sell submit do NOT interleave their bodies (serialized by the per-wallet lock)",
+    "sellNonceLock.test.ts: a private sell submit and a same-wallet buy submit do NOT interleave their bodies (serialized by the per-wallet lock)",
+    "inclusionReconciliation.test.ts: D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)"
+  ],
+  "escaped_regression": "Replace submitBuyTx( with sendTxWithRetry( at src/bot.ts:1100 (the WR-01 bug): buyNonceLock stays green (the seam still exists) and the inclusionReconciliation source regex accepts the direct call. Replace submitPrivateSell( with escalatePrivateSell( at src/exitEngine.ts:909: sellNonceLock stays green."
+}

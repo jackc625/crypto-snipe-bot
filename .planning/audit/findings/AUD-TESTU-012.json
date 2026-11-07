@@ -1,0 +1,65 @@
+{
+  "id": "AUD-TESTU-012",
+  "title": "The anti-rug gas-multiplier wiring in executeFullSell is checked only by source-text regexes, not by observing the fee a sell submits, so the anti-rug exit can lose its elevated gas with the test green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "test/unit/exitEngine/antiRugReason.test.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/antiRugReason.test.ts:272-318@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Tests 1, 2, 3 and 3b regex-match exitEngine.ts text (within-80-character windows); no fee is observed"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/antiRugReason.test.ts:427-444@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 7: source text check on executePartialSell"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:782-788@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the 3b regex is satisfied by this seam definition alone"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the call site that must pass gasMultiplier; not covered by any regex"
+    }
+  ],
+  "sibling_sites_checked": "mevStrategies/gasMultiplier.test.ts proves the strategies apply a multiplier they are given (real); no test proves executeFullSell hands the anti-rug multiplier to the strategy. Other source-grep tests in the slice (twoStageSigint Test 4b, inclusionReconciliation :920 and :967, api/antiRug, codeQuality) are labelled per file.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: on the most time-critical exit (an active rug), losing the elevated bid delays inclusion while liquidity drains (an S1 class); the tests that claim the wiring do not observe it.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive executeFullSell with reason anti-rug through a real strategy (relay mocked at the wire) and assert the submitted fee is the elevated one; keep source checks only as a supplement.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 1: the reason parameter type includes 'anti-rug'",
+    "Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier",
+    "Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)",
+    "Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)",
+    "Test 7: executePartialSell does NOT call unsubscribeAntiRug"
+  ],
+  "escaped_regression": "Pass undefined instead of gasMultiplier to submitPrivateSell at src/exitEngine.ts:909: Test 3b still matches the seam definition at :788 and Test 2 still finds the conditional, so every case stays green while the anti-rug private sell bids the normal fee."
+}

@@ -1,0 +1,67 @@
+{
+  "id": "AUD-TESTU-011",
+  "title": "The sell-ceiling config tests prove buildReconcileConfig reads MEV_SELL_MAX_PRIORITY_FEE_GWEI when called with leg \"sell\", but no production strategy ever passes \"sell\", so the registered defect that private sells run with the buy ceiling passes them green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S3",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C16",
+    "C18"
+  ],
+  "files": [
+    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts:116-122@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loadReconcileConfig calls buildReconcileConfig(process.env, SELL_GAS_LIMIT, 3, leg) directly"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts:225-249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"the sell leg reads its OWN ceiling\": asserted only on the direct call with leg \"sell\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:174-193@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the ceiling is the sell value only when leg is \"sell\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the strategy calls buildReconcileConfig with no leg (buy); passthrough.ts:83 and bloxroute.ts:104 the same"
+    }
+  ],
+  "sibling_sites_checked": "mevStrategies/gasMultiplier.test.ts and inclusionReconciliation.test.ts (CR-01 clamp cases) drive the strategies with the default buy leg; exitEngine tests mock escalatePrivateSell. No unit test drives a private sell through a strategy and inspects its fee ceiling.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the test is real for the function but its claim (\"the sell leg uses the SELL ceiling\") does not hold on any live path; the hidden registered defect AUD-TX-010 is S2.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-010"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: assert the ceiling a private sell actually submits with (escalatePrivateSell through a strategy), not the config helper alone.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 1 — sell leg uses the SELL ceiling (25 gwei) when MEV_SELL_MAX_PRIORITY_FEE_GWEI=25",
+    "Test 5 — sell ceiling defaults to 25 gwei when MEV_SELL_MAX_PRIORITY_FEE_GWEI is unset",
+    "respects an operator override of the sell ceiling (e.g. 40 gwei)"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-TX-010): every strategy calls buildReconcileConfig without a leg (flashbots.ts:182), so private sells use the buy ceiling while these cases stay green."
+}

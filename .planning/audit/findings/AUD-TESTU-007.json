@@ -1,0 +1,55 @@
+{
+  "id": "AUD-TESTU-007",
+  "title": "The case named \"startExitMonitor emits exit.monitor.started\" asserts that the monitor does not start when the first price quote fails, so it encodes the registered S1 (exit monitor silently never starts) as expected behaviour and never observes the op it names",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C03",
+    "C12"
+  ],
+  "files": [
+    "test/unit/exitEngine/opEnrichment.test.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/opEnrichment.test.ts:387-421@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "MockContract has no getAmountsOut, so the first quote fails; the only assertion is expect(ops).not.toContain('exit.monitor.started')"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1870-1872@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "entryPrice === null: log \"exit monitor not started\" and return, no retry, no alert"
+    }
+  ],
+  "sibling_sites_checked": "exitEngine/pollTelemetry.test.ts:277-290 runs a startExitMonitor body with a quote and asserts the poll-cycle log, not exit.monitor.started; no unit test asserts exit.monitor.started or what happens to a position whose first quote fails.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a hollow, misnamed case on the exit path that pins the S1 AUD-EXIT-002 behaviour (no stop-loss until restart) as correct.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-002",
+    "AUD-TESTU-006"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: rename the case to what it proves, add a positive case that observes exit.monitor.started with a working quote, and add a RED case for AUD-EXIT-002 (first quote fails, later quotes work: the position must still get a monitor).",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "startExitMonitor emits exit.monitor.started"
+  ],
+  "escaped_regression": "Delete the exit.monitor.started log from startExitMonitor, or keep the silent return at src/exitEngine.ts:1870-1872 forever: the case stays green either way."
+}

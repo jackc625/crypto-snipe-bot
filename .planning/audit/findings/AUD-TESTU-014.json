@@ -1,0 +1,62 @@
+{
+  "id": "AUD-TESTU-014",
+  "title": "The snipe fail-clean test asserts \"ZERO ETH spent, NO trades row\" from a mocked submit that throws, so it encodes the registered S1 (any error after submission treated as a clean zero-spend failure) as the required behaviour",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C09",
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "test/unit/bot/snipeFailClean.test.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/bot/snipeFailClean.test.ts:209-211@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendTxWithRetry is mocked to reject with a ceiling-hit message; nothing models whether a bundle was broadcast or landed"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/snipeFailClean.test.ts:236-250@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "asserts insertTrade.run, recordSnipe and startExitMonitor were never called; \"ZERO ETH spent\" is in the name but spend is never observed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the catch that the test pins: every throw after the submit is treated as zero spend"
+    }
+  ],
+  "sibling_sites_checked": "Other snipe-failure tests in the slice: none drive a throw after a broadcast that later lands (reconciliation inconclusive, relay hiccup AUD-TX-009). inclusionReconciliation.test.ts covers the strategies' own false-negative handling with the strategy real, but not the bot.ts catch.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the test claims capital safety (\"zero spend\") on the buy path without observing spend, and its assertions require the behaviour the S1 AUD-BUY-002 describes as the defect.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002",
+    "AUD-TX-009",
+    "AUD-TESTU-009"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: keep a fail-clean case for a genuine never-broadcast error, and add the RED case for AUD-BUY-002: the submit throws after the strategy broadcast a tx that the chain later includes; the bot must keep a row and arm monitoring.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "a snipe ceiling-hit throws -> ZERO ETH spent, NO trades row inserted (insertTrade.run never called)"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-BUY-002): a submit that throws after its bundle was broadcast and later lands leaves no trades row and no monitor, and this case stays green (it requires exactly that). Any change that widens the catch at src/bot.ts:1177 also stays green."
+}

@@ -1,0 +1,70 @@
+{
+  "id": "AUD-TESTU-016",
+  "title": "The failed-exit balance-truth tests drive only the thrown-error path; the exits that fail by returning false (V3 private not landed, unknown dex, routine pause) are never checked for failed-held marking, so the registered S1 that they skip it passes green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12",
+    "C14"
+  ],
+  "files": [
+    "test/unit/exitEngine/failedExitBalanceTruth.test.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/failedExitBalanceTruth.test.ts:244-266@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 1: the failure is escalatePrivateSell rejecting (a throw) on a V2 dex"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/failedExitBalanceTruth.test.ts:288-307@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 3: the paused 6th trigger returns false; the case asserts only that no submit happened, not that the position stays failed-held with a re-armed timer"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1037@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 private not landed: return false without markExitFailedHeld or re-arm (AUD-EXIT-007)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:824-830@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routine-paused return false"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:876-879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "unknown dex return false"
+    }
+  ],
+  "sibling_sites_checked": "Every exitEngine unit fixture uses a V2 dex (antiRugReason, exitInclusionLadder, noDoubleSellReconcile, opEnrichment, failedExitBalanceTruth, exitWorkerRealPath); none drives the V3 private-not-landed branch or the unknown-dex branch. noDoubleSellReconcile asserts failed-held marking on the inconclusive branch (correct).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the file claims the still-held failure keeps protection (an S1 stranded-position fix) but covers one of four failure exits; the registered S1 AUD-EXIT-007 is the uncovered rest.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-007"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: one case per false-returning branch of executeFullSell, each asserting the persisted state and the re-armed timer for a still-held position.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 1 (CANONICAL): a failed exit on a STILL-HELD position KEEPS anti-rug + persists exit_failed_held + re-arms the poll timer",
+    "Test 3: after N=5 consecutive ROUTINE failures, routine retries pause — a 6th routine trigger does NOT submit"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-EXIT-007): the V3 branch at src/exitEngine.ts:1022-1037 returns false without markExitFailedHeld after an anti-rug caller cleared the timer, and every case stays green."
+}

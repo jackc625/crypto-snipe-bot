@@ -1,0 +1,81 @@
+{
+  "id": "AUD-TESTU-015",
+  "title": "Tests overwrite or delete environment keys and clean up by deleting them instead of restoring the previous value; Vitest runs many files in one worker process, so values leak between files and, before the rails, the real .env values were deleted for later files",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "test/unit/exitEngine/attemptBudget.test.ts",
+    "test/unit/exitEngine/failedExitBalanceTruth.test.ts",
+    "test/unit/exitEngine/antiRugBounded.test.ts",
+    "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/attemptBudget.test.ts:67-85@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sets MEV_* keys in beforeEach and deletes them in afterEach without saving the previous values"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/failedExitBalanceTruth.test.ts:232-233@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deletes EXIT_DUST_THRESHOLD_BPS and EXIT_ROUTINE_MAX_FAILURES in beforeEach"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/failedExitBalanceTruth.test.ts:289@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sets EXIT_ROUTINE_MAX_FAILURES = 5 inside a case; never restored"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/exitEngine/antiRugBounded.test.ts:91@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sets WATCHDOG_BUDGET_MS and deletes it afterwards"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "before the rails the real .env was loaded into process.env, so a delete removed the operator value for the rest of the worker"
+    },
+    {
+      "type": "command",
+      "ref": "node_modules/vitest/dist/chunks/base.C9_VThnT.js:82-86 (vitest 4.1.1, not tracked)",
+      "note": "the worker loops over its files and only resets modules between them; process.env persists"
+    },
+    {
+      "type": "command",
+      "ref": "node scratchpad tools/envscan.js over the TESTU snapshot",
+      "note": "per-file counts of env assignments, deletes and save/restore idioms"
+    }
+  ],
+  "sibling_sites_checked": "envscan.js over all 84 files: save-and-restore idioms (SAVED_ENV loops) in bot/deliberateBuy*, bot/noDoubleBuyReconcile, exitEngine/exitInclusionLadder, exitEngine/noDoubleSellReconcile, mevStrategies/inclusionReconciliation (correct). Delete-only or no cleanup: the files listed here plus the Task 2 files added to this finding.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: order-dependent test results (a case can pass only because an earlier file in the same worker set or deleted a key); no direct capital effect, and the rails now replace the real values with sentinels.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTU-001"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: use vi.stubEnv with unstubEnvs (or save and restore the previous value) for every env change.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "every case in the listed files that sets or deletes a key"
+  ],
+  "escaped_regression": "A change that makes the exit engine read EXIT_ROUTINE_MAX_FAILURES at import instead of per call passes or fails depending on which file ran earlier in the worker (failedExitBalanceTruth.test.ts:289 leaves 5 behind), so the suite result depends on file order rather than on the code."
+}
