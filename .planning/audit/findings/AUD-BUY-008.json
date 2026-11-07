@@ -69,7 +69,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-02",
   "od_ref": "OD-11",
   "recommendation": "Fix together with RC-13 under card OD-11 (one per-chain WebSocket owner that notifies subscribers, destroys what it replaces, backfills the gap, detects half-open sockets and stops on shutdown); make listener registration idempotent so restart cannot stack handlers. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [

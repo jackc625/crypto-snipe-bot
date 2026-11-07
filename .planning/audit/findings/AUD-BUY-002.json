@@ -165,7 +165,7 @@
     "capital",
     "cross-class"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-02",
   "od_ref": "BUY-02",
   "recommendation": "Phase 24 (after a Phase 23 real-path proof of at least the balanceOf-throw and earlier-attempt-landed traces): separate \"did money leave the wallet\" from \"did bookkeeping succeed\". Once a submit may have broadcast, never run the zero-spend branch: reconcile against chain truth (token balance delta plus nonce, like the deliberate guard at bot.ts:617-662), record the row, and arm monitoring with retries; on any post-landing failure alert loudly that a position is held and unprotected. The direction (intent row before broadcast vs reconcile-on-throw, retry policy) is a behaviour decision on card BUY-02. Nothing is changed in Phase 22.",
   "reported_by": [

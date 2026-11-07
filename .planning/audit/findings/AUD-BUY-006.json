@@ -51,7 +51,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-02",
   "od_ref": "OD-16",
   "recommendation": "Decide on card OD-16 the default (fail closed when nothing is configured) and the semantics (AND vs OR, or an explicit mode). Phase 24; nothing is changed in Phase 22.",
   "reported_by": [

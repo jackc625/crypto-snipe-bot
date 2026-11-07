@@ -107,7 +107,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-02",
   "od_ref": "OD-6",
   "recommendation": "Decide the policy on card OD-6 (per-handler containment, a global handler, or both, and whether a global handler shuts down or continues). Phase 24; nothing is changed in Phase 22.",
   "reported_by": [

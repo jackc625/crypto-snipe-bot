@@ -57,7 +57,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-02",
   "od_ref": "OD-15",
   "recommendation": "Decide on card OD-15 whether a snipe whose quote fails is skipped (fail closed) or sent unprotected. Separately keep the slippage math in bigint basis points so a fractional percent can never throw into the fail-open catch. Phase 24, after a Phase 23 proof; nothing is changed in Phase 22.",
   "reported_by": [
