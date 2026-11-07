@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Independent money-path review result",
+  "description": "Root is an object (structured-output APIs require an object root); the findings array holds one entry per defect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["files_reviewed", "findings"],
+  "properties": {
+    "files_reviewed": {
+      "type": "array",
+      "description": "Every file path read, relative to the current folder.",
+      "items": { "type": "string" }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "line_start",
+          "line_end",
+          "class_ids",
+          "severity",
+          "capital_impact",
+          "title",
+          "explanation",
+          "sibling_sites"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Path relative to the current folder, for example src/example.ts."
+          },
+          "line_start": { "type": "integer", "description": "1-based first line of the evidence." },
+          "line_end": { "type": "integer", "description": "1-based last line of the evidence (equal to line_start for one line)." },
+          "class_ids": {
+            "type": "array",
+            "description": "Every bug class the finding belongs to.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10",
+                "C11", "C12", "C13", "C14", "C15", "C16", "C17", "C18", "C19", "C20"
+              ]
+            }
+          },
+          "severity": { "type": "string", "enum": ["S0", "S1", "S2", "S3", "S4"] },
+          "capital_impact": { "type": "string", "enum": ["LOSS", "STRAND", "OVERSPEND", "EXPOSURE", "none"] },
+          "title": { "type": "string", "description": "One line." },
+          "explanation": {
+            "type": "string",
+            "description": "What goes wrong, under which condition, and the money effect, citing file:line."
+          },
+          "sibling_sites": {
+            "type": "array",
+            "description": "Other places with the same pattern, as file:line plus a few words; empty if none.",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
