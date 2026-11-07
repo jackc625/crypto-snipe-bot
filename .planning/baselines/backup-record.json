@@ -1,0 +1,88 @@
+{
+  "phase": "22-safety-rails-audit",
+  "plan": "22-01",
+  "requirement": "SAFE-01",
+  "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "phase_start_record_commit": "df339994dedb4cb1ba62d2e091130950b090d092",
+  "backup_tool_commit_sha": "3f380bf510be711f3f0ffe40f340dc108155e060",
+  "head_at_backup": "3f380bf510be711f3f0ffe40f340dc108155e060",
+  "created_at": "2026-11-07T00:50:50.634Z",
+  "backup_root": "C:/Users/jackc/crypto-snipe-bot-backups",
+  "dated_folder": "C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06",
+  "archive_path": "C:/Users/jackc/crypto-snipe-bot-backups/crypto-snipe-bot-state-2026-11-06.tar.gz",
+  "archive_sha256": "4c8e9ab6a70b93a4d408046bebe916d29c95f93cacb47d0b50abcddfb07a1d1a",
+  "archive_size": 633197,
+  "manifest_sha256": "9e28e30f41bd5a4a7cae20f4c20d8bf37b7dd008d93ea7b43cebba2e594b151a",
+  "manifest_entry_count": 17,
+  "manifest_entry_counts": {
+    "ignition_deployments": 10,
+    "data": 6,
+    "repo_root": 1,
+    "present": 17,
+    "absent": 0
+  },
+  "inventory_check": {
+    "walked": 17,
+    "git_tracked_ignition": [
+      "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+      "ignition/deployments/chain-1/deployed_addresses.json",
+      "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+      "ignition/deployments/chain-11155111/deployed_addresses.json"
+    ],
+    "mandatory_derived": [
+      "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+      "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+      "ignition/deployments/chain-1/deployed_addresses.json",
+      "ignition/deployments/chain-1/journal.jsonl",
+      "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+      "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+      "ignition/deployments/chain-11155111/deployed_addresses.json",
+      "ignition/deployments/chain-11155111/journal.jsonl"
+    ],
+    "allowed_absent": [
+      "data/bot.db-wal",
+      "data/bot.db-shm"
+    ],
+    "missing": [],
+    "links": []
+  },
+  "db_set": [
+    {
+      "path": "data/bot.db",
+      "status": "PRESENT",
+      "size": 57344,
+      "sha256": "961aa8222c62fd12ee45aec5cf082ab1d76df138c8748b5c1b8d22c49f361c0c",
+      "mtime": "2026-05-29T21:33:56.817Z"
+    },
+    {
+      "path": "data/bot.db-shm",
+      "status": "PRESENT",
+      "size": 32768,
+      "sha256": "2200a440727514ae2893386b094d64a6e2c5b1dbaa10a8b87067dbe09289ca70",
+      "mtime": "2026-05-30T00:25:58.836Z"
+    },
+    {
+      "path": "data/bot.db-wal",
+      "status": "PRESENT",
+      "size": 164832,
+      "sha256": "70b57264ef591190515fbe9dd4427f9f606a419af6ddab83b65ee1d3449bea36",
+      "mtime": "2026-05-30T00:25:58.836Z"
+    }
+  ],
+  "db_set_mtime_note": "mtimes are UTC; local (EDT) they are 2026-05-29 17:33:56 (bot.db) and 2026-05-29 20:25:58 (-wal/-shm), matching the plan facts; nothing wrote the live DB after 2026-05-29.",
+  "verification": {
+    "verified_at": "2026-11-07T00:51Z",
+    "sha256sum_c_dated_folder": "17/17 OK",
+    "verify_folder": "VERIFY OK (17 PRESENT, 0 ABSENT)",
+    "verify_archive": "VERIFY OK (sha256 matches .sha256; extracted copy 17/17 verified)",
+    "sha256sum_archive_vs_sidecar": "OK",
+    "live_source_vs_manifest": "independent sha256sum of all 17 live source files equals SHA256SUMS"
+  },
+  "node_version": "v22.16.0",
+  "node_abi": "127",
+  "tool": {
+    "path": "scripts/backup-state.ts",
+    "git_blob_sha": "00c9c24ca6e8a0b5191f2af284cb090caffe22e0",
+    "sha256": "73da4a4c0d6a1f10fedb60de73f805991bd8f884018a8b1826d8e856f44881d5"
+  }
+}
