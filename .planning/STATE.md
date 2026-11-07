@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-17-PLAN.md
-last_updated: "2026-11-07T05:38:39.037Z"
+stopped_at: Completed 22-18-PLAN.md
+last_updated: "2026-11-07T15:43:36.010Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 354382ab3201b52d1a32f33e084222970a9321b3
+state_head: 78f1ee772ef31cd4ce9279634d5f7592296da762
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 10 of 29
+Plan: 11 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -86,11 +86,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P07 | 4min | 2 tasks | 11 files |
 | Phase 22 P08 | 24min | 3 tasks | 24 files |
 | Phase 22 P17 | 66min | 3 tasks | 43 files |
+| Phase 22 P18 | 10h 4m (wall-clock incl. operator wait) | 3 tasks | 39 files |
 
 ## Session
 
-**Last session:** 2026-11-07T05:38:38.972Z
-**Stopped at:** Completed 22-17-PLAN.md
+**Last session:** 2026-11-07T15:43:35.929Z
+**Stopped at:** Completed 22-18-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -124,3 +125,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-08: UFV-01 (AC-13) and UFV-02 (AC-17) fork-project obligations owned by Phase 25 in .planning/audit/inputs/unrun-fork-verifications.json (rehearsal pass vpu-20261107T042012-23448-c57d66); 22-29 registers them and should exclude test/*/rails/ from rail-ledger test-quality findings
 - [Phase 22]: 22-17 ESC-BUY-01: operator 'Acknowledge continue' on S0 AUD-BUY-001 (deliberate buy unprotected after script exit); stays S0, no decimal phase; interim rule on card BUY-01: start the main bot right after any manual buy
 - [Phase 22]: 22-17 ESC-BUY-02: operator 'Acknowledge continue' on the 8 BUY S1 entries (AUD-BUY-002/003/004/005/006/008/010/011); no severity changes (AUD-BUY-002 stays S1), no decimal phase; orchestrator recommendation (not operator): AUD-BUY-002 first in line in Phase 23
+- [Phase 22]: ESC-EXIT-01: operator acknowledged all 8 EXIT S1 entries (AUD-EXIT-001/002/003/007/008/013/014/015) with 'Acknowledge continue'; no severity changes, no decimal phase, Phase 22 continues
+- [Phase 22]: Orchestrator context (not operator): AUD-EXIT-001 is an operator choice via card OD-14; AUD-EXIT-002, -013, -015 are the worst stranded-position cases and go first in Phase 23
