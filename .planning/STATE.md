@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-18-PLAN.md
-last_updated: "2026-11-07T15:43:36.010Z"
+stopped_at: Completed 22-19-PLAN.md
+last_updated: "2026-11-07T16:19:53.221Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 78f1ee772ef31cd4ce9279634d5f7592296da762
+state_head: 9fa38624cdb5e689d95b86ea80dd134b7d9483ea
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 11 of 29
+Plan: 12 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -87,11 +87,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P08 | 24min | 3 tasks | 24 files |
 | Phase 22 P17 | 66min | 3 tasks | 43 files |
 | Phase 22 P18 | 10h 4m (wall-clock incl. operator wait) | 3 tasks | 39 files |
+| Phase 22 P19 | ~36min (wall-clock incl. operator wait) | 3 tasks | 29 files |
 
 ## Session
 
-**Last session:** 2026-11-07T15:43:35.929Z
-**Stopped at:** Completed 22-18-PLAN.md
+**Last session:** 2026-11-07T16:19:53.155Z
+**Stopped at:** Completed 22-19-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -127,3 +128,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-17 ESC-BUY-02: operator 'Acknowledge continue' on the 8 BUY S1 entries (AUD-BUY-002/003/004/005/006/008/010/011); no severity changes (AUD-BUY-002 stays S1), no decimal phase; orchestrator recommendation (not operator): AUD-BUY-002 first in line in Phase 23
 - [Phase 22]: ESC-EXIT-01: operator acknowledged all 8 EXIT S1 entries (AUD-EXIT-001/002/003/007/008/013/014/015) with 'Acknowledge continue'; no severity changes, no decimal phase, Phase 22 continues
 - [Phase 22]: Orchestrator context (not operator): AUD-EXIT-001 is an operator choice via card OD-14; AUD-EXIT-002, -013, -015 are the worst stranded-position cases and go first in Phase 23
+- [Phase 22]: ESC-ANTIRUG-01: operator acknowledged all 6 ANTIRUG S1 entries (AUD-ANTIRUG-001/002/003/004/005/011) with 'ackownledge continue' (verbatim, typo kept); no severity changes, no decimal phase, Phase 22 continues
+- [Phase 22]: Orchestrator/executor context (not operator): AUD-ANTIRUG-002 (refused WS reconnect crashes the process, reproduced on localhost) was the strongest decimal-phase candidate; it is already proven and should be among the first Phase 24 fixes
+- [Phase 22]: 22-19 cross-slice answer for 22-28: a refused or timed-out anti-rug escape does not fire again by design (AUD-ANTIRUG-004 sub_claim 1), so AUD-EXIT-014's mechanism is confirmed by code reading; 22-28 should update AUD-EXIT-014's status
+- [Phase 22]: 22-19: external_od_refs owner_phase is a string ("32") because check.ts:304 requires a non-empty string; the 22-19 Task 1 verify compares the number 32 and fails as written; later plans must compare as string
