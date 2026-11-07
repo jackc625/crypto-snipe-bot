@@ -245,7 +245,7 @@ completed: 2026-11-07
 
 ## Issues Encountered
 
-- **The Write tool turned a `﻿` escape in `lib.ts` into a literal BOM character.** The BOM-strip regex was replaced with a char-code check (`text.charCodeAt(0) === 0xfeff`), and every tool and record was then ASCII-scanned (0 non-ASCII characters).
+- **The Write tool turned a `U+FEFF` escape in `lib.ts` into a literal BOM character.** The BOM-strip regex was replaced with a char-code check (`text.charCodeAt(0) === 0xfeff`), and every tool and record was then ASCII-scanned (0 non-ASCII characters).
 - **My first parse of the Vitest `results.json` reported 0 failed entries,** which contradicted STL-2. Diagnosis: `results` is an array of `[key, {duration, failed}]` pairs, not an object. Parsed correctly it holds 131 entries, 9 failed and exactly the 3 duration-0 failures STL-2 names. AUD-RAIL-001 cites the correct reading.
 - **The first mutation run reported M01 (NAC-09) as missed.** That was a harness search-string escaping error, not a checker gap. Re-run with a plain anchor, the mutant was caught by case 03.
 
