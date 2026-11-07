@@ -1,0 +1,170 @@
+{
+  "tool": "betterleaks",
+  "version": "1.10.0",
+  "exe_path": "C:/Users/jackc/tools/betterleaks-1.10.0/betterleaks.exe",
+  "exe_sha256": "16600f87ef27eed53f7bcb80d56bd7c9e5730c9088c8d30ef57867b6a1fec6cf",
+  "config_sha256": {
+    "extended": "109020a5bfdc2fd1e0375f794409786b092a671e4e4fbe0761e2850268a649a6",
+    "known_public": "14e53bda7d285b867758963d6e25490ed32ed3aef358693632efbca94196e493"
+  },
+  "config_relationship": "known-public.toml = extended.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, Hardhat #0 only)",
+  "scanner_args": [
+    "dir",
+    "<target>",
+    "--config",
+    "<extended.toml|known-public.toml>",
+    "--max-archive-depth",
+    "2",
+    "--redact",
+    "--no-banner",
+    "--no-color",
+    "--report-format",
+    "json",
+    "--report-path",
+    "<report.json>",
+    "--exit-code",
+    "9",
+    "--ignore-gitleaks-allow",
+    "--gitleaks-ignore-path",
+    "<empty temp dir>"
+  ],
+  "scanner_cwd": "fresh empty os.tmpdir() folder, deleted after each run",
+  "env_belt": "HTTPS_PROXY=HTTP_PROXY=ALL_PROXY=http://127.0.0.1:1 (belt only, not an enforced network boundary)",
+  "report_fields_seen": [
+    "Attributes",
+    "Author",
+    "Commit",
+    "Date",
+    "Description",
+    "Email",
+    "EndColumn",
+    "EndLine",
+    "Entropy",
+    "File",
+    "Fingerprint",
+    "Match",
+    "Message",
+    "RuleID",
+    "Secret",
+    "StartColumn",
+    "StartLine",
+    "SymlinkFile",
+    "Tags"
+  ],
+  "exit_codes_seen": {
+    "pass1": 9,
+    "pass2": 9
+  },
+  "classification_key": [
+    "rule id",
+    "file",
+    "line",
+    "start column",
+    "end column",
+    "commit"
+  ],
+  "generated_at": "2026-11-07T01:17:58.807Z",
+  "node": "v22.16.0",
+  "all_pass_except_g": true,
+  "cases": [
+    {
+      "id": "a",
+      "expected": "exactly one evm-private-key hit, non-public; no known-public hit",
+      "observed": "evm-private-key:non-public@L1C1, generic-api-key:non-public@L1C9",
+      "pass": true,
+      "note": "other-rule hits: generic-api-key:non-public@L1C9"
+    },
+    {
+      "id": "b",
+      "expected": "evm-private-key hit(s) on the Hardhat #0 key, every hit known-public, none non-public",
+      "observed": "evm-private-key:known-public:hardhat-0@L1C30, generic-api-key:known-public:hardhat-0@L1C37",
+      "pass": true,
+      "note": "other-rule hits: generic-api-key:known-public:hardhat-0@L1C37"
+    },
+    {
+      "id": "c",
+      "expected": "same line: the Hardhat #0 hit is known-public, the random key is exactly one evm-private-key hit and non-public; no non-public hit on the Hardhat span and no known-public hit on the random span",
+      "observed": "evm-private-key:non-public@L1C109, evm-private-key:known-public:hardhat-0@L1C27, generic-api-key:known-public:hardhat-0@L1C34",
+      "pass": true,
+      "note": "split column 67 (privateKey at 26, signer at 108, 0-based); other-rule hits: generic-api-key:known-public:hardhat-0@L1C34"
+    },
+    {
+      "id": "d",
+      "expected": "telegram-string-session hit(s), all non-public",
+      "observed": "telegram-string-session:non-public@L1C1",
+      "pass": true,
+      "note": "no other-rule hits"
+    },
+    {
+      "id": "e",
+      "expected": "no evm-private-key hit on a keyword-less 64-hex value",
+      "observed": "no hits",
+      "pass": true,
+      "note": "no other-rule hits"
+    },
+    {
+      "id": "f",
+      "expected": "exactly one evm-private-key hit inside f.tar.gz, non-public (--max-archive-depth 2)",
+      "observed": "evm-private-key:non-public@L1C1, generic-api-key:non-public@L1C9",
+      "pass": true,
+      "note": "reported file(s): /f.tar.gz!inner/f.ts; other-rule hits: generic-api-key:non-public@L1C9"
+    },
+    {
+      "id": "g",
+      "expected": "recorded, not required: detected true|false for a keyword-anchored key inside a SQLite file",
+      "observed": "no hits",
+      "pass": false,
+      "detected": false,
+      "note": "fixture bytes hold the row text contiguously: true. not detected: the known dir-mode binary-file gap; the D-22 exact-value check (scripts/nac01-exact-value-check.ts, binary-SQLite self-test case) covers it."
+    },
+    {
+      "id": "h",
+      "expected": "a default-ruleset telegram-bot-api-token hit, non-public (proves useDefault is active)",
+      "observed": "telegram-bot-api-token:non-public@L1C1",
+      "pass": true,
+      "note": "no other-rule hits"
+    },
+    {
+      "id": "i",
+      "expected": "no hit of any rule on PRIVATE_KEY=0x + 63 zeros + 1",
+      "observed": "no hits",
+      "pass": true,
+      "note": "low-entropy sentinel shape used by the 22-05 test env"
+    },
+    {
+      "id": "config-prefix",
+      "expected": "known-public.toml = extended.toml bytes + one [[allowlists]] block targeting the secret; no top-level filter; no 64-hex run",
+      "observed": "extended 109020a5bfdc..., known_public 14e53bda7d28...",
+      "pass": true,
+      "note": "checked by checkConfigs() before any scanner run"
+    },
+    {
+      "id": "report-fields",
+      "expected": "every finding has RuleID, File, StartLine, StartColumn, EndColumn",
+      "observed": "fields seen: Attributes,Author,Commit,Date,Description,Email,EndColumn,EndLine,Entropy,File,Fingerprint,Match,Message,RuleID,Secret,StartColumn,StartLine,SymlinkFile,Tags",
+      "pass": true,
+      "note": "gitleaks-format JSON confirmed on the first fixture run"
+    },
+    {
+      "id": "redaction",
+      "expected": "no planted value appears in any raw report or scanner output; every Secret field is REDACTED",
+      "observed": "planted values found in raw output: 0; non-REDACTED Secret fields: 0",
+      "pass": true,
+      "note": "8 planted values checked (never printed)"
+    },
+    {
+      "id": "pass2-subset",
+      "expected": "pass 2 (known-public.toml) only ever removes hits: zero pass-2-only hits; no hit outside the case files",
+      "observed": "pass1 11, pass2 7, pass2-only 0, stray 0",
+      "pass": true,
+      "note": "none stray"
+    },
+    {
+      "id": "bytes-scanned",
+      "expected": "the scanner reports a non-zero byte count for both passes",
+      "observed": "pass1 1014, pass2 1014",
+      "pass": true,
+      "note": "parsed from the scanner log line \"scanned ~N bytes\""
+    }
+  ]
+}
