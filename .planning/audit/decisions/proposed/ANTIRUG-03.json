@@ -1,0 +1,36 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "ANTIRUG-03",
+  "title": "V3 rug signals: sell-impact check and the meaning of a lock",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: V3 signal 3 compares WETH out with tokens in; signal 2 checks lockers against the pool event owner",
+      "behavior_impact": "none",
+      "risk": "V3 detection is \"active liquidity halved at a Burn or Collect\", which also fires on a concentrated range left by price movement: a false emergency exit at any price (AUD-ANTIRUG-006)."
+    },
+    {
+      "id": "fix-units-track-nft-locks",
+      "name": "Signal 3 as a real sell-impact quote in one unit; signal 2 from NFT transfers to known lockers",
+      "behavior_impact": "V3 triggers need a real sell-impact drop and an unlocked position.",
+      "risk": "More RPC per evaluation; NFT tracking is new code and needs its own fork proof."
+    },
+    {
+      "id": "fix-units-drop-signal2-v3",
+      "name": "Signal 3 as a real sell-impact quote; drop signal 2 on V3 and document that V3 has no lock suppression",
+      "behavior_impact": "V3 triggers on liquidity drop plus real sell impact, lock or no lock.",
+      "risk": "A legitimate unlock-and-withdraw by a locker would trigger an exit."
+    }
+  ],
+  "recommendation": "fix-units-drop-signal2-v3 as the smaller safe change, unless the Phase 23 V3 fork replay shows locked V3 positions are common in the bot targets.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract).",
+  "behavior_impact": "Decides when a V3 position gets an emergency sell.",
+  "findings": [
+    "AUD-ANTIRUG-006"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

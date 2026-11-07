@@ -1,0 +1,36 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "ANTIRUG-05",
+  "title": "What dashboard Stop chain does to anti-rug monitoring",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: Stop removes every listener on ctx.wsProvider (the anti-rug filter included) and Start does not restore it",
+      "behavior_impact": "none",
+      "risk": "After Stop and Start, open positions on the chain have no rug protection until the next buy or socket drop, while the badge shows connected (AUD-ANTIRUG-001)."
+    },
+    {
+      "id": "stop-keeps-antirug",
+      "name": "Stop removes only the factory listeners; anti-rug keeps monitoring open positions",
+      "behavior_impact": "Stop pauses new entries only.",
+      "risk": "An operator who wanted everything quiet on the chain still gets anti-rug exits."
+    },
+    {
+      "id": "stop-all-with-warning",
+      "name": "Stop removes everything, shows \"anti-rug OFF\" on the dashboard, and Start re-subscribes anti-rug",
+      "behavior_impact": "Stop is a full stop with a visible protection state.",
+      "risk": "Positions are unprotected while stopped, by operator choice."
+    }
+  ],
+  "recommendation": "stop-keeps-antirug, implemented through the single WebSocket owner (OD-11).",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether stopping a chain also stops rug protection for its open positions.",
+  "findings": [
+    "AUD-ANTIRUG-001"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

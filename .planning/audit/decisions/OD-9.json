@@ -1,0 +1,36 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-9",
+  "title": "raceTelemetry.ts: keep or delete",
+  "capital": false,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep raceTelemetry.ts as it is (unused in production, one unit test)",
+      "behavior_impact": "none",
+      "risk": "Dead code stays in the money-path module tree. If a later change wires it in as written, the go-live review gets wrong post-hoc numbers (wethSaved = r1/100) and a signed sell is handed to the ordinary chain RPC through eth_callBundle (AUD-ANTIRUG-014). The 7-day dry run collects no race telemetry either way."
+    },
+    {
+      "id": "delete-after-audit",
+      "name": "Delete the module and its unit test in the Phase 25 dead-code wave",
+      "behavior_impact": "none at runtime (no production caller).",
+      "risk": "If Phase 32 (OD-19) wants race telemetry for the live gate, it has to be built again, against the relay and with correct math."
+    },
+    {
+      "id": "rebuild-for-od19",
+      "name": "Rewrite it correctly and wire it into the dry-run path as evidence for the OD-19 live gate",
+      "behavior_impact": "Dry-run triggers make extra relay and archive RPC calls.",
+      "risk": "New code and new network calls on the anti-rug path; telemetry errors must never delay a live exit."
+    }
+  ],
+  "recommendation": "delete-after-audit, unless the Phase 32 OD-19 discussion decides race telemetry is part of the live gate, in which case rebuild-for-od19 replaces it then.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract).",
+  "behavior_impact": "Decides whether an unused telemetry module with known defects stays in src/anti-rug/.",
+  "findings": [
+    "AUD-ANTIRUG-014"
+  ],
+  "needed_by": "Before Phase 25 Wave 3 (may be batched into the Phase 24 discussion)"
+}
