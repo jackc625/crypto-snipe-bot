@@ -1,0 +1,82 @@
+{
+  "id": "AUD-TX-006",
+  "title": "RC-26 getBundleStatsV2: per-builder telemetry is queried on every Flashbots attempt inside the wallet nonce lock, and the operator remediation text relies on it; whether the endpoint still answers was not re-verified (no network allowed)",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C07"
+  ],
+  "files": [
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:343-366@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "after every bundle.wait(), on success and failure, await flashbotsProvider.getBundleStatsV2(bundleHash, targetBlock); any error is caught and only logged (flashbots.bundle.stats.error)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:187@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "this runs inside the submit closure, which runs inside withNonceLock (bot.ts:267, exitEngine.ts:788, :1531)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:382@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the snipe fail-clean remediation tells the operator to \"inspect per-builder coverage in the op:flashbots.bundle.stats logs\""
+    },
+    {
+      "type": "command",
+      "ref": "@flashbots/ethers-provider-bundle@1.0.0 node_modules/@flashbots/ethers-provider-bundle/build/index.js:545-558",
+      "note": "getBundleStatsV2 is one relay request; request() (:793-806) throws \"Request failed with status <code>\" on a non-2xx answer, which the strategy catch turns into a warn log"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/utils/fetch.js:402",
+      "note": "the request uses the FetchRequest default 300000 ms (idle) timeout, so a hanging relay extends the lock hold of every attempt by up to 5 minutes"
+    }
+  ],
+  "sibling_sites_checked": "The only stats call is flashbots.ts:345; the deprecated getBundleStats (library :523) is not used. bot.ts:382 is the only operator text that relies on the stats logs. The research claim that the endpoint answers 403 since 2025-06-09 is a web claim; this plan makes no network calls, so it stays unverified here.",
+  "status": "candidate",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-26"
+  ],
+  "research_suggested_severity": "S3",
+  "severity_rationale": "S3, equal to the research suggestion: misleading telemetry and operator guidance, plus a small, bounded addition to the nonce-lock hold time of every ETH attempt (one relay round trip; up to the 300 s idle timeout if the relay hangs), which feeds the RC-11 hold time (AUD-TX-003). Status candidate because the 403 behaviour is not re-measured offline.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-003",
+    "AUD-TX-008"
+  ],
+  "tags": [
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-03",
+  "recommendation": "Phase 29 (card TX-03): verify the endpoint in Phase 23; if it is dead, remove the call and the operator text that relies on it and reconcile by receipts only (research recommendation); if kept, move it out of the nonce lock and give it a short timeout.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "getBundleStatsV2 runs on every attempt inside the wallet nonce lock",
+      "evidence": [
+        "src/utils/mevStrategies/flashbots.ts:343-366@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The relay answers 403 to getBundleStatsV2 since 2025-06-09",
+      "evidence": "research web claim (STACK P-6); not re-measured: no network calls in Phase 22 audit plans",
+      "status": "candidate"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "AUD-TX-013",
+  "title": "Section C SC-19: gasManager.ts is unreachable: getGasOptions is imported into bot.ts but never called and getGasOptionsForChain has no importer; if revived, both would bypass the fee ceilings",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/gasManager.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:3@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "import { getGasOptions } from \"./utils/gasManager\"; the name occurs nowhere else in bot.ts"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -nE \"getGasOptions|gasManager\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts test",
+      "note": "src: only bot.ts:3 and the two definitions; tests mock or unit-test the module (test/integration/anti-rug/botWiring.test.ts:239, test/unit/bot/exitFailedHeldResume.test.ts:161, test/unit/ethersV6BigIntArithmetic.test.ts:111/:144/:175)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/gasManager.ts:10-31@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getGasOptionsForChain multiplies the doubled-base maxFeePerGas by the chain multiplier and keeps the unbounded network priority fee: no ceiling, no affordability clamp"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/gasManager.ts:37-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getGasOptions: legacy single-chain CONFIG.gasMultiplier and a fixed 300000 gas limit"
+    }
+  ],
+  "sibling_sites_checked": "All importers at the base SHA (git grep over src, scripts, test). The other dead TX-adjacent helper, maybeApproveForChain (bot.ts:222-229, no caller), is in the BUY slice file; the dead legacy safety helpers are AUD-BUY-026.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: no production caller, so no behaviour; recorded because a revived call would bypass the CR-01 fee-ceiling fix and the test suite exercises it as if it were live. Section C candidate (no RC), origin research-candidate with an empty rc list.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-026"
+  ],
+  "tags": [
+    "section-c",
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25 dead-code deletion (with its unit test and the two mocks), after knip confirms no dynamic caller.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

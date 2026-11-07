@@ -1,0 +1,66 @@
+{
+  "id": "AUD-TX-009",
+  "title": "A single RPC hiccup during a Flashbots bundle wait crashes the whole bot: the library throws inside an async block listener, ethers does not catch it, and src has no unhandledRejection handler",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C11"
+  ],
+  "files": [
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:317@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "await bundle.wait() on every ETH private attempt (snipe buys, deliberate private buys, private sells, partial sells)"
+    },
+    {
+      "type": "command",
+      "ref": "@flashbots/ethers-provider-bundle@1.0.0 node_modules/@flashbots/ethers-provider-bundle/build/index.js:369-405",
+      "note": "waitForBundleInclusion registers an async handler on the provider \"block\" event; it awaits getTransactionCount (:375) and getBlock(target) (:385) and throws \"Unable to get block\" when getBlock returns null (:386-387); any rejection of those calls also escapes the handler"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:1097-1100",
+      "note": "emit calls listener.call(...) inside try/catch, which only catches synchronous throws; the promise an async listener returns is dropped, so its rejection is unhandled"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -nE \"unhandledRejection|uncaughtException\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "no output: Node 22 default (--unhandled-rejections=throw) ends the process (the RC-05 policy entry is AUD-BUY-005)"
+    },
+    {
+      "type": "command",
+      "ref": "node fb-wait-repro.js (Node 22.16.0, scratch folder outside the repo; real @flashbots/ethers-provider-bundle@1.0.0 waitForBundleInclusion on an ethers@6.16.0 AbstractProvider subclass whose _perform answers locally; no src/ import, no SQLite, no .env, no network)",
+      "note": "without a handler the process printed \"Error: Unable to get block: 101 at LocalProvider.handler (...ethers-provider-bundle/build/index.js:387:31)\" and exited with code 1; with process.on(\"unhandledRejection\") added it printed \"unhandledRejection caught: Unable to get block: 101\" and \"process still alive\", exit 0"
+    }
+  ],
+  "sibling_sites_checked": "The library's waitForTxInclusion (:428-470) has the same async-listener shape but is unused (no sendPrivateTransaction caller). Passthrough and bloXroute do not use the library wait. ethers TransactionResponse.wait() catches errors inside its own listeners (provider.js:1196-1206). Every other async listener or un-awaited call in src is the RC-05 policy entry AUD-BUY-005; this entry is the concrete trigger inside the TX slice.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1: the condition is ordinary, one transient RPC error, a rate limit, or a load-balanced node that has not yet seen the block the event came from, during the ~12 s each ETH attempt spends in bundle.wait(); the consequence is the whole bot process exiting, taking every exit monitor and anti-rug subscription down until the operator notices and restarts. If the crash happens mid-buy the bundle can still land with no trade row (AUD-BUY-002 class). Reproduced with the real library on Node 22.16.0.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-005",
+    "AUD-BUY-002",
+    "AUD-TX-003"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-6",
+  "recommendation": "Phase 24: do not depend on the library's event-based wait. Replace bundle.wait() with the slice's own bounded receipt+nonce reconcile (reconcileInclusion already exists) or wrap it so no listener rejection can escape; and decide the process-wide unhandledRejection policy on card OD-6 (RC-05). Prove it in Phase 23 with a provider that returns null for the target block.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

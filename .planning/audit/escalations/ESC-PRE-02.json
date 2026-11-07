@@ -3,7 +3,7 @@
   "date": "2026-11-06",
   "tier": "pre-phase",
   "items": ["rc:RC-10"],
-  "resolved_items": ["AUD-BUY-025", "AUD-EXIT-009"],
+  "resolved_items": ["AUD-BUY-025", "AUD-EXIT-009", "AUD-TX-001", "AUD-TX-002"],
   "summary": "New S1 evidence for research candidate RC-10, stuck nonce lock (RESEARCH.md STL-6, D-23 (b)). ethers 6.16.0 TransactionResponse.wait() defaults its timeout to 0, which arms no timer and waits forever (node_modules/ethers/lib.commonjs/providers/provider.js:1045). Such a wait with no timeout runs inside withNonceLock at three sites at the base SHA 23a6461: src/bot.ts:750 (the public-fallback buy, lock taken at :746); src/exitEngine.ts:545 (the approve, lock taken at :543); src/exitEngine.ts:556 (the public-fallback sell, lock taken at :552). withNonceLock chains each op after the prior one settles (src/utils/nonceAuthority.ts:65-73). So a tx that is never mined and never replaced, for example one underpriced and then dropped, blocks every later tx for that wallet, exits included. An outer withTimeout on the caller does not settle the inner op. The bot is OFF, so there is no live exposure. The fix is Phase 24, and nothing is fixed in Phase 22 (NAC-13). The TX slice (22-20) resolves the rc:RC-10 alias through resolved_items.",
   "presented_at": "2026-11-06 plan-phase session (22-CONTEXT.md D-23 (b))",
   "operator_response": null,

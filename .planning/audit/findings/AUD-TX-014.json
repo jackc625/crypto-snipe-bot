@@ -1,0 +1,74 @@
+{
+  "id": "AUD-TX-014",
+  "title": "Credentials written to the logs: a failed bloXroute call logs the axios error with the Authorization header, and an HTTP-level RPC error logged as err carries the RPC URL, where hosted RPC providers put the API key",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/logger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:186-189@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "relay transport failure: log.warn({ op: \"bloxroute.relay.timeout\", signedTxHash, attempt, err: relayErr })"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:66-67@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "health check failure: log.error({ err }) of the axios error"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:161-165@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the request carries Authorization: this.authHeader (BLOXROUTE_AUTH_HEADER)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/logger.ts:6-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pino with no serializers and no redact option, so the default err serializer copies every enumerable property of the error"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:122-126@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulate failure logs { err: simErr } from provider.call"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:246-249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulate failure logs { err: simErr }"
+    },
+    {
+      "type": "command",
+      "ref": "node axios-log-repro.js and node rpc-url-log-repro2.js 500 (Node 22.16.0, scratch folder outside the repo; axios@1.10.0 CJS build and ethers@6.16.0 resolved through the repo package exports, pino@10.3.1 built with the src/utils/logger.ts options; loopback 127.0.0.1 only, fake sentinel values, no src/ import, no .env)",
+      "note": "axios-log-repro: \"log line contains AUTH-HEADER-SENTINEL: true\" and \"log line contains the signed tx payload: true\" for an ECONNREFUSED relay call logged exactly as bloxroute.ts:186-189; rpc-url-log-repro2 with a loopback server answering HTTP 500: SERVER_ERROR and \"log contains URL-KEY-SENTINEL: true\"; for a JSON-RPC revert (CALL_EXCEPTION) and a refused connection the URL was not in the line"
+    }
+  ],
+  "sibling_sites_checked": "Every log call with an err field in the slice: bloxroute.ts:66, :140, :187; flashbots.ts:136, :247, :362; passthrough.ts:124, :147. The bloXroute ones carry the auth header (axios config); the ethers ones carry the RPC URL on HTTP-status errors (SERVER_ERROR). The Flashbots auth key itself is never logged (only its address, flashbots.ts:133, and per-body signatures). The wallet key is not logged anywhere in the slice; its presence on module-level CONFIG (provider.ts:59) is section C I1, owned by the config slice.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 EXPOSURE: the trigger is ordinary (any relay outage, any 429/5xx from the RPC provider) and the leaked values are credentials (bloXroute auth header; the RPC provider key, which also leaks the operator's RPC quota and lets others read through the account). No funds can be moved with them, so it is not S1. Not tagged secret: no secret value was found; this is a code path that would write one. Whether existing logs already contain such lines was not checked (the capture logs live under data/, which audit plans must not read).",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "credential-exposure"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-04",
+  "recommendation": "Phase 29 (card TX-04 for the log policy): add pino redact paths (err.config.headers.Authorization, err.config.data, err.request, err.info.requestUrl and similar) or log err.message/code only at these sites; decide on card TX-04 whether the operator should check existing log files and rotate the bloXroute header and RPC keys.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

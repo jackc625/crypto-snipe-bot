@@ -1,0 +1,87 @@
+{
+  "id": "AUD-TX-008",
+  "title": "No RPC or relay timeout on the signing path: RPC_TIMEOUT_MS is documented (default 15000) but read nowhere, the providers use ethers' 300 s idle timeout, and every RPC and relay call of an attempt is awaited inside the wallet nonce lock",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C18"
+  ],
+  "files": [
+    "src/utils/provider.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git grep -nE \"RPC_TIMEOUT\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "only src/config.ts:180 (registration with the description \"Promise.race frees a hung call ... default: 15000\") and .env.example:237: the value is never read"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:23@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "new ethers.JsonRpcProvider(url) with no options: no request timeout, no staticNetwork"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/utils/fetch.js:402",
+      "note": "FetchRequest default timeout 300000 ms; node_modules/ethers/lib.commonjs/utils/geturl.js:43 and :58-59 apply it as a socket idle timeout"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider-jsonrpc.js:478",
+      "note": "without staticNetwork a JsonRpcProvider that cannot detect its network retries every 1 s"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:84-110@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "rawSendBundle builds its own FetchRequest with the default timeout, one call per target block"
+    },
+    {
+      "type": "command",
+      "ref": "@flashbots/ethers-provider-bundle@1.0.0 node_modules/@flashbots/ethers-provider-bundle/build/index.js:40",
+      "note": "bundle.wait() resolves on the target block event or rejects with the bare string \"Timed out\" after 5 minutes (:406-415)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:371-399@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each confirm-window poll awaits getTransactionReceipt and getTransactionCount with no per-call bound; the deadline is checked only between calls, so one hung call stretches the window"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:121@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "provider.call simulate with no bound"
+    }
+  ],
+  "sibling_sites_checked": "Every network await in the slice: provider.ts (no options), flashbots.ts (FlashbotsBundleProvider.create, getNetwork, getFeeData, getBalance, signBundle, simulate, sendBundle, rawSendBundle x N, bundle.wait, getBundleStatsV2), passthrough.ts (getNetwork, getFeeData, getBalance, call, sendTransaction, wait), bloxroute.ts (getFeeData, getBalance, call, axios with timeout 10000 at :165 and 5000 at :57, the only bounded calls), reconciliation.ts (getTransactionCount, getTransactionReceipt), receiptDecoder.ts (getTransactionReceipt x2). The only use of withTimeout under src is exitTrigger.ts:265 (whole anti-rug exit, frees the caller only). Callers outside the slice use the same providers (EXIT AUD-EXIT-005 notes the quote has no timeout).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a hung RPC or relay node does not block forever (300 s idle timeout, 5 min bundle wait) but each hung call can hold the wallet lock for minutes, stacking with the RC-11 hold (AUD-TX-003) and delaying every exit of the wallet; and the documented RPC_TIMEOUT_MS gives the operator a false sense that calls are bounded at 15 s. Not S1 on its own because every call is eventually bounded.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-003",
+    "AUD-TX-002",
+    "AUD-TX-006",
+    "AUD-EXIT-005"
+  ],
+  "tags": [
+    "capital",
+    "cross-class"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-01",
+  "recommendation": "Phase 24 with card TX-01: wire RPC_TIMEOUT_MS (or delete its registration): construct providers with a bounded FetchRequest timeout and staticNetwork, bound each await inside the lock, and check the confirm-window deadline per call. Bounding the calls is not a behaviour change of trading logic, but the timeout value is, so it rides on TX-01.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

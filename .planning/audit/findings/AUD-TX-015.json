@@ -1,0 +1,57 @@
+{
+  "id": "AUD-TX-015",
+  "title": "The receipt decoder takes the first WETH Withdrawal (or WETH Transfer to the wallet) anywhere in the sell receipt without checking who emitted it, so a token whose transfer hook moves WETH can make the recorded sell proceeds wrong",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "src/utils/receiptDecoder.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:74-86@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "first Withdrawal log from the WETH address wins; its src (the account that unwrapped) is not compared to the router"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:90-102@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "fallback: first WETH Transfer with to == wallet; from is not compared to the pool"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:44-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "receipt.status is not read (safe today: both callers decode only hashes already proven included with status 1)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1058-1075@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the decoded amountOut is written to the sell trade row; realized P&L and the dashboard daily loss read from trades (api/routes/risk.ts:90, health.ts:64-66)"
+    }
+  ],
+  "sibling_sites_checked": "Both callers: exitEngine.ts:1059 (full sell) and :1546 (partial sell), each after a confirmed hash (private landed / guard included / public wait() that throws on status 0). Whether the risk manager's daily-loss limit (riskManager.ts, BUY/DB slice) reads amount_out was not traced here; that is why the entry is a candidate.",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: needs an adversarial token (a transfer hook that unwraps or sends WETH during the sell); the effect is wrong bookkeeping (sell proceeds, P&L, possibly a loss limit computed from them), not a direct loss.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "accounting"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 29: match the Withdrawal whose src is the router used (V2) or the Transfer whose from is the pool (V3), or compute proceeds from the wallet balance delta; trace whether any limit is computed from amount_out.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

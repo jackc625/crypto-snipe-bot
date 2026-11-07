@@ -1,0 +1,116 @@
+[
+  {
+    "path": "src/utils/gasManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-013"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/bloxroute.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-010",
+      "AUD-TX-014",
+      "AUD-TX-016",
+      "AUD-TX-017"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/flashbots.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-006",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-009",
+      "AUD-TX-010",
+      "AUD-TX-012",
+      "AUD-TX-014",
+      "AUD-TX-017"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/passthrough.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-002",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-010",
+      "AUD-TX-011",
+      "AUD-TX-014",
+      "AUD-TX-016",
+      "AUD-TX-017"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/reconciliation.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-005",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-010",
+      "AUD-TX-011",
+      "AUD-TX-012",
+      "AUD-TX-016",
+      "AUD-TX-017"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/types.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-010"
+    ]
+  },
+  {
+    "path": "src/utils/nonceAuthority.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-001",
+      "AUD-TX-002",
+      "AUD-TX-003",
+      "AUD-TX-004",
+      "AUD-TX-005"
+    ]
+  },
+  {
+    "path": "src/utils/provider.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-002",
+      "AUD-TX-008"
+    ]
+  },
+  {
+    "path": "src/utils/receiptDecoder.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-015"
+    ]
+  },
+  {
+    "path": "src/utils/retry.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/txManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-018",
+      "AUD-TX-002",
+      "AUD-TX-003",
+      "AUD-TX-010"
+    ]
+  }
+]

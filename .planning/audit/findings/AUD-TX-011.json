@@ -1,0 +1,67 @@
+{
+  "id": "AUD-TX-011",
+  "title": "Section C E6: the passthrough strategy swallows every wait() error, so a repriced replacement (same swap, higher fee) that mined is reported as landed-not-ours, and the buy path then reports a landed buy as a zero-spend failure",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/reconciliation.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:139-150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "catch (waitErr) logs and sets nativeConfirmed false for every error; err.code, err.reason and err.receipt are not read"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1114-1127",
+      "note": "on a replacement wait() throws TRANSACTION_REPLACED with reason \"repriced\" (same data/to/value), \"cancelled\" or \"replaced\", carrying the replacement hash and its receipt"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1136-1146",
+      "note": "a status-0 receipt throws CALL_EXCEPTION"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the reconcile then probes only the original hash: no receipt, nonce advanced -> landed-not-ours -> throw"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:963",
+      "note": "responses from getTransaction() start with #startBlock -1, so no replacement detection; the slice only waits on sendTransaction responses (replaceable, abstract-provider.js:757)"
+    }
+  ],
+  "sibling_sites_checked": "The only wait() in the slice is passthrough.ts:140 (flashbots uses the library bundle.wait, bloXroute never waits). The status-0 case is handled correctly: the catch defers to reconcile, which reads receipt status 0 as reverted (reconciliation.ts:376-378). The exit-path sites (exitEngine.ts:422, :545, :556) are AUD-EXIT-010; the deliberate public buy (bot.ts:750) is part of AUD-BUY-025. A repricing can only come from outside the process (operator wallet \"speed up\", a second process AUD-TX-005, or an out-of-process script).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3, matching the exit-path twin AUD-EXIT-010: the condition needs an external replacement of the bot's own pending tx. When it happens on a buy, the landed buy reaches the snipe catch as a failure with no row (AUD-BUY-002 consequences); on a sell the no-double-sell guard stays capital-safe through the balance check. Section C candidate (no RC number), so origin research-candidate with an empty rc list.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-010",
+    "AUD-BUY-025",
+    "AUD-BUY-002",
+    "AUD-TX-002"
+  ],
+  "tags": [
+    "section-c"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-01",
+  "recommendation": "Phase 24 with card TX-01: classify wait() errors: on TRANSACTION_REPLACED use err.receipt (status 1 and reason repriced = our swap landed under the replacement hash; return that hash), on CALL_EXCEPTION report reverted, otherwise reconcile. Return the replacement hash to the caller so the trade row and receipt decoding use the hash that mined.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

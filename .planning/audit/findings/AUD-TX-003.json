@@ -1,0 +1,151 @@
+{
+  "id": "AUD-TX-003",
+  "title": "RC-11 head-of-line blocking: a snipe buy holds the wallet nonce lock through every private attempt (about 4 minutes at default settings when the bundle does not land), so an anti-rug emergency sell of another position cannot start, times out after 60 s and is left queued to run minutes later",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C14"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/txManager.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/utils/nonceAuthority.ts",
+    "src/exitEngine.ts",
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitBuyTx = withNonceLock(wallet, () => sendTxWithRetry(txBuilder, ctx)): one lock hold covers the whole escalation"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buys pass no explicit retry budget, so retries = 3, i.e. attempts 0..3 = 4 private submissions"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:476-621@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each attempt: re-fetch nonce, submit, then (not natively confirmed) reconcileInclusion over confirmWindowMs; the loop only stops early when the clamped fee hits the ceiling or the affordability bound (:551-553, :606)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "default confirm window 45000 ms, poll 4000 ms"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:502-514@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "escalated priority fee = step x (attempt+1) = 1, 2, 3, 4 gwei by default, far below the 25 gwei buy ceiling (:69), so at calm gas the ceiling never ends the loop early"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:301-317@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "per attempt on ETH: library sendBundle, a raw fanout call per target block (default 3), then bundle.wait() until the first target block passes (about 12 s), then getBundleStatsV2 (:343-366), all inside the lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:192-194@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on BSC every submit returns nativeConfirmed false, so every attempt spends the full confirm window under the lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:871-874@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an anti-rug exit of another token first needs the same wallet lock for its approval, then again for the private sell (:909 via :782-789)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug budget = WATCHDOG_BUDGET_MS, default 60000 ms"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withTimeout frees the anti-rug caller at 60 s and records success=false; the executeFullSell it started keeps running and stays queued on the nonce lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:65-73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "strict FIFO: no priority lane, no abort, no way for an emergency op to jump the queue"
+    }
+  ],
+  "sibling_sites_checked": "All long holders of the wallet lock: submitBuyTx (bot.ts:267, snipe, 4 attempts), the deliberate private leg (bot.ts:558, DELIBERATE_BUY_PRIVATE_ATTEMPTS default 2), routine private sells (exitEngine.ts:788, MEV_SELL_FALLBACK_ATTEMPTS default 2) and partial sells (:1531, default 4 attempts), plus every wait() holder in AUD-TX-002. The sell-behind-sell case (a routine exit of token A delaying the anti-rug exit of token B) is already AUD-EXIT-014; this entry is the buy-escalation case RC-11 names and the lock policy itself. That a refused or timed-out anti-rug escape is not retried by the detector is AUD-ANTIRUG-004.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-11"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. Condition: a rug on one held position while a snipe for another token is escalating privately on the same wallet, which is ordinary operation for a sniping bot (snipes that do not land were the Phase 21.3 calm-gas problem). Default timing from code: 4 attempts x (about 12 s bundle wait + 45 s confirm window + relay calls) is about 4 minutes of lock hold on ETH and 4 x 45 s on BSC; the anti-rug exit gives up after 60 s and the detector does not retry it (AUD-ANTIRUG-004), while the abandoned sell still runs later at whatever price is left.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-014",
+    "AUD-ANTIRUG-004",
+    "AUD-TX-001",
+    "AUD-TX-002",
+    "AUD-TX-006",
+    "AUD-TX-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-17",
+  "recommendation": "Phase 24 (card OD-17, head-of-line part): decide how an emergency exit gets the wallet. Options on the card: a priority lane in the nonce authority for anti-rug exits, an abortable buy escalation that yields the lock between attempts, or releasing the lock between attempts with the nonce re-checked. Whatever is chosen, an abandoned (timed-out) exit must be cancelled or reconciled, not left queued to run minutes later. Prove the timing in Phase 23 with a held position, a non-landing private buy and a simulated rug on a local fork. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "traces": [
+    {
+      "scenario": "A rug on held token A while a snipe of token B escalates privately on ETH (defaults)",
+      "steps": [
+        "t=0: the pair handler for B calls submitBuyTx; withNonceLock(wallet) starts the escalation (bot.ts:267)",
+        "attempt 0: nonce fetch, sign, simulate, sendBundle, 3 raw fanout calls, bundle.wait() until head+1 passes (~12 s), getBundleStatsV2, then reconcileInclusion polls for 45 s (reconciliation.ts:576-583) and finds not-landed",
+        "attempts 1-3 repeat with 2, 3, 4 gwei priority; none reaches the 25 gwei ceiling, so the loop runs all 4 attempts (~4 min)",
+        "t=10 s: the anti-rug detector fires for A; exitTrigger calls executeFullSell under withTimeout(60000) (exitTrigger.ts:265-269)",
+        "executeFullSell takes A's per-token sell lock, then queues for the wallet lock to approve (exitEngine.ts:871/874)",
+        "t=70 s: withTimeout fires; anti-rug logs bounded-abort and returns false; the detector does not re-fire for that rug (AUD-ANTIRUG-004)",
+        "t=~4 min: the buy finishes (throws ceiling-hit or lands); the queued executeFullSell for A now approves and sells, with the balance it read before queuing and at whatever price is left; meanwhile every other exit of A was refused by the sell lock (AUD-EXIT-014)"
+      ],
+      "outcome": "Token A is held through the rug with no working exit for about 4 minutes, and then sold late. Capital: most of A's value can be gone (STRAND turning into LOSS). The operator sees an anti-rug watchdog-abort alert that says the position \"will retry\", which it does not do by itself."
+    }
+  ],
+  "sub_claims": [
+    {
+      "claim": "A non-landing snipe holds the wallet lock for about 4 minutes at default settings on ETH",
+      "evidence": [
+        "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:476-621@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/flashbots.ts:301-317@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The nonce authority has no priority or abort path for an emergency exit",
+      "evidence": [
+        "src/utils/nonceAuthority.ts:60-75@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "A timed-out anti-rug exit stays queued and runs later instead of being cancelled",
+      "evidence": [
+        "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
+        "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

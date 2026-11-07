@@ -1,0 +1,167 @@
+{
+  "id": "AUD-TX-002",
+  "title": "RC-10 (b) never-settling operation: a wait() with no timeout runs inside withNonceLock, including the Base/Arbitrum private-path strategy (passthrough tx.wait(3)), so a tx that is never mined holds the wallet lock forever and every later buy and exit of that wallet waits behind it",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C09",
+    "C12"
+  ],
+  "files": [
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/nonceAuthority.ts",
+    "src/utils/txManager.ts",
+    "src/bot.ts",
+    "src/exitEngine.ts",
+    "src/utils/withTimeout.ts",
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:130-150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "wallet.sendTransaction, then await tx.wait(3): 3 confirmations and NO timeout argument. The comment at :133-137 says \"tx.wait(3) may TIME OUT\"; with ethers 6.16.0 it cannot, so the submit closure never returns for a tx that is never mined. This site is not named in ESC-PRE-02"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitWithReconciliation awaits the strategy submit closure with no bound; the bounded confirm window (:576-583) only runs after the closure returns, so on Base and Arbitrum the D-CONFIRM-WINDOW bound never applies to a stuck tx"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitBuyTx holds withNonceLock for the whole sendTxWithRetry, i.e. the passthrough closure above on Base/Arbitrum buys"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitPrivateSell holds withNonceLock for the whole escalatePrivateSell (passthrough on Base/Arbitrum private sells)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1531@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial sell holds withNonceLock for sendTxWithRetry (passthrough on Base/Arbitrum)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-756@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deliberate public buy: await stx.wait() with no timeout inside withNonceLock (ESC-PRE-02 site 1; BUY-slice rediscovery AUD-BUY-025)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:543-546@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public-fallback approve: await approveTx.wait() inside withNonceLock (ESC-PRE-02 site 2; EXIT rediscovery AUD-EXIT-009)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:552-562@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public-fallback swap: await stx.wait() inside withNonceLock (ESC-PRE-02 site 3; AUD-EXIT-009)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:419-423@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ensureApproval waits with no timeout; reached under withNonceLock from :871, :874, :1509, :1512 (AUD-EXIT-009)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:65-73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the next op for the wallet starts only after the prior op settles"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Promise.race frees only the caller; the inner op keeps the lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the anti-rug exit is bounded by withTimeout(WATCHDOG_BUDGET_MS, default 60000, :77-81), so it gives up while its queued sell stays behind the stuck op"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1045",
+      "note": "wait(): const timeout = (_timeout == null) ? 0 : _timeout"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1172-1178",
+      "note": "the TIMEOUT timer is armed only when timeout > 0; otherwise the waiter settles only on a receipt with enough confirmations or a detected replacement"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1060-1063",
+      "note": "while the on-chain nonce is below the tx nonce the replacement check returns and waits again, so a dropped tx whose nonce never advances keeps waiting; the replacement scanner re-arms on every block (:1194-1210), so a stuck wait also polls blocks forever (listener leak)"
+    },
+    {
+      "type": "command",
+      "ref": "@flashbots/ethers-provider-bundle@1.0.0 node_modules/@flashbots/ethers-provider-bundle/build/index.js:40",
+      "note": "by contrast the Flashbots bundle.wait() (flashbots.ts:317) is bounded by the library TIMEOUT_MS = 5 * 60 * 1000 (:406-415), so the ETH private path is long but not unbounded (see AUD-TX-003, AUD-TX-008)"
+    },
+    {
+      "type": "command",
+      "ref": "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)",
+      "note": "A2 printed \"A2 caller: caller freed by race, op still queued\" and \"A2 after 3000ms: locked wait(3) = PENDING | queued sell ran = false\"; the control \"wait(3, 800): TIMEOUT after 816 ms\" shows the same tx settles when a timeout is passed"
+    }
+  ],
+  "sibling_sites_checked": "Every .wait( under src at the base SHA (git grep): passthrough.ts:140 (this slice, under the lock via submitBuyTx / submitPrivateSell / partial sell), flashbots.ts:317 (library bundle.wait, bounded at 5 min), bot.ts:750, exitEngine.ts:422 (via :871, :874, :1509, :1512), :545, :556. bloxroute.ts has no wait (it always reconciles, bounded by MEV_CONFIRM_WINDOW_MS). Out-of-process scripts (scripts/recover-sell-ladys.ts:72, :82, scripts/addLiquidity.ts, scripts/deploySepoliaTest.ts) take no in-process lock and belong to the SCRIPTS slice. The BUY rediscovery is AUD-BUY-025 and the EXIT rediscovery is AUD-EXIT-009; this entry is the canonical never-settling sub-finding the EXIT entry pointed to with rc:RC-10. Re-entrancy is the separate sub-finding AUD-TX-001.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-10"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion and to ESC-PRE-02. Condition: one public or sequencer tx that is never mined and never replaced (underpriced during a fee spike and then dropped, or lost by a lagging or failing RPC node). New relative to ESC-PRE-02: the Base/Arbitrum private-path strategy itself waits with no timeout (passthrough.ts:140), so on those chains every snipe buy and every private sell is a never-settling site, not only the public fallbacks; and the code comment there states the opposite. Registered as a rediscovery under the existing pre-phase record (one record per item, AC-39), not escalated again.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-001",
+    "AUD-BUY-025",
+    "AUD-EXIT-009",
+    "AUD-TX-003",
+    "AUD-TX-011"
+  ],
+  "tags": [
+    "capital",
+    "rediscovery"
+  ],
+  "escalation_ref": "ESC-PRE-02",
+  "od_ref": "TX-01",
+  "recommendation": "Phase 24 (card TX-01): never wait without a bound while holding the wallet lock. Give every wait() inside the lock (passthrough.ts:140, bot.ts:750, exitEngine.ts:422/:545/:556) an explicit timeout, and on timeout reconcile against chain state (receipt + latest nonce) the way reconcileInclusion does, then decide replace/cancel/keep-waiting outside the lock or with a bounded replacement. Keep the lock until the nonce is settled or explicitly replaced, because releasing it while a public tx is still pending would let the next op sign the same nonce (ethers contract sends take nonce \"pending\", strategies take \"latest\"). Prove it in Phase 23 with a never-mined tx on a local chain. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "Passthrough (Base/Arbitrum) private submits wait for 3 confirmations with no timeout while holding the wallet lock",
+      "evidence": [
+        "src/utils/mevStrategies/passthrough.ts:138-150@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1045"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The three ESC-PRE-02 public-path sites (bot.ts:750, exitEngine.ts:545, :556) and ensureApproval (:422) wait with no timeout under the lock",
+      "evidence": [
+        "src/bot.ts:746-756@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:543-562@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:419-423@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "An outer withTimeout or the worker watchdog frees the caller but leaves the lock held and the later ops queued",
+      "evidence": [
+        "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
+        "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "id": "AUD-TX-007",
+  "title": "RC-22 base fee doubled: maxFeePerGas - maxPriorityFeePerGas from ethers getFeeData() is exactly 2x the latest base fee, so the affordability and sell-reserve math over-reserves; buys are refused early (safe) and on a thin wallet the private sell is refused before submit and the exit goes to the public mempool",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/preflight.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:624-625",
+      "note": "maxPriorityFeePerGas = priorityFee ?? 1 gwei; maxFeePerGas = block.baseFeePerGas * 2 + maxPriorityFeePerGas, with block = latest (:601)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:169-172@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "baseFeeWei = feeData.maxFeePerGas - feeData.maxPriorityFeePerGas, i.e. 2 x latest base fee"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:63-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same derivation (Base/Arbitrum)"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deriveFeeWei uses the same derivation for the buy-time entry gate (sibling, DB/CONFIG-adjacent file)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:280-286@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reserve = sellGasLimit x (baseFeeWei x 1.5) = 3 x the real base fee per gas"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:328-333@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "headroom = balance - value - reserve - gasLimit x baseFeeWei; headroom <= 0 -> unaffordable, the strategy throws before submitting (:527-543)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:210-211@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the submitted maxFeePerGas = baseFeeWei + priority: here the 2x is the usual ethers headroom against a rising base fee, which helps inclusion and is not an overspend (EIP-1559 charges the real base fee)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:201-214@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a strategy throw on the sell leg becomes landed:false with an empty broadcast handle"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell then skips guard 2a (no hash) and goes to the balance check and the public-mempool fallback"
+    }
+  ],
+  "sibling_sites_checked": "All four derivations: flashbots.ts:169-172, passthrough.ts:63-66, preflight.ts:314-330 (deriveFeeWei), and the doc comments at reconciliation.ts:234/:255. bloxroute.ts:92 uses gasPrice (BSC legacy), so BSC is not doubled. The public fallback itself (exitEngine.ts:552-555) uses ethers default fees and is never refused by the bot; only the node can refuse it for insufficient funds.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-22"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "S2, equal to the research suggestion. Direction measured from code: the doubled base fee only ever over-reserves. It never lets a buy spend more than configured and never blocks an exit outright. Its capital effect is indirect: a buy that is affordable can be refused, and on a thin wallet (balance between about gasLimit x (2 x base + tip) and gasLimit x (5 x base + tip)) the private sell is refused before submit and the position is sold on the public mempool, where it can be sandwiched; private sells accept any output (AUD-EXIT-001). It also lowers the clamped private priority fee (headroom / gasLimit), which lowers private inclusion odds.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-001",
+    "AUD-TX-010"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-02",
+  "recommendation": "Phase 24 (card TX-02): use the real base fee (latest block baseFeePerGas, optionally projected one block ahead) for affordability and the sell reserve, keep 2 x base + tip only as the submitted maxFeePerGas cap, and do the same in preflight deriveFeeWei. Decide whether the sell leg should reserve gas at all (AUD-TX-010).",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

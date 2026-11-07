@@ -1,0 +1,131 @@
+{
+  "id": "AUD-TX-010",
+  "title": "The MEV strategies always run the buy model: private sells get the buy fee ceiling (MEV_SELL_MAX_PRIORITY_FEE_GWEI is never applied), the documented \"load-bearing\" MEV_MAX_PRIORITY_FEE_GWEI cap is read nowhere, a sell reserves gas for a further sell, and the alerts tell the operator to change knobs that do nothing",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C16",
+    "C18"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/utils/mevStrategies/types.ts",
+    "src/utils/txManager.ts",
+    "src/exitEngine.ts",
+    "src/config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:174-193@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildReconcileConfig(env, sellGasLimit, maxRetries, leg = \"buy\"): the ceiling is MEV_BUY_MAX_PRIORITY_FEE_GWEI unless leg is \"sell\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildReconcileConfig(process.env, sellGasLimit, maxRetries): no leg, so \"buy\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same, no leg"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same, no leg"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/types.ts:45-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "MevStrategy.sendTransaction has no buy/sell parameter, so a strategy cannot know it is selling"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "escalatePrivateSell calls sendTxWithRetry -> strategy.sendTransaction; the sell leg therefore runs with the buy ceiling"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only \"sell\" config is built for the no-double-sell guard, which uses only its confirm window and poll; its ceiling is never used"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:534-537@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the public-fallback alert tells the operator to \"raise MEV_SELL_MAX_PRIORITY_FEE_GWEI\", which has no effect on any submit"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -nE \"env\\.MEV_MAX_PRIORITY_FEE_GWEI\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no output: MEV_MAX_PRIORITY_FEE_GWEI, registered at config.ts:171 and .env.example:229 as the \"load-bearing safety cap (default 5)\", is read nowhere"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:607@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the ceiling-hit alert tells the operator to \"Increase MEV_MAX_PRIORITY_FEE_GWEI\", which has no effect; the real ceiling is MEV_BUY_MAX_PRIORITY_FEE_GWEI (default 25)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:321-328@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on the sell leg (value 0, buyGasLimit = sell gas limit) the bound still subtracts a reserve for \"the eventual sell\", i.e. a second sell that does not exist"
+    }
+  ],
+  "sibling_sites_checked": "All four buildReconcileConfig callers (flashbots.ts:182, passthrough.ts:83, bloxroute.ts:104 with no leg; bot.ts:577 \"buy\" and exitEngine.ts:940 \"sell\", both only for a guard reconcile window). All reads of the ceiling keys: MEV_BUY_MAX_PRIORITY_FEE_GWEI (reconciliation.ts:193), MEV_SELL_MAX_PRIORITY_FEE_GWEI (:192, reached only from exitEngine.ts:940), MEV_MAX_PRIORITY_FEE_GWEI (none). Operator texts naming the dead knobs: reconciliation.ts:607, exitEngine.ts:536. Cross-slice note for 22-28: TH-EXIT-23 records MEV_SELL_MAX_PRIORITY_FEE_GWEI as capping \"the escalated priority fee of private sell attempts\"; at the base SHA it does not (this entry); I did not edit the EXIT file.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 OVERSPEND: the operator-facing cap is 5 gwei while the enforced ceiling is 25 gwei on both legs, so private priority fees can be 5 times what the documentation promises (300k gas x 25 gwei = 0.0075 ETH per attempt vs 0.0015); the affordability clamp still bounds total spend against the wallet, so the effect is bounded. The sell-side effects are indirect: an operator who lowers MEV_BUY_MAX_PRIORITY_FEE_GWEI to save on buys silently lowers the private sell ceiling too, raising the sell ceiling does nothing, and the phantom second-sell reserve refuses the private sell earlier on a thin wallet (public fallback instead, see AUD-TX-007).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-007",
+    "AUD-EXIT-004",
+    "AUD-TX-016"
+  ],
+  "tags": [
+    "capital",
+    "cross-class"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-02",
+  "recommendation": "Phase 24 (card TX-02): pass the leg to the strategy (sendTransaction option) so sells use the sell ceiling and no second-sell reserve; decide what MEV_MAX_PRIORITY_FEE_GWEI means (remove it or make it the hard cap); correct the two operator messages. Behaviour-changing (fee ceilings), so it is a card decision.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "Private sells use the buy ceiling; MEV_SELL_MAX_PRIORITY_FEE_GWEI never reaches a submit",
+      "evidence": [
+        "src/utils/mevStrategies/flashbots.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/passthrough.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/bloxroute.ts:104@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "MEV_MAX_PRIORITY_FEE_GWEI is read nowhere although documented as the load-bearing cap",
+      "evidence": [
+        "src/config.ts:171@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:190-193@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The sell leg reserves gas for a further sell",
+      "evidence": [
+        "src/utils/mevStrategies/reconciliation.ts:321-328@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

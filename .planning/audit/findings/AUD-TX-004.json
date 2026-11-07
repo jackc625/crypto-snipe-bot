@@ -1,0 +1,89 @@
+{
+  "id": "AUD-TX-004",
+  "title": "RC-17 duplicate module instance: the nonce authority is plain module state with no duplicate-load guard, so a second copy of the module (path casing, ESM/CJS dual load, a cleared require cache) is a second, independent lock for the same wallet",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C07",
+    "C15"
+  ],
+  "files": [
+    "src/utils/nonceAuthority.ts",
+    "src/bot.ts",
+    "src/exitEngine.ts",
+    "tsconfig.bot.json"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const chains = new Map<string, Promise<unknown>>(): module-scope state; a second evaluation of the module creates a second, empty Map"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:60-75@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "serialization holds only among callers that share the same Map instance"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -niE \"Symbol\\.for|registerSingleton|processLock|lockfile|locking_mode|single[- ]instance\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no output: no duplicate-load guard and no globalThis registry anywhere at the base SHA"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -niE \"nonceauthority['\\\"]\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts test",
+      "note": "production importers are exactly bot.ts:77 and exitEngine.ts:12, both \"./utils/nonceAuthority\" from src/, so the two production imports resolve to one file and one instance today; tests reload it on purpose (vi.importActual / dynamic import after vi.resetModules)"
+    },
+    {
+      "type": "command",
+      "ref": "git show 23a64617dca167976adc4645fed0e2c69e384820:tsconfig.bot.json and dashboard/tsconfig.json",
+      "note": "forceConsistentCasingInFileNames is absent from both (present only in tsconfig.json), so a differently cased import would compile under the bot config; on Windows (this operator) a differently cased specifier loads a second module instance under CommonJS"
+    }
+  ],
+  "sibling_sites_checked": "The other module-state singletons named by RC-17 (sell lock exitManager.ts:14/:53/:104, ExitWorker exitEngine.ts:1421, anti-rug registry detector.ts:192/:197/:247) are in the EXIT and ANTIRUG slices; their slices own those entries. In this slice the only lock/registry singleton is nonceAuthority.ts:43; provider.ts:7-8 caches providers in module Maps, where a duplicate instance means a second provider, not a capital defect.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-17"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion (\"latent S1\"). The gap (no guard) is confirmed at the base SHA; a duplicate load does not happen with the two production imports today, so the condition is a non-default load (a differently cased import, the planned ESM conversion in Phase 26, a test-style module reset in a tool). When it happens two buys/sells of one wallet can sign the same nonce at once: a replaced or double-spent transaction. Mitigation: the duplicate-load guard rail of plan 22-12 (D-05) closes it; status stays confirmed until the 22-29 re-audit verifies that rail, as the PROTOCOL lifecycle allows no other change here.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-005",
+    "AUD-TX-001"
+  ],
+  "tags": [
+    "capital",
+    "latent",
+    "mitigation-planned-22-12"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Mitigated by the planned rail 22-12 (Symbol.for registry with an epoch sentinel, D-05) and forceConsistentCasingInFileNames in all tsconfigs; 22-29 re-audits the diff of nonceAuthority.ts and moves this entry forward only on evidence. No further behaviour decision.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "No duplicate-load guard exists for the nonce authority at the base SHA",
+      "evidence": [
+        "src/utils/nonceAuthority.ts:41-84@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "A duplicate load occurs in the production import graph at the base SHA",
+      "evidence": [
+        "src/bot.ts:77@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:12@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ]
+}

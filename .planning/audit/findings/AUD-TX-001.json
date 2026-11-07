@@ -1,0 +1,96 @@
+{
+  "id": "AUD-TX-001",
+  "title": "RC-10 (a) re-entrancy: withNonceLock is a non-reentrant promise chain with no owner tracking, so an op that takes the same wallet lock again waits on itself forever and freezes every later buy and exit of that wallet, silently",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07"
+  ],
+  "files": [
+    "src/utils/nonceAuthority.ts",
+    "src/exitEngine.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:60-75@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withNonceLock reads the prior tail (:65), chains prior.catch(() => {}).then(op) (:69) and stores the new tail (:73); there is no record of which async context holds the lock and no check for a nested acquire"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one plain Map of tails per lowercased address; the only other export is the test reset (:82-84)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1380-1391@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the code itself documents that this exact deadlock shipped before (CR-01): the worker took the wallet lock around executeFullSell, whose inner acquires then queued behind the outer run promise, a permanent deadlock on every worker-driven exit; the fix was to remove the outer lock, not to detect nesting"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:244-249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the buy seam relies on the same unchecked premise in a comment: the pair/pool handlers are not nested inside any other same-wallet withNonceLock hold"
+    },
+    {
+      "type": "command",
+      "ref": "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)",
+      "note": "A1 printed \"A1 re-entrant outer after 1500ms: PENDING | next same-wallet op: PENDING\": a nested same-wallet acquire never settles, and every later op for that wallet queues behind it"
+    }
+  ],
+  "sibling_sites_checked": "Every withNonceLock call at the base SHA (git grep): bot.ts:225 (maybeApproveForChain, no caller), :267 (submitBuyTx -> sendTxWithRetry), :558 (escalatePrivateBuy), :746 (public deliberate buy); exitEngine.ts:543, :552 (public fallback approve and swap), :788 (submitPrivateSell -> escalatePrivateSell), :871, :874, :1509, :1512 (ensureApproval), :1531 (partial sell -> sendTxWithRetry). For each op body I followed every call it makes (sendTxWithRetry, the three strategy sendTransaction paths, submitWithReconciliation, reconcileInclusion, escalatePrivateSell/Buy, ensureApproval, the router contract sends and the txBuilder closures): none takes withNonceLock again. Callers that hold no lock: the ExitWorker drain (exitEngine.ts:1370-1397), the anti-rug exitTrigger (exitTrigger.ts:265-269), the dashboard sells (no withNonceLock under src/api). So no re-entrant path exists at the base SHA; the defect is the missing guard. The never-settling-operation mechanism is a separate sub-finding (AUD-TX-002).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-10"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion for RC-10, kept although no re-entrant path exists at the base SHA (all 12 lock sites traced). Reasons: the deadlock has already shipped once in this code (CR-01, documented at exitEngine.ts:1380-1391); nothing detects it, so one nested call introduced by the planned refactors (Phases 25-27 restructure and the ESM conversion touch exactly these call paths) would freeze every buy, sell and anti-rug exit of the wallet with no error and no alert, which is a stranded-position condition; and the fix (detect and throw on a nested acquire) belongs with the RC-10 never-settling fix in Phase 24, not in the S2-S4 queue. This is the re-entrancy sub-finding of RC-10; the never-settling sub-finding is AUD-TX-002, and fixing one does not close the other.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-002",
+    "AUD-TX-003"
+  ],
+  "tags": [
+    "capital",
+    "latent"
+  ],
+  "escalation_ref": "ESC-PRE-02",
+  "od_ref": "OD-17",
+  "recommendation": "Phase 24 (card OD-17, re-entrancy part): make a nested same-wallet acquire impossible to miss. Options are on the card: track the holder with AsyncLocalStorage and throw on a nested acquire (research recommendation, assertNonceLockHeld), or make the lock re-entrant for the holding context. Add a real-path test that nests a call through the real exitEngine/bot seams. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "A nested same-wallet acquire never settles and blocks every later op for that wallet",
+      "evidence": [
+        "src/utils/nonceAuthority.ts:65-74@23a64617dca167976adc4645fed0e2c69e384820",
+        "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "No re-entrant acquisition path exists in production code at the base SHA",
+      "evidence": [
+        "src/bot.ts:264-268@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1370-1397@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Nothing detects or reports a nested acquire",
+      "evidence": [
+        "src/utils/nonceAuthority.ts:43-84@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}
