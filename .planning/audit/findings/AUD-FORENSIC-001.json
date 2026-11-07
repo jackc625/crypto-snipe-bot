@@ -92,7 +92,7 @@
   "tags": [
     "rail"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-FORENSIC-01",
   "od_ref": null,
   "recommendation": "Leave the live data/ files untouched (P3). The forensic result gives no reason to clean anything: no test-written row was found, and the two LADYS trades look like the real Phase 21 live capture. The SAFE-02 rails (22-05, 22-07..22-10: DB tripwire under Vitest, per-worker temp DB, no real .env) stop new test opens of the live DB, and the SAFE-04 process lock covers a second bot. Any later decision about the deleted trade id 1 or a cleanup is an operator decision for a later phase; nothing is fixed in Phase 22 (NAC-13).",
   "reported_by": [

@@ -1,0 +1,17 @@
+{
+  "id": "ESC-FORENSIC-01",
+  "date": "2026-11-06",
+  "tier": "immediate",
+  "tags": ["rail"],
+  "items": ["AUD-FORENSIC-001"],
+  "resolved_items": [],
+  "summary": "R3 forensic result (22-06 Task 2), presented because AUD-FORENSIC-001 is tagged rail (D-16 immediate tier, presented whatever the counts). A copy of the backed-up live DB (C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06) was inspected read-only with the two-image method: image B = main file only (17:33 checkpoint), image A = WAL recovered on a disposable copy (20:25). Result: zero rows added, changed or removed between 17:33 and 20:25 in trades, exit_state, pause_state, chain_state and lp_baseline; the WAL was replayed at each of its 40 commit points and no transient row appeared. The 40 WAL frames are all page-1 header writes with schema user_version 7, the fingerprint of a process loading src/utils/db.ts (import-time open plus migrateSchema), which is actual-occurrence evidence for the mechanism in AUD-RAIL-002. The kill-switch row (pause_state) reads not paused and there are no exit_state rows at both instants. Three rows match a value that appears in the test files; all three are the real LADYS token/pair (trades 2 and 3 and the lp_baseline row), whose literal is public-historical (captured real mainnet fixture), so they are not attributed to tests. Attribution counts: 0 attributed-test-write, 0 literal-match-uncorroborated, 0 unknown-origin diff rows. sqlite_sequence for trades is 3 while trades holds ids 2 and 3, so trade id 1 existed before 17:33 and was deleted; its content is not recoverable from either image or from the free bytes, and its origin is unknown. integrity_check is ok on both images; two runs produced byte-identical reports (report.json sha256 10b77e6db930534c53e4edf6a8edda28c812c87c0e9565344dd2b016178cec42, kept outside the repo); the backup folder verifies unchanged. The live data/ folder was not touched and will not be (P3); any cleanup is a later operator decision. The operator was asked to acknowledge and to say whether they want a decimal phase.",
+  "presented_at": "2026-11-06 session (2026-11-07T03:29:09Z UTC, right after commit 8c01ff9): the 22-06 Task 2 blocking checkpoint (gate blocking-human), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Ok I’ve seen this. No mini phase, proceed as normal",
+  "operator_response_recorded_at": "2026-11-07T03:47:48.000Z",
+  "operator_response_channel": "typed by the operator at the 22-06 Task 2 blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-06 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply). Presented at presented_at through the 22-06 Task 2 blocking checkpoint (gate blocking-human).",
+  "ruling": "none",
+  "ruling_note": "The operator acknowledged the result and declined a decimal (mini) phase; Phase 22 continues as planned. The operator gave no explanation for the deleted trade id 1, so it stays unexplained and open in AUD-FORENSIC-001 (origin unknown). No cleanup of the live DB is authorized or planned in Phase 22 (P3, NAC-13).",
+  "phase_continued": true
+}
