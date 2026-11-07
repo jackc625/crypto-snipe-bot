@@ -36,6 +36,8 @@ data/
 # Hardhat cache (runtime generated)
 cache/
 artifacts/
+# OD-21 (Phase 22, 22-07): Ignition per-future artifacts are tracked deployment state, not build output
+!ignition/deployments/*/artifacts/
 typechain-types/
 
 # Build output

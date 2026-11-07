@@ -1,1 +1,1 @@
-deployments/*/journal.jsonl
+# OD-21 (Phase 22, 22-07): the deployments/*/journal.jsonl rule was removed; Ignition journals are tracked deployment state
