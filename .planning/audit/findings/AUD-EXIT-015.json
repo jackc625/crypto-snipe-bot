@@ -10,7 +10,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-02",
   "reported_by": [
     "claude (22-18 executor)"
