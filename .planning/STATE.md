@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-23-PLAN.md
-last_updated: "2026-11-07T19:21:10.297Z"
+stopped_at: Completed 22-24-PLAN.md
+last_updated: "2026-11-07T19:59:45.871Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 3f6232f92c7dfbb7ffa4b8828af9da530b127026
+state_head: 50bba09cdb051ceba5de8127a4f7d53357b80029
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 15
+  completed_plans: 16
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 16 of 29
+Plan: 17 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -92,11 +92,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P21 | 35min (wall-clock incl. operator wait) | 3 tasks | 33 files |
 | Phase 22 P22 | 58min | 3 tasks | 39 files |
 | Phase 22 P23 | 30min | 2 tasks | 26 files |
+| Phase 22 P24 | 33min | 2 tasks | 30 files |
 
 ## Session
 
-**Last session:** 2026-11-07T19:21:10.216Z
-**Stopped at:** Completed 22-23-PLAN.md
+**Last session:** 2026-11-07T19:59:45.799Z
+**Stopped at:** Completed 22-24-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -147,3 +148,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-23: AUD-TESTU-001 (24 unit files reached the live DB, real .env values or the notifier before the rails) is S1 RC-19 sibling evidence linked to AUD-RAIL-002 and ESC-PRE-03 (resolved_items); no new rail-class reach in test/unit; no ESC-TESTU record and no area checkpoint (rediscovery is never escalated twice)
 - [Phase 22]: 22-23: the green unit suite would not catch AUD-BUY-001, AUD-BUY-002, AUD-EXIT-002/-007/-009/-013/-015, AUD-ANTIRUG-004, AUD-TX-002, AUD-DB-002/-003 and AUD-BUY-006 on the real path (AUD-TESTU-002..-021); the INT-NONCE-SELL regression stays green across all three nonce-lock tests (AUD-TESTU-003/-004); RED-prove those first in Phase 23/28
 - [Phase 22]: 22-23: unit type-level compile gates (@ts-expect-error in anti-rug/types and honeypotTypes) never run: no tsconfig includes test/ and Vitest does not type-check (AUD-TESTU-008); RC-28 is TESTI-owned and linked as rc:RC-28 on AUD-TESTU-017/-018/-019
+- [Phase 22]: 22-24: no integration or fork test path signs with the real key or sends to real mainnet (fork contexts use Hardhat keys on 127.0.0.1:8545); no rail-class stop
+- [Phase 22]: 22-24: RC-19 integration/fork side registered as S1 rediscovery AUD-TESTI-011 on ESC-PRE-03, not re-escalated; no new S1 so no area checkpoint
+- [Phase 22]: 22-24: coverage map AUD-TESTI-020: 0 of 39 registered money-path S0/S1 findings are caught on the real path by any integration or fork test (Phase 23 work list)

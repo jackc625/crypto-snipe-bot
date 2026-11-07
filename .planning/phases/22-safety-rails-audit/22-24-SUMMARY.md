@@ -158,6 +158,12 @@ None. No external service configuration required.
 - 22-29 owns the fork files changed in Phase 22 as dated obligations. Phase 25 is the first fork execution: AUD-TESTI-017/-019/-021/-023/-024 describe what that run must fix to be meaningful.
 - Phase 23 work list: the 39 sub-claims of AUD-TESTI-020.
 
+## Self-Check: PASSED
+
+- Files: ledger/TESTI.json, sweep/TESTI.json, AUD-TESTI-001..027, this SUMMARY: all present.
+- Commits: 6cab907, 6059885 (task) and 50bba09 (SUMMARY) are ancestors of HEAD; evaluation-scope resolves all three for 22-24.
+- Plan verification re-run after the Task 2 commit: check.ts partial --slice TESTI PASS (0 fail, 0 pending); Task 2 verify prints "TESTI ok 62"; RC-28 mapped; render.ts into a temp folder renders (canonical AUDIT-FINDINGS.md / OPERATOR-DECISIONS.md not staged).
+
 ---
 *Phase: 22-safety-rails-audit*
 *Completed: 2026-11-07*
