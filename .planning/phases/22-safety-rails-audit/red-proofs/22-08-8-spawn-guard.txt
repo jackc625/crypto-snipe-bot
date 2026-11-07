@@ -1,0 +1,76 @@
+RED proof 22-08-8 — spawn-guard
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:26:35.346Z at HEAD da4c02165bb3eecbe3dfbd1ec7409907f0fe0bac.
+Neutralised file: test/rails/spawnRailedChild.ts (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/spawnRailedChild.ts b/test/rails/spawnRailedChild.ts
+index 4636cbb..d1af017 100644
+--- a/test/rails/spawnRailedChild.ts
++++ b/test/rails/spawnRailedChild.ts
+@@ -226,6 +226,7 @@ interface Plan {
+  * directly, so even a neutralised check (RED proof 22-08-8) can never start a forbidden child.
+  */
+ export function checkSpawnLimits(cmd: string, args: string[], opts: SpawnRailedOptions = {}): void {
++    return; // RED 22-08-8: limit checks return early
+     const o = opts || {};
+     // [limit: command]
+     if (cmd !== process.execPath && cmd !== 'node' && cmd !== 'npx') {
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/childRails.test.ts -t "spawn limits"
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/childRails.test.ts (28 tests | 14 failed | 13 skipped) 16ms
+       × refuses inheritedEnv NODE_OPTIONS [limit: inheritedEnv] 7ms
+       × refuses inheritedEnv VITEST [limit: inheritedEnv] 1ms
+       × refuses envOverrides NODE_OPTIONS [limit: envOverrides] 1ms
+       × refuses nodeOptions --require [limit: nodeOptions] 1ms
+       × refuses --env-file argument [limit: env-file] 1ms
+       × refuses data/ path argument [limit: path] 0ms
+       × refuses non-Node command [limit: command] 1ms
+       × refuses home outside tmpdir [limit: homeOverride] 1ms
+       × refuses -r of a non-ts-node module [limit: require] 1ms
+       × refuses --import of a module [limit: require] 0ms
+       × refuses repo .env path argument [limit: path] 0ms
+       × refuses inheritedEnv CSB_RAIL_RUN_ID [limit: inheritedEnv] 0ms
+       × refuses inheritedEnv PATH [limit: inheritedEnv] 0ms
+       × refuses envOverrides of a non-sentinel key [limit: envOverrides] 0ms
+  ⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses inheritedEnv NODE_OPTIONS [limit: inheritedEnv]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses inheritedEnv VITEST [limit: inheritedEnv]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses envOverrides NODE_OPTIONS [limit: envOverrides]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses nodeOptions --require [limit: nodeOptions]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses --env-file argument [limit: env-file]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses data/ path argument [limit: path]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses non-Node command [limit: command]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses home outside tmpdir [limit: homeOverride]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses -r of a non-ts-node module [limit: require]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses --import of a module [limit: require]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses repo .env path argument [limit: path]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses inheritedEnv CSB_RAIL_RUN_ID [limit: inheritedEnv]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses inheritedEnv PATH [limit: inheritedEnv]
+   FAIL   unit  test/unit/rails/childRails.test.ts > spawn limits > refuses envOverrides of a non-sentinel key [limit: envOverrides]
+  AssertionError: expected [Function] to throw an error
+  - Expected:
+  + Received:
+   Test Files  1 failed (1)
+        Tests  14 failed | 1 passed | 13 skipped (28)
+     Duration  581ms (transform 58ms, setup 61ms, import 211ms, tests 16ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042631-12852-cdd17a | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042631-12852-cdd17a\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/spawnRailedChild.ts
+git status --porcelain test/rails/spawnRailedChild.ts => (empty)
+sha256 before neutralising 20dab6b1bd0fcaababc1ae4e20fc4f72b74b39ca144f5c0ccf08fd5140585e4c == after restore 20dab6b1bd0fcaababc1ae4e20fc4f72b74b39ca144f5c0ccf08fd5140585e4c
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  15 passed | 13 skipped (28)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042634-14628-10c106 | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042634-14628-10c106\summary.json
+== No child was spawned during the RED run ==
+The RED run ledger folder <tmp>/crypto-snipe-bot-rail-ledger/vpu-20261107T042631-12852-cdd17a holds exactly one pid ledger (21204.jsonl: unit:worker-start), the Vitest worker itself; a railed child would have written its own pid ledger. The spawn-limit cases call the pure checkSpawnLimits(), which never spawns.
