@@ -1,0 +1,119 @@
+{
+  "id": "AUD-TESTI-011",
+  "title": "RC-19 test-file side for the integration suite: before the rails, preflightCli and pauseCli spawned ts-node children with the parent environment (the real .env), preflightCli's child opened and migrated the live DB and called mainnet RPCs, honeypotDeploy.eth called the operator's mainnet RPC directly, and eight files loaded src/config unmocked",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C13",
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "test/integration/honeypotDeploy.eth.test.ts",
+    "test/integration/killswitchCheckpoints.test.ts",
+    "test/integration/midRunWalletCheck.test.ts",
+    "test/integration/pauseCli.test.ts",
+    "test/integration/pauseFlow.test.ts",
+    "test/integration/preflightCli.test.ts",
+    "test/integration/preflightInvocation.test.ts",
+    "test/integration/v2HoneypotIntegration.test.ts",
+    "test/integration/v3HoneypotIntegration.test.ts",
+    "test/integration/v3LiquidityWait.test.ts",
+    "scripts/preflight.ts",
+    "scripts/pause.ts",
+    "src/utils/db.ts",
+    "src/config.ts",
+    "src/utils/notifier.ts",
+    "vitest.config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/preflightCli.test.ts:37-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "spawnSync(npx ts-node scripts/preflight.ts) with env { ...process.env, ...extraEnv }, shell: true"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/preflightCli.test.ts:53-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 1 is \"run against current .env\": no override at all (Test 4 :103 repeats it)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:20-26@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the child imports src/chainRegistry, src/preflight and src/utils/provider and calls dotenv.config()"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:38-46@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the child builds a provider and a Wallet from the real PRIVATE_KEY for every enabled chain"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:49@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "src/preflight imports src/utils/db, which opens DB_PATH (cwd/data/bot.db fallback), writes pragmas and migrates at import (src/utils/db.ts:9-24, :232-235)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseCli.test.ts:282-292@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 4 spawns scripts/pause.ts with childEnv = { ...process.env } and only DASHBOARD_API_KEY blanked; scripts/pause.ts:32 calls dotenv.config()"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/honeypotDeploy.eth.test.ts:18-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "new JsonRpcProvider(process.env.ETH_RPC_URL) and provider.getCode(...) against the operator's mainnet RPC whenever ETH_RPC_URL is set (it is, from the real .env)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bot.ts imports src/config; killswitchCheckpoints, midRunWalletCheck, pauseFlow (Test 9), preflightInvocation, v2HoneypotIntegration, v3HoneypotIntegration and v3LiquidityWait import src/bot without mocking src/config"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv.config() at import: CONFIG (including walletPrivateKey) is built from the real .env values"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/v3LiquidityWait.test.ts:35-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mocks logger and db only: src/config and src/utils/notifier load for real (no send path is called by waitForLiquidity)"
+    },
+    {
+      "type": "command",
+      "ref": "node scratchpad testi-tools/reach.js over the slice-files.ts --snapshot TESTI tree and a git archive of src at 23a6461 (static import graph; vi.mock / vi.doMock targets not traversed; text only, imports no src code)",
+      "note": "per file, which of src/utils/db, src/config and src/utils/notifier are reached unmocked; the ledger rows with can_reach_real_state yes are this list plus the two spawning files and honeypotDeploy (importActual partial mocks and the spawned scripts checked by hand)"
+    }
+  ],
+  "sibling_sites_checked": "All 27 integration files at the base SHA. Spawn sites (git grep child_process / spawn / exec over test/integration): only preflightCli.test.ts:23,38 and pauseCli.test.ts:27,286. Non-loopback network: honeypotDeploy.eth.test.ts is the only integration file that constructs a provider on a real URL; every express/http server listens on 127.0.0.1:0 (auth, chains, controls, health, positions, risk, trades, wsPush, pauseCli, pauseFlow) and URL strings elsewhere (mevStrategies relay URLs, api.fixtures alchemy URL with key \"abc123\") are never contacted (FetchRequest and axios mocked). The live DB: no integration file imports src/utils/db unmocked in-process; the preflightCli child does. The fork-suite side is added in Task 2.",
+  "status": "candidate",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-19"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "Same severity and class as the canonical RC-19 entry AUD-RAIL-002 (S1 EXPOSURE), whose test-file side was left to the TESTU/TESTI audits; AUD-TESTU-001 is the unit side. Not a new escalation: linked to ESC-PRE-03 as a rediscovery (PROTOCOL section 4). The spawn sites are the ones D-03 names for spawnRailedChild and the network and DB reaches are what the SAFE-02 rails block; 22-29 re-audits the rails, so it stays a candidate.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-RAIL-002",
+    "AUD-RAIL-001",
+    "AUD-TESTU-001"
+  ],
+  "tags": [
+    "test-quality",
+    "rediscovery"
+  ],
+  "escalation_ref": "ESC-PRE-03",
+  "od_ref": null,
+  "recommendation": "Keep the rails as the guard (no change in Phase 22). Phase 28: spawn children only through spawnRailedChild with the sentinel env; give preflightCli Test 1 an explicit sentinel environment instead of \"the current .env\"; move honeypotDeploy.eth out of the integration project (it is a live-chain check: a fork or an operator-run script, never the default suite); mock src/config in every file that imports src/bot.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "every case of the files listed under files"
+  ],
+  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect. What stays green while it happens: preflightCli Test 1 opens and migrates data/bot.db in its child and calls the mainnet RPC with the operator's key-bearing URL, and passes whether preflight succeeds (exit 0) or fails (exit 1)."
+}

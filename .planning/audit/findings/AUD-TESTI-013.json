@@ -1,0 +1,78 @@
+{
+  "id": "AUD-TESTI-013",
+  "title": "wsReconnect.test.ts claims to test the DEX WebSocket reconnect but its backoff, fallback and disconnect cases re-implement the logic inside the test or only call the mock provider, so the registered reconnect S1 (leaked providers, racing loops, no backfill, no error listener) passes green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C10",
+    "C11"
+  ],
+  "files": [
+    "test/integration/wsReconnect.test.ts",
+    "src/bot.ts",
+    "src/utils/provider.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/wsReconnect.test.ts:123-166@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "backoff cases compute Math.min(reconnectDelay * 2, maxDelay) in the test; the comment says this \"validates the reconnect delay logic from handleWsClose in bot.ts\""
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1549-1576@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real V3 reconnect loop (AUD-BUY-008), never imported by the test"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/wsReconnect.test.ts:172-193@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HTTP fallback case asserts !null === true on local objects"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/wsReconnect.test.ts:199-281@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "disconnect cases call createMockProvider methods that reject and catch the error in the test body"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/wsReconnect.test.ts:50-62@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the provider-cache cases use a MockWebSocketProvider with no websocket, so the missing error listener (src/utils/provider.ts:37, AUD-ANTIRUG-002 sibling) cannot surface"
+    }
+  ],
+  "sibling_sites_checked": "All 11 cases of the file. The provider-cache cases (17-117) run the real src/utils/provider getWsProvider/removeWsProvider and are sound for what they claim. The anti-rug reconnect sibling is AUD-TESTI-004.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: tautological tests on a money-relevant path (missed or duplicated snipes, overspend per AUD-BUY-008) that claim reconnect coverage while running none of it.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-008",
+    "AUD-ANTIRUG-002",
+    "AUD-TESTI-004"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive startDexListener with a loopback ws server that closes the socket, assert one reconnect loop, the old provider destroyed, the gap backfilled and the process alive on a refused reconnect (RED today). Delete the in-test arithmetic cases.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "delay doubles on failure: 1s -> 2s -> 4s -> ... up to 60s max",
+    "successful reconnect resets delay to 1000ms",
+    "delay never exceeds 60s even after many failures",
+    "wsProvider null condition triggers HTTP polling path",
+    "provider methods throw after disconnect, caller catches gracefully",
+    "ECONNRESET error is caught and logged without crashing",
+    "multiple sequential disconnections are handled"
+  ],
+  "escaped_regression": "Change bot.ts:1559 to grow the delay without the 60 s cap, or drop the removeWsProvider call before reconnecting: every backoff and disconnect case stays green because none of them runs bot.ts."
+}

@@ -1,0 +1,81 @@
+{
+  "id": "AUD-TESTI-012",
+  "title": "The dashboard positions, risk, trades and health route tests mock the statements and the price helper and feed decimal-ETH rows, so the numbers the operator sees (P&L, exposure, daily loss, live price, stale flag) are never computed from production-shaped rows",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C01",
+    "C03",
+    "C13"
+  ],
+  "files": [
+    "test/integration/api/positions.test.ts",
+    "test/integration/api/risk.test.ts",
+    "test/integration/api/trades.test.ts",
+    "test/integration/api/health.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/api/positions.test.ts:8-11@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildPositionsWithLivePrices, the whole route body, is mocked; every case asserts the mocked object comes back (for example \"returns stale price when queryPrice fails\" :114-142 never calls queryPrice)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/risk.test.ts:14-21@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getPnL, getPnLChartData and the limit statements are mocks"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/risk.test.ts:193-208@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "limits case feeds { total: 1.5 } and { total_loss: -0.25 } (decimal ETH)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/trades.test.ts:48-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "trade rows carry sell_revenue 0.10 / sell_gas 0.001 as decimal numbers"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "production sell rows store amountOut as a wei integer string (AUD-DB-002)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/health.test.ts:8-15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "open-position count and exposure are mocked constants"
+    }
+  ],
+  "sibling_sites_checked": "All dashboard route tests in test/integration/api (auth, chains, controls, health, positions, risk, trades, wsPush). chains/controls are AUD-TESTI-008/-007; auth runs the real middleware and login and is sound; wsPush mocks the helper too (broadcast wiring only). The unit sibling for the risk SQL is AUD-TESTU-017.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: display-only routes (the risk gates themselves are covered by AUD-TESTU-017); the mocks mean a wrong P&L or exposure figure on the dashboard is invisible, which misleads the operator but does not move funds by itself.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-002",
+    "AUD-DB-003",
+    "AUD-TESTU-017"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: run the routes against a temp DB seeded through the real write paths (decimal buy, wei sell) and assert the displayed P&L, exposure and daily loss; run buildPositionsWithLivePrices with a scripted quote provider.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "GET /api/positions cases",
+    "GET /api/risk/limits: returns position limit, exposure limit, and daily loss utilization",
+    "GET /api/trades cases",
+    "GET /api/risk/pnl: returns cumulative data points from per-event sell data (D-07)"
+  ]
+}

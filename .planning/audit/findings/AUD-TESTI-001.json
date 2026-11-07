@@ -1,0 +1,168 @@
+{
+  "id": "AUD-TESTI-001",
+  "title": "RC-28: the test DB helper hand-writes a two-table schema at user_version 4 and claims it \"matches src/utils/db.ts exactly\"; production migrates to version 7 with lp_baseline, chain_state, pause_state and the exit_state failed-held columns, and the migration tests (unit and the pauseFlow integration suite) run hand-written replicas instead of migrateSchema",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "test/helpers/testDb.ts",
+    "src/utils/db.ts",
+    "test/integration/pauseFlow.test.ts",
+    "test/fixtures/exitEngine.fixtures.ts",
+    "test/unit/db.test.ts",
+    "test/unit/helpers.smoke.test.ts",
+    "test/unit/riskManager.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/helpers/testDb.ts:3@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"Creates a fresh database with the full production schema (user_version=4)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/helpers/testDb.ts:11-17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "doc comment: \"Schema matches src/utils/db.ts exactly\" and \"user_version = 4\""
+    },
+    {
+      "type": "code",
+      "ref": "test/helpers/testDb.ts:28-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "creates only trades and exit_state (exit_state without exit_failure_count / exit_status); no lp_baseline, chain_state or pause_state"
+    },
+    {
+      "type": "code",
+      "ref": "test/helpers/testDb.ts:69@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "db.pragma('user_version = 4')"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:27@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CURRENT_SCHEMA_VERSION = 7"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:122-154@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v5: lp_baseline and chain_state tables (missing from the helper)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:156-192@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v6: pause_state (single row CHECK(id = 1)) and chain_state.antirug_dry_run_started (missing from the helper)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:194-230@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v7: exit_state.exit_failure_count and exit_state.exit_status (the exit_failed_held marker) (missing from the helper)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232-235@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "migrateSchema() writes user_version 7 and runs at import; it is not exported, so no test can run it without importing the live-DB singleton"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n createTestDb 23a64617dca167976adc4645fed0e2c69e384820 -- test src scripts",
+      "note": "consumers at the base SHA: test/unit/db.test.ts (33 cases), test/unit/helpers.smoke.test.ts, test/unit/riskManager.test.ts (imported at :6); no integration or fork test uses the helper"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseFlow.test.ts:25-28@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: the replica migrations \"exercise the SAME migration shape as production src/utils/db.ts\""
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseFlow.test.ts:31-136@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "applyV1Migration .. applyV6Migration are hand copies; buildV6Db stops at user_version 6 (:134): the v7 exit_state columns are absent"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseFlow.test.ts:160-257@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Tests 1-4 (\"setPauseState writes a row\", \"restart simulation\", \"clearPauseState flips\") prepare their own UPDATE/SELECT text (:163-166, :190-191, :219-225), not the db.ts statements"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:685-687@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the production getPauseState / setPauseState / clearPauseState statements, never executed by any integration test (pauseFlow Tests 5-8 and pauseCli mock them)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fixtures/exitEngine.fixtures.ts:58-69@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "createMockExitStateRow (used by test/unit/exitEngine.test.ts:348, :355) has the v3 exit_state shape: no exit_failure_count, no exit_status"
+    }
+  ],
+  "sibling_sites_checked": "Every schema copy in the TESTI slice at the base SHA (grep CREATE TABLE, user_version, ALTER TABLE over the snapshot): test/helpers/testDb.ts (v4, two tables) and test/integration/pauseFlow.test.ts:31-136 (v6 replica) are the only two; no fork test builds a schema (the fork tests that touch the DB import src/utils/db with a temp DB_PATH, see Task 2 rows). Fixture rows shaped like DB rows: exitEngine.fixtures.ts createMockExitStateRow (pre-v7), api.fixtures.ts createMockTradeRow (trades subset, no status-failed or exit_state join). The unit-side copies (db.test.ts SQL copies, db/*Migration.test.ts replicas, the v4 pins) are TESTU scope and registered as AUD-TESTU-017/-018/-019.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-28"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "S2 as the research suggests: test/infra drift that can hide an S0/S1. The helper is the only shared test DB and it cannot hold a failed-held position or a pause row, so the registered S1 AUD-DB-003 (failed-held positions drop out of every risk limit) and the kill-switch persistence are untestable on it; the replica migrations would pass a broken migrateSchema. Capital class OVERSPEND because the hidden defects are risk-limit overspend.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTU-017",
+    "AUD-TESTU-018",
+    "AUD-TESTU-019",
+    "AUD-DB-003",
+    "AUD-RAIL-002"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: build the test DB from the production migration (the dbSchema.ts module the 22-09 relocation creates), assert user_version equals CURRENT_SCHEMA_VERSION, delete the hand schema and the pauseFlow replica, and give pauseFlow Tests 1-4 the real setPauseState / getPauseState / clearPauseState statements on a temp DB. Update createMockExitStateRow to the v7 shape. Phase 23 can use the same temp-DB-from-migrateSchema harness for its real-path triage.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "createTestDb() (every test/unit/db.test.ts case, helpers.smoke.test.ts, riskManager.test.ts)",
+    "pauseFlow Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated",
+    "pauseFlow Test 2: restart simulation — setPauseState → db.close() → reopen → row still present",
+    "pauseFlow Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns",
+    "pauseFlow Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1))"
+  ],
+  "escaped_regression": "Delete the v7 block of migrateSchema (src/utils/db.ts:194-230) or the v6 pause_state INSERT OR IGNORE (:181): a fresh production DB then has no exit_status column (every failed-held write throws) or no pause row (setPauseState updates zero rows, so the kill switch silently does nothing), and every helper-based unit test and pauseFlow Tests 1-4 stay green because they build their own schema.",
+  "sub_claims": [
+    {
+      "claim": "Helper schema and version drift: testDb.ts builds trades + exit_state at user_version 4 while production is user_version 7 with three more tables and two more exit_state columns.",
+      "evidence": [
+        "test/helpers/testDb.ts:28-69@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:27@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:122-230@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The drift hides capital-relevant behaviour: a failed-held position (exit_state.exit_status = exit_failed_held, the row the risk queries drop, AUD-DB-003) and the kill-switch row (pause_state) cannot be expressed in the helper DB, so no helper-based test can put one through a production statement.",
+      "evidence": [
+        "test/helpers/testDb.ts:53-66@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:221-227@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:420-438@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Migration tests mirror instead of run: the integration pauseFlow suite rebuilds V1..V6 by hand (stopping at 6) and asserts on its own SQL; the unit migration tests do the same (registered as AUD-TESTU-019).",
+      "evidence": [
+        "test/integration/pauseFlow.test.ts:31-136@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/integration/pauseFlow.test.ts:160-257@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Fixture drift: the exit_state row fixture used by the exit-engine unit tests has the pre-v7 shape.",
+      "evidence": [
+        "test/fixtures/exitEngine.fixtures.ts:58-69@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

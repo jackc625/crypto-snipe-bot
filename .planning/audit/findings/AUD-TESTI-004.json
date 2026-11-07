@@ -1,0 +1,107 @@
+{
+  "id": "AUD-TESTI-004",
+  "title": "The anti-rug WebSocket lifecycle tests model reconnect failure as a WebSocketProvider constructor that throws, which ethers 6.16.0 never does for an unreachable host, and prove \"backfill never fires an exit\" with the real evaluator swapped out, so the two registered S1s on that path (crash on a refused reconnect, backfill fires live exits) pass green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C11",
+    "C14"
+  ],
+  "files": [
+    "test/integration/anti-rug/wsReconnectBackfill.test.ts",
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/wsReconnectBackfill.test.ts:211-215@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "MockWebSocketProvider constructor throws while constructorFailuresRemaining > 0"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/wsReconnectBackfill.test.ts:528-574@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 27 \"3 consecutive WebSocketProvider construction failures → WS RECONNECT FAILED alert\" sets constructorFailuresRemaining = 3 (:550)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/wsReconnectBackfill.test.ts:576-628@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 28 \"disconnect >60s\" sets constructorFailuresRemaining = 100 (:599) to keep the loop failing synchronously"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider-websocket.js:25-51",
+      "note": "the constructor calls new WebSocket(url) and sets only onopen and onmessage; it does not throw for a refused or failed connection, and no error listener is installed"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:916-944@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the reconnect try only catches synchronous throws (the AUD-ANTIRUG-002 mechanism: the async ws \"error\" event has no listener and kills the process)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/wsReconnectBackfill.test.ts:752-823@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 25 \"backfilled events ... NEVER call triggerAntiRugExit\" installs a fake evaluator with mod._setEvaluateRugSignalsForTesting (:758-770) and mocks exitTrigger"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "production backfill passes each replayed log to evaluateRugSignalsShim, the live evaluator"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1964-1983@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the live evaluator schedules the confirm gate that calls triggerAntiRugExit (AUD-ANTIRUG-005)"
+    }
+  ],
+  "sibling_sites_checked": "Every WebSocketProvider stand-in in the slice at the base SHA (grep WebSocketProvider, websocket.on, terminate): wsReconnectBackfill.test.ts (constructor-throw model), wsReconnect.test.ts:50-62 (no websocket object at all, see AUD-TESTI-013), multiSignalEnd2End.test.ts (wsProvider null). None models the async error event. Backfill assertions: only Test 25, which uses the evaluator shim; Tests 23/24/29 assert chunking and the gap alert with no events to evaluate.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: mechanism mocks on the anti-rug escape path that hide two registered S1s (AUD-ANTIRUG-002 crash, AUD-ANTIRUG-005 backfill exits).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-002",
+    "AUD-ANTIRUG-005",
+    "AUD-TESTI-013"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: reconnect tests should connect a real ethers WebSocketProvider to a loopback port that refuses or a loopback ws server that drops the upgrade, and assert the process survives and the alert fires (RED today). Backfill tests should run the real evaluator over replayed logs with a recorded triggerAntiRugExit spy and assert it is not called (RED today per AUD-ANTIRUG-005).",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 27: 3 consecutive WebSocketProvider construction failures → WS RECONNECT FAILED Telegram alert (D-VIS-WS-HEALTH)",
+    "Test 28: disconnect duration >60s → WS DISCONNECTED >60s alert (D-VIS-WS-HEALTH)",
+    "Test 25: backfilled events with verdict=unsafe log antirug.backfill.too-late + broadcast outcome=too-late; NEVER call triggerAntiRugExit"
+  ],
+  "escaped_regression": "Today: a refused anti-rug reconnect throws an uncaught ws error and the bot exits (AUD-ANTIRUG-002) while Tests 27/28 pass; a backfilled Burn log for a still-held position fires a live exit through the real evaluator (AUD-ANTIRUG-005) while Test 25 passes.",
+  "sub_claims": [
+    {
+      "claim": "Reconnect failure is modelled as a synchronous constructor throw; with ethers 6.16.0 the constructor returns and the failure arrives later as a ws \"error\" event with no listener, which ends the process before either alert tier the tests assert is reached (AUD-ANTIRUG-002).",
+      "evidence": [
+        "test/integration/anti-rug/wsReconnectBackfill.test.ts:211-215@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider-websocket.js:25-51"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The backfill \"never exits\" guarantee is asserted with the evaluator replaced by a test double, so the real evaluator that schedules the confirm gate and calls triggerAntiRugExit is never on the path (AUD-ANTIRUG-005).",
+      "evidence": [
+        "test/integration/anti-rug/wsReconnectBackfill.test.ts:758-770@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

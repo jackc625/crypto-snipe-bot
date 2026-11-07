@@ -1,0 +1,68 @@
+{
+  "id": "AUD-TESTI-008",
+  "title": "The dashboard \"stop chain\" test requires wsProvider.removeAllListeners() and only checks the stopped set, encoding the registered S1 that stopping a chain also removes the anti-rug subscription, and never checks that buying stops on HTTP-polling chains",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "test/integration/api/chains.test.ts",
+    "test/fixtures/api.fixtures.ts",
+    "src/api/routes/chains.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/api/chains.test.ts:151-164@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "case \"returns 200 and marks chain stopped\" asserts stoppedChains.has(\"eth\") and removeAllListeners toHaveBeenCalled()"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:136-142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "stop: stoppedChains.add then ctx.wsProvider.removeAllListeners() with no event (AUD-API-002: also drops the anti-rug log subscription)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n stoppedChains 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "only chains.ts and server.ts read stoppedChains: no buy handler consults it (AUD-BUY-011)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fixtures/api.fixtures.ts:49-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the shared fixture wsProvider exposes only removeAllListeners, so no subscription exists for the test to lose"
+    }
+  ],
+  "sibling_sites_checked": "All cases of chains.test.ts; the unit sibling test/unit/api/chainRestart.test.ts is AUD-TESTU-020. No integration or fork test registers an anti-rug position and then stops/starts its chain.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the test pins the registered S1 AUD-API-002 as required behaviour and cannot see AUD-BUY-011 (stop does not stop buying).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-002",
+    "AUD-BUY-011",
+    "AUD-ANTIRUG-001",
+    "AUD-TESTU-020"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive stop/start on a context with a real (loopback or scripted) provider carrying both a factory listener and an anti-rug filter; assert the anti-rug filter survives stop and that the HTTP poller and Telegram routing stop buying for the stopped chain (RED today).",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "POST /api/chains/:name/stop returns 200 and marks chain stopped",
+    "broadcasts chain_status_change after stop"
+  ],
+  "escaped_regression": "Today: pressing Stop on a chain with open positions removes the anti-rug rug-log subscription (AUD-API-002) and an HTTP-polling chain keeps buying (AUD-BUY-011); the stop test stays green and in fact requires the removeAllListeners call."
+}

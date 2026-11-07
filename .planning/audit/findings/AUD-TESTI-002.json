@@ -1,0 +1,163 @@
+{
+  "id": "AUD-TESTI-002",
+  "title": "The shared mock provider models only the happy path of ethers 6.16.0: every receipt is status 1, wait() resolves immediately, a replacement or a never-mined transaction cannot be expressed, and reorgs do not exist, so the reconciliation and nonce code it feeds is never shown the failure modes ethers actually produces",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C08",
+    "C09"
+  ],
+  "files": [
+    "test/helpers/mockProvider.ts",
+    "test/integration/txManager.test.ts",
+    "test/integration/mevStrategies.test.ts",
+    "test/integration/wsReconnect.test.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/passthrough.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/helpers/mockProvider.ts:25-30@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "broadcastTransaction resolves { hash, wait } with wait resolving { status: 1, blockNumber }; waitForTransaction and getTransactionReceipt resolve the same status-1 receipt for any hash"
+    },
+    {
+      "type": "code",
+      "ref": "test/helpers/mockProvider.ts:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getTransactionCount resolves 42 forever, so \"nonce advanced by another tx\" (the replacement signal) never happens by default"
+    },
+    {
+      "type": "code",
+      "ref": "test/helpers/mockProvider.ts:11-33@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no getBlock, getTransaction, on, once or off: the event and block APIs ethers wait() and the Flashbots library use are absent"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1043-1045",
+      "note": "TransactionResponse.wait(confirms, timeout): timeout defaults to 0"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1134-1147",
+      "note": "checkReceipt: a status-0 receipt makes wait() throw CALL_EXCEPTION (\"transaction execution reverted\"); it never resolves a status-0 receipt"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1113-1127",
+      "note": "replacement detection: wait() throws TRANSACTION_REPLACED with reason \"repriced\" (same data/to/value), \"cancelled\" or \"replaced\"; cancelled is false only for repriced, but the error is thrown in every case"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1165-1178",
+      "note": "the timeout timer is armed only when timeout > 0; with the default 0 a never-mined, never-replaced tx leaves wait() pending forever"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1179-1192",
+      "note": "wait() resolves once, when the receipt reaches the confirmation count; nothing re-checks the block afterwards, so a reorg that drops the block after resolution is never reported"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:895-934",
+      "note": "provider.waitForTransaction returns a status-0 receipt without throwing and rejects TIMEOUT only when a timeout is passed; it swallows getTransactionReceipt errors (console.log \"EEE\") and keeps waiting"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:371-379@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the reconciler branches on receipt.status 1 / 0 / null; the default mock only ever returns 1"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:138-150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the passthrough submit awaits tx.wait(3) with no timeout and treats a thrown wait as \"timeout, reconcile\" (see AUD-TESTI-003)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/txManager.test.ts:288-293@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the one override that varies the receipt goes from null to status 1; no integration case returns status 0, throws CALL_EXCEPTION or TRANSACTION_REPLACED, or advances the nonce while the receipt stays null"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e \"status: 0\" -e CALL_EXCEPTION -e TRANSACTION_REPLACED -e repriced 23a64617dca167976adc4645fed0e2c69e384820 -- test/integration test/helpers",
+      "note": "no output: no integration test or helper models a reverted receipt, a replacement or a reprice"
+    }
+  ],
+  "sibling_sites_checked": "Every provider/receipt stand-in in the slice at the base SHA: test/helpers/mockProvider.ts (used by txManager.test.ts, mevStrategies.test.ts, wsReconnect.test.ts), test/fixtures/receipt.fixtures.ts (log decoding only, no status field; receiptDecoder.ts does not read status), test/fixtures/txManager.fixtures.ts createMockBundleResponse / createMockFlashbotsProvider (only referenced by test/unit/helpers.smoke.test.ts), and the inline provider objects in killswitchCheckpoints, v2/v3HoneypotIntegration, preflightInvocation, midRunWalletCheck and pauseFlow (balance/fee/network only, no receipts). The fork tests use a real Hardhat node (Task 2).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a money-path mechanism mock (receipt status, replacement and confirmation are how buys and sells decide whether money moved). It is the shared default, so every integration test that uses it inherits the blind spot, and it hides the registered S1 AUD-TX-002 (never-settling wait inside the nonce lock).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-002",
+    "AUD-TESTI-003",
+    "AUD-TESTU-002"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: replace the happy-path mock with a scripted provider whose receipts can be status 0, null-then-replaced (nonce advanced, TRANSACTION_REPLACED with repriced and cancelled), never mined (wait pending until a test-controlled timeout) and reorged (receipt removed after resolution), with wait() implemented by delegating to the real ethers TransactionResponse against that provider, so the error shapes come from the library and not from the test. Phase 23 should drive the reconciler on the Hardhat fork with a dropped and a replaced tx.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "txManager.test.ts: a genuine resubmit reuses the re-fetched \"latest\" nonce, NEVER base+attempt (no double-spend)",
+    "mevStrategies.test.ts: sendTransaction sends bsc_private_tx JSON-RPC call via axios",
+    "mevStrategies.test.ts: returns a real on-chain tx hash — no synthetic-hash bug on BSC path (regression)",
+    "mevStrategies.test.ts: reconciles a wait-timeout to a landed tx and returns the real hash (no resubmit)",
+    "wsReconnect.test.ts: RPC disconnect behavior cases"
+  ],
+  "escaped_regression": "Change reconciliation.ts:373-377 to treat status 0 like status 1 (\"included\"): a reverted buy or sell would be reported as landed with its hash, and every integration test stays green because the mock only returns status 1. Likewise the registered AUD-TX-002 hang (passthrough tx.wait(3) with no timeout, never mined) is green today.",
+  "sub_claims": [
+    {
+      "claim": "Status-0 receipt: the mock wait() resolves { status: 1 } by default; ethers 6.16.0 wait() never resolves a status-0 receipt, it throws CALL_EXCEPTION. A test that wants the revert path has to hand-write it, and none in the integration suite does.",
+      "evidence": [
+        "test/helpers/mockProvider.ts:25-30@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1134-1147"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Replacement / reprice: the mock has no way to report a replaced tx (getTransactionCount is fixed at 42, no getTransaction or getBlock); ethers 6.16.0 throws TRANSACTION_REPLACED from wait() for replaced, cancelled and also for repriced (reason \"repriced\", cancelled false), so a caller that treats every wait() throw as \"not landed\" or as \"timeout\" can misread a repriced tx that did land.",
+      "evidence": [
+        "test/helpers/mockProvider.ts:11-33@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1113-1127"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Never-mined transaction: the mock wait() settles at once; ethers 6.16.0 wait() with the default timeout 0 arms no timer and stays pending forever for a tx that is never mined and never replaced. The integration suite therefore cannot observe the registered S1 that such a wait inside withNonceLock freezes every later tx of the wallet (AUD-TX-002, ESC-PRE-02).",
+      "evidence": [
+        "test/helpers/mockProvider.ts:27@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1043-1045",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1165-1178"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Reorg or dropped transaction: the mock has no reorg concept and its receipt is permanent; ethers 6.16.0 resolves wait() once at the confirmation count and never re-checks, and a tx dropped from the mempool without a replacement looks exactly like the never-mined case. No integration test models a receipt that disappears or a block that is orphaned.",
+      "evidence": [
+        "test/helpers/mockProvider.ts:29-30@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1179-1192"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "provider.waitForTransaction differs from tx.wait(): it returns a status-0 receipt instead of throwing and swallows RPC errors; the mock returns status 1 for both, so a code path that switches between the two APIs keeps passing.",
+      "evidence": [
+        "test/helpers/mockProvider.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:895-934"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}
