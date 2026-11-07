@@ -1,0 +1,160 @@
+{
+  "phase": "22-safety-rails-audit",
+  "plan": "22-07",
+  "requirement": "SAFE-01",
+  "decision": "OD-21 (ruled 2026-11-06: track all of ignition/deployments/ after the backup verifies)",
+  "acceptance": [
+    "AC-07",
+    "AC-08"
+  ],
+  "nac": [
+    "NAC-02"
+  ],
+  "precondition": {
+    "safe01_record": ".planning/baselines/safe01-offmachine.json",
+    "safe01_status": "VALID",
+    "pre_commit_working_tree_rehash": "10/10 ignition/deployments files hash to MANIFEST.json entries (set-equal, all pure LF) before git add -f"
+  },
+  "manifest_path": "C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json",
+  "manifest_sha256": "9e28e30f41bd5a4a7cae20f4c20d8bf37b7dd008d93ea7b43cebba2e594b151a",
+  "manifest_sha256_expected": "9e28e30f41bd5a4a7cae20f4c20d8bf37b7dd008d93ea7b43cebba2e594b151a",
+  "od21_commit_sha": "93f81898e21927679117f2401491a0e9ddb8f634",
+  "committed_at": "2026-11-06T22:53:14-05:00",
+  "od21_commit_subject": "chore(22-07): track ignition/deployments in git (OD-21, after SAFE-01 verified)",
+  "staging_command": "git add -f ignition/deployments",
+  "commit_command": "git commit -m <msg> -- ignition/deployments",
+  "od21_commit_files": [
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-1/journal.jsonl",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-11155111/journal.jsonl"
+  ],
+  "od21_commit_file_count": 6,
+  "od21_commit_only_ignition_deployments": true,
+  "already_tracked_before_commit": [
+    "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-1/deployed_addresses.json",
+    "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-11155111/deployed_addresses.json"
+  ],
+  "tracked_after_commit": [
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-1/deployed_addresses.json",
+    "ignition/deployments/chain-1/journal.jsonl",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-11155111/deployed_addresses.json",
+    "ignition/deployments/chain-11155111/journal.jsonl"
+  ],
+  "tracked_after_commit_count": 10,
+  "set_equal": true,
+  "files": [
+    {
+      "path": "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+      "manifest_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+      "blob_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    },
+    {
+      "path": "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+      "manifest_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+      "blob_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    },
+    {
+      "path": "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+      "manifest_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+      "blob_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": false
+    },
+    {
+      "path": "ignition/deployments/chain-1/deployed_addresses.json",
+      "manifest_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+      "blob_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": false
+    },
+    {
+      "path": "ignition/deployments/chain-1/journal.jsonl",
+      "manifest_sha256": "f81740e9d0241b884e843653d69ffd7b745671c15667e6c86c24063f3b4d900a",
+      "blob_sha256": "f81740e9d0241b884e843653d69ffd7b745671c15667e6c86c24063f3b4d900a",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    },
+    {
+      "path": "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+      "manifest_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+      "blob_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    },
+    {
+      "path": "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+      "manifest_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+      "blob_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    },
+    {
+      "path": "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+      "manifest_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+      "blob_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": false
+    },
+    {
+      "path": "ignition/deployments/chain-11155111/deployed_addresses.json",
+      "manifest_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+      "blob_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": false
+    },
+    {
+      "path": "ignition/deployments/chain-11155111/journal.jsonl",
+      "manifest_sha256": "b6d04cdfc528759e9a79d8c71e793189e8065ed32b31566d4d9996e1101fdcd1",
+      "blob_sha256": "b6d04cdfc528759e9a79d8c71e793189e8065ed32b31566d4d9996e1101fdcd1",
+      "equal": true,
+      "working_tree_sha256_equal": true,
+      "added_in_od21_commit": true
+    }
+  ],
+  "all_equal": true,
+  "pre_commit_staged_blob_check": "git cat-file -p :<path> | sha256 for all 10 entries equalled the manifest before the commit was made",
+  "git_notices": "git add and git commit printed the expected core.autocrlf notice (LF will be replaced by CRLF the next time Git touches it) for the 6 newly added files only; git ls-files --eol shows i/lf w/lf for all 10, so the blobs hold the LF bytes (proven by blob hashes) and the notice concerns future working-tree checkouts only (registered as AUD-OD21-001)",
+  "core_autocrlf": "true",
+  "gitattributes_change": "none (blob equality held without one; .gitattributes work is Phase 25 per SPEC Boundaries)",
+  "nac02_command": "git ls-files data .env '.env.*'",
+  "nac02_ls_files_output": ".env.example",
+  "nac02_pass": true,
+  "hardhat_invocations_before_commit": "none in v7.0; Phase 22 runs no Hardhat command",
+  "hardhat_supporting_evidence": "find cache artifacts -type f -newermt 2026-05-30 found 0 files (Hardhat cache/ and artifacts/ untouched since 2026-05-29); the AC-08 ordering is: this commit precedes every Hardhat invocation in v7.0",
+  "node_version": "v22.16.0",
+  "node_abi": "127",
+  "recorded_at": "2026-11-07T03:53:43.277Z",
+  "ac07_verification": {
+    "methods": [
+      "node: git cat-file -p HEAD:<path> hashed in-process (maxBuffer 64 MiB), set + hash equality against MANIFEST.json",
+      "shell: git cat-file -p HEAD:\"<path>\" | sha256sum per path vs manifest sha256",
+      "pre-commit: git cat-file -p :<path> (index) for all 10"
+    ],
+    "result": "10/10 equal by every method; tracked set == manifest Ignition subset (both directions)",
+    "plan_verify_defect": "the 22-07 PLAN Task 1 <automated> node one-liner calls execFileSync with the default 1 MiB maxBuffer; the two build-info/*.json blobs are 3,866,938 bytes, so it aborts with spawnSync git ENOBUFS before comparing. This is a command-buffer defect, not a data mismatch: rerun unchanged except maxBuffer: 64*1024*1024 it prints AC-07 ok 10. Any later re-hash of these blobs (22-29 IGN_AC07) must raise maxBuffer or stream the blob."
+  }
+}
