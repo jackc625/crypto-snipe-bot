@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-07-PLAN.md
-last_updated: "2026-11-07T03:58:17.177Z"
+stopped_at: Completed 22-08-PLAN.md
+last_updated: "2026-11-07T04:30:35.450Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: c37a72e5d37921c5af175446c27ea731e208e04c
+state_head: 884283f65bebba91ed67079f59f0d5277794e3d5
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 8 of 29
+Plan: 9 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -84,11 +84,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P03 | 4min | 3 tasks | 1 files |
 | Phase 22 P06 | 41min | 2 tasks | 4 files |
 | Phase 22 P07 | 4min | 2 tasks | 11 files |
+| Phase 22 P08 | 24min | 3 tasks | 24 files |
 
 ## Session
 
-**Last session:** 2026-11-07T03:58:17.115Z
-**Stopped at:** Completed 22-07-PLAN.md
+**Last session:** 2026-11-07T04:30:35.387Z
+**Stopped at:** Completed 22-08-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -115,3 +116,8 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-07: OD-21 carried out - commit 93f8189 tracks all of ignition/deployments/ (6 newly tracked, 10 total); every HEAD blob sha256 equals the backup MANIFEST; NAC-02 prints only .env.example; no Hardhat command ran in v7.0 before it (AC-08)
 - [Phase 22]: 22-07: no .gitattributes change - blobs proved LF and manifest-equal without one; ignore rules scoped (!ignition/deployments/*/artifacts/, journal rule removed); the CRLF re-checkout and branch-switch deletion hazard is AUD-OD21-001 (S3, fix in Phase 25)
 - [Phase 22]: 22-07: the plan AC-07 node one-liner hits ENOBUFS (build-info blobs 3.87 MB > 1 MiB execFileSync default); 22-29 IGN_AC07 must raise maxBuffer or stream blobs and require 93f8189 as an ancestor of HEAD
+- [Phase 22]: 22-08: first railed Vitest run in the main checkout passed (unit rails 5 files/68 tests, then 6/72; integration 7; Hardhat-free fork rehearsal 5); every run wrapped by scripts/verify-prod-untouched.ts with verdict untouched, live data/ == backup MANIFEST, run-bound ledger summary
+- [Phase 22]: 22-08: Vitest MAIN process deliberately not railed (a preload there is inherited by fork workers and would scrub the fork shell keys); covered by envDir false/no dotenv, main loads only config + ledgerRun globalSetup, and the wrapper hash check; main-process outbound network is the residual for 22-15's sampled OS-level check
+- [Phase 22]: 22-08: spawnRailedChild limits live in pure checkSpawnLimits(); moduleScopeDb.cjs proves its rails live on a fake root before pointing DB_PATH at data/bot.db (a neutralised-but-installed wrapper keeps its status flag)
+- [Phase 22]: 22-08: nine setup-layer RED proofs recorded (red-proofs/22-08-1..9); restores via git -c core.autocrlf=false checkout -- proven byte-exact; no RED edit committed (core.cjs only has 6a254a1)
+- [Phase 22]: 22-08: UFV-01 (AC-13) and UFV-02 (AC-17) fork-project obligations owned by Phase 25 in .planning/audit/inputs/unrun-fork-verifications.json (rehearsal pass vpu-20261107T042012-23448-c57d66); 22-29 registers them and should exclude test/*/rails/ from rail-ledger test-quality findings
