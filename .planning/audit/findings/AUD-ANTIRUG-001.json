@@ -13,7 +13,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-ANTIRUG-01",
   "od_ref": "OD-11",
   "reported_by": [
     "claude (22-19 executor)"
