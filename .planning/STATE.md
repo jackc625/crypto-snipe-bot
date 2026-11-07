@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-11-07T00:53:38.161Z"
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-11-07T01:37:22.205Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: b15aa91adfef4dccd95d613a4252b17643d1f32c
+state_head: d06a79dd766df56a03e803e97b36eebe0ab45783
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 2 of 29
+Plan: 3 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -77,11 +77,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 22 P01 | 16min | 2 tasks | 4 files |
+| Phase 22 P02 | 39min | 3 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-11-07T00:53:38.104Z
-**Stopped at:** Completed 22-01-PLAN.md
+**Last session:** 2026-11-07T01:37:22.148Z
+**Stopped at:** Completed 22-02-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -89,3 +90,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-01: Ignition artifact rule observed on disk - each future id X in deployed_addresses.json has artifacts/X.json AND artifacts/X.dbg.json; backup-state.ts requires both
 - [Phase 22]: 22-01: SAFE-01 local backup verified at C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06 (17 PRESENT); archive crypto-snipe-bot-state-2026-11-06.tar.gz sha256 4c8e9ab6a70b93a4d408046bebe916d29c95f93cacb47d0b50abcddfb07a1d1a is the file 22-03 uploads
 - [Phase 22]: 22-01: phase_start_sha = 23a64617dca167976adc4645fed0e2c69e384820 (committed first, df33999); backup-tool commit 3f380bf
+- [Phase 22]: 22-02: ESC-SECRET-01 closed by operator ruling (verbatim) classify-addresses - hits whose flagged secret is exactly 0x+40hex are labelled public-address and stay listed; implemented as pass 3 public-address.toml (known-public.toml + one regexTarget=secret allowlist ^0x[0-9a-fA-F]{40}$), default ruleset/global filter untouched
+- [Phase 22]: 22-02: NAC-01 scanner half CLEAN - dated folder + archive 852 hits, 0 non-public, 852 public-address; FIXTURES.json config_sha256 now has 3 keys (extended, known_public, public_address); 22-03 re-scan must use fixture-check.ts --scan
+- [Phase 22]: 22-02: betterleaks dir mode skips data/bot.db whole (byte-count proven); 22-03 operator-run D-22 exact-value check is the SQLite control
