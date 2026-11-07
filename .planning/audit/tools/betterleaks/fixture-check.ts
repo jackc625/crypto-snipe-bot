@@ -13,10 +13,11 @@
 //   --bin <betterleaks.exe> --out <FIXTURES.json>
 //       Fixture proof. Builds a fixture folder under os.tmpdir() (outside the
 //       repo), plants values generated at runtime with crypto.randomBytes,
-//       runs the scanner over it once with extended.toml (pass 1) and once
-//       with known-public.toml (pass 2) using the exact flags a real scan
-//       uses, classifies with the same two-pass diff, and writes FIXTURES.json
-//       (per-case expected/observed/pass/note, both config SHA-256s, the exe
+//       runs the scanner over it once with extended.toml (pass 1), once with
+//       known-public.toml (pass 2) and once with public-address.toml (pass 3)
+//       using the exact flags a real scan uses, classifies with the same
+//       three-pass diff, and writes FIXTURES.json (per-case
+//       expected/observed/pass/note, all three config SHA-256s, the exe
 //       SHA-256; never a value). Cases:
 //         a  PRIVATE_KEY=0x<random 64 hex> in a .ts file -> one evm-private-key hit, non-public
 //         b  Hardhat #0 after privateKey: -> known-public
@@ -28,8 +29,17 @@
 //            (false is the known dir-mode binary gap that the D-22 exact-value check covers)
 //         h  default-ruleset Telegram bot token shape -> default-rule hit (useDefault active)
 //         i  PRIVATE_KEY=0x + 63 zeros + 1 (test-sentinel shape) -> no hit
+//       public-address label (operator ruling "classify-addresses", ESC-SECRET-01):
+//         j  random 64 hex after token: -> flagged, every hit non-public (a key is never an address)
+//         k  address immediately followed by more alnum after authAddress: -> every hit non-public
+//         l  address as the tail of a longer token after token: -> every hit non-public
+//         m  exact 0x+40hex after "token" and after "authAddress" (the capture-log
+//            JSON shape) -> flagged on both lines, every hit public-address
+//         n  one line holding an exact address (token) and a random 64-hex value
+//            (apiToken) -> address public-address, 64-hex non-public (the label
+//            cannot suppress a co-located secret)
 //       plus engine checks: config-prefix, report-fields, redaction (no planted
-//       value in any raw report or scanner output), pass2-subset (the
+//       value in any raw report or scanner output), pass-subset (each
 //       allowlist only ever removes hits), bytes-scanned.
 //       Exit 0 only if every case except (g) passes.
 //
@@ -37,9 +47,9 @@
 //          --raw-dir <dir outside the repo and outside every target> --out <scan.json>
 //          [--meta <json file whose top-level keys are merged into the output>]
 //       Real scan. Refuses unless the exe SHA-256 equals TOOL.json and
-//       FIXTURES.json, both config SHA-256s equal the ones FIXTURES.json
+//       FIXTURES.json, all three config SHA-256s equal the ones FIXTURES.json
 //       proved, and FIXTURES.json shows every case except (g) passing. Runs
-//       both passes per target, keeps the raw redacted reports in --raw-dir,
+//       all three passes per target, keeps the raw redacted reports in --raw-dir,
 //       and writes metadata only: per hit {rule_id, file, line, column, type,
 //       classification}. Exit 0 when there are zero non-public hits, 1 when
 //       any non-public hit exists (the caller escalates, D-16), 2 on crash or
@@ -48,13 +58,16 @@
 //
 // Classification (AC-35): hits are keyed on (rule id, file, line, start
 // column, end column, commit) and counted as a multiset, so two hits on one
-// line are never merged. Key in pass 1 and pass 2 -> non-public. Pass 1 only
+// line are never merged. Key in passes 1, 2 and 3 -> non-public. Pass 1 only
 // -> known-public:hardhat-0 (the only thing pass 2 adds is the Hardhat #0
-// allowlist). Pass 2 only is impossible by construction; if it ever happens it
-// is reported, counted, and treated as non-public.
+// allowlist). Passes 1 and 2 but not 3 -> public-address (the only thing
+// pass 3 adds is an allowlist whose one regex is ^0x[0-9a-fA-F]{40}$ on the
+// flagged secret). Every hit stays listed under its label; nothing is dropped.
+// A hit in a later pass but not an earlier one is impossible by construction;
+// if it ever happens it is reported, counted, and treated as non-public.
 //
 // Scanner invocation (identical in both modes):
-//   betterleaks.exe dir <target> --config <extended.toml|known-public.toml>
+//   betterleaks.exe dir <target> --config <extended.toml|known-public.toml|public-address.toml>
 //     --max-archive-depth 2 --redact --no-banner --no-color
 //     --report-format json --report-path <temp file>
 //     --exit-code 9 --ignore-gitleaks-allow --gitleaks-ignore-path <empty dir>
@@ -106,14 +119,27 @@ import * as cp from 'child_process';
 const HERE = __dirname;
 const EXTENDED_TOML = path.join(HERE, 'extended.toml');
 const KNOWN_PUBLIC_TOML = path.join(HERE, 'known-public.toml');
+const PUBLIC_ADDRESS_TOML = path.join(HERE, 'public-address.toml');
 const TOOL_JSON = path.join(HERE, 'TOOL.json');
 const LEAKS_EXIT = 9;
 const KNOWN_PUBLIC = 'known-public:hardhat-0';
+const PUBLIC_ADDRESS = 'public-address';
 const NON_PUBLIC = 'non-public';
 const IGNORE_FILES = ['.betterleaksignore', '.gitleaksignore', '.betterleaks.toml', '.gitleaks.toml'];
 const NET_BELT = 'http://127.0.0.1:1';
 
-type Classification = typeof KNOWN_PUBLIC | typeof NON_PUBLIC;
+// The exact non-comment lines public-address.toml may add after the bytes of
+// known-public.toml. Anything else (another regex, a paths/stopwords/condition
+// key, an unanchored pattern) is refused, so the label can only ever cover a
+// secret that is exactly 0x + 40 hex characters.
+const PUBLIC_ADDRESS_BLOCK = [
+    '[[allowlists]]',
+    'description = "public-address: the flagged secret is exactly 0x + 40 hex characters (an EVM address)"',
+    'regexTarget = "secret"',
+    "regexes = ['''^0x[0-9a-fA-F]{40}$''']",
+];
+
+type Classification = typeof KNOWN_PUBLIC | typeof PUBLIC_ADDRESS | typeof NON_PUBLIC;
 
 class Refusal extends Error {}
 
@@ -217,6 +243,36 @@ function randomDigits(n: number): string {
     return s;
 }
 
+function shannon(s: string): number {
+    const counts = new Map<string, number>();
+    for (const ch of s) counts.set(ch, (counts.get(ch) ?? 0) + 1);
+    let h = 0;
+    for (const c of counts.values()) {
+        const p = c / s.length;
+        h -= p * Math.log2(p);
+    }
+    return h;
+}
+
+// Random hex whose "0x"-prefixed form clears the default ruleset's 3.5
+// entropy floor with margin, so a positive/negative case can never pass or
+// fail by an unlucky low-entropy draw (a random 40-hex value averages ~3.7).
+function randomHexStrong(bytes: number): string {
+    for (let i = 0; i < 1000; i++) {
+        const h = crypto.randomBytes(bytes).toString('hex');
+        if (shannon(`0x${h}`) >= 3.65) return h;
+    }
+    throw new Error('could not draw a high-entropy fixture value');
+}
+
+function randomAlnumLower(n: number): string {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.randomBytes(n);
+    let s = '';
+    for (let i = 0; i < n; i++) s += alphabet[bytes[i] % alphabet.length];
+    return s;
+}
+
 // ---------------------------------------------------------------------------
 // Fixture builders: ustar + gzip (Node built-ins), SQLite (better-sqlite3)
 // ---------------------------------------------------------------------------
@@ -296,12 +352,26 @@ function verifyExe(bin: string, tool: ToolRecord): string {
 interface ConfigHashes {
     extended: string;
     known_public: string;
+    public_address: string;
 }
 
 function checkConfigs(): ConfigHashes {
     const ext = fs.readFileSync(EXTENDED_TOML);
     const kp = fs.readFileSync(KNOWN_PUBLIC_TOML);
+    const pa = fs.readFileSync(PUBLIC_ADDRESS_TOML);
     const problems: string[] = [];
+    if (pa.length <= kp.length || !pa.subarray(0, kp.length).equals(kp)) {
+        problems.push('public-address.toml does not start with the exact bytes of known-public.toml');
+    }
+    const paLines = pa
+        .subarray(kp.length)
+        .toString('utf8')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l !== '' && !l.startsWith('#'));
+    if (JSON.stringify(paLines) !== JSON.stringify(PUBLIC_ADDRESS_BLOCK)) {
+        problems.push('public-address.toml suffix must be exactly the one anchored 0x+40hex secret allowlist block');
+    }
     if (kp.length <= ext.length || !kp.subarray(0, ext.length).equals(ext)) {
         problems.push('known-public.toml does not start with the exact bytes of extended.toml');
     }
@@ -315,7 +385,7 @@ function checkConfigs(): ConfigHashes {
     if (!/^regexTarget\s*=\s*"secret"\s*$/m.test(suffix)) {
         problems.push('known-public.toml allowlist must target the secret explicitly');
     }
-    for (const [name, buf] of [['extended.toml', ext], ['known-public.toml', kp]] as const) {
+    for (const [name, buf] of [['extended.toml', ext], ['known-public.toml', kp], ['public-address.toml', pa]] as const) {
         const text = buf.toString('utf8');
         if (/^\s*(?:pre)?filter\s*=/m.test(text)) {
             problems.push(`${name} sets a top-level filter/prefilter (would replace the default global filter)`);
@@ -324,7 +394,7 @@ function checkConfigs(): ConfigHashes {
         if (!/^useDefault\s*=\s*true\s*$/m.test(text)) problems.push(`${name} does not extend the default ruleset`);
     }
     if (problems.length) throw new Refusal('config integrity: ' + problems.join('; '));
-    return { extended: sha256Buffer(ext), known_public: sha256Buffer(kp) };
+    return { extended: sha256Buffer(ext), known_public: sha256Buffer(kp), public_address: sha256Buffer(pa) };
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +464,12 @@ function scannerArgs(target: string, config: string, reportPath: string, ignoreD
     ];
 }
 
-const SCANNER_ARGS_TEMPLATE = scannerArgs('<target>', '<extended.toml|known-public.toml>', '<report.json>', '<empty temp dir>');
+const SCANNER_ARGS_TEMPLATE = scannerArgs(
+    '<target>',
+    '<extended.toml|known-public.toml|public-address.toml>',
+    '<report.json>',
+    '<empty temp dir>',
+);
 
 function assertNoIgnoreFiles(target: string): void {
     const dir = fs.statSync(target).isDirectory() ? target : path.dirname(target);
@@ -460,48 +535,67 @@ function runScanner(bin: string, target: string, config: string, reportPath: str
 interface ClassifiedHit {
     finding: Finding;
     classification: Classification;
-    pass2Only: boolean;
+    // set when a later pass reported a hit an earlier pass did not (impossible
+    // by construction; reported, counted, and treated as non-public)
+    anomaly: '' | 'pass2-only' | 'pass3-only';
+}
+
+interface Classified {
+    hits: ClassifiedHit[];
+    pass2OnlyCount: number;
+    pass3OnlyCount: number;
 }
 
 function hitKey(f: Finding): string {
     return [f.RuleID, canon(f.File), f.StartLine, f.StartColumn, f.EndColumn, f.Commit ?? ''].join('\u0000');
 }
 
-function classify(pass1: Finding[], pass2: Finding[]): { hits: ClassifiedHit[]; pass2OnlyCount: number } {
-    const groups = new Map<string, { p1: Finding[]; n2: number; p2: Finding[] }>();
-    for (const f of pass1) {
+// Per key (a multiset count per pass): n1 = pass 1, n2 = pass 2, n3 = pass 3.
+//   non-public             = min(n1, n2, n3)        present in every pass
+//   public-address         = min(n1, n2) - non-public  removed only by the pass-3 address allowlist
+//   known-public:hardhat-0 = n1 - min(n1, n2)        removed by the pass-2 Hardhat #0 allowlist
+// plus anomalies (n2 > n1, n3 > n2), each listed as non-public.
+function classify(pass1: Finding[], pass2: Finding[], pass3: Finding[]): Classified {
+    const groups = new Map<string, { p1: Finding[]; p2: Finding[]; p3: Finding[] }>();
+    const add = (f: Finding, which: 'p1' | 'p2' | 'p3'): void => {
         const k = hitKey(f);
-        const g = groups.get(k) ?? { p1: [], n2: 0, p2: [] };
-        g.p1.push(f);
+        const g = groups.get(k) ?? { p1: [], p2: [], p3: [] };
+        g[which].push(f);
         groups.set(k, g);
-    }
-    for (const f of pass2) {
-        const k = hitKey(f);
-        const g = groups.get(k) ?? { p1: [], n2: 0, p2: [] };
-        g.n2++;
-        g.p2.push(f);
-        groups.set(k, g);
-    }
+    };
+    pass1.forEach((f) => add(f, 'p1'));
+    pass2.forEach((f) => add(f, 'p2'));
+    pass3.forEach((f) => add(f, 'p3'));
     const hits: ClassifiedHit[] = [];
     let pass2OnlyCount = 0;
+    let pass3OnlyCount = 0;
     for (const k of [...groups.keys()].sort()) {
         const g = groups.get(k)!;
-        const both = Math.min(g.p1.length, g.n2);
-        for (let i = 0; i < g.p1.length; i++) {
-            hits.push({ finding: g.p1[i], classification: i < both ? NON_PUBLIC : KNOWN_PUBLIC, pass2Only: false });
+        const n1 = g.p1.length;
+        const n2 = g.p2.length;
+        const n3 = g.p3.length;
+        const in12 = Math.min(n1, n2);
+        const inAll = Math.min(in12, n3);
+        for (let i = 0; i < n1; i++) {
+            const classification: Classification = i < inAll ? NON_PUBLIC : i < in12 ? PUBLIC_ADDRESS : KNOWN_PUBLIC;
+            hits.push({ finding: g.p1[i], classification, anomaly: '' });
         }
-        for (let i = g.p1.length; i < g.n2; i++) {
+        for (let i = n1; i < n2; i++) {
             pass2OnlyCount++;
-            hits.push({ finding: g.p2[i], classification: NON_PUBLIC, pass2Only: true });
+            hits.push({ finding: g.p2[i], classification: NON_PUBLIC, anomaly: 'pass2-only' });
+        }
+        for (let i = n2; i < n3; i++) {
+            pass3OnlyCount++;
+            hits.push({ finding: g.p3[i], classification: NON_PUBLIC, anomaly: 'pass3-only' });
         }
     }
-    return { hits, pass2OnlyCount };
+    return { hits, pass2OnlyCount, pass3OnlyCount };
 }
 
 function describe(hits: ClassifiedHit[]): string {
     if (hits.length === 0) return 'no hits';
     return hits
-        .map((h) => `${h.finding.RuleID}:${h.classification}${h.pass2Only ? ':pass2-only' : ''}@L${h.finding.StartLine}C${h.finding.StartColumn}`)
+        .map((h) => `${h.finding.RuleID}:${h.classification}${h.anomaly ? `:${h.anomaly}` : ''}@L${h.finding.StartLine}C${h.finding.StartColumn}`)
         .join(', ');
 }
 
@@ -528,7 +622,7 @@ function readHardhatKey(repo: string): string {
 function caseOf(file: string): string | null {
     const f = normSlashes(file);
     if (f.includes('/f.tar.gz')) return 'f';
-    const m = /\/([a-i])\.(?:ts|sqlite)$/.exec(f);
+    const m = /\/([a-n])\.(?:ts|sqlite|log)$/.exec(f);
     return m ? m[1] : null;
 }
 
@@ -553,10 +647,22 @@ function fixtureMode(bin: string, outPath: string): number {
         const kg = randomHex32();
         const session = crypto.randomBytes(225).toString('base64');
         const botToken = `${randomDigits(10)}:A${randomTokenChars(34)}`;
+        // public-address label cases (j-n): fresh values, never printed
+        const kj = randomHexStrong(32);
+        const ak = randomHexStrong(20);
+        const tailK = randomAlnumLower(8);
+        const al = randomHexStrong(20);
+        const headL = randomAlnumLower(6);
+        const am1 = randomHexStrong(20);
+        const am2 = randomHexStrong(20);
+        const an = randomHexStrong(20);
+        const kn = randomHexStrong(32);
         planted.push(ka, kc, ke, kf, kg, session, botToken, botToken.split(':')[1]);
+        planted.push(kj, ak, `${ak}${tailK}`, al, `${headL}0x${al}`, am1, am2, an, kn);
         if (session.length !== 300) throw new Error('session fixture length');
 
         const lineC = `export const accounts = { privateKey: '0x${hardhat}', signer: '0x${kc}' };`;
+        const lineN = `{"level":30,"token":"0x${an}","apiToken":"0x${kn}","msg":"quote"}`;
         const files: Record<string, string> = {
             'a.ts': `PRIVATE_KEY=0x${ka}\n`,
             'b.ts': `export const forkAccount = { privateKey: '0x${hardhat}' };\n`,
@@ -565,20 +671,28 @@ function fixtureMode(bin: string, outPath: string): number {
             'e.ts': `export const txHash = '0x${ke}';\n`,
             'h.ts': `TELEGRAM_BOT_TOKEN=${botToken}\n`,
             'i.ts': `PRIVATE_KEY=0x${'0'.repeat(63)}1\n`,
+            'j.ts': `export const cfg = { token: '0x${kj}' };\n`,
+            'k.ts': `export const cfg = { authAddress: '0x${ak}${tailK}' };\n`,
+            'l.ts': `export const cfg = { token: '${headL}0x${al}' };\n`,
+            'm.log':
+                `{"level":30,"time":1717000000000,"token":"0x${am1}","msg":"pair detected"}\n` +
+                `{"level":30,"time":1717000000001,"authAddress":"0x${am2}","msg":"bundle signed"}\n`,
+            'n.log': `${lineN}\n`,
         };
         for (const [n, c] of Object.entries(files)) fs.writeFileSync(path.join(fx, n), c);
-        fs.writeFileSync(
-            path.join(fx, 'f.tar.gz'),
-            buildTarGz([{ name: 'inner/f.ts', data: Buffer.from(`PRIVATE_KEY=0x${kf}\n`) }]),
-        );
+        const fInner = Buffer.from(`PRIVATE_KEY=0x${kf}\n`);
+        fs.writeFileSync(path.join(fx, 'f.tar.gz'), buildTarGz([{ name: 'inner/f.ts', data: fInner }]));
         const gRow = `PRIVATE_KEY=0x${kg}`;
         buildSqlite(path.join(fx, 'g.sqlite'), gRow);
         const gBytesHold = fs.readFileSync(path.join(fx, 'g.sqlite')).includes(Buffer.from(gRow));
+        const gSize = fs.statSync(path.join(fx, 'g.sqlite')).size;
+        const textBytes = Object.values(files).reduce((s, c) => s + Buffer.byteLength(c), 0) + fInner.length;
 
-        // ---- two passes, same flags as a real scan ----
+        // ---- three passes, same flags as a real scan ----
         const p1 = runScanner(bin, fx, EXTENDED_TOML, path.join(work, 'pass1.json'), path.join(work, 'pass1.log'));
         const p2 = runScanner(bin, fx, KNOWN_PUBLIC_TOML, path.join(work, 'pass2.json'), path.join(work, 'pass2.log'));
-        const { hits, pass2OnlyCount } = classify(p1.findings, p2.findings);
+        const p3 = runScanner(bin, fx, PUBLIC_ADDRESS_TOML, path.join(work, 'pass3.json'), path.join(work, 'pass3.log'));
+        const { hits, pass2OnlyCount, pass3OnlyCount } = classify(p1.findings, p2.findings, p3.findings);
 
         const byCase = new Map<string, ClassifiedHit[]>();
         const stray: ClassifiedHit[] = [];
@@ -693,6 +807,8 @@ function fixtureMode(bin: string, outPath: string): number {
                 detected,
                 note:
                     `fixture bytes hold the row text contiguously: ${gBytesHold}. ` +
+                    `bytes scanned (pass 1) ${p1.bytesScanned ?? 'unreported'} vs text fixtures + tar member ${textBytes} ` +
+                    `(SQLite file ${gSize} B): ${p1.bytesScanned === textBytes ? 'equal, so the SQLite file contributed zero bytes' : 'NOT equal'}. ` +
                     (detected
                         ? 'dir mode scanned the SQLite file.'
                         : 'not detected: the known dir-mode binary-file gap; the D-22 exact-value check (scripts/nac01-exact-value-check.ts, binary-SQLite self-test case) covers it.'),
@@ -721,16 +837,80 @@ function fixtureMode(bin: string, outPath: string): number {
                 note: 'low-entropy sentinel shape used by the 22-05 test env',
             });
         }
+        // j, k, l: shapes the public-address label must NOT cover (operator ruling negatives)
+        const negative = (id: string, expected: string, note: string): void => {
+            const hs = of(id);
+            results.push({
+                id,
+                expected,
+                observed: describe(hs),
+                pass: hs.length >= 1 && hs.every((h) => h.classification === NON_PUBLIC),
+                note: `${note}; rules: ${[...new Set(hs.map((h) => h.finding.RuleID))].join(',') || 'none'}`,
+            });
+        };
+        negative(
+            'j',
+            'a fresh random 64-hex value after token: is flagged and every hit is non-public (never public-address)',
+            'a 64-hex secret is not an address; the anchored {40} regex cannot match it',
+        );
+        negative(
+            'k',
+            'an address immediately followed by 8 more alnum characters after authAddress: is flagged and every hit is non-public',
+            'proves the end anchor: the flagged secret is longer than 0x+40hex',
+        );
+        negative(
+            'l',
+            'an address forming the tail of a longer token after token: is flagged and every hit is non-public',
+            'proves the start anchor: the flagged secret has characters before 0x',
+        );
+        // m: the positive shape, as it appears in the bot capture logs
+        {
+            const hs = of('m');
+            const lines = new Set(hs.map((h) => h.finding.StartLine));
+            results.push({
+                id: 'm',
+                expected:
+                    'an exact 0x+40hex value after "token" (line 1) and after "authAddress" (line 2) is flagged on both lines and every hit is public-address',
+                observed: describe(hs),
+                pass: lines.has(1) && lines.has(2) && hs.every((h) => h.classification === PUBLIC_ADDRESS),
+                note: `capture-log JSON shape; rules: ${[...new Set(hs.map((h) => h.finding.RuleID))].join(',') || 'none'}`,
+            });
+        }
+        // n: co-located address and 64-hex secret on one line
+        {
+            const hs = of('n');
+            const split = lineN.indexOf('"apiToken"');
+            const addrSide = hs.filter((h) => h.finding.StartColumn <= split);
+            const keySide = hs.filter((h) => h.finding.StartColumn > split);
+            results.push({
+                id: 'n',
+                expected:
+                    'same line: the exact address (token) is public-address, the random 64-hex value (apiToken) is flagged and non-public; ' +
+                    'the address label cannot suppress or relabel a co-located secret',
+                observed: describe(hs),
+                pass:
+                    hs.every((h) => h.finding.StartLine === 1) &&
+                    addrSide.length >= 1 &&
+                    addrSide.every((h) => h.classification === PUBLIC_ADDRESS) &&
+                    keySide.length >= 1 &&
+                    keySide.every((h) => h.classification === NON_PUBLIC),
+                note: `split column ${split} (0-based index of "apiToken"); rules: ${[...new Set(hs.map((h) => h.finding.RuleID))].join(',') || 'none'}`,
+            });
+        }
 
         // ---- engine checks ----
         results.push({
             id: 'config-prefix',
-            expected: 'known-public.toml = extended.toml bytes + one [[allowlists]] block targeting the secret; no top-level filter; no 64-hex run',
-            observed: `extended ${configSha.extended.slice(0, 12)}..., known_public ${configSha.known_public.slice(0, 12)}...`,
+            expected:
+                'known-public.toml = extended.toml bytes + one [[allowlists]] block targeting the secret; public-address.toml = known-public.toml bytes + ' +
+                'exactly the anchored ^0x[0-9a-fA-F]{40}$ secret allowlist block; no top-level filter; no 64-hex run',
+            observed:
+                `extended ${configSha.extended.slice(0, 12)}..., known_public ${configSha.known_public.slice(0, 12)}..., ` +
+                `public_address ${configSha.public_address.slice(0, 12)}...`,
             pass: true,
             note: 'checked by checkConfigs() before any scanner run',
         });
-        const fieldsSeen = [...new Set([...p1.fieldsSeen, ...p2.fieldsSeen])].sort();
+        const fieldsSeen = [...new Set([...p1.fieldsSeen, ...p2.fieldsSeen, ...p3.fieldsSeen])].sort();
         results.push({
             id: 'report-fields',
             expected: 'every finding has RuleID, File, StartLine, StartColumn, EndColumn',
@@ -738,9 +918,11 @@ function fixtureMode(bin: string, outPath: string): number {
             pass: p1.findings.length > 0,
             note: 'gitleaks-format JSON confirmed on the first fixture run',
         });
-        const rawBlobs = [p1.reportPath, p2.reportPath].map((p) => fs.readFileSync(p, 'utf8')).concat([p1.logText, p2.logText]);
+        const rawBlobs = [p1.reportPath, p2.reportPath, p3.reportPath]
+            .map((p) => fs.readFileSync(p, 'utf8'))
+            .concat([p1.logText, p2.logText, p3.logText]);
         const leaked = planted.filter((v) => rawBlobs.some((b) => b.includes(v) || b.toLowerCase().includes(v.toLowerCase()))).length;
-        const unredacted = [...p1.findings, ...p2.findings].filter((f) => f.Secret !== undefined && f.Secret !== 'REDACTED').length;
+        const unredacted = [...p1.findings, ...p2.findings, ...p3.findings].filter((f) => f.Secret !== undefined && f.Secret !== 'REDACTED').length;
         results.push({
             id: 'redaction',
             expected: 'no planted value appears in any raw report or scanner output; every Secret field is REDACTED',
@@ -749,17 +931,25 @@ function fixtureMode(bin: string, outPath: string): number {
             note: `${planted.length} planted values checked (never printed)`,
         });
         results.push({
-            id: 'pass2-subset',
-            expected: 'pass 2 (known-public.toml) only ever removes hits: zero pass-2-only hits; no hit outside the case files',
-            observed: `pass1 ${p1.findings.length}, pass2 ${p2.findings.length}, pass2-only ${pass2OnlyCount}, stray ${stray.length}`,
-            pass: pass2OnlyCount === 0 && stray.length === 0 && p2.findings.length <= p1.findings.length,
+            id: 'pass-subset',
+            expected:
+                'each allowlist only ever removes hits: zero pass-2-only and zero pass-3-only hits, pass3 <= pass2 <= pass1; no hit outside the case files',
+            observed:
+                `pass1 ${p1.findings.length}, pass2 ${p2.findings.length}, pass3 ${p3.findings.length}, ` +
+                `pass2-only ${pass2OnlyCount}, pass3-only ${pass3OnlyCount}, stray ${stray.length}`,
+            pass:
+                pass2OnlyCount === 0 &&
+                pass3OnlyCount === 0 &&
+                stray.length === 0 &&
+                p2.findings.length <= p1.findings.length &&
+                p3.findings.length <= p2.findings.length,
             note: stray.length ? `stray: ${describe(stray)}` : 'none stray',
         });
         results.push({
             id: 'bytes-scanned',
-            expected: 'the scanner reports a non-zero byte count for both passes',
-            observed: `pass1 ${p1.bytesScanned ?? 'unreported'}, pass2 ${p2.bytesScanned ?? 'unreported'}`,
-            pass: (p1.bytesScanned ?? 0) > 0 && (p2.bytesScanned ?? 0) > 0,
+            expected: 'the scanner reports the same non-zero byte count for all three passes',
+            observed: `pass1 ${p1.bytesScanned ?? 'unreported'}, pass2 ${p2.bytesScanned ?? 'unreported'}, pass3 ${p3.bytesScanned ?? 'unreported'}`,
+            pass: (p1.bytesScanned ?? 0) > 0 && p1.bytesScanned === p2.bytesScanned && p2.bytesScanned === p3.bytesScanned,
             note: 'parsed from the scanner log line "scanned ~N bytes"',
         });
 
@@ -771,12 +961,20 @@ function fixtureMode(bin: string, outPath: string): number {
             exe_path: normSlashes(bin),
             exe_sha256: exeSha,
             config_sha256: configSha,
-            config_relationship: 'known-public.toml = extended.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, Hardhat #0 only)',
+            config_relationship:
+                'known-public.toml = extended.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, Hardhat #0 only); ' +
+                'public-address.toml = known-public.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, ^0x[0-9a-fA-F]{40}$ only)',
+            classification_labels: {
+                [NON_PUBLIC]: 'reported by all three passes',
+                [KNOWN_PUBLIC]: 'reported by pass 1, removed by the pass-2 Hardhat #0 allowlist',
+                [PUBLIC_ADDRESS]:
+                    'reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling "classify-addresses", ESC-SECRET-01)',
+            },
             scanner_args: SCANNER_ARGS_TEMPLATE,
             scanner_cwd: 'fresh empty os.tmpdir() folder, deleted after each run',
             env_belt: `HTTPS_PROXY=HTTP_PROXY=ALL_PROXY=${NET_BELT} (belt only, not an enforced network boundary)`,
             report_fields_seen: fieldsSeen,
-            exit_codes_seen: { pass1: p1.exitCode, pass2: p2.exitCode },
+            exit_codes_seen: { pass1: p1.exitCode, pass2: p2.exitCode, pass3: p3.exitCode },
             classification_key: ['rule id', 'file', 'line', 'start column', 'end column', 'commit'],
             generated_at: new Date().toISOString(),
             node: process.version,
@@ -828,6 +1026,10 @@ function scanMode(bin: string): number {
     if (!fx.all_pass_except_g || required.length < 8 || !required.every((c) => c.pass === true) || fx.cases.length < 9) {
         throw new Refusal('FIXTURES.json does not show every required case passing');
     }
+    const mustHave = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'redaction', 'pass-subset', 'bytes-scanned'];
+    const ids = new Set(fx.cases.map((c) => c.id));
+    const missing = mustHave.filter((id) => !ids.has(id));
+    if (missing.length) throw new Refusal(`FIXTURES.json lacks case(s) ${missing.join(',')}; re-run the fixture proof`);
     const repo = findRepoRoot(HERE);
     const parsedTargets = targets.map((t) => {
         const eq = t.indexOf('=');
@@ -861,8 +1063,14 @@ function scanMode(bin: string): number {
         const base = path.join(raw, `${t.name}-${stamp}`);
         const p1 = runScanner(bin, t.path, EXTENDED_TOML, `${base}.pass1.json`, `${base}.pass1.log`);
         const p2 = runScanner(bin, t.path, KNOWN_PUBLIC_TOML, `${base}.pass2.json`, `${base}.pass2.log`);
-        if ((p1.bytesScanned ?? 0) <= 0 || (p2.bytesScanned ?? 0) <= 0) throw new Error(`scanner read no bytes of target ${t.name}`);
-        const { hits, pass2OnlyCount } = classify(p1.findings, p2.findings);
+        const p3 = runScanner(bin, t.path, PUBLIC_ADDRESS_TOML, `${base}.pass3.json`, `${base}.pass3.log`);
+        if ((p1.bytesScanned ?? 0) <= 0 || (p2.bytesScanned ?? 0) <= 0 || (p3.bytesScanned ?? 0) <= 0) {
+            throw new Error(`scanner read no bytes of target ${t.name}`);
+        }
+        if (p1.bytesScanned !== p2.bytesScanned || p2.bytesScanned !== p3.bytesScanned) {
+            throw new Error(`the three passes read different byte counts of target ${t.name}`);
+        }
+        const { hits, pass2OnlyCount, pass3OnlyCount } = classify(p1.findings, p2.findings, p3.findings);
         const prefix = normSlashes(t.path);
         for (const h of hits) {
             let rel = normSlashes(h.finding.File);
@@ -891,11 +1099,14 @@ function scanMode(bin: string): number {
             hit_count: hits.length,
             non_public_count: hits.filter((h) => h.classification === NON_PUBLIC).length,
             known_public_count: hits.filter((h) => h.classification === KNOWN_PUBLIC).length,
+            public_address_count: hits.filter((h) => h.classification === PUBLIC_ADDRESS).length,
             pass1_count: p1.findings.length,
             pass2_count: p2.findings.length,
+            pass3_count: p3.findings.length,
             pass2_only_count: pass2OnlyCount,
-            bytes_scanned: { pass1: p1.bytesScanned, pass2: p2.bytesScanned },
-            raw_reports: [p1.reportPath, p2.reportPath].map(normSlashes),
+            pass3_only_count: pass3OnlyCount,
+            bytes_scanned: { pass1: p1.bytesScanned, pass2: p2.bytesScanned, pass3: p3.bytesScanned },
+            raw_reports: [p1.reportPath, p2.reportPath, p3.reportPath].map(normSlashes),
         });
     }
     const nonPublic = outHits.filter((h) => h.classification === NON_PUBLIC).length;
@@ -914,6 +1125,13 @@ function scanMode(bin: string): number {
         targets: outTargets,
         non_public_count: nonPublic,
         known_public_count: outHits.filter((h) => h.classification === KNOWN_PUBLIC).length,
+        public_address_count: outHits.filter((h) => h.classification === PUBLIC_ADDRESS).length,
+        classification_labels: {
+            [NON_PUBLIC]: 'reported by all three passes',
+            [KNOWN_PUBLIC]: 'reported by pass 1, removed by the pass-2 Hardhat #0 allowlist',
+            [PUBLIC_ADDRESS]:
+                'reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling "classify-addresses", ESC-SECRET-01)',
+        },
         hits: outHits,
     };
     for (const k of Object.keys(meta)) {
@@ -922,7 +1140,10 @@ function scanMode(bin: string): number {
     const doc = { ...computed, ...meta };
     fs.writeFileSync(outPath, JSON.stringify(doc, null, 2) + '\n');
     for (const t of outTargets) {
-        console.log(`TARGET ${String(t.name)} kind=${String(t.kind)} hits=${String(t.hit_count)} non-public=${String(t.non_public_count)} known-public=${String(t.known_public_count)}`);
+        console.log(
+            `TARGET ${String(t.name)} kind=${String(t.kind)} hits=${String(t.hit_count)} non-public=${String(t.non_public_count)} ` +
+                `known-public=${String(t.known_public_count)} public-address=${String(t.public_address_count)}`,
+        );
     }
     console.log(`RESULT ${nonPublic === 0 ? 'CLEAN (zero non-public hits)' : `NON-PUBLIC HITS: ${nonPublic}`}`);
     return nonPublic === 0 ? 0 : 1;

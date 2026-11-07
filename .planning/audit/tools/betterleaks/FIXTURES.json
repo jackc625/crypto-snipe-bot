@@ -5,14 +5,20 @@
   "exe_sha256": "16600f87ef27eed53f7bcb80d56bd7c9e5730c9088c8d30ef57867b6a1fec6cf",
   "config_sha256": {
     "extended": "109020a5bfdc2fd1e0375f794409786b092a671e4e4fbe0761e2850268a649a6",
-    "known_public": "14e53bda7d285b867758963d6e25490ed32ed3aef358693632efbca94196e493"
+    "known_public": "14e53bda7d285b867758963d6e25490ed32ed3aef358693632efbca94196e493",
+    "public_address": "72063e891bd369a77d5340c49d71230eb3833758bc7e20564f0049c581ee9edf"
   },
-  "config_relationship": "known-public.toml = extended.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, Hardhat #0 only)",
+  "config_relationship": "known-public.toml = extended.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, Hardhat #0 only); public-address.toml = known-public.toml byte-for-byte + one appended [[allowlists]] block (regexTarget secret, ^0x[0-9a-fA-F]{40}$ only)",
+  "classification_labels": {
+    "non-public": "reported by all three passes",
+    "known-public:hardhat-0": "reported by pass 1, removed by the pass-2 Hardhat #0 allowlist",
+    "public-address": "reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling \"classify-addresses\", ESC-SECRET-01)"
+  },
   "scanner_args": [
     "dir",
     "<target>",
     "--config",
-    "<extended.toml|known-public.toml>",
+    "<extended.toml|known-public.toml|public-address.toml>",
     "--max-archive-depth",
     "2",
     "--redact",
@@ -53,7 +59,8 @@
   ],
   "exit_codes_seen": {
     "pass1": 9,
-    "pass2": 9
+    "pass2": 9,
+    "pass3": 9
   },
   "classification_key": [
     "rule id",
@@ -63,7 +70,7 @@
     "end column",
     "commit"
   ],
-  "generated_at": "2026-11-07T01:17:58.807Z",
+  "generated_at": "2026-11-07T01:33:08.897Z",
   "node": "v22.16.0",
   "all_pass_except_g": true,
   "cases": [
@@ -115,7 +122,7 @@
       "observed": "no hits",
       "pass": false,
       "detected": false,
-      "note": "fixture bytes hold the row text contiguously: true. not detected: the known dir-mode binary-file gap; the D-22 exact-value check (scripts/nac01-exact-value-check.ts, binary-SQLite self-test case) covers it."
+      "note": "fixture bytes hold the row text contiguously: true. bytes scanned (pass 1) 1670 vs text fixtures + tar member 1670 (SQLite file 8192 B): equal, so the SQLite file contributed zero bytes. not detected: the known dir-mode binary-file gap; the D-22 exact-value check (scripts/nac01-exact-value-check.ts, binary-SQLite self-test case) covers it."
     },
     {
       "id": "h",
@@ -132,9 +139,44 @@
       "note": "low-entropy sentinel shape used by the 22-05 test env"
     },
     {
+      "id": "j",
+      "expected": "a fresh random 64-hex value after token: is flagged and every hit is non-public (never public-address)",
+      "observed": "generic-api-key:non-public@L1C22",
+      "pass": true,
+      "note": "a 64-hex secret is not an address; the anchored {40} regex cannot match it; rules: generic-api-key"
+    },
+    {
+      "id": "k",
+      "expected": "an address immediately followed by 8 more alnum characters after authAddress: is flagged and every hit is non-public",
+      "observed": "generic-api-key:non-public@L1C22",
+      "pass": true,
+      "note": "proves the end anchor: the flagged secret is longer than 0x+40hex; rules: generic-api-key"
+    },
+    {
+      "id": "l",
+      "expected": "an address forming the tail of a longer token after token: is flagged and every hit is non-public",
+      "observed": "generic-api-key:non-public@L1C22",
+      "pass": true,
+      "note": "proves the start anchor: the flagged secret has characters before 0x; rules: generic-api-key"
+    },
+    {
+      "id": "m",
+      "expected": "an exact 0x+40hex value after \"token\" (line 1) and after \"authAddress\" (line 2) is flagged on both lines and every hit is public-address",
+      "observed": "generic-api-key:public-address@L1C35, generic-api-key:public-address@L2C35",
+      "pass": true,
+      "note": "capture-log JSON shape; rules: generic-api-key"
+    },
+    {
+      "id": "n",
+      "expected": "same line: the exact address (token) is public-address, the random 64-hex value (apiToken) is flagged and non-public; the address label cannot suppress or relabel a co-located secret",
+      "observed": "generic-api-key:public-address@L1C14, generic-api-key:non-public@L1C67",
+      "pass": true,
+      "note": "split column 65 (0-based index of \"apiToken\"); rules: generic-api-key"
+    },
+    {
       "id": "config-prefix",
-      "expected": "known-public.toml = extended.toml bytes + one [[allowlists]] block targeting the secret; no top-level filter; no 64-hex run",
-      "observed": "extended 109020a5bfdc..., known_public 14e53bda7d28...",
+      "expected": "known-public.toml = extended.toml bytes + one [[allowlists]] block targeting the secret; public-address.toml = known-public.toml bytes + exactly the anchored ^0x[0-9a-fA-F]{40}$ secret allowlist block; no top-level filter; no 64-hex run",
+      "observed": "extended 109020a5bfdc..., known_public 14e53bda7d28..., public_address 72063e891bd3...",
       "pass": true,
       "note": "checked by checkConfigs() before any scanner run"
     },
@@ -150,19 +192,19 @@
       "expected": "no planted value appears in any raw report or scanner output; every Secret field is REDACTED",
       "observed": "planted values found in raw output: 0; non-REDACTED Secret fields: 0",
       "pass": true,
-      "note": "8 planted values checked (never printed)"
+      "note": "17 planted values checked (never printed)"
     },
     {
-      "id": "pass2-subset",
-      "expected": "pass 2 (known-public.toml) only ever removes hits: zero pass-2-only hits; no hit outside the case files",
-      "observed": "pass1 11, pass2 7, pass2-only 0, stray 0",
+      "id": "pass-subset",
+      "expected": "each allowlist only ever removes hits: zero pass-2-only and zero pass-3-only hits, pass3 <= pass2 <= pass1; no hit outside the case files",
+      "observed": "pass1 18, pass2 14, pass3 11, pass2-only 0, pass3-only 0, stray 0",
       "pass": true,
       "note": "none stray"
     },
     {
       "id": "bytes-scanned",
-      "expected": "the scanner reports a non-zero byte count for both passes",
-      "observed": "pass1 1014, pass2 1014",
+      "expected": "the scanner reports the same non-zero byte count for all three passes",
+      "observed": "pass1 1670, pass2 1670, pass3 1670",
       "pass": true,
       "note": "parsed from the scanner log line \"scanned ~N bytes\""
     }
