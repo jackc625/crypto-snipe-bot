@@ -1,0 +1,70 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-003",
+    "AUD-EXIT-021"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "EXIT-04",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-21"
+  ],
+  "research_suggested_severity": "S2",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-005",
+  "title": "Per-position setInterval(async) poll has no in-flight guard and the price quote has no timeout, so slow RPC stacks overlapping cycles on one shared state object",
+  "severity": "S2",
+  "capital_impact": "none",
+  "classes": [
+    "C12",
+    "C15"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1906-1942@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor: setInterval(async () => { await pollExitStrategy(...) }, 5000) with no running flag; a cycle slower than 5 s overlaps the next"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:2007-2042@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeExitMonitor: identical loop"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:315-345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice awaits the RPC with no withTimeout; only the ethers FetchRequest default bounds it"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/utils/fetch.js:402",
+      "note": "FetchRequest default timeout is 300000 ms, so one stalled quote can stack up to about 60 pending cycles per position"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1705@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "all overlapping cycles mutate the same state object (highWaterMark :1717-1719, volatility samples :1720, trailingActivated :1776) and each persists it (:1829)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1918-1925@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the overrun telemetry is logged only when a cycle completes, so stacked cycles are invisible while they pile up"
+    }
+  ],
+  "sibling_sites_checked": "In the slice: the two exit intervals (:1906, :2007); exitWatchdog.ts and withTimeout.ts use setTimeout only, cleared in finally. Duplicate triggers from overlapping cycles are absorbed: enqueueExit dedupes per position (tryEnqueuePosition, exitManager.ts:66-71), and partial detection-to-lock is synchronous (:1732 -> :1822 -> tryAcquireSellLock :1483 with no await between), and tiers are marked before the sell lock is released (:1568-1575 before finally :1590), so no double partial was found. Same-pattern siblings outside the slice, named by path only (owned by their slices): src/bot.ts (:1636, :1660, :1740, :1774), src/anti-rug/detector.ts (:1261), src/api/server.ts (:186).",
+  "status": "confirmed",
+  "severity_rationale": "S2, equal to the research suggestion. Overlap is proven by the code. Its money effect is bounded because the queue and sell locks absorb duplicate triggers; what remains is unbounded pile-up of pending cycles and sockets during an RPC stall, stale-ordered state writes, and no exit decisions until the stall clears (a stalled quote also skips the urgency exit, AUD-EXIT-003).",
+  "recommendation": "Run each position poll as a self-rescheduling setTimeout (or skip a tick while one is in flight) and bound queryPrice with withTimeout. Card EXIT-04 (exit-path liveness). Phase 29 unless Phase 24 folds it into the exit fixes."
+}

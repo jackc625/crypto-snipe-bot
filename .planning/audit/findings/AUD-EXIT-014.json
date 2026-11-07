@@ -1,0 +1,74 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-009",
+    "AUD-EXIT-004"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-11",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-014",
+  "title": "An anti-rug exit is refused while another exit of the same token holds the sell lock, and waits behind any routine private escalation that holds the wallet nonce lock, where its 60 s budget can run out",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C07",
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/utils/exitManager.ts",
+    "src/utils/withTimeout.ts",
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:832-835@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell returns false at once when the per-token sell lock is held (\"Another exit already handling token, skipping\"), whatever the reason, anti-rug included"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1483-1486@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a detached partial sell holds the same lock for its whole submit (:1488-1591)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:240-270@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug clears the token timers, then runs executeFullSell under withTimeout(WATCHDOG_BUDGET_MS, default 60000 :77-81); a refusal or a timeout becomes success=false"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitPrivateSell holds the wallet nonce lock for the whole escalatePrivateSell, i.e. every private attempt and its confirm window (45 s default each, reconciliation.ts:55), so a routine exit of token A blocks every signing op of the wallet, including an anti-rug exit of token B"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:871-874@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "token B's anti-rug exit needs the nonce lock already for its approval; it can sit there past the 60 s budget"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the budget frees only the caller; the queued exit still runs later with its stale balance read"
+    }
+  ],
+  "sibling_sites_checked": "Lock holders that can block an anti-rug exit: a routine full exit of the same token (sell lock :832, held through the whole ladder), a detached partial of the same token (:1483), and any private escalation on the wallet (nonce lock :788, plus approvals :871/:874/:1509/:1512 and the public fallback :543/:552). Whether a refused anti-rug exit is retried depends on the anti-rug detector firing again on a new pool event (ANTIRUG slice; the dispatch at detector.ts:1341-1392 runs per event), and whether a refused or timed-out exit counts against the anti-rug circuit breaker is for the ANTIRUG slice too.",
+  "status": "candidate",
+  "severity_rationale": "S1 candidate. The refusals and the lock hold times are code facts. The plausible condition is a rug that starts while another exit is running: a price drop from early sell-offs triggers stop-loss first, and the liquidity pull arrives seconds later. The anti-rug exit is then dropped (same token) or delayed past its budget (another token). The in-flight routine exit keeps selling, but with routine parameters (two private attempts, 5% public slippage, no anti-rug gas multiplier), which is what makes it a loss case rather than a strand. Left candidate until the ANTIRUG slice confirms the retry and circuit-breaker behaviour.",
+  "recommendation": "Decide on card EXIT-11 how an anti-rug exit takes precedence over an in-flight exit (pre-empt it, escalate the in-flight one to anti-rug parameters, or queue and retry) and whether the nonce lock may be held across a whole private escalation. Phase 24."
+}

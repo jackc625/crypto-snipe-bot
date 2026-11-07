@@ -1,0 +1,118 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-002",
+    "AUD-EXIT-015"
+  ],
+  "tags": [
+    "capital",
+    "cross-class"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-02",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-08"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-003",
+  "title": "The exit price signal is not a price: a fixed probe (the ETH buy amount reused as a raw token amount) is quoted, and the ratio of two quote outputs drives every exit decision",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C01",
+    "C03"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:315-345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice quotes tokenIn=token -> WETH with amountIn = buyAmountWei (V3 quoter :325-333, V2 getAmountsOut :335-338) and returns Number(amountOut)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor: buyAmountWei = parseEther(buyAmountNative), i.e. the snipe size in native-coin wei, then passed as the token amountIn"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1869@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "entryPrice = the probe output at monitor start"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1708@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pollExitStrategy: currentPrice = the same probe output each tick"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1714@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "priceMultiple = currentPrice / state.entryPrice: a ratio of two quote outputs, used by partial tiers (:1732), trailing activation at 2.0 (:1774), trailing trigger (:1751-1752) and stop-loss (:1782-1783)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1709-1712@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a null quote returns continue before every check, including the 30-minute urgency exit (:1801)"
+    }
+  ],
+  "sub_claims": [
+    {
+      "claim": "(1) Unit mismatch: the probe sells a fixed raw token amount equal to the ETH buy size in wei (for a 0.01 snipe, 1e16 raw units) whatever the token decimals: 0.01 tokens of an 18-decimal token, 10,000,000 tokens of a 9-decimal token. Its size relative to the position and to the pool varies by many orders of magnitude between tokens.",
+      "evidence": [
+        "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:328@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:337@23a64617dca167976adc4645fed0e2c69e384820",
+        "no decimals() read anywhere in the slice (sweep C03 search)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) Non-linear quote: for a V2 pool, out = R_out*d*0.997/(R_in + 0.997*d). The ratio at :1714 equals the spot-price ratio only when the probe d is tiny against the token reserve R_in. When d is comparable to or larger than R_in (low-decimal tokens, thin pools) the output saturates toward R_out and the ratio tracks the WETH reserve, roughly the square root of the price ratio: a 25% stop-loss then fires only near a 44% price drop and a 15% trailing stop near 28%. The same probe also makes partial-tier multiples (2x, 5x) mean different price moves per token.",
+      "evidence": [
+        "src/exitEngine.ts:1714@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1751-1752@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1782-1783@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1732@23a64617dca167976adc4645fed0e2c69e384820",
+        "constant-product arithmetic from the V2 getAmountOut formula; magnitude per real token is unmeasured"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "(3) Zero or coarse output: with an 18-decimal, very-high-supply token the small probe can quote 0 or a few wei. A few-wei quote makes priceMultiple jump in large steps, so rounding alone can cross the stop-loss; a current quote of 0 with a non-zero entry gives priceMultiple 0, which fires stop-loss or trailing immediately.",
+      "evidence": [
+        "src/exitEngine.ts:333@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:338@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1714@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1782-1783@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "(4) Non-finite ratio when entryPrice is 0 (a 0 first quote is accepted, only null is rejected at :1870). Re-measured against the code, the effect differs from the research hint (\"trailing and stop-loss never fire\"): current > 0 gives Infinity, which activates trailing on the first tick (:1774), disables stop-loss (:1781) and fires every partial tier at once (:1732, Infinity >= every multiple), selling the whole tier percentage immediately; current = 0 gives NaN (0/0), and stop-loss then fires because fixedStopPrice is 0 and 0 <= 0 (:1782-1783). The alert text (formatExitReason, :1665) shows NaN/Infinity.",
+      "evidence": [
+        "src/exitEngine.ts:1869-1873@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1714@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1732@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1774@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1781-1783@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1665@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "sibling_sites_checked": "Every consumer of queryPrice: startExitMonitor (:1869), resumeExitMonitor no-row branch (:1980), pollExitStrategy (:1708). Every consumer of priceMultiple: getUnfilledTiers (:1732), trailing activation (:1774), formatExitReason (:1661-1680), the partial alert (:1521). The probe amount source differs per entry: bot.ts:422 (buyAmountNative of the buy), bot.ts:1483 and :1948/:1955 and exitEngine.ts:731 (ctx.chain.snipeAmount); the consequence of that difference is AUD-EXIT-015. The anti-rug slice measures the pool by reserves, not by this probe (not re-audited here).",
+  "status": "confirmed",
+  "severity_rationale": "S1, equal to the research suggestion. Sub-claims 1 and 4 are proven by the code; 2 and 3 are proven as mechanisms, but their size for real tokens needs a Phase 23 measurement, so they stay candidate. The entry stays confirmed because the defect itself (the signal is a fixed-probe output ratio, not a decimals-aware price) is a code fact. Capital class STRAND for the null-quote path (no exit at all, not even urgency); the zero/non-finite paths instead sell at the wrong time (LOSS), noted in the sub-claims.",
+  "recommendation": "Replace the probe with a decimals-aware spot price (read decimals once, quote a small fixed fraction of the position or read reserves/slot0), persist the probe definition with the entry, reject a 0 or non-finite entry, and let the 30-minute urgency exit fire even when the quote is null. Decide on card EXIT-02 (Phase 24, after a Phase 23 fork measurement on real low-decimal and high-supply tokens)."
+}

@@ -1,0 +1,70 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-005"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-04",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-021",
+  "title": "Exits await Telegram alerts that have no timeout before sending the sell, and the watchdog awaits one after an overrun, so a hung Telegram request delays sells and the worker",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/utils/exitWatchdog.ts",
+    "src/utils/notifier.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:893@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "await sendCtxAlert before submitPrivateSell (:909)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:533-538@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "await sendCtxAlert before the public-fallback approve and swap"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1521@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "await sendCtxAlert before the partial submit"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitWatchdog.ts:75-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the watchdog awaits sendCtxAlert after an overrun before returning false, so the freed drain loop waits on Telegram"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:75-87@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendCtxAlert: await axios.post(TELEGRAM_API, ...) with no timeout option"
+    },
+    {
+      "type": "command",
+      "ref": "axios@1.10.0 node_modules/axios/lib/defaults/index.js:132",
+      "note": "axios default timeout is 0 (none)"
+    }
+  ],
+  "sibling_sites_checked": "Every awaited sendCtxAlert in the slice: before the money action (:533, :893, :1521) and after it (:744, :751, :950, :966, :1010, :1031, :1104, :1155, :1166, :1583, exitWatchdog.ts:75). Errors are caught in notifier, so only a hang matters. The worker watchdog does bound the whole submit, so a hang there is capped at the budget; the anti-rug path is capped by its withTimeout, which then counts the exit as failed.",
+  "status": "confirmed",
+  "severity_rationale": "S2: proven by the code; the condition is a stalled Telegram API connection. Delaying an exit is a bounded loss, and the watchdog and anti-rug budgets cap the delay (while turning it into a failed exit).",
+  "recommendation": "Never await an alert before a money action (fire and forget with a short timeout), and give the notifier a request timeout. Card EXIT-04. Phase 24 for the pre-sell awaits."
+}

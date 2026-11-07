@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-001",
+    "AUD-EXIT-004"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-09",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-011",
+  "title": "Public fallback quotes first, then waits for an approve with no timeout, then swaps with the old quote as its floor, so a draining pool makes the fallback revert",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C04",
+    "C05",
+    "C15"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:519-523@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "expectedOut from getAmountsOut, minOut = computePublicMinOut(expectedOut, slippagePct) computed before the approve"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:540-547@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "approve under the nonce lock and wait for it to be mined (no timeout); during an anti-rug exit this can be several blocks"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:549-555@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the swap is then sent with the pre-approve minOut and a 600 s deadline"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:464-476@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routine slippage 5%, anti-rug max(15, 10, routine)"
+    }
+  ],
+  "sibling_sites_checked": "Only one public sell exists (:508-564). The private legs have no floor at all (AUD-EXIT-001). After a revert the catch keeps the position monitored and re-arms the timer; the retry then runs as a routine exit (routine slippage, two private attempts first), because anti-rug fires again only on a new pool event (ANTIRUG slice).",
+  "status": "candidate",
+  "severity_rationale": "S2: the order is a code fact; whether the approve wait is long enough for the floor to go stale during a real drain needs a Phase 23 measurement. Effect: the guaranteed exit can revert exactly when liquidity is leaving, costing a full retry cycle at routine parameters.",
+  "recommendation": "Re-quote after the approve (or approve earlier, card EXIT-03) so the floor is computed right before the swap. Card EXIT-09. Phase 24."
+}

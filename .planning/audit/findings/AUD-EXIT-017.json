@@ -1,0 +1,65 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-010"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-08",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-017",
+  "title": "Exit bookkeeping is not crash-consistent: a partial tier can be re-sold after a crash, a sold position is resumed as failed, and a sold row is written before the still-held check",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1531-1575@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial: the tx lands (:1531), then await decodeReceipt (:1545-1547), then insertTrade (:1550) and only then the tiers are marked and persisted (:1568-1575); a crash during decodeReceipt leaves the tier unmarked, so a restart sells it again"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1073-1102@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "full: insertTrade(status sold) runs before the post-sell balance check, so a still-held position also gets a sold sell row (:1107-1111)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1935-1938@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resume: a zero balance marks the buy row failed, so a position that sold just before a crash (sell landed, teardown not reached) is recorded as failed"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1058-1059@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a decodeReceipt throw after a landed sell goes to the catch, which tears down correctly but inserts no sell row"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:667-675@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "teardownGenuineClose writes four separate statements with no transaction"
+    }
+  ],
+  "sibling_sites_checked": "All exit writes: insertTrade (:1073, :1550), upsertExitState (:1575, :1646, :1829, :1891, :2001), markExitFailedHeld (:700), updateTradeStatus (:668, :1163), deleteExitState (:670). None is in a transaction. The re-sold-tier window is the decodeReceipt RPC call between the landed tx and the tier persist.",
+  "status": "candidate",
+  "severity_rationale": "S2: the orderings are code facts; a loss needs a crash or kill inside a short window. The capital part is the partial tier sold twice after a restart (selling more of the position than configured). The rest is P&L and status accuracy.",
+  "recommendation": "Persist tier completion (keyed by tx hash) before the receipt decode, insert the sell row after the balance check with the real outcome, and wrap teardown writes in one transaction. Card EXIT-08. Phase 29, or Phase 24 for the tier re-sell."
+}

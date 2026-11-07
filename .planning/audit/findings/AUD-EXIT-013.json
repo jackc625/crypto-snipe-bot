@@ -1,0 +1,86 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-003"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-10",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-013",
+  "title": "After a restart (and in the dashboard sells) a position is quoted and sold through the first V2 or V3 dex of its chain, not the dex it was bought on, so positions on a second dex lose working exits",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/api/routes/controls.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1940-1956@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeMultiChainMonitoring picks ctx.chain.dexes.find(isDexV3) or find(isDexV2), the first of each type, and passes it to resumeExitMonitor"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1732-1734@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "listeners start for every dex of the chain, so buys happen on all of them (sushiswap-v2 on ETH, biswap-v2 and pancakeswap-v3 on BSC, aerodrome on Base, camelot-v2 on Arbitrum; chainRegistry.ts:176-390)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1145@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the buy row stores dexName: dex.name (also :787, :1469); the resume query does not read it (db.ts:597-604)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:33-40@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "findDex for the dashboard sells has the same first-of-type rule"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1954-2045@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeExitMonitor uses the given dex for every quote (:1980, and pollExitStrategy) and every later sell"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:723-732@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a failed dashboard sell re-arms the monitor with the dex it was given, so the wrong dex then sticks for that process"
+    }
+  ],
+  "sibling_sites_checked": "Every place a dex is chosen for an existing position: bot.ts resume (:1940-1956, first of type), controls.ts findDex (:33-40, first of type), exitEngine.ts re-arm (:731, passes through whatever dex the failed exit had), the in-process monitor started at buy time (correct dex). If the wrong router has no pair for the token the quote reverts (null every tick, no exit at all, not even urgency, AUD-EXIT-003) and the sell reverts. If it has a different pool, exits run on that pool. Sibling noted for the BUY/DB slices: the aerodrome router (chainRegistry.ts:315-318) is typed v2 but its router takes Route[] rather than address[] paths, so the V2 ROUTER_ABI calls cannot match it (candidate, not verified against its ABI here).",
+  "status": "confirmed",
+  "severity_rationale": "S1. Proven by the code: the dex identity is stored but not used on resume or in the dashboard sells. Plausible condition: any restart while a position bought on a non-first dex is open. Not S0 because it needs that restart (or a dashboard sell) and anti-rug resumes separately.",
+  "recommendation": "Resolve the dex by the stored dex_name (fail loud if it is missing or not configured) in the resume path and the dashboard sells. Card EXIT-10. Phase 24.",
+  "traces": [
+    {
+      "scenario": "resumed-exit",
+      "steps": [
+        "Boot: startMultiChainBot calls resumeMultiChainMonitoring (bot.ts:1797) before resumeAntiRugMonitoring (:1805) and before installExitWatchdog (:1879, AUD-EXIT-019)",
+        "getResumeExitMonitorTrades (db.ts:597-604) returns pending buys plus every exit_failed_held row",
+        "Per trade, balanceOf (bot.ts:1933-1934): 0 -> updateTradeStatus(\"failed\") even if the position was sold before a crash (AUD-EXIT-017) and return",
+        "Dex chosen as the first V3 (when pool_type v3 and fee_tier set) or the first V2 of the chain, ignoring the stored dex_name (bot.ts:1940-1956; this finding)",
+        "resumeExitMonitor (:1954) with buyAmountNative = ctx.chain.snipeAmount (the current setting, not the probe used at entry, AUD-EXIT-015)",
+        "exit_state row present -> deserializeExitState (:1969): entry price, high-water mark, tiers and urgencyStartTs restored; a position older than 30 minutes fires the urgency exit on its first good tick",
+        "No row (the monitor never started, AUD-EXIT-002) -> one fresh quote; null returns with no monitor; otherwise a fresh state with originalTokenAmount = current balance and urgency restarted",
+        "setInterval poll armed (:2007-2042) and registered (:2044)"
+      ],
+      "outcome": "State written: exit_state restored or created (urgency_start_ts and entry price are never updated by the upsert, db.ts:505-513); buy row unchanged, or marked failed when the balance is 0. The dex and probe used from here on can differ from the ones the position was bought and baselined with."
+    }
+  ]
+}

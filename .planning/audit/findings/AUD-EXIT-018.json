@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-004"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "BUY-03",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-018",
+  "title": "Exit monitors are keyed by chain and token, so a second open trade of the same token replaces the first trade's monitor and baseline",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C12",
+    "C14"
+  ],
+  "files": [
+    "src/utils/exitManager.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/exitManager.ts:161-176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "registerExitMonitor clears any existing timers under chain:token and stores only the new interval"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1945@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor registers per chain:token, not per tradeId (also :2044)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:667-670@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "teardownGenuineClose marks every pending row of the token sold but deletes only its own tradeId exit_state row"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1736@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial amounts come from the surviving trade state originalTokenAmount only"
+    }
+  ],
+  "sibling_sites_checked": "All per-token keyed state: sell lock, position queue, timer registry (exitManager.ts), routine pause set (:644). A second open trade of one token on one chain is reachable through the double-buy race (AUD-BUY-004) or through a re-buy while a failed-held position is open. The full sell sells the whole balance, so both trades exit together; partial tiers and the stop/trailing baseline follow only the newer trade.",
+  "status": "candidate",
+  "severity_rationale": "S2: needs two open trades of one token (itself a BUY S1 defect). Effect is wrong exit sizing and baselines plus an orphaned exit_state row, not a strand.",
+  "recommendation": "Fix at the source (one open position per token, card BUY-03); if two trades can coexist, key monitors by tradeId. Phase 24 with AUD-BUY-004."
+}

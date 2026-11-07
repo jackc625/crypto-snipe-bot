@@ -1,0 +1,49 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "EXIT-08",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-020",
+  "title": "Exit teardown trusts one balance read at one confirmation, so a reorg of the sell block leaves a held position torn down",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C08"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1099-1105@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "post-sell balanceOf <= dust -> teardownGenuineClose immediately"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1044",
+      "note": "wait() default confirms is 1"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:667-675@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "teardown unsubscribes anti-rug, deletes exit_state and clears timers, all irreversible within the process"
+    }
+  ],
+  "sibling_sites_checked": "Every teardown decision (:841-846, :984-992, :1099-1105, :1143-1157) reads balanceOf once at the node head. No confirmation depth or later re-check exists in the slice.",
+  "status": "candidate",
+  "severity_rationale": "S3: reorgs deep enough to drop a mined sell are rare on the four chains; if one happens the position is held with no monitor or anti-rug.",
+  "recommendation": "Re-check the balance after a few blocks before the irreversible teardown, or keep a cheap watcher until finality. Card EXIT-08. Phase 29."
+}

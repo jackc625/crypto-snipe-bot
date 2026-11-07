@@ -1,0 +1,54 @@
+[
+  {
+    "path": "src/exitEngine.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-EXIT-001",
+      "AUD-EXIT-002",
+      "AUD-EXIT-003",
+      "AUD-EXIT-004",
+      "AUD-EXIT-005",
+      "AUD-EXIT-006",
+      "AUD-EXIT-007",
+      "AUD-EXIT-008",
+      "AUD-EXIT-009",
+      "AUD-EXIT-010",
+      "AUD-EXIT-011",
+      "AUD-EXIT-013",
+      "AUD-EXIT-014",
+      "AUD-EXIT-015",
+      "AUD-EXIT-016",
+      "AUD-EXIT-017",
+      "AUD-EXIT-018",
+      "AUD-EXIT-019",
+      "AUD-EXIT-020",
+      "AUD-EXIT-021"
+    ]
+  },
+  {
+    "path": "src/utils/exitManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-EXIT-012",
+      "AUD-EXIT-014",
+      "AUD-EXIT-018"
+    ]
+  },
+  {
+    "path": "src/utils/exitWatchdog.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-EXIT-009",
+      "AUD-EXIT-019",
+      "AUD-EXIT-021"
+    ]
+  },
+  {
+    "path": "src/utils/withTimeout.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-EXIT-009",
+      "AUD-EXIT-014"
+    ]
+  }
+]

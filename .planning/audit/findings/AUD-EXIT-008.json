@@ -1,0 +1,70 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-007"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-07",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-008",
+  "title": "Dashboard force-sell and emergency-sell are sent as a routine exit, so a position whose routine retries are paused cannot be sold from the dashboard, even though the pause alert tells the operator to act manually",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/api/routes/controls.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:96-104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell calls executeFullSell with reason urgency-market-sell"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:169-177@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emergency-sell does the same"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:824-830@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell skips any non-anti-rug reason when isRoutinePaused, before the sell lock, returning false"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:738-749@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the pause is set after EXIT_ROUTINE_MAX_FAILURES consecutive failures; the alert says \"inspect the position ... and resume manually\""
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:644@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routinePausedPositions is an in-memory Set; it is cleared only by a genuine close (:674); there is no resume or override path in the slice"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:106-112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "false is reported as 409 \"Sell already in progress for this position\", which is wrong here; the timers were already cleared at :92"
+    }
+  ],
+  "sibling_sites_checked": "Both dashboard sell routes (controls.ts force-sell :96-104, emergency-sell :169-177) and the pause check (:824-830). The success-still-held path (:1110) and the inconclusive path (:995) leave the buy row pending, so those positions are selectable by the dashboard but then refused by the pause; positions failed through the catch are marked failed (:1163) and are not selectable at all, which is the ESC-PRE-04 sibling owned by 22-22 (key:API:failed-held-sell-selection). The two gaps together mean a paused position cannot be sold from the dashboard either way. The only exits left are anti-rug (bypasses the pause) or a restart.",
+  "status": "confirmed",
+  "severity_rationale": "S1. Proven by the code. The plausible condition is the one the pause is built for: five failed routine exits on a still-held position (a sell-reverting token, a relay outage). The bot then tells the operator to act manually, and the dashboard controls refuse with a misleading \"already in progress\". Not S0 because anti-rug still fires and a restart lifts the pause for one more attempt.",
+  "recommendation": "Give operator sells their own reason that bypasses the routine pause (as anti-rug does), report the real reason a sell did not run, and offer an explicit resume. Card EXIT-07. Phase 24 together with the ESC-PRE-04 fix."
+}

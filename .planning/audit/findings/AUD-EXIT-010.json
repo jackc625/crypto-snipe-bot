@@ -1,0 +1,56 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-017"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "EXIT-08",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-010",
+  "title": "wait() errors on exit paths are not classified: a repriced replacement or a status-0 receipt both land in the generic catch, which stays capital-safe through the balance check but records and alerts the wrong outcome",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1112-1127",
+      "note": "on replacement wait() throws TRANSACTION_REPLACED with reason repriced, cancelled or replaced; repriced still throws (cancelled is false only for repriced)"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1135-1143",
+      "note": "checkReceipt throws CALL_EXCEPTION for a status-0 receipt"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:552-562@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public fallback awaits stx.wait() and returns stx.hash; no error is inspected"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1112-1157@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "catch: re-fetch balanceOf; <= dust is treated as a genuine close with the alert \"sell reported failure but position closed\"; no sell trades row is inserted on this path (insertTrade is at :1073, before)"
+    }
+  ],
+  "sibling_sites_checked": "All three wait() sites (:422, :545, :556). The balance-is-truth catch covers every error class: a repriced sell that landed reads balance ~0 and is torn down; a reverted sell reads the balance held and keeps monitoring. Private-leg receipts come from the TX slice (reconciliation), not wait().",
+  "status": "confirmed",
+  "severity_rationale": "S3: no capital effect found, because the balance re-fetch decides teardown. What remains is a landed (repriced) sell with no sell row, so its proceeds are missing from P&L, and an alert that says the sell failed.",
+  "recommendation": "On TRANSACTION_REPLACED use err.receipt (check its status) to record the landed sell; on CALL_EXCEPTION record a reverted attempt. Card EXIT-08 (exit bookkeeping). Phase 29."
+}

@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-013"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "EXIT-04",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-019",
+  "title": "Resumed positions can trigger exits before the exit-worker watchdog is installed, so those first exits run unbounded",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/exitEngine.ts",
+    "src/utils/exitWatchdog.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1797@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeMultiChainMonitoring arms resumed polls"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1805@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "then await resumeAntiRugMonitoring (RPC backfill)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "installExitWatchdog runs only after the listeners and Telegram start"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1279@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "until then the worker uses identityWatchdog (no bound); drain reads this.watchdog per item (:1399)"
+    }
+  ],
+  "sibling_sites_checked": "The only watchdog install site (bot.ts:2177-2182) and the boot order around it. Resumed positions older than 30 minutes fire the urgency exit on their first good tick, 5 s after resume, which is likely before :1879 when the anti-rug backfill is slow.",
+  "status": "confirmed",
+  "severity_rationale": "S3: the order is a code fact; the effect is a liveness bound missing for the first boot-time exits only.",
+  "recommendation": "Install the watchdog before any monitor is armed. Card EXIT-04 (no trading-rule change, only ordering). Phase 29."
+}

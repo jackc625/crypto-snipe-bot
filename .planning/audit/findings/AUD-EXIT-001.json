@@ -1,0 +1,91 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-011"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-14",
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-03"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-001",
+  "title": "Private (MEV-routed) sells accept any output: amountOutMin = 0 on V2 and V3, full and partial sells",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C04"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:351-372@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildV2SellTx encodes swapExactTokensForETH(amount, 0, path, wallet, deadline): the second argument, amountOutMin, is the literal 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:378-407@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildV3SellTx sets amountOutMinimum: 0n (:395) inside exactInputSingle, wrapped in multicall(deadline, ...)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:870-876@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell builds the private-leg tx with these builders for every full-exit reason (trailing-stop, stop-loss, urgency-market-sell, anti-rug)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1508-1514@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executePartialSell uses the same builders, so partial take-profit sells also have no output floor"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitPrivateSell sends the zero-floor tx through escalatePrivateSell (the per-chain MEV strategy) under the wallet nonce lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: the public fallback computes a real floor, computePublicMinOut(expectedOut, slippagePct), from a fresh quote; only the private leg has none"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:327@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Base mevStrategy is passthrough (direct submission to the sequencer); :384 Arbitrum also passthrough; :201 ETH flashbots, :270 BSC bloxroute. On Base and Arbitrum the \"private\" sell is a normal sequencer submission with no floor"
+    }
+  ],
+  "sibling_sites_checked": "Every swap builder in the slice: buildV2SellTx (:351-372, minOut 0), buildV3SellTx (:378-407, minOut 0), executePublicFallbackSell (:508-564, bounded minOut via computePublicMinOut, :520-523). Callers: executeFullSell V3 (:871-872) and V2 (:874-875), executePartialSell V3 (:1509-1510) and V2 (:1512-1513). No other amountOutMin/minOut in the slice (sweep C04). The buy-side sibling (snipe minOut 0 on a failed quote) is AUD-BUY-003 / card OD-15; the deliberate private buy leg with a documented 0 floor is recorded there too.",
+  "status": "confirmed",
+  "severity_rationale": "S1, equal to the research suggestion. The code alone proves every private sell (full and partial, V2 and V3) is sent with no minimum output. A loss needs a condition: the price moving between the trigger and inclusion (a bundle can land blocks later, up to the confirm window per attempt), a sell-tax raised by the token owner so the swap succeeds with almost nothing instead of reverting, or a chain where the private route is a plain sequencer submission (Base, Arbitrum passthrough). Not S0: the private routing removes the ordinary public sandwich on ETH and BSC, and the loss is bounded by the position. Whether 0 is deliberate for anti-rug exits is a decision (card OD-14).",
+  "recommendation": "Decide on card OD-14 whether private sells keep a zero floor, use a bounded floor from a fresh quote (computePublicMinOut), or use a bounded floor for routine exits and keep 0 only for anti-rug exits. Phase 24, after a Phase 23 real-path proof (fork replay of a rug and a taxed token). Nothing is changed in Phase 22.",
+  "traces": [
+    {
+      "scenario": "full-exit",
+      "steps": [
+        "Trigger: pollExitStrategy (:1699) detects trailing-stop (:1750-1773), stop-loss (:1781-1797) or urgency (:1801-1815) and calls enqueueExit, then returns continue (the 5 s interval stays armed)",
+        "ExitWorker.enqueue (:1322) takes the per-position queue lock (tryEnqueuePosition, exitManager.ts:66-71) and kicks drain (:1361); drain runs the item through the installed watchdog (:1399; bot.ts:2177-2181 installs a 60 s budget)",
+        "executeFullSell (:809): routine-pause check (:824-830), per-token sell lock (:832), balanceOf (:839); a zero balance is torn down as a genuine close (:841-846)",
+        "Approval under the wallet nonce lock: ensureApproval approves exactly the balance and waits with no timeout (:871/:874 -> :419-423); the approve goes to the public mempool (AUD-EXIT-004)",
+        "Alert awaited before the sell (:893; axios with no timeout, AUD-EXIT-021), then submitPrivateSell (:909) with amountOutMin 0 (this finding)",
+        "Landed: txHash set (:911-914). Not landed: reconcile the last broadcast hash (:939-973); inconclusive -> balance-truth teardown without a public sell (:984-997); otherwise re-fetch balanceOf and sell only the held amount on the V2 public fallback with a bounded minOut (:1001-1021); V3 has no fallback (AUD-EXIT-007)",
+        "decodeReceipt (:1058-1070), then insertTrade(action sell, status sold) (:1073-1092) before the post-sell balance check",
+        "balanceOf <= dust (computeDustThreshold, :615-622) -> teardownGenuineClose (:667-675): trades buy rows still pending -> sold (updateTradeStatus matches status pending only, db.ts:325-327), clearAllTimersForToken, deleteExitState, unsubscribe anti-rug, lift routine pause; confirm alert (:1101-1105)"
+      ],
+      "outcome": "State written on a clean full exit: a trades row (action sell, status sold, amount_in = amount actually sold); the buy row moved pending -> sold; exit_state row deleted; poll timer cleared; anti-rug unsubscribed. The sell itself carried no output floor on the private leg."
+    }
+  ]
+}

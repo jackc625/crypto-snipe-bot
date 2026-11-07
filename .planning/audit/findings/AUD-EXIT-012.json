@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-18 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-012",
+  "title": "Legacy single-argument lock and timer overloads key by token alone, a second key space that does not exclude the chain:token keys",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C15"
+  ],
+  "files": [
+    "src/utils/exitManager.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/exitManager.ts:16-34@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tryAcquireSellLock / releaseSellLock: one argument gives key token.toLowerCase(), two arguments give chain:token"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitManager.ts:106-157@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "registerStopLoss, registerTakeProfit, registerTimedSell keep legacy (token, handle) overloads"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitManager.ts:199-212@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "clearAllTimersForToken has the same dual keying"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -E \"(tryAcquireSellLock|releaseSellLock|clearAllTimersForToken|registerStopLoss|registerTakeProfit|registerTimedSell)\\(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "every caller at the base SHA uses the two-argument form (exitEngine.ts :669, :832, :1169, :1483, :1590; exitTrigger.ts:240; controls.ts:92, :167); registerStopLoss/TakeProfit/TimedSell have no callers"
+    }
+  ],
+  "sibling_sites_checked": "All overloads in exitManager.ts and every caller in src/ and scripts/ at the base SHA (command evidence). tryEnqueuePosition and hasExitMonitorTimer are two-argument only.",
+  "status": "confirmed",
+  "severity_rationale": "S4: latent, no caller uses the legacy form today. A future caller using it would not exclude a chain-keyed exit of the same token (a double sell). The three registrars are dead code.",
+  "recommendation": "Delete the single-argument overloads and the three dead registrars (Phase 25 audited dead-code removal). No behaviour change, so no card."
+}
