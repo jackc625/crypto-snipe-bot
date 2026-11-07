@@ -31,6 +31,13 @@
 //      table's primary key, and a cross-reference of token / tx_hash /
 //      pair_or_pool_address values against the hex literals in test/ at
 //      --test-literals-sha.
+//   5. Blind-spot closers (added during 22-06 execution): a WAL frame
+//      inventory plus a commit-by-commit replay (each commit state rebuilt by
+//      SQLite's own recovery on a throwaway copy holding E's main bytes and a
+//      WAL truncated at that commit), which surfaces rows inserted and deleted
+//      again inside the window ("transient rows"); sqlite_sequence per image
+//      (reveals deleted AUTOINCREMENT ids); and a scan of E's raw bytes for
+//      0x hex strings that no live row holds (residue of deleted rows).
 //
 // A literal match is not proof of test authorship. Each matched literal has a
 // provenance class:
@@ -142,10 +149,71 @@ interface ImageData {
     header_bytes_18_19_original: number[] | null;
     header_patched: boolean;
     user_version: number | null;
+    change_counter: number | null;
     integrity: string;
     integrity_ok: boolean;
     tables: Record<string, TableInfo>;
     rows: Record<string, Row[]>;
+    sqlite_sequence: Row[];
+}
+
+interface WalFrame {
+    frame: number;
+    page: number;
+    commit_db_pages: number;
+    salt_matches_header: boolean;
+}
+
+interface CommitPoint {
+    frame: number;
+    pages_written: number[];
+    user_version: number | null;
+    change_counter: number | null;
+    integrity: string;
+    counts: Record<string, number | 'absent'>;
+    rows_equal_merged_image: boolean;
+}
+
+interface TransientRow {
+    table: string;
+    key: string;
+    first_commit_frame: number;
+    last_commit_frame: number;
+    literal_matches: { column: string; literal: string; literal_provenance: LiteralInfo['provenance']; test_paths: string[] }[];
+    corroboration: string[];
+    attribution: MatchEntry['attribution'] | 'unknown-origin';
+    row: Row;
+}
+
+interface WalReport {
+    present: boolean;
+    bytes: number;
+    magic: string | null;
+    format_version: number | null;
+    page_size: number | null;
+    checkpoint_sequence: number | null;
+    salts: string[] | null;
+    frame_count: number;
+    trailing_bytes: number;
+    frames_salt_matching: number;
+    commit_frames: number;
+    pages_touched: number[];
+    frames: WalFrame[];
+    replay_method: string;
+    commit_points: CommitPoint[];
+    distinct_row_states: number;
+    transient_rows: TransientRow[];
+}
+
+interface ResidualHex {
+    file: string;
+    /** The test literal hit, or (no hit) the 64-hex candidate if the run is long enough, else the 40-hex one. */
+    literal: string;
+    /** In SQLite records adjacent column bytes follow a value directly, so a run is cut at 40 and/or 64 hex. */
+    candidates: string[];
+    occurrences: number;
+    test_literal_provenance: LiteralInfo['provenance'] | null;
+    test_paths: string[];
 }
 
 interface LiteralInfo {
@@ -232,6 +300,8 @@ interface Report {
     attribution_counts: Record<string, number>;
     unknown_origin_diff_rows: UnknownOriginRow[];
     extraction_limits: { path: string; patterns: string[] }[];
+    wal: WalReport | null;
+    residual_hex_strings: ResidualHex[] | null;
     rows_merged_image: Record<string, Row[]> | null;
 }
 
@@ -382,10 +452,12 @@ function emptyImage(): ImageData {
         header_bytes_18_19_original: null,
         header_patched: false,
         user_version: null,
+        change_counter: null,
         integrity: 'not run',
         integrity_ok: false,
         tables: {},
         rows: {},
+        sqlite_sequence: [],
     };
 }
 
@@ -401,6 +473,7 @@ function openImage(raw: Buffer | null, rawError: string | null): { img: ImageDat
         const p = toRollbackHeader(raw);
         img.header_bytes_18_19_original = p.original;
         img.header_patched = p.patched;
+        img.change_counter = p.buf.readUInt32BE(24);
         db = new Database(p.buf, { readonly: true });
         db.defaultSafeIntegers(true);
     } catch (e) {
@@ -452,6 +525,13 @@ function openImage(raw: Buffer | null, rawError: string | null): { img: ImageDat
             };
             img.rows[t] = rows;
         }
+        if (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'`).get()) {
+            img.sqlite_sequence = (db.prepare('SELECT * FROM sqlite_sequence ORDER BY name').all() as Record<string, unknown>[]).map((r) => {
+                const o: Row = {};
+                for (const k of Object.keys(r)) o[k] = normCell(r[k]);
+                return o;
+            });
+        }
     } catch (e) {
         if (e instanceof ForensicFailure) throw e;
         img.integrity = `${img.integrity}\nquery error after integrity ok: ${errMsg(e)}`;
@@ -474,12 +554,23 @@ function imageSummary(img: ImageData): Record<string, unknown> {
         header_bytes_18_19_original: img.header_bytes_18_19_original,
         header_patched: img.header_patched,
         user_version: img.user_version,
+        change_counter: img.change_counter,
         integrity: img.integrity,
         counts,
         tables,
+        sqlite_sequence: img.sqlite_sequence,
         pause_state: img.rows.pause_state ?? [],
         chain_state: img.rows.chain_state ?? [],
     };
+}
+
+function imageCounts(img: ImageData): Record<string, number | 'absent'> {
+    const counts: Record<string, number | 'absent'> = {};
+    for (const t of TABLES) {
+        const ti = img.tables[t];
+        counts[t] = ti && ti.present ? (ti.count as number) : 'absent';
+    }
+    return counts;
 }
 
 // ---------------------------------------------------------------------------
@@ -659,6 +750,50 @@ function isTrivialValue(v: string): boolean {
 // Matching and classification
 // ---------------------------------------------------------------------------
 
+/** "values:<cols>@<path>" for every test file where >= 2 other non-trivial column values sit near the literal. */
+function valueCorroboration(row: Row, pk: string, col: string, li: LiteralInfo, idx: LiteralIndex): string[] {
+    const out: string[] = [];
+    if (li.provenance !== 'synthetic') return out;
+    for (const p of [...li.occurrences.keys()].sort()) {
+        const vals = windowValues(idx, p, li.occurrences.get(p) as number[]);
+        const hit = Object.keys(row)
+            .filter((c) => c !== pk && c !== col)
+            .filter((c) => {
+                const cv = row[c];
+                if (cv === null) return false;
+                const s = String(cv).toLowerCase();
+                return !isTrivialValue(s) && vals.has(s);
+            })
+            .sort();
+        if (hit.length >= 2) out.push(`values:${hit.join(',')}@${p}`);
+    }
+    return out;
+}
+
+function attributionOf(li: LiteralInfo, corroboration: string[]): MatchEntry['attribution'] {
+    if (li.provenance === 'production-constant') return 'production-constant-literal';
+    if (li.provenance === 'public-historical') return 'public-historical-literal';
+    return corroboration.length > 0 ? 'attributed-test-write' : 'literal-match-uncorroborated';
+}
+
+const ATTRIBUTION_RANK: Record<MatchEntry['attribution'], number> = {
+    'attributed-test-write': 3,
+    'literal-match-uncorroborated': 2,
+    'public-historical-literal': 1,
+    'production-constant-literal': 0,
+};
+
+function literalHitsOfRow(row: Row, idx: LiteralIndex): { column: string; li: LiteralInfo }[] {
+    const out: { column: string; li: LiteralInfo }[] = [];
+    for (const col of MATCH_COLUMNS) {
+        const v = row[col];
+        if (typeof v !== 'string') continue;
+        const li = idx.literals.get(v.toLowerCase());
+        if (li) out.push({ column: col, li });
+    }
+    return out;
+}
+
 function classify(
     A: ImageData,
     B: ImageData,
@@ -678,12 +813,7 @@ function classify(
         return 'unchanged';
     };
 
-    const rank: Record<MatchEntry['attribution'], number> = {
-        'attributed-test-write': 3,
-        'literal-match-uncorroborated': 2,
-        'public-historical-literal': 1,
-        'production-constant-literal': 0,
-    };
+    const rank = ATTRIBUTION_RANK;
 
     for (const t of TABLES) {
         const pk = A.tables[t]?.pk ?? B.tables[t]?.pk ?? EXPECTED_PK[t];
@@ -709,25 +839,8 @@ function classify(
                     const inDiff = changeOf(t, k);
                     const corroboration: string[] = [];
                     if (inDiff === 'added' || inDiff === 'changed') corroboration.push(`diff:${inDiff}`);
-                    if (li.provenance === 'synthetic') {
-                        for (const p of [...li.occurrences.keys()].sort()) {
-                            const vals = windowValues(idx, p, li.occurrences.get(p) as number[]);
-                            const hit = Object.keys(row)
-                                .filter((c) => c !== pk && c !== col)
-                                .filter((c) => {
-                                    const cv = row[c];
-                                    if (cv === null) return false;
-                                    const s = String(cv).toLowerCase();
-                                    return !isTrivialValue(s) && vals.has(s);
-                                })
-                                .sort();
-                            if (hit.length >= 2) corroboration.push(`values:${hit.join(',')}@${p}`);
-                        }
-                    }
-                    let attribution: MatchEntry['attribution'];
-                    if (li.provenance === 'production-constant') attribution = 'production-constant-literal';
-                    else if (li.provenance === 'public-historical') attribution = 'public-historical-literal';
-                    else attribution = corroboration.length > 0 ? 'attributed-test-write' : 'literal-match-uncorroborated';
+                    corroboration.push(...valueCorroboration(row, pk, col, li, idx));
+                    const attribution = attributionOf(li, corroboration);
                     const image: MatchEntry['image'] = imgs.has('A') && imgs.has('B') ? 'A+B' : imgs.has('A') ? 'A' : 'B';
                     matches.push({
                         table: t,
@@ -794,6 +907,223 @@ function classify(
             : compareKeys(a.key, b.key) || (a.matched_column < b.matched_column ? -1 : a.matched_column > b.matched_column ? 1 : 0) || (a.literal < b.literal ? -1 : a.literal > b.literal ? 1 : 0),
     );
     return { matches, unknown };
+}
+
+// ---------------------------------------------------------------------------
+// WAL frame inventory and commit-by-commit replay
+// ---------------------------------------------------------------------------
+//
+// The two-image diff cannot see a row that was inserted and deleted again
+// inside the window. The replay closes that gap without hand-parsing pages:
+// for every commit frame k, a fresh throwaway folder R gets E's main-file
+// bytes plus the first k frames of E's -wal (truncated at a frame boundary);
+// SQLite's own recovery then yields exactly the state as of commit k. Only
+// the frame headers are read here (page number, commit marker, salts).
+
+const REPLAY_METHOD =
+    'per commit frame k: throwaway copy = E main bytes + first k WAL frames; SQLite recovery, serialize, header patch, read-only in-memory open';
+
+const hex8 = (n: number): string => '0x' + n.toString(16).padStart(8, '0');
+
+function analyzeWal(E: string, A: ImageData, B: ImageData, idx: LiteralIndex): { report: WalReport; failures: string[] } {
+    const failures: string[] = [];
+    const rep: WalReport = {
+        present: false,
+        bytes: 0,
+        magic: null,
+        format_version: null,
+        page_size: null,
+        checkpoint_sequence: null,
+        salts: null,
+        frame_count: 0,
+        trailing_bytes: 0,
+        frames_salt_matching: 0,
+        commit_frames: 0,
+        pages_touched: [],
+        frames: [],
+        replay_method: REPLAY_METHOD,
+        commit_points: [],
+        distinct_row_states: 0,
+        transient_rows: [],
+    };
+    const walPath = path.join(E, 'bot.db-wal');
+    if (!fs.existsSync(walPath)) return { report: rep, failures };
+    const wal = fs.readFileSync(walPath);
+    rep.present = true;
+    rep.bytes = wal.length;
+    if (wal.length < 32) {
+        rep.trailing_bytes = wal.length;
+        return { report: rep, failures };
+    }
+    const magic = wal.readUInt32BE(0);
+    rep.magic = hex8(magic);
+    if (magic !== 0x377f0682 && magic !== 0x377f0683) {
+        failures.push(`WAL magic ${rep.magic} is not a SQLite WAL header`);
+        return { report: rep, failures };
+    }
+    rep.format_version = wal.readUInt32BE(4);
+    const ps = wal.readUInt32BE(8);
+    rep.page_size = ps;
+    rep.checkpoint_sequence = wal.readUInt32BE(12);
+    const salt1 = wal.readUInt32BE(16);
+    const salt2 = wal.readUInt32BE(20);
+    rep.salts = [hex8(salt1), hex8(salt2)];
+    const fsz = 24 + ps;
+    const n = Math.floor((wal.length - 32) / fsz);
+    rep.frame_count = n;
+    rep.trailing_bytes = wal.length - 32 - n * fsz;
+    const pages = new Set<number>();
+    for (let i = 0; i < n; i++) {
+        const o = 32 + i * fsz;
+        const f: WalFrame = {
+            frame: i + 1,
+            page: wal.readUInt32BE(o),
+            commit_db_pages: wal.readUInt32BE(o + 4),
+            salt_matches_header: wal.readUInt32BE(o + 8) === salt1 && wal.readUInt32BE(o + 12) === salt2,
+        };
+        rep.frames.push(f);
+        if (f.salt_matches_header) {
+            rep.frames_salt_matching++;
+            pages.add(f.page);
+            if (f.commit_db_pages > 0) rep.commit_frames++;
+        }
+    }
+    rep.pages_touched = [...pages].sort((a, b) => a - b);
+
+    const pkOf = (t: TableName): string => A.tables[t]?.pk ?? B.tables[t]?.pk ?? EXPECTED_PK[t];
+    const finalRows = new Map<string, string>();
+    const startRows = new Map<string, string>();
+    for (const t of TABLES) {
+        for (const r of A.rows[t] ?? []) finalRows.set(`${t}\u0000${String(r[pkOf(t)])}`, stableJson(r));
+        for (const r of B.rows[t] ?? []) startRows.set(`${t}\u0000${String(r[pkOf(t)])}`, stableJson(r));
+    }
+    const states = new Set<string>([stableJson(B.rows)]);
+    const transient = new Map<string, TransientRow>();
+    const mainBytes = path.join(E, 'bot.db');
+    let pending: number[] = [];
+    for (const f of rep.frames) {
+        if (!f.salt_matches_header) continue;
+        pending.push(f.page);
+        if (f.commit_db_pages === 0) continue;
+        const R = fs.mkdtempSync(path.join(os.tmpdir(), 'forensic-R-'));
+        let buf: Buffer | null = null;
+        let err: string | null = null;
+        try {
+            fs.copyFileSync(mainBytes, path.join(R, 'bot.db'));
+            fs.writeFileSync(path.join(R, 'bot.db-wal'), wal.subarray(0, 32 + f.frame * fsz));
+            const r = new Database(path.join(R, 'bot.db'), { fileMustExist: true });
+            try {
+                buf = r.serialize();
+            } finally {
+                r.close();
+            }
+        } catch (e) {
+            err = `replay copy at frame ${f.frame} could not be opened/serialized: ${errMsg(e)}`;
+        } finally {
+            fs.rmSync(R, { recursive: true, force: true });
+        }
+        const { img, db } = openImage(buf, err);
+        db?.close();
+        if (!img.integrity_ok) failures.push(`replay image at commit frame ${f.frame} integrity: ${img.integrity}`);
+        rep.commit_points.push({
+            frame: f.frame,
+            pages_written: [...new Set(pending)].sort((a, b) => a - b),
+            user_version: img.user_version,
+            change_counter: img.change_counter,
+            integrity: img.integrity,
+            counts: imageCounts(img),
+            rows_equal_merged_image: stableJson(img.rows) === stableJson(A.rows),
+        });
+        pending = [];
+        if (!img.integrity_ok) continue;
+        states.add(stableJson(img.rows));
+        for (const t of TABLES) {
+            const pk = pkOf(t);
+            for (const r of img.rows[t] ?? []) {
+                const k = String(r[pk]);
+                const id = `${t}\u0000${k}`;
+                const rj = stableJson(r);
+                if (rj === finalRows.get(id) || rj === startRows.get(id)) continue;
+                const tid = `${id}\u0000${rj}`;
+                const prev = transient.get(tid);
+                if (prev) {
+                    prev.last_commit_frame = f.frame;
+                    continue;
+                }
+                const hits = literalHitsOfRow(r, idx);
+                let best: TransientRow['attribution'] = 'unknown-origin';
+                const corroboration = ['diff:transient'];
+                for (const h of hits) {
+                    const vc = valueCorroboration(r, pk, h.column, h.li, idx);
+                    corroboration.push(...vc);
+                    const a = attributionOf(h.li, ['diff:transient', ...vc]);
+                    if (best === 'unknown-origin' || ATTRIBUTION_RANK[a] > ATTRIBUTION_RANK[best]) best = a;
+                }
+                transient.set(tid, {
+                    table: t,
+                    key: k,
+                    first_commit_frame: f.frame,
+                    last_commit_frame: f.frame,
+                    literal_matches: hits.map((h) => ({
+                        column: h.column,
+                        literal: h.li.literal,
+                        literal_provenance: h.li.provenance,
+                        test_paths: [...h.li.occurrences.keys()].sort(),
+                    })),
+                    corroboration: [...new Set(corroboration)].sort(),
+                    attribution: best,
+                    row: r,
+                });
+            }
+        }
+    }
+    rep.distinct_row_states = states.size;
+    rep.transient_rows = [...transient.values()].sort((a, b) =>
+        a.table !== b.table ? (a.table < b.table ? -1 : 1) : compareKeys(a.key, b.key) || a.first_commit_frame - b.first_commit_frame,
+    );
+    return { report: rep, failures };
+}
+
+/**
+ * 0x hex strings in the raw bytes of E's main file and -wal that are not a value of any
+ * live row in either image: leftovers of deleted or overwritten rows (secure_delete is
+ * off in this SQLite build, so freed cell bytes usually survive until a page rewrite).
+ */
+function residualHex(E: string, A: ImageData, B: ImageData, idx: LiteralIndex): ResidualHex[] {
+    const live = new Set<string>();
+    for (const img of [A, B]) {
+        for (const t of TABLES) for (const r of img.rows[t] ?? []) for (const v of Object.values(r)) if (typeof v === 'string') live.add(v.toLowerCase());
+    }
+    const out: ResidualHex[] = [];
+    for (const rel of ['data/bot.db', 'data/bot.db-wal']) {
+        const p = path.join(E, path.basename(rel));
+        if (!fs.existsSync(p)) continue;
+        // No boundary assertions: record bytes are packed, so the next column ('eth', digits)
+        // often continues the hex run. Each run is judged by its 40- and 64-hex prefixes.
+        const found = new Map<string, { candidates: string[]; li: LiteralInfo | undefined; count: number }>();
+        for (const m of fs.readFileSync(p).toString('latin1').matchAll(/0x([0-9a-fA-F]{40,})/g)) {
+            const h = m[1].toLowerCase();
+            const c40 = '0x' + h.slice(0, 40);
+            const c64 = h.length >= 64 ? '0x' + h.slice(0, 64) : null;
+            if (live.has(c40) || (c64 !== null && live.has(c64))) continue;
+            const li = (c64 !== null ? idx.literals.get(c64) : undefined) ?? idx.literals.get(c40);
+            const key = li ? li.literal : (c64 ?? c40);
+            const prev = found.get(key);
+            if (prev) prev.count++;
+            else found.set(key, { candidates: c64 !== null ? [c40, c64] : [c40], li, count: 1 });
+        }
+        for (const [lit, f] of [...found.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+            out.push({
+                file: rel,
+                literal: lit,
+                candidates: f.candidates,
+                occurrences: f.count,
+                test_literal_provenance: f.li ? f.li.provenance : null,
+                test_paths: f.li ? [...f.li.occurrences.keys()].sort() : [],
+            });
+        }
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -937,6 +1267,8 @@ function runForensic(o: { source: string; out: string; literals: LiteralInput; l
             },
             unknown_origin_diff_rows: [],
             extraction_limits: idx.limits,
+            wal: null,
+            residual_hex_strings: null,
             rows_merged_image: null,
         };
         if (!integrityFailed) {
@@ -958,6 +1290,11 @@ function runForensic(o: { source: string; out: string; literals: LiteralInput; l
             report.test_literal_matches = matches;
             for (const m of matches) report.attribution_counts[m.attribution]++;
             report.unknown_origin_diff_rows = unknown;
+            const w = analyzeWal(E, A, B, idx);
+            failures.push(...w.failures);
+            report.wal = w.report;
+            report.state_changes.transient_rows_found = w.report.transient_rows.length > 0;
+            report.residual_hex_strings = residualHex(E, A, B, idx);
             report.rows_merged_image = A.rows;
         }
     } finally {
@@ -1023,6 +1360,15 @@ function printDigest(r: RunResult, log: (l: string) => void): void {
     log(`literals:    ${rep.test_literals.literal_count} ${JSON.stringify(rep.test_literals.by_provenance)}`);
     log(`matches:     ${rep.test_literal_matches.length} ${JSON.stringify(rep.attribution_counts)}`);
     log(`unknown-origin diff rows: ${rep.unknown_origin_diff_rows.length}`);
+    if (rep.wal) {
+        const w = rep.wal;
+        const headerOnly = w.commit_points.filter((c) => c.pages_written.length === 1 && c.pages_written[0] === 1).length;
+        log(
+            `wal:         ${w.bytes} B, ${w.frame_count} frames (${w.frames_salt_matching} current), ${w.commit_frames} commits, ` +
+                `pages ${JSON.stringify(w.pages_touched)}, header-only commits ${headerOnly}, distinct row states ${w.distinct_row_states}, transient rows ${w.transient_rows.length}`,
+        );
+    }
+    if (rep.residual_hex_strings) log(`residual hex strings (not in live rows): ${rep.residual_hex_strings.length}`);
     log(`extraction limits: ${rep.extraction_limits.length} test files`);
 }
 
@@ -1058,6 +1404,8 @@ async function selfTest(): Promise<number> {
         P: hx('b2', 20), // only in a realLaunches fixture
         U: hx('c3', 20), // matches no literal
         PAIR: hx('99', 20), // lp_baseline pair, no literal
+        T: hx('3e', 20), // synthetic; inserted and deleted again inside the WAL (transient)
+        RES: hx('4d', 20), // synthetic; inserted and deleted before the checkpoint (residual bytes)
     };
     try {
         // --- fixture DB: base rows checkpointed into the main file ---
@@ -1072,6 +1420,8 @@ async function selfTest(): Promise<number> {
         ins.run(2, L.V, 'arbitrum', 'buy', null, '987654321', 'pending');
         ins.run(3, L.C, 'eth', 'buy', null, '1234', 'sold');
         ins.run(4, L.X, 'eth', 'buy', null, '3141592', 'pending');
+        ins.run(8, L.RES, 'eth', 'buy', null, '8080', 'pending');
+        base.exec('DELETE FROM trades WHERE id = 8');
         base.exec(`INSERT INTO pause_state (id, paused) VALUES (1, 0); INSERT INTO chain_state VALUES ('eth', 100, 1700000000);`);
         base.close(); // checkpoints; the main file now holds every base row
 
@@ -1092,6 +1442,8 @@ async function selfTest(): Promise<number> {
             `INSERT INTO exit_state VALUES (5, 0.5, '424242');`,
             `INSERT INTO lp_baseline VALUES (6, 'v2', '${L.PAIR}', 17000000);`,
             `UPDATE pause_state SET paused = 1, paused_by = 'cli', reason = 'selftest' WHERE id = 1;`,
+            `INSERT INTO trades (id, token, chain, action, tx_hash, amount_in, status) VALUES (9, '${L.T}', 'eth', 'buy', NULL, '9090', 'pending');`,
+            `DELETE FROM trades WHERE id = 9;`,
         ].join('\n');
         const payload = JSON.stringify({ mod: require.resolve('better-sqlite3'), db: dbPath, sql: walSql });
         const env: NodeJS.ProcessEnv = {};
@@ -1130,6 +1482,7 @@ async function selfTest(): Promise<number> {
             ['test/unit/s.test.ts', `const S = '${L.S}';\nconst tx = '${L.STX}';\ninsert({ token: S, chain: 'base', amount_in: '424242', tx_hash: tx });\n`],
             ['test/fork/fixtures/realLaunches/fixture-p.json', `{ "tokenAddress": "${'0x' + L.P.slice(2).toUpperCase()}", "chain": "eth" }\n`],
             ['test/unit/random.test.ts', `const w = ethers.Wallet.createRandom();\nconst t = '0x' + suffix;\n`],
+            ['test/unit/t.test.ts', `const TRANSIENT = '${L.T}';\nconst GONE = '${L.RES}';\n`],
         ]);
         const srcFiles = new Map<string, string>([['src/constants.ts', `export const WETH = '${L.C}';\n`]]);
         const literals: LiteralInput = { sha: '0'.repeat(40), testFiles, srcFiles };
@@ -1176,6 +1529,29 @@ async function selfTest(): Promise<number> {
         check("X ('0x' + 'ab'.repeat(20)) is matched via concat expansion", X?.attribution === 'literal-match-uncorroborated' && (X?.literal_forms ?? []).includes('concat-expanded'));
         const lim = rep.extraction_limits.find((e) => e.path === 'test/unit/random.test.ts');
         check('extraction limits list the runtime-generating test file', !!lim && lim.patterns.includes('createRandom') && lim.patterns.some((p) => p.startsWith('computed')), JSON.stringify(lim?.patterns));
+        const wal = rep.wal;
+        check(
+            'WAL replay visits every commit frame (8 single-statement commits)',
+            !!wal && wal.commit_frames === 8 && wal.commit_points.length === 8 && wal.commit_points[wal.commit_points.length - 1].rows_equal_merged_image,
+            `commits ${String(wal?.commit_frames)}, points ${String(wal?.commit_points.length)}`,
+        );
+        const T = wal?.transient_rows.find((x) => x.table === 'trades' && x.key === '9');
+        check(
+            'T (inserted and deleted inside the WAL) is a transient row, attributed-test-write, absent from A and B',
+            T?.attribution === 'attributed-test-write' && T.corroboration.includes('diff:transient') && m('9') === undefined && !addedKeys.includes('9'),
+            JSON.stringify(T?.corroboration),
+        );
+        const unrelatedTransient = (wal?.transient_rows ?? []).filter((x) => !(x.table === 'trades' && x.key === '9'));
+        check('no other row is reported transient (rows added once are not transient)', unrelatedTransient.length === 0, JSON.stringify(unrelatedTransient.map((x) => `${x.table}:${x.key}`)));
+        const res = (rep.residual_hex_strings ?? []).find((x) => x.literal === L.RES && x.file === 'data/bot.db');
+        check('RES (deleted before the checkpoint) is found as a residual hex string in the main file', res?.test_literal_provenance === 'synthetic', JSON.stringify(res));
+        const resT = (rep.residual_hex_strings ?? []).find((x) => x.literal === L.T && x.file === 'data/bot.db-wal');
+        check('T (transient) also leaves residual bytes in the -wal', resT?.test_literal_provenance === 'synthetic');
+        const liveVals = new Set([L.R, L.V, L.C, L.X, L.S, L.STX, L.P, L.U, L.PAIR]);
+        const liveReported = (rep.residual_hex_strings ?? []).filter((x) => x.candidates.some((c) => liveVals.has(c)));
+        check('no live value is reported as residual (packed record bytes handled)', liveReported.length === 0, JSON.stringify(liveReported.map((x) => x.literal)));
+        const seqB = (rep.images[IMAGE_B] as { sqlite_sequence: Row[] }).sqlite_sequence.find((r) => r.name === 'trades');
+        check('sqlite_sequence shows the deleted id (trades seq 8 in B)', seqB?.seq === '8', JSON.stringify(seqB));
         check('E hashes unchanged and E equals the source', r1.meta.e_unchanged && r1.meta.e_equals_source && r2.meta.e_unchanged);
         check('source fixture folder unchanged', sameHashes(srcHashesBefore, hashFolder(src, 'source')) && r1.meta.source_unchanged);
         const b1 = fs.readFileSync(r1.reportPath);
