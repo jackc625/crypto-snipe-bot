@@ -220,7 +220,12 @@ interface Plan {
     overridesDir: string | null;
 }
 
-function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan {
+/**
+ * Every fail-closed limit, as a pure check: it never spawns and never writes anything.
+ * spawnRailedChild / spawnRailedChildAsync call it first; the 'spawn limits' tests call it
+ * directly, so even a neutralised check (RED proof 22-08-8) can never start a forbidden child.
+ */
+export function checkSpawnLimits(cmd: string, args: string[], opts: SpawnRailedOptions = {}): void {
     const o = opts || {};
     // [limit: command]
     if (cmd !== process.execPath && cmd !== 'node' && cmd !== 'npx') {
@@ -298,6 +303,22 @@ function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan 
             if (typeof v !== 'string') refuse('inheritedEnv', `value for ${k} must be a string literal`);
         }
     }
+
+    // [limit: railsEntry] / [limit: timeoutMs]
+    if (o.railsEntry !== undefined && o.railsEntry !== 'preload' && o.railsEntry !== 'setup-fork') {
+        refuse('railsEntry', `${JSON.stringify(o.railsEntry)} is not 'preload' or 'setup-fork'`);
+    }
+    if (o.timeoutMs !== undefined && (!Number.isInteger(o.timeoutMs) || o.timeoutMs <= 0)) refuse('timeoutMs', 'timeoutMs must be a positive integer');
+}
+
+function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan {
+    checkSpawnLimits(cmd, args, opts);
+    const o = opts || {};
+    const cwd = o.cwd === undefined ? REPO_ROOT : o.cwd;
+    const nodeOptions = o.nodeOptions || [];
+    const sentinels = readSentinels();
+    const overrides = o.envOverrides;
+    const inherited = o.inheritedEnv;
 
     // ---- build the child env from scratch (the parent env is never spread in) ----
     const env: Record<string, string> = {};
