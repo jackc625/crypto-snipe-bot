@@ -19,6 +19,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+# Committed SAFE-02 test-rail sentinel env: every value is an inert TEST-SENTINEL (D-02)
+!test/.env.test
 cookies.txt
 *.pem
 *.key
