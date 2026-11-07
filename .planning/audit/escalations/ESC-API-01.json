@@ -1,0 +1,23 @@
+{
+  "id": "ESC-API-01",
+  "date": "2026-11-07",
+  "tier": "area-batch",
+  "tags": [
+    "capital"
+  ],
+  "items": [
+    "AUD-API-002",
+    "AUD-API-008"
+  ],
+  "resolved_items": [],
+  "summary": "Dashboard API area S1 batch (22-22 Task 2, D-16 area-batch tier), presented together once the API slice audit (the 14 src/api files at audit base 23a6461), its ledger, sweep, thresholds inventory and cards OD-11 and API-01..03 were complete. Two new S1 entries, each a way a dashboard request can leave held positions without protection under a realistic condition: AUD-API-002 (RC-12, STRAND) the per-chain \"Stop\" button calls ctx.wsProvider.removeAllListeners() with no event argument on the provider it shares with anti-rug, so the rug-log subscription for every position on that chain is removed too; \"Start\" re-runs only the DEX listeners, the anti-rug health still shows connected and the Stop dialog says positions keep being monitored (src/api/routes/chains.ts:136-142, :172-176; src/bot.ts:1808-1852; src/anti-rug/detector.ts:643-657, :678-679; dashboard/src/pages/ChainControls.tsx:175); card OD-11 (one WebSocket owner per chain), shared with AUD-ANTIRUG-001 and AUD-BUY-008; AUD-API-008 (independent, STRAND) one request with a malformed Host header and an Upgrade header, sent before any login, ends the whole bot process: the WebSocket upgrade handler parses the Host with new URL() outside any try and there is no process-level handler (src/api/ws/handler.ts:43; src/api/server.ts:183); reproduced on loopback with the exact line from the audit-base snapshot (Host \"a b\", \"[\" and \"x:99999999\" each exit the process with TypeError: Invalid URL); in the documented remote mode (DASHBOARD_HOST=0.0.0.0) any host that can reach the port can do it. Already escalated, no new answer asked: AUD-API-001 (the emergency-sell and force-sell buttons cannot reach a position whose exit already failed while the tokens are still held), linked to ESC-PRE-04 as a rediscovery with its four-step trace and card API-01 for the Phase 24 capital discussion. No S0, no rail, test-origin-db-row or non-public-secret item was found in the API slice. The bot is OFF for all of v7.0, so neither item can cause a loss now. Nothing is changed in Phase 22 (NAC-13): each item is proven with a real-path test in Phase 23 and fixed in Phase 24. The operator was asked to acknowledge and say whether any item needs its own urgent decimal phase before Phase 24, or to stop the phase.",
+  "presented_at": "2026-11-07 session (after commit 81aa3dc at 2026-11-07T18:08:22Z UTC): the 22-22 Task 2 area-batch blocking checkpoint (checkpoint:decision, gate blocking-human), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Acknowledge continue",
+  "operator_response_recorded_at": "2026-11-07T18:32:38Z",
+  "operator_response_channel": "typed by the operator at the 22-22 Task 2 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-22 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-22 Task 2 blocking checkpoint (gate blocking-human).",
+  "ruling": "none",
+  "ruling_option_text": "acknowledge-continue: Acknowledge and continue (default plan). The audit continues to the dashboard front end; the items wait for Phase 23 proof and Phase 24 fixes with the bot off.",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: the operator chose the acknowledge-continue option for AUD-API-002 and AUD-API-008. No severity was changed, no decimal phase is inserted, and Phase 22 continues. Context, attributed to the execute-phase orchestrator and NOT to the operator (shown to the operator with the checkpoint): the orchestrator independently confirmed that src/api/ws/handler.ts:43 at the audit base builds new URL(req.url || '/', 'http://' + (req.headers.host || 'localhost')) unguarded inside the upgrade handler; the AUD-API-008 fix is small and behaviour-neutral and is a natural early Phase 24 item; AUD-API-002 shares the OD-11 fix with AUD-ANTIRUG-001 and AUD-BUY-008 and should be fixed together with them; interim operator guidance: do not use the dashboard per-chain Stop as a safety switch (see also AUD-BUY-011, Stop does not stop HTTP-polled buys) and use the global pause instead. As S1 capital findings, neither can rest on a keep-current default; each blocks the live re-entry gate until it is fixed.",
+  "phase_continued": true
+}

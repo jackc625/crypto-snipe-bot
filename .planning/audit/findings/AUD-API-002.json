@@ -75,7 +75,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-API-01",
   "od_ref": "OD-11",
   "recommendation": "Never call an argument-less removeAllListeners on a shared provider. Under card OD-11 (one WebSocket owner per chain that notifies subscribers) Stop pauses only the chain's DEX factory subscribers by handle, anti-rug is never touched by Stop/Start, and Start resumes the same subscribers with a backfill from the last seen block. The Stop dialog text should say exactly what keeps running. Real-path test: Stop then Start a chain with a registered position and assert a rug log still reaches dispatchEvent. Phase 24 (capital), nothing changed in Phase 22.",
   "reported_by": [

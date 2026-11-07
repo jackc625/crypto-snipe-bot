@@ -68,7 +68,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-API-01",
   "od_ref": null,
   "recommendation": "Parse the upgrade URL inside try/catch (or use url.parse on the path only) and answer 400; wrap the whole upgrade handler so any throw destroys only that socket. Decide the process-level uncaught-exception policy with card OD-6 (AUD-BUY-005). Real-path test: send the malformed request to a running server and assert it stays up. Phase 24 (a pure bug fix, no behaviour decision).",
   "reported_by": [
