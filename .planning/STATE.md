@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-20-PLAN.md
-last_updated: "2026-11-07T17:07:10.568Z"
+stopped_at: Completed 22-21-PLAN.md
+last_updated: "2026-11-07T17:45:30.103Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 8dc20f0c6ab5cc5015b31ba124a4e58131cdd21d
+state_head: 5683d9bfcb931d7354f2a49fdf882eda41c643bd
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 13 of 29
+Plan: 14 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -89,11 +89,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P18 | 10h 4m (wall-clock incl. operator wait) | 3 tasks | 39 files |
 | Phase 22 P19 | ~36min (wall-clock incl. operator wait) | 3 tasks | 29 files |
 | Phase 22 P20 | 44min | 3 tasks | 27 files |
+| Phase 22 P21 | 35min (wall-clock incl. operator wait) | 3 tasks | 33 files |
 
 ## Session
 
-**Last session:** 2026-11-07T17:07:10.501Z
-**Stopped at:** Completed 22-20-PLAN.md
+**Last session:** 2026-11-07T17:45:30.028Z
+**Stopped at:** Completed 22-21-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -136,3 +137,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-20 ESC-TX-01: operator ruled acknowledge-continue on the TX S1 batch (AUD-TX-003, -004, -005, -009); no severity change, no decimal phase; RC-10 sub-findings AUD-TX-001/-002 stay on ESC-PRE-02
 - [Phase 22]: 22-20: AUD-TX-004 (RC-17) and AUD-TX-005 (RC-18) stay confirmed S1 until 22-29 re-audits rails 22-12/22-13; AUD-TX-009 (bundle-wait crash) to be fixed with AUD-ANTIRUG-002 in Phase 24 (card OD-6)
 - [Phase 22]: 22-20 for 22-28: TH-EXIT-23 is wrong (MEV_SELL_MAX_PRIORITY_FEE_GWEI never caps private sells, AUD-TX-010); AUD-TX-014 stays S2 though backup copies of persisted logs passed the D-22 exact-value check
+- [Phase 22]: 22-21 ESC-DB-01: operator ruled acknowledge-continue on the DB S1 batch (AUD-DB-002, -003, -004, -001, -007); no severity change, no decimal phase; AUD-DB-007 and S2 AUD-DB-006 (RC-25) are being closed by rail 22-09, re-audited in 22-29
+- [Phase 22]: Orchestrator context (not operator): AUD-DB-002 (risk SQL db.ts:425-459 subtracts decimal-ETH amount_in from wei amount_out/gas, so the daily-loss breaker and exposure cap do not work) goes first in Phase 23/24; decide OD-25 values treating those limits as not working until AUD-DB-002/-003 are fixed (card DB-01 before OD-25)
+- [Phase 22]: 22-21: AUD-DB-009 (Telegram bot token in logs via err.config.url) and AUD-DB-010 (RPC URL with API key in preflight Telegram alert) are S2 secret-handling items for Phase 24 (card TX-04); the 22-21 Task 2 verify prints 'rows undefined' for {rows, discovery} thresholds files (print bug; actual 24 rows)

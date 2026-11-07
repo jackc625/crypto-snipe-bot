@@ -118,7 +118,7 @@ status: complete
 - **Findings (AUD-DB-001..019).** 5 S1, 6 S2 and 8 S3, no S0, every one at `audit_base_sha` 23a6461.
   - **RC mapping:** RC-06 is AUD-DB-001, with 16 per-site sub-claims that keep fail-open and fail-closed separate. RC-14 is AUD-DB-004, RC-23 is AUD-DB-005 and RC-25 is AUD-DB-006. None is NOT-A-BUG.
   - **Shared database across wallets:** two bots with different wallets sharing one `data/bot.db` is its own entry (AUD-DB-015). It is kept separate from the same-wallet process lock that 22-13 adds.
-- **Ledger and sweep.** The ledger has 7 rows, matching `slice-files.ts --check DB`. The sweep has 20 cells. Twelve read "checked, none" with their searches: C04-C12, C16 and C19 (eleven) plus C10. Findings sit under C01-C03, C13-C15, C17, C18 and C20.
+- **Ledger and sweep.** The ledger has 7 rows, matching `slice-files.ts --check DB`. The sweep has 20 cells. Eleven read "checked, none" with their searches: C04-C12, C16 and C19. Findings sit under C01-C03, C13-C15, C17, C18 and C20.
 - **Thresholds.** 24 AC-37 rows (TH-DB-01..24), covering:
   - the five OD-25 risk defaults with every definition site, flagged where the sites disagree;
   - the per-chain capital, size, gas, tax and block-age defaults;
