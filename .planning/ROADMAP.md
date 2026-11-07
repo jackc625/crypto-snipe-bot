@@ -141,7 +141,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 **Conventions**: D-STOP-THE-LINE (any candidate that reads as S0/S1, or a rail finding such as evidence that tests already mutated the live DB, is re-surfaced to the operator at once and never filed-and-deferred); D-NONCE-AUTHORITY-ALL (the singleton guards and the process lock keep one nonce authority per wallet; the sweep includes a census of every signing call site, scripts included).
 **Operator decisions**: OD-21 during Wave 1, after the backup verifies. This phase produces the cards for OD-6, OD-9, OD-10, OD-11, OD-14 to OD-18, OD-25, and any new ones.
 **Research flag**: Yes for the audit wave (per-area deep reading; ethers v6 `getFeeData` base-fee derivation and `wait()` error semantics such as `TRANSACTION_REPLACED`/`repriced`). The rail mechanics are already specified.
-**Plans**: 4/29 plans executed in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
+**Plans**: 5/29 plans executed in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
 
 Plans:
 **Wave 1**
@@ -153,7 +153,7 @@ Plans:
 - [x] 22-05-PLAN.md — SAFE-02 setup-layer rails (one CommonJS module), sentinel env with fork-mode shell keys, vitest wiring, npm test re-scope (no Vitest run)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
+- [x] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
 - [ ] 22-06-PLAN.md — forensic two-image report on a backup copy of the live DB; register and escalate test-origin rows
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -529,7 +529,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Safety Rails & Audit | 4/29 | In Progress | - |
+| 22. Safety Rails & Audit | 5/29 | In Progress | - |
 | 23. Test Safety Net (Harness, Triage, Characterization) | 0/TBD | Not started | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
