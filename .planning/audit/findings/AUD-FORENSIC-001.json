@@ -1,0 +1,103 @@
+{
+  "id": "AUD-FORENSIC-001",
+  "title": "Live DB was opened and its header written 40 times between the 17:33 checkpoint and 20:25 (no row changed; no test-written rows found)",
+  "kind": "finding",
+  "area": "src",
+  "slice": "FORENSIC",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH = process.env.DB_PATH || cwd/data/bot.db: any process with the repo as cwd and no DB_PATH resolves the live DB"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "new Database(DB_PATH) at import time"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:20-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "journal_mode = WAL, synchronous = NORMAL and busy_timeout pragmas at import (no page write when the file is already in WAL mode)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "user_version = 7 written unconditionally by migrateSchema(): one write transaction on page 1 per open even when the value is already 7, the exact fingerprint of the 40 WAL frames"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:235@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "migrateSchema() runs at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:35@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "trades.id is INTEGER PRIMARY KEY AUTOINCREMENT, so sqlite_sequence keeps the highest id ever used (3), which shows that id 1 was deleted before 17:33"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=\"/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH\" node node_modules/ts-node/dist/bin.js scripts/forensic-db.ts --source C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06 --out C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run1 --test-literals-sha 23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exit 0, FORENSIC OK; report.json sha256 10b77e6db930534c53e4edf6a8edda28c812c87c0e9565344dd2b016178cec42; both images integrity ok, user_version 7; counts trades 2, exit_state 0, pause_state 1, chain_state 1, lp_baseline 1 in both; diff B->A 0 added / 0 changed / 0 removed in all five tables; WAL 164832 B = 40 current frames, 40 commits, page 1 only, 1 distinct row state, 0 transient rows; 0 residual hex strings; 3 literal matches, all public-historical-literal; E and source hashes unchanged. The metadata copy lives in the audit inputs folder as forensic-summary.json (a data location, not anchoring evidence)"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=\"/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH\" node node_modules/ts-node/dist/bin.js scripts/forensic-db.ts --source C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06 --out C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run2 --test-literals-sha 23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exit 0; report.json sha256 10b77e6db930534c53e4edf6a8edda28c812c87c0e9565344dd2b016178cec42 (equal to run1)"
+    },
+    {
+      "type": "command",
+      "ref": "cmp C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run1/report.json C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run2/report.json",
+      "note": "no difference: the report is byte-identical across two runs (AC-10)"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=\"/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH\" node node_modules/ts-node/dist/bin.js scripts/backup-state.ts --verify C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06",
+      "note": "VERIFY OK (17 PRESENT, 0 ABSENT, MANIFEST sha256 9e28e30f41bd5a4a7cae20f4c20d8bf37b7dd008d93ea7b43cebba2e594b151a) before run1 and after run2: the backup was not changed"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=\"/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH\" node node_modules/ts-node/dist/bin.js scripts/forensic-db.ts --self-test",
+      "note": "SELF-TEST OK (31 checks): WAL-only rows surface in image A and the diff, transient rows surface in the replay, the attribution classes behave as specified (cases S/P/U/R/V/C/X/T), residual bytes are found, an integrity failure exits 1, and the STL-3 control holds"
+    },
+    {
+      "type": "command",
+      "ref": "node <temp probe>: three child processes open a temp WAL DB the way src/utils/db.ts does at import (pragmas plus user_version = 7 on a DB already at 7) and exit without close()",
+      "note": "each child adds exactly one WAL frame (page 1, commit), matching the live WAL fingerprint of 40 page-1 commits"
+    },
+    {
+      "type": "command",
+      "ref": "git log --all --since=\"2026-05-29T16:00:00-04:00\" --until=\"2026-05-29T21:00:00-04:00\" --format=\"%ad %h %s\"",
+      "note": "window context: 17:36 6058389 live capture complete; 18:13 d9c8f1e dashboard fix; 19:04 78479a8; 19:32 1ca40c8 Nyquist validation; 20:28 daf8f4e INT-NONCE-SELL. The 40 opens fall inside this development window"
+    }
+  ],
+  "sibling_sites_checked": "All five tables (trades, exit_state, pause_state, chain_state, lp_baseline) in both in-memory images (A_merged_2025 = WAL-recovered 20:25 state, B_checkpoint_1733 = main-file-only 17:33 state), keyed by schema-confirmed primary keys (trades.id, exit_state.trade_id, pause_state.id, chain_state.chain, lp_baseline.trade_id). token, tx_hash and pair_or_pool_address compared against 150 hex literals from 146 test files at the audit base (99 synthetic, 12 public-historical, 39 production-constant). Every one of the 40 WAL commit points replayed. Raw bytes of the main file and the WAL scanned for leftover hex values. sqlite_sequence read in both images. Writers at the base SHA: src/utils/db.ts import-time open, pragmas, migrateSchema (user_version :232), migrateJsonState :315 (no-op when trades exist) and normalizeLegacyMainnetRows :316 (writes only legacy mainnet rows; none present).",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 / EXPOSURE: the test-to-live-DB trust boundary was crossed in practice (40 opens of the live DB wrote its header between 17:33 and 20:25), but the realized effect stops at the file header: no row in trades, exit_state, pause_state, chain_state or lp_baseline changed at any commit point, so dedup, exit resume and the kill-switch were not affected. The mechanism itself (tests open and migrate the live DB at import) is graded S1 in AUD-RAIL-002. The only literal-matched rows are the LADYS token and pair, public-historical and consistent with the Phase 21 live capture, so they are not attributed to tests. No row is attributed-test-write or literal-match-uncorroborated, so the tag test-origin-db-row is not set and the status stays candidate. Open items: the deleted trade id 1 (before 17:33, origin unknown) and which program made the 40 opens.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-RAIL-002"
+  ],
+  "tags": [
+    "rail"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Leave the live data/ files untouched (P3). The forensic result gives no reason to clean anything: no test-written row was found, and the two LADYS trades look like the real Phase 21 live capture. The SAFE-02 rails (22-05, 22-07..22-10: DB tripwire under Vitest, per-worker temp DB, no real .env) stop new test opens of the live DB, and the SAFE-04 process lock covers a second bot. Any later decision about the deleted trade id 1 or a cleanup is an operator decision for a later phase; nothing is fixed in Phase 22 (NAC-13).",
+  "reported_by": [
+    "claude (22-06 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}
