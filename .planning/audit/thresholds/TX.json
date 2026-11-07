@@ -1,0 +1,702 @@
+[
+  {
+    "id": "TH-TX-01",
+    "name": "Confirm window per private attempt",
+    "current_value": "45000",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:55@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:180@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:366@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:398-400@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:227",
+      "src/config.ts:169@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "reconcileInclusion polls receipt and nonce while Date.now() < start + window; the deadline is checked only between awaited RPC calls",
+    "units": "milliseconds",
+    "representation": "integer via Number.parseInt, must be finite and > 0 (reconciliation.ts:679-683)",
+    "effective_unset": "45000",
+    "effective_empty": "45000",
+    "effective_non_numeric": "45000; a prefix like \"45000ms\" parses as 45000 and \"1.5\" as 1",
+    "rationale": "~3-4 ETH blocks (.env.example:227); no per-chain value",
+    "overlap": "held inside the wallet nonce lock once per not-natively-confirmed attempt (4 attempts on a snipe, AUD-TX-003); the exit guard reuses it outside the lock (TH-EXIT-22); must stay below WATCHDOG_BUDGET_MS (TH-BUY-14, TH-EXIT-21)",
+    "env_key": "MEV_CONFIRM_WINDOW_MS",
+    "hardcoded": false,
+    "flags": [
+      "held-under-nonce-lock",
+      "one-value-for-all-chains",
+      "deadline-checked-between-calls"
+    ],
+    "recommendation": "Decide on card OD-17 how long a buy may hold the lock in total (not per attempt); make the window per chain (2 s blocks on Base vs 12 s on ETH) and check the deadline per call (TX-01).",
+    "od_ref": "OD-17"
+  },
+  {
+    "id": "TH-TX-02",
+    "name": "Poll interval inside the confirm window",
+    "current_value": "4000",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:399@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:228",
+      "src/config.ts:170@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "sleep between receipt/nonce probes",
+    "units": "milliseconds",
+    "representation": "integer via Number.parseInt, must be finite and > 0 (reconciliation.ts:679-683)",
+    "effective_unset": "4000",
+    "effective_empty": "4000",
+    "effective_non_numeric": "4000 (prefix parse as above)",
+    "rationale": "none in code beyond the default list",
+    "overlap": "each poll is 2 RPC calls with no per-call timeout (AUD-TX-008)",
+    "env_key": "MEV_CONFIRM_POLL_MS",
+    "hardcoded": false,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-03",
+    "name": "Private priority-fee ceiling actually applied (buy AND sell legs)",
+    "current_value": "25",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:69@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:190-193@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:201@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:311@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:104@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:277",
+      "src/config.ts:224@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "submitted priority = min(max(step x (attempt+1), chain priority), ceiling, affordability bound); ceilingHit when the clamped fee >= ceiling ends the escalation",
+    "units": "gwei",
+    "representation": "float via Number.parseFloat, must be finite and > 0, then gweiToWei = parseUnits(n.toFixed(9), \"gwei\") (reconciliation.ts:685-689, :697-701)",
+    "effective_unset": "25",
+    "effective_empty": "25",
+    "effective_non_numeric": "25; 0 or negative -> 25; a value >= 1e21 prints in exponent form and parseUnits throws inside buildReconcileConfig, so every private submit throws",
+    "rationale": "21.3 D-PRIVATE-INCLUSION-HARDEN mech 3: buy headroom at calm gas (reconciliation.ts:63-68)",
+    "overlap": "documented as the buy-only ceiling, but the strategies always build the buy config, so it is also the private SELL ceiling (AUD-TX-010); TH-EXIT-23 assumes MEV_SELL_MAX_PRIORITY_FEE_GWEI applies to sells instead",
+    "env_key": "MEV_BUY_MAX_PRIORITY_FEE_GWEI",
+    "hardcoded": false,
+    "flags": [
+      "applies-to-sells-too",
+      "gwei-float-toFixed",
+      "no-upper-bound"
+    ],
+    "recommendation": "Pass the leg to the strategies so this caps buys only, bound the accepted range at load, and parse gwei from the string rather than through a float (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-04",
+    "name": "Sell-leg priority-fee ceiling (registered, never applied to a submit)",
+    "current_value": "25 (no effect)",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:75@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:190-192@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:536@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:248",
+      "src/config.ts:190@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "read only when buildReconcileConfig gets leg \"sell\", which happens only for the exit guard (exitEngine.ts:940) whose ceiling value is unused",
+    "units": "gwei",
+    "representation": "float via Number.parseFloat, must be finite and > 0, then gweiToWei = parseUnits(n.toFixed(9), \"gwei\") (reconciliation.ts:685-689, :697-701)",
+    "effective_unset": "no effect",
+    "effective_empty": "no effect",
+    "effective_non_numeric": "no effect (a value >= 1e21 would still throw in the guard's buildReconcileConfig, exitEngine.ts:940, aborting that exit attempt)",
+    "rationale": "Finding A (config.ts:190): an independent sell ceiling",
+    "overlap": "TH-EXIT-23 records the same key as capping private sells; at the base SHA it does not (AUD-TX-010); the public-fallback alert tells the operator to raise it (exitEngine.ts:536)",
+    "env_key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
+    "hardcoded": false,
+    "flags": [
+      "no-effect",
+      "operator-text-names-dead-knob",
+      "gwei-float-toFixed"
+    ],
+    "recommendation": "Wire it to the private sell leg or delete it and fix the alert text (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-05",
+    "name": "Legacy \"load-bearing\" priority-fee cap",
+    "current_value": "5 documented; read nowhere",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:58-62@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:607@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:226",
+      ".env.example:229",
+      "src/config.ts:171@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "none: no code reads env.MEV_MAX_PRIORITY_FEE_GWEI; MEV_RECONCILE_DEFAULTS.maxPriorityFeeGwei (5) is also unused",
+    "units": "gwei",
+    "representation": "not parsed",
+    "effective_unset": "no effect",
+    "effective_empty": "no effect",
+    "effective_non_numeric": "no effect",
+    "rationale": ".env.example:226 calls it \"the load-bearing safety cap\"; the ceiling-hit alert (reconciliation.ts:607) tells the operator to increase it",
+    "overlap": "the enforced ceiling is TH-TX-03 (25 gwei), five times the documented cap",
+    "env_key": "MEV_MAX_PRIORITY_FEE_GWEI",
+    "hardcoded": false,
+    "flags": [
+      "no-effect",
+      "misleading-doc",
+      "operator-text-names-dead-knob"
+    ],
+    "recommendation": "Decide on card TX-02 whether it becomes the hard cap over both legs or is removed; fix .env.example and the alert text either way.",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-06",
+    "name": "Priority-fee escalation step",
+    "current_value": "1",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:76-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:194@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:202@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:502@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:230",
+      "src/config.ts:172@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "escalated = step x (attempt + 1); desired = max(escalated, chain priority) (reconciliation.ts:502-514)",
+    "units": "gwei per attempt",
+    "representation": "float via Number.parseFloat, must be finite and > 0, then gweiToWei = parseUnits(n.toFixed(9), \"gwei\") (reconciliation.ts:685-689, :697-701)",
+    "effective_unset": "1",
+    "effective_empty": "1",
+    "effective_non_numeric": "1; 0 or negative -> 1",
+    "rationale": "none in code",
+    "overlap": "the first attempt already bids at least one step, on every chain (AUD-TX-016)",
+    "env_key": "MEV_PRIORITY_FEE_STEP_GWEI",
+    "hardcoded": false,
+    "flags": [
+      "one-value-for-all-chains",
+      "floor-on-first-attempt"
+    ],
+    "recommendation": "Make the step and first-attempt floor per chain or relative to the observed priority fee (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-07",
+    "name": "Reserve sell gas switch",
+    "current_value": "true",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:79@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:195@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:321-323@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:691-694@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:231",
+      "src/config.ts:173@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "when true the affordability bound subtracts sellGasLimit x (baseFee x 1.5)",
+    "units": "boolean",
+    "representation": "string; only \"false\" after trim + lower-case disables (parseBoolDefaultTrue)",
+    "effective_unset": "true",
+    "effective_empty": "true",
+    "effective_non_numeric": "true for anything except \"false\" (\"0\", \"no\", \"off\" all keep it on)",
+    "rationale": "Pitfall 7: never strand the exit (reconciliation.ts:17-21)",
+    "overlap": "also applied on the private SELL leg, where it reserves gas for a second sell that does not exist (AUD-TX-010)",
+    "env_key": "MEV_RESERVE_SELL_GAS",
+    "hardcoded": false,
+    "flags": [
+      "sell-leg-reserves-second-sell"
+    ],
+    "recommendation": "Apply the reserve to buys only once the strategies know the leg (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-08",
+    "name": "Runtime sell-reserve base-fee buffer",
+    "current_value": "1.5",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:45@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:283@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "reserve = (sellGasLimit + approvalGasLimit) x baseFeeWei x 1.5",
+    "units": "multiplier",
+    "representation": "constant; applied via applyGasMultiplier (round(m x 100) / 100, bigint)",
+    "effective_unset": "1.5 (hard-coded)",
+    "effective_empty": "1.5 (hard-coded)",
+    "effective_non_numeric": "1.5 (hard-coded)",
+    "rationale": "pads a modest base-fee rise between buy and sell (reconciliation.ts:41-44)",
+    "overlap": "baseFeeWei is already 2 x the latest base fee (TH-TX-09), so the effective buffer is 3x; the buy-time gate uses EXIT_GATE_SELL_GAS_BUFFER 2.0 (TH-EXIT-26), effectively 4x",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "compounds-doubled-base-fee"
+    ],
+    "recommendation": "Re-derive the buffer once the real base fee is used (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-09",
+    "name": "Base-fee derivation for affordability and the sell reserve (RC-22)",
+    "current_value": "maxFeePerGas - maxPriorityFeePerGas = 2 x latest block base fee",
+    "definition_sites": [
+      "src/utils/mevStrategies/flashbots.ts:169-172@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:63-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820",
+      "node_modules/ethers/lib.commonjs/providers/abstract-provider.js:624-625 (ethers@6.16.0)"
+    ],
+    "comparison": "feeds headroom = balance - value - reserve - gasLimit x baseFee (reconciliation.ts:328) and the submitted maxFeePerGas = baseFee + priority (flashbots.ts:211, passthrough.ts:105)",
+    "units": "wei per gas",
+    "representation": "bigint",
+    "effective_unset": "n/a (formula)",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a; legacy chains (BSC) use gasPrice, not doubled (bloxroute.ts:92)",
+    "rationale": "comments call it \"EIP-1559 base\" (flashbots.ts:167-168); ethers defines maxFee as 2 x base + tip",
+    "overlap": "TH-TX-08 and TH-EXIT-26 multiply it again",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "doubled-base-fee"
+    ],
+    "recommendation": "Use the latest block baseFeePerGas for affordability; keep 2 x base + tip only as the submitted cap (card TX-02, AUD-TX-007).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-10",
+    "name": "ethers priority-fee fallback relied on as the competitive floor",
+    "current_value": "1 gwei when eth_maxPriorityFeePerGas fails",
+    "definition_sites": [
+      "node_modules/ethers/lib.commonjs/providers/abstract-provider.js:624 (ethers@6.16.0)",
+      "src/utils/mevStrategies/flashbots.ts:178@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:76@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "chainPriorityWei = feeData.maxPriorityFeePerGas (x anti-rug multiplier) is folded in as the desired-fee floor",
+    "units": "gwei",
+    "representation": "bigint from the library",
+    "effective_unset": "n/a (library)",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "library default",
+    "overlap": "on Base/Arbitrum a failed priority query silently becomes a 1 gwei floor (far above the market tip on those chains)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "one-value-for-all-chains"
+    ],
+    "recommendation": "Treat a failed priority query as unknown (log it) rather than as 1 gwei on L2s (card TX-02).",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-11",
+    "name": "Flashbots target blocks per attempt",
+    "current_value": "3",
+    "definition_sites": [
+      "src/utils/mevStrategies/flashbots.ts:55-64@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:218@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:302-309@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:276",
+      "src/config.ts:223@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "targetBlock = head + 1; the same signed bundle is sent for targetBlock .. targetBlock + N - 1 (one raw relay call each); bundle.wait() watches only targetBlock",
+    "units": "blocks",
+    "representation": "integer via parsePositiveIntClamped, clamped to 1..8",
+    "effective_unset": "3",
+    "effective_empty": "3",
+    "effective_non_numeric": "3; 0 or negative -> 3; above 8 -> 8",
+    "rationale": "D-PRIVATE-INCLUSION-HARDEN mech 2: widen builder coverage",
+    "overlap": "at 8 blocks (~96 s) an attempt's bundle stays eligible after the next attempt is signed at the same nonce, so an earlier attempt can land while only the latest hash is reconciled (AUD-BUY-002 mechanism)",
+    "env_key": "MEV_BUY_TARGET_BLOCKS",
+    "hardcoded": false,
+    "flags": [
+      "can-outlive-attempt"
+    ],
+    "recommendation": "Keep N x block time below the bundle wait + confirm window, or reconcile every attempt's hash (AUD-BUY-002 fix, card BUY-02).",
+    "od_ref": "BUY-02"
+  },
+  {
+    "id": "TH-TX-12",
+    "name": "Builder fanout list (count and names)",
+    "current_value": "19 builders: flashbots,f1b.io,rsync,beaverbuild.org,builder0x69,Titan,EigenPhi,Gambit Labs,payload,Loki,JetBuilder,tbuilder,bobthebuilder,BTCS,bloXroute,Blockbeelder,Quasar,Eureka,Bombora",
+    "definition_sites": [
+      "src/utils/mevStrategies/flashbots.ts:36-37@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:42-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:301@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:275",
+      "src/config.ts:222@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "sent as the builders field of every raw eth_sendBundle",
+    "units": "builder name-tags (count)",
+    "representation": "comma-separated string, trimmed, empties dropped",
+    "effective_unset": "default 19",
+    "effective_empty": "default 19",
+    "effective_non_numeric": "any string is accepted; only all-commas falls back to the default",
+    "rationale": "beaverbuild.org and Titan must always be present (.env.example:275)",
+    "overlap": "none",
+    "env_key": "MEV_BUILDERS",
+    "hardcoded": false,
+    "flags": [
+      "no-validation"
+    ],
+    "recommendation": "Warn at load when beaverbuild.org or Titan is missing from an override (the documented requirement is not enforced).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-13",
+    "name": "Default private attempts when the caller passes no budget (snipe buys, partial sells)",
+    "current_value": "3 retries = 4 submissions",
+    "definition_sites": [
+      "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:177@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:476@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "loop attempt = 0 .. maxRetries inclusive",
+    "units": "retries",
+    "representation": "number; an explicit 0 or negative is honoured (?? 3)",
+    "effective_unset": "3",
+    "effective_empty": "n/a (not env)",
+    "effective_non_numeric": "n/a",
+    "rationale": "WR-04 (txManager.ts:99-106): buy behaviour unchanged at 4 attempts",
+    "overlap": "with TH-TX-01 this is the ~4 minute lock hold behind which an anti-rug exit waits (AUD-TX-003)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "lock-hold-minutes"
+    ],
+    "recommendation": "Bound the total lock hold of one escalation (card OD-17).",
+    "od_ref": "OD-17"
+  },
+  {
+    "id": "TH-TX-14",
+    "name": "Private attempt budget to maxRetries mapping",
+    "current_value": "maxRetries = budget - 1",
+    "definition_sites": [
+      "src/utils/txManager.ts:192@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/txManager.ts:297@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "budget 0 -> -1 -> no private submission; 1 -> one; 2 -> two",
+    "units": "submissions",
+    "representation": "integer arithmetic",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a (budgets parsed by the callers: TH-EXIT-12 MEV_SELL_FALLBACK_ATTEMPTS, TH-BUY-06 DELIBERATE_BUY_PRIVATE_ATTEMPTS)",
+    "rationale": "WR-05 (txManager.ts:162-173)",
+    "overlap": "TH-EXIT-12, TH-BUY-06",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-15",
+    "name": "Fallback gas limits and the sell gas reserved per strategy",
+    "current_value": "300000 (Flashbots), 500000 (passthrough, bloXroute); sellGasLimit = the buy tx gasLimit",
+    "definition_sites": [
+      "src/utils/mevStrategies/flashbots.ts:161-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:193@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:57-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:84-85@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:119@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "used only when the caller passes no gasLimit; callers pass ctx.chain.gas.maxGasLimit (chainRegistry.ts:204 ETH 300000, :273 BSC 500000, :330 Base 500000, :387 Arbitrum 1000000)",
+    "units": "gas",
+    "representation": "bigint",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "the sell leg reserves the same chain gas budget (flashbots.ts:158-160)",
+    "overlap": "the reserve uses the gas LIMIT, not expected use, times 3x base (TH-TX-08/09)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-16",
+    "name": "Escalation and ceiling-hit rule",
+    "current_value": "desired = max(step x (attempt+1), chain priority); stop when clamped fee >= ceiling or >= affordability bound",
+    "definition_sites": [
+      "src/utils/mevStrategies/reconciliation.ts:502-514@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:551-553@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:606@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "a not-landed attempt ends the escalation when the clamp binds or attempts run out",
+    "units": "wei per gas",
+    "representation": "bigint",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "CR-01: the clamp is the final authority (reconciliation.ts:545-550)",
+    "overlap": "TH-TX-03, TH-TX-06",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-17",
+    "name": "bloXroute relay and health-check timeouts",
+    "current_value": "relay 10000 ms, health ping 5000 ms",
+    "definition_sites": [
+      "src/utils/mevStrategies/bloxroute.ts:165@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:57@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "axios timeout; a relay timeout defers to chain reconciliation (not a failure)",
+    "units": "milliseconds",
+    "representation": "constant",
+    "effective_unset": "hard-coded",
+    "effective_empty": "hard-coded",
+    "effective_non_numeric": "hard-coded",
+    "rationale": "bloxroute.ts:146-154 (a timeout may fire after the relay accepted)",
+    "overlap": "the only bounded network calls in the slice (AUD-TX-008)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-18",
+    "name": "Flashbots library bundle.wait() timeout",
+    "current_value": "300000 ms (5 min), rejects with the bare string \"Timed out\"",
+    "definition_sites": [
+      "node_modules/@flashbots/ethers-provider-bundle/build/index.js (@flashbots/ethers-provider-bundle@1.0.0):40",
+      "node_modules/@flashbots/ethers-provider-bundle/build/index.js (@flashbots/ethers-provider-bundle@1.0.0):406-415",
+      "src/utils/mevStrategies/flashbots.ts:317@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "resolves on the first block event >= targetBlock; otherwise rejects after 5 minutes",
+    "units": "milliseconds",
+    "representation": "library constant",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "library default",
+    "overlap": "held under the wallet nonce lock; the async block handler can crash the process (AUD-TX-009)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "held-under-nonce-lock",
+      "unhandled-rejection-path"
+    ],
+    "recommendation": "Replace with the slice's own bounded reconcile (AUD-TX-009) and bound the hold (card OD-17).",
+    "od_ref": "OD-17"
+  },
+  {
+    "id": "TH-TX-19",
+    "name": "HTTP request timeout of every provider and relay call (ethers FetchRequest default)",
+    "current_value": "300000 ms socket idle timeout",
+    "definition_sites": [
+      "node_modules/ethers/lib.commonjs/utils/fetch.js:402 (ethers@6.16.0)",
+      "node_modules/ethers/lib.commonjs/utils/geturl.js:43 (ethers@6.16.0)",
+      "src/utils/provider.ts:23@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:97@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "applies to every JsonRpcProvider call and every relay request; idle, not total",
+    "units": "milliseconds",
+    "representation": "library default (never overridden in src)",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "library default",
+    "overlap": "TH-TX-20 documents a 15 s timeout that does not exist",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "held-under-nonce-lock",
+      "no-timeout-configured"
+    ],
+    "recommendation": "Construct providers and relay requests with an explicit bounded timeout (card TX-01, AUD-TX-008).",
+    "od_ref": "TX-01"
+  },
+  {
+    "id": "TH-TX-20",
+    "name": "Documented per-RPC-call timeout",
+    "current_value": "15000 documented; read nowhere",
+    "definition_sites": [
+      ".env.example:237",
+      "src/config.ts:180@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "none: no code reads RPC_TIMEOUT_MS",
+    "units": "milliseconds",
+    "representation": "not parsed",
+    "effective_unset": "no effect",
+    "effective_empty": "no effect",
+    "effective_non_numeric": "no effect",
+    "rationale": "Finding B (config.ts:180): \"Promise.race frees a hung call\"",
+    "overlap": "withTimeout exists (src/utils/withTimeout.ts) but is used only around the whole anti-rug exit (exitTrigger.ts:265)",
+    "env_key": "RPC_TIMEOUT_MS",
+    "hardcoded": false,
+    "flags": [
+      "no-effect",
+      "misleading-doc"
+    ],
+    "recommendation": "Wire it (TH-TX-19) or remove the registration (card TX-01).",
+    "od_ref": "TX-01"
+  },
+  {
+    "id": "TH-TX-21",
+    "name": "Passthrough native-confirm depth and timeout (Base, Arbitrum)",
+    "current_value": "3 confirmations, no timeout",
+    "definition_sites": [
+      "src/utils/mevStrategies/passthrough.ts:140@23a64617dca167976adc4645fed0e2c69e384820",
+      "node_modules/ethers/lib.commonjs/providers/provider.js:1045 (ethers@6.16.0)"
+    ],
+    "comparison": "tx.wait(3): resolves at 3 confirmations, throws on replacement or status 0, otherwise waits forever",
+    "units": "confirmations / milliseconds",
+    "representation": "literal 3; timeout argument omitted (ethers default 0 = none)",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "passthrough.ts:133-137 assumes the wait \"may TIME OUT\"; it cannot",
+    "overlap": "runs inside the wallet nonce lock (AUD-TX-002); the MEV confirm window never applies to a stuck tx",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "no-timeout",
+      "held-under-nonce-lock"
+    ],
+    "recommendation": "Pass a bounded timeout and reconcile on timeout (card TX-01).",
+    "od_ref": "TX-01"
+  },
+  {
+    "id": "TH-TX-22",
+    "name": "Provider block polling interval (drives every wait and bundle.wait)",
+    "current_value": "4000 ms",
+    "definition_sites": [
+      "node_modules/ethers/lib.commonjs/providers/provider-jsonrpc.js:68 (ethers@6.16.0)",
+      "src/utils/provider.ts:23@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "JsonRpcProvider polls for new blocks; block events resolve wait() and the library bundle.wait()",
+    "units": "milliseconds",
+    "representation": "library default",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "library default",
+    "overlap": "Base/Arbitrum produce blocks faster than the poll",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-23",
+    "name": "Generic retry helper attempts and backoff",
+    "current_value": "retries 3, delay 1000 ms, factor 2 (waits 1 s, 2 s, 4 s)",
+    "definition_sites": [
+      "src/utils/retry.ts:5-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/retry.ts:20@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "attempt > retries rethrows",
+    "units": "attempts / milliseconds",
+    "representation": "default parameters",
+    "effective_unset": "defaults",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "none",
+    "overlap": "callers are the token-safety HTTP checks only (tokenSafety.ts:28, :65, safetyProviders/*), i.e. pre-buy screening time; no signing call is wrapped, so it cannot double-send",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-24",
+    "name": "Receipt-decoder retry",
+    "current_value": "one retry after 2000 ms, then nulls",
+    "definition_sites": [
+      "src/utils/receiptDecoder.ts:44-52@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "a still-null receipt records amountOut, gasCost and blockNumber as null on the sell row",
+    "units": "milliseconds",
+    "representation": "literal",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "D-05 (receiptDecoder.ts:12)",
+    "overlap": "bookkeeping only (AUD-TX-015)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": "",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-25",
+    "name": "Gas multiplier arithmetic (anti-rug exits)",
+    "current_value": "fee x round(multiplier x 100) / 100",
+    "definition_sites": [
+      "src/utils/mevStrategies/types.ts:61-65@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:178@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:76-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:100-102@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "raises only the chain-priority floor; the result is still clamped by the ceiling and the affordability bound, and the base part of maxFeePerGas is not multiplied",
+    "units": "multiplier",
+    "representation": "float multiplier rounded to 1/100, then bigint",
+    "effective_unset": "undefined or 1 -> unchanged",
+    "effective_empty": "n/a (parsed by the anti-rug config, TH-ANTIRUG-05)",
+    "effective_non_numeric": "n/a; a multiplier below 0.005 rounds to 0 and zeroes the floor",
+    "rationale": "Phase 19 D-RACE-TELEMETRY (types.ts:55-60)",
+    "overlap": "TH-ANTIRUG-05 / TH-EXIT-20 own the value; at the 25 gwei ceiling or a binding affordability bound the \"2x anti-rug gas\" has no effect",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "clamped-away"
+    ],
+    "recommendation": "State in the anti-rug config docs that the multiplier is clamped; decide on card TX-02 whether anti-rug exits get their own ceiling.",
+    "od_ref": "TX-02"
+  },
+  {
+    "id": "TH-TX-26",
+    "name": "Coinbase-bribe switches (buy and sell)",
+    "current_value": "false; read nowhere",
+    "definition_sites": [
+      ".env.example:249",
+      ".env.example:281",
+      "src/config.ts:191@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:228@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "none (documented as RESERVED / NOT-YET-WIRED)",
+    "units": "boolean",
+    "representation": "not parsed",
+    "effective_unset": "no effect",
+    "effective_empty": "no effect",
+    "effective_non_numeric": "no effect",
+    "rationale": "reserved for a future plan (config.ts:191, :228)",
+    "overlap": "none",
+    "env_key": "MEV_BUY_COINBASE_BRIBE_ENABLED, MEV_SELL_COINBASE_BRIBE_ENABLED",
+    "hardcoded": false,
+    "flags": [
+      "no-effect"
+    ],
+    "recommendation": "Remove the registrations in Phase 29 hygiene unless a bribe bundle is planned; the no-effect status is already documented, so no behaviour decision.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-TX-27",
+    "name": "Dead gasManager multipliers and gas limit",
+    "current_value": "chain gas.multiplier on maxFee/gasPrice; CONFIG.gasMultiplier; 300000",
+    "definition_sites": [
+      "src/utils/gasManager.ts:16@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/gasManager.ts:24@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/gasManager.ts:41@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/gasManager.ts:46@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "none: no production caller (AUD-TX-013)",
+    "units": "multiplier / gas",
+    "representation": "float x 100 rounded, bigint",
+    "effective_unset": "no effect",
+    "effective_empty": "no effect",
+    "effective_non_numeric": "no effect",
+    "rationale": "legacy",
+    "overlap": "the chain gas.multiplier is read only here among the slice files",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "dead-code"
+    ],
+    "recommendation": "Delete with gasManager.ts in Phase 25 (AUD-TX-013).",
+    "od_ref": null
+  }
+]

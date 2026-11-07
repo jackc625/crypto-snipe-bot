@@ -1,0 +1,36 @@
+{
+  "id": "TX-04",
+  "title": "Log redaction for relay and RPC errors, and whether to check existing logs and rotate the bloXroute header and RPC keys",
+  "area": "TX",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: log whole error objects",
+      "behavior_impact": "none",
+      "risk": "Every bloXroute relay failure writes the auth header, and every HTTP-level RPC error the RPC URL with its key, into the logs (AUD-TX-014); anyone who sees the logs can use them."
+    },
+    {
+      "id": "redact-only",
+      "name": "Add logger-level redaction (and log message/code only at these sites); no rotation",
+      "behavior_impact": "New logs are clean.",
+      "risk": "Credentials already in old log files stay valid."
+    },
+    {
+      "id": "redact-and-rotate",
+      "name": "Redact, have the operator check old log files, and rotate the bloXroute header and RPC keys if any line contains them",
+      "behavior_impact": "New logs clean and leaked values revoked.",
+      "risk": "Operator work; a rotation touches .env (operator-only)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "redact-and-rotate if BSC (bloXroute) was ever enabled or logs were ever shared; otherwise redact-only.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S2 exposure, no direct capital effect.",
+  "behavior_impact": "Decides what error detail the logs keep and whether credentials are rotated.",
+  "findings": [
+    "AUD-TX-014"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 discussion (S2-S4 fixes); the operator may choose to check logs earlier"
+}

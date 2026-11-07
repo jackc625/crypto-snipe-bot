@@ -1,0 +1,36 @@
+{
+  "id": "TX-03",
+  "title": "Keep, move or remove the Flashbots getBundleStatsV2 telemetry",
+  "area": "TX",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: query stats on every attempt inside the nonce lock, log any error",
+      "behavior_impact": "none",
+      "risk": "An extra relay round trip under the lock on every ETH attempt (up to 5 min if the relay hangs) and operator guidance that may point at empty logs if the endpoint is dead (AUD-TX-006)."
+    },
+    {
+      "id": "remove",
+      "name": "Remove the call and the operator text that relies on it; reconcile by receipts only",
+      "behavior_impact": "No per-builder telemetry.",
+      "risk": "Lose the builder-coverage diagnosis if the endpoint still works."
+    },
+    {
+      "id": "move-out-of-lock",
+      "name": "Keep the telemetry but run it after the lock is released, with a short timeout",
+      "behavior_impact": "Same logs, no lock time.",
+      "risk": "Slightly more code; still useless if the endpoint is dead."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Verify the endpoint in Phase 23; then remove if dead (research recommendation), otherwise move-out-of-lock.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S3, no capital effect.",
+  "behavior_impact": "Telemetry only, plus a small amount of nonce-lock time.",
+  "findings": [
+    "AUD-TX-006"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 discussion (S2-S4 fixes), after the Phase 23 endpoint check"
+}
