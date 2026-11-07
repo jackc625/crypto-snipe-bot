@@ -12,6 +12,7 @@
     "test:fork": "vitest run --project fork --reporter=verbose",
     "test:all": "vitest run --reporter=verbose",
     "test:coverage": "vitest run --coverage --reporter=verbose",
+    "backup:state": "ts-node scripts/backup-state.ts",
     "preflight": "ts-node scripts/preflight.ts",
     "pause": "ts-node scripts/pause.ts",
     "resume": "ts-node scripts/resume.ts"
