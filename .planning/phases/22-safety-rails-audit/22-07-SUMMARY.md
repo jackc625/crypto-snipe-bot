@@ -197,6 +197,16 @@ None. An optional operator action is described in AUD-OD21-001: adding `ignition
   - It must re-hash the working tree and the HEAD blobs with a raised `maxBuffer` or a stream.
   - Re-audit the `.gitignore` and `ignition/.gitignore` diffs (ROOT slice) under AC-32.
 
+## Self-Check: PASSED
+
+- Files: od21-record.json, AUD-OD21-001.json, 22-07-SUMMARY.md and both journal.jsonl files exist.
+- Commits: 93f8189, 39367bb, ce3851e, eff3635, a61a614 and c37a72e are all ancestors of HEAD; `check evaluation-scope --plan 22-07` resolves them.
+- Acceptance criteria rerun at final HEAD:
+  - 10 tracked files; NAC-02 prints `.env.example` only.
+  - od21-record shows `set_equal` true and every `equal` true.
+  - The check-ignore loop finds nothing ignored, and root `artifacts/` is still ignored.
+  - `check.ts --stage partial --slice OD21` passes.
+
 ---
 *Phase: 22-safety-rails-audit*
 *Completed: 2026-11-07*

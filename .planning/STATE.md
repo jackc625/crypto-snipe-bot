@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-06-PLAN.md
-last_updated: "2026-11-07T03:50:24.545Z"
+stopped_at: Completed 22-07-PLAN.md
+last_updated: "2026-11-07T03:58:17.177Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: c8d232b2eceb6864ec5cd9f30c58bfa822a50bd9
+state_head: c37a72e5d37921c5af175446c27ea731e208e04c
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 7 of 29
+Plan: 8 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -83,11 +83,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P05 | 6 min (continuation) | 2 tasks | 11 files |
 | Phase 22 P03 | 4min | 3 tasks | 1 files |
 | Phase 22 P06 | 41min | 2 tasks | 4 files |
+| Phase 22 P07 | 4min | 2 tasks | 11 files |
 
 ## Session
 
-**Last session:** 2026-11-07T03:50:24.482Z
-**Stopped at:** Completed 22-06-PLAN.md
+**Last session:** 2026-11-07T03:58:17.115Z
+**Stopped at:** Completed 22-07-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -111,3 +112,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-06 forensic: zero row changes 17:33->20:25 in all five live-DB tables (WAL replayed at 40 commit points); the 40 page-1 header writes (user_version 7) fingerprint src/utils/db.ts import and are actual-occurrence evidence for AUD-RAIL-002
 - [Phase 22]: 22-06: the 3 test-literal matches (LADYS trades 2/3 + LP baseline) are public-historical, not test writes; AUD-FORENSIC-001 stays S2/EXPOSURE candidate without test-origin-db-row
 - [Phase 22]: ESC-FORENSIC-01: operator acknowledged, no ruling, no decimal phase, Phase 22 continues; deleted trade id 1 (before 17:33) stays unexplained, origin unknown; live data/ untouched (P3)
+- [Phase 22]: 22-07: OD-21 carried out - commit 93f8189 tracks all of ignition/deployments/ (6 newly tracked, 10 total); every HEAD blob sha256 equals the backup MANIFEST; NAC-02 prints only .env.example; no Hardhat command ran in v7.0 before it (AC-08)
+- [Phase 22]: 22-07: no .gitattributes change - blobs proved LF and manifest-equal without one; ignore rules scoped (!ignition/deployments/*/artifacts/, journal rule removed); the CRLF re-checkout and branch-switch deletion hazard is AUD-OD21-001 (S3, fix in Phase 25)
+- [Phase 22]: 22-07: the plan AC-07 node one-liner hits ENOBUFS (build-info blobs 3.87 MB > 1 MiB execFileSync default); 22-29 IGN_AC07 must raise maxBuffer or stream blobs and require 93f8189 as an ancestor of HEAD
