@@ -54,6 +54,9 @@
 //       classification}. Exit 0 when there are zero non-public hits, 1 when
 //       any non-public hit exists (the caller escalates, D-16), 2 on crash or
 //       refusal.
+//   --git-fixture / --git-scan (added by 22-26, AC-35): git-history mode with
+//       the full-history log-opts, proven on a throwaway fixture repo before
+//       every real scan. See the "Git history mode" section below.
 //   Flags accept both `--flag value` and `--flag=value`.
 //
 // Classification (AC-35): hits are keyed on (rule id, file, line, start
@@ -448,9 +451,19 @@ function scannerEnv(): NodeJS.ProcessEnv {
     return env;
 }
 
-function scannerArgs(target: string, config: string, reportPath: string, ignoreDir: string): string[] {
+// 22-26 (AC-35, D-17 amended): the one full-history log-opts string. A custom
+// --log-opts REPLACES betterleaks' default scope, so it is restated in full:
+// every ref (--all), every reflog entry (--reflog: older stashes, reset/amended
+// commits), path-unsimplified history, first-parent diffs of merges (stash
+// commits are merges), additions/modifications only (tuxdb = gitleaks default).
+const GIT_LOG_OPTS = '--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent';
+
+type ScanKind = 'dir' | 'git';
+
+function scannerArgs(target: string, config: string, reportPath: string, ignoreDir: string, mode: ScanKind = 'dir'): string[] {
+    const head = mode === 'git' ? ['git', target, `--log-opts=${GIT_LOG_OPTS}`] : ['dir', target];
     return [
-        'dir', target,
+        ...head,
         '--config', config,
         '--max-archive-depth', '2',
         '--redact',
@@ -478,12 +491,19 @@ function assertNoIgnoreFiles(target: string): void {
     }
 }
 
-function runScanner(bin: string, target: string, config: string, reportPath: string, logPath: string): ScanRun {
+function runScanner(
+    bin: string,
+    target: string,
+    config: string,
+    reportPath: string,
+    logPath: string,
+    mode: ScanKind = 'dir',
+): ScanRun {
     if (fs.existsSync(reportPath)) throw new Refusal('report path already exists; refusing to overwrite');
     assertNoIgnoreFiles(target);
     const cwdDir = mkTemp('csb-bl-cwd-');
     try {
-        const r = cp.spawnSync(bin, scannerArgs(target, config, reportPath, cwdDir), {
+        const r = cp.spawnSync(bin, scannerArgs(target, config, reportPath, cwdDir, mode), {
             cwd: cwdDir,
             env: scannerEnv(),
             encoding: 'utf8',
@@ -1005,18 +1025,9 @@ interface FixturesDoc {
     cases: CaseResult[];
 }
 
-function scanMode(bin: string): number {
-    const fixturesPath = argValue('fixtures');
-    const outPath = argValue('out');
-    const rawDir = argValue('raw-dir');
-    const metaPath = argValue('meta');
-    const targets = argValues('target');
-    if (!fixturesPath || !outPath || !rawDir || targets.length === 0) {
-        throw new Refusal('--scan needs --fixtures, --out, --raw-dir and at least one --target name=path');
-    }
-    const tool = loadTool();
-    const exeSha = verifyExe(bin, tool);
-    const configSha = checkConfigs();
+// Refuses unless FIXTURES.json was proven with this exact executable and these
+// exact three configs, and shows every required case (all but g) passing.
+function requireProvenFixtures(fixturesPath: string, exeSha: string, configSha: ConfigHashes): void {
     const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8')) as FixturesDoc;
     if (fx.exe_sha256 !== exeSha) throw new Refusal('FIXTURES.json was proven with a different scanner executable');
     if (JSON.stringify(fx.config_sha256) !== JSON.stringify(configSha)) {
@@ -1030,6 +1041,21 @@ function scanMode(bin: string): number {
     const ids = new Set(fx.cases.map((c) => c.id));
     const missing = mustHave.filter((id) => !ids.has(id));
     if (missing.length) throw new Refusal(`FIXTURES.json lacks case(s) ${missing.join(',')}; re-run the fixture proof`);
+}
+
+function scanMode(bin: string): number {
+    const fixturesPath = argValue('fixtures');
+    const outPath = argValue('out');
+    const rawDir = argValue('raw-dir');
+    const metaPath = argValue('meta');
+    const targets = argValues('target');
+    if (!fixturesPath || !outPath || !rawDir || targets.length === 0) {
+        throw new Refusal('--scan needs --fixtures, --out, --raw-dir and at least one --target name=path');
+    }
+    const tool = loadTool();
+    const exeSha = verifyExe(bin, tool);
+    const configSha = checkConfigs();
+    requireProvenFixtures(fixturesPath, exeSha, configSha);
     const repo = findRepoRoot(HERE);
     const parsedTargets = targets.map((t) => {
         const eq = t.indexOf('=');
@@ -1150,12 +1176,448 @@ function scanMode(bin: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Git history mode (22-26, AC-35, D-17 amended)
+// ---------------------------------------------------------------------------
+//
+//   --git-fixture --bin <exe> --fixtures <FIXTURES.json> [--out <json>]
+//       Git-mode proof only: builds a throwaway repo under os.tmpdir(), plants
+//       random keys (never printed) and runs the three passes in git mode with
+//       GIT_LOG_OPTS over it. Exit 0 only if every git case passes.
+//   --git-scan --bin <exe> --fixtures <FIXTURES.json> --repo <repo root>
+//              --raw-dir <dir outside the repo> --out <history-scan.json> [--meta <json>]
+//       Runs the git fixture proof FIRST with the identical scanner arguments
+//       and refuses the real scan unless it passes; then scans the repo's full
+//       history (three passes), keeps the raw redacted reports in --raw-dir and
+//       writes metadata only: per hit {rule_id, file, commit, line, column,
+//       type, classification}. Exit 0 zero non-public hits, 1 any non-public
+//       hit (the caller escalates, D-16 immediate tier), 2 crash or refusal.
+//
+// Git cases (fixture repo, commits made with an isolated git config):
+//   git-history        a key added in commit A and deleted in commit B is found at A
+//   git-reflog         a key in commit C, then `reset --hard` back to B, so C is
+//                      reachable only from the reflog (proven with rev-list), is found at C
+//   git-stash-reflog   a key in the OLDER of two stashes (stash@{1}; --all reaches only
+//                      the refs/stash tip, proven with rev-list) is found at its commit
+//   git-ref-no-reflog  a key in commit D reachable only from refs/backup/d, a ref with no
+//                      reflog (proven with rev-list), is found at D (this needs --all)
+//   git-known-public   Hardhat #0 in commit A -> every hit known-public:hardhat-0
+//   git-public-address an exact 0x+40hex after "token" in commit A -> every hit public-address
+//   plus git-redaction, git-pass-subset, git-bytes-scanned, git-no-stray and
+//   git-temp-clean (the scanner's own temporary git copy is gone after each run).
+
+const BL_GIT_TEMP_PREFIX = 'betterleaks-git-';
+
+function scannerTempLeftovers(): string[] {
+    return fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith(BL_GIT_TEMP_PREFIX)).sort();
+}
+
+function gitRun(cwd: string, args: string[], env: NodeJS.ProcessEnv): string {
+    const r = cp.spawnSync('git', args, {
+        cwd,
+        env,
+        encoding: 'utf8',
+        windowsHide: true,
+        maxBuffer: 256 * 1024 * 1024,
+    });
+    if (r.error) throw new Error(`git did not run: ${r.error.message}`);
+    if (r.status !== 0) throw new Error(`git ${args.filter((a) => !a.startsWith('-c')).slice(0, 2).join(' ')} failed (exit ${r.status})`);
+    return r.stdout;
+}
+
+// Read-only git env for the real repo: the caller's env minus GIT_* overrides.
+function readGitEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {};
+    for (const [k, v] of Object.entries(process.env)) if (!/^GIT_/i.test(k)) env[k] = v;
+    env.GIT_TERMINAL_PROMPT = '0';
+    env.GIT_OPTIONAL_LOCKS = '0';
+    return env;
+}
+
+interface GitRunSet {
+    p1: ScanRun;
+    p2: ScanRun;
+    p3: ScanRun;
+    classified: Classified;
+    tempLeftovers: string[];
+}
+
+function runGitPasses(bin: string, repoPath: string, base: string): GitRunSet {
+    const before = scannerTempLeftovers();
+    const p1 = runScanner(bin, repoPath, EXTENDED_TOML, `${base}.pass1.json`, `${base}.pass1.log`, 'git');
+    const p2 = runScanner(bin, repoPath, KNOWN_PUBLIC_TOML, `${base}.pass2.json`, `${base}.pass2.log`, 'git');
+    const p3 = runScanner(bin, repoPath, PUBLIC_ADDRESS_TOML, `${base}.pass3.json`, `${base}.pass3.log`, 'git');
+    const after = scannerTempLeftovers();
+    const tempLeftovers = after.filter((n) => !before.includes(n));
+    for (const f of [...p1.findings, ...p2.findings, ...p3.findings]) {
+        if (typeof f.Commit !== 'string' || !/^[0-9a-f]{40}$/.test(f.Commit)) {
+            throw new Error('a git-mode finding lacks a 40-hex Commit; report shape changed');
+        }
+    }
+    return { p1, p2, p3, classified: classify(p1.findings, p2.findings, p3.findings), tempLeftovers };
+}
+
+interface GitFixtureOutcome {
+    pass: boolean;
+    history_hit: boolean;
+    reflog_hit: boolean;
+    stash_reflog_hit: boolean;
+    ref_without_reflog_hit: boolean;
+    known_public_hit: boolean;
+    public_address_hit: boolean;
+    reflog_only_proven: boolean;
+    stash_only_proven: boolean;
+    ref_without_reflog_proven: boolean;
+    commits_all: number;
+    commits_all_reflog: number;
+    pass_counts: { pass1: number; pass2: number; pass3: number; pass2_only: number; pass3_only: number };
+    bytes_scanned: { pass1: number | null; pass2: number | null; pass3: number | null };
+    cases: CaseResult[];
+    log_opts: string;
+    generated_at: string;
+}
+
+function gitFixture(bin: string): GitFixtureOutcome {
+    const repo = findRepoRoot(HERE);
+    const hardhat = readHardhatKey(repo);
+    const fx = mkTemp('csb-bl-gitfx-');
+    const work = mkTemp('csb-bl-gitwork-');
+    const hooks = mkTemp('csb-bl-githooks-');
+    if ([fx, work, hooks].some((d) => isInside(d, repo))) throw new Refusal('temp folders resolved inside the repo');
+    const emptyGlobal = path.join(work, 'empty.gitconfig');
+    fs.writeFileSync(emptyGlobal, '');
+    const env = readGitEnv();
+    env.GIT_CONFIG_NOSYSTEM = '1';
+    env.GIT_CONFIG_GLOBAL = emptyGlobal;
+    const C = [
+        '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false',
+        '-c', 'core.autocrlf=false', '-c', `core.hooksPath=${normSlashes(hooks)}`, '-c', 'init.defaultBranch=main',
+    ];
+    const g = (...args: string[]): string => gitRun(fx, [...C, ...args], env).trim();
+    const results: CaseResult[] = [];
+    const planted: string[] = [];
+    try {
+        const k1 = randomHexStrong(32);
+        const k2 = randomHexStrong(32);
+        const k3 = randomHexStrong(32);
+        const k4 = randomHexStrong(32);
+        const addr = randomHexStrong(20);
+        planted.push(k1, k2, k3, k4, addr);
+        g('init', '-q');
+        // commit A: deleted-later key, Hardhat #0, an address, a placeholder for the stash case
+        fs.writeFileSync(path.join(fx, 'a.ts'), `PRIVATE_KEY=0x${k1}\n`);
+        fs.writeFileSync(path.join(fx, 'h.ts'), `export const forkAccount = { privateKey: '0x${hardhat}' };\n`);
+        fs.writeFileSync(path.join(fx, 'm.log'), `{"level":30,"time":1717000000000,"token":"0x${addr}","msg":"pair detected"}\n`);
+        fs.writeFileSync(path.join(fx, 's.ts'), 'export const placeholder = 1;\n');
+        g('add', '--', 'a.ts', 'h.ts', 'm.log', 's.ts');
+        g('commit', '-q', '-m', 'A');
+        const shaA = g('rev-parse', 'HEAD');
+        // commit B: delete the key file
+        g('rm', '-q', '--', 'a.ts');
+        g('commit', '-q', '-m', 'B');
+        const shaB = g('rev-parse', 'HEAD');
+        // commit C: a second key, then reset back so C is reflog-only
+        fs.writeFileSync(path.join(fx, 'c.ts'), `PRIVATE_KEY=0x${k2}\n`);
+        g('add', '--', 'c.ts');
+        g('commit', '-q', '-m', 'C');
+        const shaC = g('rev-parse', 'HEAD');
+        g('reset', '-q', '--hard', shaB);
+        // commit D: a fourth key reachable only from refs/backup/d, a ref that has
+        // NO reflog (core.logAllRefUpdates logs only heads/remotes/notes/HEAD),
+        // like this repo's refs/backup ref and its tags: needs --all, not --reflog
+        fs.writeFileSync(path.join(fx, 'd.ts'), `PRIVATE_KEY=0x${k4}\n`);
+        g('add', '--', 'd.ts');
+        const treeD = g('write-tree');
+        const shaD = g('commit-tree', treeD, '-p', shaB, '-m', 'D');
+        g('update-ref', 'refs/backup/d', shaD);
+        g('rm', '-q', '--cached', '--', 'd.ts');
+        fs.unlinkSync(path.join(fx, 'd.ts'));
+        // stash 1 holds a third key; stash 2 (innocuous) pushes it to stash@{1}
+        fs.writeFileSync(path.join(fx, 's.ts'), `PRIVATE_KEY=0x${k3}\n`);
+        g('stash', 'push', '-q', '-m', 's1');
+        const shaS1 = g('rev-parse', 'refs/stash');
+        fs.writeFileSync(path.join(fx, 's.ts'), 'export const placeholder = 2;\n');
+        g('stash', 'push', '-q', '-m', 's2');
+        const shaS2 = g('rev-parse', 'refs/stash');
+        const all = new Set(g('rev-list', '--all').split(/\r?\n/).filter(Boolean));
+        const allReflog = new Set(g('rev-list', '--all', '--reflog').split(/\r?\n/).filter(Boolean));
+        const reflogOnly = !all.has(shaC) && allReflog.has(shaC);
+        const stashOnly = shaS1 !== shaS2 && !all.has(shaS1) && allReflog.has(shaS1);
+        const reflogAlone = new Set(g('rev-list', '--reflog').split(/\r?\n/).filter(Boolean));
+        const noReflogRef = all.has(shaD) && !reflogAlone.has(shaD) && !g('rev-list', 'HEAD').split(/\r?\n/).includes(shaD);
+        if (!all.has(shaA) || !all.has(shaB)) throw new Error('git fixture: A/B not reachable from --all');
+
+        const run = runGitPasses(bin, fx, path.join(work, 'gitfx'));
+        const hits = run.classified.hits;
+        const fileOf = (h: ClassifiedHit): string => normSlashes(h.finding.File).replace(/^\/+/, '');
+        const sel = (file: string): ClassifiedHit[] => hits.filter((h) => fileOf(h) === file);
+        const desc = (hs: ClassifiedHit[]): string =>
+            hs.length === 0
+                ? 'no hits'
+                : hs.map((h) => `${h.finding.RuleID}:${h.classification}@${(h.finding.Commit ?? '').slice(0, 7)}:L${h.finding.StartLine}C${h.finding.StartColumn}`).join(', ');
+        const keyCase = (id: string, file: string, sha: string, what: string, extra: boolean): boolean => {
+            const hs = sel(file);
+            const ok =
+                extra &&
+                hs.some((h) => h.finding.RuleID === 'evm-private-key' && h.finding.Commit === sha && h.classification === NON_PUBLIC) &&
+                hs.every((h) => h.classification === NON_PUBLIC && h.finding.Commit === sha);
+            results.push({ id, expected: what, observed: desc(hs), pass: ok, note: `expected commit ${sha.slice(0, 7)}` });
+            return ok;
+        };
+        const historyHit = keyCase(
+            'git-history',
+            'a.ts',
+            shaA,
+            'a random key added in commit A and deleted in commit B: an evm-private-key hit at A, every a.ts hit non-public at A',
+            true,
+        );
+        const reflogHit = keyCase(
+            'git-reflog',
+            'c.ts',
+            shaC,
+            'a random key in commit C after reset --hard back to B (C reachable only from the reflog): an evm-private-key hit at C, every c.ts hit non-public',
+            reflogOnly,
+        );
+        const stashHit = keyCase(
+            'git-stash-reflog',
+            's.ts',
+            shaS1,
+            'a random key in the older stash (stash@{1}, not reachable from --all): an evm-private-key hit at that stash commit, every s.ts hit non-public',
+            stashOnly,
+        );
+        const refNoReflogHit = keyCase(
+            'git-ref-no-reflog',
+            'd.ts',
+            shaD,
+            'a random key in commit D reachable only from refs/backup/d, a ref with no reflog (not from HEAD, not from any reflog): an evm-private-key hit at D, every d.ts hit non-public',
+            noReflogRef,
+        );
+        const hh = sel('h.ts');
+        const kpHit = hh.some((h) => h.finding.RuleID === 'evm-private-key') && hh.every((h) => h.classification === KNOWN_PUBLIC);
+        results.push({
+            id: 'git-known-public',
+            expected: 'Hardhat #0 in commit A: an evm-private-key hit, every h.ts hit known-public:hardhat-0',
+            observed: desc(hh),
+            pass: kpHit,
+            note: 'the pass-2 allowlist works in git mode',
+        });
+        const mh = sel('m.log');
+        const paHit = mh.length > 0 && mh.every((h) => h.classification === PUBLIC_ADDRESS);
+        results.push({
+            id: 'git-public-address',
+            expected: 'an exact 0x+40hex after "token" in commit A: flagged, every m.log hit public-address',
+            observed: desc(mh),
+            pass: paHit,
+            note: 'the pass-3 allowlist works in git mode',
+        });
+        const known = new Set(['a.ts', 'c.ts', 'd.ts', 's.ts', 'h.ts', 'm.log']);
+        const stray = hits.filter((h) => !known.has(fileOf(h)));
+        results.push({ id: 'git-no-stray', expected: 'no hit outside the six case files', observed: desc(stray), pass: stray.length === 0, note: '' });
+        const rawBlobs = [run.p1.reportPath, run.p2.reportPath, run.p3.reportPath]
+            .map((p) => fs.readFileSync(p, 'utf8'))
+            .concat([run.p1.logText, run.p2.logText, run.p3.logText]);
+        const leaked = planted.filter((v) => rawBlobs.some((b) => b.toLowerCase().includes(v.toLowerCase()))).length;
+        const unredacted = [...run.p1.findings, ...run.p2.findings, ...run.p3.findings].filter((f) => f.Secret !== 'REDACTED').length;
+        results.push({
+            id: 'git-redaction',
+            expected: 'no planted value in any raw report or scanner output; every Secret field is REDACTED',
+            observed: `planted values found in raw output: ${leaked}; non-REDACTED Secret fields: ${unredacted}`,
+            pass: leaked === 0 && unredacted === 0,
+            note: `${planted.length} planted values checked (never printed)`,
+        });
+        const { pass2OnlyCount, pass3OnlyCount } = run.classified;
+        const n1 = run.p1.findings.length;
+        const n2 = run.p2.findings.length;
+        const n3 = run.p3.findings.length;
+        results.push({
+            id: 'git-pass-subset',
+            expected: 'each allowlist only removes hits: zero pass-2-only and zero pass-3-only hits, pass3 <= pass2 <= pass1',
+            observed: `pass1 ${n1}, pass2 ${n2}, pass3 ${n3}, pass2-only ${pass2OnlyCount}, pass3-only ${pass3OnlyCount}`,
+            pass: pass2OnlyCount === 0 && pass3OnlyCount === 0 && n3 <= n2 && n2 <= n1,
+            note: '',
+        });
+        const b = [run.p1.bytesScanned, run.p2.bytesScanned, run.p3.bytesScanned];
+        results.push({
+            id: 'git-bytes-scanned',
+            expected: 'the same non-zero byte count for all three passes',
+            observed: `pass1 ${b[0]}, pass2 ${b[1]}, pass3 ${b[2]}`,
+            pass: (b[0] ?? 0) > 0 && b[0] === b[1] && b[1] === b[2],
+            note: 'parsed from "scanned ~N bytes"',
+        });
+        results.push({
+            id: 'git-temp-clean',
+            expected: `no ${BL_GIT_TEMP_PREFIX}* folder left in the temp folder after the three runs`,
+            observed: `${run.tempLeftovers.length} left`,
+            pass: run.tempLeftovers.length === 0,
+            note: 'the scanner copies the git dir to a temp folder for each run',
+        });
+        return {
+            pass: results.every((r) => r.pass),
+            history_hit: historyHit,
+            reflog_hit: reflogHit,
+            stash_reflog_hit: stashHit,
+            ref_without_reflog_hit: refNoReflogHit,
+            known_public_hit: kpHit,
+            public_address_hit: paHit,
+            reflog_only_proven: reflogOnly,
+            stash_only_proven: stashOnly,
+            ref_without_reflog_proven: noReflogRef,
+            commits_all: all.size,
+            commits_all_reflog: allReflog.size,
+            pass_counts: { pass1: n1, pass2: n2, pass3: n3, pass2_only: pass2OnlyCount, pass3_only: pass3OnlyCount },
+            bytes_scanned: { pass1: b[0], pass2: b[1], pass3: b[2] },
+            cases: results,
+            log_opts: GIT_LOG_OPTS,
+            generated_at: new Date().toISOString(),
+        };
+    } finally {
+        rmTree(fx);
+        rmTree(work);
+        rmTree(hooks);
+    }
+}
+
+function gitFixtureMode(bin: string): number {
+    const fixturesPath = argValue('fixtures');
+    if (!fixturesPath) throw new Refusal('--git-fixture needs --fixtures');
+    const tool = loadTool();
+    const exeSha = verifyExe(bin, tool);
+    requireProvenFixtures(fixturesPath, exeSha, checkConfigs());
+    const out = gitFixture(bin);
+    const outPath = argValue('out');
+    if (outPath) fs.writeFileSync(outPath, JSON.stringify(out, null, 2) + '\n');
+    for (const c of out.cases) console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.id}: ${c.observed}`);
+    console.log(`GIT FIXTURE ${out.pass ? 'PASS' : 'FAIL'}`);
+    return out.pass ? 0 : 1;
+}
+
+function gitScanMode(bin: string): number {
+    const fixturesPath = argValue('fixtures');
+    const outPath = argValue('out');
+    const rawDir = argValue('raw-dir');
+    const repoArg = argValue('repo');
+    const metaPath = argValue('meta');
+    if (!fixturesPath || !outPath || !rawDir || !repoArg) {
+        throw new Refusal('--git-scan needs --fixtures, --repo, --raw-dir and --out');
+    }
+    const tool = loadTool();
+    const exeSha = verifyExe(bin, tool);
+    const configSha = checkConfigs();
+    requireProvenFixtures(fixturesPath, exeSha, configSha);
+    const repo = findRepoRoot(HERE);
+    const target = path.resolve(repoArg);
+    if (canon(target) !== canon(repo)) throw new Refusal('--repo must be exactly this repository root');
+    const raw = path.resolve(rawDir);
+    if (isInside(raw, repo)) throw new Refusal('--raw-dir must be outside the repo');
+    if (fs.existsSync(raw) && fs.readdirSync(raw).length !== 0) throw new Refusal('--raw-dir must be new or empty');
+    let meta: Record<string, unknown> = {};
+    if (metaPath) meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as Record<string, unknown>;
+
+    // 1. git-mode fixture proof with the identical scanner arguments
+    const fixture = gitFixture(bin);
+    for (const c of fixture.cases) console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.id}: ${c.observed}`);
+    if (!fixture.pass) throw new Refusal('the git-mode fixture proof failed; the log-opts do not cover what AC-35 needs');
+
+    // 2. the commit universe (read-only git)
+    const env = readGitEnv();
+    const rg = (...args: string[]): string => gitRun(repo, args, env);
+    const headSha = rg('rev-parse', 'HEAD').trim();
+    const commitsAll = Number(rg('rev-list', '--all', '--count').trim());
+    const commitsAllReflog = Number(rg('rev-list', '--all', '--reflog', '--count').trim());
+    const refs = rg('for-each-ref', '--format=%(refname)').split(/\r?\n/).filter(Boolean);
+    const stashCount = rg('stash', 'list').split(/\r?\n/).filter(Boolean).length;
+    const reflogSet = new Set(rg('rev-list', '--all', '--reflog').split(/\r?\n/).filter(Boolean));
+    const gitVersion = rg('--version').trim();
+
+    // 3. the real three passes
+    fs.mkdirSync(raw, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const run = runGitPasses(bin, repo, path.join(raw, `history-${stamp}`));
+    if ((run.p1.bytesScanned ?? 0) <= 0 || run.p1.bytesScanned !== run.p2.bytesScanned || run.p2.bytesScanned !== run.p3.bytesScanned) {
+        throw new Error('the three history passes read zero or different byte counts');
+    }
+    if (run.tempLeftovers.length) throw new Error(`the scanner left ${run.tempLeftovers.length} temporary git copy folder(s)`);
+    const unredacted = [...run.p1.findings, ...run.p2.findings, ...run.p3.findings].filter((f) => f.Secret !== 'REDACTED').length;
+    if (unredacted) throw new Error(`${unredacted} finding(s) carry a non-REDACTED Secret field`);
+    const outsideUniverse = run.classified.hits.filter((h) => !reflogSet.has(h.finding.Commit ?? '')).length;
+    const hits = run.classified.hits.map((h) => ({
+        rule_id: h.finding.RuleID,
+        file: normSlashes(h.finding.File).replace(/^\/+/, ''),
+        commit: h.finding.Commit,
+        line: h.finding.StartLine,
+        column: h.finding.StartColumn,
+        type: h.finding.Description ?? h.finding.RuleID,
+        classification: h.classification,
+    }));
+    const count = (c: Classification): number => hits.filter((h) => h.classification === c).length;
+    const nonPublic = count(NON_PUBLIC);
+    const computed: Record<string, unknown> = {
+        tool: 'betterleaks',
+        version: tool.version,
+        binary_sha256: exeSha,
+        config_sha256: configSha,
+        fixtures_sha256: sha256File(fixturesPath),
+        engine: '.planning/audit/tools/betterleaks/fixture-check.ts --git-scan (three-pass classification, operator ruling classify-addresses)',
+        mode: 'git',
+        log_opts: GIT_LOG_OPTS,
+        scanner_args: scannerArgs('<repo root>', '<extended.toml|known-public.toml|public-address.toml>', '<report.json>', '<empty temp dir>', 'git'),
+        env_belt: `HTTPS_PROXY=HTTP_PROXY=ALL_PROXY=${NET_BELT} (belt only, not an enforced network boundary)`,
+        scanned_at: new Date().toISOString(),
+        node: process.version,
+        git_version: gitVersion,
+        git_fixture: fixture,
+        head_sha: headSha,
+        commits_all: commitsAll,
+        commits_all_reflog: commitsAllReflog,
+        refs,
+        ref_count: refs.length,
+        stash_count: stashCount,
+        hits_outside_commit_universe: outsideUniverse,
+        bytes_scanned: { pass1: run.p1.bytesScanned, pass2: run.p2.bytesScanned, pass3: run.p3.bytesScanned },
+        pass_counts: {
+            pass1: run.p1.findings.length,
+            pass2: run.p2.findings.length,
+            pass3: run.p3.findings.length,
+            pass2_only: run.classified.pass2OnlyCount,
+            pass3_only: run.classified.pass3OnlyCount,
+        },
+        raw_report_dir: normSlashes(raw),
+        raw_reports: [run.p1.reportPath, run.p2.reportPath, run.p3.reportPath].map(normSlashes),
+        classification_labels: {
+            [NON_PUBLIC]: 'reported by all three passes',
+            [KNOWN_PUBLIC]: 'reported by pass 1, removed by the pass-2 Hardhat #0 allowlist',
+            [PUBLIC_ADDRESS]:
+                'reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling "classify-addresses", ESC-SECRET-01)',
+        },
+        classification_key: ['rule id', 'file', 'commit', 'line', 'start column', 'end column'],
+        hit_counts: {
+            total: hits.length,
+            [NON_PUBLIC]: nonPublic,
+            [KNOWN_PUBLIC]: count(KNOWN_PUBLIC),
+            [PUBLIC_ADDRESS]: count(PUBLIC_ADDRESS),
+        },
+        hits,
+    };
+    for (const k of Object.keys(meta)) {
+        if (k in computed) throw new Refusal(`--meta key ${k} would override a computed field`);
+    }
+    fs.writeFileSync(outPath, JSON.stringify({ ...computed, ...meta }, null, 2) + '\n');
+    console.log(
+        `HISTORY commits_all=${commitsAll} commits_all_reflog=${commitsAllReflog} refs=${refs.length} stashes=${stashCount} ` +
+            `hits=${hits.length} non-public=${nonPublic} known-public=${count(KNOWN_PUBLIC)} public-address=${count(PUBLIC_ADDRESS)}`,
+    );
+    console.log(`RESULT ${nonPublic === 0 ? 'CLEAN (zero non-public hits)' : `NON-PUBLIC HITS: ${nonPublic}`}`);
+    return nonPublic === 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 
 function main(): number {
     const bin = argValue('bin');
     if (!bin) throw new Refusal('--bin <betterleaks.exe> is required');
+    if (hasFlag('git-scan')) return gitScanMode(path.resolve(bin));
+    if (hasFlag('git-fixture')) return gitFixtureMode(path.resolve(bin));
     if (hasFlag('scan')) return scanMode(path.resolve(bin));
     const out = argValue('out');
     if (!out) throw new Refusal('--out <FIXTURES.json> is required');
