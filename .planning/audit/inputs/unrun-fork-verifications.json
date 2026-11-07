@@ -1,0 +1,36 @@
+{
+  "description": "Fork-project assertions written in Phase 22 that Phase 22 never runs under the real fork project (npm run test:fork starts Hardhat; Phase 22 runs no Hardhat command, AC-08). Each is a dated obligation for 22-29 to register; whichever phase first runs npm run test:fork must check these assertions by name under the real fork project.",
+  "registered_by_plan": "22-08",
+  "entries": [
+    {
+      "id": "UFV-01",
+      "ac": "AC-13",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > module scope: the Telegram token and every test/.env.test key except the fork shell keys equal their sentinels (AC-13)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts setup-fork child cases (railsEntry 'setup-fork': sentinel env, fork mode, Telegram deny on, DB denied; fork shell keys (i)-(v))",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts (project fork-rehearsal: the fork project's setupFiles, fileParallelism, pool and timeouts pinned by test/unit/rails/forkRehearsalParity.test.ts, without the Hardhat globalSetup)",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project",
+      "registered": "2026-11-06",
+      "registered_by_plan": "22-08"
+    },
+    {
+      "id": "UFV-02",
+      "ac": "AC-17 / SPEC R4",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > in-worker fork shell key: ETH_FORK_RPC_URL is present, non-empty, not the sentinel, and preserved (AC-17)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts 'fork shell keys (SPEC R4 / AC-17)' cases (i)-(vii) in railsEntry 'setup-fork' children",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); ledger fork-shell-key ETH_FORK_RPC_URL preserved, ALLOW_REAL_MAINNET absent",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project, with the operator's real fork URL in the shell",
+      "registered": "2026-11-06",
+      "registered_by_plan": "22-08"
+    }
+  ]
+}
