@@ -1,0 +1,49 @@
+RED proof 22-08-2 — env-block
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:23:38.671Z at HEAD 860e656729de15506ebbeadcd1b54463f7a22a09.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..a064366 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -690,7 +690,7 @@ function checkFsCall(api, idxs, envRead, ancestor, args) {
+         }
+         for (const c of cands) {
+             const abs = path.resolve(c);
+-            if (maybeEnv(abs)) {
++            if (false && maybeEnv(abs)) { // RED 22-08-2: .env fs wrappers pass through
+                 const hit = protectedEnvHit(c);
+                 if (hit) {
+                     const readLike = envRead && /^(readFile|open|openAsBlob|createReadStream|ReadStream)/.test(baseApi);
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/envSentinel.test.ts -t "env block"
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/envSentinel.test.ts (7 tests | 1 failed | 5 skipped) 12ms
+       × a protected root .env is invisible to fs.readFileSync, fs.promises.readFile and dotenv, and is ledgered 9ms
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/envSentinel.test.ts > env block (D-04) > a protected root .env is invisible to fs.readFileSync, fs.promises.readFile and dotenv, and is ledgered
+  AssertionError: expected 'RAIL_ENV_MARKER=planted-marker-21544-…' to be undefined
+  - Expected:
+  + Received:
+   Test Files  1 failed (1)
+        Tests  1 failed | 1 passed | 5 skipped (7)
+     Duration  336ms (transform 25ms, setup 58ms, import 37ms, tests 12ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042335-22308-289ba0 | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042335-22308-289ba0\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  2 passed | 5 skipped (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042337-20296-143dd0 | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042337-20296-143dd0\summary.json
