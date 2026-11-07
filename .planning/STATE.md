@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-22-PLAN.md
-last_updated: "2026-11-07T18:45:58.210Z"
+stopped_at: Completed 22-23-PLAN.md
+last_updated: "2026-11-07T19:21:10.297Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 24352159ab1b68c81315cff919779902b3fb2904
+state_head: 3f6232f92c7dfbb7ffa4b8828af9da530b127026
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 15 of 29
+Plan: 16 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -91,11 +91,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P20 | 44min | 3 tasks | 27 files |
 | Phase 22 P21 | 35min (wall-clock incl. operator wait) | 3 tasks | 33 files |
 | Phase 22 P22 | 58min | 3 tasks | 39 files |
+| Phase 22 P23 | 30min | 2 tasks | 26 files |
 
 ## Session
 
-**Last session:** 2026-11-07T18:45:58.138Z
-**Stopped at:** Completed 22-22-PLAN.md
+**Last session:** 2026-11-07T19:21:10.216Z
+**Stopped at:** Completed 22-23-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -143,3 +144,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-21: AUD-DB-009 (Telegram bot token in logs via err.config.url) and AUD-DB-010 (RPC URL with API key in preflight Telegram alert) are S2 secret-handling items for Phase 24 (card TX-04); the 22-21 Task 2 verify prints 'rows undefined' for {rows, discovery} thresholds files (print bug; actual 24 rows)
 - [Phase 22]: 22-22: ESC-API-01 recorded - operator 'Acknowledge continue' for AUD-API-002 (RC-12, Stop chain disarms anti-rug) and AUD-API-008 (malformed Host header kills the process); AUD-API-001 (failed-held emergency/force-sell gap) stays on ESC-PRE-04. Interim orchestrator guidance: do not use per-chain Stop as a safety switch, use the global pause.
 - [Phase 22]: 22-22: dashboard slice has no S0/S1 (max S2: anti-rug state wiped by 5 s positions push AUD-DASH-001, CB trip not re-loaded AUD-DASH-002, session-only dry-run review panel AUD-DASH-003); card DASH-01 (evidence before ANTIRUG_LIVE_EXECUTE) routed to the Phase 24 capital discussion.
+- [Phase 22]: 22-23: AUD-TESTU-001 (24 unit files reached the live DB, real .env values or the notifier before the rails) is S1 RC-19 sibling evidence linked to AUD-RAIL-002 and ESC-PRE-03 (resolved_items); no new rail-class reach in test/unit; no ESC-TESTU record and no area checkpoint (rediscovery is never escalated twice)
+- [Phase 22]: 22-23: the green unit suite would not catch AUD-BUY-001, AUD-BUY-002, AUD-EXIT-002/-007/-009/-013/-015, AUD-ANTIRUG-004, AUD-TX-002, AUD-DB-002/-003 and AUD-BUY-006 on the real path (AUD-TESTU-002..-021); the INT-NONCE-SELL regression stays green across all three nonce-lock tests (AUD-TESTU-003/-004); RED-prove those first in Phase 23/28
+- [Phase 22]: 22-23: unit type-level compile gates (@ts-expect-error in anti-rug/types and honeypotTypes) never run: no tsconfig includes test/ and Vitest does not type-check (AUD-TESTU-008); RC-28 is TESTI-owned and linked as rc:RC-28 on AUD-TESTU-017/-018/-019

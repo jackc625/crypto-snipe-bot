@@ -122,7 +122,7 @@ See key-decisions. The main one: AUD-TESTU-001 is S1 and links to ESC-PRE-03 as 
 
 **1. [Rule 3 - Blocking] ESC-PRE-03.json edited (not in files_modified)**
 - **Found during:** Task 1
-- **Issue:** The plan requires real-state reach to set `escaped_regression`-linked `escalation_ref` ESC-PRE-03. check.ts (:652) fails unless that record lists the finding.
+- **Issue:** The plan requires the real-state-reach finding to carry `escalation_ref` ESC-PRE-03. check.ts (:652) fails unless that record lists the finding.
 - **Fix:** Added `AUD-TESTU-001` to the empty `resolved_items` with a format-preserving one-line edit. `items` is unchanged, which follows the ESC-PRE-02 rediscovery pattern.
 - **Files modified:** .planning/audit/escalations/ESC-PRE-03.json
 - **Commit:** 5f29bbe
