@@ -1,0 +1,63 @@
+RED proof 22-08-9 — udp-deny
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:27:07.494Z at HEAD fb12fb6aa3eeb5ed6aacdd9131975bcf4c1b4cf3.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..94accba 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -1122,7 +1122,7 @@ function emitUdpError(sock, err, cb) {
+ function makeUdpSendWrapper(orig) {
+     return function railUdpSend(...args) {
+         const st = getState();
+-        if (!st) return Reflect.apply(orig, this, args);
++        if (true || !st) return Reflect.apply(orig, this, args); // RED 22-08-9: dgram send passes through
+         let connected = false;
+         try {
+             this.remoteAddress();
+@@ -1154,7 +1154,7 @@ function makeUdpSendWrapper(orig) {
+ function makeUdpConnectWrapper(orig) {
+     return function railUdpConnect(...args) {
+         const st = getState();
+-        if (!st) return Reflect.apply(orig, this, args);
++        if (true || !st) return Reflect.apply(orig, this, args); // RED 22-08-9: dgram connect passes through
+         const [port] = args;
+         let address = args[1];
+         if (typeof address === 'function') address = undefined;
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/netDeny.test.ts -t "udp"
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/netDeny.test.ts (18 tests | 2 failed | 15 skipped) 27ms
+       × a udp4 send to the TEST-NET-1 address fails with E_RAIL_NET_DENIED 9ms
+       × holds net-deny, dns-deny, udp-deny and net-allow entries for this worker 16ms
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/netDeny.test.ts > udp deny (dgram) > a udp4 send to the TEST-NET-1 address fails with E_RAIL_NET_DENIED
+  AssertionError: expected 'succeeded' to be 'denied' // Object.is equality
+  Expected: "denied"
+  Received: "succeeded"
+   FAIL   unit  test/unit/rails/netDeny.test.ts > rail ledger > holds net-deny, dns-deny, udp-deny and net-allow entries for this worker
+  AssertionError: udp-deny: expected false to be true // Object.is equality
+  - Expected
+  + Received
+   Test Files  1 failed (1)
+        Tests  2 failed | 1 passed | 15 skipped (18)
+     Duration  618ms (transform 30ms, setup 61ms, import 295ms, tests 27ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042703-20124-412694 | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042703-20124-412694\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  3 passed | 15 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042706-22952-4d1310 | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042706-22952-4d1310\summary.json
