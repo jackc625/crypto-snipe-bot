@@ -118,9 +118,10 @@
     },
     "C18": {
       "result": [
+        "AUD-BUY-005",
         "AUD-BUY-006"
       ],
-      "search": "Grep tool for the env-read pattern over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (telegramListener.ts:42-57; bot.ts:529, :557, :577, :703, :1764, :2178, :2305) and the per-chain env parsing it depends on (chainRegistry.ts:663-714); parse behaviour for unset/''/non-numeric recorded per row in thresholds/BUY.json"
+      "search": "Grep tool for the env-read pattern over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (telegramListener.ts:42-57; bot.ts:529, :557, :577, :703, :1764, :2178, :2305) and the per-chain env parsing it depends on (chainRegistry.ts:663-714); parse behaviour for unset/''/non-numeric recorded per row in thresholds/BUY.json Threshold inventory discovery: every env read and money/timing constant in the slice maps to a TH-BUY row except: TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION (credentials, not a money or timing number (values never read during the audit)); TELEGRAM_ALLOWED_SENDERS, TELEGRAM_ALLOWED_CHANNELS (allowlists, not numbers (AUD-BUY-006, card OD-16)); (whole environment passed to buildReconcileConfig) (the MEV_BUY_* reconcile keys are parsed in src/utils/mevStrategies/reconciliation.ts (TX slice, 22-20)); Telegram connectionRetries 5 (connection setup only; does not change what or when the bot buys); sanitize MAX_REASON_LEN 120 (cosmetic (alert text length)); getV3Price (dead code (AUD-BUY-026))."
     },
     "C19": {
       "result": "checked, none",

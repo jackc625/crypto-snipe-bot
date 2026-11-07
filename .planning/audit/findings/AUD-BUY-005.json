@@ -8,7 +8,8 @@
   "capital_impact": "STRAND",
   "classes": [
     "C11",
-    "C12"
+    "C12",
+    "C18"
   ],
   "files": [
     "src/bot.ts"
@@ -83,6 +84,11 @@
       "type": "command",
       "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node -e \"setInterval(()=>{},1000); Promise.reject(new Error('probe'))\"; echo exit=$?",
       "note": "exit=1 under v22.16.0: an unhandled rejection terminates the process even with a live interval timer (Node default --unhandled-rejections=throw)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:185@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "concrete trigger found during the threshold inventory: parseEther(<envPrefix>_MIN_LIQUIDITY) runs before the try in checkMinLiquidity (:190) and before the V3 honeypot gate; a non-numeric value (not validated at load, chainRegistry.ts:665) rejects the un-awaited V3 handler on the first pool and exits the process (TH-BUY-08)"
     }
   ],
   "sibling_sites_checked": "Every async call site in bot.ts was read: listener callbacks (:1542, :1583), poll dispatches (:1644, :1669), the un-awaited poll starter (:1531), the entry point (:2360), the four setInterval callbacks (:1636, :1660, :1740, :1774; the two poll loops have try/catch around their bodies, the two health/balance loops do not), the two close handlers, resumeMultiChainMonitoring (.then/.catch present, :1934-1959, contained) and the shutdown disconnect (.catch present, :2323). telegramListener.ts:121 contains with .catch (correct). The exit engine poll loop has its own try/catch (exitEngine.ts:1906-1942, EXIT slice).",

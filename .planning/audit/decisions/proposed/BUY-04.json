@@ -1,0 +1,36 @@
+{
+  "id": "BUY-04",
+  "title": "What dashboard \"stop chain\" means for buying",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: stop removes WebSocket listeners only",
+      "behavior_impact": "none",
+      "risk": "HTTP-polling chains keep buying, Telegram drops still buy on stopped chains, and start adds a second poller (double dispatch)."
+    },
+    {
+      "id": "stop-means-no-new-buys",
+      "name": "Every buy entry point checks the stopped state; stop clears pollers; start is idempotent",
+      "behavior_impact": "A stopped chain makes no new buys from any source; exits and anti-rug continue.",
+      "risk": "Needs the stopped state shared with bot.ts and every entry point covered by a test."
+    },
+    {
+      "id": "remove-per-chain-stop",
+      "name": "Remove per-chain stop/start and rely on the global pause",
+      "behavior_impact": "One control that already works (CP1/CP2).",
+      "risk": "Loses the ability to halt one chain while others trade."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "stop-means-no-new-buys. Until then, use the global pause to halt buying.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether the per-chain stop control actually stops buying.",
+  "findings": [
+    "AUD-BUY-011"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

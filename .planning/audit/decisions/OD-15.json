@@ -1,0 +1,42 @@
+{
+  "id": "OD-15",
+  "title": "Snipe buy minOut when the price quote fails",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: on a quote failure send the buy with amountOutMin = 0",
+      "behavior_impact": "none",
+      "risk": "The buy executes at any price; during a busy launch block that can be far above the price the bot saw (bounded by the snipe amount). A fractional slippage value would silently hit the same path."
+    },
+    {
+      "id": "fail-closed",
+      "name": "Skip the snipe when the quote fails",
+      "behavior_impact": "No buy without a slippage floor; some opportunities are missed on an RPC blip.",
+      "risk": "Missed snipes when the RPC is unreliable."
+    },
+    {
+      "id": "retry-then-skip",
+      "name": "Retry the quote once or twice within a short budget, then skip",
+      "behavior_impact": "Fewer missed snipes than fail-closed; still never buys without a floor.",
+      "risk": "Adds latency to the buy; the retries need their own timeout."
+    },
+    {
+      "id": "floor-from-roundtrip",
+      "name": "Fall back to a floor derived from the honeypot roundtrip result",
+      "behavior_impact": "Buys still go out with some floor when the router quote fails.",
+      "risk": "The roundtrip does not return an expected output today, so this needs new plumbing and its floor may be stale."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "fail-closed (research recommendation), with the slippage math moved to integer basis points so no configuration can throw into the zero-floor path. The deliberate private leg's documented 0 floor (bot.ts:527-543) is a separate, intentional choice and is not decided by this card unless the operator wants it included.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether the bot ever sends a snipe with no minimum output.",
+  "findings": [
+    "AUD-BUY-003"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

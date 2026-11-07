@@ -1,0 +1,50 @@
+{
+  "id": "OD-6",
+  "title": "Floating-promise and unhandled-rejection policy",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: no process handler, un-awaited calls stay as they are",
+      "behavior_impact": "none",
+      "risk": "Any rejection on an un-awaited path (listener callbacks, pollers, the entry point, async intervals and close handlers) exits the process under Node 22 (exit 1); every exit monitor and anti-rug subscription stops until someone restarts the bot."
+    },
+    {
+      "id": "contain-per-handler",
+      "name": "Contain every un-awaited entry with .catch that logs and alerts",
+      "behavior_impact": "The process survives a failing handler; the failing handler's own work is abandoned with an alert.",
+      "risk": "A half-finished buy or arming step can continue unnoticed if the escalation is only a log line; each new call site must remember the wrapper."
+    },
+    {
+      "id": "global-alert-shutdown",
+      "name": "Add a process-level unhandledRejection handler that alerts and shuts down cleanly",
+      "behavior_impact": "Unknown failures stop the bot on purpose; open positions are re-armed by the boot resume when it is restarted.",
+      "risk": "Without an automatic restart, positions are unmonitored from the shutdown until the operator restarts."
+    },
+    {
+      "id": "global-alert-continue",
+      "name": "Add a process-level handler that alerts and keeps running",
+      "behavior_impact": "The bot never exits on a stray rejection.",
+      "risk": "It keeps trading in an unknown state (for example a position whose arming failed half-way)."
+    },
+    {
+      "id": "contain-plus-global",
+      "name": "Both: contain per handler (fail closed for startup, listener and arming paths) and a global handler that alerts and shuts down cleanly",
+      "behavior_impact": "Expected failures are contained where they happen; anything unexpected stops the bot with an alert.",
+      "risk": "More code paths to test; same restart dependency as global-alert-shutdown for the unexpected case."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "contain-plus-global (research recommendation): contain each handler with a fail-closed escalation for startup, listener and arming paths, plus a global handler that hard-alerts and triggers a controlled shutdown; never disable no-floating-promises; do not add awaits inside event handlers or poll loops in lint-only commits.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a stray async error crashes the bot, is contained, or stops it on purpose; affects every position's protection during an error.",
+  "findings": [
+    "AUD-BUY-005",
+    "AUD-BUY-002",
+    "AUD-BUY-008"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}
