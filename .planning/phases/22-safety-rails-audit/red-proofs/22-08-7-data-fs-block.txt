@@ -1,0 +1,48 @@
+RED proof 22-08-7 — data-fs-block
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:26:13.453Z at HEAD b9ff28662b2c5d495e6e01aad90435c3422ab115.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..3c61e82 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -698,7 +698,7 @@ function checkFsCall(api, idxs, envRead, ancestor, args) {
+                     return envBlockedError(api, abs);
+                 }
+             }
+-            if (maybeData(abs) || ancestor) {
++            if (false && (maybeData(abs) || ancestor)) { // RED 22-08-7: data fs wrappers pass through
+                 const dataDir = protectedDataHit(c, ancestor);
+                 if (dataDir) {
+                     ledgerAppend({ kind: 'data-access-blocked', target: { api, path: abs } });
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/dbTripwireSetup.test.ts
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/dbTripwireSetup.test.ts (11 tests | 11 skipped) 24ms
+  ⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/dbTripwireSetup.test.ts [ test/unit/rails/dbTripwireSetup.test.ts ]
+  AssertionError: expected 'NO-THROW' to be 'RAIL_DATA_TRIPWIRE' // Object.is equality
+  Expected: "RAIL_DATA_TRIPWIRE"
+  Received: "NO-THROW"
+   Test Files  1 failed (1)
+        Tests  11 skipped (11)
+     Duration  400ms (transform 63ms, setup 61ms, import 88ms, tests 24ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042609-12692-c95828 | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042609-12692-c95828\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  11 passed (11)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042611-22204-1ac063 | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042611-22204-1ac063\summary.json
