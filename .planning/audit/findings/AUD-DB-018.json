@@ -1,0 +1,57 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-018",
+  "title": "sendTelegramAlert returns before the dashboard broadcast when Telegram is not configured, so every alert sent through it (preflight FATALs, buy and exit alerts that use it) never reaches the dashboard either, while sendCtxAlert broadcasts regardless; and it always labels its broadcast info/system",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C20"
+  ],
+  "files": [
+    "src/utils/notifier.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:37-41@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "missing chat id or token -> log.warn and return (before the broadcast at :54-59)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:54-59@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "broadcast severity 'info', category 'system' for every message"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:75-97@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendCtxAlert: skips only the Telegram post and always broadcasts with inferred severity"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -c \"sendTelegramAlert(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "sendTelegramAlert is used across src (bot.ts, preflight.ts, exitEngine.ts and others), so the dashboard feed depends on Telegram being configured for those messages"
+    }
+  ],
+  "sibling_sites_checked": "Both exported senders and sendChainAlert (a sendTelegramAlert wrapper, :66-68). TELEGRAM_* keys are required by validateEnvVars (config.ts:18-22), so in the bot an unset token exits at boot; the gap appears when a key is present but empty in tooling and under the 22-05 rails (D-04 amended chose the catch path for exactly this reason). Markdown injection of token symbols is AUD-BUY-022; no request timeout is AUD-EXIT-021.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading telemetry; the operator can miss alerts on the dashboard when Telegram is off, and every sendTelegramAlert broadcast looks like routine info.",
+  "related": [
+    "AUD-BUY-022",
+    "AUD-EXIT-021"
+  ],
+  "tags": [],
+  "od_ref": "DB-05",
+  "recommendation": "Always broadcast (as sendCtxAlert does) and infer severity the same way in both senders. Card DB-05. Phase 29."
+}

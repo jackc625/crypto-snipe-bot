@@ -1,0 +1,73 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-003",
+  "title": "Positions the bot still holds after a failed sell are marked trades.status='failed', and every risk query counts only status='pending' buys, so stuck positions drop out of the open-position limit, the exposure cap and the daily-loss total and the bot keeps buying past its limits",
+  "severity": "S1",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C14",
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts",
+    "src/riskManager.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1159-1166@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "still-held failed exit: updateTradeStatus.run('failed', ...) for operator visibility, then keepMonitoringFailedHeld (the position is kept and retried)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:420-422@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getOpenPositionCount: WHERE status = 'pending' AND action = 'buy'"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getTotalExposure: WHERE b.status = 'pending' AND b.action = 'buy'"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:48-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exposureByChain: same status = 'pending' filter"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:441-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getDailyRealizedLoss counts only rows with a sell; a held, unsold position has no sell row, so its loss is not counted either"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the restart scan already treats exit_status = 'exit_failed_held' as still open (UNION with pending); the risk queries do not"
+    }
+  ],
+  "sibling_sites_checked": "All five updateTradeStatus.run sites (git grep at the base SHA): bot.ts:1189 and :1514 (buy catch, AUD-BUY-002), bot.ts:1937 (restart: zero balance -> failed, correct), exitEngine.ts:668 (sold) and exitEngine.ts:1163 (still-held failed exit -> failed, this finding). All risk SQL in db.ts and riskManager.ts filters on status = 'pending'; none reads exit_state.exit_status. The restart-resume queries getResumeExitMonitorTrades / getResumeAntiRugTrades (db.ts:597-620) do include exit_failed_held.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 OVERSPEND: more positions and more capital are put at risk than MAX_OPEN_POSITIONS and MAX_TOTAL_EXPOSURE allow whenever sells fail on held tokens, a common condition for sniped tokens (transfer tax, honeypot-like behaviour, liquidity pulled). Each stuck position frees one slot for a new buy. Bounded by the per-trade size and the wallet balance, so not S0.",
+  "related": [
+    "AUD-DB-002",
+    "AUD-BUY-002",
+    "AUD-BUY-010"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "DB-01",
+  "recommendation": "Count a position as open from its exit lifecycle (pending buy, or exit_state row present, including exit_failed_held) rather than from trades.status, in every risk query; keep the operator-visible 'failed' label separately. Card DB-01. Phase 24; nothing is changed in Phase 22."
+}

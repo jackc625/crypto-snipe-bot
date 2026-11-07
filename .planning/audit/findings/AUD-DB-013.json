@@ -1,0 +1,66 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-013",
+  "title": "Beyond the unit mix-up, the risk formulas are wrong: each partial sell is charged the full buy cost in the daily-loss sum, exposure subtracts sale proceeds instead of the cost sold (it goes negative on a profitable partial), buy gas is never recorded, and ETH and BNB amounts are added into one total against one cap",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C01"
+  ],
+  "files": [
+    "src/utils/db.ts",
+    "src/riskManager.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:441-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one row per sell joined to its buy: s.amount_out - b.amount_in - b.gas_cost - s.gas_cost; with two partial sells and a final sell the buy cost is subtracted three times"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exposure = amount_in - SUM(partial_sell amount_out): proceeds, not the share of cost sold"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1140@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buy rows write gasCost: null (also :1464, :782), so buy gas never enters any loss figure"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no chain filter: BSC amounts (BNB) and ETH/Base/Arbitrum amounts (ETH) are summed into one number compared with MAX_TOTAL_EXPOSURE"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:449@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "join on token + chain + s.timestamp >= b.timestamp: a second buy of the same token joins every earlier sell (same-token rebuys, AUD-EXIT-018)"
+    }
+  ],
+  "sibling_sites_checked": "getPnLQuery (:351-384) and getPnLChartDataQuery (:463-485) use the same join; api/routes/risk.ts:66 pro-rates the buy cost per event for its chart (API slice), so the dashboard and the breaker compute loss differently. These defects remain after AUD-DB-002 is fixed, so they are a separate entry.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the double charge makes the breaker trip early (fail-closed direction); the proceeds-based exposure and the cross-currency total let the exposure cap be exceeded by bounded amounts (fail-open direction); buy gas is a small understatement. Bounded effects, so below the S1 of AUD-DB-002.",
+  "related": [
+    "AUD-DB-002",
+    "AUD-DB-014",
+    "AUD-EXIT-018"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "DB-01",
+  "recommendation": "Define realized loss per position (proceeds minus cost of the part sold minus all gas), exposure as remaining cost basis, and keep totals per currency (or convert explicitly). Card DB-01. Phase 24."
+}

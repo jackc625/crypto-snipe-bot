@@ -1,0 +1,76 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-011",
+  "title": "Section C SC-14: ALCHEMY_URL is required while ETH_RPC_URL is the documented key, preflight then refuses an ALCHEMY_URL-only setup that the registry accepts, process.env.ALCHEMY_URL! assertions hide the fallback, and chain addresses and gas settings exist twice (legacy CONFIG and CHAIN_TEMPLATES)",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/config.ts",
+    "src/chainRegistry.ts",
+    "src/preflight.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/config.ts:16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ALCHEMY_URL required: true ('legacy, use ETH_RPC_URL instead')"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:249-253@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "rpc.sepolia / rpc.mainnet = ETH_RPC_URL || ALCHEMY_URL! ; rpc.bsc falls back to a public BSC endpoint"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:934-938@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "eth falls back to ALCHEMY_URL when ETH_RPC_URL is unset"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:762-780@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Rule 4 fails eth when ETH_RPC_URL is unset, ignoring the ALCHEMY_URL fallback"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:255-263@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "NETWORK defaults to 'sepolia' while .env.example:55 ships NETWORK=mainnet; the value only picks the legacy provider key"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:273-286@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "legacy ETH factory/router/WETH addresses, gasMultiplier 1.2 and gasLimit 300000 duplicated from CHAIN_TEMPLATES.eth (chainRegistry.ts:179-204)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"CONFIG\\.\\(factoryAddress\\|routerAddress\\|wethAddress\\|gasMultiplier\\|snipeAmountETH\\)\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "consumers: tokenSafety.ts legacy functions (not called on the multi-chain path; bot.ts imports simulateSwap but never calls it), gasManager.ts:41 (unreachable, SC-19), pairDiscovery.ts:11-14 (unreachable, SC-20), scripts/addLiquidity.ts"
+    }
+  ],
+  "sibling_sites_checked": "All rpc / address duplicates in the slice listed in evidence. Outside: provider.ts:16-19 uses CONFIG.network / CONFIG.rpc as the legacy fallback key (TX slice). The multi-chain buy and exit paths read ctx.chain (CHAIN_TEMPLATES) only; no live path was found using the legacy addresses.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading configuration and drift risk. Today the live paths use one source (CHAIN_TEMPLATES), and the contradictory ETH RPC rules fail closed (preflight refuses), so no capital effect.",
+  "related": [
+    "AUD-DB-016"
+  ],
+  "tags": [
+    "section-c:SC-14"
+  ],
+  "od_ref": "DB-06",
+  "recommendation": "Make ETH_RPC_URL the required key (ALCHEMY_URL an explicit alias resolved in one place), drop the non-null assertions, and remove the legacy CONFIG addresses and gas values with their dead consumers. Card DB-06 (env contract). Phase 27/29."
+}

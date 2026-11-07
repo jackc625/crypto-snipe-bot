@@ -1,0 +1,68 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-008",
+  "title": "Section C SC-13: the raw wallet private key sits on the exported module-level CONFIG object and is read from process.env again for every chain context, and the logger has no redaction configured, so any future log of CONFIG, an env dump or an error object carrying it would write the key",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "src/config.ts",
+    "src/chainRegistry.ts",
+    "src/utils/logger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/config.ts:268-271@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "export const CONFIG = { ..., walletPrivateKey: process.env.PRIVATE_KEY! }"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:1067@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "createChainContext: new ethers.Wallet(process.env.PRIVATE_KEY!, httpProvider)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/logger.ts:6-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pino options: level, timestamp, base only; no redact paths"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"log.*CONFIG\\b\\|JSON.stringify(CONFIG\\|logger.*(CONFIG\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no output: CONFIG is not logged anywhere at the base SHA, so this is latent"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"CONFIG.walletPrivateKey\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "consumers: src/utils/provider.ts:59 (getWallet) and src/utils/tokenSafety.ts:41 (legacy path)"
+    }
+  ],
+  "sibling_sites_checked": "Key reads in the slice: config.ts:271 and chainRegistry.ts:1067; validateEnvVars checks presence only (config.ts:231-242). Outside the slice: provider.ts:59 and tokenSafety.ts:41 read CONFIG.walletPrivateKey (TX and BUY slices). ethers v6 Wallet keeps the key in a private field, so logging a Wallet or ctx does not print it. Credential sinks that do exist today are AUD-DB-009 (Telegram token), AUD-DB-010 (RPC key to Telegram) and AUD-TX-014 (bloXroute header, RPC URLs).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: no path at the base SHA writes the key; the defect is that nothing would stop one (no redaction, the key on a widely imported plain object). A future debug log of CONFIG or an env dump would expose the wallet, so it is recorded rather than dismissed.",
+  "related": [
+    "AUD-DB-009",
+    "AUD-DB-010",
+    "AUD-TX-014"
+  ],
+  "tags": [
+    "section-c:SC-13",
+    "credential-exposure"
+  ],
+  "od_ref": null,
+  "recommendation": "Keep the key only where the Wallet is built (read once, never on an exported object) and add pino redact paths for the key, auth headers, bot token and RPC URLs (with card TX-04). No behaviour change for trading. Phase 29."
+}

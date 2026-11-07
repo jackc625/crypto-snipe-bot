@@ -1,0 +1,87 @@
+[
+  {
+    "path": "src/chainRegistry.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-008",
+      "AUD-DB-011",
+      "AUD-DB-014",
+      "AUD-DB-016",
+      "AUD-DB-017"
+    ]
+  },
+  {
+    "path": "src/config.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-005",
+      "AUD-DB-008",
+      "AUD-DB-011",
+      "AUD-DB-014",
+      "AUD-DB-016"
+    ]
+  },
+  {
+    "path": "src/preflight.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-006",
+      "AUD-DB-010",
+      "AUD-DB-011",
+      "AUD-DB-016",
+      "AUD-DB-017"
+    ]
+  },
+  {
+    "path": "src/riskManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-002",
+      "AUD-DB-003",
+      "AUD-DB-013",
+      "AUD-DB-014",
+      "AUD-BUY-010"
+    ]
+  },
+  {
+    "path": "src/utils/db.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-002",
+      "AUD-DB-003",
+      "AUD-DB-004",
+      "AUD-DB-006",
+      "AUD-DB-007",
+      "AUD-DB-012",
+      "AUD-DB-013",
+      "AUD-DB-015",
+      "AUD-DB-019",
+      "AUD-BUY-002",
+      "AUD-RAIL-002",
+      "AUD-FORENSIC-001"
+    ]
+  },
+  {
+    "path": "src/utils/logger.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-005",
+      "AUD-DB-008",
+      "AUD-DB-009"
+    ]
+  },
+  {
+    "path": "src/utils/notifier.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-009",
+      "AUD-DB-018",
+      "AUD-BUY-022",
+      "AUD-EXIT-021"
+    ]
+  }
+]

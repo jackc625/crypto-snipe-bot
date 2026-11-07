@@ -1,0 +1,56 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-012",
+  "title": "Schema migrations 1 to 5 run outside a transaction and user_version is written only after all of them, so a crash during the first migration of a new or old database leaves a half-migrated file whose re-run fails (duplicate column, existing trades_new) and the bot cannot boot",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:56-62@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v2: two ALTER TABLE ADD COLUMN with no existence guard and no transaction"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:83-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v3: CREATE trades_new, INSERT, DROP trades, RENAME in one db.exec without a transaction"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:171-190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "v6 and v7 (:221-228) are wrapped in db.transaction(); 1-5 are not"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "user_version is set once at the end, so any crash before it re-runs every step on the next import"
+    }
+  ],
+  "sibling_sites_checked": "Every migration block in db.ts:29-233. v4 (:113-118), v6 and v7 guard their ALTERs with PRAGMA table_info; v1 and v5 use CREATE ... IF NOT EXISTS. The live database is at version 7 (AUD-FORENSIC-001), so only a database created or upgraded from now on is exposed; 22-09 moves migrateSchema verbatim into dbSchema.ts for npm run db:init (D-24), which keeps this behaviour. Multi-statement state changes outside a transaction in bot.ts (buy row, exit_state, lp_baseline) are SC-06 (BUY slice).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: a boot-time crash-consistency defect with no capital effect at the base SHA (the bot refuses to boot rather than run on a bad schema); the v3 table rebuild without a transaction could lose the trades table only on a crash in the middle of that one historical step.",
+  "related": [
+    "AUD-DB-006"
+  ],
+  "tags": [],
+  "od_ref": null,
+  "recommendation": "Run each version step and its user_version bump in one transaction (and make v2 idempotent like v4/v6/v7); a pure robustness change with no behaviour change on a successful migration. Phase 29 (or with the 22-09 dbSchema move, which must stay verbatim per D-24)."
+}

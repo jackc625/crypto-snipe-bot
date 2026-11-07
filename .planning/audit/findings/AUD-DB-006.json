@@ -1,0 +1,98 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-006",
+  "title": "RC-25 no newer-schema guard: importing db.ts migrates and then writes user_version = 7 unconditionally, so an older build opened on a newer database silently downgrades its version, and every import (including the read-only preflight command) writes the live database",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:27-30@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CURRENT_SCHEMA_VERSION = 7; version read with no upper-bound check"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "db.pragma(`user_version = ${CURRENT_SCHEMA_VERSION}`) runs on every import, whatever version was found"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:17-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "new Database(DB_PATH) (creates the file if missing), then WAL and synchronous pragmas, all at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:303-316@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "normalizeLegacyMainnetRows runs an UPDATE on every import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:320-709@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "all prepared statements are compiled at import against whatever schema is on disk"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:49@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the preflight module imports './utils/db', so any process that loads preflight opens, migrates and writes the database"
+    }
+  ],
+  "sibling_sites_checked": "The forensic copy showed 40 page-1 header writes with user_version 7 and no row changes, the fingerprint of this import path (AUD-FORENSIC-001, AUD-RAIL-002; linked, not repeated). scripts/preflight.ts and scripts/pause.ts / resume.ts (SCRIPTS slice) load db.ts the same way. The 22-09 rail (D-08, D-24) adds a read-only version probe before any pragma and refuses a CURRENT+1 database; 22-29 re-audits that diff.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-25"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "S2, equal to the research suggestion. Effects of an older build on a newer database: user_version drops to 7, so the next newer boot re-runs its migrations (a non-idempotent ALTER then fails and the bot cannot boot); a removed column makes a prepared statement fail at import (refuses to start); a newly required column makes the buy-row insert fail after the buy has landed (stranded position). Needs a rollback to an older build after a schema change, which D-ROLLBACK makes plausible but not routine. Mitigated by the 22-09 rail; status stays confirmed until 22-29 verifies it.",
+  "related": [
+    "AUD-RAIL-002",
+    "AUD-FORENSIC-001",
+    "AUD-DB-012"
+  ],
+  "tags": [
+    "mitigation-planned-22-09"
+  ],
+  "od_ref": null,
+  "recommendation": "Mitigated by the planned 22-09 rail (read-only user_version probe before any write; refuse version > CURRENT with the file hash unchanged). 22-29 re-audits the db.ts diff; no further behaviour decision.",
+  "sub_claims": [
+    {
+      "claim": "user_version is written unconditionally, downgrading a newer database",
+      "evidence": [
+        "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Prepared statements compiled at import assume the schema-7 columns",
+      "evidence": [
+        "src/utils/db.ts:320-323@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:505-518@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Every import of db.ts writes the database (pragma user_version and an UPDATE), including the read-only preflight command",
+      "evidence": [
+        "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:315-316@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:49@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-002",
+  "title": "The daily-loss breaker and the exposure cap compare numbers in different units: buy rows store the ETH/BNB amount as a decimal (\"0.01\") while sell rows store the proceeds and gas as wei integers, so ordinary losing trades never count as a loss and one partial sell makes total exposure hugely negative",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C01",
+    "C03"
+  ],
+  "files": [
+    "src/utils/db.ts",
+    "src/riskManager.ts",
+    "src/bot.ts",
+    "src/exitEngine.ts",
+    "src/utils/receiptDecoder.ts",
+    "src/api/helpers/positions.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1127-1145@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "snipe V2 buy row: amountIn = ctx.chain.snipeAmount, a decimal string in native units (\"0.01\"); gasCost null"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1451-1466@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "snipe V3 buy row: same (amountIn = ctx.chain.snipeAmount)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:773-786@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deliberate buy row: amountIn = ethers.formatEther(amountInWei), also a native-unit decimal"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1073-1093@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sell row: amountOut and gasCost straight from the receipt decoder"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1550-1566@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial_sell row: same"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:62@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "gasCost = (gasUsed * gasPrice).toString(): wei integer string"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "amountOut = WETH Withdrawal wad.toString(): wei integer string (V3 at :99 the same)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:441-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getDailyRealizedLoss: CAST(s.amount_out AS REAL) - CAST(b.amount_in AS REAL) - CAST(b.gas_cost) - CAST(s.gas_cost), summed only where < 0: wei minus a decimal ETH amount"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getTotalExposure: CAST(b.amount_in AS REAL) - SUM(partial_sell amount_out): decimal ETH minus wei"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:94-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "canSnipe compares those sums to -(maxCapital * DAILY_LOSS_PCT / 100) (native units) and to MAX_TOTAL_EXPOSURE (native units)"
+    },
+    {
+      "type": "command",
+      "ref": "node risk-sql-repro.js <snapshot>/src/utils/db.ts (scratch folder outside the repo (Node 22.16.0; no src/ import, no .env, no live DB; loopback 127.0.0.1 only); in-memory ':memory:' SQLite through the repo better-sqlite3; the SQL text of getDailyRealizedLoss, getTotalExposure and getPnLQuery is extracted verbatim from the audit-base snapshot; rows written in the formats above)",
+      "note": "output: 25 trades each sold at a 50% loss (true loss 0.1325 ETH against a 0.1 ETH limit) -> SQL daily loss = 0, breaker does not trip; one 99.99% loss -> -2.99e14 (trips); one profitable sell whose amount_out could not be decoded (NULL) -> -3e14 (trips for 24 h); 10 open 0.01 buys -> exposure 0.1, then one 0.006 ETH partial sell -> exposure -6e15 and the cap check (e + 0.01 > 10.0) is false forever; getPnL realized_pnl of that position = 5.7e15"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:144-147@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sibling (API slice): the dashboard divides the live price by 1e18 but adds sell_revenue (wei) to buy_cost (decimal ETH) unconverted"
+    }
+  ],
+  "sibling_sites_checked": "Every insertTrade.run site at the base SHA (git grep -n -A16 \"insertTrade.run\"): bot.ts:773 (deliberate), :1127 (V2 snipe), :1451 (V3 snipe) write decimal native amount_in and null gas; exitEngine.ts:1073 (sell) and :1550 (partial sell) write wei amount_out and wei gas_cost. Every SQL that mixes them: db.ts getPnLQuery (:351-384), getTotalExposure (:425-438), getDailyRealizedLoss (:441-459), getPnLChartDataQuery (:463-485) and riskManager.ts exposureByChain (:48-63). Consumers: riskManager canSnipe (enforcement), api/routes/risk.ts:66 and :80-95, api/routes/trades.ts:85-180, api/routes/health.ts:66 and api/helpers/positions.ts:144-168 (display, API slice). No conversion (formatEther or / 1e18) of amount_out or gas_cost exists anywhere at the base SHA (git grep \"amount_out\\|sell_revenue\\|realized_pnl\").",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 EXPOSURE: a configured risk limit is bypassed under the most ordinary condition there is (a sniped token that loses 10-90%). The daily-loss breaker (RISK-02) only ever trips on a sell that returned less than its own gas (near-total loss) or whose proceeds were not decoded, and then for a whole day; normal losing streaks are invisible to it. With partial sells configured (PARTIAL_SELL_TARGETS, empty by default) the exposure cap (RISK-05) is disabled for as long as that position stays open. Not S0: the per-trade size, the position count and the cooldown still bound spending, and the bot is OFF. Proven on the real SQL text with an offline in-memory database, not on mocks. Context for the operator: the OD-25 defaults (MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT) cannot work as written until this is fixed, so tuning them first would not change what the bot does.",
+  "related": [
+    "AUD-DB-001",
+    "AUD-DB-003",
+    "AUD-DB-013",
+    "AUD-TX-015"
+  ],
+  "tags": [
+    "capital",
+    "cross-class"
+  ],
+  "od_ref": "DB-01",
+  "recommendation": "Store every amount in one unit (wei integer strings, as the receipts already are) and compare in bigint, or convert at the SQL boundary in one place; backfill existing buy rows with a migration. Add a real-path test that writes rows through the real insert sites and asserts the breaker trips. How the risk limits should count (units, failed-held positions, partial sells, per-chain cap) is card DB-01. Phase 24; nothing is changed in Phase 22.",
+  "sub_claims": [
+    {
+      "claim": "Buy rows store amount_in as a native decimal string; sell and partial-sell rows store amount_out and gas_cost as wei integer strings",
+      "evidence": [
+        "src/bot.ts:1138@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1462@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:780@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1085-1086@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1558-1559@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/receiptDecoder.ts:62@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/receiptDecoder.ts:83@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The daily-loss breaker does not count ordinary losing trades and trips for a day on a decoder miss or a near-total loss",
+      "evidence": [
+        "src/utils/db.ts:441-459@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "node risk-sql-repro.js (offline in-memory reproduction, output in evidence)"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "One partial sell makes total exposure negative by about the proceeds in wei, so the exposure cap never refuses while that position is open",
+      "evidence": [
+        "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "node risk-sql-repro.js"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Dashboard P&L, risk utilisation and trade filters show mixed-unit numbers (realized_pnl about 5.7e15 for a small profit)",
+      "evidence": [
+        "src/utils/db.ts:351-384@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/helpers/positions.ts:144-147@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

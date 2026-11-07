@@ -1,0 +1,67 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-014",
+  "title": "The per-chain max capital (ETH_MAX_CAPITAL and the others, documented as \"Max ETH deployment\") is never enforced as a cap: it only scales the daily-loss threshold",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/riskManager.ts",
+    "src/chainRegistry.ts",
+    "src/config.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:94-99@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only use of maxCapitalNative: lossThreshold = -(maxCapital * dailyLossPct / 100)"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:48-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "per-chain deployed capital is computed (exposureByChain) but only returned for display (getPortfolioExposure)"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ETH_MAX_CAPITAL=1.0 # Max ETH deployment (default: 1.0); the same wording for BSC/Base/Arbitrum at :22, :28, :34"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:45@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ETH_MAX_CAPITAL 'ETH max capital deployment (default: 1.0)'"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"maxCapital\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "consumers: riskManager.ts:96 (daily-loss scale), api/routes/chains.ts:84 (display), bot.ts:909 and :1248 (passed to canSnipe); no comparison of deployed capital with it"
+    }
+  ],
+  "sibling_sites_checked": "Every maxCapital read listed in evidence; preflight wallet floor uses snipeAmount x MAX_OPEN_POSITIONS + gasBuffer, not maxCapital (preflight.ts:200-202).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: an operator who lowers ETH_MAX_CAPITAL to limit what the bot deploys on a chain gets no such limit; deployment stays bounded by MAX_OPEN_POSITIONS x snipe amount, MAX_TOTAL_EXPOSURE and the wallet balance, so the effect is bounded. At the defaults (10 x 0.01 ETH = 0.1 ETH < 1.0) the count binds first.",
+  "related": [
+    "AUD-DB-013",
+    "AUD-DB-001"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "DB-01",
+  "recommendation": "Either enforce deployed-per-chain <= maxCapital in canSnipe or rename the setting to what it does (daily-loss base). Card DB-01. Phase 24."
+}

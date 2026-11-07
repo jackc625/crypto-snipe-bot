@@ -1,0 +1,57 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-019",
+  "title": "migrateJsonState imports a .bot-state.json from the current directory into any empty database as open buys (status pending unless the file says otherwise, no amount, chain stamped mainnet then eth) and renames the file, so a stale file next to a fresh database creates phantom open positions",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C13",
+    "C18"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:241-247@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "path.join(process.cwd(), .bot-state.json); runs only when trades is empty"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:258-277@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "INSERT ... VALUES (?, 'mainnet', 'buy', ?, ?, ?) with status from the file or 'pending'"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:280@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "renames the file to .bak"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:303-316@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "then rewrites chain 'mainnet' to 'eth'"
+    }
+  ],
+  "sibling_sites_checked": "Imported rows count toward getOpenPositionCount (db.ts:420-422) and are picked up by the restart scan (:597-604); the restart balance check then marks tokens the wallet does not hold as failed (bot.ts:1933-1938). A .bot-state.json.bak exists at the repo root (research note), so the migration ran once with cwd = repo root. Combined with AUD-DB-007 (fresh database in another cwd) a stale file in that directory is imported.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: needs a stale pre-Phase-4 state file next to an empty database; the phantom rows take position slots until the restart check clears them, and the import renames the file as a side effect of any import of db.ts.",
+  "related": [
+    "AUD-DB-007"
+  ],
+  "tags": [],
+  "od_ref": "DB-03",
+  "recommendation": "Retire the one-time JSON import (it has done its job) or move it into npm run db:init behind an explicit flag. Card DB-03. Phase 29."
+}

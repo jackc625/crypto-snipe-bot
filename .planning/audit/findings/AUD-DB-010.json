@@ -1,0 +1,65 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-010",
+  "title": "Preflight failures send the RPC URL with its API key to the Telegram chat and the fatal log: the failure reason embeds the ethers error message, which for HTTP-level RPC errors includes info.requestUrl (reproduced offline)",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17",
+    "C20"
+  ],
+  "files": [
+    "src/preflight.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:498-506@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkRpcChainId catch: reason = `RPC unreachable: ${err.message}`"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:538-545@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkRpcBlockAge catch: reason embeds err.message"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:220-232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkWalletBalance catch: reason and details.err embed err.message"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:974-990@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "preflight(): log.fatal with reason + details, then sendTelegramAlert(`*PREFLIGHT FATAL* [...] ${r.reason}`)"
+    },
+    {
+      "type": "command",
+      "ref": "node rpc-reason-repro.js (scratch folder outside the repo (Node 22.16.0; no src/ import, no .env, no live DB; loopback 127.0.0.1 only); ethers 6.16.0 from the repo; loopback JSON-RPC server answering eth_chainId then HTTP 500; fake API key in the URL path)",
+      "note": "output: code SERVER_ERROR; reason contains key: true; message ends with info={ \"requestUrl\": \"http://127.0.0.1:<port>/v2/<KEY>\", ... }"
+    }
+  ],
+  "sibling_sites_checked": "Every preflight check that wraps an RPC error: checkWalletBalance (:220-232), checkEntryExitAffordability (:462-477, reason returned to bot.ts and logged), checkRpcChainId (:498-506), checkRpcBlockAge (:538-545), checkMevHealth (:575-582), checkHoneypotCheckerCode (:613-620). Only preflight() forwards reasons to Telegram (:986-990); the mid-run wallet check reuses checkWalletBalance (bot.ts, BUY slice). Hosted RPC URLs carry the key in the path (.env.example:13, :54).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 EXPOSURE: on an RPC provider outage or rate limit at boot (ordinary), the provider API key is sent to Telegram servers and the chat history, in addition to the logs (AUD-TX-014 covers the log sink in the TX slice). No funds move with an RPC key; a leaked key can be abused against the operator account.",
+  "related": [
+    "AUD-TX-014",
+    "AUD-DB-009"
+  ],
+  "tags": [
+    "credential-exposure"
+  ],
+  "od_ref": "TX-04",
+  "recommendation": "Build preflight reasons from error.code and a masked host only (api/routes/chains.ts already has maskUrl), never err.message; with card TX-04, check the Telegram chat history and rotate the RPC key if a FATAL reason ever contained it."
+}

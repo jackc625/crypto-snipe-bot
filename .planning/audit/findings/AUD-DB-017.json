@@ -1,0 +1,62 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-017",
+  "title": "Preflight checks that pass when they should not: the block-age check accepts an Infinity tolerance and any block dated in the future, the honeypot-checker check accepts any contract code at the address, and the cross-env rules read ENABLED_CHAINS with a different default from the registry",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/preflight.ts",
+    "src/chainRegistry.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:675-676@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Number('Infinity') passes the NaN / <= 0 check"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:526-528@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "blockAgeSec <= tolerance: a negative age (block timestamp ahead of local time, or a wrong local clock) always passes"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:602-603@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passed = code !== '0x': any contract at the configured address passes, not the HoneypotChecker bytecode"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:709-712@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ENABLED_CHAINS || '' (no chain) versus chainRegistry.ts:644 || 'eth': with ENABLED_CHAINS unset, rules 1, 2 and 4 check nothing while eth is enabled"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:553-562@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passthrough chains (Base, Arbitrum) always pass MEV health (no private path by design)"
+    }
+  ],
+  "sibling_sites_checked": "All nine preflight checks read: wallet balance and entry affordability fail closed on RPC error (:220-233, :462-477); chainId compares exactly; the anti-rug 7-day gate is time-based (SC-11, ANTIRUG slice); stale-data never blocks by design. With ENABLED_CHAINS unset the registry itself still exits on a missing FLASHBOTS_AUTH_KEY (chainRegistry.ts:948-951), so rule 1 is covered there.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: each gap needs an operator mistake (Infinity tolerance, wrong address) or a clock problem and is backed by another layer (the registry FATALs, the honeypot dispatch returns unknown on a non-checker contract); misleading rather than capital-affecting at the base SHA.",
+  "related": [
+    "AUD-DB-001"
+  ],
+  "tags": [],
+  "od_ref": "DB-04",
+  "recommendation": "Require a finite tolerance with an upper bound, treat a future block beyond a small skew as a failure, compare the checker code hash with the deployed artifact, and parse ENABLED_CHAINS in one place. Card DB-04 (preflight strictness). Phase 29."
+}
