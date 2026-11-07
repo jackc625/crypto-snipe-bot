@@ -1,0 +1,64 @@
+RED proof 22-08-6 — fork-shell-keys
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:25:51.321Z at HEAD 9b4330bfdee4e8f18397d7d018f02b3528714c98.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..16767ff 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -1247,7 +1247,7 @@ function applyEnv(st) {
+         if (isEssentialKey(k)) throw new Error('SAFE-02 rails install failed: test/.env.test may not set ' + k);
+         process.env[k] = v;
+     }
+-    if (st.mode === 'fork') {
++    if (false && st.mode === 'fork') { // RED 22-08-6: fork-mode re-apply is a no-op
+         for (const k of FORK_SHELL_KEYS) {
+             if (forkShellValues.has(k)) process.env[k] = forkShellValues.get(k);
+             else if (FORK_SHELL_ABSENT[k] === 'delete') delete process.env[k];
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/childRails.test.ts -t "fork shell"
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/childRails.test.ts (28 tests | 4 failed | 21 skipped) 670ms
+       × (i) setup-fork keeps the planted fork URL and ALLOW_REAL_MAINNET; ALCHEMY_URL and the token become sentinels 137ms
+       × (iii) setup-fork with nothing planted: ETH_FORK_RPC_URL absent, ALLOW_REAL_MAINNET empty 128ms
+       × (iv) a protected-root .env with ALLOW_REAL_MAINNET=1 cannot open the gate even through dotenv override 133ms
+       × (v) a test-written value followed by a re-install is reset to the first-captured value 135ms
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (i) setup-fork keeps the planted fork URL and ALLOW_REAL_MAINNET; ALCHEMY_URL and the token become sentinels
+  AssertionError: expected 'http://127.0.0.1:1' to be 'http://127.0.0.1:9/fork-shell-marker' // Object.is equality
+  Expected: "http://127.0.0.1:9/fork-shell-marker"
+  Received: "http://127.0.0.1:1"
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (iii) setup-fork with nothing planted: ETH_FORK_RPC_URL absent, ALLOW_REAL_MAINNET empty
+  AssertionError: expected 'http://127.0.0.1:1' to be null
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (iv) a protected-root .env with ALLOW_REAL_MAINNET=1 cannot open the gate even through dotenv override
+  AssertionError: expected 'http://127.0.0.1:1' to be null
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (v) a test-written value followed by a re-install is reset to the first-captured value
+  AssertionError: expected 'http://127.0.0.1:1' to be 'http://127.0.0.1:9/fork-shell-marker' // Object.is equality
+  Expected: "http://127.0.0.1:9/fork-shell-marker"
+  Received: "http://127.0.0.1:1"
+   Test Files  1 failed (1)
+        Tests  4 failed | 3 passed | 21 skipped (28)
+     Duration  1.17s (transform 59ms, setup 60ms, import 210ms, tests 670ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042545-22584-93b5bc | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042545-22584-93b5bc\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  7 passed | 21 skipped (28)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042549-12872-235b3b | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042549-12872-235b3b\summary.json
