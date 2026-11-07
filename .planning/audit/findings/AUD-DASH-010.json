@@ -1,0 +1,59 @@
+{
+  "id": "AUD-DASH-010",
+  "title": "The dashboard page loads its fonts from Google on every open while the API serves it with the Content-Security-Policy turned off, so a third party learns when and from where the operator opens the bot dashboard, and the browser has no limit on which origins the page may load from",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C19"
+  ],
+  "files": [
+    "dashboard/index.html",
+    "src/api/server.ts",
+    "dashboard/src/index.css"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/index.html:7@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "<link href=\"https://fonts.googleapis.com/css2?family=Inter...&family=JetBrains+Mono...\" rel=\"stylesheet\">"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:53@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "helmet({ contentSecurityPolicy: false })"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:165-166@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the built dashboard (dashboard/dist) is served by the bot process itself"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/index.css:29-30@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "both font stacks have local fallbacks, so the external fonts are not needed"
+    }
+  ],
+  "sibling_sites_checked": "Every external URL in the dashboard sources (grep for http:// and https:// over the snapshot): index.html:7 only (the AntiRugExitDetailModal explorer link is a prop that is never passed). XSS paths: no dangerouslySetInnerHTML, innerHTML, eval or new Function anywhere in dashboard/src; token addresses, alert text and symbols are rendered as React text (EventFeed.tsx:100, PositionTable.tsx:160), so no injection was found; the API key is typed into a password field, sent once (LoginForm.tsx:18-23) and never stored (no localStorage, sessionStorage or document.cookie use except sidebar and gap-banner flags). The CORS / Host checks are AUD-API-005 and the cookie flags AUD-API-007.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: a privacy leak of operator activity and a missing defence-in-depth layer; no injection path was found that the missing CSP would have stopped.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-005",
+    "AUD-API-007"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Serve the fonts from the dashboard build (or use the local fallbacks) and enable a strict CSP (default-src 'self'; connect-src 'self' plus the ws origin). Phase 29, together with card API-03.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

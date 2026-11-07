@@ -1,0 +1,87 @@
+{
+  "id": "AUD-DASH-003",
+  "title": "The dry-run review panel that tells the operator when to switch anti-rug to live selling shows only the events this browser tab happened to receive, plus hard-coded zero charts and a filter that does nothing, so \"zero false positives in 7 days\" cannot be read from it",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx",
+    "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx",
+    "dashboard/src/hooks/useWebSocket.ts",
+    "src/api/routes/antiRug.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx:101-104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "panel headline: \"7-day dry-run review window for <CHAIN>\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx:115-121@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "empty-state advice: \"After 7 days with zero false positives, you can flip <CHAIN>_ANTIRUG_LIVE_EXECUTE=true in .env and restart\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx:76-82@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "detection-latency histogram counts are a constant [0, 0, 0, 0, 0] (comment: no latency field wired)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx:153-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Flashbots verdict bars are a constant [0, 0, 0]"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx:61-70@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the signal-source filter returns true whatever is selected"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:197-208@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug events exist only as received on this socket since the tab opened, capped at 100 per chain"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:62-96@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "nothing loads past events on open or reconnect"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx:31-41@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"Dry-run events today\" and \"Suppressed today\" count only this tab's received events"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/antiRug.ts:78-96@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only server event list is the circuit-breaker ring buffer (bounded by circuitBreakerTriggers, default 3), not a 7-day record, and the dashboard does not call it"
+    }
+  ],
+  "sibling_sites_checked": "Every dashboard surface that reports anti-rug detections: FrontrunDistributionPanel (this finding), AntiRugMonitorTile counts and last-10 list (same session-only source), the per-position badge (AUD-DASH-001), the CB-reset trigger list (push payload, AUD-DASH-002). Server side: the only event read route is the ring buffer of at most circuitBreakerTriggers entries (antiRug.ts:78-96); no persisted 7-day store exists in src/api. The live-execute switch itself (per-chain ANTIRUG_LIVE_EXECUTE) and its validation are ANTIRUG-slice items (card ANTIRUG-07 for numeric settings); this entry covers only the evidence the dashboard offers for flipping it.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 LOSS (indirect, through an operator decision): the panel instructs the operator to arm live anti-rug market sells after a week without false positives, but it cannot show any detection that happened while this tab was closed or disconnected (a reload shows \"No dry-run events yet\"), and two of its three charts are fixed zeros presented as data. Arming live exits on that evidence can turn false-positive detections into real sells of healthy positions. Not S1: a human decision sits between the display and any loss, and logs/Telegram dry-run alerts (exitTrigger.ts:195) are another record.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DASH-001",
+    "AUD-DASH-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "DASH-01",
+  "recommendation": "Decide (card DASH-01) what evidence gates the live-execute switch; at least remove or label the placeholder charts and the no-op filter as not wired, and stop presenting a session-only list as a 7-day record. Real-path test: record dry-run detections with the tab closed, reopen and assert they are shown. Nothing changed in Phase 22.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,121 @@
+{
+  "id": "AUD-DASH-001",
+  "title": "The positions table loses every anti-rug state within 5 seconds: the 5 s positions_update push replaces the whole positions list with rows that carry no anti-rug fields, so every position shows \"Unmonitored\" and a failed live anti-rug exit (\"Exit fired ✗\", \"consider a manual Force Sell\") disappears from the dashboard",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C15"
+  ],
+  "files": [
+    "dashboard/src/hooks/useWebSocket.ts",
+    "dashboard/src/components/PositionTable.tsx",
+    "dashboard/src/components/anti-rug/AntiRugStateBadge.tsx",
+    "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx",
+    "dashboard/src/pages/Overview.tsx",
+    "src/api/helpers/positions.ts",
+    "src/api/server.ts",
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:133-136@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "positions_update: setPositions(data.positions || []) replaces the whole list"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:155-189@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "antirug_state_update merges antiRugState / antiRugLastSignals / antiRugLastSuccess into the matching row only; nothing keeps them across the next positions_update"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:185-199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every 5 s (while any dashboard socket is open) the server broadcasts positions_update built by buildPositionsWithLivePrices"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:151-170@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the returned position row has tradeId, token, chain, prices, pnl, costs, times, pool and exitState fields only; no antiRugState, antiRugLastSignals or antiRugLastSuccess"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:207-213@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "antirug_state_update is sent with state 'would-have-sold' (dry-run detection)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:303-310@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "antirug_state_update is sent with state 'exit-fired' and success (live exit outcome)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"antirug_state_update\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only src/anti-rug/exitTrigger.ts:114 (comment), :207 and :303: the states live, dry-run, halted and unmonitored are never sent, and no other code path sets anti-rug state on a position"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:149-152@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "missing state is shown as 'unmonitored'"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:113-114@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the unmonitored tooltip says \"No LP baseline recorded for this position. Anti-rug monitoring is not active.\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:126-137@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the exit-fired failure tooltip: \"the position is still open and a trigger slot was consumed\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx:138-144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "EXIT FAILED banner: \"The position is still open ... consider a manual Force Sell\" (lost with the state)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugStateBadge.tsx:53-60@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "six badge states are drawn; four of them (Live, Dry-run, Halted (CB), Unmonitored-as-real-state) have no producer"
+    }
+  ],
+  "sibling_sites_checked": "Every writer of setPositions in the dashboard (useWebSocket.ts:76 REST refresh on connect, :135 positions_update, :177-189 antirug_state_update merge): the first two replace the list from the API row shape (src/api/helpers/positions.ts:151-170), which has no anti-rug fields, so the merge survives at most until the next 5 s broadcast or reconnect. Every producer of antirug_state_update (git grep over src and scripts at the base SHA): exitTrigger.ts:207 and :303 only. Every consumer of the anti-rug fields: PositionTable.tsx:149-152 and :177-183 (badge and tooltip), Overview.tsx:127-135 (detail-modal variant, AUD-DASH-004), AntiRugExitDetailModal.tsx:131-144 (success/failure banner). The same replace-on-push pattern for chain statuses (useWebSocket.ts:147-151) carries no merged fields and is correct. Telegram: exitTrigger.ts sends its own alert only on the dry-run path (:195) and the watchdog-abort path (:288-295); the exit engine's own sell-failure alerts are EXIT-slice and not re-audited here. The anti-rug monitoring gap after a dashboard Stop is AUD-API-002.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 STRAND (indirect): no funds move because of this display defect, but the one dashboard signal that a live anti-rug exit failed and the tokens are still held is wiped within 5 s, and every protected position is labelled \"Anti-rug monitoring is not active\" while monitored ones and unmonitored ones look identical, so the operator cannot use the dashboard to see which positions lack rug protection or which need a manual sell. Not S1: anti-rug live execute is off by default (dry-run), the bot itself keeps monitoring a failed-held position, and Telegram/log alerts remain. Proven from the base-SHA code alone (row shape, push cadence, replace semantics, the only two producers).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-002",
+    "AUD-API-016",
+    "AUD-DASH-004",
+    "AUD-DASH-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Send the anti-rug state (monitor state, last signals, last exit success) inside the server-built position row (from the detector's per-position state) so every positions_update carries it, or merge pushed anti-rug fields by tradeId instead of replacing the list; produce the live, dry-run, halted and unmonitored states for real. Real-path test: fire an exit-fired success=false update, then a positions_update, and assert the badge still shows the failure. Pure bug fix (Phase 29 S2 queue, or with the Phase 24 anti-rug work); nothing changed in Phase 22.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "traces": [
+    {
+      "scenario": "A live anti-rug exit fails on a held position while the operator has the Overview open",
+      "steps": [
+        "exitTrigger broadcasts antirug_state_update {state: 'exit-fired', success: false} (exitTrigger.ts:303-310)",
+        "useWebSocket merges it into the row; the badge shows 'Exit fired ✗' and the detail modal shows EXIT FAILED (useWebSocket.ts:177-189; AntiRugStateBadge.tsx:68-72)",
+        "at most 5 s later server.ts:186-199 broadcasts positions_update built from helpers/positions.ts:151-170 (no anti-rug fields)",
+        "useWebSocket.ts:135 replaces the list; the row's antiRugState is undefined, the badge falls back to 'Unmonitored' (PositionTable.tsx:149)"
+      ],
+      "outcome": "The failure indicator is gone within 5 s and the position reads \"Anti-rug monitoring is not active\" like every other position."
+    }
+  ]
+}

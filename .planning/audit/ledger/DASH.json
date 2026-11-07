@@ -1,0 +1,318 @@
+[
+  {
+    "path": "dashboard/.gitignore",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/index.html",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-010"
+    ]
+  },
+  {
+    "path": "dashboard/package-lock.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/package.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/App.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/ChainBadge.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/ChainStatusCard.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-003"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/ConfirmDialog.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-004"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/EmergencyConfirmDialog.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-015",
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/EventFeed.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-013"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/ExposureDonut.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/FilterChips.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/Layout.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-005"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/LoginForm.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/PauseBanner.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-015"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/PnLChart.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-008"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/PositionTable.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-016",
+      "AUD-DASH-001",
+      "AUD-DASH-004",
+      "AUD-DASH-005",
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/RiskGauge.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-017"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/Sidebar.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-005"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/StatCard.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/StatusDot.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/TimeRangeSelector.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/components/TradeTable.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-DASH-007"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-001",
+      "AUD-DASH-004"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-002",
+      "AUD-DASH-003"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/AntiRugStateBadge.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-001"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-002"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/CircuitBreakerResetModal.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-002"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-003"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/GapDetectedBanner.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-002"
+    ]
+  },
+  {
+    "path": "dashboard/src/components/anti-rug/WsHealthIndicator.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-002"
+    ]
+  },
+  {
+    "path": "dashboard/src/hooks/WebSocketContext.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-009"
+    ]
+  },
+  {
+    "path": "dashboard/src/hooks/useApi.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-005",
+      "AUD-DASH-008"
+    ]
+  },
+  {
+    "path": "dashboard/src/hooks/useWebSocket.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-012",
+      "AUD-DASH-001",
+      "AUD-DASH-002",
+      "AUD-DASH-003",
+      "AUD-DASH-005",
+      "AUD-DASH-009"
+    ]
+  },
+  {
+    "path": "dashboard/src/index.css",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/main.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/pages/ChainControls.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-002",
+      "AUD-API-004",
+      "AUD-API-015",
+      "AUD-DASH-005",
+      "AUD-DASH-009"
+    ]
+  },
+  {
+    "path": "dashboard/src/pages/Login.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/pages/Overview.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-003",
+      "AUD-API-004",
+      "AUD-API-017",
+      "AUD-DASH-002",
+      "AUD-DASH-004",
+      "AUD-DASH-005",
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/src/pages/RiskExposure.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-003",
+      "AUD-API-017",
+      "AUD-DASH-005",
+      "AUD-DASH-008"
+    ]
+  },
+  {
+    "path": "dashboard/src/pages/TradeHistory.tsx",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/types/api.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/src/utils/formatters.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DASH-006"
+    ]
+  },
+  {
+    "path": "dashboard/tsconfig.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "dashboard/vite.config.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-005"
+    ]
+  }
+]

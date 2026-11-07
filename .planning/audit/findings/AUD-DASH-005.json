@@ -1,0 +1,130 @@
+{
+  "id": "AUD-DASH-005",
+  "title": "Stale state is shown as current: exposure, risk limits, 24 h P&L and Telegram status are loaded once per page visit and never refreshed, a dropped dashboard socket leaves every table and card frozen with only a small sidebar dot, and the empty positions text says \"The bot is running\" when the data simply did not load",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C10",
+    "C02"
+  ],
+  "files": [
+    "dashboard/src/hooks/useApi.ts",
+    "dashboard/src/hooks/useWebSocket.ts",
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/pages/RiskExposure.tsx",
+    "dashboard/src/components/Layout.tsx",
+    "dashboard/src/components/Sidebar.tsx",
+    "dashboard/src/components/PositionTable.tsx",
+    "dashboard/src/pages/ChainControls.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useApi.ts:25-68@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one fetch per URL change or manual refetch; no interval and no timestamp of the data"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "/api/risk/exposure, /api/risk/limits and /health loaded once on mount"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:61-73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Total Exposure and 24h P&L stat cards come from those one-time loads; Open Positions and Total P&L from the socket"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:64@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exposure?.total ?? 0: a failed or pending load is shown as \"0.0000\" exposure, indistinguishable from none"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/RiskExposure.tsx:16-20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "P&L, exposure and limits loaded once per visit"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/Layout.tsx:19-25@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Telegram status from one /health load"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/Sidebar.tsx:50-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only connection indicator: a dot and \"Reconnecting...\" in the sidebar footer (hidden text when collapsed)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:286-293@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on close only connected is cleared; positions, chain statuses and anti-rug state keep their last values"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:93-95@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a failed REST refresh is swallowed"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:24-33@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"No Open Positions. The bot is running but has not entered any positions yet\" is shown for an empty list whatever the cause (not loaded yet, socket down, load failed, only failed-held positions left)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:115@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "chain cards prefer the last pushed chain statuses, also kept while disconnected"
+    }
+  ],
+  "sibling_sites_checked": "Every dashboard data source and how it refreshes: useApi users (Overview exposure/limits/health, RiskExposure pnl/exposure/limits, Layout health, ChainControls chains, TradeHistory trades) load once; socket-fed state (positions, notifications, chain statuses, anti-rug maps, pause) updates only while connected and is never cleared or marked on disconnect. Per-row staleness exists only for a position's Current value (PositionTable.tsx:163-171, AUD-API-016). The failed-held cause of an empty table is AUD-API-001 sub_claim 3 (linked, not repeated). The 24 h P&L and exposure figures themselves are mixed-unit SQL (AUD-DB-002, AUD-API-017).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading presentation that can change the operator's understanding of exposure and of whether the bot is reachable, without changing what the bot does. Raised from S4 because the same screens hold the sell buttons: an operator can act (or not act) on exposure and position lists that are minutes or hours old with no marker.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-001",
+    "AUD-API-016",
+    "AUD-API-017",
+    "AUD-DASH-002"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Refresh exposure, limits and health on each positions_update (or on an interval) and show the time of the last update; on socket loss mark the whole page stale (banner, greyed figures) and say \"not loaded\" instead of 0.0000 or \"The bot is running\". Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "REST-loaded totals (exposure, limits, 24 h P&L, Telegram status) are never refreshed and carry no time",
+      "evidence": [
+        "dashboard/src/hooks/useApi.ts:25-68@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/Overview.tsx:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/pages/RiskExposure.tsx:16-20@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/components/Layout.tsx:19-25@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "a dropped dashboard socket freezes every socket-fed view with only a sidebar indicator",
+      "evidence": [
+        "dashboard/src/hooks/useWebSocket.ts:286-293@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/components/Sidebar.tsx:50-58@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "missing data is shown as zero exposure or as \"The bot is running but has not entered any positions yet\"",
+      "evidence": [
+        "dashboard/src/pages/Overview.tsx:64@23a64617dca167976adc4645fed0e2c69e384820",
+        "dashboard/src/components/PositionTable.tsx:24-33@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

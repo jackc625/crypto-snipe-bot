@@ -1,0 +1,81 @@
+{
+  "id": "AUD-DASH-009",
+  "title": "Chain Controls opens its own second WebSocket on every visit and never really closes it: the cleanup closes the socket, but the close handler then arms a new 3 s reconnect that nothing cancels, so each visit leaves a socket that reconnects (and reloads positions, chains and pause state) for as long as the tab is open",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12",
+    "C10"
+  ],
+  "files": [
+    "dashboard/src/pages/ChainControls.tsx",
+    "dashboard/src/hooks/useWebSocket.ts",
+    "dashboard/src/hooks/WebSocketContext.tsx",
+    "dashboard/src/App.tsx",
+    "src/api/server.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:7@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports useWebSocket directly"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/ChainControls.tsx:21@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const { chainStatuses } = useWebSocket(): a second connection next to the shared provider"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/WebSocketContext.tsx:32-35@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the shared provider every other page reads through useWs()"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:300-310@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "cleanup: clear the pending timer, then wsRef.current.close()"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:286-293@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onclose (which runs after close() completes, i.e. after the cleanup) sets wsRef.current = null and arms setTimeout(connect, 3000)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:109-119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "connect() then finds wsRef.current null and opens a new socket, whose own onclose re-arms again; nothing references this hook instance any more"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:121-125@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each open triggers refreshFromRest (three GETs)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:186-187@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the 5 s live-quote broadcast runs while any authenticated socket is connected (AUD-API-012)"
+    }
+  ],
+  "sibling_sites_checked": "Every caller of useWebSocket: WebSocketContext.tsx:33 (the shared provider) and ChainControls.tsx:21 (this finding). The same cleanup defect exists in the shared provider; it matters only if the provider unmounts. App.tsx:11-40 and :48-87 mount a WebSocketProvider inside each route's own AuthGuard; whether React Router reuses that instance across route changes was not established without running the app (no browser run in Phase 22), so a leak per navigation is recorded as possible, not proven. Other timers in the dashboard: GapDetectedBanner none; AntiRugExitDetailModal 2 s copy toast (harmless); PnLChart resize listener removed on unmount.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: resource leak and ops friction. Each visit adds a permanent reconnecting client: more authenticated sockets receiving every broadcast, three extra API reads per reconnect, and the server's 5 s quote loop kept running. Over a long session this adds RPC and CPU load on the bot process that also runs the exits (AUD-API-012). No direct money effect.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-012"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Read chain statuses from the shared useWs() context instead of a second hook; in the hook, set a \"closed by cleanup\" flag (or remove onclose) before close() so the cleanup cannot re-arm the reconnect. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

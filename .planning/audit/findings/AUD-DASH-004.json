@@ -1,0 +1,68 @@
+{
+  "id": "AUD-DASH-004",
+  "title": "The anti-rug detail dialog tells the wrong story: any position that is not \"exit-fired\" or \"would-have-sold\" (which after AUD-DASH-001 is nearly all) opens the \"Exit pending confirmation: the bot has detected a confirmed rug signal\" variant, and the live variant never receives the transaction details it says are shown",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C02"
+  ],
+  "files": [
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx",
+    "dashboard/src/components/PositionTable.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:127-135@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "variant = 'live' for exit-fired, 'dry-run' for would-have-sold, otherwise 'pending-confirm' (including live, dry-run, halted, unmonitored and missing state)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx:216-222@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pending-confirm text: \"Exit pending confirmation. The bot has detected a confirmed rug signal and will submit the exit transaction after ? blocks\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:273-281@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the modal gets variant, token prefix, chain, signals and success only: no txHash, block, amounts or explorer link"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx:131-137@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "success banner: \"see the tx artifacts below for the receipt\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx:147@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the tx block renders only when txHash is set, which it never is"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:177-183@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every badge, whatever its state, opens the dialog"
+    }
+  ],
+  "sibling_sites_checked": "Both openers of the dialog (PositionTable badge click via Overview.tsx:167-169; AntiRugMonitorTile event click via Overview.tsx:225-237, which matches the position by token and opens it with that position's current state, not the event's); all three variants and their inputs (AntiRugExitDetailModal.tsx:131-222). The token is shown as an address prefix labelled tokenSymbol (Overview.tsx:276). No other dialog in the dashboard derives its message from a fallback state.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading operator text. Clicking the badge of a quiet position states that a confirmed rug was detected and an exit is about to be submitted; an operator who believes an exit is pending may wait instead of acting, or act on a rug that did not happen. No money path changes.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DASH-001"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Map each monitor state to its own dialog text (no rug-detected wording for live, dry-run, halted or unmonitored), and pass the exit transaction details through the state update or drop the claim that they are shown. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}
