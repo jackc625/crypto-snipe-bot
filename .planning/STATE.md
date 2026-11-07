@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-25-PLAN.md
-last_updated: "2026-11-07T20:52:48.603Z"
+stopped_at: Completed 22-26-PLAN.md
+last_updated: "2026-11-07T21:45:49.080Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: e569ae101b40fd6fdd28a2f3b9eaebe246a99555
+state_head: b9153b062196056b2b3b758521cb846a39cbe92b
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 17
+  completed_plans: 18
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 18 of 29
+Plan: 19 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -95,11 +95,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P23 | 30min | 2 tasks | 26 files |
 | Phase 22 P24 | 33min | 2 tasks | 30 files |
 | Phase 22 P25 | 36min (continuation; incl. operator wait) | 3 tasks tasks | 33 files files |
+| Phase 22 P26 | 51min (wall-clock incl. two operator waits) | 2 tasks | 16 files |
 
 ## Session
 
-**Last session:** 2026-11-07T20:52:48.529Z
-**Stopped at:** Completed 22-25-PLAN.md
+**Last session:** 2026-11-07T21:45:49.006Z
+**Stopped at:** Completed 22-26-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -156,3 +157,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-25 ESC-SCRIPTS-01: operator 'Acknowledge. Decide in phase 29' on S1 AUD-SCRIPTS-002 (signing scripts outside the nonce lock and pause switch); stays S1, no decimal phase. The D-06 premise challenge (tryAcquireThenRelease releases the lock before the script signs: check-then-act race) is DEFERRED to Phase 29 HYG-03, NOT resolved; card SCRIPTS-01 stays open, D-06 wording unchanged
 - [Phase 22]: Orchestrator context (not operator): hold-lock (script holds acquireProcessLock for its whole run, checks pause while holding it) is the only option that closes the race and is the recommendation on record; query-then-sign gives false assurance; hold-lock matches BUY-01 refuse-while-running, and BUY-01 handoff-to-running-bot would mean no separate script signs for a deliberate buy
 - [Phase 22]: 22-25: SCRIPTS/CONTRACTS/ROOT have no S0, rail, test-origin-db-row or non-public secret; Hardhat real .env load and mainnet/sepolia DEPLOY_PRIVATE_KEY accounts are a recorded boundary (AUD-CONTRACTS-001, S2) no test/fork/CI path reaches; RC-27 = AUD-SCRIPTS-001 (S3); root findings in sweep/contrib-ROOT.json for 22-28
+- [Phase 22]: 22-26 ESC-SECRET-02: operator ruled "not secrets" - the 4 non-public full-history hits (AUD-SECRET-004 content hash, AUD-SECRET-005 URL-userinfo test strings) close NOT-A-BUG; full-history scan of 1053 commits (git-mode proven on a fixture) found no real secret; nothing rotated, history not rewritten
+- [Phase 22]: 22-26 ESC-CENSUS-01: operator ruled "keep s1" - AUD-CENSUS-002 (src/utils/tokenSafety.ts:277, real approve inside dead simulateSell outside withNonceLock) stays S1; 22-28 must raise canonical AUD-BUY-007 to S1 and attach ESC-CENSUS-01 (5 merge items: evidence, reported_by, severity, rationale, escalation_ref)
+- [Phase 22]: Orchestrator context (not operator): keep-s1 recommended because the fix is deleting a dead function (near-zero cost) and S1 makes sure Phase 24 removes it; a function named simulateSell that really signs is a re-wiring trap
+- [Phase 22]: 22-26 census: N = 23 tx-signing sites for the Phase 23 assertion (src 11: 10 locked, 1 unlocked; scripts 12 unlocked, out-of-process, ESC-SCRIPTS-01 / Phase 29; 4 ContractFactory.deploy included); 1 message signature (flashbots.ts:102) excluded; signing-census.ts --self-test 31/31; manual inventory reconciled with 0 differences
