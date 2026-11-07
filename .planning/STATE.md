@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-08-PLAN.md
-last_updated: "2026-11-07T04:30:35.450Z"
+stopped_at: Completed 22-17-PLAN.md
+last_updated: "2026-11-07T05:38:39.037Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 884283f65bebba91ed67079f59f0d5277794e3d5
+state_head: 354382ab3201b52d1a32f33e084222970a9321b3
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 9 of 29
+Plan: 10 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -85,11 +85,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P06 | 41min | 2 tasks | 4 files |
 | Phase 22 P07 | 4min | 2 tasks | 11 files |
 | Phase 22 P08 | 24min | 3 tasks | 24 files |
+| Phase 22 P17 | 66min | 3 tasks | 43 files |
 
 ## Session
 
-**Last session:** 2026-11-07T04:30:35.387Z
-**Stopped at:** Completed 22-08-PLAN.md
+**Last session:** 2026-11-07T05:38:38.972Z
+**Stopped at:** Completed 22-17-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -121,3 +122,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-08: spawnRailedChild limits live in pure checkSpawnLimits(); moduleScopeDb.cjs proves its rails live on a fake root before pointing DB_PATH at data/bot.db (a neutralised-but-installed wrapper keeps its status flag)
 - [Phase 22]: 22-08: nine setup-layer RED proofs recorded (red-proofs/22-08-1..9); restores via git -c core.autocrlf=false checkout -- proven byte-exact; no RED edit committed (core.cjs only has 6a254a1)
 - [Phase 22]: 22-08: UFV-01 (AC-13) and UFV-02 (AC-17) fork-project obligations owned by Phase 25 in .planning/audit/inputs/unrun-fork-verifications.json (rehearsal pass vpu-20261107T042012-23448-c57d66); 22-29 registers them and should exclude test/*/rails/ from rail-ledger test-quality findings
+- [Phase 22]: 22-17 ESC-BUY-01: operator 'Acknowledge continue' on S0 AUD-BUY-001 (deliberate buy unprotected after script exit); stays S0, no decimal phase; interim rule on card BUY-01: start the main bot right after any manual buy
+- [Phase 22]: 22-17 ESC-BUY-02: operator 'Acknowledge continue' on the 8 BUY S1 entries (AUD-BUY-002/003/004/005/006/008/010/011); no severity changes (AUD-BUY-002 stays S1), no decimal phase; orchestrator recommendation (not operator): AUD-BUY-002 first in line in Phase 23
