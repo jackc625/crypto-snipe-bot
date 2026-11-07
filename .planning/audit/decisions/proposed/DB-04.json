@@ -1,0 +1,30 @@
+{
+  "id": "DB-04",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Preflight strictness: finite block-age tolerance, future blocks, checker bytecode, one ENABLED_CHAINS parse",
+  "capital": false,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current preflight rules",
+      "behavior_impact": "none",
+      "risk": "Infinity tolerance or a wrong clock passes the staleness check; any contract at the checker address passes (AUD-DB-017)."
+    },
+    {
+      "id": "strict",
+      "name": "Require finite bounded tolerances, fail a block more than a small skew in the future, compare the checker code hash, parse ENABLED_CHAINS once",
+      "behavior_impact": "Preflight refuses a few more misconfigurations at boot.",
+      "risk": "A clock skew on the operator machine can now refuse boot; the checker hash must be updated with every redeploy."
+    }
+  ],
+  "recommendation": "strict.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S3.",
+  "behavior_impact": "Decides which misconfigurations stop the bot at boot.",
+  "findings": [
+    "AUD-DB-017"
+  ],
+  "needed_by": "Phase 29 discussion (S2-S4 fixes)"
+}

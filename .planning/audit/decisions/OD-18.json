@@ -1,0 +1,42 @@
+{
+  "id": "OD-18",
+  "title": "Write-ahead buy intent row and synchronous=FULL (schema 7 to 8), and what the first shutdown signal does with an in-flight buy",
+  "area": "DB",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: the buy row is written only after the submission returns, the first shutdown signal closes the DB and exits at once, synchronous=NORMAL",
+      "behavior_impact": "none",
+      "risk": "A buy that lands while the bot is stopped or crashes inside its multi-minute submission window is held with no row: no exit monitor, no anti-rug watch, no dedup record (AUD-DB-004); a power loss can roll back the last committed rows."
+    },
+    {
+      "id": "full-only",
+      "name": "Switch to synchronous=FULL only",
+      "behavior_impact": "One fsync per commit; rows survive a power loss or OS crash.",
+      "risk": "Does nothing for the stop/crash window, which is the larger exposure."
+    },
+    {
+      "id": "shutdown-drain",
+      "name": "First signal waits (up to SIGINT_GRACE_MS) for in-flight buys to finish and write their row before closing the DB; no schema change",
+      "behavior_impact": "A routine stop no longer loses a landing buy; stopping can take up to the grace period.",
+      "risk": "Crashes and force-kills (taskkill, a second signal, the grace timeout) still lose the row."
+    },
+    {
+      "id": "intent-row-and-full",
+      "name": "Write an intent row (token, chain, nonce, signed hashes) before the first submission, reconcile intents against the chain at boot (schema 8), add the shutdown drain and synchronous=FULL",
+      "behavior_impact": "Every landed buy is either recorded or found at the next boot; a routine stop waits for in-flight buys.",
+      "risk": "A schema migration (7 to 8) and boot reconciliation on the money path; must be proven on a fork before live use; the newer-schema guard (22-09) then blocks a rollback to an older build."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Research recommendation (research SUMMARY OD-18): synchronous=FULL (negligible cost); the intent row only if the audit confirms the crash window. The audit confirms the window and finds the routine shutdown path inside it (AUD-DB-004), which matches intent-row-and-full.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a buy can land without the bot knowing about it, how a stop treats an in-flight buy, and the database durability mode.",
+  "findings": [
+    "AUD-DB-004"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion before Wave A (capital fixes, after the Phase 23 real-path proof)"
+}

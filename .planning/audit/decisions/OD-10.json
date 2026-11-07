@@ -1,0 +1,42 @@
+{
+  "id": "OD-10",
+  "title": "Honor LOG_LEVEL from .env",
+  "area": "DB",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: LOG_LEVEL only works when set in the shell; the .env line does nothing",
+      "behavior_impact": "none",
+      "risk": "The documented setting (.env.example:91) is silently ignored, so an operator who sets debug or warn in .env gets info and does not know it (AUD-DB-005)."
+    },
+    {
+      "id": "honor-after-redaction",
+      "name": "Load .env before the logger is created, after logger-level redaction of err objects, RPC URLs, auth headers and the bot token is in place",
+      "behavior_impact": "LOG_LEVEL in .env takes effect; at debug the bot writes whole RPC error objects (14 debug sites, for example exitEngine.ts:342 once per position every 5 s on a failing price query), so volume rises sharply.",
+      "risk": "Depends on the redaction work (card TX-04) landing first; debug volume can fill disks on long runs."
+    },
+    {
+      "id": "honor-now",
+      "name": "Load .env before the logger now, without redaction",
+      "behavior_impact": "LOG_LEVEL in .env takes effect immediately.",
+      "risk": "Debug-level { err } logs of HTTP RPC failures carry the RPC URL with the provider API key (AUD-TX-014 mechanism) into every log line."
+    },
+    {
+      "id": "shell-only",
+      "name": "Keep the code, remove LOG_LEVEL from .env.example and document it as a shell-only setting",
+      "behavior_impact": "No runtime change; the documentation matches what the code does.",
+      "risk": "Operators who want debug must set it in the shell each time; an unknown level in the shell still stops the process at start (pino throws)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Research recommendation (research SUMMARY OD-10): fix it as an explicit behaviour change after reviewing what debug emits. The review here found that debug emits RPC error objects that carry the provider key, so the research recommendation corresponds to honor-after-redaction.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); no capital effect.",
+  "behavior_impact": "Decides whether the log level in .env takes effect and how much (and what) the bot writes at debug.",
+  "findings": [
+    "AUD-DB-005"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 discussion (S2-S4 fixes), together with card TX-04 (log redaction)"
+}

@@ -1,0 +1,1741 @@
+{
+  "rows": [
+    {
+      "hardcoded": false,
+      "flags": [
+        "differing-parsers",
+        "nan-fail-open-at-site",
+        "four-definition-sites",
+        "excludes-failed-held"
+      ],
+      "recommendation": "One typed parser (strict integer >= 0, fail loud) used by riskManager, preflight and both dashboard routes; count open positions by exit lifecycle (AUD-DB-003). Card OD-25 (defaults and parser), DB-01 (what counts).",
+      "od_ref": "OD-25",
+      "id": "TH-DB-01",
+      "name": "Maximum open positions (all chains together)",
+      "env_key": "MAX_OPEN_POSITIONS",
+      "current_value": "10",
+      "definition_sites": [
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58"
+      ],
+      "comparison": "canSnipe: count of status='pending' buys >= max -> refuse (riskManager.ts:111-120); preflight wallet floor multiplies the snipe amount by it (preflight.ts:200-202)",
+      "units": "positions (count)",
+      "representation": "riskManager and risk.ts parseInt(x || \"10\"); preflight Number() + Number.isInteger; chains.ts raw string",
+      "effective_unset": "10 at all four sites",
+      "effective_empty": "10 at all four sites (|| in riskManager/routes; preflight treats '' as unset)",
+      "effective_non_numeric": "riskManager NaN (count >= NaN false, would never refuse) but preflight returns passed:false and boot exits FATAL, so the running bot never sees it; '7.9' -> riskManager 7, preflight refuses; '0' -> refuses every snipe (floor = gas buffer only)",
+      "rationale": "none stated in code",
+      "overlap": "TH-BUY-27 (BUY consumer row); the per-chain wallet floor TH-DB-18 multiplies by this global count on every chain; counts only status pending, so failed-held positions are not counted (AUD-DB-003). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "nan-fail-open",
+        "size-mismatch",
+        "mixed-currency",
+        "unit-mismatch",
+        "float-money",
+        "differing-parsers",
+        "excludes-failed-held"
+      ],
+      "recommendation": "Fix the unit and accounting basis first (card DB-01), then decide a cap that can bind (for example a multiple of the snipe size or of the funded wallet, per currency) on card OD-25; validate at boot.",
+      "od_ref": "OD-25",
+      "id": "TH-DB-02",
+      "name": "Maximum total exposure (all chains together)",
+      "env_key": "MAX_TOTAL_EXPOSURE",
+      "current_value": "10.0",
+      "definition_sites": [
+        "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:59"
+      ],
+      "comparison": "canSnipe: getTotalExposure + snipe amount > cap -> refuse (riskManager.ts:139-148); getTotalExposure sums amount_in of status='pending' buys minus partial-sell proceeds (db.ts:425-438)",
+      "units": "'native currency' per the description, but ETH and BNB amounts are summed into one number, and the stored proceeds are wei (AUD-DB-002)",
+      "representation": "float (parseFloat of the env string; CAST AS REAL in SQL); amounts are not compared in wei",
+      "effective_unset": "10.0",
+      "effective_empty": "10.0 (||)",
+      "effective_non_numeric": "NaN: total + amount > NaN is false, the cap never refuses (fail-open); '5ETH' -> 5 (prefix accepted)",
+      "rationale": "none stated in code",
+      "overlap": "TH-BUY-27; Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits. After one partial sell the stored total is about -proceeds-in-wei and the check is always false (AUD-DB-002)."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "nan-fail-open",
+        "float-money"
+      ],
+      "recommendation": "Validate at boot (positive decimal or unset) and compare in wei. Card OD-25.",
+      "od_ref": "OD-25",
+      "id": "TH-DB-03",
+      "name": "Maximum position size per snipe",
+      "env_key": "MAX_POSITION_SIZE",
+      "current_value": "unset (no cap)",
+      "definition_sites": [
+        "src/riskManager.ts:32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:81-89@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:61@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:63"
+      ],
+      "comparison": "canSnipe: maxPositionSize !== null && parseFloat(snipeAmount) > maxPositionSize -> refuse",
+      "units": "native coin per trade",
+      "representation": "float; truthiness check on the raw string (not ||)",
+      "effective_unset": "null: no cap (documented: use the chain snipe amount)",
+      "effective_empty": "null: no cap ('' is falsy)",
+      "effective_non_numeric": "NaN: amount > NaN is false, the cap the operator set does nothing (fail-open); '0' refuses every snipe",
+      "rationale": "comment D-01/D-02: reject, never auto-reduce (riskManager.ts:79-80)",
+      "overlap": "TH-BUY-27; the deliberate buy path never calls canSnipe (by design, AUD-BUY-010 sibling note), so the cap does not apply there"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "nan-fail-open",
+        "unit-mismatch",
+        "double-count-partials",
+        "differing-parsers"
+      ],
+      "recommendation": "Fix the loss accounting (card DB-01) before choosing a value; validate at boot (card OD-25).",
+      "od_ref": "OD-25",
+      "id": "TH-DB-04",
+      "name": "Daily loss limit (percent of per-chain max capital, rolling 24 h)",
+      "env_key": "DAILY_LOSS_PCT",
+      "current_value": "10 (= 0.1 ETH on ETH with ETH_MAX_CAPITAL 1.0)",
+      "definition_sites": [
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61"
+      ],
+      "comparison": "canSnipe: getDailyRealizedLoss(chain, now - 86400) <= -(maxCapital * pct / 100) -> refuse for that chain",
+      "units": "percent of <PREFIX>_MAX_CAPITAL",
+      "representation": "float (parseFloat); the loss sum is a REAL in SQL over mixed decimal and wei strings",
+      "effective_unset": "10",
+      "effective_empty": "10 (||)",
+      "effective_non_numeric": "NaN: threshold NaN, the breaker never trips (fail-open); '0' -> threshold -0 and 0 <= -0 is true, every snipe refused; negative refuses every snipe",
+      "rationale": "none stated beyond the description",
+      "overlap": "TH-BUY-27; base is TH-DB-07; the breaker does not count ordinary losing trades because of the unit mix-up (AUD-DB-002) and charges each partial sell the full cost (AUD-DB-013); the dashboard computes daily loss differently (api/routes/risk.ts:66, :91-95)"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "nan-fail-open",
+        "resets-on-restart",
+        "recorded-after-submit"
+      ],
+      "recommendation": "Validate at boot (card OD-25); reserving the cooldown at canSnipe time is card BUY-03.",
+      "od_ref": "OD-25",
+      "id": "TH-DB-05",
+      "name": "Snipe cooldown per chain",
+      "env_key": "SNIPE_COOLDOWN_MS",
+      "current_value": "30000",
+      "definition_sites": [
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:159-162@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:60@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:62"
+      ],
+      "comparison": "canSnipe: Date.now() - lastSnipeTime[chain] < cooldown -> refuse; lastSnipeTime set by recordSnipe after a buy was submitted (bot.ts:1125, :1449, :772)",
+      "units": "milliseconds",
+      "representation": "integer (parseInt)",
+      "effective_unset": "30000",
+      "effective_empty": "30000 (||)",
+      "effective_non_numeric": "NaN: Date.now() - last < NaN is false, no cooldown (fail-open); '0' no cooldown; '30s' -> 30 ms",
+      "rationale": "D-09 (in-memory, ephemeral by design) in the comment at riskManager.ts:38-40",
+      "overlap": "TH-BUY-27; the map is empty after every restart; recorded only after the submit returns, so concurrent handlers all pass (AUD-BUY-010)"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "float-money",
+        "no-validation-at-load",
+        "stored-as-decimal"
+      ],
+      "recommendation": "Validate as a positive decimal with <= 18 decimals at registry load (fail loud like chainRegistry.ts:701-714) and store amounts in wei (card DB-01). Card OD-25 for the values.",
+      "od_ref": "OD-25",
+      "id": "TH-DB-06",
+      "name": "Per-chain snipe amount",
+      "env_key": "<PREFIX>_SNIPE_AMOUNT (ETH, BSC, BASE, ARB)",
+      "current_value": "ETH 0.01, BSC 0.05 (BNB), Base 0.005, Arbitrum 0.005",
+      "definition_sites": [
+        "src/chainRegistry.ts:663@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:207@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:276@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:333@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:390@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:15",
+        ".env.example:21",
+        ".env.example:27",
+        ".env.example:33",
+        "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:201@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1044@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1359@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "no comparison at the definition; buy value (parseEther), canSnipe size/exposure input (parseFloat), wallet floor multiplicand, entry floor term, stored as the buy row amount_in",
+      "units": "native coin (decimal string)",
+      "representation": "string; bigint wei via parseEther for the buy and floors; float in canSnipe; stored as the decimal string (AUD-DB-002)",
+      "effective_unset": "template default",
+      "effective_empty": "template default ('' falsy, ||)",
+      "effective_non_numeric": "preflight parseEther throws inside its try -> passed:false -> boot FATAL (fail-closed); '0' accepted (no positive check)",
+      "rationale": "none stated beyond per-chain defaults",
+      "overlap": "TH-BUY-01 (BUY consumer row), TH-EXIT-24 (price probe); the legacy CONFIG.snipeAmountETH 0.01 duplicates the ETH value (config.ts:280, TH-DB-23). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits."
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "nan-fail-open",
+        "documented-as-cap-not-enforced",
+        "float-money"
+      ],
+      "recommendation": "Decide whether it is a cap (enforce per-chain deployed <= maxCapital) or a loss base (rename) on card DB-01; validate at boot (OD-25).",
+      "od_ref": "OD-25",
+      "id": "TH-DB-07",
+      "name": "Per-chain max capital",
+      "env_key": "<PREFIX>_MAX_CAPITAL (ETH, BSC, BASE, ARB)",
+      "current_value": "ETH 1.0, BSC 5.0 (BNB), Base 0.5, Arbitrum 0.5",
+      "definition_sites": [
+        "src/chainRegistry.ts:664@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:208@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:277@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:334@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:391@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:96-97@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:16",
+        ".env.example:22",
+        ".env.example:28",
+        ".env.example:34",
+        "src/api/routes/chains.ts:84@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "only scales the daily-loss threshold: -(maxCapital * DAILY_LOSS_PCT / 100); never compared with deployed capital (AUD-DB-014)",
+      "units": "native coin",
+      "representation": "string -> parseFloat",
+      "effective_unset": "template default",
+      "effective_empty": "template default (||)",
+      "effective_non_numeric": "NaN -> daily-loss breaker disabled for the chain (fail-open); no boot validation anywhere",
+      "rationale": "none stated; documented as \"Max ETH deployment\" (.env.example:16) which the code does not do",
+      "overlap": "TH-BUY-28 (BUY consumer row); TH-DB-04"
+    },
+    {
+      "hardcoded": false,
+      "flags": [],
+      "recommendation": null,
+      "od_ref": "OD-25",
+      "id": "TH-DB-08",
+      "name": "Per-chain gas buffer (wallet floor and entry cushion)",
+      "env_key": "<PREFIX>_GAS_BUFFER (ETH, BSC, BASE, ARB)",
+      "current_value": "ETH 0.005, BSC 0.003 (BNB), Base 0.0005, Arbitrum 0.0005",
+      "definition_sites": [
+        "src/chainRegistry.ts:669@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:233@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:297@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:354@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:411@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-202@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:433@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:140-143@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:200-203"
+      ],
+      "comparison": "balance >= snipe x MAX_OPEN_POSITIONS + gasBuffer (preflight and mid-run); balance >= snipe + buy gas + exit gas + gasBuffer (entry gate)",
+      "units": "native coin",
+      "representation": "string -> parseEther (bigint wei)",
+      "effective_unset": "template default",
+      "effective_empty": "template default (||)",
+      "effective_non_numeric": "parseEther throws inside try -> passed:false (boot FATAL; snipe refused at the entry gate): fail-closed",
+      "rationale": "config.ts:136-139: 'chosen for capital safety on ~0.0124 ETH funded mainnet wallet'",
+      "overlap": "TH-DB-18, TH-DB-19"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "prefix-parse",
+        "not-registered"
+      ],
+      "recommendation": "Reject anything that is not a whole integer string; register the keys (card DB-06).",
+      "od_ref": null,
+      "id": "TH-DB-09",
+      "name": "Per-chain maximum buy tax",
+      "env_key": "<PREFIX>_MAX_BUY_TAX_BPS (ETH, BSC, BASE, ARB)",
+      "current_value": "1000 bps (10 %) on every chain",
+      "definition_sites": [
+        "src/chainRegistry.ts:695@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:697@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:701-707@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:213@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:339@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:396@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:124",
+        ".env.example:126",
+        ".env.example:128",
+        ".env.example:130"
+      ],
+      "comparison": "honeypot checker tax gate (consumer in the BUY slice, TH-BUY-19)",
+      "units": "basis points",
+      "representation": "integer (parseInt), validated in [0, 10000]",
+      "effective_unset": "1000",
+      "effective_empty": "1000 (||)",
+      "effective_non_numeric": "NaN or out of range -> log.fatal + exit (fail-closed); '10abc' -> 10 and '1.5' -> 1 accepted (prefix parse)",
+      "rationale": "D-TAX-THRESHOLDS (comment chainRegistry.ts:691-693)",
+      "overlap": "TH-BUY-19 (consumer row); not in the config.ts env list (AUD-DB-016)"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "prefix-parse",
+        "not-registered"
+      ],
+      "recommendation": "As TH-DB-09 (card DB-06).",
+      "od_ref": null,
+      "id": "TH-DB-10",
+      "name": "Per-chain maximum sell tax",
+      "env_key": "<PREFIX>_MAX_SELL_TAX_BPS (ETH, BSC, BASE, ARB)",
+      "current_value": "1000 bps (10 %) on every chain",
+      "definition_sites": [
+        "src/chainRegistry.ts:696@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:698@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:708-714@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:214@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:283@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:340@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:397@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:125",
+        ".env.example:127",
+        ".env.example:129",
+        ".env.example:131"
+      ],
+      "comparison": "honeypot checker tax gate (BUY slice, TH-BUY-19)",
+      "units": "basis points",
+      "representation": "integer (parseInt), validated in [0, 10000]",
+      "effective_unset": "1000",
+      "effective_empty": "1000 (||)",
+      "effective_non_numeric": "NaN or out of range -> fatal (fail-closed); prefix values accepted",
+      "rationale": "D-TAX-THRESHOLDS",
+      "overlap": "TH-BUY-19; not registered (AUD-DB-016)"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "infinity-accepted",
+        "future-block-passes",
+        "rationale-mismatch"
+      ],
+      "recommendation": "Require a finite value with an upper bound and treat future blocks beyond a small skew as a failure (card DB-04); decide whether the defaults should follow the stated 5x rule (card OD-25).",
+      "od_ref": "OD-25",
+      "id": "TH-DB-11",
+      "name": "Per-chain RPC block-age tolerance (preflight)",
+      "env_key": "<PREFIX>_BLOCK_AGE_TOLERANCE_SEC (ETH, BSC, BASE, ARB)",
+      "current_value": "ETH 300 s, BSC 60 s, Base 30 s, Arbitrum 30 s",
+      "definition_sites": [
+        "src/chainRegistry.ts:674-682@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:298@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:355@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:412@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:526-528@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:147-150@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:207-210"
+      ],
+      "comparison": "boot: now - latest block timestamp <= tolerance -> pass",
+      "units": "seconds",
+      "representation": "Number() of the env string; rejected when NaN or <= 0",
+      "effective_unset": "template default",
+      "effective_empty": "template default ('' falsy)",
+      "effective_non_numeric": "log.fatal + exit (explicit rejection, fail-closed); 'Infinity' and huge values accepted (check can never fail); a block dated in the future always passes",
+      "rationale": "'~5x chain block-time' (config.ts:144-146, chainRegistry.ts:163-165), which no value matches: ETH 300 s = 25 blocks, BSC 60 s = 20 blocks, Base 30 s = 15 blocks, Arbitrum 30 s = about 120 blocks",
+      "overlap": "checked only at boot; no mid-run staleness check in this slice"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "log-only"
+      ],
+      "recommendation": "Keep; document that it only logs (the name suggests a gate).",
+      "od_ref": null,
+      "id": "TH-DB-12",
+      "name": "Stale pending position warning age",
+      "env_key": "STALE_WARN_SEC",
+      "current_value": "120",
+      "definition_sites": [
+        "src/preflight.ts:837@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:845@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:862-866@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:155@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:216"
+      ],
+      "comparison": "pending buys with timestamp < now - warn are logged (warn or error); never blocks startup",
+      "units": "seconds",
+      "representation": "Number(x) || 120",
+      "effective_unset": "120",
+      "effective_empty": "120",
+      "effective_non_numeric": "120; '0' also 120 (cannot be set to 0)",
+      "rationale": "D-STALE-THRESHOLDS",
+      "overlap": "TH-DB-13"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "log-only",
+        "no-order-check"
+      ],
+      "recommendation": "Keep; validate error >= warn when the env module lands (card DB-06).",
+      "od_ref": null,
+      "id": "TH-DB-13",
+      "name": "Stale pending position error age",
+      "env_key": "STALE_ERROR_SEC",
+      "current_value": "600",
+      "definition_sites": [
+        "src/preflight.ts:838@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:862-866@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:156@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:217"
+      ],
+      "comparison": "age > error -> log.error, else log.warn",
+      "units": "seconds",
+      "representation": "Number(x) || 600",
+      "effective_unset": "600",
+      "effective_empty": "600",
+      "effective_non_numeric": "600; no check that error >= warn",
+      "rationale": "D-STALE-THRESHOLDS",
+      "overlap": "TH-DB-12"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "grace-not-used-for-inflight"
+      ],
+      "recommendation": "Make the first signal wait (up to the grace) for in-flight buys and their row before closing the DB. Card OD-18.",
+      "od_ref": "OD-18",
+      "id": "TH-DB-14",
+      "name": "Two-stage SIGINT grace",
+      "env_key": "SIGINT_GRACE_MS",
+      "current_value": "8000",
+      "definition_sites": [
+        "src/bot.ts:2305-2307@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:2270-2274@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:239"
+      ],
+      "comparison": "force-exit timer armed on the first signal; but cleanup runs synchronously right after and calls closeDb() and process.exit(0) (bot.ts:2309-2349), so the grace only matters if cleanup throws or hangs",
+      "units": "milliseconds",
+      "representation": "integer (parseInt), finite > 0 else 8000",
+      "effective_unset": "8000",
+      "effective_empty": "8000",
+      "effective_non_numeric": "8000; '5x' -> 5",
+      "rationale": "RESEARCH A4 (comment bot.ts:2302-2304)",
+      "overlap": "TH-BUY-15 (BUY row); the grace is not used to let an in-flight buy finish and record its row (AUD-DB-004)"
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "blocks-event-loop"
+      ],
+      "recommendation": "Keep the value; note it in the 22-13 lock design (one bot per file) and keep script writes short.",
+      "od_ref": null,
+      "id": "TH-DB-15",
+      "name": "SQLite busy timeout",
+      "env_key": null,
+      "current_value": "5000 ms",
+      "definition_sites": [
+        "src/utils/db.ts:24@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "a statement that finds the database locked by another connection retries for up to 5 s, then throws SQLITE_BUSY",
+      "units": "milliseconds",
+      "representation": "pragma integer",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "comment 'Wait 5s for locks instead of failing immediately' (db.ts:23)",
+      "overlap": "better-sqlite3 is synchronous: a wait blocks the event loop (every exit monitor and anti-rug handler) for up to 5 s; only possible with a second process on the file (preflight/pause/resume scripts, AUD-DB-015)"
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "power-loss-durability",
+        "comment-misstates-risk"
+      ],
+      "recommendation": "Decide synchronous=FULL on card OD-18 (research: negligible cost).",
+      "od_ref": "OD-18",
+      "id": "TH-DB-16",
+      "name": "SQLite durability mode",
+      "env_key": null,
+      "current_value": "journal_mode = WAL, synchronous = NORMAL (pause/resume add wal_checkpoint(FULL))",
+      "definition_sites": [
+        "src/utils/db.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:718-740@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "WAL frames are written on commit and fsynced only at checkpoints",
+      "units": "pragma mode",
+      "representation": "pragma enum",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "comment 'synchronous = NORMAL is safe and fast for WAL mode' (db.ts:21); the CR-04 comment (db.ts:718-737) says a commit can be lost on SIGKILL, which overstates the risk (process death keeps committed frames; power loss or an OS crash can roll them back)",
+      "overlap": "AUD-DB-004 (RC-14); trades, exit_state, lp_baseline rows have no extra fsync"
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "duplicated-in-api"
+      ],
+      "recommendation": "One shared constant for enforcement and display.",
+      "od_ref": null,
+      "id": "TH-DB-17",
+      "name": "Daily-loss rolling window",
+      "env_key": null,
+      "current_value": "86400 s (24 h, rolling)",
+      "definition_sites": [
+        "src/riskManager.ts:94@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:91-92@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "sells with timestamp >= now - 86400 are summed",
+      "units": "seconds",
+      "representation": "integer literal (the API route uses its own 86400000 ms literal)",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "'Uses rolling 24h window, auto-resumes' (.env.example:61)",
+      "overlap": "TH-DB-04"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "global-count-per-chain"
+      ],
+      "recommendation": "Decide whether the floor should use a per-chain position budget (card OD-25).",
+      "od_ref": "OD-25",
+      "id": "TH-DB-18",
+      "name": "Preflight and mid-run wallet floor",
+      "env_key": "MAX_OPEN_POSITIONS, <PREFIX>_SNIPE_AMOUNT, <PREFIX>_GAS_BUFFER (derived)",
+      "current_value": "ETH 0.01 x 10 + 0.005 = 0.105 ETH; BSC 0.503 BNB; Base 0.0505 ETH; Arbitrum 0.0505 ETH",
+      "definition_sites": [
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198"
+      ],
+      "comparison": "balance >= floor -> pass (boot FATAL otherwise; the mid-run interval in bot.ts auto-pauses on an undercut)",
+      "units": "wei (bigint)",
+      "representation": "bigint",
+      "effective_unset": "derived from the three inputs",
+      "effective_empty": "derived",
+      "effective_non_numeric": "any non-numeric input -> passed:false (fail-closed)",
+      "rationale": "D-BALANCE-FLOOR (preflight.ts:168-177)",
+      "overlap": "uses the GLOBAL position count on every chain (over-reserves when several chains are enabled); ignores per-buy gas (the entry gate TH-DB-19 covers that per buy); at the defaults the ETH floor (0.105 ETH) is far above the ~0.0124 ETH funded wallet named in config.ts:136-139"
+    },
+    {
+      "hardcoded": false,
+      "flags": [
+        "base-fee-derivation-rc22"
+      ],
+      "recommendation": "Use the latest block baseFeePerGas when the TX card for RC-22 is decided; no separate change here.",
+      "od_ref": null,
+      "id": "TH-DB-19",
+      "name": "Buy-time entry affordability floor",
+      "env_key": "EXIT_GATE_SELL_GAS_BUFFER, DELIBERATE_BUY_GAS_BUFFER, <PREFIX>_GAS_BUFFER (plus hard-coded terms)",
+      "current_value": "snipe + maxGasLimit x maxFeePerGas + (maxGasLimit + 60000) x baseFee x 2.0 + gasBuffer (+ deliberate: maxGasLimit x baseFee x 2.0)",
+      "definition_sites": [
+        "src/preflight.ts:370-435@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "balance >= floor -> buy allowed; any RPC error -> refused (fail-closed)",
+      "units": "wei (bigint)",
+      "representation": "bigint via applyGasMultiplier",
+      "effective_unset": "buffers 2.0",
+      "effective_empty": "buffers 2.0",
+      "effective_non_numeric": "buffers fall back to 2.0 when not finite or <= 0 (default)",
+      "rationale": "Finding A / D-EXIT-AFFORDABILITY-GATE (preflight.ts:332-369)",
+      "overlap": "TH-EXIT-26 owns EXIT_GATE_SELL_GAS_BUFFER; the base fee is derived as maxFeePerGas - maxPriorityFeePerGas (preflight.ts:319-323), the RC-22 2x over-estimate recorded on TH-TX-09 (TX slice)"
+    },
+    {
+      "hardcoded": true,
+      "flags": [],
+      "recommendation": null,
+      "od_ref": null,
+      "id": "TH-DB-20",
+      "name": "Reserved approval gas in the entry floor",
+      "env_key": null,
+      "current_value": "60000 gas",
+      "definition_sites": [
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:278@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:415@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "added to the sell gas limit when pricing the worst-case public exit",
+      "units": "gas",
+      "representation": "bigint literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "'a standard ERC-20 approve is ~46k gas; we reserve a generous 60k' (preflight.ts:155-159)",
+      "overlap": "TH-DB-19"
+    },
+    {
+      "hardcoded": false,
+      "flags": [],
+      "recommendation": null,
+      "od_ref": null,
+      "id": "TH-DB-21",
+      "name": "Deliberate-buy public gas buffer",
+      "env_key": "DELIBERATE_BUY_GAS_BUFFER",
+      "current_value": "2.0",
+      "definition_sites": [
+        "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:280"
+      ],
+      "comparison": "multiplier on base fee for the deliberate buy public-fallback reserve in the entry floor",
+      "units": "multiplier",
+      "representation": "float (Number.parseFloat), finite > 0 else 2.0",
+      "effective_unset": "2.0",
+      "effective_empty": "2.0",
+      "effective_non_numeric": "2.0 (default)",
+      "rationale": "D-BUY-AFFORDABILITY-EXTEND",
+      "overlap": "TH-DB-19"
+    },
+    {
+      "hardcoded": true,
+      "flags": [],
+      "recommendation": null,
+      "od_ref": null,
+      "id": "TH-DB-22",
+      "name": "Preflight FATAL Telegram alert timeout",
+      "env_key": null,
+      "current_value": "5000 ms per alert, all in parallel",
+      "definition_sites": [
+        "src/preflight.ts:986-1003@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "Promise.race(sendTelegramAlert, 5 s) then allSettled, then process.exit(1)",
+      "units": "milliseconds",
+      "representation": "integer literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "CR-03 fix comment (preflight.ts:969-973)",
+      "overlap": "the alert text carries the failure reason, which can include the RPC URL and key (AUD-DB-010)"
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "dead-constants",
+        "duplicate-source"
+      ],
+      "recommendation": "Remove the dead constants and move slippagePercent next to its consumers (card DB-06).",
+      "od_ref": null,
+      "id": "TH-DB-23",
+      "name": "Legacy CONFIG money and timing constants",
+      "env_key": null,
+      "current_value": "snipeAmountETH 0.01, slippage 0.1, slippagePercent 5, gasMultiplier 1.2, gasLimit 300000, slippageTolerance 0.1, stopLossCheckInterval 15000, autoSellAfterMs 300000, takeProfitPercent 50, takeProfitCheckInterval 15000",
+      "definition_sites": [
+        "src/config.ts:280-298@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "live consumer only for slippagePercent (bot.ts:1050, :1373, exitEngine.ts:470; rows TH-BUY-02, TH-EXIT-13); gasMultiplier feeds the unreachable gasManager (TH-TX-27); snipeAmountETH feeds legacy tokenSafety functions not called on the multi-chain path; the rest have no consumer (git grep)",
+      "units": "mixed (native coin, fraction, percent, gas, ms)",
+      "representation": "number literals on an exported object",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "'Legacy single-chain CONFIG -- being replaced by ChainConfig' (config.ts:266-267)",
+      "overlap": "duplicates CHAIN_TEMPLATES.eth values (chainRegistry.ts:204, :207) - two sources of truth (AUD-DB-011)"
+    },
+    {
+      "hardcoded": true,
+      "flags": [
+        "dead-multiplier"
+      ],
+      "recommendation": "Remove or wire the multiplier; keep maxGasLimit (card DB-06).",
+      "od_ref": null,
+      "id": "TH-DB-24",
+      "name": "Per-chain gas template",
+      "env_key": null,
+      "current_value": "ETH eip1559 x1.2 maxGasLimit 300000; BSC legacy x1.1 500000; Base eip1559 x1.1 500000; Arbitrum eip1559 x1.1 1000000",
+      "definition_sites": [
+        "src/chainRegistry.ts:204@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:273@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:330@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:387@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "maxGasLimit is the buy and sell gas limit and enters the affordability floors (bot.ts:577, exitEngine.ts:864, :1499, preflight.ts:382); the multiplier has no live reader (git grep gas.multiplier; TH-TX-27)",
+      "units": "gas units / multiplier",
+      "representation": "bigint gas limit, float multiplier",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none stated",
+      "overlap": "TH-EXIT-19 (sell gas limit), TH-TX-15 (strategy fallbacks), TH-TX-27 (dead multipliers)"
+    }
+  ],
+  "discovery": {
+    "env_reads": [
+      {
+        "key": "MAX_OPEN_POSITIONS",
+        "sites": [
+          "src/riskManager.ts:28",
+          "src/preflight.ts:185"
+        ],
+        "row_id": "TH-DB-01"
+      },
+      {
+        "key": "MAX_TOTAL_EXPOSURE",
+        "sites": [
+          "src/riskManager.ts:29"
+        ],
+        "row_id": "TH-DB-02"
+      },
+      {
+        "key": "DAILY_LOSS_PCT",
+        "sites": [
+          "src/riskManager.ts:30"
+        ],
+        "row_id": "TH-DB-04"
+      },
+      {
+        "key": "SNIPE_COOLDOWN_MS",
+        "sites": [
+          "src/riskManager.ts:31"
+        ],
+        "row_id": "TH-DB-05"
+      },
+      {
+        "key": "MAX_POSITION_SIZE",
+        "sites": [
+          "src/riskManager.ts:32"
+        ],
+        "row_id": "TH-DB-03"
+      },
+      {
+        "key": "EXIT_GATE_SELL_GAS_BUFFER",
+        "sites": [
+          "src/preflight.ts:290"
+        ],
+        "excluded_reason": "money threshold owned by another slice: TH-EXIT-26 (row named by key; 22-28 resolves); its preflight parser is described on TH-DB-19"
+      },
+      {
+        "key": "DELIBERATE_BUY_GAS_BUFFER",
+        "sites": [
+          "src/preflight.ts:301"
+        ],
+        "row_id": "TH-DB-21"
+      },
+      {
+        "key": "STALE_WARN_SEC",
+        "sites": [
+          "src/preflight.ts:837"
+        ],
+        "row_id": "TH-DB-12"
+      },
+      {
+        "key": "STALE_ERROR_SEC",
+        "sites": [
+          "src/preflight.ts:838"
+        ],
+        "row_id": "TH-DB-13"
+      },
+      {
+        "key": "STOP_LOSS_PCT",
+        "sites": [
+          "src/config.ts:291"
+        ],
+        "excluded_reason": "money threshold owned by the EXIT slice: TH-EXIT-01"
+      },
+      {
+        "key": "TRAILING_STOP_PCT",
+        "sites": [
+          "src/config.ts:300"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-02"
+      },
+      {
+        "key": "TRAILING_MIN_PCT",
+        "sites": [
+          "src/config.ts:301"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-03"
+      },
+      {
+        "key": "TRAILING_MAX_PCT",
+        "sites": [
+          "src/config.ts:302"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-04"
+      },
+      {
+        "key": "PARTIAL_SELL_TARGETS",
+        "sites": [
+          "src/config.ts:303"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-06"
+      },
+      {
+        "key": "ENABLED_CHAINS",
+        "sites": [
+          "src/chainRegistry.ts:644",
+          "src/preflight.ts:709"
+        ],
+        "excluded_reason": "non-numeric (chain list); the default drift between the two sites is AUD-DB-017"
+      },
+      {
+        "key": "NETWORK",
+        "sites": [
+          "src/config.ts:258"
+        ],
+        "excluded_reason": "non-numeric (legacy provider key)"
+      },
+      {
+        "key": "LOG_LEVEL",
+        "sites": [
+          "src/utils/logger.ts:7"
+        ],
+        "excluded_reason": "non-numeric, not money-or-timing (AUD-DB-005, card OD-10)"
+      },
+      {
+        "key": "DB_PATH",
+        "sites": [
+          "src/utils/db.ts:9"
+        ],
+        "excluded_reason": "non-numeric file path (AUD-DB-007)"
+      },
+      {
+        "key": "PRIVATE_KEY",
+        "sites": [
+          "src/config.ts:234",
+          "src/config.ts:271",
+          "src/chainRegistry.ts:1067"
+        ],
+        "excluded_reason": "non-numeric secret (AUD-DB-008)"
+      },
+      {
+        "key": "ALCHEMY_URL",
+        "sites": [
+          "src/config.ts:234",
+          "src/config.ts:250-251",
+          "src/chainRegistry.ts:936-937"
+        ],
+        "excluded_reason": "non-numeric URL secret (AUD-DB-011)"
+      },
+      {
+        "key": "ETH_RPC_URL",
+        "sites": [
+          "src/config.ts:250-251",
+          "src/chainRegistry.ts:661 (template httpRpcEnv)",
+          "src/preflight.ts:771 (rpcEnvMap)"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BSC_RPC_URL",
+        "sites": [
+          "src/config.ts:252",
+          "src/chainRegistry.ts:661",
+          "src/preflight.ts:771"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BASE_RPC_URL",
+        "sites": [
+          "src/chainRegistry.ts:661",
+          "src/preflight.ts:771"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "ARB_RPC_URL",
+        "sites": [
+          "src/chainRegistry.ts:661",
+          "src/preflight.ts:771"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "ETH_WS_URL",
+        "sites": [
+          "src/chainRegistry.ts:662 (template wsRpcEnv)"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BSC_WS_URL",
+        "sites": [
+          "src/chainRegistry.ts:662 (template wsRpcEnv)"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BASE_WS_URL",
+        "sites": [
+          "src/chainRegistry.ts:662 (template wsRpcEnv)"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "ARB_WS_URL",
+        "sites": [
+          "src/chainRegistry.ts:662 (template wsRpcEnv)"
+        ],
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "FLASHBOTS_AUTH_KEY",
+        "sites": [
+          "src/chainRegistry.ts:948",
+          "src/chainRegistry.ts:980-981",
+          "src/preflight.ts:721"
+        ],
+        "excluded_reason": "non-numeric secret"
+      },
+      {
+        "key": "BLOXROUTE_AUTH_HEADER",
+        "sites": [
+          "src/chainRegistry.ts:952",
+          "src/chainRegistry.ts:983-984",
+          "src/preflight.ts:732"
+        ],
+        "excluded_reason": "non-numeric secret"
+      },
+      {
+        "key": "TELEGRAM_API_ID",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:743"
+        ],
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TELEGRAM_API_HASH",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:750 (tuple)"
+        ],
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TELEGRAM_SESSION",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:750 (tuple)"
+        ],
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TELEGRAM_BOT_TOKEN",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:750 (tuple)",
+          "src/utils/notifier.ts:10",
+          "src/utils/notifier.ts:38",
+          "src/utils/notifier.ts:76"
+        ],
+        "excluded_reason": "non-numeric credential (AUD-DB-009)"
+      },
+      {
+        "key": "TELEGRAM_CHAT_ID",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:750 (tuple)",
+          "src/utils/notifier.ts:38",
+          "src/utils/notifier.ts:45",
+          "src/utils/notifier.ts:76",
+          "src/utils/notifier.ts:81"
+        ],
+        "excluded_reason": "non-numeric identifier"
+      },
+      {
+        "key": "DASHBOARD_API_KEY",
+        "sites": [
+          "src/config.ts:234",
+          "src/preflight.ts:792"
+        ],
+        "excluded_reason": "non-numeric credential; the >= 16 character rule (preflight.ts:809) is an auth-strength check, not money-or-timing"
+      },
+      {
+        "key": "ETH_SNIPE_AMOUNT",
+        "sites": [
+          "src/chainRegistry.ts:663 (process.env[`${template.envPrefix}_SNIPE_AMOUNT`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-06"
+      },
+      {
+        "key": "BSC_SNIPE_AMOUNT",
+        "sites": [
+          "src/chainRegistry.ts:663 (process.env[`${template.envPrefix}_SNIPE_AMOUNT`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-06"
+      },
+      {
+        "key": "BASE_SNIPE_AMOUNT",
+        "sites": [
+          "src/chainRegistry.ts:663 (process.env[`${template.envPrefix}_SNIPE_AMOUNT`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-06"
+      },
+      {
+        "key": "ARB_SNIPE_AMOUNT",
+        "sites": [
+          "src/chainRegistry.ts:663 (process.env[`${template.envPrefix}_SNIPE_AMOUNT`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-06"
+      },
+      {
+        "key": "ETH_MAX_CAPITAL",
+        "sites": [
+          "src/chainRegistry.ts:664 (process.env[`${template.envPrefix}_MAX_CAPITAL`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-07"
+      },
+      {
+        "key": "BSC_MAX_CAPITAL",
+        "sites": [
+          "src/chainRegistry.ts:664 (process.env[`${template.envPrefix}_MAX_CAPITAL`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-07"
+      },
+      {
+        "key": "BASE_MAX_CAPITAL",
+        "sites": [
+          "src/chainRegistry.ts:664 (process.env[`${template.envPrefix}_MAX_CAPITAL`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-07"
+      },
+      {
+        "key": "ARB_MAX_CAPITAL",
+        "sites": [
+          "src/chainRegistry.ts:664 (process.env[`${template.envPrefix}_MAX_CAPITAL`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-07"
+      },
+      {
+        "key": "ETH_MIN_LIQUIDITY",
+        "sites": [
+          "src/chainRegistry.ts:665 (process.env[`${template.envPrefix}_MIN_LIQUIDITY`], envPrefix ETH)"
+        ],
+        "excluded_reason": "money threshold owned by the BUY slice: TH-BUY-08 (parsed here with || and no validation; the crash on a non-numeric value is AUD-BUY-005)"
+      },
+      {
+        "key": "BSC_MIN_LIQUIDITY",
+        "sites": [
+          "src/chainRegistry.ts:665 (process.env[`${template.envPrefix}_MIN_LIQUIDITY`], envPrefix BSC)"
+        ],
+        "excluded_reason": "money threshold owned by the BUY slice: TH-BUY-08 (parsed here with || and no validation; the crash on a non-numeric value is AUD-BUY-005)"
+      },
+      {
+        "key": "BASE_MIN_LIQUIDITY",
+        "sites": [
+          "src/chainRegistry.ts:665 (process.env[`${template.envPrefix}_MIN_LIQUIDITY`], envPrefix BASE)"
+        ],
+        "excluded_reason": "money threshold owned by the BUY slice: TH-BUY-08 (parsed here with || and no validation; the crash on a non-numeric value is AUD-BUY-005)"
+      },
+      {
+        "key": "ARB_MIN_LIQUIDITY",
+        "sites": [
+          "src/chainRegistry.ts:665 (process.env[`${template.envPrefix}_MIN_LIQUIDITY`], envPrefix ARB)"
+        ],
+        "excluded_reason": "money threshold owned by the BUY slice: TH-BUY-08 (parsed here with || and no validation; the crash on a non-numeric value is AUD-BUY-005)"
+      },
+      {
+        "key": "ETH_GAS_BUFFER",
+        "sites": [
+          "src/chainRegistry.ts:669 (process.env[`${template.envPrefix}_GAS_BUFFER`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-08"
+      },
+      {
+        "key": "BSC_GAS_BUFFER",
+        "sites": [
+          "src/chainRegistry.ts:669 (process.env[`${template.envPrefix}_GAS_BUFFER`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-08"
+      },
+      {
+        "key": "BASE_GAS_BUFFER",
+        "sites": [
+          "src/chainRegistry.ts:669 (process.env[`${template.envPrefix}_GAS_BUFFER`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-08"
+      },
+      {
+        "key": "ARB_GAS_BUFFER",
+        "sites": [
+          "src/chainRegistry.ts:669 (process.env[`${template.envPrefix}_GAS_BUFFER`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-08"
+      },
+      {
+        "key": "ETH_BLOCK_AGE_TOLERANCE_SEC",
+        "sites": [
+          "src/chainRegistry.ts:674 (process.env[`${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-11"
+      },
+      {
+        "key": "BSC_BLOCK_AGE_TOLERANCE_SEC",
+        "sites": [
+          "src/chainRegistry.ts:674 (process.env[`${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-11"
+      },
+      {
+        "key": "BASE_BLOCK_AGE_TOLERANCE_SEC",
+        "sites": [
+          "src/chainRegistry.ts:674 (process.env[`${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-11"
+      },
+      {
+        "key": "ARB_BLOCK_AGE_TOLERANCE_SEC",
+        "sites": [
+          "src/chainRegistry.ts:674 (process.env[`${template.envPrefix}_BLOCK_AGE_TOLERANCE_SEC`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-11"
+      },
+      {
+        "key": "ETH_HONEYPOT_CHECKER_ADDRESS",
+        "sites": [
+          "src/chainRegistry.ts:694 (process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "BSC_HONEYPOT_CHECKER_ADDRESS",
+        "sites": [
+          "src/chainRegistry.ts:694 (process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "BASE_HONEYPOT_CHECKER_ADDRESS",
+        "sites": [
+          "src/chainRegistry.ts:694 (process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "ARB_HONEYPOT_CHECKER_ADDRESS",
+        "sites": [
+          "src/chainRegistry.ts:694 (process.env[`${template.envPrefix}_HONEYPOT_CHECKER_ADDRESS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "ETH_MAX_BUY_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:695 (process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-09"
+      },
+      {
+        "key": "BSC_MAX_BUY_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:695 (process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-09"
+      },
+      {
+        "key": "BASE_MAX_BUY_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:695 (process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-09"
+      },
+      {
+        "key": "ARB_MAX_BUY_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:695 (process.env[`${template.envPrefix}_MAX_BUY_TAX_BPS`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-09"
+      },
+      {
+        "key": "ETH_MAX_SELL_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:696 (process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`], envPrefix ETH)"
+        ],
+        "row_id": "TH-DB-10"
+      },
+      {
+        "key": "BSC_MAX_SELL_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:696 (process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`], envPrefix BSC)"
+        ],
+        "row_id": "TH-DB-10"
+      },
+      {
+        "key": "BASE_MAX_SELL_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:696 (process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`], envPrefix BASE)"
+        ],
+        "row_id": "TH-DB-10"
+      },
+      {
+        "key": "ARB_MAX_SELL_TAX_BPS",
+        "sites": [
+          "src/chainRegistry.ts:696 (process.env[`${template.envPrefix}_MAX_SELL_TAX_BPS`], envPrefix ARB)"
+        ],
+        "row_id": "TH-DB-10"
+      },
+      {
+        "key": "ETH_ANTIRUG_LIVE_EXECUTE",
+        "sites": [
+          "src/chainRegistry.ts:721 (process.env[`${template.envPrefix}_ANTIRUG_LIVE_EXECUTE`], envPrefix ETH)",
+          "src/preflight.ts:630 (`${chain.name.toUpperCase()}_ANTIRUG_LIVE_EXECUTE`)"
+        ],
+        "excluded_reason": "boolean switch owned by the ANTIRUG slice: TH-ANTIRUG-08 (also read at src/preflight.ts:630)"
+      },
+      {
+        "key": "BSC_ANTIRUG_LIVE_EXECUTE",
+        "sites": [
+          "src/chainRegistry.ts:721 (process.env[`${template.envPrefix}_ANTIRUG_LIVE_EXECUTE`], envPrefix BSC)",
+          "src/preflight.ts:630 (`${chain.name.toUpperCase()}_ANTIRUG_LIVE_EXECUTE`)"
+        ],
+        "excluded_reason": "boolean switch owned by the ANTIRUG slice: TH-ANTIRUG-08 (also read at src/preflight.ts:630)"
+      },
+      {
+        "key": "BASE_ANTIRUG_LIVE_EXECUTE",
+        "sites": [
+          "src/chainRegistry.ts:721 (process.env[`${template.envPrefix}_ANTIRUG_LIVE_EXECUTE`], envPrefix BASE)",
+          "src/preflight.ts:630 (`${chain.name.toUpperCase()}_ANTIRUG_LIVE_EXECUTE`)"
+        ],
+        "excluded_reason": "boolean switch owned by the ANTIRUG slice: TH-ANTIRUG-08 (also read at src/preflight.ts:630)"
+      },
+      {
+        "key": "ARB_ANTIRUG_LIVE_EXECUTE",
+        "sites": [
+          "src/chainRegistry.ts:721 (process.env[`${template.envPrefix}_ANTIRUG_LIVE_EXECUTE`], envPrefix ARB)",
+          "src/preflight.ts:630 (`${chain.name.toUpperCase()}_ANTIRUG_LIVE_EXECUTE`)"
+        ],
+        "excluded_reason": "boolean switch owned by the ANTIRUG slice: TH-ANTIRUG-08 (also read at src/preflight.ts:630)"
+      },
+      {
+        "key": "ETH_ANTIRUG_LP_REMOVAL_PCT",
+        "sites": [
+          "src/chainRegistry.ts:727 (process.env[`${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-01"
+      },
+      {
+        "key": "BSC_ANTIRUG_LP_REMOVAL_PCT",
+        "sites": [
+          "src/chainRegistry.ts:727 (process.env[`${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-01"
+      },
+      {
+        "key": "BASE_ANTIRUG_LP_REMOVAL_PCT",
+        "sites": [
+          "src/chainRegistry.ts:727 (process.env[`${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-01"
+      },
+      {
+        "key": "ARB_ANTIRUG_LP_REMOVAL_PCT",
+        "sites": [
+          "src/chainRegistry.ts:727 (process.env[`${template.envPrefix}_ANTIRUG_LP_REMOVAL_PCT`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-01"
+      },
+      {
+        "key": "ETH_ANTIRUG_CONFIRM_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:747 (process.env[`${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-02"
+      },
+      {
+        "key": "BSC_ANTIRUG_CONFIRM_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:747 (process.env[`${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-02"
+      },
+      {
+        "key": "BASE_ANTIRUG_CONFIRM_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:747 (process.env[`${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-02"
+      },
+      {
+        "key": "ARB_ANTIRUG_CONFIRM_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:747 (process.env[`${template.envPrefix}_ANTIRUG_CONFIRM_BLOCKS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-02"
+      },
+      {
+        "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sites": [
+          "src/chainRegistry.ts:767 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-03"
+      },
+      {
+        "key": "BSC_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sites": [
+          "src/chainRegistry.ts:767 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-03"
+      },
+      {
+        "key": "BASE_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sites": [
+          "src/chainRegistry.ts:767 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-03"
+      },
+      {
+        "key": "ARB_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sites": [
+          "src/chainRegistry.ts:767 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-03"
+      },
+      {
+        "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sites": [
+          "src/chainRegistry.ts:787 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-04"
+      },
+      {
+        "key": "BSC_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sites": [
+          "src/chainRegistry.ts:787 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-04"
+      },
+      {
+        "key": "BASE_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sites": [
+          "src/chainRegistry.ts:787 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-04"
+      },
+      {
+        "key": "ARB_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sites": [
+          "src/chainRegistry.ts:787 (process.env[`${template.envPrefix}_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-04"
+      },
+      {
+        "key": "ETH_ANTIRUG_GAS_MULTIPLIER",
+        "sites": [
+          "src/chainRegistry.ts:807 (process.env[`${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-05 (and TH-EXIT-20)"
+      },
+      {
+        "key": "BSC_ANTIRUG_GAS_MULTIPLIER",
+        "sites": [
+          "src/chainRegistry.ts:807 (process.env[`${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-05 (and TH-EXIT-20)"
+      },
+      {
+        "key": "BASE_ANTIRUG_GAS_MULTIPLIER",
+        "sites": [
+          "src/chainRegistry.ts:807 (process.env[`${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-05 (and TH-EXIT-20)"
+      },
+      {
+        "key": "ARB_ANTIRUG_GAS_MULTIPLIER",
+        "sites": [
+          "src/chainRegistry.ts:807 (process.env[`${template.envPrefix}_ANTIRUG_GAS_MULTIPLIER`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-05 (and TH-EXIT-20)"
+      },
+      {
+        "key": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:826 (process.env[`${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-06"
+      },
+      {
+        "key": "BSC_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:826 (process.env[`${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-06"
+      },
+      {
+        "key": "BASE_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:826 (process.env[`${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-06"
+      },
+      {
+        "key": "ARB_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:826 (process.env[`${template.envPrefix}_ANTIRUG_BACKFILL_CAP_BLOCKS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-06"
+      },
+      {
+        "key": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:847 (process.env[`${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`], envPrefix ETH)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-07"
+      },
+      {
+        "key": "BSC_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:847 (process.env[`${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`], envPrefix BSC)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-07"
+      },
+      {
+        "key": "BASE_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:847 (process.env[`${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`], envPrefix BASE)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-07"
+      },
+      {
+        "key": "ARB_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sites": [
+          "src/chainRegistry.ts:847 (process.env[`${template.envPrefix}_ANTIRUG_MAX_BACKFILL_BLOCKS`], envPrefix ARB)"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-07"
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+        "sites": [
+          "src/chainRegistry.ts:882 (parseAllowlistExtra, called at :910-912) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`], envPrefix ETH)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+        "sites": [
+          "src/chainRegistry.ts:882 (parseAllowlistExtra, called at :910-912) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`], envPrefix BSC)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA",
+        "sites": [
+          "src/chainRegistry.ts:882 (parseAllowlistExtra, called at :910-912) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`], envPrefix BASE)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA",
+        "sites": [
+          "src/chainRegistry.ts:882 (parseAllowlistExtra, called at :910-912) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA`], envPrefix ARB)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :927) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V2`], envPrefix ETH)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :927) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V2`], envPrefix BSC)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :927) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V2`], envPrefix BASE)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :927) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V2`], envPrefix ARB)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :931) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V3`], envPrefix ETH)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :931) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V3`], envPrefix BSC)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :931) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V3`], envPrefix BASE)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sites": [
+          "src/chainRegistry.ts:882 (called at :931) (process.env[`${template.envPrefix}_ANTIRUG_ALLOWLIST_EXTRA_V3`], envPrefix ARB)"
+        ],
+        "excluded_reason": "non-numeric address list (TH-ANTIRUG-09)"
+      },
+      {
+        "key": "X",
+        "sites": [
+          "src/preflight.ts:63"
+        ],
+        "excluded_reason": "not a read: the text process.env.X sits in a comment"
+      },
+      {
+        "key": "MEV_STRATEGY",
+        "sites": [
+          "src/preflight.ts:715"
+        ],
+        "excluded_reason": "not a read: named in a comment (WR-08 note)"
+      }
+    ],
+    "constants": [
+      {
+        "name": "busy_timeout 5000",
+        "sites": [
+          "src/utils/db.ts:24"
+        ],
+        "row_id": "TH-DB-15"
+      },
+      {
+        "name": "journal_mode WAL / synchronous NORMAL",
+        "sites": [
+          "src/utils/db.ts:20-22",
+          "src/utils/db.ts:738-740"
+        ],
+        "row_id": "TH-DB-16"
+      },
+      {
+        "name": "CURRENT_SCHEMA_VERSION 7",
+        "sites": [
+          "src/utils/db.ts:27",
+          "src/utils/db.ts:232"
+        ],
+        "excluded_reason": "schema version identifier, not money-or-timing (AUD-DB-006)"
+      },
+      {
+        "name": "risk defaults 10 / 10.0 / 10 / 30000",
+        "sites": [
+          "src/riskManager.ts:28-31"
+        ],
+        "row_id": "TH-DB-01"
+      },
+      {
+        "name": "daily-loss window 86400",
+        "sites": [
+          "src/riskManager.ts:94"
+        ],
+        "row_id": "TH-DB-17"
+      },
+      {
+        "name": "percent divisor 100 in the loss threshold",
+        "sites": [
+          "src/riskManager.ts:97"
+        ],
+        "row_id": "TH-DB-04"
+      },
+      {
+        "name": "cooldown seconds rounding / 1000",
+        "sites": [
+          "src/riskManager.ts:126-127"
+        ],
+        "excluded_reason": "cosmetic (alert text only)"
+      },
+      {
+        "name": "chain template snipe amounts 0.01 / 0.05 / 0.005 / 0.005",
+        "sites": [
+          "src/chainRegistry.ts:207",
+          "src/chainRegistry.ts:276",
+          "src/chainRegistry.ts:333",
+          "src/chainRegistry.ts:390"
+        ],
+        "row_id": "TH-DB-06"
+      },
+      {
+        "name": "chain template max capital 1.0 / 5.0 / 0.5 / 0.5",
+        "sites": [
+          "src/chainRegistry.ts:208",
+          "src/chainRegistry.ts:277",
+          "src/chainRegistry.ts:334",
+          "src/chainRegistry.ts:391"
+        ],
+        "row_id": "TH-DB-07"
+      },
+      {
+        "name": "chain template min liquidity 0.5 / 1.0 / 0.1 / 0.1",
+        "sites": [
+          "src/chainRegistry.ts:209",
+          "src/chainRegistry.ts:278",
+          "src/chainRegistry.ts:335",
+          "src/chainRegistry.ts:392"
+        ],
+        "excluded_reason": "owned by the BUY slice: TH-BUY-08"
+      },
+      {
+        "name": "chain template gas buffers",
+        "sites": [
+          "src/chainRegistry.ts:233",
+          "src/chainRegistry.ts:297",
+          "src/chainRegistry.ts:354",
+          "src/chainRegistry.ts:411"
+        ],
+        "row_id": "TH-DB-08"
+      },
+      {
+        "name": "chain template block-age tolerances",
+        "sites": [
+          "src/chainRegistry.ts:234",
+          "src/chainRegistry.ts:298",
+          "src/chainRegistry.ts:355",
+          "src/chainRegistry.ts:412"
+        ],
+        "row_id": "TH-DB-11"
+      },
+      {
+        "name": "chain template tax bps 1000 and the [0, 10000] range",
+        "sites": [
+          "src/chainRegistry.ts:213-214",
+          "src/chainRegistry.ts:282-283",
+          "src/chainRegistry.ts:339-340",
+          "src/chainRegistry.ts:396-397",
+          "src/chainRegistry.ts:701",
+          "src/chainRegistry.ts:708"
+        ],
+        "row_id": "TH-DB-09"
+      },
+      {
+        "name": "chain template gas type / multiplier / maxGasLimit",
+        "sites": [
+          "src/chainRegistry.ts:204",
+          "src/chainRegistry.ts:273",
+          "src/chainRegistry.ts:330",
+          "src/chainRegistry.ts:387"
+        ],
+        "row_id": "TH-DB-24"
+      },
+      {
+        "name": "chain template anti-rug defaults and validation bounds (0..100, >= 1, <= 100000, >= cap)",
+        "sites": [
+          "src/chainRegistry.ts:225-231",
+          "src/chainRegistry.ts:289-295",
+          "src/chainRegistry.ts:346-352",
+          "src/chainRegistry.ts:403-409",
+          "src/chainRegistry.ts:730-865"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-01..07"
+      },
+      {
+        "name": "legacy CONFIG constants",
+        "sites": [
+          "src/config.ts:280-298"
+        ],
+        "row_id": "TH-DB-23"
+      },
+      {
+        "name": "CONFIG exit constants exitPollIntervalMs 5000, urgencyWindowMs 1800000, volatility 0.03 / 60 / 12",
+        "sites": [
+          "src/config.ts:304-308"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-07, TH-EXIT-08, TH-EXIT-09"
+      },
+      {
+        "name": "SEVEN_DAYS_SEC",
+        "sites": [
+          "src/preflight.ts:127",
+          "src/preflight.ts:669"
+        ],
+        "excluded_reason": "owned by the ANTIRUG slice: TH-ANTIRUG-10"
+      },
+      {
+        "name": "EXIT_GATE_SELL_GAS_BUFFER_DEFAULT 2.0",
+        "sites": [
+          "src/preflight.ts:145"
+        ],
+        "excluded_reason": "owned by the EXIT slice: TH-EXIT-26 (described on TH-DB-19)"
+      },
+      {
+        "name": "DELIBERATE_BUY_GAS_BUFFER_DEFAULT 2.0",
+        "sites": [
+          "src/preflight.ts:153"
+        ],
+        "row_id": "TH-DB-21"
+      },
+      {
+        "name": "EXIT_GATE_APPROVAL_GAS_LIMIT 60000n",
+        "sites": [
+          "src/preflight.ts:160"
+        ],
+        "row_id": "TH-DB-20"
+      },
+      {
+        "name": "wallet floor default position count 10",
+        "sites": [
+          "src/preflight.ts:187"
+        ],
+        "row_id": "TH-DB-18"
+      },
+      {
+        "name": "stale defaults 120 / 600",
+        "sites": [
+          "src/preflight.ts:837-838"
+        ],
+        "row_id": "TH-DB-12"
+      },
+      {
+        "name": "preflight Telegram race 5000",
+        "sites": [
+          "src/preflight.ts:992"
+        ],
+        "row_id": "TH-DB-22"
+      },
+      {
+        "name": "DASHBOARD_API_KEY minimum length 16",
+        "sites": [
+          "src/preflight.ts:809"
+        ],
+        "excluded_reason": "auth-strength rule, not money-or-timing (API slice for auth)"
+      },
+      {
+        "name": "stale-age / days arithmetic 86400 in preflight",
+        "sites": [
+          "src/preflight.ts:668-670"
+        ],
+        "excluded_reason": "cosmetic (message text for the 7-day gate)"
+      },
+      {
+        "name": "migrateJsonState timestamp / 1000",
+        "sites": [
+          "src/utils/db.ts:271"
+        ],
+        "excluded_reason": "unit conversion of imported legacy timestamps, not a threshold"
+      }
+    ]
+  }
+}

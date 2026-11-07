@@ -1,0 +1,54 @@
+{
+  "id": "OD-25",
+  "title": "Risk defaults (10 ETH exposure cap vs 0.01 ETH snipe size) and the other inventory thresholds, including how risk settings are parsed",
+  "area": "DB",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current defaults and parsing",
+      "behavior_impact": "none",
+      "risk": "A malformed MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT, SNIPE_COOLDOWN_MS, MAX_POSITION_SIZE or per-chain max capital silently turns that limit off (AUD-DB-001); the 10 ETH exposure cap is about 800 x the funded wallet and cannot bind; the block-age defaults do not follow their stated 5x rule (TH-DB-11)."
+    },
+    {
+      "id": "align-one-parser",
+      "name": "One typed parser and one default per key, used by riskManager, preflight and the dashboard, refusing to boot on non-numeric, non-finite or out-of-range values; default values unchanged",
+      "behavior_impact": "A bad value stops the bot at boot with a message instead of disabling a limit; the dashboard shows exactly what is enforced.",
+      "risk": "A .env that boots today with a typo will refuse to boot; every risk key is touched in one change."
+    },
+    {
+      "id": "change-specific-defaults",
+      "name": "Change specific defaults (for example an exposure cap scaled to the snipe size or the wallet, per currency; block-age tolerances that follow one rule)",
+      "behavior_impact": "The changed limits bind in normal operation; more snipes may be refused.",
+      "risk": "Without the parser change and the accounting fix (card DB-01) a new default can still be disabled by a typo or mis-measured."
+    },
+    {
+      "id": "align-and-change",
+      "name": "Both: one strict parser and the chosen new defaults",
+      "behavior_impact": "Limits that bind and cannot be turned off by a typo.",
+      "risk": "Largest behaviour change; needs the accounting fix (DB-01) first so that new defaults measure what they say."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Research recommendation (research SUMMARY OD-25): surface the defaults in the thresholds inventory and leave them unchanged unless decided. Audit note for the decision: the daily-loss and exposure limits do not currently measure what their defaults describe (AUD-DB-002, AUD-DB-003, card DB-01), so a choice of values is only meaningful after that is fixed; the parser question (align-one-parser) is independent of the values.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides which risk limits can bind, what a malformed setting does, and the default values of every flagged threshold row.",
+  "findings": [
+    "AUD-DB-001"
+  ],
+  "threshold_rows": [
+    "TH-DB-01",
+    "TH-DB-02",
+    "TH-DB-03",
+    "TH-DB-04",
+    "TH-DB-05",
+    "TH-DB-06",
+    "TH-DB-07",
+    "TH-DB-08",
+    "TH-DB-11",
+    "TH-DB-18"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion before Wave A (capital fixes), after card DB-01"
+}
