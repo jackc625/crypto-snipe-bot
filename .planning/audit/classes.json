@@ -1,0 +1,26 @@
+{
+  "source": ".planning/REQUIREMENTS.md AUDIT-03, in requirement order",
+  "areas": ["src", "dashboard", "test", "scripts", "contracts"],
+  "classes": [
+    { "id": "C01", "name": "BigInt/Number mixing" },
+    { "id": "C02", "name": "|| vs ?? with 0n/''/0" },
+    { "id": "C03", "name": "token decimals" },
+    { "id": "C04", "name": "slippage/minOut" },
+    { "id": "C05", "name": "deadlines" },
+    { "id": "C06", "name": "approvals" },
+    { "id": "C07", "name": "nonce management" },
+    { "id": "C08", "name": "reorgs" },
+    { "id": "C09", "name": "receipt status" },
+    { "id": "C10", "name": "WS reconnect/backfill" },
+    { "id": "C11", "name": "unhandled rejections" },
+    { "id": "C12", "name": "timer leaks" },
+    { "id": "C13", "name": "SQLite transaction boundaries and crash consistency" },
+    { "id": "C14", "name": "idempotent exits" },
+    { "id": "C15", "name": "TOCTOU" },
+    { "id": "C16", "name": "gas/fee ceilings" },
+    { "id": "C17", "name": "key handling" },
+    { "id": "C18", "name": "env validation" },
+    { "id": "C19", "name": "API auth/CORS" },
+    { "id": "C20", "name": "Telegram trust" }
+  ]
+}

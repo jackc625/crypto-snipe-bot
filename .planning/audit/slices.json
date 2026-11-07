@@ -1,0 +1,974 @@
+[
+  {
+    "slice": "BUY",
+    "id_prefix": "AUD-BUY",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/bot.ts",
+      "src/main.ts",
+      "src/telegramListener.ts",
+      "src/alphaDrop.ts",
+      "src/utils/tokenSafety.ts",
+      "src/utils/honeypot/",
+      "src/utils/safetyProviders/",
+      "src/utils/pairDiscovery.ts",
+      "src/utils/blocklist.ts",
+      "src/utils/abis.ts"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/bot.ts",
+      "src/utils/honeypot/checkerContract.ts",
+      "src/utils/safetyProviders/goplus.ts"
+    ],
+    "files_at_base": [
+      "src/alphaDrop.ts",
+      "src/bot.ts",
+      "src/telegramListener.ts",
+      "src/utils/abis.ts",
+      "src/utils/blocklist.ts",
+      "src/utils/honeypot/abi.ts",
+      "src/utils/honeypot/bytecodeScan.ts",
+      "src/utils/honeypot/checkerContract.ts",
+      "src/utils/honeypot/index.ts",
+      "src/utils/honeypot/sanitize.ts",
+      "src/utils/honeypot/simulator.ts",
+      "src/utils/honeypot/types.ts",
+      "src/utils/pairDiscovery.ts",
+      "src/utils/safetyProviders/goplus.ts",
+      "src/utils/safetyProviders/honeypotIs.ts",
+      "src/utils/safetyProviders/mudra.ts",
+      "src/utils/safetyProviders/types.ts",
+      "src/utils/safetyProviders/unicrypt.ts",
+      "src/utils/tokenSafety.ts"
+    ],
+    "count_at_base": 19,
+    "owned_rc": [
+      1,
+      2,
+      4,
+      5,
+      9,
+      16,
+      20,
+      24
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-01",
+        "candidate": "Stale buy deadline captured outside the tx-builder closure on multi-block escalation (B4)",
+        "ref": "bot.ts:1043"
+      },
+      {
+        "id": "SC-05",
+        "candidate": "No reorg handling: events processed at head with lastBlock = currentBlock (E5)",
+        "ref": "bot.ts:1636-1680 (FEATURES E5)"
+      },
+      {
+        "id": "SC-06",
+        "candidate": "getTradeIdForPendingToken ambiguity and non-transactional multi-statement state changes (G1)",
+        "ref": "bot.ts:1127-1154"
+      },
+      {
+        "id": "SC-09",
+        "candidate": "Telegram regex/cooldown/unbounded processedContracts Set (K2)",
+        "ref": "telegramListener.ts (FEATURES K2)"
+      },
+      {
+        "id": "SC-10",
+        "candidate": "Attacker-controlled token symbol/name flows into Telegram Markdown and the dashboard (J4)",
+        "ref": "bot.ts:1145 (FEATURES J4)"
+      },
+      {
+        "id": "SC-16",
+        "candidate": "Inline require('./utils/db') in shutdown",
+        "ref": "bot.ts:2344"
+      },
+      {
+        "id": "SC-20",
+        "candidate": "Unreachable pairDiscovery.ts",
+        "ref": "utils/pairDiscovery.ts"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-6",
+      "OD-15",
+      "OD-16"
+    ],
+    "plan": "22-17"
+  },
+  {
+    "slice": "EXIT",
+    "id_prefix": "AUD-EXIT",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/exitEngine.ts",
+      "src/utils/exitManager.ts",
+      "src/utils/exitWatchdog.ts",
+      "src/utils/withTimeout.ts"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/exitEngine.ts",
+      "src/utils/exitManager.ts",
+      "src/utils/exitWatchdog.ts",
+      "src/utils/withTimeout.ts"
+    ],
+    "files_at_base": [
+      "src/exitEngine.ts",
+      "src/utils/exitManager.ts",
+      "src/utils/exitWatchdog.ts",
+      "src/utils/withTimeout.ts"
+    ],
+    "count_at_base": 4,
+    "owned_rc": [
+      3,
+      7,
+      8,
+      15,
+      21
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-02",
+        "candidate": "Private V2 sell uses non-fee-on-transfer swapExactTokensForETH while the public fallback uses the supporting variant (B2)",
+        "ref": "exitEngine.ts:363 vs :553"
+      },
+      {
+        "id": "SC-03",
+        "candidate": "Stale-quote approve-then-swap during drain (B5)",
+        "ref": "exitEngine.ts:524-560"
+      },
+      {
+        "id": "SC-04",
+        "candidate": ".wait() error classification for TRANSACTION_REPLACED reason repriced (E6)",
+        "ref": "exitEngine.ts:545,556 and every .wait() site (FEATURES E6)"
+      },
+      {
+        "id": "SC-17",
+        "candidate": "Legacy single-arg lock overloads keyed token, not chain:token",
+        "ref": "exitManager.ts:16-31"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-14"
+    ],
+    "plan": "22-18"
+  },
+  {
+    "slice": "ANTIRUG",
+    "id_prefix": "AUD-ANTIRUG",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/anti-rug/"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/anti-rug/detector.ts",
+      "src/anti-rug/circuitBreaker.ts"
+    ],
+    "files_at_base": [
+      "src/anti-rug/allowlist.ts",
+      "src/anti-rug/circuitBreaker.ts",
+      "src/anti-rug/detector.ts",
+      "src/anti-rug/events.ts",
+      "src/anti-rug/exitTrigger.ts",
+      "src/anti-rug/lpBaseline.ts",
+      "src/anti-rug/raceTelemetry.ts",
+      "src/anti-rug/types.ts"
+    ],
+    "count_at_base": 8,
+    "owned_rc": [
+      13
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-11",
+        "candidate": "Anti-rug 7-day dry-run default is time-based (L1)",
+        "ref": "anti-rug/detector.ts (FEATURES L1)"
+      },
+      {
+        "id": "SC-18",
+        "candidate": "raceTelemetry.ts production-dead",
+        "ref": "anti-rug/raceTelemetry.ts"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-9"
+    ],
+    "plan": "22-19"
+  },
+  {
+    "slice": "TX",
+    "id_prefix": "AUD-TX",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/utils/nonceAuthority.ts",
+      "src/utils/txManager.ts",
+      "src/utils/gasManager.ts",
+      "src/utils/provider.ts",
+      "src/utils/retry.ts",
+      "src/utils/receiptDecoder.ts",
+      "src/utils/mevStrategies/",
+      "src/guards/",
+      "src/utils/processLock.ts"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/utils/nonceAuthority.ts",
+      "src/utils/txManager.ts",
+      "src/utils/mevStrategies/flashbots.ts"
+    ],
+    "files_at_base": [
+      "src/utils/gasManager.ts",
+      "src/utils/mevStrategies/bloxroute.ts",
+      "src/utils/mevStrategies/flashbots.ts",
+      "src/utils/mevStrategies/passthrough.ts",
+      "src/utils/mevStrategies/reconciliation.ts",
+      "src/utils/mevStrategies/types.ts",
+      "src/utils/nonceAuthority.ts",
+      "src/utils/provider.ts",
+      "src/utils/receiptDecoder.ts",
+      "src/utils/retry.ts",
+      "src/utils/txManager.ts"
+    ],
+    "count_at_base": 11,
+    "owned_rc": [
+      10,
+      11,
+      17,
+      18,
+      22,
+      26
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-19",
+        "candidate": "Unreachable gasManager.getGasOptions",
+        "ref": "utils/gasManager.ts"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-17"
+    ],
+    "plan": "22-20"
+  },
+  {
+    "slice": "DB",
+    "id_prefix": "AUD-DB",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/utils/db.ts",
+      "src/riskManager.ts",
+      "src/config.ts",
+      "src/chainRegistry.ts",
+      "src/preflight.ts",
+      "src/utils/logger.ts",
+      "src/utils/notifier.ts",
+      "src/utils/repoRoot.ts",
+      "src/utils/dbPath.ts",
+      "src/utils/dbSchema.ts"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/utils/db.ts",
+      "src/riskManager.ts"
+    ],
+    "files_at_base": [
+      "src/chainRegistry.ts",
+      "src/config.ts",
+      "src/preflight.ts",
+      "src/riskManager.ts",
+      "src/utils/db.ts",
+      "src/utils/logger.ts",
+      "src/utils/notifier.ts"
+    ],
+    "count_at_base": 7,
+    "owned_rc": [
+      6,
+      14,
+      23,
+      25
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-13",
+        "candidate": "Raw key on module-level CONFIG and log-redaction coverage (I1)",
+        "ref": "config.ts:271 (FEATURES I1)"
+      },
+      {
+        "id": "SC-14",
+        "candidate": "process.env.ALCHEMY_URL! assertions and two sources of truth for chain addresses (I2)",
+        "ref": "config.ts:265-310 (FEATURES I2)"
+      },
+      {
+        "id": "SC-21",
+        "candidate": "Relative DB_PATH silently creates a fresh DB",
+        "ref": "unnamed in SUMMARY.md; assigned to DB (utils/db.ts path resolution)"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-10",
+      "OD-18",
+      "OD-25"
+    ],
+    "plan": "22-21"
+  },
+  {
+    "slice": "API",
+    "id_prefix": "AUD-API",
+    "area": "src",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "src/api/"
+    ],
+    "exclude": [],
+    "anchors": [
+      "src/api/routes/controls.ts",
+      "src/api/server.ts"
+    ],
+    "files_at_base": [
+      "src/api/helpers/positions.ts",
+      "src/api/middleware/auth.ts",
+      "src/api/middleware/errorHandler.ts",
+      "src/api/routes/antiRug.ts",
+      "src/api/routes/auth.ts",
+      "src/api/routes/chains.ts",
+      "src/api/routes/controls.ts",
+      "src/api/routes/health.ts",
+      "src/api/routes/positions.ts",
+      "src/api/routes/risk.ts",
+      "src/api/routes/trades.ts",
+      "src/api/server.ts",
+      "src/api/ws/broadcaster.ts",
+      "src/api/ws/handler.ts"
+    ],
+    "count_at_base": 14,
+    "owned_rc": [
+      12
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-07",
+        "candidate": "Dashboard emergency-sell runs inside the HTTP request, no idempotency (J3)",
+        "ref": "api/routes/controls.ts:121-222"
+      },
+      {
+        "id": "SC-08",
+        "candidate": "Same-origin check derived from the Host header, no login rate limit, key-length leak (J1/J2)",
+        "ref": "api/middleware/auth.ts (FEATURES J1/J2)"
+      },
+      {
+        "id": "SC-15",
+        "candidate": "__dirname-relative package.json read at import",
+        "ref": "api/routes/health.ts:15"
+      }
+    ],
+    "owned_od_cards": [
+      "OD-11"
+    ],
+    "plan": "22-22"
+  },
+  {
+    "slice": "DASH",
+    "id_prefix": "AUD-DASH",
+    "area": "dashboard",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": false,
+      "findings_only": false
+    },
+    "include": [
+      "dashboard/"
+    ],
+    "exclude": [],
+    "anchors": [
+      "dashboard/package.json"
+    ],
+    "files_at_base": [
+      "dashboard/.gitignore",
+      "dashboard/index.html",
+      "dashboard/package-lock.json",
+      "dashboard/package.json",
+      "dashboard/src/App.tsx",
+      "dashboard/src/components/ChainBadge.tsx",
+      "dashboard/src/components/ChainStatusCard.tsx",
+      "dashboard/src/components/ConfirmDialog.tsx",
+      "dashboard/src/components/EmergencyConfirmDialog.tsx",
+      "dashboard/src/components/EventFeed.tsx",
+      "dashboard/src/components/ExposureDonut.tsx",
+      "dashboard/src/components/FilterChips.tsx",
+      "dashboard/src/components/Layout.tsx",
+      "dashboard/src/components/LoginForm.tsx",
+      "dashboard/src/components/PauseBanner.tsx",
+      "dashboard/src/components/PnLChart.tsx",
+      "dashboard/src/components/PositionTable.tsx",
+      "dashboard/src/components/RiskGauge.tsx",
+      "dashboard/src/components/Sidebar.tsx",
+      "dashboard/src/components/StatCard.tsx",
+      "dashboard/src/components/StatusDot.tsx",
+      "dashboard/src/components/TimeRangeSelector.tsx",
+      "dashboard/src/components/TradeTable.tsx",
+      "dashboard/src/components/anti-rug/AntiRugExitDetailModal.tsx",
+      "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx",
+      "dashboard/src/components/anti-rug/AntiRugStateBadge.tsx",
+      "dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx",
+      "dashboard/src/components/anti-rug/CircuitBreakerResetModal.tsx",
+      "dashboard/src/components/anti-rug/FrontrunDistributionPanel.tsx",
+      "dashboard/src/components/anti-rug/GapDetectedBanner.tsx",
+      "dashboard/src/components/anti-rug/WsHealthIndicator.tsx",
+      "dashboard/src/hooks/WebSocketContext.tsx",
+      "dashboard/src/hooks/useApi.ts",
+      "dashboard/src/hooks/useWebSocket.ts",
+      "dashboard/src/index.css",
+      "dashboard/src/main.tsx",
+      "dashboard/src/pages/ChainControls.tsx",
+      "dashboard/src/pages/Login.tsx",
+      "dashboard/src/pages/Overview.tsx",
+      "dashboard/src/pages/RiskExposure.tsx",
+      "dashboard/src/pages/TradeHistory.tsx",
+      "dashboard/src/types/api.ts",
+      "dashboard/src/utils/formatters.ts",
+      "dashboard/tsconfig.json",
+      "dashboard/vite.config.ts"
+    ],
+    "count_at_base": 45,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-22"
+  },
+  {
+    "slice": "TESTU",
+    "id_prefix": "AUD-TESTU",
+    "area": "test",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": false,
+      "findings_only": false
+    },
+    "include": [
+      "test/unit/"
+    ],
+    "exclude": [],
+    "anchors": [
+      "test/unit/db.test.ts"
+    ],
+    "files_at_base": [
+      "test/unit/anti-rug/allowlist.test.ts",
+      "test/unit/anti-rug/circuitBreaker.test.ts",
+      "test/unit/anti-rug/detectorEvaluator.test.ts",
+      "test/unit/anti-rug/detectorRegistry.test.ts",
+      "test/unit/anti-rug/dryRunTimestamp.test.ts",
+      "test/unit/anti-rug/exitTrigger.test.ts",
+      "test/unit/anti-rug/lpBaseline.test.ts",
+      "test/unit/anti-rug/raceTelemetry.test.ts",
+      "test/unit/anti-rug/types.test.ts",
+      "test/unit/api/antiRug.test.ts",
+      "test/unit/bot/buyNonceLock.test.ts",
+      "test/unit/bot/deliberateBuyAffordability.test.ts",
+      "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+      "test/unit/bot/exitFailedHeldResume.test.ts",
+      "test/unit/bot/noDoubleBuyReconcile.test.ts",
+      "test/unit/bot/snipeFailClean.test.ts",
+      "test/unit/bot/twoStageSigint.test.ts",
+      "test/unit/bot/watchdog.test.ts",
+      "test/unit/bytecodeScan.test.ts",
+      "test/unit/chainRegistry.test.ts",
+      "test/unit/chainRegistry/antiRugConfig.test.ts",
+      "test/unit/chainRestart.test.ts",
+      "test/unit/ci/rootFileGuard.test.ts",
+      "test/unit/codeQuality.test.ts",
+      "test/unit/configEnvVar.test.ts",
+      "test/unit/dashboard/anti-rug/displayComponents.test.ts",
+      "test/unit/dashboard/anti-rug/interactiveComponents.test.ts",
+      "test/unit/dashboard/pauseBanner.test.ts",
+      "test/unit/db.test.ts",
+      "test/unit/db/exitFailedHeldMigration.test.ts",
+      "test/unit/db/lpBaselineMigration.test.ts",
+      "test/unit/db/pauseStateMigration.test.ts",
+      "test/unit/ethersV5PatternsAbsent.test.ts",
+      "test/unit/ethersV6BigIntArithmetic.test.ts",
+      "test/unit/ethersV6ToolboxConfig.test.ts",
+      "test/unit/exitEngine.test.ts",
+      "test/unit/exitEngine/antiRugBounded.test.ts",
+      "test/unit/exitEngine/antiRugReason.test.ts",
+      "test/unit/exitEngine/attemptBudget.test.ts",
+      "test/unit/exitEngine/computePublicMinOut.test.ts",
+      "test/unit/exitEngine/exitInclusionLadder.test.ts",
+      "test/unit/exitEngine/exitWorker.test.ts",
+      "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+      "test/unit/exitEngine/failedExitBalanceTruth.test.ts",
+      "test/unit/exitEngine/noDoubleSellReconcile.test.ts",
+      "test/unit/exitEngine/opEnrichment.test.ts",
+      "test/unit/exitEngine/partialSellDecoupled.test.ts",
+      "test/unit/exitEngine/pollTelemetry.test.ts",
+      "test/unit/exitEngine/sellNonceLock.test.ts",
+      "test/unit/exitEngineSell.test.ts",
+      "test/unit/exitEngineZeroBalance.test.ts",
+      "test/unit/helpers.smoke.test.ts",
+      "test/unit/honeypotDispatch.test.ts",
+      "test/unit/honeypotTaxThreshold.test.ts",
+      "test/unit/honeypotTypes.test.ts",
+      "test/unit/mevStrategies/flashbotsBundleHash.test.ts",
+      "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
+      "test/unit/mevStrategies/gasMultiplier.test.ts",
+      "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+      "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+      "test/unit/positionsHelper.test.ts",
+      "test/unit/preflight/antiRugLiveGate.test.ts",
+      "test/unit/preflight/crossEnvRules.test.ts",
+      "test/unit/preflight/exitAffordability.test.ts",
+      "test/unit/preflight/honeypotCheckerCode.test.ts",
+      "test/unit/preflight/mevHealth.test.ts",
+      "test/unit/preflight/rpcHealth.test.ts",
+      "test/unit/preflight/staleData.test.ts",
+      "test/unit/preflight/walletBalance.test.ts",
+      "test/unit/provider.test.ts",
+      "test/unit/receiptDecoder.test.ts",
+      "test/unit/riskManager.test.ts",
+      "test/unit/safetyBank/checkHoneypotForChain.test.ts",
+      "test/unit/safetyBank/checkTokenMetadataForChain.test.ts",
+      "test/unit/safetyBank/hasMaxWalletOrTxLimitsForChain.test.ts",
+      "test/unit/safetyBank/isBlacklistedTokenForChain.test.ts",
+      "test/unit/safetyBank/isLiquidityLockedForChain.test.ts",
+      "test/unit/safetyBank/isLiquiditySufficientForChain.test.ts",
+      "test/unit/safetyBank/simulateSwapForChain.test.ts",
+      "test/unit/telegramListener.test.ts",
+      "test/unit/tokenSafety.test.ts",
+      "test/unit/utils/nonceAuthority.test.ts",
+      "test/unit/utils/withTimeout.test.ts",
+      "test/unit/v3Abis.test.ts"
+    ],
+    "count_at_base": 84,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-23"
+  },
+  {
+    "slice": "TESTI",
+    "id_prefix": "AUD-TESTI",
+    "area": "test",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": false,
+      "findings_only": false
+    },
+    "include": [
+      "test/"
+    ],
+    "exclude": [
+      "test/unit/"
+    ],
+    "anchors": [
+      "test/helpers/testDb.ts",
+      "test/fork/setup.ts"
+    ],
+    "files_at_base": [
+      "test/fixtures/api.fixtures.ts",
+      "test/fixtures/chainConfig.ts",
+      "test/fixtures/contracts/Honeypot.sol",
+      "test/fixtures/contracts/RugPull.sol",
+      "test/fixtures/exitEngine.fixtures.ts",
+      "test/fixtures/mythril/sample-clean.json",
+      "test/fixtures/mythril/sample-high.json",
+      "test/fixtures/receipt.fixtures.ts",
+      "test/fixtures/tokenSafety.fixtures.ts",
+      "test/fixtures/txManager.fixtures.ts",
+      "test/fork/antiRugDetector.fork.test.ts",
+      "test/fork/captureRehearsal.fork.test.ts",
+      "test/fork/deliberateBuyReplay.fork.test.ts",
+      "test/fork/exitStatePersistence.fork.test.ts",
+      "test/fork/fixtures/honeypots/README.md",
+      "test/fork/fixtures/honeypots/eth-max-wallet.json",
+      "test/fork/fixtures/honeypots/eth-sell-revert.json",
+      "test/fork/fixtures/honeypots/eth-v3-honeypot.json",
+      "test/fork/fixtures/realLaunches/README.md",
+      "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+      "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+      "test/fork/fixtures/realLaunches/eth-v3-trailing.json",
+      "test/fork/fixtures/rugs/README.md",
+      "test/fork/fixtures/rugs/eth-v2-horse.json",
+      "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json",
+      "test/fork/helpers/realMainnetGate.ts",
+      "test/fork/honeypotChecker.fork.test.ts",
+      "test/fork/honeypotMultiAmount.fork.test.ts",
+      "test/fork/realLaunchReplay.fork.test.ts",
+      "test/fork/realMainnetGate.fork.test.ts",
+      "test/fork/setup.ts",
+      "test/fork/snipeLifecycle.test.ts",
+      "test/fork/teardown.ts",
+      "test/helpers/mockProvider.ts",
+      "test/helpers/testDb.ts",
+      "test/integration/anti-rug/botWiring.test.ts",
+      "test/integration/anti-rug/multiSignalEnd2End.test.ts",
+      "test/integration/anti-rug/wsReconnectBackfill.test.ts",
+      "test/integration/api/auth.test.ts",
+      "test/integration/api/chains.test.ts",
+      "test/integration/api/controls.test.ts",
+      "test/integration/api/health.test.ts",
+      "test/integration/api/positions.test.ts",
+      "test/integration/api/risk.test.ts",
+      "test/integration/api/trades.test.ts",
+      "test/integration/api/wsPush.test.ts",
+      "test/integration/exitMonitor.test.ts",
+      "test/integration/honeypotDeploy.eth.test.ts",
+      "test/integration/honeypotDispatch.test.ts",
+      "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "test/integration/killswitchCheckpoints.test.ts",
+      "test/integration/mevStrategies.test.ts",
+      "test/integration/midRunWalletCheck.test.ts",
+      "test/integration/pauseCli.test.ts",
+      "test/integration/pauseFlow.test.ts",
+      "test/integration/preflightCli.test.ts",
+      "test/integration/preflightInvocation.test.ts",
+      "test/integration/txManager.test.ts",
+      "test/integration/v2HoneypotIntegration.test.ts",
+      "test/integration/v3HoneypotIntegration.test.ts",
+      "test/integration/v3LiquidityWait.test.ts",
+      "test/integration/wsReconnect.test.ts"
+    ],
+    "count_at_base": 62,
+    "owned_rc": [
+      28
+    ],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-24"
+  },
+  {
+    "slice": "SCRIPTS",
+    "id_prefix": "AUD-SCRIPTS",
+    "area": "scripts",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": true,
+      "findings_only": false
+    },
+    "include": [
+      "scripts/"
+    ],
+    "exclude": [
+      "scripts/deploy-honeypot-checker.ts",
+      "scripts/audit-honeypot-checker.ts",
+      "scripts/check-mythril-report.ts"
+    ],
+    "anchors": [
+      "scripts/deliberate-buy.ts",
+      "scripts/recover-sell-ladys.ts"
+    ],
+    "files_at_base": [
+      "scripts/addLiquidity.ts",
+      "scripts/capture-launch.ts",
+      "scripts/check-empty-files.sh",
+      "scripts/deliberate-buy.ts",
+      "scripts/deploySepoliaTest.ts",
+      "scripts/pause.ts",
+      "scripts/preflight.ts",
+      "scripts/recover-sell-ladys.ts",
+      "scripts/resume.ts",
+      "scripts/telegram-login.ts"
+    ],
+    "count_at_base": 10,
+    "owned_rc": [
+      27
+    ],
+    "owned_section_c": [
+      {
+        "id": "SC-12",
+        "candidate": "Out-of-process signing scripts bypass the lock and kill-switch (D4)",
+        "ref": "scripts/recover-sell-ladys.ts, scripts/deliberate-buy.ts"
+      }
+    ],
+    "owned_od_cards": [],
+    "plan": "22-25"
+  },
+  {
+    "slice": "CONTRACTS",
+    "id_prefix": "AUD-CONTRACTS",
+    "area": "contracts",
+    "capabilities": {
+      "ledger": true,
+      "sweep": true,
+      "thresholds": false,
+      "findings_only": false
+    },
+    "include": [
+      "hardhat.config.ts",
+      "contracts/",
+      "ignition/modules/",
+      ".github/workflows/",
+      "scripts/deploy-honeypot-checker.ts",
+      "scripts/audit-honeypot-checker.ts",
+      "scripts/check-mythril-report.ts"
+    ],
+    "exclude": [],
+    "anchors": [
+      "hardhat.config.ts"
+    ],
+    "files_at_base": [
+      ".github/workflows/test.yml",
+      "contracts/FakeToken.sol",
+      "contracts/honeypot/HoneypotChecker.sol",
+      "hardhat.config.ts",
+      "ignition/modules/HoneypotChecker.ts",
+      "scripts/audit-honeypot-checker.ts",
+      "scripts/check-mythril-report.ts",
+      "scripts/deploy-honeypot-checker.ts"
+    ],
+    "count_at_base": 8,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-25"
+  },
+  {
+    "slice": "ROOT",
+    "id_prefix": "AUD-ROOT",
+    "area": "root",
+    "capabilities": {
+      "ledger": true,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": false
+    },
+    "include": [
+      "vitest.config.ts",
+      "eslint.config.mjs",
+      "tsconfig.json",
+      "tsconfig.bot.json",
+      "package.json",
+      "package-lock.json",
+      ".gitignore",
+      ".gitattributes",
+      ".npmrc",
+      ".graphifyignore",
+      ".env.example",
+      "README.md",
+      ".DS_Store",
+      "ignition/.gitignore",
+      ".idea/",
+      "reports/"
+    ],
+    "exclude": [],
+    "anchors": [
+      "package.json"
+    ],
+    "files_at_base": [
+      ".DS_Store",
+      ".env.example",
+      ".gitattributes",
+      ".gitignore",
+      ".graphifyignore",
+      ".idea/.gitignore",
+      ".idea/crypto-snipe-bot.iml",
+      ".idea/modules.xml",
+      ".idea/vcs.xml",
+      ".npmrc",
+      "README.md",
+      "eslint.config.mjs",
+      "ignition/.gitignore",
+      "package-lock.json",
+      "package.json",
+      "reports/.gitkeep",
+      "tsconfig.bot.json",
+      "tsconfig.json",
+      "vitest.config.ts"
+    ],
+    "count_at_base": 19,
+    "owned_rc": [],
+    "owned_section_c": [
+      {
+        "id": "SC-22",
+        "candidate": "The --legacy-peer-deps cause (flashbots peer pin)",
+        "ref": "unnamed in SUMMARY.md; assigned to ROOT (package.json / .npmrc)"
+      }
+    ],
+    "owned_od_cards": [],
+    "plan": "22-25"
+  },
+  {
+    "slice": "RAIL",
+    "id_prefix": "AUD-RAIL",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [
+      19
+    ],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-04"
+  },
+  {
+    "slice": "FORENSIC",
+    "id_prefix": "AUD-FORENSIC",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-06"
+  },
+  {
+    "slice": "SECRET",
+    "id_prefix": "AUD-SECRET",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-26"
+  },
+  {
+    "slice": "CENSUS",
+    "id_prefix": "AUD-CENSUS",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-26"
+  },
+  {
+    "slice": "TESTQ",
+    "id_prefix": "AUD-TESTQ",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-29"
+  },
+  {
+    "slice": "REAUDIT",
+    "id_prefix": "AUD-REAUDIT",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [],
+    "plan": "22-29"
+  },
+  {
+    "slice": "OD21",
+    "id_prefix": "AUD-OD21",
+    "area": null,
+    "capabilities": {
+      "ledger": false,
+      "sweep": false,
+      "thresholds": false,
+      "findings_only": true
+    },
+    "include": [],
+    "exclude": [],
+    "anchors": [],
+    "files_at_base": [],
+    "count_at_base": 0,
+    "owned_rc": [],
+    "owned_section_c": [],
+    "owned_od_cards": [
+      "OD-21"
+    ],
+    "plan": "22-07"
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "rule": "every tracked file must belong to exactly one slice in slices.json or exactly one prefix below (checkUniverse); a new tracked file that fits neither fails the universe check until it is assigned or declared out of scope here with a reason",
+  "out_of_scope": [
+    {
+      "prefix": ".planning/",
+      "reason": "planning documents; P9 forbids citing prior SUMMARY/VERIFICATION docs as evidence"
+    },
+    {
+      "prefix": "docs/",
+      "reason": "prose documentation; the start-command references are rewritten and checked in 22-13"
+    },
+    {
+      "prefix": "ignition/deployments/",
+      "reason": "deployment records (data, not code); tracked by OD-21 and verified byte-for-byte by AC-07/IGN_AC07 instead of audited"
+    }
+  ]
+}
