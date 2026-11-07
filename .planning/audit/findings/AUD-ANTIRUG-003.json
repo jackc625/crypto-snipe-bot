@@ -1,0 +1,148 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-004",
+    "AUD-ANTIRUG-005",
+    "AUD-ANTIRUG-007",
+    "AUD-ANTIRUG-010",
+    "AUD-EXIT-014"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "ANTIRUG-01",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-003",
+  "title": "The circuit breaker counts dispatches, not rugs: every matching log of one LP removal starts its own confirm gate and exit attempt, refused duplicates still count, so one rug can trip the chain breaker and suppress every later anti-rug exit on that chain",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14",
+    "C15",
+    "C12"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/events.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/anti-rug/circuitBreaker.ts",
+    "src/exitEngine.ts",
+    "src/chainRegistry.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dispatchEvent evaluates each log on its own; there is no per-position, per-transaction or in-flight dedupe"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:628-637@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one filter covers four topics (V2 Burn, V2 Transfer, V3 Burn, V3 Collect) on every registered pair or pool (events.ts:81-95)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2251-2253@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 Burn and V2 Transfer logs both go to the V2 evaluator; decodeDestination (:1519-1532) takes the to field of each"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1964-1983@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each unsafe verdict schedules its own confirm gate; each gate (:1848-1908) calls triggerAntiRugExit"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:240@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every trigger clears the token timers and calls executeFullSell (:263-269)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:832-835@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the second and later calls return false at once because the sell lock is held"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:312-319@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "incrementCircuitBreaker runs on every call, success or failure (refusals included)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:107-128@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "per-chain timestamp count; trips at recent.length >= threshold"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:227-228@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "default threshold 3 in a 1 h window (same at :291-292, :348-349, :405-406)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:221-232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "once tripped, every anti-rug exit on the chain returns false with only a log.fatal; no Telegram per suppressed exit"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:464-492@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "unregisterAntiRugPosition removes the registry entry but not pending confirm gates (:1909) or V3 grace watchers (:2167); a gate scheduled before a close still fires and counts"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:337-397@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the fork tests build one synthetic log per case; the HORSE replay (:808-826) dispatches only the Burn log of the rug transaction, so the full log set of a removal is never dispatched in any test"
+    }
+  ],
+  "sibling_sites_checked": "Every path into triggerAntiRugExit: the confirm gate (detector.ts:1834, :1900) reached from the live WS dispatcher (:652), the HTTP poller (:1297), the backfill replay (:1155, AUD-ANTIRUG-005) and the V3 grace watcher (:2140). Every call site of incrementCircuitBreaker (exitTrigger.ts:316 only) and isCircuitBreakerTripped (exitTrigger.ts:221, api/routes/antiRug.ts:59). Multipliers of the count: duplicate subscriptions (AUD-ANTIRUG-001), stacked HTTP pollers (AUD-ANTIRUG-007), backfill replays (AUD-ANTIRUG-005), stale gates of closed positions (this entry).",
+  "status": "candidate",
+  "severity_rationale": "S1 candidate. The counting rule is a code fact (sub-claims 1, 3, 4). Whether one real rug reaches three dispatches depends on how many matched logs one removal emits (sub-claim 2), which needs a Phase 23 fork replay of a complete removal transaction; with two per removal, two rugs within an hour trip the breaker, which is the serial-rugger case. After a trip, every other open position on the chain has no anti-rug exit until the operator resets the breaker or restarts. Live mode only: in dry-run (the default) the breaker is never reached (exitTrigger.ts:179-216).",
+  "sub_claims": [
+    {
+      "claim": "(1) The breaker counts each triggerAntiRugExit call, and each unsafe log verdict makes one; nothing groups calls by position or by transaction.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1964-1983@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/exitTrigger.ts:312-319@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) A V2 removal through the router emits several logs this filter matches: the LP Transfer from the remover to the pair, the LP Transfer from the pair to the zero address, and the pair Burn. Each is evaluated against post-removal state, so one removal yields up to three unsafe verdicts. Uniswap source is not in the repo; the Phase 23 fork replay must count the dispatched logs of a real removal.",
+      "evidence": [
+        "src/anti-rug/events.ts:39-49@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1519-1532@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/antiRugDetector.fork.test.ts:808-826@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "(3) Duplicate subscriptions, stacked pollers, backfill replays and stale gates of closed positions add further counts.",
+      "evidence": [
+        "src/anti-rug/detector.ts:643-657@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1261@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1155@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:464-492@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(4) The increment happens after the exit returns, so the threshold-th exit has already been sent when the breaker trips; the breaker limits damage only from the next trigger on.",
+      "evidence": [
+        "src/anti-rug/exitTrigger.ts:263-319@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/circuitBreaker.ts:127@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "recommendation": "Keep one in-flight anti-rug dispatch per position (keyed by tradeId, with the triggering tx hash as evidence), count the breaker per position or per rug event rather than per log, cancel pending gates and grace watchers on unregister, and send a Telegram alert for every suppressed exit. Card ANTIRUG-01. Phase 24, after a fork replay of a complete removal transaction."
+}

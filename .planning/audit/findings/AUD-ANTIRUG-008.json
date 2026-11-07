@@ -1,0 +1,97 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-002",
+    "AUD-BUY-002"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "ANTIRUG-06",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-008",
+  "title": "Anti-rug health signals do not track protection: the dashboard shows connected while no rug-log subscription exists, the reconnect-failure and >60 s alerts cannot fire, skipped registrations and failed verification are only logged, and new buys arm anti-rug on a chain that failed verification",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C12"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/allowlist.ts",
+    "src/bot.ts",
+    "src/utils/notifier.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:782-807@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the heartbeat re-broadcasts connected on every healthy tick without checking that a subscription exists"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:668-693@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "with zero positions no subscription is installed, yet connected is broadcast"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1242-1249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the HTTP fallback reports connected before its first poll"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:916-944@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a constructed provider counts as reconnected and the loop exits; consecutiveFailures (:946) and the >60 s tier (:889-914) need a loop pass a refused connect never reaches (it crashes, AUD-ANTIRUG-002)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:904-907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the alerts are awaited inside the reconnect loop (also :974-977)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:80-84@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "axios.post with no timeout"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:382-392@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a missing baseline only logs; the position is silently unmonitored for anti-rug"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2015-2028@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an allowlist verify RPC failure only logs and skips the chain at resume"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1994-2006@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: a failed chain \"truly runs without anti-rug monitoring\""
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:440@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a later V2 buy still calls registerAntiRugPosition, which arms the listener against the unverified allowlist (V3 at :1492)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/allowlist.ts:135-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "verify is a serial getCode per entry; an entry with no code ends the process with exit(1)"
+    }
+  ],
+  "sibling_sites_checked": "Every chain_ws_health_change broadcast (detector.ts:689, :800, :864, :908, :1244) and every sendCtxAlert in the slice (detector.ts:904, :974, :1064; exitTrigger.ts:195, :288; circuitBreaker.ts:156). The dashboard side of the badge (dashboard/src) is the DASH slice and was not read here.",
+  "status": "confirmed",
+  "severity_rationale": "S2. The operator only sees anti-rug protection through these signals, and they say connected in exactly the situations where positions are unprotected (after a dashboard stop, AUD-ANTIRUG-001; with no positions; with a dead poller). Indirect capital effect: the operator does not act.",
+  "recommendation": "Define health as \"subscription installed on a live provider and a log or block seen recently\"; alert (not only log) on a skipped registration, a failed verify and a failed backfill; give the alert calls a timeout or fire them without awaiting inside the reconnect loop; what a failed verify means for new buys is card ANTIRUG-06. Phase 24 for the verify policy, Phase 29 for the signal fixes."
+}

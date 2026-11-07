@@ -1,0 +1,133 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-014",
+    "AUD-EXIT-007",
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-005"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-11",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-004",
+  "title": "A refused, timed-out or failed anti-rug escape is never retried by the detector: nothing records the unsafe verdict, re-triggering needs a new LP log, and the poll timer the escape cleared comes back only on some failure paths",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14",
+    "C12",
+    "C07"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1832-1842@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "confirmBlocks 0: triggerAntiRugExit is awaited and its boolean discarded"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1900-1907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "confirmBlocks > 0: same, the result is discarded; no pending-rug state is kept anywhere in the module"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1850@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the gate removes its block handler before it re-evaluates; one gate is one attempt"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1871-1882@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a re-evaluation RPC error aborts the dispatch; the log calls it fail-closed but it means no exit and no alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1991-2003@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an RPC error while evaluating the triggering log returns verdict unknown with only log.error (V3 the same at :2078-2091); no retry, no alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:255-262@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: the position \"retries on a later poll/anti-rug cycle\"; no anti-rug cycle exists, dispatch is log-driven only (:1341), plus backfill (:1007) and the gate and grace watchers"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:240@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every timer of the token is cleared before executeFullSell"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:832-835@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a sell-lock refusal returns false without keepMonitoringFailedHeld, so this path never re-arms the timer"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:719-732@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the re-arm exists only inside keepMonitoringFailedHeld (failed or still-held exits that reach it)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1483-1591@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a detached partial sell holding the lock ends (return true :1584, false :1588) without re-arming the poll interval anti-rug cleared"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a budget overrun frees the caller and counts as failure; the underlying executeFullSell keeps running and decides the re-arm on its own later"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the private escalation holds the wallet nonce lock for the whole ladder, so an anti-rug exit of another token waits there and can overrun its 60 s budget (RC-11 sibling owned by the TX slice; AUD-EXIT-014)"
+    }
+  ],
+  "sibling_sites_checked": "Every way a dispatch can end without a sell: sell-lock refusal (exitEngine.ts:832), routine-pause check (bypassed for anti-rug, :824), budget overrun (exitTrigger.ts:263-296), executeFullSell returning false on its own paths (AUD-EXIT-007), confirm re-read error (detector.ts:1871), evaluator error (:1991, :2078), circuit breaker (exitTrigger.ts:221) and dry-run (:179). Every way a dispatch can recur: a new matching log on the pair or pool (dispatchEvent :1341), a backfill replay (:1007, AUD-ANTIRUG-005), the V3 grace timeout (:2123-2141, once per Burn). No other trigger exists in the slice.",
+  "status": "confirmed",
+  "severity_rationale": "S1, confirmed by code reading; this also confirms the mechanism AUD-EXIT-014 left as a candidate (that entry is EXIT-owned; its status is for the 22-28 consolidation to update). Plausible conditions: a rug that starts while another exit of the token is in flight (stop-loss firing on the first dumps), a 60 s budget overrun behind the wallet nonce lock, or one RPC error during the evaluation or the confirm re-read. The emergency exit is then lost, and in the partial-sell case the routine exit too.",
+  "sub_claims": [
+    {
+      "claim": "(1) Answer to the AUD-EXIT-014 open question (22-18): a refused or timed-out rug escape does NOT fire again by design. It recurs only when (a) a new Burn, Transfer or Collect log arrives on the same pair or pool and evaluates unsafe, or (b) a backfill replay (AUD-ANTIRUG-005) happens to re-cover the original rug logs, which needs a WS reconnect or any new registration on the chain with a gap within maxBackfillBlocks. After a completed rug there are usually no further LP logs, so in practice the escape is lost.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1832-1842@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1900-1907@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) If the sell lock was held by a detached partial sell when anti-rug fired, nothing re-arms the poll interval anti-rug cleared; the position stays held with anti-rug registered but no stop-loss, trailing or urgency exit (the AUD-EXIT-007 shape).",
+      "evidence": [
+        "src/anti-rug/exitTrigger.ts:240@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:832-835@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1483-1591@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(3) Each refused or timed-out attempt still counts against the circuit breaker.",
+      "evidence": [
+        "src/anti-rug/exitTrigger.ts:312-319@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "recommendation": "Keep per-position anti-rug state: an unsafe verdict stays pending until a successful exit or a genuine close, and a refused, aborted or failed escape is retried on the next block (bounded, with the anti-rug parameters) with an alert each time; re-arm the poll timer on every false return after clearing it. Precedence over in-flight exits is card EXIT-11; dedupe and retry are card ANTIRUG-01. Phase 24."
+}

@@ -1,0 +1,64 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-009"
+  ],
+  "tags": [
+    "section-c:SC-18",
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-9",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "research-candidate",
+  "id": "AUD-ANTIRUG-014",
+  "title": "raceTelemetry.ts is production-dead (only its own unit test imports it), and its post-hoc and race functions would give wrong answers if they were ever wired in",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "src/anti-rug/raceTelemetry.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git grep -n raceTelemetry 23a64617dca167976adc4645fed0e2c69e384820 -- src test scripts dashboard",
+      "note": "only the module itself and test/unit/anti-rug/raceTelemetry.test.ts:12 (measureDetectionLatency); no production import"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/raceTelemetry.ts:189-203@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tokenIsR0 is always false and unused; wethSaved = r1 / 100, unrelated to the position size or direction"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/raceTelemetry.ts:101-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "eth_callBundle is sent through ctx.httpProvider (the chain RPC), not the Flashbots relay, together with a signed sell transaction"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/raceTelemetry.ts:109-124@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every error, including \"method not supported\", is reported as loss"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/raceTelemetry.ts:206-220@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 post-hoc uses the first V3 dex quoter of the chain and a 3000 fee default"
+    }
+  ],
+  "sibling_sites_checked": "Searched src, test, scripts and dashboard at the base for every export (measureDetectionLatency, flashbotsRaceVerdict, postHocReality): only the unit test uses measureDetectionLatency. The dashboard frontrun panel (DASH slice) has no data source from this module.",
+  "status": "confirmed",
+  "severity_rationale": "S3: no runtime effect today. It is dead code in the money-path module tree whose telemetry would mislead the go-live review if wired as written, and whose race check would hand a signed sell to an ordinary RPC. Section-C item SC-18.",
+  "recommendation": "Decide keep or delete on card OD-9; if race telemetry is wanted for the Phase 32 live gate (OD-19), rebuild it against the relay with correct post-hoc math rather than wiring this module."
+}

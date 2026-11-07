@@ -1,0 +1,76 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-013"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-10",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-011",
+  "title": "After a restart anti-rug re-registers each position with the first dex of its pool type, not the dex it was bought on, so a position on a chain second V2 dex (every chain has two) gets its emergency exit routed through the wrong router",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/anti-rug/detector.ts",
+    "src/utils/db.ts",
+    "src/chainRegistry.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2096-2098@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ctx.chain.dexes.find(d => d.dexType === trade.pool_type): first dex of that type"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:612-621@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeAntiRugTrades does not select dex_name"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:321-322@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dex_name is recorded on the buy row (bot.ts:1145, :1469 pass dex.name), so the right dex is known and not used"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:397-406@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the dex is stored on the RegisteredPosition"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1900-1907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "it is passed to triggerAntiRugExit, which calls executeFullSell(ctx, dex, ...) (exitTrigger.ts:266)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1713-1722@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V3 sell simulation uses position.dex.quoterAddress"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:176-195@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ETH lists uniswap-v2 and sushiswap-v2; BSC lists two V2 and two V3 (:238-264), Base two V2 (:302-321), Arbitrum two V2 (:359-378)"
+    }
+  ],
+  "sibling_sites_checked": "AUD-EXIT-013 records the same first-of-type choice for the exit-monitor resume (bot.ts:1940-1956) and the dashboard sells (controls.ts findDex); its sibling list does not name this anti-rug resume site (bot.ts:2098), which is why this is a separate entry. The registrations at buy time (bot.ts:440, :1492) pass the correct dex. The backfill and dispatch paths use whatever dex the registration stored.",
+  "status": "confirmed",
+  "severity_rationale": "S1, as AUD-EXIT-013. After any restart, every position bought on a second dex has an anti-rug exit that sells through a router whose factory either has no pair for the token (the sell reverts) or a different pool. On BSC V3 the sell simulation hits the other dex quoter, reverts, and trips signal 3 (fail-closed), so the trigger fires and the escape fails. Restarts are routine, and half of the V2 dexes are second dexes.",
+  "recommendation": "Resolve the dex from trades.dex_name on resume, for both the exit monitor and anti-rug (card EXIT-10). Phase 24."
+}

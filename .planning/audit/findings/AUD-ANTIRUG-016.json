@@ -1,0 +1,64 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-005",
+    "AUD-BUY-008"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-016",
+  "title": "Every (re)arm adds another close and pong handler to the same socket and runs a full backfill, so N registrations mean N close handlers, N backfills and Node listener-leak warnings",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12",
+    "C10"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:706-719@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each startChainAntiRugListener call adds rawWs.on(close) and runs backfillSinceLastSeen"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:771-774@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "setupHeartbeat adds another pong handler each time (and a close handler at :809-814)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:447@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "called on every registration"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2120-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "and once per position plus once per chain at resume"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:852-862@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the reconnecting guard keeps the extra close handlers from starting parallel loops"
+    }
+  ],
+  "sibling_sites_checked": "All listener additions on the raw socket in the slice (detector.ts:710, :771, :809). The bot.ts close handlers stack the same way on dashboard restart (AUD-BUY-008).",
+  "status": "confirmed",
+  "severity_rationale": "S3: the guard prevents parallel reconnect loops, so the effect is listener growth (Node warns past 10 listeners) and repeated full backfills on the buy path; the backfill consequences are AUD-ANTIRUG-005.",
+  "recommendation": "Attach the socket handlers once per provider and refresh only the filter on registration. Phase 29 (or with the OD-11 single WebSocket owner)."
+}

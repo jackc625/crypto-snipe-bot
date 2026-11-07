@@ -1,0 +1,89 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-005",
+    "AUD-BUY-008",
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-11",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-002",
+  "title": "A WebSocket reconnect attempt that cannot connect kills the bot: no socket has an error listener, so the ws library throws its error event as an uncaught exception and the process exits",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C11"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/bot.ts",
+    "src/utils/provider.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:916-944@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the try around new WebSocketProvider only catches synchronous throws; the doc comment at :834 says the constructor \"raises if RPC unreachable; loops\", which is not what the library does"
+    },
+    {
+      "type": "command",
+      "ref": "node_modules/ethers/lib.commonjs/providers/provider-websocket.js:25-51 (ethers@6.16.0)",
+      "note": "the constructor calls new WebSocket(url) and sets only onopen and onmessage; no onerror, so a failed connect is not caught by the constructor and no error listener exists"
+    },
+    {
+      "type": "command",
+      "ref": "node_modules/ethers/node_modules/ws/lib/websocket.js:876-881, :911-915, :1033-1037 (ws@8.17.1)",
+      "note": "a refused connect or an unexpected upgrade response (for example HTTP 429) calls emitErrorAndClose / abortHandshake, which does websocket.emit('error', err); receiverOnError (:1176-1192) does the same for a bad frame on a live socket"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e uncaughtException -e onerror -e \"on('error'\" -e \"on(\\\"error\\\"\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "no output: no error listener on any socket and no uncaughtException handler anywhere in src"
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"const {WebSocketProvider}=require('ethers');const p=new WebSocketProvider('ws://127.0.0.1:1',1);p.websocket.on('close',...)\" (Node 22.16.0, loopback only, no src import)",
+      "note": "printed \"constructed without throw\", then \"Unhandled 'error' event ... connect ECONNREFUSED 127.0.0.1:1 ... at emitErrorAndClose (ws/lib/websocket.js:1035)\", exit=1; the same script with an error listener printed \"error handled: ECONNREFUSED\", \"close handler ran\", \"still alive after 3s\", exit=0"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:945-980@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the RECONNECT_FAILURE_ALERT tier and the backoff growth live in the catch; the >60 s tier (:889-914) needs a later loop pass; a refused connect ends the process before either is reached"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1561@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 DEX reconnect builds a provider the same way (no error listener)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1603@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 DEX reconnect, same"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:37@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getWsProvider at boot and in onRestart (bot.ts:1815), same"
+    }
+  ],
+  "sibling_sites_checked": "Every WebSocketProvider construction at the base: detector.ts:921, bot.ts:1561, bot.ts:1603, provider.ts:37 (git grep). None attaches an error listener. Once a connection is established, a socket-level error (ECONNRESET) is handled inside ws by socketOnError (websocket.js:1328-1338), which destroys the socket without emitting error on the WebSocket, so a plain drop only closes; a protocol error on a live socket (receiverOnError) does emit error and crashes the same way. AUD-BUY-005 (no unhandledRejection handler) is the promise-rejection sibling; this is a synchronous EventEmitter throw, a separate mechanism with the same effect.",
+  "status": "confirmed",
+  "severity_rationale": "S1. Effect: the process exits, so every open position on every chain loses its exit monitor and anti-rug protection until the operator restarts the bot (there is no supervisor). Condition: the endpoint is unreachable or refuses the upgrade (outage, 429, 5xx, DNS) at the moment of a reconnect attempt, 1 s after any socket drop; plausible, because drops often come from the same provider trouble. Not S0: a drop followed by a successful reconnect does not crash.",
+  "recommendation": "Attach an error listener to every WebSocket before it can fail (part of the single WebSocket owner, card OD-11); treat a failed connect as a failed attempt that stays in the backoff loop, so the tiered alerts become reachable; decide the process-level uncaught-exception policy together with AUD-BUY-005. Phase 24, proven in Phase 23 with a refused-connect test against a real socket (not a mocked provider)."
+}

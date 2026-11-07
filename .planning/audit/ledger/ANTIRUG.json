@@ -1,0 +1,75 @@
+[
+  {
+    "path": "src/anti-rug/allowlist.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-006",
+      "AUD-ANTIRUG-008"
+    ]
+  },
+  {
+    "path": "src/anti-rug/circuitBreaker.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-003",
+      "AUD-ANTIRUG-010"
+    ]
+  },
+  {
+    "path": "src/anti-rug/detector.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-001",
+      "AUD-ANTIRUG-002",
+      "AUD-ANTIRUG-003",
+      "AUD-ANTIRUG-004",
+      "AUD-ANTIRUG-005",
+      "AUD-ANTIRUG-006",
+      "AUD-ANTIRUG-007",
+      "AUD-ANTIRUG-008",
+      "AUD-ANTIRUG-009",
+      "AUD-ANTIRUG-011",
+      "AUD-ANTIRUG-012",
+      "AUD-ANTIRUG-013",
+      "AUD-ANTIRUG-016"
+    ]
+  },
+  {
+    "path": "src/anti-rug/events.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-003"
+    ]
+  },
+  {
+    "path": "src/anti-rug/exitTrigger.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-003",
+      "AUD-ANTIRUG-004",
+      "AUD-ANTIRUG-009",
+      "AUD-ANTIRUG-010",
+      "AUD-ANTIRUG-017"
+    ]
+  },
+  {
+    "path": "src/anti-rug/lpBaseline.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-013",
+      "AUD-ANTIRUG-015"
+    ]
+  },
+  {
+    "path": "src/anti-rug/raceTelemetry.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-014"
+    ]
+  },
+  {
+    "path": "src/anti-rug/types.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  }
+]

@@ -1,0 +1,68 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-005"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-013",
+  "title": "The confirm-blocks gate counts from when the log is processed, ignores removed (reorged) logs and re-reads unpinned latest state; the LP baseline snapshot is not read at one block either",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C08",
+    "C13"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/lpBaseline.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1845-1849@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "triggerBlock = getBlockNumber() at scheduling time; logEvent.blockNumber is not used"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no check of logEvent.removed before evaluating"
+    },
+    {
+      "type": "command",
+      "ref": "grep -n \"removed\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG)",
+      "note": "no read of a log removed property anywhere in the slice (the matches are comments and log text only)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1576-1579@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 re-reads at latest, not at the confirm block (V3 :1685)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/lpBaseline.ts:110-119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getBlockNumber, then getReserves and totalSupply in separate calls; the stored snapshot_block may not be the block the values came from (V3 :137-140)"
+    },
+    {
+      "type": "command",
+      "ref": "node_modules/ethers/lib.commonjs/providers/subscriber-polling.js:53-83 (ethers@6.16.0)",
+      "note": "block events come from a 4 s poll and are emitted once per block number, so the gate fires at the first poll at or after confirmBlock"
+    }
+  ],
+  "sibling_sites_checked": "All block-number uses in the slice: detector.ts:1013, :1234, :1263, :1845, :2107, lpBaseline.ts:110, raceTelemetry.ts:158 (dead code). A reorged-out removal is self-correcting in practice because the gate re-reads live state, which no longer shows the removal.",
+  "status": "confirmed",
+  "severity_rationale": "S3: the confirm delay is longer and less precise than configured, and a removed log is processed as new, but every decision re-reads live state, so a reorged-out removal does not trip. No capital effect found.",
+  "recommendation": "Count confirmations from the log block, skip logs with removed set, and read the confirm-block state with a block tag; take the baseline values and the block number from one block. Phase 29."
+}
