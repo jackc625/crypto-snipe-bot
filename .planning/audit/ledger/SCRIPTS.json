@@ -1,0 +1,87 @@
+[
+  {
+    "path": "scripts/addLiquidity.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-001",
+      "AUD-SCRIPTS-002",
+      "AUD-SCRIPTS-005"
+    ]
+  },
+  {
+    "path": "scripts/capture-launch.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-005",
+      "AUD-SCRIPTS-009"
+    ]
+  },
+  {
+    "path": "scripts/check-empty-files.sh",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-010"
+    ]
+  },
+  {
+    "path": "scripts/deliberate-buy.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-002",
+      "AUD-SCRIPTS-004",
+      "AUD-SCRIPTS-005",
+      "AUD-BUY-001",
+      "AUD-TESTU-006",
+      "AUD-TESTI-027"
+    ]
+  },
+  {
+    "path": "scripts/deploySepoliaTest.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-001",
+      "AUD-SCRIPTS-002",
+      "AUD-SCRIPTS-005"
+    ]
+  },
+  {
+    "path": "scripts/pause.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-008",
+      "AUD-TESTI-011"
+    ]
+  },
+  {
+    "path": "scripts/preflight.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-005",
+      "AUD-SCRIPTS-007",
+      "AUD-TESTI-011"
+    ]
+  },
+  {
+    "path": "scripts/recover-sell-ladys.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-002",
+      "AUD-SCRIPTS-003",
+      "AUD-SCRIPTS-005"
+    ]
+  },
+  {
+    "path": "scripts/resume.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-008"
+    ]
+  },
+  {
+    "path": "scripts/telegram-login.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-006"
+    ]
+  }
+]

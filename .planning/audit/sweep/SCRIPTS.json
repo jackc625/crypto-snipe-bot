@@ -1,0 +1,120 @@
+{
+  "slice": "SCRIPTS",
+  "area": "scripts",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for BigInt(|[0-9]n\\b|Number(|parseInt|parseFloat: bigint-only money math (recover-sell-ladys.ts:64 expected * 90n / 100n; addLiquidity.ts:28-30 balance - parseEther); Number() only on argv, chainId and event fee tiers (capture-launch.ts:143-163, :274, :284, :366; deliberate-buy.ts:129); no bigint/number mixing"
+    },
+    "C02": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for \"||\" and \"??\": env fallbacks ETH_RPC_URL || ALCHEMY_URL (recover-sell-ladys.ts:36), DASHBOARD_URL/HOST/PORT || default (pause.ts:50-52, resume.ts:42-44) and capture-launch option defaults (:133, :175-178, :398) treat \"\" and unset alike on purpose; no 0n or 0 value passes through ||. The DELIBERATE_BUY_SLIPPAGE_PCT fallback CONFIG.slippagePercent || 5 is in src/bot.ts:529 (TH-BUY-03)"
+    },
+    "C03": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for decimals|parseUnits|formatUnits|parseEther: recover-sell-ladys.ts reads decimals() for display only and sells the raw balance (:53-56, :89); addLiquidity.ts:25 parseUnits(\"1000\", 18) matches the 18-decimal FakeToken (contracts/FakeToken.sol inherits OZ ERC20); deliberate-buy.ts:82 parseEther of the native amount"
+    },
+    "C04": {
+      "result": [
+        "AUD-SCRIPTS-001",
+        "AUD-SCRIPTS-003"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for minOut|amountOutMin|slippage|getAmountsOut|Min and literal 0 arguments: addLiquidity.ts:63-64 amountAMin/amountBMin = 0 (latent, AUD-SCRIPTS-001); recover-sell-ladys.ts:62-64 90% of a tax-blind spot quote on the public mempool (AUD-SCRIPTS-003). The deliberate buy minOut is computed in src/bot.ts (BUY slice, TH-BUY-03)"
+    },
+    "C05": {
+      "result": [
+        "AUD-SCRIPTS-003"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for deadline|Date.now: recover-sell-ladys.ts:76 now + 600 s on a public sell (AUD-SCRIPTS-003); addLiquidity.ts:32 now + 600 s (latent, TH-SCRIPTS-12); the deliberate buy deadlines are src/bot.ts (TH-BUY-05)"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for approve|allowance: recover-sell-ladys.ts:67-73 approves exactly the balance only when the allowance is short and waits for the receipt; addLiquidity.ts:48, :53 approve exact amounts (latent); no unlimited approvals and no approve left behind on a failed swap beyond the exact amount"
+    },
+    "C07": {
+      "result": [
+        "AUD-SCRIPTS-002"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for nonce|getTransactionCount|withNonceLock|processLock plus git grep -n \"getPauseState|pause_state|withNonceLock|processLock|canSnipe\" at the base -- scripts (no output): every bot-wallet signer runs in its own process with its own nonce authority (deliberate-buy via src/bot.ts:558 and :746-747; recover-sell-ladys.ts:70, :78; addLiquidity.ts and deploySepoliaTest.ts latent); ethers populateTransaction takes the pending count (abstract-signer.js:69) while the bot uses latest"
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for wait(|confirmations|reorg: every script waits for one confirmation (addLiquidity.ts:44-69, deploySepoliaTest.ts:62, recover-sell-ladys.ts:72, :82) and persists nothing block-based except capture-launch.ts, which reads historical finalized blocks only"
+    },
+    "C09": {
+      "result": [
+        "AUD-SCRIPTS-001"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for receipt|status|logs: addLiquidity.ts:70 prints receipt.transactionHash (undefined in ethers v6) and deploySepoliaTest.ts:74-77 writes the string \"UNKNOWN\" as the pair when the log is not parsed (AUD-SCRIPTS-001); recover-sell-ladys.ts:82-83 relies on wait() throwing on status 0 (ethers v6 CALL_EXCEPTION, caught at :93) and prints the status"
+    },
+    "C10": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for WebSocket|wss|reconnect|on(: no script opens a WebSocket; telegram-login.ts:39-41 uses the gramjs client with connectionRetries 5 for a one-off interactive login"
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for .catch|unhandledRejection|process.exit|async without await: every script ends with main().catch(... process.exit(non-zero)); telegram-login.ts callbacks are awaited by client.start; no floating promise in the scripts themselves (the in-process exit monitor that deliberate-buy starts is AUD-BUY-001)"
+    },
+    "C12": {
+      "result": [
+        "AUD-BUY-001"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for setTimeout|setInterval|sleep|process.exit after async work: deliberate-buy.ts:137 sleep(5000) (TH-SCRIPTS-04) and :150 process.exit(0) right after a landed buy, which ends the exit-monitor and anti-rug timers the buy just armed in this process (AUD-BUY-001, S0, card BUY-01); no other script starts timers"
+    },
+    "C13": {
+      "result": [
+        "AUD-SCRIPTS-007"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for db.|sqlite|insertTrade|writeFileSync|renameSync|mkdirSync and the import closure of every script: preflight.ts opens and migrates the live database at import through src/preflight -> src/utils/db (AUD-SCRIPTS-007); deliberate-buy.ts writes trade rows through src/bot.ts (BUY slice, AUD-BUY-002); file writes are addLiquidity.ts:76, deploySepoliaTest.ts:83 (AUD-SCRIPTS-001) and capture-launch.ts:432-434 (AUD-SCRIPTS-009), none atomic"
+    },
+    "C14": {
+      "result": [
+        "AUD-SCRIPTS-002",
+        "AUD-BUY-001"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for sell|swapExactTokensForETH: recover-sell-ladys.ts:78 sells the full balance with no check that the bot is not exiting the same position (AUD-SCRIPTS-002); a deliberate buy leaves its exit to a process that exits (AUD-BUY-001)"
+    },
+    "C15": {
+      "result": [
+        "AUD-SCRIPTS-002"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for check-then-act between a read and a signed send: recover-sell-ladys.ts reads balance and allowance (:54, :67) then signs without any exclusion of the bot (AUD-SCRIPTS-002); the D-06 tryAcquireThenRelease query would add a check-then-act window of its own (AUD-SCRIPTS-002 trace 3, card SCRIPTS-01)"
+    },
+    "C16": {
+      "result": [
+        "AUD-SCRIPTS-001",
+        "AUD-SCRIPTS-003"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for gasLimit|maxFeePerGas|maxPriorityFee|gasPrice|getFeeData: addLiquidity.ts:67 fixed gasLimit 300000 (latent); recover-sell-ladys.ts sets no fee at all (AUD-SCRIPTS-003, TH-SCRIPTS-08); the deliberate buy fee caps are src/ (TX slice)"
+    },
+    "C17": {
+      "result": [
+        "AUD-SCRIPTS-001",
+        "AUD-SCRIPTS-005",
+        "AUD-SCRIPTS-006"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for PRIVATE_KEY|API_KEY|SESSION|TOKEN|apiKey|secret and every log/console call: no script logs or passes a key as argv (pause.ts:13-16 invariant checked in all 13 scripts); the bot key is used to deploy by deploySepoliaTest.ts (AUD-SCRIPTS-001); crash output can print the RPC key (AUD-SCRIPTS-005); telegram-login.ts prints the session secret (AUD-SCRIPTS-006)"
+    },
+    "C18": {
+      "result": [
+        "AUD-SCRIPTS-001",
+        "AUD-SCRIPTS-007",
+        "AUD-SCRIPTS-008"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for process.env|dotenv|chainId: every script calls dotenv.config() at import; network checks: recover-sell-ladys.ts:47-51 and capture-launch.ts:365-369 refuse anything but chainId 1, deliberate-buy.ts uses the registry chain config; addLiquidity.ts and deploySepoliaTest.ts check nothing and use ALCHEMY_URL (AUD-SCRIPTS-001); DASHBOARD_URL honoured verbatim (AUD-SCRIPTS-008); preflight resolves the database path from the current folder (AUD-SCRIPTS-007)"
+    },
+    "C19": {
+      "result": [
+        "AUD-SCRIPTS-008"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for Cookie|login|auth|axios: pause.ts and resume.ts are the only HTTP clients of the dashboard API (AUD-SCRIPTS-008); the server-side auth is the API slice (AUD-API-007)"
+    },
+    "C20": {
+      "result": [
+        "AUD-SCRIPTS-006"
+      ],
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for telegram|Telegram|TelegramClient|session: telegram-login.ts creates the account session the alpha-drop listener trusts and prints it (AUD-SCRIPTS-006); deliberate-buy alerts go through src/utils/notifier (no script-side Telegram trust decision)"
+    }
+  }
+}

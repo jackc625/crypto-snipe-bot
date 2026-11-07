@@ -1,0 +1,88 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-007",
+  "title": "npm run preflight, the operator read-only check, opens and migrates the live database at import: it writes the schema version, can rewrite legacy trade rows and rename a state file in the current folder, and with a relative path from another folder it creates a new empty database there",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C13",
+    "C18"
+  ],
+  "files": [
+    "scripts/preflight.ts",
+    "src/preflight.ts",
+    "src/utils/db.ts",
+    "package.json"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "package.json:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"preflight\": \"ts-node scripts/preflight.ts\""
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:10-14@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "documented as a check that does not start the bot"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports preflightDryRun from src/preflight"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:49@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "src/preflight imports getAntirugDryRunStarted and getStaleTradesQuery from ./utils/db, so loading it runs db.ts module code"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH falls back to cwd/data/bot.db; mkdir if missing; new Database(DB_PATH) creates the file if absent; journal_mode/synchronous/busy_timeout pragmas"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232-235@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "migrateSchema() runs and writes user_version = 7 unconditionally"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:241-280@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "migrateJsonState reads cwd/.bot-state.json and renames it to .bak"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:305-316@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "normalizeLegacyMainnetRows runs UPDATE trades SET chain = eth WHERE chain = mainnet at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:988@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "FATAL results are also sent to Telegram (AUD-DB-010)"
+    }
+  ],
+  "sibling_sites_checked": "Import closures of every script at the base: deliberate-buy.ts imports src/bot (database, notifier and config, which is expected for a buy that records a trade); preflight.ts imports src/preflight (database and notifier); audit-honeypot-checker.ts imports src/chainRegistry (provider and config, no database); pause.ts, resume.ts, capture-launch.ts and deploy-honeypot-checker.ts import only src/utils/logger (pino to stdout) and, for capture-launch, src/utils/abis; telegram-login.ts, recover-sell-ladys.ts and check-mythril-report.ts import nothing from src/. So preflight is the only script presented as read-only that writes the live database. The import-time writes themselves are AUD-DB-006 (version downgrade, rail 22-09) and AUD-DB-007 (cwd path, rail 22-09); the test-side reach is AUD-RAIL-002.",
+  "status": "confirmed",
+  "severity_rationale": "S3, misleading ops behaviour: the writes are idempotent at the current schema and the legacy-row update is a no-op once applied, so no trade data changes today; but the operator relies on preflight being read-only (it is the sanctioned cold-start check before the live re-entry), and from a different folder it silently creates and migrates a new empty database instead of checking the real one. The downgrade risk is AUD-DB-006.",
+  "related": [
+    "AUD-DB-006",
+    "AUD-DB-007",
+    "AUD-DB-010",
+    "AUD-RAIL-002"
+  ],
+  "tags": [],
+  "recommendation": "Phase 29 (or with the 22-09 database rails, re-audited in 22-29): give preflight a read-only database path (open the file read-only, refuse when it is missing, never migrate), or move the two queries it needs out of the import-time database module; document the remaining side effects in the runbook until then."
+}

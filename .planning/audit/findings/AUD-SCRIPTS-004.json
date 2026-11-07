@@ -1,0 +1,89 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": "SCRIPTS-02",
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-004",
+  "title": "The deliberate buy accepts any positive amount and applies none of the bot buy guards except affordability (no risk gate: max position size, open positions, exposure, cooldown, daily loss; no circuit breaker; no pause); the only stop before signing is a 5-second \"press Ctrl+C\" window, which may not stop an npx-launched script on Windows",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [],
+  "files": [
+    "scripts/deliberate-buy.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:79-86@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "amountEth is parsed with parseEther and only checked to be > 0; no upper bound, no comparison with the configured snipe amount or caps"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:112-137@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "banner (chain, wallet, balance, token, dex, value) and \"Aborting in 5s - press Ctrl+C now\", then sleep(5000) and sign; no typed confirmation"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:27-28@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "documented launch: npx ts-node scripts/deliberate-buy.ts ..."
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:485-497@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeDeliberateBuy runs enforceEntryExitAffordability and then signs; canSnipe (the risk gate imported at :109) is not called on this path"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:109@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "import { canSnipe, recordSnipe } from ./riskManager: used by the snipe handlers only"
+    }
+  ],
+  "sibling_sites_checked": "All callers of executeDeliberateBuy at the base (git grep: scripts/deliberate-buy.ts:142 only). The snipe handlers call the risk gate and the pause checkpoints; the deliberate path calls neither. Other signing scripts have no confirmation step at all (recover-sell-ladys.ts signs right after printing the quote; AUD-SCRIPTS-003).",
+  "status": "confirmed",
+  "severity_rationale": "S2. The operator types the amount and the banner prints it, so an overspend needs both a mistake (for example 1 instead of 0.1) and a missed banner; the wallet balance and the affordability gate bound it. The bypassed caps are mostly unset or not enforced today (MAX_POSITION_SIZE has no default, TH-DB-03; per-chain max capital is not a cap, AUD-DB-014), so the bypass matters most once Phase 24 enforces them. The Ctrl+C part is recorded as unverified (sub_claims).",
+  "related": [
+    "AUD-SCRIPTS-002",
+    "AUD-BUY-001",
+    "AUD-DB-014"
+  ],
+  "tags": [
+    "capital",
+    "signing-script"
+  ],
+  "recommendation": "Decide on card SCRIPTS-02 which bot guards a deliberate buy must pass (risk gate, circuit breaker, pause) and how the operator confirms before signing (typed confirmation of chain, token and amount instead of a timed Ctrl+C window, or both). Phase 23 should prove on the operator terminal (Git Bash, npx ts-node) whether Ctrl+C during the window actually stops the script before signing.",
+  "sub_claims": [
+    {
+      "claim": "No risk gate, circuit breaker or pause check on the deliberate buy path",
+      "evidence": [
+        "src/bot.ts:485-497@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:109@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "No upper bound on the amount",
+      "evidence": [
+        "scripts/deliberate-buy.ts:79-86@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "Ctrl+C during the 5-second window may not stop the script when launched through npx in Git Bash on Windows (the operator-recorded note in STATE.md says npx swallows Ctrl+C there, which is why the bot is stopped by killing the PID)",
+      "evidence": [
+        "scripts/deliberate-buy.ts:124-137@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "unverified: environment behaviour; prove in Phase 23 without signing (for example with a stub that only sleeps)"
+    }
+  ]
+}

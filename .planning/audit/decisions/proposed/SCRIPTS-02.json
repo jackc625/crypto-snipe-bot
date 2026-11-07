@@ -1,0 +1,36 @@
+{
+  "id": "SCRIPTS-02",
+  "title": "Which bot guards apply to a deliberate buy, and how does the operator confirm before it signs?",
+  "area": "SCRIPTS",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: affordability check only, 5-second Ctrl+C window",
+      "behavior_impact": "none",
+      "risk": "Any typed amount the wallet can afford is bought (no risk gate, circuit breaker or pause); a typo or a wrong token goes out unless Ctrl+C lands within 5 seconds, and Ctrl+C through npx on Windows may not stop the script (AUD-SCRIPTS-004, S2)."
+    },
+    {
+      "id": "typed-confirmation",
+      "name": "Typed confirmation, guards unchanged",
+      "behavior_impact": "after the banner the operator must type the amount and the last characters of the token address (or \"yes\") before anything is signed; no timed window",
+      "risk": "Still bypasses the risk gate, circuit breaker and pause; a wrong but confirmed amount still goes out."
+    },
+    {
+      "id": "guards-and-confirmation",
+      "name": "Typed confirmation plus the bot buy guards, with an explicit typed override",
+      "behavior_impact": "the deliberate buy also passes the risk gate, the circuit breaker and the pause check; the operator can override a risk-gate refusal only by typing an override phrase that is logged and alerted",
+      "risk": "A deliberate buy the operator really wants can be refused until they override; the override path needs its own test."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "guards-and-confirmation: a manual buy should not be the one buy that skips every limit, and a typed confirmation does not depend on how the terminal handles Ctrl+C. Decide with SCRIPTS-01 (pause check while holding the lock) and BUY-01.",
+  "default": "Keep current behaviour until the owning phase rules (milestone contract); nothing changes in Phase 22. The bot is off for all of v7.0; deliberate buys are only run by the operator by hand.",
+  "behavior_impact": "Decides which limits a manual buy respects and what the operator must do before it is signed.",
+  "findings": [
+    "AUD-SCRIPTS-004"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 capital discussion (with BUY-01), or Phase 29 HYG-03 at the latest"
+}

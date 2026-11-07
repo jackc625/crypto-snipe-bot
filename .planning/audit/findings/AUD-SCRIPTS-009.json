@@ -1,0 +1,59 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-009",
+  "title": "capture-launch.ts writes fixtures without care: it overwrites an existing pinned fixture silently, joins an unchecked --slug into the output path, stamps every capture expectedVerdict \"safe\", and clamps --window to 10 blocks although its header says an archive key widens it",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "scripts/capture-launch.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:431-434@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mkdirSync + writeFileSync to test/fork/fixtures/realLaunches/<slug>.json with no existence check"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:175@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "slug comes from --slug unchecked (only the symbol-derived default is sanitised at :398), so --slug ../../x writes outside the fixture folder"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:420-422@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "expectedVerdict: \"safe\" and discoveredVia: \"etherscan\" are constants for every capture"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:244@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "effectiveWindow = min(window, 10) always, while :32-35 says a PAYG/archive endpoint allows wider windows"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:379-385@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "when no Mint is found within 50 blocks, mintBlock null is written without a warning"
+    }
+  ],
+  "sibling_sites_checked": "The only other fixture writer under scripts/ is none (addLiquidity.ts and deploySepoliaTest.ts write src/addresses.json, AUD-SCRIPTS-001). The replay test does not read expectedVerdict (git grep expectedVerdict under test/ at the base: only the anti-rug fork test and the honeypot fixtures, not realLaunchReplay), so the constant is narration only. The script never reads PRIVATE_KEY (it loads .env but only uses RPC URLs) and checks chainId 1 (:365-369).",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: operator-run, read-only on chain; a wrong or overwritten fixture is visible in git diff.",
+  "related": [],
+  "tags": [
+    "side-effects-traced"
+  ],
+  "recommendation": "Phase 29 (HYG-03): refuse to overwrite an existing fixture without --force, validate --slug like the derived slug, drop or compute expectedVerdict, and make the window clamp follow the endpoint (or fix the header)."
+}

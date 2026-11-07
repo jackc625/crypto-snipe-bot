@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-006",
+  "title": "telegram-login.ts prints the new TELEGRAM_SESSION string (full access to the Telegram account) to the terminal and reads the 2FA password with echo on",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17",
+    "C20"
+  ],
+  "files": [
+    "scripts/telegram-login.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/telegram-login.ts:50-54@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "console.log(\"TELEGRAM_SESSION=\" + sessionString): the secret goes to stdout for the operator to copy into .env"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/telegram-login.ts:23-25@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "readline.question echoes every typed character"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/telegram-login.ts:46@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the 2FA password is read through the same echoing prompt"
+    }
+  ],
+  "sibling_sites_checked": "The NEVER-logged rule stated in pause.ts:13-16 was checked in all 13 scripts: PRIVATE_KEY, DEPLOY_PRIVATE_KEY, DASHBOARD_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_API_HASH and FLASHBOTS_AUTH_KEY values are never logged or passed as argv by any script; DASHBOARD_API_KEY travels only in a request body (pause.ts:91-95, resume.ts:57-61); ETHERSCAN_API_KEY travels in an Etherscan URL query string over HTTPS (audit-honeypot-checker.ts:46, :74) and is not printed. telegram-login.ts is the only script that prints a secret on its success path, by design.",
+  "status": "confirmed",
+  "severity_rationale": "S3: by design and only when the operator runs the helper, but the printed value is a full account credential for the Telegram account the bot listens with (an attacker with it can read and send as that account, including fake alpha-drop calls the bot trusts, C20). Scrollback, terminal logging or an agent capturing stdout keep it.",
+  "related": [
+    "AUD-SCRIPTS-005"
+  ],
+  "tags": [
+    "credential-exposure"
+  ],
+  "recommendation": "Phase 29 (HYG-03): write the session into .env directly after a confirmation (atomic replace of the one line) or into a user-only file, and print only a short fingerprint; read the 2FA password and the login code without echo. No trading behaviour changes."
+}

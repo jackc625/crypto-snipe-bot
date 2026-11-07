@@ -1,0 +1,74 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-008",
+  "title": "The pause and resume CLIs work only through a running dashboard API, and send DASHBOARD_API_KEY to whatever DASHBOARD_URL says, including plain http to another host",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C18",
+    "C19"
+  ],
+  "files": [
+    "scripts/pause.ts",
+    "scripts/resume.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/pause.ts:49-53@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DASHBOARD_URL is honoured verbatim; no scheme or host check"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/pause.ts:91-95@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "POST {apiKey} to `${dashboardUrl}/api/auth/login`"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/resume.ts:41-45@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same URL rule"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/resume.ts:57-61@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same login body"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/pause.ts:144-155@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "when the dashboard is unreachable the CLI exits 2; there is no other way in the scripts to set the persisted pause flag"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/pause.ts:102-103@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "forwards the whole first Set-Cookie header line (with its attributes) as the Cookie header"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:220@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DASHBOARD_URL=http://127.0.0.1:8080 shipped"
+    }
+  ],
+  "sibling_sites_checked": "Both CLIs (pause.ts, resume.ts) and their callers in package.json (:16-17). The NEVER-logged invariant holds in both: the key is only in the request body and no log call references it (pause.ts:83-117, resume.ts:47-79). The dashboard side of pause (controls.ts) and its auth are the API slice (AUD-API-001, AUD-API-007).",
+  "status": "confirmed",
+  "severity_rationale": "S3: an operator override that points at a remote http dashboard sends the key in clear text, and an emergency pause is impossible whenever the dashboard API is down while trading continues; both need an unusual setup or failure, and the dashboard pause banner and Stop controls are alternative paths only while the API is up.",
+  "related": [
+    "AUD-API-007"
+  ],
+  "tags": [],
+  "recommendation": "Phase 29: refuse a non-loopback DASHBOARD_URL unless it is https; add an offline pause that writes the persisted pause flag directly (with the database rails) for when the API is down; parse only the session cookie name and value from Set-Cookie."
+}

@@ -1,0 +1,94 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-005",
+  "title": "Script crash output can print the RPC URL with its API key: deliberate-buy, recover-sell-ladys, capture-launch, preflight and the two legacy scripts print the raw error (or its message), and an ethers HTTP error message ends with the request URL",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "scripts/deliberate-buy.ts",
+    "scripts/recover-sell-ladys.ts",
+    "scripts/capture-launch.ts",
+    "scripts/preflight.ts",
+    "scripts/addLiquidity.ts",
+    "scripts/deploySepoliaTest.ts",
+    "scripts/audit-honeypot-checker.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:166-169@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "log.error({err}) serializes the whole error and console.error prints err.message"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:93-96@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "console.error(err.message)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-launch.ts:455-458@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "log.fatal({err: err.message}); on success the script logs only the variable name of the endpoint (:201), so the key leaks only on a crash"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:69-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each failed check prints reason and details; the reasons embed the ethers error message (AUD-DB-010 for the src side and the Telegram copy)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/preflight.ts:114-119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "crash path prints err.message"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:83-86@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "console.error(err) (cannot run today, AUD-SCRIPTS-001)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:94-97@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "console.error(err) (cannot run today)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/audit-honeypot-checker.ts:124-127@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "console.error(\"Audit failed:\", e) with the full error (CONTRACTS slice file, recorded here as a sibling)"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:13@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "hosted RPC URLs carry the key in the path (/v2/YOUR_KEY); same at :54"
+    },
+    {
+      "type": "command",
+      "ref": "node rpc-reason-repro.js (registered under AUD-DB-010: loopback JSON-RPC server answering eth_chainId then HTTP 500, fake key in the URL path, ethers 6.16.0)",
+      "note": "the SERVER_ERROR message ends with info={ \"requestUrl\": \"http://127.0.0.1:<port>/v2/<KEY>\" }: the same error object reaches these script catch blocks"
+    }
+  ],
+  "sibling_sites_checked": "Every catch and log call in the 10 SCRIPTS files and the three contracts-tooling scripts. pause.ts and resume.ts log only status, response body, URL and error code (the dashboard URL holds no key by default). telegram-login.ts prints err.message of a Telegram error (no RPC URL). deploy-honeypot-checker.ts logs only the exit status of the Hardhat child; the child prints its own errors (Hardhat redacts nothing for us, recorded under AUD-CONTRACTS-004). The logger writes to stdout only (src/utils/logger.ts:6-10, no file transport), so the exposure is the terminal and anything that captures it.",
+  "status": "confirmed",
+  "severity_rationale": "S3: a credential (RPC API key) reaches local terminal output only on an error path; no file, no Telegram (the Telegram copy is AUD-DB-010, S2). Risk grows when output is pasted into a chat, an issue or an agent transcript.",
+  "related": [
+    "AUD-DB-010"
+  ],
+  "tags": [
+    "credential-exposure"
+  ],
+  "recommendation": "Phase 29 together with the AUD-DB-010 fix (card TX-04 covers the src side): one shared redaction helper that strips URLs (or at least their path and query) from error messages and logged error objects, used by every script catch block."
+}
