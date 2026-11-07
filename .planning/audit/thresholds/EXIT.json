@@ -1,0 +1,908 @@
+{
+  "rows": [
+    {
+      "id": "TH-EXIT-01",
+      "recommendation": "Validate 0 < STOP_LOSS_PCT < 100 at load and fail loud; compare against a real price (card EXIT-02).",
+      "od_ref": "EXIT-12",
+      "name": "Fixed stop-loss percent (active below 2x, before trailing activates)",
+      "current_value": "25",
+      "definition_sites": [
+        "src/config.ts:290-293@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:116@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1781-1783@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:70"
+      ],
+      "comparison": "currentPrice <= entryPrice * (1 - stopLossPct / 100) while trailingActivated is false; currentPrice and entryPrice are probe outputs (AUD-EXIT-003)",
+      "units": "percent below the entry probe output",
+      "representation": "float (parseFloat)",
+      "effective_unset": "25",
+      "effective_empty": "25 ('' || '25')",
+      "effective_non_numeric": "25 (isNaN guard); but 0, negative and >= 100 are accepted: 0 sells at the first tick at or below entry, negative sells at once, >= 100 never sells",
+      "rationale": "none in code (marked @deprecated next to the legacy fields but still used by the exit engine)",
+      "overlap": "disabled once trailing activates at 2x (:1781); the urgency exit (TH-EXIT-08) is the only other routine exit",
+      "env_key": "STOP_LOSS_PCT",
+      "hardcoded": false,
+      "flags": [
+        "no-range-check",
+        "probe-ratio-not-price",
+        "no-rationale"
+      ]
+    },
+    {
+      "id": "TH-EXIT-02",
+      "recommendation": "Guard NaN and validate min <= base <= max at load (fail loud).",
+      "od_ref": "EXIT-12",
+      "name": "Trailing stop base percent (pullback from the high-water mark, active at >= 2x)",
+      "current_value": "15",
+      "definition_sites": [
+        "src/config.ts:300@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:113@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1745-1752@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:66"
+      ],
+      "comparison": "currentPrice <= highWaterMark * (1 - effectivePct / 100), effectivePct = clamp(base * volatilityMult * urgencyMult, min, max)",
+      "units": "percent pullback",
+      "representation": "float (parseFloat), no NaN guard",
+      "effective_unset": "15",
+      "effective_empty": "15 ('' || '15')",
+      "effective_non_numeric": "NaN: effectivePct is NaN and the trailing stop never fires (AUD-EXIT-016)",
+      "rationale": "none in code",
+      "overlap": "combines with TH-EXIT-03/04 (clamp), TH-EXIT-08 (urgency tightens) and TH-EXIT-09 (volatility widens)",
+      "env_key": "TRAILING_STOP_PCT",
+      "hardcoded": false,
+      "flags": [
+        "nan-disables-exit",
+        "no-range-check"
+      ]
+    },
+    {
+      "id": "TH-EXIT-03",
+      "recommendation": "Guard NaN and require min <= max.",
+      "od_ref": "EXIT-12",
+      "name": "Trailing stop minimum percent after adjustment",
+      "current_value": "5",
+      "definition_sites": [
+        "src/config.ts:301@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:114@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:224@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:229@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:67"
+      ],
+      "comparison": "Math.max(minPct, Math.min(maxPct, adjusted))",
+      "units": "percent",
+      "representation": "float (parseFloat), no NaN guard",
+      "effective_unset": "5",
+      "effective_empty": "5",
+      "effective_non_numeric": "NaN: Math.max(NaN, x) is NaN, so the trailing stop never fires",
+      "rationale": "none in code",
+      "overlap": "with the urgency multiplier going to 0, effectivePct converges to this minimum near the 30-minute deadline",
+      "env_key": "TRAILING_MIN_PCT",
+      "hardcoded": false,
+      "flags": [
+        "nan-disables-exit",
+        "no-range-check"
+      ]
+    },
+    {
+      "id": "TH-EXIT-04",
+      "recommendation": "Guard NaN and require max < 100 and >= min.",
+      "od_ref": "EXIT-12",
+      "name": "Trailing stop maximum percent after adjustment",
+      "current_value": "40",
+      "definition_sites": [
+        "src/config.ts:302@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:115@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:225@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:229@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:68"
+      ],
+      "comparison": "Math.min(maxPct, adjusted)",
+      "units": "percent",
+      "representation": "float (parseFloat), no NaN guard",
+      "effective_unset": "40",
+      "effective_empty": "40",
+      "effective_non_numeric": "NaN: the clamp yields NaN, so the trailing stop never fires",
+      "rationale": "none in code",
+      "overlap": "caps the volatility widening (TH-EXIT-09)",
+      "env_key": "TRAILING_MAX_PCT",
+      "hardcoded": false,
+      "flags": [
+        "nan-disables-exit",
+        "no-range-check"
+      ]
+    },
+    {
+      "id": "TH-EXIT-05",
+      "recommendation": "Keep the number; base it on a real price (card EXIT-02).",
+      "od_ref": "EXIT-02",
+      "name": "Trailing stop activation multiple",
+      "current_value": "2.0",
+      "definition_sites": [
+        "src/exitEngine.ts:1774-1777@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "priceMultiple >= 2.0 sets trailingActivated (permanent for the position; it also turns stop-loss off)",
+      "units": "ratio of probe outputs (not a price ratio, AUD-EXIT-003)",
+      "representation": "float literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a; an Infinity multiple (entry price 0) activates it on the first tick",
+      "rationale": "D-01 (comment)",
+      "overlap": "with partial tiers at the same multiple both act on one tick (the full-exit check runs first, :1817-1826)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "probe-ratio-not-price"
+      ]
+    },
+    {
+      "id": "TH-EXIT-06",
+      "recommendation": "Require multiples > 1 at load; base tiers on a real price (card EXIT-02).",
+      "od_ref": "EXIT-12",
+      "name": "Partial sell tiers",
+      "current_value": "'' (no partial sells)",
+      "definition_sites": [
+        "src/config.ts:303@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:80-101@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1731-1739@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:251-257@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:69"
+      ],
+      "comparison": "priceMultiple >= tier.multiple for each unfilled tier; amount = originalTokenAmount * sum(percent) / 100 (bigint)",
+      "units": "multiple of the entry probe output : percent of the ORIGINAL token amount",
+      "representation": "string \"2x:50,5x:25\" parsed to floats and ints, sorted by multiple",
+      "effective_unset": "[] (no tiers)",
+      "effective_empty": "[]",
+      "effective_non_numeric": "throws at module load (exitConfig is built at import, :126), so the bot does not start: fail loud. A multiple below 1 (e.g. 0.5x) is accepted and sells that tier at the first tick; percent is parseInt, so 33.9 becomes 33",
+      "rationale": "D-06..D-11 (comments); total must be < 100%",
+      "overlap": "Infinity multiple (entry 0) fires every tier at once (AUD-EXIT-003 sub-claim 4)",
+      "env_key": "PARTIAL_SELL_TARGETS",
+      "hardcoded": false,
+      "flags": [
+        "probe-ratio-not-price",
+        "no-range-check"
+      ]
+    },
+    {
+      "id": "TH-EXIT-07",
+      "recommendation": "Self-rescheduling timer or skip-if-running, plus a quote timeout below the interval (card EXIT-04).",
+      "od_ref": "EXIT-04",
+      "name": "Exit poll interval per position",
+      "current_value": "5000 ms",
+      "definition_sites": [
+        "src/config.ts:304@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:118@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1906-1942@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:2007-2042@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "setInterval cadence; overrun telemetry durationMs > pollIntervalMs (:1924)",
+      "units": "milliseconds",
+      "representation": "number literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "D-04 (comment)",
+      "overlap": "a cycle slower than 5 s overlaps the next (no in-flight guard, AUD-EXIT-005); the quote has no timeout (ethers FetchRequest default 300000 ms), so up to about 60 cycles can stack",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "overlap-no-guard"
+      ]
+    },
+    {
+      "id": "TH-EXIT-08",
+      "recommendation": "Let the urgency exit fire even when the price quote is null (card EXIT-02).",
+      "od_ref": "EXIT-02",
+      "name": "Urgency window (hard market exit deadline)",
+      "current_value": "30 minutes (1800000 ms)",
+      "definition_sites": [
+        "src/config.ts:305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:119@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:209-214@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1744@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1801-1815@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "urgencyMult = 1 - age/window (linear); urgencyMult <= 0 enqueues urgency-market-sell; it also shrinks the trailing percent toward the minimum",
+      "units": "milliseconds since urgencyStartTs (set at monitor start, persisted, never updated on upsert)",
+      "representation": "number literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "D-17/D-19 (comments)",
+      "overlap": "skipped entirely on a null quote (:1709-1712), so it is not a guaranteed backstop; after a restart later than 30 minutes every resumed position exits on its first good tick",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "skipped-on-null-quote"
+      ]
+    },
+    {
+      "id": "TH-EXIT-09",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Volatility tracker parameters (baseline CV, max samples, min samples)",
+      "current_value": "baseline CV 0.03, max 60 samples (5 min at 5 s), min 12 samples (1 min)",
+      "definition_sites": [
+        "src/config.ts:306-308@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:120-122@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:140-175@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "multiplier = max(1, (stddev/mean) / 0.03) once >= 12 samples; widens the trailing percent before the clamp",
+      "units": "dimensionless CV; sample counts",
+      "representation": "number literals",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "D-12..D-15 (comments)",
+      "overlap": "samples are probe outputs; stacked overlapping cycles add extra samples (AUD-EXIT-005)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-10",
+      "recommendation": "Cap at a small value (for example 100 bps) at load and fail loud above it.",
+      "od_ref": "EXIT-12",
+      "name": "Dust threshold for \"position closed\"",
+      "current_value": "1 bps of the original token amount, with an absolute floor of 1000 base units",
+      "definition_sites": [
+        "src/exitEngine.ts:615-622@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:986-987@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1100-1101@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1142-1143@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:262"
+      ],
+      "comparison": "balanceOf <= max(original * bps / 10000, 1000) means a genuine close (teardown); above means still held",
+      "units": "basis points of original_token_amount; token base units",
+      "representation": "bigint",
+      "effective_unset": "1",
+      "effective_empty": "1",
+      "effective_non_numeric": "1 (parseInt, NaN or negative falls back); '1.9' gives 1; no upper bound: 10000 or more makes any balance up to the original count as closed",
+      "rationale": "RESEARCH A6 (comment): 0.01%",
+      "overlap": "when exit_state is missing (original 0) only the 1000-unit floor applies, which fails safe toward held",
+      "env_key": "EXIT_DUST_THRESHOLD_BPS",
+      "hardcoded": false,
+      "flags": [
+        "no-upper-bound"
+      ]
+    },
+    {
+      "id": "TH-EXIT-11",
+      "recommendation": "Require >= 1; exempt operator sells from the pause (card EXIT-07).",
+      "od_ref": "EXIT-07",
+      "name": "Consecutive routine exit failures before routine retries pause",
+      "current_value": "5",
+      "definition_sites": [
+        "src/exitEngine.ts:599-602@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:738-749@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:824-830@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:263"
+      ],
+      "comparison": "reason !== 'anti-rug' && exit_failure_count >= max -> pause (in-memory Set)",
+      "units": "count (persisted in exit_state.exit_failure_count)",
+      "representation": "integer",
+      "effective_unset": "5",
+      "effective_empty": "5",
+      "effective_non_numeric": "5; 0 is accepted (pause after the first failure)",
+      "rationale": "D-FAILED-EXIT-KEEP-MONITORING (comment): stop burning gas",
+      "overlap": "the pause also blocks the dashboard force/emergency sells (AUD-EXIT-008); the in-memory pause is lost on restart while the persisted count is kept",
+      "env_key": "EXIT_ROUTINE_MAX_FAILURES",
+      "hardcoded": false,
+      "flags": [
+        "blocks-operator-exit",
+        "no-range-check"
+      ]
+    },
+    {
+      "id": "TH-EXIT-12",
+      "recommendation": "Keep attempts * confirm window below the watchdog budget, or derive one from the other (card EXIT-11).",
+      "od_ref": "EXIT-11",
+      "name": "Private sell attempts before the public fallback",
+      "current_value": "routine 2; anti-rug 1 (hard-coded)",
+      "definition_sites": [
+        "src/exitEngine.ts:453-456@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:903@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:251"
+      ],
+      "comparison": "attempts passed to escalatePrivateSell and to the sell reconcile config",
+      "units": "count",
+      "representation": "integer",
+      "effective_unset": "2",
+      "effective_empty": "2",
+      "effective_non_numeric": "2; 0 is accepted and means no private attempt (straight to public, txManager.ts:100 comment)",
+      "rationale": "D-FALLBACK-TRIGGER (comment): a rug is happening now, so anti-rug burns one quick attempt",
+      "overlap": "each attempt holds the wallet nonce lock for its confirm window (TH-EXIT-22), so 2 attempts can exceed the 60 s watchdog (TH-EXIT-21)",
+      "env_key": "MEV_SELL_FALLBACK_ATTEMPTS",
+      "hardcoded": false,
+      "flags": [
+        "exceeds-watchdog-budget"
+      ]
+    },
+    {
+      "id": "TH-EXIT-13",
+      "recommendation": "Re-quote right before the swap (card EXIT-09).",
+      "od_ref": "EXIT-09",
+      "name": "Routine public-fallback slippage",
+      "current_value": "5 %",
+      "definition_sites": [
+        "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:470-471@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:522-523@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "minOut = expectedOut * (100 - slippage) / 100 from a quote taken before the approve wait (AUD-EXIT-011)",
+      "units": "percent",
+      "representation": "number literal; CONFIG.slippagePercent || 5",
+      "effective_unset": "n/a (hard-coded 5)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "D-FALLBACK-NO-DOUBLE-SELL (comment): reuse the configured exit slippage",
+      "overlap": "shared with the buy slippage (TH-BUY-02)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "stale-quote"
+      ]
+    },
+    {
+      "id": "TH-EXIT-14",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Anti-rug public-fallback slippage",
+      "current_value": "15 % (never below 10 % or the routine value)",
+      "definition_sites": [
+        "src/exitEngine.ts:471-475@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:522@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:252"
+      ],
+      "comparison": "max(antiRug, 10, routine)",
+      "units": "percent",
+      "representation": "float (parseFloat, > 0 else fallback)",
+      "effective_unset": "15",
+      "effective_empty": "15",
+      "effective_non_numeric": "15; values above 99 are clamped to 99 by TH-EXIT-15",
+      "rationale": "T-21.2-SANDWICH (comment): a sandwiched sell beats a stranded position; 10 % floor from recover-sell-ladys.ts",
+      "overlap": "only used when the anti-rug private attempt did not land",
+      "env_key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT",
+      "hardcoded": false,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-15",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Public minOut clamp",
+      "current_value": "effective slippage clamped to [0, 99] %, keep at least 1 %",
+      "definition_sites": [
+        "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "keepPct = max(1, round(100 - clamp(slippage, 0, 99))); minOut = expectedOut * keepPct / 100",
+      "units": "percent",
+      "representation": "bigint math after Math.round",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "IN-03 (comment): never a zero floor on a public sell",
+      "overlap": "applies to the public fallback only; private sells have no floor (TH-EXIT-16)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-16",
+      "recommendation": "Decide on card OD-14.",
+      "od_ref": "OD-14",
+      "name": "Private sell minimum output",
+      "current_value": "0 (V2 amountOutMin and V3 amountOutMinimum)",
+      "definition_sites": [
+        "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:395@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "none: any output is accepted",
+      "units": "wei of WETH",
+      "representation": "literal 0 / 0n",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none in code; private routing is the implied protection",
+      "overlap": "used by full and partial private sells on every chain, including passthrough chains",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "no-floor"
+      ]
+    },
+    {
+      "id": "TH-EXIT-17",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Private sell deadline",
+      "current_value": "now + 60 s, computed each time the builder runs",
+      "definition_sites": [
+        "src/exitEngine.ts:362@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:399@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "router deadline check on chain",
+      "units": "seconds (unix)",
+      "representation": "integer",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none in code",
+      "overlap": "shorter than one 45 s confirm window plus polling only if the builder is not re-run per attempt (it is re-run, since the builder is a closure)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-18",
+      "recommendation": "Re-quote after the approve (card EXIT-09).",
+      "od_ref": "EXIT-09",
+      "name": "Public fallback deadline",
+      "current_value": "now + 600 s, computed after the approve wait",
+      "definition_sites": [
+        "src/exitEngine.ts:551@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "router deadline check on chain",
+      "units": "seconds (unix)",
+      "representation": "integer",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "promoted from recover-sell-ladys.ts (comment)",
+      "overlap": "the minOut it carries comes from a quote taken before the approve wait (TH-EXIT-13)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "stale-quote"
+      ]
+    },
+    {
+      "id": "TH-EXIT-19",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Sell gas limit",
+      "current_value": "chain maxGasLimit: ETH 300000, BSC 500000, Base 500000, Arbitrum 1000000",
+      "definition_sites": [
+        "src/chainRegistry.ts:204@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:273@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:330@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:864@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1499@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "fixed gasLimit on the private sell tx; also the gas input to the sell reconcile config",
+      "units": "gas",
+      "representation": "bigint literal",
+      "effective_unset": "n/a (hard-coded per chain)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none in code",
+      "overlap": "approvals and the public fallback use ethers estimateGas instead",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-20",
+      "recommendation": "Apply the anti-rug fee policy to the approve and the public fallback too, under a ceiling (card EXIT-03).",
+      "od_ref": "EXIT-03",
+      "name": "Anti-rug gas multiplier",
+      "current_value": "2.0 (template default per chain)",
+      "definition_sites": [
+        "src/chainRegistry.ts:806-822@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:862@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "multiplies the private-leg fee fields when reason is anti-rug; not applied to approvals or the public fallback",
+      "units": "multiplier",
+      "representation": "Number()",
+      "effective_unset": "2.0 (template default)",
+      "effective_empty": "0 (Number('')), which is < 1.0, so boot exits (fail loud)",
+      "effective_non_numeric": "NaN, so boot exits (fail loud); 'Infinity' passes the check",
+      "rationale": "ANTIRUG-08 (comment): race the rug-puller",
+      "overlap": "not applied on the public fallback, which is the guaranteed lever",
+      "env_key": "<PREFIX>_ANTIRUG_GAS_MULTIPLIER",
+      "hardcoded": false,
+      "flags": [
+        "not-applied-to-fallback"
+      ]
+    },
+    {
+      "id": "TH-EXIT-21",
+      "recommendation": "Derive the budget from attempts * confirm window, and release the sell lock when an exit is abandoned (cards EXIT-11, EXIT-04).",
+      "od_ref": "EXIT-11",
+      "name": "Exit watchdog budget (worker submits and the direct anti-rug exit)",
+      "current_value": "60000 ms",
+      "definition_sites": [
+        "src/bot.ts:2177-2182@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:238"
+      ],
+      "comparison": "Promise.race(submit, timer); on overrun the caller is freed and the exit counted as failed; the submit keeps running and keeps its locks",
+      "units": "milliseconds",
+      "representation": "integer (parseInt, > 0 else default)",
+      "effective_unset": "60000",
+      "effective_empty": "60000",
+      "effective_non_numeric": "60000; '1.5e3' parses as 1",
+      "rationale": ".env.example: must exceed one 45 s confirm window plus margin",
+      "overlap": "shorter than 2 routine private attempts * 45 s plus reconcile plus public fallback, so a normal routine exit can overrun it; an anti-rug exit waiting on the nonce lock can overrun it before it signs (AUD-EXIT-014). Same knob as TH-BUY-14 (22-28 merges)",
+      "env_key": "WATCHDOG_BUDGET_MS",
+      "hardcoded": false,
+      "flags": [
+        "budget-below-ladder-duration"
+      ]
+    },
+    {
+      "id": "TH-EXIT-22",
+      "recommendation": "See TH-EXIT-12 / TH-EXIT-21.",
+      "od_ref": "EXIT-11",
+      "name": "Sell-leg confirm window and poll",
+      "current_value": "confirm window 45000 ms, poll 4000 ms",
+      "definition_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:180-181@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:227-228"
+      ],
+      "comparison": "reconcileInclusion polls receipt and nonce until the window ends",
+      "units": "milliseconds",
+      "representation": "integer (parsePositiveInt, > 0 else default, reconciliation.ts:679-683)",
+      "effective_unset": "45000 / 4000",
+      "effective_empty": "45000 / 4000",
+      "effective_non_numeric": "45000 / 4000",
+      "rationale": "~3-4 ETH blocks (.env.example)",
+      "overlap": "also used per private attempt inside escalatePrivateSell (TX slice) while the nonce lock is held; owned by the TX slice, recorded here for its exit timing effect",
+      "env_key": "MEV_CONFIRM_WINDOW_MS, MEV_CONFIRM_POLL_MS",
+      "hardcoded": false,
+      "flags": [
+        "exceeds-watchdog-budget"
+      ]
+    },
+    {
+      "id": "TH-EXIT-23",
+      "recommendation": "Apply a sell ceiling to approvals and the public fallback (card EXIT-03).",
+      "od_ref": "EXIT-03",
+      "name": "Sell-leg priority fee ceiling",
+      "current_value": "25 gwei",
+      "definition_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:190-192@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:248"
+      ],
+      "comparison": "caps the escalated priority fee of private sell attempts (still affordability-clamped)",
+      "units": "gwei",
+      "representation": "float (parsePositiveNumber)",
+      "effective_unset": "25",
+      "effective_empty": "25",
+      "effective_non_numeric": "25",
+      "rationale": "Finding A (config.ts:190)",
+      "overlap": "does not cover approvals or the public fallback swap (AUD-EXIT-004); TX slice owns the escalation",
+      "env_key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
+      "hardcoded": false,
+      "flags": [
+        "partial-coverage"
+      ]
+    },
+    {
+      "id": "TH-EXIT-24",
+      "recommendation": "Card EXIT-02.",
+      "od_ref": "EXIT-02",
+      "name": "Price probe amount",
+      "current_value": "parseEther(buy amount) at start (snipe amount, or the deliberate amount); parseEther(current snipe amount) on resume and re-arm",
+      "definition_sites": [
+        "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1962@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:731@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:422@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:860-862@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1483@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "used as the token amountIn of the quote; priceMultiple = output / entry output",
+      "units": "native-coin wei reused as raw token units (AUD-EXIT-003)",
+      "representation": "bigint",
+      "effective_unset": "snipe amount template default (TH-BUY-01)",
+      "effective_empty": "template default",
+      "effective_non_numeric": "parseEther throws, so startExitMonitor rejects (AUD-EXIT-002 sibling)",
+      "rationale": "none in code",
+      "overlap": "not persisted with the entry price, so resume and re-arm compare different probes (AUD-EXIT-015)",
+      "env_key": "<PREFIX>_SNIPE_AMOUNT (indirect)",
+      "hardcoded": false,
+      "flags": [
+        "unit-mismatch",
+        "not-persisted"
+      ]
+    },
+    {
+      "id": "TH-EXIT-25",
+      "recommendation": null,
+      "od_ref": null,
+      "name": "Exit worker priority ranks",
+      "current_value": "anti-rug 0 (reserved, unused), urgency 1, stop-loss 1, trailing 2, other 3",
+      "definition_sites": [
+        "src/exitEngine.ts:1248-1256@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1335-1340@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "ascending rank, FIFO within a rank",
+      "units": "rank",
+      "representation": "integer literals",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "D-EXIT-PRIORITY (comment)",
+      "overlap": "anti-rug and partial sells do not go through the queue, so they never pre-empt it (AUD-EXIT-014)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": []
+    },
+    {
+      "id": "TH-EXIT-26",
+      "recommendation": "Price the reserve with the same fee rule the fallback actually uses (card EXIT-03).",
+      "od_ref": "EXIT-03",
+      "name": "Exit-reserve base-fee multiplier in the buy-time affordability gate",
+      "current_value": "2.0",
+      "definition_sites": [
+        "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:287-294@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:381@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:250"
+      ],
+      "comparison": "worstCasePublicSellGas = (maxGasLimit + approvalGas) * baseFee * buffer, reserved before a buy",
+      "units": "multiplier on base fee",
+      "representation": "float (> 0 else default)",
+      "effective_unset": "2.0",
+      "effective_empty": "2.0",
+      "effective_non_numeric": "2.0",
+      "rationale": "Finding A (config.ts:192)",
+      "overlap": "not read by the EXIT slice; the real public fallback uses ethers default fees (2 * baseFee + node priority fee, no ceiling), so the reserve can be smaller than the real cost in a gas spike",
+      "env_key": "EXIT_GATE_SELL_GAS_BUFFER",
+      "hardcoded": false,
+      "flags": [
+        "reserve-vs-actual-mismatch"
+      ]
+    },
+    {
+      "id": "TH-EXIT-27",
+      "recommendation": "Card EXIT-03.",
+      "od_ref": "EXIT-03",
+      "name": "Approval amount",
+      "current_value": "exactly the amount being sold",
+      "definition_sites": [
+        "src/exitEngine.ts:419-421@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:871@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:874@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1509@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1512@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:541-544@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "currentAllowance < amount -> approve(amount)",
+      "units": "token base units",
+      "representation": "bigint",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none in code",
+      "overlap": "each first exit of a position needs a public, unbounded-wait approve first (AUD-EXIT-004, AUD-EXIT-009)",
+      "env_key": null,
+      "hardcoded": true,
+      "flags": [
+        "public-uncapped"
+      ]
+    }
+  ],
+  "discovery": {
+    "env_reads": [
+      {
+        "key": "STOP_LOSS_PCT",
+        "sites": [
+          "src/config.ts:291@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-01"
+      },
+      {
+        "key": "TRAILING_STOP_PCT",
+        "sites": [
+          "src/config.ts:300@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-02"
+      },
+      {
+        "key": "TRAILING_MIN_PCT",
+        "sites": [
+          "src/config.ts:301@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-03"
+      },
+      {
+        "key": "TRAILING_MAX_PCT",
+        "sites": [
+          "src/config.ts:302@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-04"
+      },
+      {
+        "key": "PARTIAL_SELL_TARGETS",
+        "sites": [
+          "src/config.ts:303@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-06"
+      },
+      {
+        "key": "EXIT_DUST_THRESHOLD_BPS",
+        "sites": [
+          "src/exitEngine.ts:616@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-10"
+      },
+      {
+        "key": "EXIT_ROUTINE_MAX_FAILURES",
+        "sites": [
+          "src/exitEngine.ts:601@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-11"
+      },
+      {
+        "key": "MEV_SELL_FALLBACK_ATTEMPTS",
+        "sites": [
+          "src/exitEngine.ts:455@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-12"
+      },
+      {
+        "key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT",
+        "sites": [
+          "src/exitEngine.ts:472@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-14"
+      },
+      {
+        "key": "MEV_CONFIRM_WINDOW_MS",
+        "sites": [
+          "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:180@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-22"
+      },
+      {
+        "key": "MEV_CONFIRM_POLL_MS",
+        "sites": [
+          "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:181@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-22"
+      },
+      {
+        "key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
+        "sites": [
+          "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:192@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-23"
+      },
+      {
+        "key": "WATCHDOG_BUDGET_MS",
+        "sites": [
+          "src/bot.ts:2178@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/exitTrigger.ts:78@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-21"
+      },
+      {
+        "key": "<PREFIX>_ANTIRUG_GAS_MULTIPLIER",
+        "sites": [
+          "src/chainRegistry.ts:807@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-20"
+      },
+      {
+        "key": "EXIT_GATE_SELL_GAS_BUFFER",
+        "sites": [
+          "src/preflight.ts:290@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-EXIT-26"
+      },
+      {
+        "key": "MID_RUN_CHECK_INTERVAL_SEC",
+        "sites": [
+          "src/bot.ts:1764@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "not read by the EXIT slice (mid-run wallet re-check in bot.ts); inventoried as TH-BUY-13"
+      },
+      {
+        "key": "other keys passed in process.env to buildReconcileConfig (MEV_PRIORITY_FEE_STEP_GWEI, MEV_RESERVE_SELL_GAS, ...)",
+        "sites": [
+          "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:174-200@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "escalation-internal settings of the TX slice; they do not change the exit decision logic in this slice"
+      }
+    ],
+    "constants": [
+      {
+        "site": "src/exitEngine.ts:1774@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-05"
+      },
+      {
+        "site": "src/config.ts:304@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-07"
+      },
+      {
+        "site": "src/config.ts:305@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-08"
+      },
+      {
+        "site": "src/config.ts:306-308@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-09"
+      },
+      {
+        "site": "src/exitEngine.ts:620@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-10"
+      },
+      {
+        "site": "src/exitEngine.ts:454@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-12"
+      },
+      {
+        "site": "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-13"
+      },
+      {
+        "site": "src/exitEngine.ts:475@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-14"
+      },
+      {
+        "site": "src/exitEngine.ts:492-495@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-15"
+      },
+      {
+        "site": "src/exitEngine.ts:364@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-16"
+      },
+      {
+        "site": "src/exitEngine.ts:395@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-16"
+      },
+      {
+        "site": "src/exitEngine.ts:362@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-17"
+      },
+      {
+        "site": "src/exitEngine.ts:399@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-17"
+      },
+      {
+        "site": "src/exitEngine.ts:551@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-18"
+      },
+      {
+        "site": "src/exitEngine.ts:864@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-19"
+      },
+      {
+        "site": "src/exitEngine.ts:1248-1256@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-25"
+      },
+      {
+        "site": "src/utils/exitWatchdog.ts:55@23a64617dca167976adc4645fed0e2c69e384820",
+        "row_id": "TH-EXIT-21"
+      },
+      {
+        "site": "src/utils/withTimeout.ts:42-45@23a64617dca167976adc4645fed0e2c69e384820",
+        "excluded_reason": "generic helper; its only exit caller passes WATCHDOG_BUDGET_MS (TH-EXIT-21)"
+      },
+      {
+        "site": "src/exitEngine.ts:256@23a64617dca167976adc4645fed0e2c69e384820",
+        "excluded_reason": "the 100n divisor of a percentage, not a tunable"
+      },
+      {
+        "site": "src/exitEngine.ts:617@23a64617dca167976adc4645fed0e2c69e384820",
+        "excluded_reason": "the 10000n divisor of basis points, not a tunable"
+      }
+    ]
+  }
+}

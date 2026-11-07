@@ -1,0 +1,36 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-11",
+  "title": "Anti-rug precedence over in-flight exits and nonce-lock hold time",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: an anti-rug exit is refused while the token sell lock is held and waits behind any private escalation on the wallet",
+      "behavior_impact": "none",
+      "risk": "A rug during another exit is handled at routine parameters, or the anti-rug exit times out before it signs (AUD-EXIT-014)."
+    },
+    {
+      "id": "escalate-in-flight",
+      "name": "When anti-rug fires during an in-flight exit of the same token, switch that exit to anti-rug parameters (one attempt, wider slippage, gas multiplier) instead of refusing",
+      "behavior_impact": "The rug response is not lost.",
+      "risk": "Changing an in-flight ladder needs care around the no-double-sell guard."
+    },
+    {
+      "id": "short-lock-holds",
+      "name": "Hold the nonce lock per signed tx, not across a whole escalation, and size the watchdog from attempts * confirm window",
+      "behavior_impact": "Exits on other tokens are not blocked for minutes.",
+      "risk": "Nonce reconciliation must still be safe with interleaved signers (TX slice)."
+    }
+  ],
+  "recommendation": "escalate-in-flight together with short-lock-holds, designed with the TX slice RC-10 fix.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether an anti-rug exit always gets its emergency treatment.",
+  "findings": [
+    "AUD-EXIT-014"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

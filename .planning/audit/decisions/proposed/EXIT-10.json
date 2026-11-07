@@ -1,0 +1,30 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-10",
+  "title": "Which dex an existing position is monitored and sold on",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: the first V2 or V3 dex of the chain on resume and in dashboard sells",
+      "behavior_impact": "none",
+      "risk": "Positions bought on a second dex lose working exits after a restart or a dashboard sell (AUD-EXIT-013)."
+    },
+    {
+      "id": "stored-dex",
+      "name": "Use the stored dex_name; fail loud when it is missing or not configured",
+      "behavior_impact": "Every position is always quoted and sold on its own pool.",
+      "risk": "Old rows with a null dex_name need a one-time decision."
+    }
+  ],
+  "recommendation": "stored-dex.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides which router and pool an existing position uses.",
+  "findings": [
+    "AUD-EXIT-013"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

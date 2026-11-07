@@ -1,0 +1,36 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-14",
+  "title": "Minimum output on private (MEV-routed) sells",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: every private sell (full, partial, every reason) uses amountOutMin = 0",
+      "behavior_impact": "none",
+      "risk": "A sell accepts any output: price movement between trigger and inclusion, a sell tax raised by the token owner, or a chain where the private route is a plain sequencer submission (Base, Arbitrum) can turn the exit into a near-zero fill (AUD-EXIT-001). The loss is bounded by the position."
+    },
+    {
+      "id": "bounded-all",
+      "name": "Bounded floor on every private sell, from a fresh quote with the reason-aware slippage (the computePublicMinOut rule the public fallback already uses)",
+      "behavior_impact": "Private sells revert instead of filling below the floor; the ladder then falls through to the public fallback.",
+      "risk": "During a fast rug a floor can make the private attempt revert and cost its confirm window before the public fallback runs; the quote itself has the probe problems of AUD-EXIT-003 unless it is a proper sell quote for the held amount."
+    },
+    {
+      "id": "bounded-routine-zero-antirug",
+      "name": "Bounded floor for routine exits (trailing, stop-loss, urgency, partial); keep 0 for anti-rug exits only",
+      "behavior_impact": "Routine exits gain a floor; anti-rug exits keep filling at any price to get out first.",
+      "risk": "Anti-rug sells keep the zero-floor exposure; a mislabelled reason would pick the wrong policy."
+    }
+  ],
+  "recommendation": "bounded-routine-zero-antirug (the research recommendation), decided only after a Phase 23 fork replay of the LADYS position and rug fixtures shows the anti-rug private attempt still lands; the quote used for the floor must be a sell quote for the held amount, not the price probe.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether an exit sell can ever fill at any price.",
+  "findings": [
+    "AUD-EXIT-001"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}
