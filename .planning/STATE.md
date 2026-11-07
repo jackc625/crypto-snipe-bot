@@ -31,8 +31,8 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 
 Phase: 22 (Safety Rails & Audit) — READY TO EXECUTE
 Plan: 0/29 complete (13 waves; first is 22-01, the SAFE-01 backup)
-Status: Planned and checker-verified; next is `/gsd-execute-phase 22`. Run on Node 22.16.0 by absolute path (CONTEXT D-21); the global Node 24 cannot load better-sqlite3.
-Last activity: 2026-11-06 — Phase 22 planned (research, 29 plans, 1 revision iteration, verification passed)
+Status: Planned, cross-AI reviewed (22-REVIEWS.md, Codex only; Antigravity dropped on quota), replanned with --reviews and checker-verified; next is `/gsd-execute-phase 22`. Run on Node 22.16.0 by absolute path (CONTEXT D-21); the global Node 24 cannot load better-sqlite3.
+Last activity: 2026-11-06 — Phase 22 replanned from review feedback (all 29 plans revised; 1 revision iteration; verification passed). New D-STOP-THE-LINE record ESC-PRE-04: dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24).
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
