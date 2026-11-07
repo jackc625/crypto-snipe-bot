@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-24-PLAN.md
-last_updated: "2026-11-07T19:59:45.871Z"
+stopped_at: Completed 22-25-PLAN.md
+last_updated: "2026-11-07T20:52:48.603Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 50bba09cdb051ceba5de8127a4f7d53357b80029
+state_head: e569ae101b40fd6fdd28a2f3b9eaebe246a99555
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 16
+  completed_plans: 17
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 17 of 29
+Plan: 18 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -54,6 +54,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 ## Blockers / Concerns
 
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
+- **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
 
 ## Operating Notes (carry to next session)
 
@@ -93,11 +94,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P22 | 58min | 3 tasks | 39 files |
 | Phase 22 P23 | 30min | 2 tasks | 26 files |
 | Phase 22 P24 | 33min | 2 tasks | 30 files |
+| Phase 22 P25 | 36min (continuation; incl. operator wait) | 3 tasks tasks | 33 files files |
 
 ## Session
 
-**Last session:** 2026-11-07T19:59:45.799Z
-**Stopped at:** Completed 22-24-PLAN.md
+**Last session:** 2026-11-07T20:52:48.529Z
+**Stopped at:** Completed 22-25-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -151,3 +153,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-24: no integration or fork test path signs with the real key or sends to real mainnet (fork contexts use Hardhat keys on 127.0.0.1:8545); no rail-class stop
 - [Phase 22]: 22-24: RC-19 integration/fork side registered as S1 rediscovery AUD-TESTI-011 on ESC-PRE-03, not re-escalated; no new S1 so no area checkpoint
 - [Phase 22]: 22-24: coverage map AUD-TESTI-020: 0 of 39 registered money-path S0/S1 findings are caught on the real path by any integration or fork test (Phase 23 work list)
+- [Phase 22]: 22-25 ESC-SCRIPTS-01: operator 'Acknowledge. Decide in phase 29' on S1 AUD-SCRIPTS-002 (signing scripts outside the nonce lock and pause switch); stays S1, no decimal phase. The D-06 premise challenge (tryAcquireThenRelease releases the lock before the script signs: check-then-act race) is DEFERRED to Phase 29 HYG-03, NOT resolved; card SCRIPTS-01 stays open, D-06 wording unchanged
+- [Phase 22]: Orchestrator context (not operator): hold-lock (script holds acquireProcessLock for its whole run, checks pause while holding it) is the only option that closes the race and is the recommendation on record; query-then-sign gives false assurance; hold-lock matches BUY-01 refuse-while-running, and BUY-01 handoff-to-running-bot would mean no separate script signs for a deliberate buy
+- [Phase 22]: 22-25: SCRIPTS/CONTRACTS/ROOT have no S0, rail, test-origin-db-row or non-public secret; Hardhat real .env load and mainnet/sepolia DEPLOY_PRIVATE_KEY accounts are a recorded boundary (AUD-CONTRACTS-001, S2) no test/fork/CI path reaches; RC-27 = AUD-SCRIPTS-001 (S3); root findings in sweep/contrib-ROOT.json for 22-28
