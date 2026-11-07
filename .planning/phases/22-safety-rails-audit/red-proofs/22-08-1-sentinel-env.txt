@@ -1,0 +1,56 @@
+RED proof 22-08-1 — sentinel-env
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:23:17.485Z at HEAD 64bc83235844077c7975ae0e0c0275cf31b73cb3.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..52a218d 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -1245,7 +1245,7 @@ function applyEnv(st) {
+     }
+     for (const [k, v] of Object.entries(st.sentinels)) {
+         if (isEssentialKey(k)) throw new Error('SAFE-02 rails install failed: test/.env.test may not set ' + k);
+-        process.env[k] = v;
++        void v; // RED 22-08-1: sentinel values are NOT loaded into process.env
+     }
+     if (st.mode === 'fork') {
+         for (const k of FORK_SHELL_KEYS) {
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/envSentinel.test.ts
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/envSentinel.test.ts (7 tests | 2 failed) 50ms
+       × module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel 4ms
+       × every .env.example key in process.env equals its test/.env.test value 5ms
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/envSentinel.test.ts > sentinel env (D-02, AC-13) > module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel
+  AssertionError: expected undefined to be 'TEST-SENTINEL' // Object.is equality
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/envSentinel.test.ts > sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value
+  AssertionError: expected [ 'PRIVATE_KEY', …(145) ] to deeply equal []
+  - Expected
+  + Received
+  +   "RPC_TIMEOUT_MS",
+  +   "EXIT_ROUTINE_MAX_FAILURES",
+   Test Files  1 failed (1)
+        Tests  2 failed | 5 passed (7)
+     Duration  380ms (transform 25ms, setup 60ms, import 39ms, tests 50ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042313-14168-665123 | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042313-14168-665123\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  7 passed (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042316-20888-be298d | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042316-20888-be298d\summary.json
