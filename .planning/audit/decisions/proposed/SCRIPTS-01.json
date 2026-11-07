@@ -38,6 +38,11 @@
     "AUD-SCRIPTS-002"
   ],
   "decided": null,
-  "needed_by": "Phase 29 HYG-03 discussion (before the script changes are planned); the operator preference is asked for at the 22-25 Task 3 checkpoint because it questions the D-06 premise",
-  "premise_challenge": "D-06 (22-CONTEXT.md): \"The query API for Phase 29 scripts is try-acquire-then-release.\" Re-surfaced per D-STOP-THE-LINE at 22-25 Task 3; not filed and deferred."
+  "needed_by": "Phase 29 HYG-03 discussion, the decision owner per operator ruling ESC-SCRIPTS-01 (\"decide in Phase 29\"): rule on this card before the script changes are planned, together with card BUY-01 (still open; owned by the Phase 24 capital discussion, which comes before Phase 29), because the BUY-01 outcome decides whether the deliberate buy is still a separate signing script",
+  "premise_challenge": "D-06 (22-CONTEXT.md): \"The query API for Phase 29 scripts is try-acquire-then-release.\" Re-surfaced per D-STOP-THE-LINE at 22-25 Task 3; not filed and deferred. Operator ruling at that checkpoint (ESC-SCRIPTS-01, verbatim \"Acknowledge. Decide in phase 29\"): the question is left open, undecided, for the Phase 29 discussion; D-06 is not reworded now.",
+  "operator_input": "\"Acknowledge. Decide in phase 29\" (the operator's words, verbatim, 2026-11-07, at the 22-25 Task 3 blocking checkpoint; record ESC-SCRIPTS-01). Meaning: AUD-SCRIPTS-002 is acknowledged and option decide-in-phase-29 was chosen; no preference between keep-current, query-then-sign, hold-lock and bot-performs-operation was given, so the question stays open for the Phase 29 (HYG-03) discussion. The hold-lock recommendation stays on record. This input does not change status.",
+  "decision_owner": "Phase 29 (HYG-03) discussion: must rule on this card before the HYG-03 script changes are planned, with the outcome of card BUY-01 (deliberate-buy protection, Phase 24 capital discussion) in front of it. If BUY-01 picks handoff-to-running-bot, the deliberate buy becomes a bot-performed operation and no separate script signs for it; if BUY-01 picks refuse-while-running-and-prompt, that matches hold-lock here. The D-06 wording in 22-CONTEXT.md (\"the query API for Phase 29 scripts is try-acquire-then-release\") stays unchanged until Phase 29 rules.",
+  "related_cards": [
+    "BUY-01"
+  ]
 }

@@ -6,7 +6,7 @@
   "rc": [],
   "research_suggested_severity": null,
   "duplicate_of": null,
-  "escalation_ref": null,
+  "escalation_ref": "ESC-SCRIPTS-01",
   "od_ref": "SCRIPTS-01",
   "reported_by": [
     "claude (22-25 executor)"
