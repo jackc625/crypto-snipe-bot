@@ -1,0 +1,50 @@
+{
+  "id": "AUD-BUY-017",
+  "title": "Telegram alpha drops for V3 pass block 0, so an existing liquid pool is dropped unless someone mints new liquidity within 30 seconds",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/alphaDrop.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/alphaDrop.ts:43-49@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loops fee tiers [500, 3000, 10000]; the first pool found is passed with blockNumber 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:150-156@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same-block check queries Mint events from blockNumber to blockNumber (0 to 0)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:162-176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "then waits up to 30 s for a new Mint before dropping the opportunity"
+    }
+  ],
+  "sibling_sites_checked": "The V2 alpha path (alphaDrop.ts:27-38) checks the pair exists and goes straight to the handler; it does not have this defect. The factory-event V3 path passes the real event block (bot.ts:1541, :1669).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the alpha path calls handleNewV3PoolForChain with blockNumber 0; waitForLiquidity then looks for a Mint in block 0..0 (none) and waits 30 s for a NEW Mint event. A pool that already has liquidity is skipped. Missed opportunity only. The routing also takes the first fee tier that has a pool (500, 3000, 10000), not the deepest.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-021"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "BUY-06",
+  "recommendation": "For an alpha drop, check current pool liquidity instead of waiting for a new Mint, and choose the fee tier by depth. Behaviour change (more alpha buys), card BUY-06.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,145 @@
+[
+  {
+    "path": "src/alphaDrop.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-004",
+      "AUD-BUY-017"
+    ]
+  },
+  {
+    "path": "src/bot.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-001",
+      "AUD-BUY-002",
+      "AUD-BUY-003",
+      "AUD-BUY-004",
+      "AUD-BUY-005",
+      "AUD-BUY-007",
+      "AUD-BUY-008",
+      "AUD-BUY-009",
+      "AUD-BUY-010",
+      "AUD-BUY-011",
+      "AUD-BUY-013",
+      "AUD-BUY-015",
+      "AUD-BUY-017",
+      "AUD-BUY-018",
+      "AUD-BUY-019",
+      "AUD-BUY-020",
+      "AUD-BUY-022",
+      "AUD-BUY-023",
+      "AUD-BUY-025",
+      "AUD-BUY-026"
+    ]
+  },
+  {
+    "path": "src/telegramListener.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-004",
+      "AUD-BUY-006",
+      "AUD-BUY-011",
+      "AUD-BUY-021"
+    ]
+  },
+  {
+    "path": "src/utils/abis.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/blocklist.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-013"
+    ]
+  },
+  {
+    "path": "src/utils/honeypot/abi.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/honeypot/bytecodeScan.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-014"
+    ]
+  },
+  {
+    "path": "src/utils/honeypot/checkerContract.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/honeypot/index.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/honeypot/sanitize.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/honeypot/simulator.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/honeypot/types.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/pairDiscovery.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-024"
+    ]
+  },
+  {
+    "path": "src/utils/safetyProviders/goplus.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-016",
+      "AUD-BUY-026"
+    ]
+  },
+  {
+    "path": "src/utils/safetyProviders/honeypotIs.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-026"
+    ]
+  },
+  {
+    "path": "src/utils/safetyProviders/mudra.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/safetyProviders/types.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/safetyProviders/unicrypt.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-016"
+    ]
+  },
+  {
+    "path": "src/utils/tokenSafety.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-007",
+      "AUD-BUY-012",
+      "AUD-BUY-013",
+      "AUD-BUY-016",
+      "AUD-BUY-026"
+    ]
+  }
+]

@@ -1,0 +1,68 @@
+{
+  "id": "AUD-BUY-003",
+  "title": "Snipe buy minOut fails open: when the quote fails the buy is still sent with amountOutMin = 0",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C01",
+    "C02",
+    "C04"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1048-1056@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2: let minOut = 0n; try { getAmountsOut ... } catch { warn \"defaulting to 0\" } — then the swap is built with that minOut (:1104-1109)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1362-1377@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3: same pattern on quoteExactInputSingle; amountOutMinimum: minOut (:1390)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1053@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "minOut = expectedOut - expectedOut * BigInt(slippage) / 100n: BigInt() of a fractional percent throws RangeError, which the same catch turns into minOut = 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "slippagePercent is hard-coded 5, so the fractional crash is latent today; CONFIG.slippagePercent || 5 at bot.ts:1050/:1373 also makes 0 impossible"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:711-729@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sibling in the same file already fails CLOSED: the deliberate public leg returns null on a quote failure"
+    }
+  ],
+  "sibling_sites_checked": "V2 snipe (bot.ts:1048-1056) and V3 snipe (:1362-1377) both fail open. Deliberate private leg (:527-543) also defaults privMinOut to 0 on a quote failure; that is documented intent (comment :533-538: private, un-sandwichable routing) and is recorded here as a sibling for card OD-15, not as a separate defect. Deliberate public leg (:711-729) fails closed (correct). tokenSafety simulateSwap/simulateSwapForChain use amountOutMin 0 only inside .staticCall (simulation, no money). Exit-side minOut belongs to the EXIT slice (RC-03).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-02"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. The code alone proves the fail-open: on any quote error minOut stays 0n and the buy proceeds. Plausible condition: one RPC error or a quoter revert during a launch block. The private routing prevents a sandwich but not buying at the top of a launch block behind other snipers, so the loss is bounded by the snipe amount, not prevented.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-15",
+  "recommendation": "Decide on card OD-15 whether a snipe whose quote fails is skipped (fail closed) or sent unprotected. Separately keep the slippage math in bigint basis points so a fractional percent can never throw into the fail-open catch. Phase 24, after a Phase 23 proof; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

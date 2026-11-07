@@ -1,0 +1,112 @@
+{
+  "id": "AUD-BUY-004",
+  "title": "Double-buy race: the already-sniped check runs many awaits before the row is written and is never repeated inside the nonce lock, so two concurrent handlers for one token both buy",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C07",
+    "C15"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/telegramListener.ts",
+    "src/alphaDrop.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:881-885@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 dedup: isTokenSniped is read once at handler start"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1210-1214@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 dedup: same read"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:341-347@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isTokenSniped = SELECT 1 FROM trades WHERE token=? AND chain=? — true only once a row exists"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1127@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 row is inserted only after submitBuyTx returned (many awaits after the check)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1451@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 row is inserted only after submit"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:263-268@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitBuyTx serializes submits through withNonceLock but nothing re-checks isTokenSniped inside the lock: the second handler waits for the lock, then buys again"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1225@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 handler awaits waitForLiquidity (up to 30 s) before its buy, widening the window against a V2 handler for the same token"
+    },
+    {
+      "type": "code",
+      "ref": "src/alphaDrop.ts:36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Telegram alpha drop calls handleNewPairForChain directly, concurrently with any factory event for the same pair"
+    },
+    {
+      "type": "code",
+      "ref": "src/alphaDrop.ts:47@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same for V3"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:120-124@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one address is routed to every matching chain context without awaiting"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1636-1651@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 HTTP poll: async setInterval callback with no in-flight guard; lastBlock is advanced only after queryFilter and the loop (:1647), so a cycle slower than 2 s lets the next cycle query the same block range and dispatch the same PairCreated twice"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1660-1676@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 HTTP poll: same shape"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:549-551@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getTradeIdForPendingToken orders by second-resolution timestamp, so two rows of one token in one second are ambiguous (AUD-BUY-020)"
+    }
+  ],
+  "sibling_sites_checked": "Both handler entry checks (bot.ts:881, :1211) and both inserts (:1127, :1451) checked. Concurrency sources found: V2 PairCreated and V3 PoolCreated for one token; the same token on two V2 DEXes of a chain; Telegram alpha routing (telegramListener.ts:120-124 -> alphaDrop.ts:36/:47) concurrent with factory events; overlapping HTTP-poll cycles (:1636-1651, :1660-1676); duplicate listeners after dashboard stop/start or a WS drop (AUD-BUY-008, AUD-BUY-011). The deliberate path has a separate structural guard (nonce + balance delta, :617-662) and is not affected by this race within one process. The risk-gate race across DIFFERENT tokens is a separate mechanism, AUD-BUY-010.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-04"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. The check-then-act gap and the concurrent dispatch sources are visible in code; a double buy spends twice the configured amount on one token (OVERSPEND), and the second position is then mis-linked (AUD-BUY-020).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-008",
+    "AUD-BUY-010",
+    "AUD-BUY-011",
+    "AUD-BUY-020"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-03",
+  "recommendation": "Phase 24: claim the token synchronously (before the first await) in an in-process set keyed by chain+token, and re-check the claim and the DB inside the nonce lock before submitting; release the claim on a genuine fail-clean. The exact mechanism and whether risk budget is reserved at the same time is card BUY-03. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

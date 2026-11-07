@@ -1,0 +1,62 @@
+{
+  "id": "AUD-BUY-006",
+  "title": "Telegram allowlist is allow-all unless BOTH sender and channel lists are set: empty means allow, and sender OR channel is enough",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C18",
+    "C20"
+  ],
+  "files": [
+    "src/telegramListener.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:53-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lists parsed from env with || ''; an unset or empty value gives an empty Set"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:77-78@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "senderAllowed = size===0 || has(sender); channelAllowed = size===0 || has(chat)"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:80-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a message is rejected only if BOTH are false (OR semantics)"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the comment states the OR logic is intended (D-21, D-22), so this is a policy question as well as a defect"
+    }
+  ],
+  "sibling_sites_checked": "The only allowlist in the slice is telegramListener.ts:53-83. The credential gate (:47-50) only decides whether the listener starts. The regex intake, cooldown and processed set are SC-09 (AUD-BUY-021). Routing to stopped chains is AUD-BUY-011.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-09"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. Code alone proves the truth table: no lists (the default) = every visible message accepted; only senders set = channelAllowed is true for every message = every message accepted; only channels set = same through senderAllowed. Anyone who can post in any chat the account can see can push a token address of their choosing into the buy pipeline (the safety bank still runs), which bypasses the intended trust boundary.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-011",
+    "AUD-BUY-021"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-16",
+  "recommendation": "Decide on card OD-16 the default (fail closed when nothing is configured) and the semantics (AND vs OR, or an explicit mode). Phase 24; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

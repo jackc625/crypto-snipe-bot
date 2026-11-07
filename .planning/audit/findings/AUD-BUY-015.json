@@ -1,0 +1,51 @@
+{
+  "id": "AUD-BUY-015",
+  "title": "The V3 minimum-liquidity check only proves the quoter did not revert, which an exact-input quote does not do on thin liquidity, so it does not enforce the threshold",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:179-215@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkMinLiquidity: two quotes (0.001 native and the full threshold); success = no revert; the returned amounts are ignored"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:185@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "threshold = parseEther(ctx.chain.minLiquidityThreshold)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1232-1238@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only gate on V3 pool depth before the buy (the V2-only liquidity checks are skipped for V3, :1290-1292)"
+    }
+  ],
+  "sibling_sites_checked": "V2 uses a reserve comparison against a hard-coded 1 native (tokenSafety.ts:417-421, threshold row TH-BUY-09) instead of the configured threshold; V3 uses the configured threshold through this quote-success test. No other V3 depth check exists in the slice.",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2, candidate: checkMinLiquidity treats \"quoteExactInputSingle(amountIn = threshold) did not revert\" as \"the pool holds at least the threshold\". An exact-input quote with no price limit walks the pool to its price bound and returns whatever it could fill without reverting (Uniswap V3 QuoterV2 behaviour, to be proven on a fork in Phase 23), so a thin V3 pool passes. The buy itself is still bounded by the roundtrip gate and minOut (when the quote succeeds), which keeps this at S2.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-013"
+  ],
+  "tags": [
+    "safety-gate"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-05",
+  "recommendation": "Measure V3 depth directly (in-range liquidity or the WETH balance of the pool, or compare the quoted output against an expected price) and use one threshold semantics for V2 and V3. Behaviour change on card BUY-05.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

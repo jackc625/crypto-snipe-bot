@@ -1,0 +1,47 @@
+{
+  "id": "AUD-BUY-024",
+  "title": "Section C SC-20: src/utils/pairDiscovery.ts has no importer and uses the legacy single-chain mainnet config",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/utils/pairDiscovery.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/pairDiscovery.ts:9-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getPairAddressFromToken uses CONFIG.factoryAddress / CONFIG.wethAddress and the legacy getProvider()"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e pairDiscovery -e getPairAddressFromToken 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only comments in bot.ts (:811, :841) and the file itself: no importer"
+    }
+  ],
+  "sibling_sites_checked": "Searched src and scripts for the module name and its export.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: unreachable module; if revived it would query the hard-coded mainnet V2 factory for every chain.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-026"
+  ],
+  "tags": [
+    "section-c:SC-20",
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Delete the module (no importer, no behaviour change) and fix the two comments that cite it. Phase 29.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

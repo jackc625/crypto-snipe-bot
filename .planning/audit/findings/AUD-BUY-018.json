@@ -1,0 +1,57 @@
+{
+  "id": "AUD-BUY-018",
+  "title": "Section C SC-01: the snipe deadline is fixed once before submit, and the tx is built once, so later escalation attempts reuse a 60-second deadline",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C05"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/txManager.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1043@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 deadline = now + 60, computed before the quote, pause checks and the affordability gate"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1382@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 deadline = now + 60"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:113@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendTxWithRetry calls txBuilder() once and hands the same tx to every attempt"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:544@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deliberate private leg: same 60 s pattern"
+    }
+  ],
+  "sibling_sites_checked": "All deadline sites in the slice: bot.ts:544 (deliberate private, 60 s), :731 (deliberate public, 600 s, single send), :1043 and :1382 (snipes), and the simulation-only deadlines in tokenSafety.ts (:24, :144, :281, :380). Thresholds TH-BUY-04 and TH-BUY-05.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: attempts that start more than 60 s after the deadline was computed are doomed to revert in simulation, which cuts the private escalation short (missed snipes). The strategies simulate before sending, so no gas is lost.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "section-c:SC-01"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-07",
+  "recommendation": "Rebuild the tx (fresh deadline) per attempt, or size the deadline to the whole escalation budget; the fix sits in the TX slice's sendTxWithRetry. Card BUY-07.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,61 @@
+{
+  "id": "AUD-BUY-026",
+  "title": "Dead code in the buy slice: getV3Price, the legacy single-chain safety helpers imported into bot.ts, and the third-party honeypot dispatch",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/bot.ts",
+    "src/utils/tokenSafety.ts",
+    "src/utils/safetyProviders/honeypotIs.ts",
+    "src/utils/safetyProviders/goplus.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:119-140@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getV3Price is defined and never called"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:4-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkTokenMetadata, isLiquidityLocked, simulateSwap, checkHoneypot, isBlacklistedToken, isLiquiditySufficient, isKnownBadToken, hasMaxWalletOrTxLimits are imported and never called in bot.ts"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:309-314@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkHoneypotForChain has no caller (removed from both banks per the comment at bot.ts:955-963), so honeypotIsCheck and goplusHoneypotCheck are unreachable"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e getV3Price -e \"checkHoneypotForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "definitions only"
+    }
+  ],
+  "sibling_sites_checked": "Call counts for every imported legacy helper in bot.ts were 0 (grep over the snapshot). simulateSell is RC-16 (AUD-BUY-007), checkHoneypot's key defect is AUD-BUY-012, pairDiscovery is SC-20 (AUD-BUY-024).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: unreachable code that still reads like live safety logic and keeps legacy CONFIG paths importable.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-007",
+    "AUD-BUY-012",
+    "AUD-BUY-024"
+  ],
+  "tags": [
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Delete the unreachable functions and imports (no behaviour change). Phase 29.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,68 @@
+{
+  "id": "AUD-BUY-007",
+  "title": "Dead tokenSafety.simulateSell sends a real approve of the whole balance to the legacy router, outside the nonce lock; it is still imported, and maybeApproveForChain is also dead",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C06",
+    "C07"
+  ],
+  "files": [
+    "src/utils/tokenSafety.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:269-299@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell: erc20 connected to the Wallet signer; approve(CONFIG.routerAddress, balance) at :277 is a real transaction, only the swap is .staticCall"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell is still imported into bot.ts"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:222-229@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "maybeApproveForChain: defined, never called"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"simulateSell(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the definition at tokenSafety.ts:269; no caller"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"maybeApproveForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the definition at bot.ts:222; no caller"
+    }
+  ],
+  "sibling_sites_checked": "All approve( sites in the slice: bot.ts:226 (dead maybeApproveForChain, inside the nonce lock), tokenSafety.ts:277 (dead simulateSell, outside the lock); abis.ts:31 is the ABI fragment. Exit-side approvals belong to the EXIT slice. The other legacy single-chain helpers imported at bot.ts:4-18 are recorded in AUD-BUY-026; the key-handling defect in checkHoneypot is AUD-BUY-012.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-16"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "S2, equal to the research suggestion. It is a real signing approve inside a function named like a read-only check (same class as the deleted hasHighTransferTax), but it has no caller at the base, so the effect is a re-introduction hazard, not a live path.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-012",
+    "AUD-BUY-026"
+  ],
+  "tags": [
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Delete simulateSell, its import at bot.ts:17 and maybeApproveForChain (no caller, so no behaviour change). Phase 29 hygiene unless Phase 24 touches the file first.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

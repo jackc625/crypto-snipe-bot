@@ -1,0 +1,57 @@
+{
+  "id": "AUD-BUY-025",
+  "title": "Rediscovery of RC-10 in the deliberate public buy: stx.wait() with no timeout runs inside the per-wallet nonce lock",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C09"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-756@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withNonceLock(... async () => { stx = await router.swap...; const rec = await stx.wait(); ... })"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1045",
+      "note": "wait() defaults its timeout to 0, which arms no timer and waits forever"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1138",
+      "note": "a status-0 receipt makes wait() throw CALL_EXCEPTION, so a revert leaves executeDeliberateBuy by a throw (no record, which is correct: no tokens)"
+    }
+  ],
+  "sibling_sites_checked": "The only wait( in the slice is bot.ts:750 (C09 search). The snipe submits go through sendTxWithRetry/strategies (TX slice, owner of RC-10). The deliberate private leg runs escalatePrivateBuy under the lock (:558), which is the TX slice's reconcile machinery.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-10"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion for RC-10 and to the pre-phase escalation ESC-PRE-02, which names this exact site (src/bot.ts:750, lock taken at :746) as one of its three: if the public tx is never mined (dropped or underpriced), wait() never returns, the nonce lock is never released, and every later same-wallet submit (sells, anti-rug exits) in that process blocks behind it. Registered from the BUY slice because the site is in this slice; it is a rediscovery, so it links the existing record through resolved_items and is not escalated again (PROTOCOL rediscovery rule). The TX slice (22-20) owns RC-10 and its other two sites (exitEngine.ts:545, :556); 22-28 merges the entries (one becomes duplicate_of the other).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-001"
+  ],
+  "tags": [
+    "capital",
+    "rediscovery"
+  ],
+  "escalation_ref": "ESC-PRE-02",
+  "od_ref": null,
+  "recommendation": "Covered by the RC-10 fix (bounded wait or no wait inside the lock) planned for Phase 24 in the TX slice; apply it to this site too.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

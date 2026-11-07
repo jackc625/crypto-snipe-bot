@@ -1,0 +1,66 @@
+{
+  "id": "AUD-BUY-020",
+  "title": "Section C SC-06: the trade id is found by \"latest pending row of this token\" (second resolution) instead of the inserted row id, and the buy bookkeeping is several separate writes",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13",
+    "C15"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:549-551@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "SELECT id ... WHERE token=? AND chain=? AND status=pending AND action=buy ORDER BY timestamp DESC LIMIT 1; timestamp is whole seconds"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1137@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "timestamp = Math.floor(Date.now()/1000)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1162@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 resolves the id by that query instead of insertTrade.run(...).lastInsertRowid"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1481@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 same"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:834@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deliberate path same"
+    }
+  ],
+  "sibling_sites_checked": "All three lookups (bot.ts:834, :1162, :1481) use the token query; none uses lastInsertRowid. The write sequence across db.ts/exitEngine.ts/anti-rug is shared with the DB slice (22-21) and EXIT slice (22-18).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2, bounded: two pending rows of one token exist only after a double buy (AUD-BUY-004); then both handlers can resolve the same id, arm two monitors on one exit_state row and leave the other position without one until a restart. The multi-statement sequence (insertTrade, later upsertExitState, lp_baseline) is not transactional, so a crash between them leaves partial state that the boot resume handles only in part (AUD-BUY-002 traces).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002",
+    "AUD-BUY-004"
+  ],
+  "tags": [
+    "section-c:SC-06"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Use the inserted row id returned by insertTrade.run for every later link (bookkeeping correctness, no trading behaviour change). The transactional grouping of the post-buy writes goes with card BUY-02.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

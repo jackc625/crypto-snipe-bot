@@ -1,0 +1,56 @@
+{
+  "id": "AUD-BUY-016",
+  "title": "The GoPlus liquidity-lock check queries the pair address as if it were a token, and the Unicrypt call has no timeout",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/utils/safetyProviders/goplus.ts",
+    "src/utils/safetyProviders/unicrypt.ts",
+    "src/utils/tokenSafety.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/goplus.ts:57-60@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "goplusLiquidityLockCheck(ctx, pairAddress) calls token_security with contract_addresses = the pair address and reads lp_holders of that result"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/unicrypt.ts:18-20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "axios.get with no timeout option, wrapped in retry()"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:65-67@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "legacy isLiquidityLocked: same missing timeout and a hard-coded chainId=11155111 (dead)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/goplus.ts:33-36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: GoPlus sets timeout 10000"
+    }
+  ],
+  "sibling_sites_checked": "All four providers read: goplus (timeout 10000), honeypotIs (timeout 10000, dead path), mudra (timeout 10000, falls back to GoPlus), unicrypt (no timeout). Which chain uses which lock provider is set in chainRegistry.ts (DB slice), not changed here. Whether GoPlus answers a pair address in token_security is an external API fact to confirm in Phase 23.",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: both fail toward not buying. A wrong GoPlus query returns no lp_holders, so the lock reads as not locked and the V2 snipe is skipped on every chain that uses GoPlus for locks; a hung Unicrypt request stalls the safety bank (and the handler) with no timeout. Missed opportunities and stuck handlers, no capital loss.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "safety-gate"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-05",
+  "recommendation": "Query GoPlus by the token address (its lp_holders describe the token's LP) and add a timeout to the Unicrypt call matching the other providers. Behaviour change (more snipes can pass), card BUY-05.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

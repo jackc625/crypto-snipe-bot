@@ -1,0 +1,51 @@
+{
+  "id": "AUD-BUY-014",
+  "title": "The mutable-token bytecode scan cannot see an upgradeable proxy's implementation and matches selectors as raw substrings anywhere in the bytecode",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [],
+  "files": [
+    "src/utils/honeypot/bytecodeScan.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/honeypot/bytecodeScan.ts:93-104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getCode(token) then codeLower.includes(selector) over the whole bytecode"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/honeypot/bytecodeScan.ts:99-101@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"0x\" code returns not-mutable"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/honeypot/bytecodeScan.ts:40-60@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "fixed list of 19 selectors; a renamed setter is invisible"
+    }
+  ],
+  "sibling_sites_checked": "Only caller pair: bot.ts:982 (V2 bank) and :1317 (V3 bank). No implementation-slot (EIP-1967) read anywhere in the slice. GoPlus returns is_proxy (goplus.ts:21) but the GoPlus token check is not called by the buy path (AUD-BUY-026).",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the gate exists to stop \"owner flips the tax after we buy\" (comment :5-8). A proxy token passes it (getCode returns the proxy, whose code has none of the setter selectors) and can change behaviour after the buy; substring matching can also block a clean token whose bytecode contains the 8 hex digits elsewhere. Bounded: the roundtrip gate still measures tax at buy time. Candidate until a Phase 23 fork test shows a proxy token passing.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-013"
+  ],
+  "tags": [
+    "safety-gate"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-05",
+  "recommendation": "Decide on card BUY-05 whether proxy tokens are blocked outright, scanned through their implementation slot, or accepted as today; match selectors only at PUSH4 positions if the scan stays. Behaviour change, Phase 24 or 29 per the card.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

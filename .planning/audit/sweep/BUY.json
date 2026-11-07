@@ -1,0 +1,138 @@
+{
+  "slice": "BUY",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-BUY-003"
+      ],
+      "search": "grep -rnE \"BigInt\\(|Number\\(|parseFloat|parseInt|toFixed\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read every money-adjacent hit (bot.ts:1053/:1374 BigInt(slippage); checkerContract.ts:134-136 Number() of tax bps; unicrypt.ts:41, tokenSafety.ts:93/:249/:499 float ratios of bigint LP/limit amounts)"
+    },
+    "C02": {
+      "result": [
+        "AUD-BUY-003"
+      ],
+      "search": "grep -rnE \"\\|\\| \" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); classified each numeric or env default (bot.ts:529/:703/:1050/:1373 CONFIG.slippagePercent || 5; telegramListener.ts:54/:57 allowlist || ''); env reads in chainRegistry.ts:663-696 (|| defaults) read as definition sites"
+    },
+    "C03": {
+      "result": "checked, none",
+      "search": "grep -rn \"decimals\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:988-997/:1322-1331 (display only, default 18), tokenSafety.ts:124/:358 (6..18 bound, bigint compared with number is exact); no decimals-scaled money math in the slice"
+    },
+    "C04": {
+      "result": [
+        "AUD-BUY-003"
+      ],
+      "search": "grep -rnE \"amountOutMin|minOut|slippage\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); traced bot.ts:1048-1056, :1362-1377 (fail-open), :527-543 (documented private 0), :711-731 (fail-closed public), tokenSafety.ts:143/:379 (staticCall simulations only)"
+    },
+    "C05": {
+      "result": [
+        "AUD-BUY-018"
+      ],
+      "search": "grep -rn \"deadline\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:544, :731, :1043, :1382 plus txManager.ts:113 (txBuilder called once)"
+    },
+    "C06": {
+      "result": [
+        "AUD-BUY-007"
+      ],
+      "search": "grep -rn \"approve(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:226 (dead maybeApproveForChain), tokenSafety.ts:277 (dead simulateSell, real tx); git grep for callers at the base"
+    },
+    "C07": {
+      "result": [
+        "AUD-BUY-002",
+        "AUD-BUY-004",
+        "AUD-BUY-007",
+        "AUD-BUY-025"
+      ],
+      "search": "grep -rnE \"nonce|withNonceLock|getTransactionCount\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read submitBuyTx (bot.ts:263-268), the deliberate guard (:576-662), the public leg lock (:746-756), and the reconcile loop it relies on (reconciliation.ts:454-628, TX slice)"
+    },
+    "C08": {
+      "result": [
+        "AUD-BUY-019"
+      ],
+      "search": "grep -rnE \"confirmations|reorg|getBlock|getBlockNumber|removed\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); only the HTTP pollers (bot.ts:1632-1672) read the head; no confirmation depth or removed-log handling anywhere"
+    },
+    "C09": {
+      "result": [
+        "AUD-BUY-002",
+        "AUD-BUY-025"
+      ],
+      "search": "grep -rnE \"\\.status|wait\\(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:750 stx.wait() (ethers 6.16.0 provider.js:1045 timeout 0, :1138 status-0 throw); snipe receipts are handled in reconciliation.ts:371-410 (TX slice), read for the RC-01 traces"
+    },
+    "C10": {
+      "result": [
+        "AUD-BUY-008",
+        "AUD-BUY-011"
+      ],
+      "search": "grep -rnE \"WebSocketProvider|removeAllListeners|on\\('close'|reconnect|destroy\\(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read both reconnect loops (bot.ts:1549-1618), onRestart (:1808-1852), provider.ts:33-51 and the dashboard stop/start routes (api/routes/chains.ts:121-190)"
+    },
+    "C11": {
+      "result": [
+        "AUD-BUY-002",
+        "AUD-BUY-005"
+      ],
+      "search": "grep -rnE \"unhandledRejection|uncaughtException|\\.catch\\(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) and git grep -e unhandledRejection -e uncaughtException over src and scripts at the base (no handler); listed every un-awaited async call in bot.ts (:1531, :1542, :1583, :1644, :1669, :2360) and the async interval/close callbacks; node 22.16.0 rejection probe (exit=1)"
+    },
+    "C12": {
+      "result": [
+        "AUD-BUY-001",
+        "AUD-BUY-005",
+        "AUD-BUY-008",
+        "AUD-BUY-011"
+      ],
+      "search": "grep -rnE \"setInterval|setTimeout|clearTimeout|clearInterval|clearAll\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:164 (cleared), :1636/:1660 (poll handles discarded, never cleared), :1740/:1774 (no handle), :1557 while(true) reconnect, :2270 grace timer (unref); exit-monitor timers registered via exitManager (EXIT slice) and their death on process exit (scripts/deliberate-buy.ts:150)"
+    },
+    "C13": {
+      "result": [
+        "AUD-BUY-002",
+        "AUD-BUY-020"
+      ],
+      "search": "grep -rnE \"insertTrade|updateTradeStatus|\\.run\\(|transaction\\(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); no transaction() in the slice; traced the post-buy write sequence (bot.ts:1125-1173, :1449-1507, :772-863) and the SQL it hits (db.ts:320-327, :549-551, :597-604)"
+    },
+    "C14": {
+      "result": [
+        "AUD-BUY-001",
+        "AUD-BUY-002"
+      ],
+      "search": "grep -rnE \"isTokenSniped|already|getTradeIdForPendingToken\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); dedup semantics (db.ts:341-345 any row), the cases where a held position has no row (AUD-BUY-002) and where monitoring dies with a short-lived process (AUD-BUY-001)"
+    },
+    "C15": {
+      "result": [
+        "AUD-BUY-004",
+        "AUD-BUY-010",
+        "AUD-BUY-020"
+      ],
+      "search": "traced every check-then-act pair in the buy handlers: isTokenSniped (bot.ts:881/:1211) vs insertTrade (:1127/:1451); canSnipe (:909/:1248) vs recordSnipe (:1125/:1449) against riskManager.ts:75-148; getTradeIdForPendingToken (db.ts:549-551); pause CP1/CP2 (documented TOCTOU, kill-switch, not a capital overspend)"
+    },
+    "C16": {
+      "result": [
+        "AUD-BUY-002"
+      ],
+      "search": "grep -rnE \"maxFeePerGas|gasPrice|ceiling|maxPriorityFee|gasLimit\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (no hits: fee ceilings live in the TX slice); read the ceiling-hit throw (reconciliation.ts:606-614) for its effect on the buy catch"
+    },
+    "C17": {
+      "result": [
+        "AUD-BUY-012"
+      ],
+      "search": "grep -rnE \"PRIVATE_KEY|walletPrivateKey|new Wallet|Wallet\\(|signer|getWallet\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); tokenSafety.ts:41 key passed as an address (ethers 6.16.0 checks.js:61/:103-109, errors.js:100-124 read); no key value was printed during the audit"
+    },
+    "C18": {
+      "result": [
+        "AUD-BUY-006"
+      ],
+      "search": "Grep tool for the env-read pattern over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (telegramListener.ts:42-57; bot.ts:529, :557, :577, :703, :1764, :2178, :2305) and the per-chain env parsing it depends on (chainRegistry.ts:663-714); parse behaviour for unset/''/non-numeric recorded per row in thresholds/BUY.json"
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "grep -rnE \"cors|express|Authorization|apiKey|router\\.(get|post)\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files): no HTTP server, route or auth code in this slice (the only hits are DEX router calls); API auth/CORS is owned by the API slice. The dashboard stop/start routes were read only for their effect on buying (AUD-BUY-011), not for auth"
+    },
+    "C20": {
+      "result": [
+        "AUD-BUY-006",
+        "AUD-BUY-021",
+        "AUD-BUY-022"
+      ],
+      "search": "grep -rnE \"senderAllowed|channelAllowed|TELEGRAM_ALLOWED|processedContracts|COOLDOWN_MS|match\\(/0x\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read the whole Telegram handler (telegramListener.ts:41-136) and alphaDrop routing; token-controlled text into Telegram alerts (bot.ts sendCtxAlert sites)"
+    }
+  }
+}

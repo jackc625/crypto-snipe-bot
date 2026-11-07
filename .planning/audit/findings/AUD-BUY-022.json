@@ -1,0 +1,76 @@
+{
+  "id": "AUD-BUY-022",
+  "title": "Section C SC-10: the token symbol (chosen by the token deployer) is put unescaped into Telegram Markdown alerts and the dashboard notification feed",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "none",
+  "classes": [
+    "C20"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1023@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "New Token alert interpolates symbol"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1147@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Buy TX sent alert interpolates symbol"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "TX failed alert interpolates symbol"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1341@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 New Token alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1472@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 Buy TX sent alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1515@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 TX failed alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:80-87@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "parse_mode Markdown; an API error is only logged"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/honeypot/sanitize.ts:47-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the existing sanitizer is not used for symbols"
+    }
+  ],
+  "sibling_sites_checked": "Every sendCtxAlert in bot.ts that carries token-controlled text checked: symbol at :1023, :1147, :1190, :1341, :1472, :1515; reasons are sanitized (:941, :1282, :323). Addresses are hex and safe. alphaDrop.ts alerts carry only the address. The dashboard rendering side belongs to the DASHBOARD slice.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a deployer can choose a symbol that breaks Markdown (Telegram rejects the message, sendCtxAlert swallows the error, so the operator loses that alert, for example \"Buy TX sent\" or \"TX failed\") or that injects a link or fake text into the operator channel. Capital effect is indirect (lost or forged operator information). sanitizeReason exists but is applied only to reason strings.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "section-c:SC-10"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Escape or sanitize every token-controlled string at the alert boundary (alert text only, no trading behaviour change). Phase 29.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "AUD-BUY-019",
+  "title": "Section C SC-05: factory events are processed at the chain head with no reorg handling",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C08"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1638-1647@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HTTP poll: queries lastBlock+1..head and sets lastBlock = head, no confirmation depth, no overlap rescan"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1662-1672@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 poll: same"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1582-1586@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "WS listener: dispatches on every event with no removed-log check"
+    }
+  ],
+  "sibling_sites_checked": "Both pollers and both WS listeners checked; no use of confirmations, removed logs or block hashes anywhere in the slice (C08 search).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: a PairCreated from a block that is reorged out triggers a buy that then fails (the strategies simulate first), and an event re-included in a later block below lastBlock is never seen by the HTTP poller. Missed or wasted opportunities, no capital path.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "section-c:SC-05"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-08",
+  "recommendation": "Decide on card BUY-08 whether to keep head processing for speed and add an overlap rescan, or wait for confirmations.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

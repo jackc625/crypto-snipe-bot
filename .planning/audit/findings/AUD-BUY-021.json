@@ -1,0 +1,64 @@
+{
+  "id": "AUD-BUY-021",
+  "title": "Section C SC-09: Telegram intake uses one global 5-second cooldown that silently drops other addresses, marks an address processed before routing succeeds, and keeps an unbounded set",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C20"
+  ],
+  "files": [
+    "src/telegramListener.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:27@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "processedContracts = new Set — never pruned"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "COOLDOWN_MS = 5000, one value for all addresses"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:95-98@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "cooldown check, then lastProcessed and processedContracts.add BEFORE routing"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:103-117@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routing by getCode; on failure everywhere the address is only logged"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "regex 0x + 40 hex matches any address in the text, including the bot's own alert texts if they are visible to the account"
+    }
+  ],
+  "sibling_sites_checked": "The whole handler (telegramListener.ts:71-128) read. Allowlist semantics are AUD-BUY-006; V3 alpha block 0 is AUD-BUY-017.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: missed signals and a slow memory growth, no capital path. A second address within 5 s (same or another message) is skipped without being recorded, so it is lost; an address whose getCode routing fails on every chain (RPC blip) is already marked processed and is never retried.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-006",
+    "AUD-BUY-017"
+  ],
+  "tags": [
+    "section-c:SC-09"
+  ],
+  "escalation_ref": null,
+  "od_ref": "BUY-06",
+  "recommendation": "Rate-limit per address (not globally), record an address only after routing succeeded, and bound the set (TTL or LRU). Behaviour change in what gets bought, card BUY-06.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}
