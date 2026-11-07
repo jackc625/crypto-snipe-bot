@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-02-PLAN.md
-last_updated: "2026-11-07T01:37:22.205Z"
+stopped_at: Completed 22-04-PLAN.md
+last_updated: "2026-11-07T02:13:01.477Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: d06a79dd766df56a03e803e97b36eebe0ab45783
+state_head: 93e2f8a4083fbcf36d8bad923866c2e150bc6373
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 3 of 29
+Plan: 4 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -78,11 +78,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 |------|----------|-------|-------|
 | Phase 22 P01 | 16min | 2 tasks | 4 files |
 | Phase 22 P02 | 39min | 3 tasks | 9 files |
+| Phase 22 P04 | 24min | 2 tasks | 20 files |
 
 ## Session
 
-**Last session:** 2026-11-07T01:37:22.148Z
-**Stopped at:** Completed 22-02-PLAN.md
+**Last session:** 2026-11-07T02:13:01.416Z
+**Stopped at:** Completed 22-04-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -93,3 +94,8 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-02: ESC-SECRET-01 closed by operator ruling (verbatim) classify-addresses - hits whose flagged secret is exactly 0x+40hex are labelled public-address and stay listed; implemented as pass 3 public-address.toml (known-public.toml + one regexTarget=secret allowlist ^0x[0-9a-fA-F]{40}$), default ruleset/global filter untouched
 - [Phase 22]: 22-02: NAC-01 scanner half CLEAN - dated folder + archive 852 hits, 0 non-public, 852 public-address; FIXTURES.json config_sha256 now has 3 keys (extended, known_public, public_address); 22-03 re-scan must use fixture-check.ts --scan
 - [Phase 22]: 22-02: betterleaks dir mode skips data/bot.db whole (byte-count proven); 22-03 operator-run D-22 exact-value check is the SQLite control
+- [Phase 22]: 22-04: audit register built on one enumerator (full-tree git ls-tree -r -z filtered in JS by literal entries; glob/brace rejected) + independent universe (scope.json); audit_base_sha 23a6461; base counts match plan exactly; universe clean at base (861) and HEAD (875)
+- [Phase 22]: 22-04: check.ts stages partial (unfinished work = PENDING) / consolidation / final (HEAD universe + re_audit to last-change SHA); self-test 18/18 with 18 mutants caught; audit tools are run(argv, io) for in-process testing
+- [Phase 22]: 22-04: ESC-SECRET-01 fits the canonical escalation shape unchanged (input: aliases resolve via its closed resolution); rediscovery = later record lists canonical in resolved_items and duplicate keeps canonical escalation_ref
+- [Phase 22]: 22-04: ESC-PRE-04 seeded (capital, d-stop-the-line, STRAND) with refs re-measured at 23a6461 (controls.ts:51-56/:70/:126; exitEngine.ts:1163/:700; db.ts:540-545); 22-22 must resolve key:API:failed-held-sell-selection, 22-20 must resolve rc:RC-10 (ESC-PRE-02)
+- [Phase 22]: 22-04: .planning/audit/.gitattributes pins LF (* text=auto eol=lf) so committed renders and SHA-pinned betterleaks configs survive core.autocrlf checkouts (closes the 22-02 line-ending caveat for .planning/audit/)
