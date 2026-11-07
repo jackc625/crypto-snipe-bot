@@ -58,7 +58,7 @@
     "capital",
     "mitigation-planned-22-13"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-TX-01",
   "od_ref": null,
   "recommendation": "Mitigated by the planned rail 22-13 (single-instance process lock keyed by the wallet address, acquired in src/main.ts before bot.ts loads); 22-29 re-audits it. Out-of-process scripts honoring the lock is Phase 29 (HYG-03).",
   "reported_by": [

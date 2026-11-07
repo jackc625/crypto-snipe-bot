@@ -97,7 +97,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-TX-01",
   "od_ref": "OD-17",
   "recommendation": "Phase 24 (card OD-17, head-of-line part): decide how an emergency exit gets the wallet. Options on the card: a priority lane in the nonce authority for anti-rug exits, an abortable buy escalation that yields the lock between attempts, or releasing the lock between attempts with the nonce re-checked. Whatever is chosen, an abandoned (timed-out) exit must be cancelled or reconciled, not left queued to run minutes later. Prove the timing in Phase 23 with a held position, a non-landing private buy and a simulated rug on a local fork. Nothing is changed in Phase 22.",
   "reported_by": [

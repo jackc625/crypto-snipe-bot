@@ -61,7 +61,7 @@
     "latent",
     "mitigation-planned-22-12"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-TX-01",
   "od_ref": null,
   "recommendation": "Mitigated by the planned rail 22-12 (Symbol.for registry with an epoch sentinel, D-05) and forceConsistentCasingInFileNames in all tsconfigs; 22-29 re-audits the diff of nonceAuthority.ts and moves this entry forward only on evidence. No further behaviour decision.",
   "reported_by": [

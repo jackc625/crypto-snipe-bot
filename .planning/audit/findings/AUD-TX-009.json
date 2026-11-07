@@ -55,7 +55,7 @@
   "tags": [
     "capital"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-TX-01",
   "od_ref": "OD-6",
   "recommendation": "Phase 24: do not depend on the library's event-based wait. Replace bundle.wait() with the slice's own bounded receipt+nonce reconcile (reconcileInclusion already exists) or wrap it so no listener rejection can escape; and decide the process-wide unhandledRejection policy on card OD-6 (RC-05). Prove it in Phase 23 with a provider that returns null for the target block.",
   "reported_by": [
