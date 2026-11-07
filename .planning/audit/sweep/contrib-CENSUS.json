@@ -1,0 +1,30 @@
+{
+  "name": "CENSUS",
+  "contributions": [
+    {
+      "class": "C07",
+      "area": "src",
+      "ids": [
+        "AUD-CENSUS-001",
+        "AUD-CENSUS-002"
+      ],
+      "search": "signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): 11 src transaction-signing sites, 10 locked (lexical or transitive), 1 unlocked (dead simulateSell, AUD-CENSUS-002), 0 unknown; 12 withNonceLock calls, all keyed ctx.wallet.address"
+    },
+    {
+      "class": "C06",
+      "area": "src",
+      "ids": [
+        "AUD-CENSUS-002"
+      ],
+      "search": "signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): approve sites bot.ts:226, exitEngine.ts:421, exitEngine.ts:544 locked; tokenSafety.ts:277 unlocked"
+    },
+    {
+      "class": "C07",
+      "area": "scripts",
+      "ids": [
+        "AUD-CENSUS-001"
+      ],
+      "search": "signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): 12 script transaction-signing sites (4 ContractFactory deployments), all in the script process outside the bot lock; owned by AUD-SCRIPTS-002 / ESC-SCRIPTS-01 (Phase 29); deploy-honeypot-checker.ts signs through a Hardhat child process (AUD-CONTRACTS-004)"
+    }
+  ]
+}

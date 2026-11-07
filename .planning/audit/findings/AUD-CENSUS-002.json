@@ -1,0 +1,65 @@
+{
+  "id": "AUD-CENSUS-002",
+  "title": "D-NONCE-AUTHORITY-ALL violation candidate: src/utils/tokenSafety.ts:277 sends a real approve of the whole token balance with the bot wallet and no withNonceLock (simulateSell); the function is exported and imported by src/bot.ts:17 but has no caller at the base (duplicate of AUD-BUY-007)",
+  "kind": "finding",
+  "area": "src",
+  "slice": "CENSUS",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C06"
+  ],
+  "files": [
+    "src/utils/tokenSafety.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:269-299@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell(tokenAddress, wallet): new Contract(tokenAddress, ERC20_ABI, wallet) at :274, then await erc20.approve(CONFIG.routerAddress, balance) at :277 with no lock, then a staticCall sell simulation at :286"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell is imported into bot.ts; nothing calls it"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"simulateSell(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the declaration (tokenSafety.ts:269); test files only mock it (vi.fn())"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node node_modules/ts-node/dist/bin.js .planning/audit/tools/signing-census.ts --root <git archive 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts tsconfig.json tsconfig.bot.json package.json, node_modules = per-entry junctions> --sha 23a64617dca167976adc4645fed0e2c69e384820 --out .planning/audit/census/signing-sites.json --manual .planning/audit/census/manual-inventory.json",
+      "note": "census site SIG-049: kind tx-signing, api contract.approve, runner signer (traced to :274), mutability nonpayable (ERC20_ABI src/utils/abis.ts:31), lock_status unlocked: \"simulateSell is exported with no in-program caller (entry: an importer can call it outside any lock)\""
+    }
+  ],
+  "sibling_sites_checked": "The other contract.approve sites in the census: src/bot.ts:226 (locked lexical, dead maybeApproveForChain), src/exitEngine.ts:421 (locked transitive via ensureApproval), src/exitEngine.ts:544 (locked lexical); script approves scripts/addLiquidity.ts:48 and :53 and scripts/recover-sell-ladys.ts:70 run in their own processes (AUD-SCRIPTS-002). It is the only src tx-signing site of the 11 that is not locked, and the census found no unknown site.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 by the 22-26 census rule: every src transaction-signing site that is not proven to run under the nonce lock is a D-NONCE-AUTHORITY-ALL violation candidate graded S1 or above. If it runs while the bot is trading, the approve can take the same nonce as a buy or sell of the same wallet; one of the two is then dropped or replaced, and a dropped sell leaves the position held (STRAND). Mitigating fact, recorded honestly: the site is unreachable at the base (no caller; imported but never called; tests mock it), which is why AUD-BUY-007 graded the same defect S2 as a re-introduction hazard. Merge: duplicate of AUD-BUY-007 (same site, same defect); the canonical must carry the higher severity, the union of evidence and this escalation at consolidation (22-28) unless the operator rules otherwise at ESC-CENSUS-01.",
+  "duplicate_of": "AUD-BUY-007",
+  "related": [
+    "AUD-BUY-007",
+    "AUD-BUY-026",
+    "AUD-CENSUS-001"
+  ],
+  "tags": [
+    "d-nonce-authority-all",
+    "capital",
+    "dead-code"
+  ],
+  "escalation_ref": "ESC-CENSUS-01",
+  "od_ref": null,
+  "recommendation": "Delete simulateSell and its import at src/bot.ts:17 (no caller, so no behaviour change), as AUD-BUY-007 recommends; if a sell simulation is ever needed again, use staticCall only and never sign. Phase 23 cannot assert \"every src signing site is locked\" while this site exists. Owner: Phase 24 if it touches tokenSafety.ts first, else Phase 29. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-26 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "input_refs": []
+}
