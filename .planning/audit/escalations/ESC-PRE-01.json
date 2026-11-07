@@ -1,0 +1,13 @@
+{
+  "id": "ESC-PRE-01",
+  "date": "2026-11-06",
+  "tier": "pre-phase",
+  "items": ["AUD-RAIL-001"],
+  "resolved_items": [],
+  "summary": "Rail finding (RESEARCH.md STL-2, D-23 (a)). Vitest ran in the main checkout on 2026-11-06 at 11:21:39 with the real .env loaded (vitest.config.ts:2-4 calls dotenv config()). The data/ files are unchanged by mtime, because the DB-importing test files crashed at load. Whether any non-DB test made a network or Telegram call cannot be determined from disk. The operator may check the bot's Telegram chat around 11:21. Nothing is fixed in Phase 22 beyond the planned rails (NAC-13).",
+  "presented_at": "2026-11-06 plan-phase session (22-CONTEXT.md D-23 (a))",
+  "operator_response": null,
+  "acknowledgement_evidence": "22-CONTEXT.md D-23 (a): surfaced to the operator in the 2026-11-06 plan-phase session; the operator stated the cause as an automated tool or agent",
+  "ruling": "none",
+  "phase_continued": true
+}

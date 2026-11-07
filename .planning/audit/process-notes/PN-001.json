@@ -1,0 +1,12 @@
+{
+  "id": "PN-001",
+  "date": "2026-11-06",
+  "description": "Process note, no escalation tier (D-23 (c)). On 2026-11-06 a research sandbox experiment sent one HTTPS request to api.telegram.org (/botX/sendMessage) with a fake token and no repository data. This happened before its network-deny prototype was corrected (the path: null bug). The same attempt also made DNS lookups for .invalid names. Nothing in the repository was involved. It is recorded here as an honest account of Phase 22 outbound activity.",
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "grep -n 'Research note' .planning/phases/22-safety-rails-audit/22-RESEARCH.md",
+      "note": "the researcher's own account at the end of 22-RESEARCH.md; confirmed as a D-23 (c) process note in 22-CONTEXT.md"
+    }
+  ]
+}
