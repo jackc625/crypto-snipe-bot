@@ -34,9 +34,10 @@
     },
     "C07": {
       "result": [
-        "AUD-SCRIPTS-002"
+        "AUD-SCRIPTS-002",
+        "AUD-CENSUS-001"
       ],
-      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for nonce|getTransactionCount|withNonceLock|processLock plus git grep -n \"getPauseState|pause_state|withNonceLock|processLock|canSnipe\" at the base -- scripts (no output): every bot-wallet signer runs in its own process with its own nonce authority (deliberate-buy via src/bot.ts:558 and :746-747; recover-sell-ladys.ts:70, :78; addLiquidity.ts and deploySepoliaTest.ts latent); ethers populateTransaction takes the pending count (abstract-signer.js:69) while the bot uses latest"
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for nonce|getTransactionCount|withNonceLock|processLock plus git grep -n \"getPauseState|pause_state|withNonceLock|processLock|canSnipe\" at the base -- scripts (no output): every bot-wallet signer runs in its own process with its own nonce authority (deliberate-buy via src/bot.ts:558 and :746-747; recover-sell-ladys.ts:70, :78; addLiquidity.ts and deploySepoliaTest.ts latent); ethers populateTransaction takes the pending count (abstract-signer.js:69) while the bot uses latest | 22-28 fold of sweep/contrib-CENSUS.json: signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): 12 script transaction-signing sites (4 ContractFactory deployments), all in the script process outside the bot lock; owned by AUD-SCRIPTS-002 / ESC-SCRIPTS-01 (Phase 29); deploy-honeypot-checker.ts signs through a Hardhat child process (AUD-CONTRACTS-004)"
     },
     "C08": {
       "result": "checked, none",
@@ -94,7 +95,7 @@
         "AUD-SCRIPTS-005",
         "AUD-SCRIPTS-006"
       ],
-      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for PRIVATE_KEY|API_KEY|SESSION|TOKEN|apiKey|secret and every log/console call: no script logs or passes a key as argv (pause.ts:13-16 invariant checked in all 13 scripts); the bot key is used to deploy by deploySepoliaTest.ts (AUD-SCRIPTS-001); crash output can print the RPC key (AUD-SCRIPTS-005); telegram-login.ts prints the session secret (AUD-SCRIPTS-006)"
+      "search": "grep over the SCRIPTS snapshot (slice-files.ts --snapshot SCRIPTS at 23a6461, the 10 files) for PRIVATE_KEY|API_KEY|SESSION|TOKEN|apiKey|secret and every log/console call: no script logs or passes a key as argv (pause.ts:13-16 invariant checked in all 13 scripts); the bot key is used to deploy by deploySepoliaTest.ts (AUD-SCRIPTS-001); crash output can print the RPC key (AUD-SCRIPTS-005); telegram-login.ts prints the session secret (AUD-SCRIPTS-006) | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists: no hit of any classification under scripts/ in any commit"
     },
     "C18": {
       "result": [

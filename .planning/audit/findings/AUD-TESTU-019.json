@@ -60,7 +60,7 @@
   "severity_rationale": "S2: the migrations carry state the exit engine relies on (exit_failed_held, pause_state, lp_baseline); a broken upgrade step loses failed-held persistence (an S1 stranded-position class) while the replicas stay green. The production cases add live-DB reach before the rails (AUD-TESTU-001).",
   "duplicate_of": null,
   "related": [
-    "rc:RC-28",
+    "AUD-TESTI-001",
     "AUD-TESTU-001",
     "AUD-TESTU-010",
     "AUD-TESTU-018"

@@ -2,14 +2,14 @@
   "kind": "finding",
   "area": "src",
   "slice": "ANTIRUG",
-  "duplicate_of": null,
+  "duplicate_of": "AUD-EXIT-013",
   "related": [
     "AUD-EXIT-013"
   ],
   "tags": [
     "capital"
   ],
-  "escalation_ref": "ESC-ANTIRUG-01",
+  "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-10",
   "reported_by": [
     "claude (22-19 executor)"
@@ -71,6 +71,6 @@
   ],
   "sibling_sites_checked": "AUD-EXIT-013 records the same first-of-type choice for the exit-monitor resume (bot.ts:1940-1956) and the dashboard sells (controls.ts findDex); its sibling list does not name this anti-rug resume site (bot.ts:2098), which is why this is a separate entry. The registrations at buy time (bot.ts:440, :1492) pass the correct dex. The backfill and dispatch paths use whatever dex the registration stored.",
   "status": "confirmed",
-  "severity_rationale": "S1, as AUD-EXIT-013. After any restart, every position bought on a second dex has an anti-rug exit that sells through a router whose factory either has no pair for the token (the sell reverts) or a different pool. On BSC V3 the sell simulation hits the other dex quoter, reverts, and trips signal 3 (fail-closed), so the trigger fires and the escape fails. Restarts are routine, and half of the V2 dexes are second dexes.",
+  "severity_rationale": "S1, as AUD-EXIT-013. After any restart, every position bought on a second dex has an anti-rug exit that sells through a router whose factory either has no pair for the token (the sell reverts) or a different pool. On BSC V3 the sell simulation hits the other dex quoter, reverts, and trips signal 3 (fail-closed), so the trigger fires and the escape fails. Restarts are routine, and half of the V2 dexes are second dexes. Merged at 22-28 into AUD-EXIT-013 (canonical): same defect, one root cause (the resume path picks the first dex of the pool type instead of the stored dex_name), one fix, card EXIT-10.",
   "recommendation": "Resolve the dex from trades.dex_name on resume, for both the exit monitor and anti-rug (card EXIT-10). Phase 24."
 }

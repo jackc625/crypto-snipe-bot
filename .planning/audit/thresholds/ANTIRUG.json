@@ -136,7 +136,8 @@
       "src/chainRegistry.ts:806-824@23a64617dca167976adc4645fed0e2c69e384820",
       "src/exitEngine.ts:862@23a64617dca167976adc4645fed0e2c69e384820",
       "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/utils/mevStrategies/types.ts:61@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/utils/mevStrategies/types.ts:61@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:806-822@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "multiplies the fee fields of the private anti-rug sell only (passed to submitPrivateSell; applyGasMultiplier in the MEV strategies)",
     "units": "multiplier on fee per gas",
@@ -151,7 +152,10 @@
       "float-on-fee"
     ],
     "recommendation": "Add an upper bound and fail loud above it (card ANTIRUG-07); confirm the TX-slice multiplication is exact bigint math.",
-    "od_ref": "ANTIRUG-07"
+    "od_ref": "ANTIRUG-07",
+    "also_defined_in": [
+      "TH-EXIT-20"
+    ]
   },
   {
     "id": "TH-ANTIRUG-06",
@@ -476,7 +480,12 @@
     "definition_sites": [
       "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
       "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2182@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:238"
     ],
     "comparison": "withTimeout(executeFullSell, budget): overrun frees the caller, counts as a failed exit and alerts; the sell keeps running",
     "units": "milliseconds",
@@ -490,7 +499,11 @@
       "parseInt-prefix"
     ],
     "recommendation": "Parse strictly and fail loud (card ANTIRUG-07); size it from the anti-rug attempt budget and confirm window (card EXIT-11).",
-    "od_ref": "ANTIRUG-07"
+    "od_ref": "ANTIRUG-07",
+    "also_defined_in": [
+      "TH-BUY-14",
+      "TH-EXIT-21"
+    ]
   },
   {
     "id": "TH-ANTIRUG-19",
@@ -525,7 +538,10 @@
     "definition_sites": [
       "src/exitEngine.ts:453-455@23a64617dca167976adc4645fed0e2c69e384820",
       "src/exitEngine.ts:469-476@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/config.ts:194@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/config.ts:194@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:471-475@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:522@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:252"
     ],
     "comparison": "reason anti-rug gets 1 private attempt before the public fallback; the fallback minOut uses the widened slippage",
     "units": "attempts; percent",
@@ -537,6 +553,9 @@
     "overlap": "EXIT rows TH-EXIT-12 and TH-EXIT-14 own these numbers; listed here so the anti-rug emergency sell parameters are complete in one place",
     "flags": [],
     "recommendation": "Covered by the EXIT inventory (card OD-14 decides the private-sell floor).",
-    "od_ref": "OD-14"
+    "od_ref": "OD-14",
+    "also_defined_in": [
+      "TH-EXIT-14"
+    ]
   }
 ]

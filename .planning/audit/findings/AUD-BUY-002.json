@@ -173,9 +173,14 @@
       "type": "code",
       "ref": "src/utils/mevStrategies/reconciliation.ts:605-613@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "codex (22-27 independent second opinion, graded S1): A reconciliation timeout abandons transactions that can still execute"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:179-190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28 (from sweep/TX.json C07): relay transport failure defers to reconciliation"
     }
   ],
-  "sibling_sites_checked": "V2 handleNewPairForChain (bot.ts:1087-1191) and V3 handleNewV3PoolForChain (bot.ts:1379-1516) both checked: same single try/catch, same catch body; V3 arms monitoring inline (:1481-1507), V2 via armPositionMonitoring (:413-452). The deliberate path (executeDeliberateBuy, :485-761) records and arms outside any catch (its own defect is AUD-BUY-001). Every submit strategy reachable from submitBuyTx was traced for \"throws after a broadcast\": flashbots fanout (flashbots.ts:303-309), shared reconcile loop (reconciliation.ts:476-497, :576-628), passthrough send (passthrough.ts:130); bloxroute.ts was not traced line by line and is left to the TX slice (22-20). Both resume queries were read (db.ts:597-604 and the lp_baseline INNER JOIN used at bot.ts:2043). The pause read, recordSnipe, insertTrade, alert, balanceOf, trade-id lookup and both arming helpers were each checked as separate throw points.",
+  "sibling_sites_checked": "V2 handleNewPairForChain (bot.ts:1087-1191) and V3 handleNewV3PoolForChain (bot.ts:1379-1516) both checked: same single try/catch, same catch body; V3 arms monitoring inline (:1481-1507), V2 via armPositionMonitoring (:413-452). The deliberate path (executeDeliberateBuy, :485-761) records and arms outside any catch (its own defect is AUD-BUY-001). Every submit strategy reachable from submitBuyTx was traced for \"throws after a broadcast\": flashbots fanout (flashbots.ts:303-309), shared reconcile loop (reconciliation.ts:476-497, :576-628), passthrough send (passthrough.ts:130); bloxroute.ts was traced by the TX slice (sweep/TX.json cell C07): a relay transport failure defers to reconciliation (bloxroute.ts:179-190), and after a not-landed attempt the next attempt re-signs the same nonce and only the latest hash is reconciled (reconciliation.ts:476-497, :576-603), so an earlier accepted attempt that mines reads as landed-not-ours, the same mechanism as sub_claim 3. Recorded at 22-28. Both resume queries were read (db.ts:597-604 and the lp_baseline INNER JOIN used at bot.ts:2043). The pause read, recordSnipe, insertTrade, alert, balanceOf, trade-id lookup and both arming helpers were each checked as separate throw points.",
   "status": "confirmed",
   "origin": "research-candidate",
   "rc": [
@@ -189,7 +194,7 @@
     "AUD-BUY-004",
     "AUD-BUY-005",
     "AUD-BUY-020",
-    "rc:RC-07"
+    "AUD-EXIT-002"
   ],
   "tags": [
     "capital",

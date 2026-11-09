@@ -9,7 +9,16 @@
       "src/utils/mevStrategies/reconciliation.ts:366@23a64617dca167976adc4645fed0e2c69e384820",
       "src/utils/mevStrategies/reconciliation.ts:398-400@23a64617dca167976adc4645fed0e2c69e384820",
       ".env.example:227",
-      "src/config.ts:169@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/config.ts:169@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:180-181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:227-228",
+      "src/utils/mevStrategies/reconciliation.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:399@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:228",
+      "src/config.ts:170@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "reconcileInclusion polls receipt and nonce while Date.now() < start + window; the deadline is checked only between awaited RPC calls",
     "units": "milliseconds",
@@ -27,7 +36,10 @@
       "deadline-checked-between-calls"
     ],
     "recommendation": "Decide on card OD-17 how long a buy may hold the lock in total (not per attempt); make the window per chain (2 s blocks on Base vs 12 s on ETH) and check the deadline per call (TX-01).",
-    "od_ref": "OD-17"
+    "od_ref": "OD-17",
+    "also_defined_in": [
+      "TH-EXIT-22"
+    ]
   },
   {
     "id": "TH-TX-02",
@@ -38,7 +50,11 @@
       "src/utils/mevStrategies/reconciliation.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
       "src/utils/mevStrategies/reconciliation.ts:399@23a64617dca167976adc4645fed0e2c69e384820",
       ".env.example:228",
-      "src/config.ts:170@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/config.ts:170@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:180-181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:227-228"
     ],
     "comparison": "sleep between receipt/nonce probes",
     "units": "milliseconds",
@@ -52,7 +68,10 @@
     "hardcoded": false,
     "flags": [],
     "recommendation": "",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-EXIT-22"
+    ]
   },
   {
     "id": "TH-TX-03",
@@ -115,7 +134,10 @@
       "gwei-float-toFixed"
     ],
     "recommendation": "Wire it to the private sell leg or delete it and fix the alert text (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "TX-02",
+    "also_defined_in": [
+      "TH-EXIT-23"
+    ]
   },
   {
     "id": "TH-TX-05",
@@ -342,7 +364,8 @@
       "src/utils/mevStrategies/passthrough.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
       "src/utils/mevStrategies/bloxroute.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
       "src/utils/mevStrategies/reconciliation.ts:177@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/utils/mevStrategies/reconciliation.ts:476@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/utils/mevStrategies/reconciliation.ts:476@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:369@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "loop attempt = 0 .. maxRetries inclusive",
     "units": "retries",
@@ -358,7 +381,10 @@
       "lock-hold-minutes"
     ],
     "recommendation": "Bound the total lock hold of one escalation (card OD-17).",
-    "od_ref": "OD-17"
+    "od_ref": "OD-17",
+    "also_defined_in": [
+      "TH-BUY-16"
+    ]
   },
   {
     "id": "TH-TX-14",

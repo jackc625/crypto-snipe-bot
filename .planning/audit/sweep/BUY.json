@@ -24,9 +24,10 @@
     },
     "C04": {
       "result": [
-        "AUD-BUY-003"
+        "AUD-BUY-003",
+        "AUD-BUY-033"
       ],
-      "search": "grep -rnE \"amountOutMin|minOut|slippage\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); traced bot.ts:1048-1056, :1362-1377 (fail-open), :527-543 (documented private 0), :711-731 (fail-closed public), tokenSafety.ts:143/:379 (staticCall simulations only)"
+      "search": "grep -rnE \"amountOutMin|minOut|slippage\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); traced bot.ts:1048-1056, :1362-1377 (fail-open), :527-543 (documented private 0), :711-731 (fail-closed public), tokenSafety.ts:143/:379 (staticCall simulations only) | 22-28 consolidation: V3 snipe value and refund behaviour traced (bot.ts:1362-1437, abis.ts:68-71; no refundETH anywhere in src)"
     },
     "C05": {
       "result": [
@@ -36,9 +37,10 @@
     },
     "C06": {
       "result": [
-        "AUD-BUY-007"
+        "AUD-BUY-007",
+        "AUD-CENSUS-002"
       ],
-      "search": "grep -rn \"approve(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:226 (dead maybeApproveForChain), tokenSafety.ts:277 (dead simulateSell, real tx); git grep for callers at the base"
+      "search": "grep -rn \"approve(\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:226 (dead maybeApproveForChain), tokenSafety.ts:277 (dead simulateSell, real tx); git grep for callers at the base | 22-28 fold of sweep/contrib-CENSUS.json: signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): approve sites bot.ts:226, exitEngine.ts:421, exitEngine.ts:544 locked; tokenSafety.ts:277 unlocked"
     },
     "C07": {
       "result": [
@@ -46,9 +48,11 @@
         "AUD-BUY-004",
         "AUD-BUY-007",
         "AUD-BUY-025",
-        "AUD-BUY-030"
+        "AUD-BUY-030",
+        "AUD-CENSUS-001",
+        "AUD-CENSUS-002"
       ],
-      "search": "grep -rnE \"nonce|withNonceLock|getTransactionCount\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read submitBuyTx (bot.ts:263-268), the deliberate guard (:576-662), the public leg lock (:746-756), and the reconcile loop it relies on (reconciliation.ts:454-628, TX slice) | 22-27 merge: AUD-BUY-030 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+      "search": "grep -rnE \"nonce|withNonceLock|getTransactionCount\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read submitBuyTx (bot.ts:263-268), the deliberate guard (:576-662), the public leg lock (:746-756), and the reconcile loop it relies on (reconciliation.ts:454-628, TX slice) | 22-27 merge: AUD-BUY-030 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-28 fold of sweep/contrib-CENSUS.json: signing-census.ts (TypeScript type-checker + language-service reference chains) over every CallExpression in src/ and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820; reconciled with census/manual-inventory.json (grep floor + manual read): 11 src transaction-signing sites, 10 locked (lexical or transitive), 1 unlocked (dead simulateSell, AUD-CENSUS-002), 0 unknown; 12 withNonceLock calls, all keyed ctx.wallet.address"
     },
     "C08": {
       "result": [
@@ -118,9 +122,12 @@
     },
     "C17": {
       "result": [
-        "AUD-BUY-012"
+        "AUD-BUY-012",
+        "AUD-SECRET-001",
+        "AUD-SECRET-003",
+        "AUD-SECRET-004"
       ],
-      "search": "grep -rnE \"PRIVATE_KEY|walletPrivateKey|new Wallet|Wallet\\(|signer|getWallet\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); tokenSafety.ts:41 key passed as an address (ethers 6.16.0 checks.js:61/:103-109, errors.js:100-124 read); no key value was printed during the audit"
+      "search": "grep -rnE \"PRIVATE_KEY|walletPrivateKey|new Wallet|Wallet\\(|signer|getWallet\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); tokenSafety.ts:41 key passed as an address (ethers 6.16.0 checks.js:61/:103-109, errors.js:100-124 read); no key value was printed during the audit | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists; NAC-01 backup scans and the D-22 exact-value check (AUD-SECRET-003); repository-level .planning hits are filed under src"
     },
     "C18": {
       "result": [

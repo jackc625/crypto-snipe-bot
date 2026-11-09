@@ -34,7 +34,8 @@
       "AUD-BUY-027",
       "AUD-BUY-028",
       "AUD-BUY-029",
-      "AUD-BUY-030"
+      "AUD-BUY-030",
+      "AUD-BUY-033"
     ]
   },
   {
@@ -50,7 +51,9 @@
   {
     "path": "src/utils/abis.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-    "findings": "none"
+    "findings": [
+      "AUD-BUY-033"
+    ]
   },
   {
     "path": "src/utils/blocklist.ts",

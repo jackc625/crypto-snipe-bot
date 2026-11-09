@@ -1,0 +1,84 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-015"
+  ],
+  "tags": [
+    "capital",
+    "d-stop-the-line"
+  ],
+  "escalation_ref": "ESC-BUY-05",
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-28 consolidation executor, found while re-grading codex-BUY-12)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-BUY-033",
+  "title": "A V3 snipe sends the whole amount as ETH value and never refunds it: if the pool can only fill part of the buy, the unspent ETH stays inside the swap router, where anyone can take it",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C04"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/abis.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1381-1392@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 snipe: exactInputSingle with amountIn = the snipe amount, sqrtPriceLimitX96 0 (no price limit), recipient the wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1431-1437@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "The tx sent is multicall(deadline, [swapData]) with value = amountIn; the only call in the multicall is the swap"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1362-1377@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "minOut = quote minus slippage; the quote is computed at the same amount and reflects the same partial fill, so a partial fill still satisfies amountOutMinimum"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/abis.ts:68-71@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "The V3 router ABI has only exactInputSingle and multicall: refundETH is not available to the bot"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -E \"refundETH|unwrapWETH9|sweepToken\" 23a64617dca167976adc4645fed0e2c69e384820 -- src contracts",
+      "note": "No output: nothing in the bot calls the router refund, so unspent ETH is never recovered"
+    },
+    {
+      "type": "code",
+      "ref": "contracts/honeypot/HoneypotChecker.sol:298-325@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "The honeypot checker also buys through exactInputSingle{value:amountIn} with the same shape; it records received tokens and tax, not unspent ETH, so the gate cannot see this"
+    }
+  ],
+  "sibling_sites_checked": "V2 snipe path (bot.ts:1100-1110): swapExactETHForTokens spends the whole msg.value, no leftover. Deliberate public buy (bot.ts:747-748): V2 FoT variant, same. V3 sell path (exitEngine.ts:375-400): sends tokens, no ETH value. Dashboard and scripts: none send V3 ETH value. The only site with a value-bearing V3 multicall is bot.ts:1436, and it has no refund call in the batch.",
+  "status": "candidate",
+  "severity_rationale": "S1 LOSS, candidate until a Phase 23 fork test shows it on a real pool. Mechanism (standard, documented Uniswap behaviour, not provable from this repository since the router and pool contracts are not vendored): the V3 pool swap stops when it reaches the price limit (here the extreme bound) and charges only the input it consumed; SwapRouter02 wraps only that amount and leaves the rest of msg.value in the router; refundETH on the router is public and sends the router balance to its caller. So when a pool cannot absorb the whole snipe, the bot pays the unspent part and any sweeper can take it. The buy still passes minOut (the quote reflects the same partial fill). AUD-BUY-015 means a thin pool is not refused, and an attacker can build a pool to be exactly that thin, so the condition is plausible on V3 snipes rather than exotic. Loss is capped by the snipe amount per position, which is why it is S1 and not S0 (it needs a pool thinner than the snipe size).",
+  "recommendation": "Phase 24: add refundETH to the snipe multicall, or wrap only the amount the quote says will be consumed and revert if less than the full amount is taken, and treat a partial fill as a skipped snipe. Prove the behaviour first on a Phase 23 fork with a deliberately thin single-sided V3 pool. No behaviour trade-off, so this needs no decision card; nothing is changed in Phase 22.",
+  "traces": [
+    {
+      "scenario": "A V3 pool whose liquidity above the current price can absorb less than the snipe amount",
+      "steps": [
+        "checkMinLiquidity passes (quoter does not revert on a thin pool; AUD-BUY-015)",
+        "honeypot roundtrip passes (buy, sell and tax are read against the quote at the same size)",
+        "minOut is set from a quote that already reflects the partial fill",
+        "multicall(deadline, [exactInputSingle]) is sent with value = the full snipe amount",
+        "the pool swaps until it reaches the price limit and charges only the input it took; the router wraps only that amount",
+        "the remaining ETH sits in the router; the next caller of refundETH collects it"
+      ],
+      "outcome": "The position is opened for less than was paid; the unspent ETH is lost to whoever sweeps the router first."
+    }
+  ]
+}

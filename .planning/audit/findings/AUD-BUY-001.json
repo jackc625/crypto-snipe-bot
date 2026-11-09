@@ -85,7 +85,7 @@
   "severity_rationale": "S0 under the rubric: on the ordinary success path of an operator-run money path (every landed deliberate buy, no unusual condition), the position is held with no exit monitor and no anti-rug protection from the moment the script exits until the main bot is next started. If the main bot was already running, it does not pick the position up until it is restarted. The length of the unprotected window depends only on what the operator does next, and nothing in the code prompts a restart. The bot is OFF throughout Phase 22, so there is no live exposure now. Grading between S0 and S1 is a judgment (S1 if one treats 'the operator restarts the bot afterwards' as the expected procedure); it is escalated at the immediate tier so the operator can rule. Operator ruling (ESC-BUY-01, recorded 2026-11-07): acknowledge-continue; the severity stays S0, no decimal phase, Phase 22 continues; interim rule: after any landed deliberate buy, start (or restart) the main bot immediately.",
   "duplicate_of": null,
   "related": [
-    "rc:RC-18",
+    "AUD-TX-005",
     "AUD-BUY-002",
     "AUD-BUY-025"
   ],

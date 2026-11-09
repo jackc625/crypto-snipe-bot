@@ -328,7 +328,11 @@
       "definition_sites": [
         "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:470-471@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/exitEngine.ts:522-523@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/exitEngine.ts:522-523@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1050@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1053@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1373@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1374@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "minOut = expectedOut * (100 - slippage) / 100 from a quote taken before the approve wait (AUD-EXIT-011)",
       "units": "percent",
@@ -342,6 +346,9 @@
       "hardcoded": true,
       "flags": [
         "stale-quote"
+      ],
+      "also_defined_in": [
+        "TH-BUY-02"
       ]
     },
     {
@@ -353,7 +360,10 @@
       "definition_sites": [
         "src/exitEngine.ts:471-475@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:522@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:252"
+        ".env.example:252",
+        "src/exitEngine.ts:453-455@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:469-476@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:194@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "max(antiRug, 10, routine)",
       "units": "percent",
@@ -365,7 +375,10 @@
       "overlap": "only used when the anti-rug private attempt did not land",
       "env_key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT",
       "hardcoded": false,
-      "flags": []
+      "flags": [],
+      "also_defined_in": [
+        "TH-ANTIRUG-20"
+      ]
     },
     {
       "id": "TH-EXIT-15",
@@ -482,7 +495,10 @@
       "overlap": "approvals and the public fallback use ethers estimateGas instead",
       "env_key": null,
       "hardcoded": true,
-      "flags": []
+      "flags": [],
+      "also_defined_in": [
+        "TH-DB-24"
+      ]
     },
     {
       "id": "TH-EXIT-20",
@@ -493,7 +509,13 @@
       "definition_sites": [
         "src/chainRegistry.ts:806-822@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:862@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:229@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:293@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:350@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:407@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:806-824@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/types.ts:61@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "multiplies the private-leg fee fields when reason is anti-rug; not applied to approvals or the public fallback",
       "units": "multiplier",
@@ -507,6 +529,9 @@
       "hardcoded": false,
       "flags": [
         "not-applied-to-fallback"
+      ],
+      "also_defined_in": [
+        "TH-ANTIRUG-05"
       ]
     },
     {
@@ -520,7 +545,10 @@
         "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
         "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
         "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:238"
+        ".env.example:238",
+        "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "Promise.race(submit, timer); on overrun the caller is freed and the exit counted as failed; the submit keeps running and keeps its locks",
       "units": "milliseconds",
@@ -534,6 +562,10 @@
       "hardcoded": false,
       "flags": [
         "budget-below-ladder-duration"
+      ],
+      "also_defined_in": [
+        "TH-ANTIRUG-18",
+        "TH-BUY-14"
       ]
     },
     {
@@ -546,7 +578,18 @@
         "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
         "src/utils/mevStrategies/reconciliation.ts:180-181@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:940-943@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:227-228"
+        ".env.example:227-228",
+        "src/utils/mevStrategies/reconciliation.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:399@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:228",
+        "src/config.ts:170@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:55@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:180@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:366@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:398-400@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:227",
+        "src/config.ts:169@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "reconcileInclusion polls receipt and nonce until the window ends",
       "units": "milliseconds",
@@ -560,31 +603,42 @@
       "hardcoded": false,
       "flags": [
         "exceeds-watchdog-budget"
+      ],
+      "also_defined_in": [
+        "TH-TX-02",
+        "TH-TX-01"
       ]
     },
     {
       "id": "TH-EXIT-23",
-      "recommendation": "Apply a sell ceiling to approvals and the public fallback (card EXIT-03).",
+      "recommendation": "Wire the leg through to the strategies so this ceiling applies to private sells (card TX-02, AUD-TX-010), and apply a sell ceiling to approvals and the public fallback (card EXIT-03).",
       "od_ref": "EXIT-03",
       "name": "Sell-leg priority fee ceiling",
-      "current_value": "25 gwei",
+      "current_value": "25 gwei (no effect on any private sell: the strategies call buildReconcileConfig with no leg, so private sells use the buy ceiling MEV_BUY_MAX_PRIORITY_FEE_GWEI; AUD-TX-010)",
       "definition_sites": [
         "src/utils/mevStrategies/reconciliation.ts:190-192@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:248"
+        ".env.example:248",
+        "src/utils/mevStrategies/reconciliation.ts:75@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:536@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:190@23a64617dca167976adc4645fed0e2c69e384820"
       ],
-      "comparison": "caps the escalated priority fee of private sell attempts (still affordability-clamped)",
+      "comparison": "would cap the escalated priority fee of private sells, but the leg argument never reaches the strategies (flashbots.ts:182, bloxroute.ts:104, passthrough.ts:83); only the no-double-sell guard config at exitEngine.ts:940 reads it, and that config uses only the confirm window and poll, so this ceiling caps nothing today",
       "units": "gwei",
       "representation": "float (parsePositiveNumber)",
       "effective_unset": "25",
       "effective_empty": "25",
       "effective_non_numeric": "25",
       "rationale": "Finding A (config.ts:190)",
-      "overlap": "does not cover approvals or the public fallback swap (AUD-EXIT-004); TX slice owns the escalation",
+      "overlap": "does not cap private sells (AUD-TX-010) and does not cover approvals or the public fallback swap (AUD-EXIT-004); the TX slice owns the escalation (TH-TX-04)",
       "env_key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
       "hardcoded": false,
       "flags": [
+        "no-effect",
         "partial-coverage"
+      ],
+      "also_defined_in": [
+        "TH-TX-04"
       ]
     },
     {
@@ -601,7 +655,31 @@
         "src/bot.ts:860-862@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:1483@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:663@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:207@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:276@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:333@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:390@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1044@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1359@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1138@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1462@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1173@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/honeypot/checkerContract.ts:297@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/honeypot/checkerContract.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/tokenSafety.ts:378@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:201@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:15",
+        ".env.example:21",
+        ".env.example:27",
+        ".env.example:33",
+        "src/preflight.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "used as the token amountIn of the quote; priceMultiple = output / entry output",
       "units": "native-coin wei reused as raw token units (AUD-EXIT-003)",
@@ -616,6 +694,10 @@
       "flags": [
         "unit-mismatch",
         "not-persisted"
+      ],
+      "also_defined_in": [
+        "TH-BUY-01",
+        "TH-DB-06"
       ]
     },
     {
@@ -650,7 +732,16 @@
         "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:287-294@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:381@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:250"
+        ".env.example:250",
+        "src/preflight.ts:370-435@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:280"
       ],
       "comparison": "worstCasePublicSellGas = (maxGasLimit + approvalGas) * baseFee * buffer, reserved before a buy",
       "units": "multiplier on base fee",
@@ -664,6 +755,9 @@
       "hardcoded": false,
       "flags": [
         "reserve-vs-actual-mismatch"
+      ],
+      "also_defined_in": [
+        "TH-DB-19"
       ]
     },
     {

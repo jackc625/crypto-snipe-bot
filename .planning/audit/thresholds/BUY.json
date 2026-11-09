@@ -21,7 +21,21 @@
       "src/utils/honeypot/checkerContract.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
       "src/utils/tokenSafety.ts:378@23a64617dca167976adc4645fed0e2c69e384820",
       "src/preflight.ts:201@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:15",
+      ".env.example:21",
+      ".env.example:27",
+      ".env.example:33",
+      "src/preflight.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:1962@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:731@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:422@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:860-862@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "no comparison at the definition; used as the buy value (parseEther) and as a float in canSnipe (riskManager.ts:76: amount > maxPositionSize, total + amount > maxTotalExposure)",
     "units": "native coin (ETH/BNB), decimal string",
@@ -38,7 +52,11 @@
       "no-rationale"
     ],
     "recommendation": "Validate at registry load as a positive decimal with at most 18 decimals and fail loud (as the tax bps are at chainRegistry.ts:701-714); compare risk limits in wei (bigint), not parseFloat. Validation belongs to the DB slice (chainRegistry.ts); recorded here because the buy path consumes it.",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-06",
+      "TH-EXIT-24"
+    ]
   },
   {
     "id": "TH-BUY-02",
@@ -49,7 +67,9 @@
       "src/bot.ts:1050@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:1053@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:1373@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/bot.ts:1374@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:1374@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:470-471@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:522-523@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "minOut = expectedOut - expectedOut * BigInt(slippage) / 100n; the router reverts if the output is below minOut",
     "units": "percent (integer)",
@@ -66,7 +86,10 @@
       "no-rationale"
     ],
     "recommendation": "Hold slippage as integer basis points (bigint math) so no value can throw into the fail-open catch, and decide the quote-failure behaviour on OD-15.",
-    "od_ref": "OD-15"
+    "od_ref": "OD-15",
+    "also_defined_in": [
+      "TH-EXIT-13"
+    ]
   },
   {
     "id": "TH-BUY-03",
@@ -76,7 +99,9 @@
       "src/bot.ts:529@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:703@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:338-342@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:279",
+      "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "computePublicMinOut: keepPct = round(100 - min(max(0, s), 99)), minOut = expected * keepPct / 100",
     "units": "percent",
@@ -90,7 +115,10 @@
     "hardcoded": false,
     "flags": [],
     "recommendation": null,
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-SCRIPTS-01"
+    ]
   },
   {
     "id": "TH-BUY-04",
@@ -155,7 +183,9 @@
       "src/bot.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:332-336@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/bot.ts:577@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:577@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:278",
+      "scripts/deliberate-buy.ts:13-15@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "number of private submissions passed to escalatePrivateBuy and buildReconcileConfig",
     "units": "count",
@@ -171,7 +201,10 @@
       "no-upper-bound"
     ],
     "recommendation": "Reject non-integers and cap at a documented maximum, because the whole private leg holds the wallet nonce lock (bot.ts:558).",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-SCRIPTS-02"
+    ]
   },
   {
     "id": "TH-BUY-07",
@@ -362,7 +395,14 @@
     "name": "Exit-worker watchdog budget",
     "current_value": "default 60000 ms",
     "definition_sites": [
-      "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2182@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:238"
     ],
     "comparison": "per-submit wall-clock race budget (exit worker)",
     "units": "milliseconds",
@@ -379,7 +419,11 @@
       "no-lower-bound"
     ],
     "recommendation": "Enforce the documented minimum (above the confirm window) and a maximum below the timer limit. The watchdog semantics belong to the EXIT slice.",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-ANTIRUG-18",
+      "TH-EXIT-21"
+    ]
   },
   {
     "id": "TH-BUY-15",
@@ -387,7 +431,9 @@
     "current_value": "default 8000 ms",
     "definition_sites": [
       "src/bot.ts:2305-2307@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/bot.ts:2270-2274@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:2270-2274@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:239"
     ],
     "comparison": "force-exit timer after the first signal",
     "units": "milliseconds",
@@ -403,7 +449,10 @@
       "no-upper-bound"
     ],
     "recommendation": "Cap below the timer limit.",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-14"
+    ]
   },
   {
     "id": "TH-BUY-16",
@@ -411,7 +460,12 @@
     "current_value": "4 (hard-coded), equal to the txManager default 3 retries + 1",
     "definition_sites": [
       "src/bot.ts:369@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:177@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:476@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "none (telemetry only; the real budget is retries ?? 3 in txManager)",
     "units": "count",
@@ -427,7 +481,10 @@
       "duplicated-constant"
     ],
     "recommendation": "Report the attempt count from the same source sendTxWithRetry uses, so the alert cannot drift from the real budget.",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-TX-13"
+    ]
   },
   {
     "id": "TH-BUY-17",
@@ -686,7 +743,30 @@
       "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:61",
+      "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:58",
+      "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:198",
+      "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:59",
+      "src/riskManager.ts:159-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:60@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:62"
     ],
     "comparison": "Date.now() - last < cooldown -> refuse; count >= max -> refuse; total + amount > cap -> refuse",
     "units": "milliseconds / count / native coin",
@@ -700,10 +780,21 @@
     "hardcoded": false,
     "flags": [
       "nan-fail-open",
-      "overlap"
+      "overlap",
+      "differing-defaults"
     ],
     "recommendation": "Validate the risk env values at load (fail loud as the tax bps do) and reserve the cooldown and budget at canSnipe time (card BUY-03). riskManager.ts belongs to the DB slice (22-21); recorded here because the buy path consumes it.",
-    "od_ref": "BUY-03"
+    "od_ref": "BUY-03",
+    "also_defined_in": [
+      "TH-API-06",
+      "TH-DB-04",
+      "TH-API-04",
+      "TH-DB-01",
+      "TH-DB-18",
+      "TH-API-05",
+      "TH-DB-02",
+      "TH-DB-05"
+    ]
   },
   {
     "id": "TH-BUY-28",
@@ -717,7 +808,14 @@
       "src/chainRegistry.ts:391@23a64617dca167976adc4645fed0e2c69e384820",
       "src/riskManager.ts:94-99@23a64617dca167976adc4645fed0e2c69e384820",
       "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
-      "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820"
+      "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:96-97@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:16",
+      ".env.example:22",
+      ".env.example:28",
+      ".env.example:34",
+      "src/api/routes/chains.ts:84@23a64617dca167976adc4645fed0e2c69e384820"
     ],
     "comparison": "daily realized loss <= -(maxCapital * DAILY_LOSS_PCT / 100) -> refuse",
     "units": "native coin",
@@ -734,6 +832,9 @@
       "float-money"
     ],
     "recommendation": "Validate at registry load and compare in wei. Owned by the DB slice (chainRegistry.ts, riskManager.ts); recorded here because the buy path consumes it.",
-    "od_ref": null
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-07"
+    ]
   }
 ]

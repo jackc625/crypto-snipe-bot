@@ -18,8 +18,10 @@
   ],
   "found_date": "2026-11-09",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-  "rc": [],
-  "research_suggested_severity": null,
+  "rc": [
+    "RC-14"
+  ],
+  "research_suggested_severity": "S1",
   "origin": "external",
   "id": "AUD-DB-021",
   "title": "SQLite runs WAL with synchronous=NORMAL, so a just-written position record can be lost on power loss or OS crash",
@@ -45,7 +47,7 @@
   ],
   "sibling_sites_checked": "All critical writes (db.ts:320-323, :540-545, :631-652) use the same database handle and setting.",
   "status": "confirmed",
-  "severity_rationale": "S2: a power cut or OS crash in the small window after a buy is recorded, on a machine with no battery guarantee. The effect is a lost row for a real position.",
+  "severity_rationale": "S2: a power cut or OS crash in the small window after a buy is recorded, on a machine with no battery guarantee. The effect is a lost row for a real position. Linked at 22-28 to RC-14, whose text names synchronous=NORMAL under WAL; the RC is otherwise carried by AUD-DB-004. S2 is below the S1 suggestion because a loss here needs a host-level crash within the OS write-back window after a buy (a process crash cannot lose WAL commits).",
   "recommendation": "Decide whether critical writes need FULL durability in card DB-07. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-DB-08"

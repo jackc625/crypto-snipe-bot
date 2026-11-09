@@ -13,7 +13,8 @@
   "od_ref": "EXIT-10",
   "reported_by": [
     "claude (22-18 executor)",
-    "codex"
+    "codex",
+    "claude (22-19 executor)"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -67,11 +68,46 @@
       "type": "code",
       "ref": "src/bot.ts:1943-1948@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "codex (22-27 independent second opinion, graded S1): Restart monitoring selects the first DEX instead of the trade's DEX"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2096-2098@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ctx.chain.dexes.find(d => d.dexType === trade.pool_type): first dex of that type"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:612-621@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeAntiRugTrades does not select dex_name"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:321-322@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dex_name is recorded on the buy row (bot.ts:1145, :1469 pass dex.name), so the right dex is known and not used"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:397-406@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the dex is stored on the RegisteredPosition"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1900-1907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "it is passed to triggerAntiRugExit, which calls executeFullSell(ctx, dex, ...) (exitTrigger.ts:266)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1713-1722@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V3 sell simulation uses position.dex.quoterAddress"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:176-195@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ETH lists uniswap-v2 and sushiswap-v2; BSC lists two V2 and two V3 (:238-264), Base two V2 (:302-321), Arbitrum two V2 (:359-378)"
     }
   ],
-  "sibling_sites_checked": "Every place a dex is chosen for an existing position: bot.ts resume (:1940-1956, first of type), controls.ts findDex (:33-40, first of type), exitEngine.ts re-arm (:731, passes through whatever dex the failed exit had), the in-process monitor started at buy time (correct dex). If the wrong router has no pair for the token the quote reverts (null every tick, no exit at all, not even urgency, AUD-EXIT-003) and the sell reverts. If it has a different pool, exits run on that pool. Sibling noted for the BUY/DB slices: the aerodrome router (chainRegistry.ts:315-318) is typed v2 but its router takes Route[] rather than address[] paths, so the V2 ROUTER_ABI calls cannot match it (candidate, not verified against its ABI here).",
+  "sibling_sites_checked": "Every place a dex is chosen for an existing position: bot.ts resume (:1940-1956, first of type), controls.ts findDex (:33-40, first of type), exitEngine.ts re-arm (:731, passes through whatever dex the failed exit had), the in-process monitor started at buy time (correct dex). If the wrong router has no pair for the token the quote reverts (null every tick, no exit at all, not even urgency, AUD-EXIT-003) and the sell reverts. If it has a different pool, exits run on that pool. Sibling noted for the BUY/DB slices: the aerodrome router (chainRegistry.ts:315-318) is typed v2 but its router takes Route[] rather than address[] paths, so the V2 ROUTER_ABI calls cannot match it (candidate, not verified against its ABI here). Sibling added at 22-28 from AUD-ANTIRUG-011: resumeAntiRugMonitoring (bot.ts:2096-2098) picks ctx.chain.dexes.find by pool type the same way, so the anti-rug exit routes through the wrong router after a restart.",
   "status": "confirmed",
-  "severity_rationale": "S1. Proven by the code: the dex identity is stored but not used on resume or in the dashboard sells. Plausible condition: any restart while a position bought on a non-first dex is open. Not S0 because it needs that restart (or a dashboard sell) and anti-rug resumes separately.",
+  "severity_rationale": "S1. Proven by the code: the dex identity is stored but not used on resume or in the dashboard sells. Plausible condition: any restart while a position bought on a non-first dex is open. Not S0 because it needs that restart (or a dashboard sell) and anti-rug resumes separately. Merged at 22-28 with AUD-ANTIRUG-011 (the anti-rug re-registration site bot.ts:2096-2098), both S1 STRAND; one finding, one fix, one card (EXIT-10).",
   "recommendation": "Resolve the dex by the stored dex_name (fail loud if it is missing or not configured) in the resume path and the dashboard sells. Card EXIT-10. Phase 24.",
   "traces": [
     {

@@ -6,7 +6,8 @@
         "differing-parsers",
         "nan-fail-open-at-site",
         "four-definition-sites",
-        "excludes-failed-held"
+        "excludes-failed-held",
+        "differing-defaults"
       ],
       "recommendation": "One typed parser (strict integer >= 0, fail loud) used by riskManager, preflight and both dashboard routes; count open positions by exit lifecycle (AUD-DB-003). Card OD-25 (defaults and parser), DB-01 (what counts).",
       "od_ref": "OD-25",
@@ -20,7 +21,25 @@
         "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
         "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:58"
+        ".env.example:58",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198"
       ],
       "comparison": "canSnipe: count of status='pending' buys >= max -> refuse (riskManager.ts:111-120); preflight wallet floor multiplies the snipe amount by it (preflight.ts:200-202)",
       "units": "positions (count)",
@@ -29,7 +48,12 @@
       "effective_empty": "10 at all four sites (|| in riskManager/routes; preflight treats '' as unset)",
       "effective_non_numeric": "riskManager NaN (count >= NaN false, would never refuse) but preflight returns passed:false and boot exits FATAL, so the running bot never sees it; '7.9' -> riskManager 7, preflight refuses; '0' -> refuses every snipe (floor = gas buffer only)",
       "rationale": "none stated in code",
-      "overlap": "TH-BUY-27 (BUY consumer row); the per-chain wallet floor TH-DB-18 multiplies by this global count on every chain; counts only status pending, so failed-held positions are not counted (AUD-DB-003). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits."
+      "overlap": "TH-BUY-27 (BUY consumer row); the per-chain wallet floor TH-DB-18 multiplies by this global count on every chain; counts only status pending, so failed-held positions are not counted (AUD-DB-003). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits.",
+      "also_defined_in": [
+        "TH-API-04",
+        "TH-BUY-27",
+        "TH-DB-18"
+      ]
     },
     {
       "hardcoded": false,
@@ -40,7 +64,8 @@
         "unit-mismatch",
         "float-money",
         "differing-parsers",
-        "excludes-failed-held"
+        "excludes-failed-held",
+        "differing-defaults"
       ],
       "recommendation": "Fix the unit and accounting basis first (card DB-01), then decide a cap that can bind (for example a multiple of the snipe size or of the funded wallet, per currency) on card OD-25; validate at boot.",
       "od_ref": "OD-25",
@@ -54,7 +79,30 @@
         "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
         "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:59"
+        ".env.example:59",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58",
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198"
       ],
       "comparison": "canSnipe: getTotalExposure + snipe amount > cap -> refuse (riskManager.ts:139-148); getTotalExposure sums amount_in of status='pending' buys minus partial-sell proceeds (db.ts:425-438)",
       "units": "'native currency' per the description, but ETH and BNB amounts are summed into one number, and the stored proceeds are wei (AUD-DB-002)",
@@ -63,7 +111,11 @@
       "effective_empty": "10.0 (||)",
       "effective_non_numeric": "NaN: total + amount > NaN is false, the cap never refuses (fail-open); '5ETH' -> 5 (prefix accepted)",
       "rationale": "none stated in code",
-      "overlap": "TH-BUY-27; Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits. After one partial sell the stored total is about -proceeds-in-wei and the check is always false (AUD-DB-002)."
+      "overlap": "TH-BUY-27; Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits. After one partial sell the stored total is about -proceeds-in-wei and the check is always false (AUD-DB-002).",
+      "also_defined_in": [
+        "TH-API-05",
+        "TH-BUY-27"
+      ]
     },
     {
       "hardcoded": false,
@@ -98,7 +150,8 @@
         "nan-fail-open",
         "unit-mismatch",
         "double-count-partials",
-        "differing-parsers"
+        "differing-parsers",
+        "differing-defaults"
       ],
       "recommendation": "Fix the loss accounting (card DB-01) before choosing a value; validate at boot (card OD-25).",
       "od_ref": "OD-25",
@@ -112,7 +165,16 @@
         "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
         "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:61"
+        ".env.example:61",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "canSnipe: getDailyRealizedLoss(chain, now - 86400) <= -(maxCapital * pct / 100) -> refuse for that chain",
       "units": "percent of <PREFIX>_MAX_CAPITAL",
@@ -121,7 +183,11 @@
       "effective_empty": "10 (||)",
       "effective_non_numeric": "NaN: threshold NaN, the breaker never trips (fail-open); '0' -> threshold -0 and 0 <= -0 is true, every snipe refused; negative refuses every snipe",
       "rationale": "none stated beyond the description",
-      "overlap": "TH-BUY-27; base is TH-DB-07; the breaker does not count ordinary losing trades because of the unit mix-up (AUD-DB-002) and charges each partial sell the full cost (AUD-DB-013); the dashboard computes daily loss differently (api/routes/risk.ts:66, :91-95)"
+      "overlap": "TH-BUY-27; base is TH-DB-07; the breaker does not count ordinary losing trades because of the unit mix-up (AUD-DB-002) and charges each partial sell the full cost (AUD-DB-013); the dashboard computes daily loss differently (api/routes/risk.ts:66, :91-95)",
+      "also_defined_in": [
+        "TH-API-06",
+        "TH-BUY-27"
+      ]
     },
     {
       "hardcoded": false,
@@ -141,7 +207,34 @@
         "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
         "src/riskManager.ts:159-162@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:60@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:62"
+        ".env.example:62",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58",
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198",
+        "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:59"
       ],
       "comparison": "canSnipe: Date.now() - lastSnipeTime[chain] < cooldown -> refuse; lastSnipeTime set by recordSnipe after a buy was submitted (bot.ts:1125, :1449, :772)",
       "units": "milliseconds",
@@ -150,7 +243,10 @@
       "effective_empty": "30000 (||)",
       "effective_non_numeric": "NaN: Date.now() - last < NaN is false, no cooldown (fail-open); '0' no cooldown; '30s' -> 30 ms",
       "rationale": "D-09 (in-memory, ephemeral by design) in the comment at riskManager.ts:38-40",
-      "overlap": "TH-BUY-27; the map is empty after every restart; recorded only after the submit returns, so concurrent handlers all pass (AUD-BUY-010)"
+      "overlap": "TH-BUY-27; the map is empty after every restart; recorded only after the submit returns, so concurrent handlers all pass (AUD-BUY-010)",
+      "also_defined_in": [
+        "TH-BUY-27"
+      ]
     },
     {
       "hardcoded": false,
@@ -181,7 +277,23 @@
         "src/preflight.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:1044@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:1359@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1138@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1462@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1173@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1483@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/honeypot/checkerContract.ts:297@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/honeypot/checkerContract.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/tokenSafety.ts:378@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1962@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:731@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:422@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:860-862@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "no comparison at the definition; buy value (parseEther), canSnipe size/exposure input (parseFloat), wallet floor multiplicand, entry floor term, stored as the buy row amount_in",
       "units": "native coin (decimal string)",
@@ -190,7 +302,11 @@
       "effective_empty": "template default ('' falsy, ||)",
       "effective_non_numeric": "preflight parseEther throws inside its try -> passed:false -> boot FATAL (fail-closed); '0' accepted (no positive check)",
       "rationale": "none stated beyond per-chain defaults",
-      "overlap": "TH-BUY-01 (BUY consumer row), TH-EXIT-24 (price probe); the legacy CONFIG.snipeAmountETH 0.01 duplicates the ETH value (config.ts:280, TH-DB-23). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits."
+      "overlap": "TH-BUY-01 (BUY consumer row), TH-EXIT-24 (price probe); the legacy CONFIG.snipeAmountETH 0.01 duplicates the ETH value (config.ts:280, TH-DB-23). Size mismatch on the OD-25 risk defaults: MAX_TOTAL_EXPOSURE 10.0 is 1000 x the ETH snipe (0.01), 100 x the deployment the default position count allows (10 x 0.01 = 0.1 ETH) and about 800 x the ~0.0124 ETH funded wallet named in config.ts:136-139, so the exposure cap cannot bind at the defaults; the position count and the wallet balance are the real limits.",
+      "also_defined_in": [
+        "TH-BUY-01",
+        "TH-EXIT-24"
+      ]
     },
     {
       "hardcoded": false,
@@ -217,7 +333,10 @@
         ".env.example:22",
         ".env.example:28",
         ".env.example:34",
-        "src/api/routes/chains.ts:84@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/chains.ts:84@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-99@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "only scales the daily-loss threshold: -(maxCapital * DAILY_LOSS_PCT / 100); never compared with deployed capital (AUD-DB-014)",
       "units": "native coin",
@@ -226,7 +345,10 @@
       "effective_empty": "template default (||)",
       "effective_non_numeric": "NaN -> daily-loss breaker disabled for the chain (fail-open); no boot validation anywhere",
       "rationale": "none stated; documented as \"Max ETH deployment\" (.env.example:16) which the code does not do",
-      "overlap": "TH-BUY-28 (BUY consumer row); TH-DB-04"
+      "overlap": "TH-BUY-28 (BUY consumer row); TH-DB-04",
+      "also_defined_in": [
+        "TH-BUY-28"
+      ]
     },
     {
       "hardcoded": false,
@@ -435,7 +557,10 @@
       "effective_empty": "8000",
       "effective_non_numeric": "8000; '5x' -> 5",
       "rationale": "RESEARCH A4 (comment bot.ts:2302-2304)",
-      "overlap": "TH-BUY-15 (BUY row); the grace is not used to let an in-flight buy finish and record its row (AUD-DB-004)"
+      "overlap": "TH-BUY-15 (BUY row); the grace is not used to let an in-flight buy finish and record its row (AUD-DB-004)",
+      "also_defined_in": [
+        "TH-BUY-15"
+      ]
     },
     {
       "hardcoded": true,
@@ -498,7 +623,8 @@
       "current_value": "86400 s (24 h, rolling)",
       "definition_sites": [
         "src/riskManager.ts:94@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/api/routes/risk.ts:91-92@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/risk.ts:91-92@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/health.ts:63@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "sells with timestamp >= now - 86400 are summed",
       "units": "seconds",
@@ -507,12 +633,16 @@
       "effective_empty": "n/a",
       "effective_non_numeric": "n/a",
       "rationale": "'Uses rolling 24h window, auto-resumes' (.env.example:61)",
-      "overlap": "TH-DB-04"
+      "overlap": "TH-DB-04",
+      "also_defined_in": [
+        "TH-API-07"
+      ]
     },
     {
       "hardcoded": false,
       "flags": [
-        "global-count-per-chain"
+        "global-count-per-chain",
+        "differing-defaults"
       ],
       "recommendation": "Decide whether the floor should use a per-chain position budget (card OD-25).",
       "od_ref": "OD-25",
@@ -523,7 +653,28 @@
       "definition_sites": [
         "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:198"
+        ".env.example:198",
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58"
       ],
       "comparison": "balance >= floor -> pass (boot FATAL otherwise; the mid-run interval in bot.ts auto-pauses on an undercut)",
       "units": "wei (bigint)",
@@ -532,7 +683,12 @@
       "effective_empty": "derived",
       "effective_non_numeric": "any non-numeric input -> passed:false (fail-closed)",
       "rationale": "D-BALANCE-FLOOR (preflight.ts:168-177)",
-      "overlap": "uses the GLOBAL position count on every chain (over-reserves when several chains are enabled); ignores per-buy gas (the entry gate TH-DB-19 covers that per buy); at the defaults the ETH floor (0.105 ETH) is far above the ~0.0124 ETH funded wallet named in config.ts:136-139"
+      "overlap": "uses the GLOBAL position count on every chain (over-reserves when several chains are enabled); ignores per-buy gas (the entry gate TH-DB-19 covers that per buy); at the defaults the ETH floor (0.105 ETH) is far above the ~0.0124 ETH funded wallet named in config.ts:136-139",
+      "also_defined_in": [
+        "TH-API-04",
+        "TH-BUY-27",
+        "TH-DB-01"
+      ]
     },
     {
       "hardcoded": false,
@@ -551,7 +707,14 @@
         "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:280",
+        "src/preflight.ts:287-294@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:381@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:250"
       ],
       "comparison": "balance >= floor -> buy allowed; any RPC error -> refused (fail-closed)",
       "units": "wei (bigint)",
@@ -560,7 +723,12 @@
       "effective_empty": "buffers 2.0",
       "effective_non_numeric": "buffers fall back to 2.0 when not finite or <= 0 (default)",
       "rationale": "Finding A / D-EXIT-AFFORDABILITY-GATE (preflight.ts:332-369)",
-      "overlap": "TH-EXIT-26 owns EXIT_GATE_SELL_GAS_BUFFER; the base fee is derived as maxFeePerGas - maxPriorityFeePerGas (preflight.ts:319-323), the RC-22 2x over-estimate recorded on TH-TX-09 (TX slice)"
+      "overlap": "TH-EXIT-26 owns EXIT_GATE_SELL_GAS_BUFFER; the base fee is derived as maxFeePerGas - maxPriorityFeePerGas (preflight.ts:319-323), the RC-22 2x over-estimate recorded on TH-TX-09 (TX slice)",
+      "also_defined_in": [
+        "TH-DB-21",
+        "TH-SCRIPTS-03",
+        "TH-EXIT-26"
+      ]
     },
     {
       "hardcoded": true,
@@ -599,7 +767,12 @@
         "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
         "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:280"
+        ".env.example:280",
+        "src/preflight.ts:370-435@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "multiplier on base fee for the deliberate buy public-fallback reserve in the entry floor",
       "units": "multiplier",
@@ -608,7 +781,11 @@
       "effective_empty": "2.0",
       "effective_non_numeric": "2.0 (default)",
       "rationale": "D-BUY-AFFORDABILITY-EXTEND",
-      "overlap": "TH-DB-19"
+      "overlap": "TH-DB-19",
+      "also_defined_in": [
+        "TH-SCRIPTS-03",
+        "TH-DB-19"
+      ]
     },
     {
       "hardcoded": true,
@@ -670,7 +847,10 @@
         "src/chainRegistry.ts:204@23a64617dca167976adc4645fed0e2c69e384820",
         "src/chainRegistry.ts:273@23a64617dca167976adc4645fed0e2c69e384820",
         "src/chainRegistry.ts:330@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/chainRegistry.ts:387@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/chainRegistry.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:864@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1499@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "maxGasLimit is the buy and sell gas limit and enters the affordability floors (bot.ts:577, exitEngine.ts:864, :1499, preflight.ts:382); the multiplier has no live reader (git grep gas.multiplier; TH-TX-27)",
       "units": "gas units / multiplier",
@@ -679,7 +859,10 @@
       "effective_empty": "n/a",
       "effective_non_numeric": "n/a",
       "rationale": "none stated",
-      "overlap": "TH-EXIT-19 (sell gas limit), TH-TX-15 (strategy fallbacks), TH-TX-27 (dead multipliers)"
+      "overlap": "TH-EXIT-19 (sell gas limit), TH-TX-15 (strategy fallbacks), TH-TX-27 (dead multipliers)",
+      "also_defined_in": [
+        "TH-EXIT-19"
+      ]
     }
   ],
   "discovery": {

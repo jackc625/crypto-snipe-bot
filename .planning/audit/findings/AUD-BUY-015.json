@@ -4,7 +4,7 @@
   "kind": "finding",
   "area": "src",
   "slice": "BUY",
-  "severity": "S2",
+  "severity": "S1",
   "capital_impact": "EXPOSURE",
   "classes": [],
   "files": [
@@ -35,6 +35,21 @@
       "type": "code",
       "ref": "src/utils/tokenSafety.ts:417-418@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "codex (22-27 independent second opinion, graded S1): V2 liquidity checks ignore the chain's configured threshold"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1362-1377@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28 re-grade: minOut is computed from the same V3 quote at the snipe amount, so it cannot bound pool depth"
+    },
+    {
+      "type": "code",
+      "ref": "contracts/honeypot/HoneypotChecker.sol:280-324@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28 re-grade: the roundtrip gate measures buy tax against the quote at trade size; price impact in a thin pool is not a gate"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:209@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28 re-grade: default minLiquidityThreshold (0.5 ETH on ETH; 1.0 BNB, 0.1 on Base and Arbitrum at :278, :335, :392) is the limit this gate fails to enforce on V3"
     }
   ],
   "sibling_sites_checked": "V2 uses a reserve comparison against a hard-coded 1 native (tokenSafety.ts:417-421, threshold row TH-BUY-09) instead of the configured threshold; V3 uses the configured threshold through this quote-success test. No other V3 depth check exists in the slice.",
@@ -42,15 +57,16 @@
   "origin": "independent",
   "rc": [],
   "research_suggested_severity": null,
-  "severity_rationale": "S2, candidate: checkMinLiquidity treats \"quoteExactInputSingle(amountIn = threshold) did not revert\" as \"the pool holds at least the threshold\". An exact-input quote with no price limit walks the pool to its price bound and returns whatever it could fill without reverting (Uniswap V3 QuoterV2 behaviour, to be proven on a fork in Phase 23), so a thin V3 pool passes. The buy itself is still bounded by the roundtrip gate and minOut (when the quote succeeds), which keeps this at S2.",
+  "severity_rationale": "S1 (raised from S2 by the 22-28 re-grade of codex-BUY-12, read at the base). checkMinLiquidity treats \"quoteExactInputSingle(amountIn = threshold) did not revert\" as proof of depth. An exact-input quote with no price limit returns what the pool could fill and does not revert (QuoterV2 only reverts when nothing fills), so every V3 pool with any active liquidity passes the gate on an ordinary condition. The earlier S2 reasoning named two bounds that do not hold: minOut is derived from the same quote at the same depth, and the honeypot roundtrip measures tax against the quote at trade size, so neither limits how thin the pool is. A configured capital risk limit is therefore bypassed on every V3 snipe: S1, candidate until a Phase 23 fork run shows a sub-threshold pool pass the gate. codex-BUY-13 (V2 hardcodes 1 native) is a sibling recorded here; on its own it would grade S3 because defaults are at or below 1 native on every chain. See AUD-BUY-033 for the loss the partial fill causes.",
   "duplicate_of": null,
   "related": [
-    "AUD-BUY-013"
+    "AUD-BUY-013",
+    "AUD-BUY-033"
   ],
   "tags": [
     "safety-gate"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-BUY-04",
   "od_ref": "BUY-05",
   "recommendation": "Measure V3 depth directly (in-range liquidity or the WETH balance of the pool, or compare the quoted output against an expected price) and use one threshold semantics for V2 and V3. Behaviour change on card BUY-05.",
   "reported_by": [

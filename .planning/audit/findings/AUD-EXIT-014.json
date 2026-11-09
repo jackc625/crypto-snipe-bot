@@ -65,10 +65,25 @@
       "type": "code",
       "ref": "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the budget frees only the caller; the queued exit still runs later with its stale balance read"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1839-1848@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28: with confirmBlocks 0 the gate awaits triggerAntiRugExit and discards the boolean; no pending-rug state is kept"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1900-1907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28: with confirmBlocks > 0 the same; one gate fires once and removes its own block handler"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:240-262@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28: the escape clears the poll timers first, then returns false on a refused or timed-out sell; the comment \"retries on a later poll/anti-rug cycle\" is not implemented"
     }
   ],
   "sibling_sites_checked": "Lock holders that can block an anti-rug exit: a routine full exit of the same token (sell lock :832, held through the whole ladder), a detached partial of the same token (:1483), and any private escalation on the wallet (nonce lock :788, plus approvals :871/:874/:1509/:1512 and the public fallback :543/:552). Whether a refused anti-rug exit is retried depends on the anti-rug detector firing again on a new pool event (ANTIRUG slice; the dispatch at detector.ts:1341-1392 runs per event), and whether a refused or timed-out exit counts against the anti-rug circuit breaker is for the ANTIRUG slice too.",
-  "status": "candidate",
-  "severity_rationale": "S1 candidate. The refusals and the lock hold times are code facts. The plausible condition is a rug that starts while another exit is running: a price drop from early sell-offs triggers stop-loss first, and the liquidity pull arrives seconds later. The anti-rug exit is then dropped (same token) or delayed past its budget (another token). The in-flight routine exit keeps selling, but with routine parameters (two private attempts, 5% public slippage, no anti-rug gas multiplier), which is what makes it a loss case rather than a strand. Left candidate until the ANTIRUG slice confirms the retry and circuit-breaker behaviour.",
+  "status": "confirmed",
+  "severity_rationale": "S1 candidate. The refusals and the lock hold times are code facts. The plausible condition is a rug that starts while another exit is running: a price drop from early sell-offs triggers stop-loss first, and the liquidity pull arrives seconds later. The anti-rug exit is then dropped (same token) or delayed past its budget (another token). The in-flight routine exit keeps selling, but with routine parameters (two private attempts, 5% public slippage, no anti-rug gas multiplier), which is what makes it a loss case rather than a strand. Left candidate until the ANTIRUG slice confirms the retry and circuit-breaker behaviour. Confirmed at 22-28 against the code (see the last evidence entries and AUD-ANTIRUG-004 sub_claim 1): a refused or timed-out rug escape does not fire again; it recurs only on a new LP log or a backfill replay.",
   "recommendation": "Decide on card EXIT-11 how an anti-rug exit takes precedence over an in-flight exit (pre-empt it, escalate the in-flight one to anti-rug parameters, or queue and retry) and whether the nonce lock may be held across a whole private escalation. Phase 24."
 }

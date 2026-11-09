@@ -77,7 +77,7 @@
         "AUD-CONTRACTS-004",
         "AUD-SCRIPTS-005"
       ],
-      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for PRIVATE_KEY|DEPLOY_PRIVATE_KEY|API_KEY|dotenv|accounts|env: hardhat.config.ts:9 loads .env and :51-95 build DEPLOY_PRIVATE_KEY accounts (AUD-CONTRACTS-001); deploy wrapper key check and env pass-through (AUD-CONTRACTS-004); audit-honeypot-checker.ts crash prints the raw error (AUD-SCRIPTS-005); Etherscan key in the HTTPS query string at :46, :74 is not printed"
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for PRIVATE_KEY|DEPLOY_PRIVATE_KEY|API_KEY|dotenv|accounts|env: hardhat.config.ts:9 loads .env and :51-95 build DEPLOY_PRIVATE_KEY accounts (AUD-CONTRACTS-001); deploy wrapper key check and env pass-through (AUD-CONTRACTS-004); audit-honeypot-checker.ts crash prints the raw error (AUD-SCRIPTS-005); Etherscan key in the HTTPS query string at :46, :74 is not printed | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists: no hit of any classification under contracts/ in any commit"
     },
     "C18": {
       "result": [

@@ -62,10 +62,15 @@
       "type": "code",
       "ref": "src/exitEngine.ts:1531-1546@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "codex (22-27 independent second opinion, graded S1): Post-submission errors can repeat an already executed partial sale"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:44@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28: getTransactionReceipt is unguarded, so one RPC error after a successful swap throws into the partial-sell catch"
     }
   ],
   "sibling_sites_checked": "All exit writes: insertTrade (:1073, :1550), upsertExitState (:1575, :1646, :1829, :1891, :2001), markExitFailedHeld (:700), updateTradeStatus (:668, :1163), deleteExitState (:670). None is in a transaction. The re-sold-tier window is the decodeReceipt RPC call between the landed tx and the tier persist.",
   "status": "candidate",
-  "severity_rationale": "S2: the orderings are code facts; a loss needs a crash or kill inside a short window. The capital part is the partial tier sold twice after a restart (selling more of the position than configured). The rest is P&L and status accuracy.",
+  "severity_rationale": "S2: the orderings are code facts; a loss needs a crash or kill inside a short window. The capital part is the partial tier sold twice after a restart (selling more of the position than configured). The rest is P&L and status accuracy. Corrected at 22-28: the condition is wider than a crash. A single RPC error from decodeReceipt (receiptDecoder.ts:44, unguarded) or a SQLite error after the swap lands in the catch at exitEngine.ts:1585-1588, which leaves the tier incomplete and lets the next poll repeat the sale. The grade stays S2 because the repeat is a sale at market of tokens the wallet holds, and the proceeds return to the wallet: it over-liquidates a position above its tier; it does not lose principal.",
   "recommendation": "Persist tier completion (keyed by tx hash) before the receipt decode, insert the sell row after the balance check with the real outcome, and wrap teardown writes in one transaction. Card EXIT-08. Phase 29, or Phase 24 for the tier re-sell."
 }

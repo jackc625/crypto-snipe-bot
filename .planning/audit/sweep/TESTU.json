@@ -81,9 +81,10 @@
         "AUD-TESTU-017",
         "AUD-TESTU-018",
         "AUD-TESTU-019",
-        "AUD-TESTU-023"
+        "AUD-TESTU-023",
+        "AUD-RAIL-002"
       ],
-      "search": "tests touching SQLite state (grep src/utils/db mocks, prepare(, better-sqlite3, insertTrade, markExitFailedHeld, getResume*) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461): which use the real statement, which mock it, which mirror it, and which open the real DB unmocked. Remaining files: db.test.ts runs SQL copies on the v4 helper schema (AUD-TESTU-017, AUD-TESTU-018) and imports src/utils/db unmocked (AUD-TESTU-001); the three db/*Migration files run replicas of migrateSchema and their own statement SQL and import src/utils/db unmocked (AUD-TESTU-019, AUD-TESTU-001); configEnvVar mis-paths its db mock (AUD-TESTU-023); riskManager and preflight/* mock the statements."
+      "search": "tests touching SQLite state (grep src/utils/db mocks, prepare(, better-sqlite3, insertTrade, markExitFailedHeld, getResume*) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461): which use the real statement, which mock it, which mirror it, and which open the real DB unmocked. Remaining files: db.test.ts runs SQL copies on the v4 helper schema (AUD-TESTU-017, AUD-TESTU-018) and imports src/utils/db unmocked (AUD-TESTU-001); the three db/*Migration files run replicas of migrateSchema and their own statement SQL and import src/utils/db unmocked (AUD-TESTU-019, AUD-TESTU-001); configEnvVar mis-paths its db mock (AUD-TESTU-023); riskManager and preflight/* mock the statements. | 22-28 consolidation: AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
     },
     "C14": {
       "result": [
@@ -110,18 +111,23 @@
     },
     "C17": {
       "result": [
-        "AUD-TESTU-001"
+        "AUD-TESTU-001",
+        "AUD-SECRET-002",
+        "AUD-RAIL-001",
+        "AUD-RAIL-002"
       ],
-      "search": "hard-coded keys and key handling (grep 0x+64 hex, PRIVATE_KEY, AUTH_KEY, new Wallet) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the only key material is the known-public Hardhat #0 key used as the Flashbots auth signer (flashbotsMultiBuilder.test.ts:153, inclusionReconciliation.test.ts:137; known-public, not escalated, AC-35) and 0x11..11 placeholders; the real PRIVATE_KEY reached tests only through the pre-rail .env load (AUD-TESTU-001). Remaining files: chainRegistry, antiRugConfig, configEnvVar, v3Abis, provider, tokenSafety use 0x11..11 placeholder keys; crossEnvRules uses placeholder secrets; no real key material in the slice."
+      "search": "hard-coded keys and key handling (grep 0x+64 hex, PRIVATE_KEY, AUTH_KEY, new Wallet) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the only key material is the known-public Hardhat #0 key used as the Flashbots auth signer (flashbotsMultiBuilder.test.ts:153, inclusionReconciliation.test.ts:137; known-public, not escalated, AC-35) and 0x11..11 placeholders; the real PRIVATE_KEY reached tests only through the pre-rail .env load (AUD-TESTU-001). Remaining files: chainRegistry, antiRugConfig, configEnvVar, v3Abis, provider, tokenSafety use 0x11..11 placeholder keys; crossEnvRules uses placeholder secrets; no real key material in the slice. | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists; known-public Hardhat #0 and public-address hits in test files | 22-28 consolidation: AUD-RAIL-001 and AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
     },
     "C18": {
       "result": [
         "AUD-TESTU-001",
         "AUD-TESTU-011",
         "AUD-TESTU-015",
-        "AUD-TESTU-021"
+        "AUD-TESTU-021",
+        "AUD-RAIL-001",
+        "AUD-RAIL-002"
       ],
-      "search": "environment manipulation patterns (envscan.js: env assignments, deletes and save/restore idioms per file) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); save-and-restore in deliberateBuy*, noDoubleBuyReconcile, exitInclusionLadder, noDoubleSellReconcile, inclusionReconciliation; delete-only or no cleanup in the AUD-TESTU-015 files. Remaining files: configEnvVar, chainRegistry, antiRugConfig, v3Abis, riskManager and preflight/antiRugLiveGate overwrite or delete keys without restoring (AUD-TESTU-015); telegramListener pins the allow-all allowlist env semantics (AUD-TESTU-021); crossEnvRules, exitAffordability, staleData, walletBalance and telegramListener snapshot and restore correctly."
+      "search": "environment manipulation patterns (envscan.js: env assignments, deletes and save/restore idioms per file) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); save-and-restore in deliberateBuy*, noDoubleBuyReconcile, exitInclusionLadder, noDoubleSellReconcile, inclusionReconciliation; delete-only or no cleanup in the AUD-TESTU-015 files. Remaining files: configEnvVar, chainRegistry, antiRugConfig, v3Abis, riskManager and preflight/antiRugLiveGate overwrite or delete keys without restoring (AUD-TESTU-015); telegramListener pins the allow-all allowlist env semantics (AUD-TESTU-021); crossEnvRules, exitAffordability, staleData, walletBalance and telegramListener snapshot and restore correctly. | 22-28 consolidation: AUD-RAIL-001 and AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
     },
     "C19": {
       "result": "checked, none",

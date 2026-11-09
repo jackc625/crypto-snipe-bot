@@ -121,7 +121,8 @@
         "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820",
         "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820"
       ],
-      "status": "confirmed"
+      "status": "confirmed",
+      "reverified": "22-28 consolidation read the cited lines at the base: the detector discards the triggerAntiRugExit result and keeps no pending-rug state (detector.ts:1839-1848, :1900-1907), exitTrigger clears the timers first and returns false (exitTrigger.ts:240-262), and dispatch is log-driven only (detector.ts:1341-1396). Holds."
     },
     {
       "claim": "(2) If the sell lock was held by a detached partial sell when anti-rug fired, nothing re-arms the poll interval anti-rug cleared; the position stays held with anti-rug registered but no stop-loss, trailing or urgency exit (the AUD-EXIT-007 shape).",

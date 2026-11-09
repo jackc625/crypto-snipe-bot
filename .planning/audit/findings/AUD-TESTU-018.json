@@ -44,7 +44,7 @@
   "severity_rationale": "S3: misleading assurance about the schema; the capital-relevant consequence (risk SQL on the wrong shape) is AUD-TESTU-017.",
   "duplicate_of": null,
   "related": [
-    "rc:RC-28",
+    "AUD-TESTI-001",
     "AUD-TESTU-017",
     "AUD-TESTU-019"
   ],

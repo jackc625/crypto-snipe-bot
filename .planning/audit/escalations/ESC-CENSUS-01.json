@@ -9,7 +9,9 @@
   "items": [
     "AUD-CENSUS-002"
   ],
-  "resolved_items": [],
+  "resolved_items": [
+    "AUD-BUY-007"
+  ],
   "summary": "Signing-site census (22-26 Task 2, AC-36, D-16 area-batch tier for S1): of 11 transaction-signing sites in src/, 10 are proven to run inside the wallet nonce lock and 1 is not: src/utils/tokenSafety.ts:277, the real approve inside simulateSell, which has no caller at the base (imported by src/bot.ts:17, never called; tests mock it). It is the same defect AUD-BUY-007 recorded at S2; the census rule grades it S1, so the operator is asked how to grade it. No unknown site. The 12 script sites run in their own processes and are already acknowledged in ESC-SCRIPTS-01 (Phase 29); they are not re-escalated. Nothing is changed in Phase 22.",
   "presented_at": "2026-11-07 session: the 22-26 Task 2 blocking checkpoint (checkpoint:decision, area-batch), relayed to the operator by the execute-phase orchestrator",
   "operator_response": "keep s1",

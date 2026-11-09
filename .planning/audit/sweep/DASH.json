@@ -94,8 +94,10 @@
       "search": "not applicable to a browser front end (no fees are set in the browser); searched for gasPrice|maxFeePerGas|gasLimit over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
     },
     "C17": {
-      "result": "checked, none",
-      "search": "for apiKey|localStorage|sessionStorage|document.cookie|password|Authorization: the API key is typed into a password field, POSTed once to /api/auth/login (LoginForm.tsx:18-23) and never stored; auth is the server-set session cookie sent with credentials: include; localStorage holds only the sidebar flag (Layout.tsx:16, :28) and gap-banner dismissals (GapDetectedBanner.tsx:34-55); cookie flags and session lifetime are AUD-API-007; none in the dashboard over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+      "result": [
+        "AUD-SECRET-005"
+      ],
+      "search": "for apiKey|localStorage|sessionStorage|document.cookie|password|Authorization: the API key is typed into a password field, POSTed once to /api/auth/login (LoginForm.tsx:18-23) and never stored; auth is the server-set session cookie sent with credentials: include; localStorage holds only the sidebar flag (Layout.tsx:16, :28) and gap-banner dismissals (GapDetectedBanner.tsx:34-55); cookie flags and session lifetime are AUD-API-007; none in the dashboard over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full) | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists; the Phase 20 dashboard host-check review strings (AUD-SECRET-005)"
     },
     "C18": {
       "result": [

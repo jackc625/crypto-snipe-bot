@@ -14,7 +14,9 @@
         "src/bot.ts:529@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:703@23a64617dca167976adc4645fed0e2c69e384820",
         ".env.example:279",
-        "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820"
+        "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:338-342@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "computePublicMinOut: minOut = expected x round(100 - clamp(s, 0, 99)) / 100 for the private leg (:529) and the public leg (:703)",
       "units": "percent",
@@ -22,7 +24,10 @@
       "effective_unset": "5",
       "effective_empty": "'' -> 5",
       "effective_non_numeric": "'abc' -> 5; '0' or negative -> 5 (0% cannot be configured); '150' -> clamped to 99",
-      "rationale": "one slippage helper for both legs (src/bot.ts:524-526)"
+      "rationale": "one slippage helper for both legs (src/bot.ts:524-526)",
+      "also_defined_in": [
+        "TH-BUY-03"
+      ]
     },
     {
       "hardcoded": false,
@@ -40,7 +45,9 @@
         "src/bot.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
         "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
         ".env.example:278",
-        "scripts/deliberate-buy.ts:13-15@23a64617dca167976adc4645fed0e2c69e384820"
+        "scripts/deliberate-buy.ts:13-15@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:332-336@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:577@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "number of private submissions before the no-double-buy guard and the public fallback",
       "units": "count",
@@ -48,7 +55,10 @@
       "effective_unset": "2",
       "effective_empty": "'' -> 2",
       "effective_non_numeric": "'abc' -> 2; '0' -> 2; '5x' -> 5 (numeric prefix accepted); no upper bound",
-      "rationale": "default 2 private submissions (src/bot.ts:554)"
+      "rationale": "default 2 private submissions (src/bot.ts:554)",
+      "also_defined_in": [
+        "TH-BUY-06"
+      ]
     },
     {
       "hardcoded": false,
@@ -63,7 +73,14 @@
       "definition_sites": [
         "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
         "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
-        ".env.example:280"
+        ".env.example:280",
+        "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:370-435@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "multiplier on base fee for the public-fallback gas reserve in the entry affordability floor checked before the deliberate buy",
       "units": "multiplier",
@@ -71,7 +88,11 @@
       "effective_unset": "2.0",
       "effective_empty": "2.0",
       "effective_non_numeric": "2.0 (default)",
-      "rationale": "D-BUY-AFFORDABILITY-EXTEND"
+      "rationale": "D-BUY-AFFORDABILITY-EXTEND",
+      "also_defined_in": [
+        "TH-DB-21",
+        "TH-DB-19"
+      ]
     },
     {
       "hardcoded": true,

@@ -68,9 +68,10 @@
         "AUD-DB-019",
         "AUD-DB-007",
         "AUD-DB-021",
-        "AUD-DB-022"
+        "AUD-DB-022",
+        "AUD-FORENSIC-001"
       ],
-      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for transaction(|db.exec|pragma|synchronous|journal_mode|user_version|INSERT|UPDATE|DELETE|prepare( (emphasis): synchronous=NORMAL under WAL and no buy intent row (AUD-DB-004, RC-14), unconditional user_version write and writes on every import (AUD-DB-006, RC-25), migrations 1-5 outside transactions (AUD-DB-012), no wallet scoping or DB lock (AUD-DB-015), risk queries keyed on trades.status instead of the exit lifecycle (AUD-DB-003), cwd-relative state (AUD-DB-007, AUD-DB-019); markExitFailedHeld + updateTradeStatus as two statements without a transaction live in exitEngine.ts (EXIT slice); buy row then exit_state then lp_baseline in bot.ts is SC-06 (BUY slice) | 22-27 merge: AUD-DB-021 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-DB-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for transaction(|db.exec|pragma|synchronous|journal_mode|user_version|INSERT|UPDATE|DELETE|prepare( (emphasis): synchronous=NORMAL under WAL and no buy intent row (AUD-DB-004, RC-14), unconditional user_version write and writes on every import (AUD-DB-006, RC-25), migrations 1-5 outside transactions (AUD-DB-012), no wallet scoping or DB lock (AUD-DB-015), risk queries keyed on trades.status instead of the exit lifecycle (AUD-DB-003), cwd-relative state (AUD-DB-007, AUD-DB-019); markExitFailedHeld + updateTradeStatus as two statements without a transaction live in exitEngine.ts (EXIT slice); buy row then exit_state then lp_baseline in bot.ts is SC-06 (BUY slice) | 22-27 merge: AUD-DB-021 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-DB-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-28 consolidation: AUD-FORENSIC-001 (findings-only slice, area src, class C13) folded in"
     },
     "C14": {
       "result": [

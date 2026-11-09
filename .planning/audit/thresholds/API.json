@@ -75,7 +75,8 @@
       "hardcoded": false,
       "flags": [
         "display-duplicate-parser",
-        "excludes-failed-held"
+        "excludes-failed-held",
+        "differing-defaults"
       ],
       "od_ref": "OD-25",
       "id": "TH-API-04",
@@ -84,7 +85,29 @@
       "current_value": "10",
       "definition_sites": [
         "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58",
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198"
       ],
       "comparison": "display only: positionLimit.max next to the pending-buy count",
       "units": "positions (count)",
@@ -94,14 +117,20 @@
       "effective_non_numeric": "risk.ts NaN -> JSON null; chains.ts the raw text; but preflight refuses a non-numeric value at boot, so the running bot never has one",
       "rationale": "mirrors riskManager.ts:28",
       "overlap": "TH-DB-01 (the enforcing row, which already lists these two sites); count excludes failed-held positions (AUD-API-001 sub_claim 5, AUD-DB-003)",
-      "recommendation": "Serve the effective value from riskManager (AUD-API-003, card OD-25)."
+      "recommendation": "Serve the effective value from riskManager (AUD-API-003, card OD-25).",
+      "also_defined_in": [
+        "TH-BUY-27",
+        "TH-DB-01",
+        "TH-DB-18"
+      ]
     },
     {
       "hardcoded": false,
       "flags": [
         "display-duplicate-parser",
         "nan-shown-as-null",
-        "mixed-units"
+        "mixed-units",
+        "differing-defaults"
       ],
       "od_ref": "OD-25",
       "id": "TH-API-05",
@@ -110,7 +139,34 @@
       "current_value": "10.0",
       "definition_sites": [
         "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61",
+        "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:58",
+        "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:198",
+        "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:59"
       ],
       "comparison": "display only: exposureLimit.max next to the mixed-unit exposure total",
       "units": "native coin (ETH/BNB), but compared with a wei/decimal mixed total (AUD-DB-002)",
@@ -120,13 +176,18 @@
       "effective_non_numeric": "risk.ts NaN -> null (riskManager NaN = cap off, AUD-DB-001); chains.ts raw text; \"5ETH\" -> 5 at both risk.ts and riskManager",
       "rationale": "mirrors riskManager.ts:29",
       "overlap": "TH-DB-02 (enforcing row)",
-      "recommendation": "Serve the effective value and an explicit invalid/off state from riskManager (AUD-API-003, OD-25)."
+      "recommendation": "Serve the effective value and an explicit invalid/off state from riskManager (AUD-API-003, OD-25).",
+      "also_defined_in": [
+        "TH-BUY-27",
+        "TH-DB-02"
+      ]
     },
     {
       "hardcoded": false,
       "flags": [
         "display-duplicate-parser",
-        "unit-mismatch-in-display"
+        "unit-mismatch-in-display",
+        "differing-defaults"
       ],
       "od_ref": "OD-25",
       "id": "TH-API-06",
@@ -135,7 +196,20 @@
       "current_value": "10",
       "definition_sites": [
         "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:61"
       ],
       "comparison": "display only: dailyLoss.limitPct next to an absolute summed loss (AUD-API-017)",
       "units": "percent of per-chain max capital (enforcement); shown against an absolute amount",
@@ -145,7 +219,11 @@
       "effective_non_numeric": "risk.ts NaN -> null (riskManager NaN = breaker off, AUD-DB-001); chains.ts raw text",
       "rationale": "mirrors riskManager.ts:30",
       "overlap": "TH-DB-03 (enforcing row)",
-      "recommendation": "Return per-chain used and threshold in one unit (AUD-API-017, card DB-01) and the parsed value (OD-25)."
+      "recommendation": "Return per-chain used and threshold in one unit (AUD-API-017, card DB-01) and the parsed value (OD-25).",
+      "also_defined_in": [
+        "TH-BUY-27",
+        "TH-DB-04"
+      ]
     },
     {
       "hardcoded": true,
@@ -160,7 +238,8 @@
       "current_value": "86400000",
       "definition_sites": [
         "src/api/routes/risk.ts:91-92@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/api/routes/health.ts:63@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/api/routes/health.ts:63@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94@23a64617dca167976adc4645fed0e2c69e384820"
       ],
       "comparison": "sell timestamp >= now - 24 h (risk /limits daily loss; /health dailyPnL by buy time)",
       "units": "ms (24 h)",
@@ -170,7 +249,10 @@
       "effective_non_numeric": "n/a (literal)",
       "rationale": "mirrors the rolling 24 h window of the breaker",
       "overlap": "Same window as the breaker in riskManager (TH-DB row for DAILY_LOSS window); /health filters by buy time (b.timestamp) while the breaker filters by sell time, so the two \"24 h\" figures cover different trades",
-      "recommendation": "Take the window and the figure from riskManager so display and breaker agree (AUD-API-017)."
+      "recommendation": "Take the window and the figure from riskManager so display and breaker agree (AUD-API-017).",
+      "also_defined_in": [
+        "TH-DB-17"
+      ]
     },
     {
       "hardcoded": true,

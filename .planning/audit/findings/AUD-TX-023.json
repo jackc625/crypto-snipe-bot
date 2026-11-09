@@ -46,7 +46,7 @@
   ],
   "sibling_sites_checked": "flashbots.ts:210 and bloxroute.ts:117 mix fee fields the same way.",
   "status": "candidate",
-  "severity_rationale": "S4: unreachable today because no builder sets gasPrice.",
+  "severity_rationale": "S4: unreachable in practice. Buy builders go through wallet.populateTransaction (type-2 on EIP-1559 chains) and sell builders set only gasLimit, and each strategy overrides the fee fields from its own feeData snapshot, so an inconsistency needs the RPC fee model to change between the two calls. (Corrected at 22-28: earlier wording said no builder sets gasPrice.)",
   "recommendation": "Strip incompatible fee fields in the strategy. No behaviour change for current callers. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-TX-02"
