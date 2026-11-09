@@ -104,3 +104,13 @@ No gaps. Nothing in the phase goal is failed or missing. Status is `human_needed
 
 _Verified: 2026-11-09_
 _Verifier: Claude (gsd-verifier)_
+
+## Post-ship amendment (2026-11-09)
+
+The first CI run on PR #2 failed, so the seal details earlier in this report are superseded.
+
+- **Cause:** two rail test files assumed the gitignored `data/` folder exists, and CI never installed the dashboard's own packages before type-checking it.
+- **Fixes (`ea193b8`):** the two test files, the CI workflow, and a setup hook in `deliberateBuyArmMonitoring.test.ts` so the cold import of `src/bot` no longer counts against its first test.
+- **Register:** AUD-TESTQ-036, AUD-TESTQ-037 and AUD-CONTRACTS-006 are added and marked fixed, taking the register from 287 to 290 findings.
+- **Seal:** moved from `93d9029` to `1d1dd17` by the same steps as the original: re-audit of the changed files, `check.ts --stage final`, the end-of-phase checks, and the phase-wide secret scan (213 commits, 0 hits). No path was added to the exempt list.
+- **Verdicts unchanged:** `src/` and `test/rails/core.cjs` were not touched by these fixes.
