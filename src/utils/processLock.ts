@@ -11,6 +11,12 @@
 // cleanup. A leftover -journal file is harmless. Any error that is not "held" refuses too
 // (NAC-07): the lock never fails open.
 //
+// Two processes colliding in SQLite's lock upgrade (both reach SHARED, then neither can reach
+// EXCLUSIVE) both get SQLITE_BUSY with timeout 0, so a raw attempt can give ZERO winners
+// (measured in the AC-23c race). That is safe but wrong for a simultaneous start, so the whole
+// attempt is retried for BUSY_RETRY_BUDGET_MS: a genuine holder still refuses, about a second
+// later, and a collision resolves to exactly one winner.
+//
 // Rules for this module:
 //   - STL-5, the pin: the handle lives on globalThis[Symbol.for('crypto-snipe-bot.processLock')]
 //     for the whole process lifetime. An unreferenced better-sqlite3 handle is closed by the
@@ -35,6 +41,8 @@ import path from 'path';
 
 const PIN = Symbol.for('crypto-snipe-bot.processLock');
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+// How long to keep retrying while the lock file is busy. See the header.
+const BUSY_RETRY_BUDGET_MS = 1000;
 
 export type ProcessLockErrorCode = 'PROCESS_LOCK_HELD' | 'PROCESS_LOCK_MECHANISM';
 
@@ -124,8 +132,8 @@ function mechanismError(address: string, lockFile: string, cause: unknown): Proc
     );
 }
 
-/** Takes the exclusive lock. On failure the handle is closed and the raw error is thrown. */
-function openExclusive(lockDir: string, lockFile: string): Database.Database {
+/** One attempt at the exclusive lock. On failure the handle is closed and the raw error is thrown. */
+function openExclusiveOnce(lockDir: string, lockFile: string): Database.Database {
     fs.mkdirSync(lockDir, { recursive: true });
     const db = new Database(lockFile, { timeout: 0 });
     try {
@@ -142,6 +150,23 @@ function openExclusive(lockDir: string, lockFile: string): Database.Database {
             /* the error being reported is the one that matters */
         }
         throw err;
+    }
+}
+
+/**
+ * Retries while the lock file is busy, within a fixed budget. Each attempt closes its own
+ * handle first, so no attempt ever holds a lock while another opens the file.
+ */
+function openExclusive(lockDir: string, lockFile: string): Database.Database {
+    const deadline = Date.now() + BUSY_RETRY_BUDGET_MS;
+    for (;;) {
+        try {
+            return openExclusiveOnce(lockDir, lockFile);
+        } catch (err) {
+            if (!isBusy(err) || Date.now() >= deadline) throw err;
+            const pauseMs = 5 + Math.floor(Math.random() * 20);
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs);
+        }
     }
 }
 
