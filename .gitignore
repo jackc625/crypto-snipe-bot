@@ -80,3 +80,6 @@ dashboard/src/**/*.js
 # it churns heavily per rebuild and conflicts across per-phase branches.
 graphify-out/
 .planning/graphs/
+
+# GSD code-review run diagnostics (local, one folder per run)
+.review-diagnostics/
