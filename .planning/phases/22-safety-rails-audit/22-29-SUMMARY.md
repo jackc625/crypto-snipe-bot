@@ -193,7 +193,7 @@ status: complete
 - **Committed in:** `93d9029`
 
 **5. Adjustments 5 and 6 from the orchestrator's list**
-- The resume prompt says adjustments 1, 3, 5 and 6 were applied in Task 1 and 2 and 4 are due in Task 3. The notes passed to this continuation enumerate 1 to 4 only, so 5 and 6 cannot be described further here. Item 1 and item 3 above cover the two that were listed.
+- The resume prompt says adjustments 1, 3, 5 and 6 were applied in Task 1 and 2 and 4 are due in Task 3. The continuation prompt repeated only 1 to 4, an omission by the orchestrator. Adjustment 5 registered every `rails-discoveries.json` entry by `defect_type`, honouring its `resolution` or `routing` field. Adjustment 6 registered the rail tests' own deliberate denials in one S4 informational AUD-TESTQ entry instead of as test-quality defects. Both were applied in Task 1.
 
 **6. [Rule 3 - Blocking] `related` link recorded as `related_inputs`**
 - **Found during:** Task 2

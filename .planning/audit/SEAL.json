@@ -26,9 +26,10 @@
     ".planning/phases/22-safety-rails-audit/*-REVIEW*.md",
     ".planning/phases/22-safety-rails-audit/*-UAT.md",
     ".planning/phases/22-safety-rails-audit/*-SECURITY.md",
+    ".planning/phases/22-safety-rails-audit/*-VALIDATION.md",
     ".planning/phases/22-safety-rails-audit/22-ORCHESTRATOR-NOTES.md",
     ".planning/phases/22-safety-rails-audit/.continue-here.md"
   ],
-  "exempt_paths_note": "`*` matches any run of characters except `/`, whole path; proven by seal-verify.ts --self-test. Exempt paths may change but are still scanned for secrets by seal-verify.ts --scan.",
+  "exempt_paths_note": "`*` matches any run of characters except `/`, whole path; proven by seal-verify.ts --self-test. Exempt paths may change but are still scanned for secrets by seal-verify.ts --scan. The *-VALIDATION.md entry was added after the seal by the execute-phase orchestrator: validate-phase writes only that bookkeeping file unless the operator chooses to add tests, and any new test file would still invalidate this seal.",
   "rule": "any later change outside exempt_paths invalidates this seal; run seal-verify.ts --scan"
 }
