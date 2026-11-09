@@ -50,6 +50,14 @@
     "findings": [
       "AUD-SCRIPTS-008",
       "AUD-TESTI-011"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "One hunk: dotenv gated on VITEST. Reviewed; no other change."
+      }
     ]
   },
   {
@@ -59,6 +67,14 @@
       "AUD-SCRIPTS-005",
       "AUD-SCRIPTS-007",
       "AUD-TESTI-011"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "One hunk: dotenv gated on VITEST. Reviewed; no other change."
+      }
     ]
   },
   {
@@ -75,6 +91,14 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-SCRIPTS-008"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "One hunk: dotenv gated on VITEST. Reviewed; no other change."
+      }
     ]
   },
   {
@@ -82,6 +106,107 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-SCRIPTS-006"
+    ]
+  },
+  {
+    "path": "scripts/backup-state.ts",
+    "audited_sha": "3f380bf510be711f3f0ffe40f340dc108155e060",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3f380bf510be711f3f0ffe40f340dc108155e060",
+        "findings": "none",
+        "note": "Reviewed for its safety invariants. Raw-byte hash and copy, no SQLite and no env loading, links refused, dated folder never overwritten, staging folder renamed only after verification; ABI-127 assert (AUD-REAUDIT-002). The unlink calls outside the self-check remove only files of the throwaway staging tree or the self-check fixtures."
+      }
+    ]
+  },
+  {
+    "path": "scripts/capture-baselines.ts",
+    "audited_sha": "e095ab5385a66355f0c2263fdb0a9a0ca25cd940",
+    "findings": [
+      "AUD-ROOT-009",
+      "AUD-ROOT-010"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "e095ab5385a66355f0c2263fdb0a9a0ca25cd940",
+        "findings": [
+          "AUD-ROOT-009",
+          "AUD-ROOT-010"
+        ],
+        "note": "Reviewed for its safety invariants. Pre-rail counts come only from an isolated git archive export; junctions are unlinked before the recursive delete; every child goes through spawnRailedChild; NAC-08 and NAC-03 re-hash at the end. Two tooling items registered from the code review: a collection failure counted as 0 in the finished --phase before mode (AUD-ROOT-009) and a bare --out writing to the committed folder (AUD-ROOT-010)."
+      }
+    ]
+  },
+  {
+    "path": "scripts/check-vi-mock-paths.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Reviewed. AST gate over vi.mock family calls; reads source only; exits 1 on a broken specifier; tested by viMockGate.test.ts."
+      }
+    ]
+  },
+  {
+    "path": "scripts/db-init.ts",
+    "audited_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+        "findings": "none",
+        "note": "Reviewed in full. Target resolved with the same function as db.ts. Refuses stale temp files, any sidecar, any non-zero version and any non-empty version-0 file. Builds beside the target, verifies the version, re-probes the target state, then renames. The typed-path confirmation covers replacement of an empty target. dotenv gated on VITEST."
+      }
+    ]
+  },
+  {
+    "path": "scripts/forensic-db.ts",
+    "audited_sha": "2561d5e848e320bd10995fe8e53667d97005cbd4",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2561d5e848e320bd10995fe8e53667d97005cbd4",
+        "findings": "none",
+        "note": "Reviewed for its safety invariants. Reads a backup copy only and refuses a source or output inside the repo; the only file SQLite opens is a disposable copy; the report stays outside the repo. No src import, no dotenv loader. ABI-127 assert (AUD-REAUDIT-002)."
+      }
+    ]
+  },
+  {
+    "path": "scripts/nac01-exact-value-check.ts",
+    "audited_sha": "80e76cdc565070bb325992d01b026fe415379223",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "80e76cdc565070bb325992d01b026fe415379223",
+        "findings": "none",
+        "note": "Reviewed for its safety invariants. Parses the env file with dotenv's pure parse only; output is key names and yes/no/unset. D-22: only the operator runs it against the real file, and no agent did. ABI-127 assert (AUD-REAUDIT-002)."
+      }
+    ]
+  },
+  {
+    "path": "scripts/verify-prod-untouched.ts",
+    "audited_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+    "findings": [
+      "AUD-ROOT-011"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+        "findings": [
+          "AUD-ROOT-011"
+        ],
+        "note": "Reviewed in full. Raw-byte hashes only, never SQLite; manifest compare covers hash, size and mtime; ledger gate checks run id, expected projects and worker presence; --net-watch is honestly described as sampled. The Vitest main process is covered only by hash, listing and sampled net-watch, not the ledger (see judgment-reviews question a). Open tooling item from the code review: AUD-ROOT-011."
+      }
     ]
   }
 ]
