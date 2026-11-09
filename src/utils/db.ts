@@ -5,13 +5,23 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { logger } from './logger';
+import { findRepoRoot } from './repoRoot';
+import { assertNotProdDbUnderVitest, resolveDbPath } from './dbPath';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'bot.db');
+// Anchored to the repository root, never the directory the process started in (SAFE-05).
+const vitest = !!process.env.VITEST;
+const repoRoot = findRepoRoot(__filename);
+const DB_PATH = resolveDbPath(process.env.DB_PATH, repoRoot, { vitest });
 
-// Ensure data directory exists
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+if (vitest) {
+    // Src-layer tripwire (SAFE-02): under Vitest the live data folder can never be opened from
+    // here, independently of the setup-layer rails.
+    assertNotProdDbUnderVitest(DB_PATH, repoRoot);
+    // Tests create fresh DBs; a temp folder may not exist yet.
+    const dbDir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+    }
 }
 
 const db = new Database(DB_PATH);
@@ -713,6 +723,11 @@ const getAntirugDryRunStarted = db.prepare(`SELECT antirug_dry_run_started FROM 
 export function closeDb(): void {
     db.close();
     logger.info('Database connection closed');
+}
+
+/** The resolved absolute path of the database this process opened. */
+export function getDbFilePath(): string {
+    return DB_PATH;
 }
 
 /**
