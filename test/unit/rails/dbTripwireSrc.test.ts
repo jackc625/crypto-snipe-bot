@@ -25,6 +25,9 @@ const core = req('../../rails/core.cjs') as {
 const REPO = core.railsStatus().repoRoot;
 const IS_WIN = process.platform === 'win32';
 const SAVED_DB_PATH = process.env.DB_PATH;
+// data/ is gitignored, so a fresh checkout (CI) has no folder at all. What must hold is that this
+// file does not change that: an existing folder is not removed, and a missing one is not created.
+const DATA_EXISTED_AT_START = fs.existsSync(path.join(REPO, 'data'));
 
 function restoreEnv(): void {
     if (SAVED_DB_PATH === undefined) delete process.env.DB_PATH;
@@ -72,7 +75,7 @@ beforeAll(async () => {
 afterAll(() => {
     // The fake root stays a protected root for the life of this worker, so its temp folder is
     // left in the OS temp directory (same as dbTripwireSetup.test.ts).
-    expect(fs.existsSync(path.join(REPO, 'data'))).toBe(true);
+    expect(fs.existsSync(path.join(REPO, 'data'))).toBe(DATA_EXISTED_AT_START);
 });
 
 afterEach(() => {

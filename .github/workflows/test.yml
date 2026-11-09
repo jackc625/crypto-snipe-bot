@@ -53,6 +53,10 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.json
       - name: TypeScript check (tsconfig.bot.json)
         run: npx tsc --noEmit -p tsconfig.bot.json
+      - name: Install dashboard dependencies
+        # dashboard/ has its own package.json and lockfile. The root install above does not
+        # cover them, and without them the type check below cannot find React.
+        run: npm ci --prefix dashboard
       - name: TypeScript check (dashboard/tsconfig.json)
         run: npx tsc --noEmit -p dashboard/tsconfig.json
 

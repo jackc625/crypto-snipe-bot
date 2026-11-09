@@ -24,6 +24,7 @@ const req = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const core = req('../../rails/core.cjs') as {
     railsStatus(): { installed: boolean; repoRoot: string; dbWrapperInstalled: boolean; dataBlockInstalled: boolean };
+    isProtectedDbPath(p: string): boolean;
     addProtectedRoot(dir: string): string;
 };
 
@@ -55,6 +56,31 @@ function statFacts(dir: string): string {
         .join('|');
 }
 
+// data/ is gitignored, so a fresh checkout (CI) has no folder at all. "Absent" is a recorded state
+// and is compared like any other: there, it proves nothing in this file created the folder. The
+// `present:` prefix also keeps an empty folder from reading as "never captured" in afterAll.
+function realDataFacts(): string {
+    const dir = path.join(REPO, 'data');
+    return fs.existsSync(dir) ? `present:${statFacts(dir)}` : 'absent';
+}
+
+// The rail wraps better-sqlite3's native constructor. The library's own JS layer runs first and
+// refuses a path whose folder does not exist, so on a checkout with no data/ (CI) the open is
+// refused before the rail is reached and there is no database to protect. There, assert that
+// refusal and ask the rail directly: it must still class this exact path as protected, so the
+// tripwire fires as soon as the folder exists. When the folder exists, the real tripwire is
+// asserted as always.
+function expectRealDbOpenRefused(target: string): void {
+    const code = codeOf(() => new Database(target, { readonly: true, fileMustExist: true }));
+    if (fs.existsSync(path.join(REPO, 'data'))) {
+        expect(code).toBe('RAIL_DB_TRIPWIRE');
+        return;
+    }
+    expect(code).toBe('Cannot open database because the directory does not exist');
+    expect(core.isProtectedDbPath(target)).toBe(true);
+    expect(core.isProtectedDbPath(path.join(REPO, 'not-data', 'bot.db'))).toBe(false);
+}
+
 function childSha256(file: string): string {
     // A railed child reads the FAKE fixture (its own rails protect only its repo root).
     const r = spawnRailedChild(process.execPath, ['-e', "process.stdout.write(require('crypto').createHash('sha256').update(require('fs').readFileSync(process.argv[1])).digest('hex'))", file]);
@@ -75,7 +101,7 @@ function requireLive(): void {
 
 beforeAll(() => {
     expect(core.railsStatus().installed).toBe(true);
-    realDataBefore = statFacts(path.join(REPO, 'data'));
+    realDataBefore = realDataFacts();
 
     fake = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-dbtrip-'));
     fs.writeFileSync(path.join(fake, 'package.json'), JSON.stringify({ name: 'crypto-snipe-bot' }));
@@ -130,7 +156,7 @@ beforeAll(() => {
 
 afterAll(() => {
     // Real data/ metadata unchanged by this file (the wrapper checks hashes too).
-    if (realDataBefore) expect(statFacts(path.join(REPO, 'data'))).toBe(realDataBefore);
+    if (realDataBefore) expect(realDataFacts()).toBe(realDataBefore);
 });
 
 describe('fake-root liveness', () => {
@@ -147,21 +173,21 @@ describe('real root (runs only after the fake-root liveness passed)', () => {
 
     it("new Database('./data/bot.db') throws RAIL_DB_TRIPWIRE (AC-14)", () => {
         requireLive();
-        expect(codeOf(() => new Database('./data/bot.db', { readonly: true, fileMustExist: true }))).toBe('RAIL_DB_TRIPWIRE');
+        expectRealDbOpenRefused('./data/bot.db');
     });
 
     it('the absolute path (and on win32 an upper-cased variant) throws RAIL_DB_TRIPWIRE', () => {
         requireLive();
         const abs = path.join(REPO, 'data', 'bot.db');
-        expect(codeOf(() => new Database(abs, { readonly: true, fileMustExist: true }))).toBe('RAIL_DB_TRIPWIRE');
+        expectRealDbOpenRefused(abs);
         if (IS_WIN) {
-            expect(codeOf(() => new Database(abs.toUpperCase(), { readonly: true, fileMustExist: true }))).toBe('RAIL_DB_TRIPWIRE');
+            expectRealDbOpenRefused(abs.toUpperCase());
         }
     });
 
     it('data/bot.db-wal throws RAIL_DB_TRIPWIRE', () => {
         requireLive();
-        expect(codeOf(() => new Database(path.join(REPO, 'data', 'bot.db-wal'), { readonly: true, fileMustExist: true }))).toBe('RAIL_DB_TRIPWIRE');
+        expectRealDbOpenRefused(path.join(REPO, 'data', 'bot.db-wal'));
     });
 
     it('a raw fs.readFileSync of data/bot.db throws RAIL_DATA_TRIPWIRE (read only, never a write)', () => {
@@ -171,12 +197,12 @@ describe('real root (runs only after the fake-root liveness passed)', () => {
 
     it('a railed child that sets DB_PATH=./data/bot.db and imports src/utils/db at module scope is blocked (AC-14)', () => {
         requireLive();
-        const before = statFacts(path.join(REPO, 'data'));
+        const before = realDataFacts();
         const r = spawnRailedChild(process.execPath, ['test/rails/probes/moduleScopeDb.cjs'], { timeoutMs: 60_000 });
         expect(r.status).not.toBe(0);
         expect(r.status).not.toBe(3); // 3 = the probe refused because its own rails were not live
         expect(r.stderr).toContain('RAIL_DB_TRIPWIRE');
-        expect(statFacts(path.join(REPO, 'data'))).toBe(before);
+        expect(realDataFacts()).toBe(before);
     }, 60_000);
 });
 
