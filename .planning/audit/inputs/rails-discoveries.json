@@ -24,6 +24,6 @@
     "defect_type": "test",
     "severity_estimate": "S3",
     "found_in_plan": "22-15",
-    "resolution": null
+    "resolution": "Operator ruling ESC-RAILS-01 (reply: b): the one test moved to the fork project in commit d66d8d0 (test/fork/honeypotDeploy.eth.fork.test.ts), assertions word for word. It has not run in its new file; the real run is obligation UFV-05, owner Phase 25. 22-29 registers this as a test-quality finding."
   }
 ]

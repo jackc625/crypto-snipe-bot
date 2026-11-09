@@ -7,13 +7,22 @@
 // For every test file tracked at <sha> (git ls-tree, read with git show) and every test file in
 // the working tree, the TypeScript compiler API extracts the title path of each describe/it/test
 // call. A base title missing at HEAD is `missing`, unless a rails-test-edits.json entry for that
-// file records it as title_before (then it is `renamed`). A base file missing at HEAD is
+// file records it as title_before (then it is `renamed`), or unless it was moved to another file by
+// an operator ruling (then it is `moved`, see below). A base file missing at HEAD is
 // `missing_file`. From the Vitest JSON report, every HEAD title of a base file under test/unit/
 // or test/integration/ must have passed; base files under test/fork/ are compared by title only
 // and recorded as not_run_by_design. Titles that are computed at run time (a .each table, a
 // template with a substitution) are recorded as dynamic and compared by call count.
 //
+// A base title absent from its original file is `moved` only when ALL of these hold: a
+// rails-test-edits.json entry names the old file, the new file (moved_to) and the title; the title
+// exists at HEAD in the new file; and the entry's operator_ruling names an escalation record whose
+// operator_response is non-null. Anything else stays `missing`, so a test cannot be relocated
+// without a recorded operator decision. A title moved into test/fork/ is not_run_by_design and is
+// never counted as executed; a title moved into a file the run covers must have passed.
+//
 // Usage: test-identity.ts --base <sha> --report <vitest json> --out <json> [--ledger <summary.json>]
+//        test-identity.ts --self-test
 // Exit: 0 clean, 1 at least one problem (the report is still written), 2 bad usage or crash.
 //
 // It reads tracked test files and JSON under .planning/ only. It never reads .env, never opens
@@ -115,10 +124,28 @@ interface ReportFile {
     assertionResults?: ReportAssertion[];
 }
 
-interface Edit {
+export interface Edit {
     file: string;
     title_before?: string;
     title_after?: string;
+    moved_to?: string;
+    title?: string;
+    operator_ruling?: string;
+}
+
+export interface MovedTitle {
+    title: string;
+    moved_to: string;
+    operator_ruling: string;
+    run_status: 'not_run_by_design' | 'passed';
+}
+
+/** What compareFile needs to judge a recorded move; injected so the self-test uses fabricated inputs. */
+export interface MoveFacts {
+    edits: Edit[];
+    titlesAtHead: (file: string) => Set<string> | undefined;
+    operatorResponse: (escalationId: string) => unknown;
+    statusInFile: (file: string, title: string) => string | undefined;
 }
 
 interface FileReport {
@@ -126,6 +153,7 @@ interface FileReport {
     titles_at_head: number;
     missing: string[];
     renamed: Array<{ title_before: string; title_after: string }>;
+    moved: MovedTitle[];
     dynamic_at_base: number;
     dynamic_at_head: number;
     dynamic_counts_equal: boolean;
@@ -163,18 +191,46 @@ function walkTests(repo: string): string[] {
     return out;
 }
 
-export function compareFile(base: Extracted, head: Extracted, renames: Edit[], statusByTitle: Map<string, string> | undefined, nonPassedInFile: Array<{ title: string; status: string }>): FileReport {
+// The only way a base title may leave its file. Every condition is required; on any doubt, undefined.
+export function recordedMove(file: string, title: string, facts: MoveFacts | undefined): Edit | undefined {
+    if (!facts) return undefined;
+    const rec = facts.edits.find((e) => e.file === file && e.title === title && typeof e.moved_to === 'string' && e.moved_to !== '');
+    if (!rec || rec.moved_to === undefined) return undefined;
+    if (typeof rec.operator_ruling !== 'string' || !/^ESC-[A-Z0-9]+-\d+$/.test(rec.operator_ruling)) return undefined;
+    const response = facts.operatorResponse(rec.operator_ruling);
+    if (typeof response !== 'string' || response.trim() === '') return undefined;
+    if (!facts.titlesAtHead(rec.moved_to)?.has(title)) return undefined;
+    return rec;
+}
+
+export function compareFile(base: Extracted, head: Extracted, renames: Edit[], statusByTitle: Map<string, string> | undefined, nonPassedInFile: Array<{ title: string; status: string }>, file = '', moveFacts?: MoveFacts): FileReport {
     const headSet = new Set(head.titles);
     const missing: string[] = [];
     const renamed: Array<{ title_before: string; title_after: string }> = [];
+    const moved: MovedTitle[] = [];
+    const movedNotExecuted: Array<{ title: string; status: string }> = [];
     for (const t of base.titles) {
         if (headSet.has(t)) continue;
         const parts = t.split(' > ');
         const own = parts[parts.length - 1];
         const rec = renames.find((e) => e.title_before === own && typeof e.title_after === 'string');
         const after = rec ? [...parts.slice(0, -1), rec.title_after as string].join(' > ') : undefined;
-        if (rec && after !== undefined && headSet.has(after)) renamed.push({ title_before: t, title_after: after });
-        else missing.push(t);
+        if (rec && after !== undefined && headSet.has(after)) {
+            renamed.push({ title_before: t, title_after: after });
+            continue;
+        }
+        const move = recordedMove(file, t, moveFacts);
+        if (!move || move.moved_to === undefined || move.operator_ruling === undefined) {
+            missing.push(t);
+            continue;
+        }
+        if (move.moved_to.startsWith('test/fork/')) {
+            moved.push({ title: t, moved_to: move.moved_to, operator_ruling: move.operator_ruling, run_status: 'not_run_by_design' });
+            continue;
+        }
+        moved.push({ title: t, moved_to: move.moved_to, operator_ruling: move.operator_ruling, run_status: 'passed' });
+        const status = moveFacts?.statusInFile(move.moved_to, t);
+        if (status !== 'passed') movedNotExecuted.push({ title: `${move.moved_to}: ${t}`, status: status || 'absent from report' });
     }
     const notExecuted: Array<{ title: string; status: string }> = [];
     if (statusByTitle) {
@@ -185,11 +241,13 @@ export function compareFile(base: Extracted, head: Extracted, renames: Edit[], s
         const seen = new Set(notExecuted.map((n) => n.title));
         for (const n of nonPassedInFile) if (!seen.has(n.title)) notExecuted.push(n);
     }
+    notExecuted.push(...movedNotExecuted);
     return {
         titles_at_base: base.titles.length,
         titles_at_head: head.titles.length,
         missing,
         renamed,
+        moved,
         dynamic_at_base: base.dynamicCount,
         dynamic_at_head: head.dynamicCount,
         dynamic_counts_equal: base.dynamicCount === head.dynamicCount,
@@ -202,8 +260,59 @@ function usage(msg: string): never {
     process.exit(2);
 }
 
+function selfTest(): number {
+    const TITLE = 'suite > the moved test';
+    const src = (...its: string[]) => `describe('suite', () => { ${its.map((n) => `it('${n}', () => {});`).join(' ')} });`;
+    const baseEx = extractTitles('a.test.ts', src('kept', 'the moved test'));
+    const headEx = extractTitles('a.test.ts', src('kept'));
+    const OLD = 'test/integration/a.test.ts';
+    const FORK = 'test/fork/a.fork.test.ts';
+    const INT = 'test/integration/b.test.ts';
+    const good: Edit = { file: OLD, moved_to: FORK, title: TITLE, operator_ruling: 'ESC-RAILS-01' };
+    const facts = (over: Partial<MoveFacts>): MoveFacts => ({
+        edits: [good],
+        titlesAtHead: () => new Set([TITLE]),
+        operatorResponse: () => 'b',
+        statusInFile: () => 'passed',
+        ...over,
+    });
+    const run = (f: MoveFacts | undefined) => compareFile(baseEx, headEx, [], new Map([['suite > kept', 'passed']]), [], OLD, f);
+    const results: Array<[string, boolean]> = [];
+    const rec = (label: string, ok: boolean) => results.push([label, ok]);
+    const isMissing = (r: FileReport) => r.missing.length === 1 && r.missing[0] === TITLE && r.moved.length === 0;
+
+    const ok = run(facts({}));
+    rec('recorded, ruled move -> moved', ok.missing.length === 0 && ok.moved.length === 1 && ok.moved[0].moved_to === FORK);
+    rec('a title moved to test/fork/ is not_run_by_design and never counted as executed', ok.moved[0]?.run_status === 'not_run_by_design' && ok.not_executed.length === 0);
+    rec('no facts at all -> missing', isMissing(run(undefined)));
+    rec('an unrecorded move (no edit entry) -> missing', isMissing(run(facts({ edits: [] }))));
+    rec('an entry for another file -> missing', isMissing(run(facts({ edits: [{ ...good, file: 'test/integration/other.test.ts' }] }))));
+    rec('an entry for another title -> missing', isMissing(run(facts({ edits: [{ ...good, title: 'suite > something else' }] }))));
+    rec('an entry with no new file -> missing', isMissing(run(facts({ edits: [{ ...good, moved_to: undefined }] }))));
+    rec('an entry with no operator_ruling -> missing', isMissing(run(facts({ edits: [{ ...good, operator_ruling: undefined }] }))));
+    rec('an operator_ruling that is not a record id -> missing', isMissing(run(facts({ edits: [{ ...good, operator_ruling: '../../etc' }] }))));
+    rec('a record whose operator_response is null -> missing', isMissing(run(facts({ operatorResponse: () => null }))));
+    rec('a record whose operator_response is empty -> missing', isMissing(run(facts({ operatorResponse: () => '  ' }))));
+    rec('a named record that does not exist -> missing', isMissing(run(facts({ operatorResponse: () => undefined }))));
+    rec('the title absent from the new file -> missing', isMissing(run(facts({ titlesAtHead: () => new Set(['suite > other']) }))));
+    rec('the new file absent at HEAD -> missing', isMissing(run(facts({ titlesAtHead: () => undefined }))));
+    const toInt = run(facts({ edits: [{ ...good, moved_to: INT }], statusInFile: () => 'failed' }));
+    rec('a title moved into a run file that did not pass -> not_executed', toInt.missing.length === 0 && toInt.moved.length === 1 && toInt.not_executed.length === 1 && toInt.not_executed[0].status === 'failed');
+    const toIntOk = run(facts({ edits: [{ ...good, moved_to: INT }] }));
+    rec('a title moved into a run file that passed -> moved, executed', toIntOk.moved[0]?.run_status === 'passed' && toIntOk.not_executed.length === 0);
+
+    let pass = true;
+    for (const [label, passed] of results) {
+        if (!passed) pass = false;
+        process.stdout.write(`test-identity self-test: ${passed ? 'PASS' : 'FAIL'} - ${label}\n`);
+    }
+    process.stdout.write(`test-identity self-test: ${pass ? 'PASS' : 'FAIL'} (${results.filter((r) => r[1]).length}/${results.length})\n`);
+    return pass ? 0 : 1;
+}
+
 function main(): void {
     const argv = process.argv.slice(2);
+    if (argv.length === 1 && argv[0] === '--self-test') process.exit(selfTest());
     let base = '';
     let reportPath = '';
     let outPath = '';
@@ -225,6 +334,12 @@ function main(): void {
         byFile.set(path.relative(repo, t.name).split(path.sep).join('/'), t);
     }
     const edits = (JSON.parse(fs.readFileSync(path.join(repo, '.planning/audit/inputs/rails-test-edits.json'), 'utf8')) as { entries: Edit[] }).entries;
+    const statusIn = (file: string, title: string): string | undefined => {
+        for (const a of byFile.get(file)?.assertionResults || []) {
+            if ([...(a.ancestorTitles || []), a.title || ''].join(' > ') === title) return a.status || 'unknown';
+        }
+        return undefined;
+    };
 
     const baseFiles = git(repo, ['ls-tree', '-r', '--name-only', base])
         .split('\n')
@@ -232,6 +347,16 @@ function main(): void {
         .sort();
     const headFiles = walkTests(repo);
     const headSet = new Set(headFiles);
+    const moveFacts: MoveFacts = {
+        edits,
+        titlesAtHead: (file) => (headSet.has(file) ? new Set(extractTitles(file, fs.readFileSync(path.join(repo, file), 'utf8')).titles) : undefined),
+        operatorResponse: (id) => {
+            const p = path.join(repo, '.planning/audit/escalations', `${id}.json`);
+            if (!fs.existsSync(p)) return undefined;
+            return (JSON.parse(fs.readFileSync(p, 'utf8')) as { operator_response?: unknown }).operator_response;
+        },
+        statusInFile: statusIn,
+    };
 
     const files: Record<string, FileReport> = {};
     const missingFiles: string[] = [];
@@ -255,7 +380,7 @@ function main(): void {
                 if (a.status !== 'passed') nonPassed.push({ title: key, status: a.status || 'unknown' });
             }
         }
-        const rep = compareFile(baseEx, headEx, renames, statusByTitle, nonPassed);
+        const rep = compareFile(baseEx, headEx, renames, statusByTitle, nonPassed, f, moveFacts);
         if (!executed) rep.not_run_by_design = true;
         files[f] = rep;
     }
@@ -279,6 +404,8 @@ function main(): void {
         missing: list.reduce((n, r) => n + r.missing.length, 0),
         missing_file: missingFiles.length,
         renamed: list.reduce((n, r) => n + r.renamed.length, 0),
+        moved: list.reduce((n, r) => n + r.moved.length, 0),
+        moved_not_run_by_design: list.reduce((n, r) => n + r.moved.filter((m) => m.run_status === 'not_run_by_design').length, 0),
         not_executed: list.reduce((n, r) => n + r.not_executed.length, 0),
         dynamic_mismatch: list.filter((r) => !r.dynamic_counts_equal).length,
         not_run_by_design_files: list.filter((r) => r.not_run_by_design).length,
