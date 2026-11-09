@@ -24,6 +24,9 @@ export default defineConfig({
     test: {
         projects: [
             {
+                // Without this the root-level `envDir: false` does not reach the project and Vite
+                // reads the repo .env files in the unrailed Vitest main process (AUD-REAUDIT-001).
+                extends: true,
                 root,
                 test: {
                     name: 'fork-rehearsal',
