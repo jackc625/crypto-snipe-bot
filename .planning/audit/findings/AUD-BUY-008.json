@@ -50,6 +50,11 @@
       "type": "code",
       "ref": "src/api/routes/chains.ts:140-142@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "dashboard stop removes provider listeners but not the raw-socket close handlers"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1561-1569@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): DEX reconnects never backfill events missed during disconnection"
     }
   ],
   "sibling_sites_checked": "V2 and V3 reconnect loops both checked (identical shape). provider.ts getWsProvider/removeWsProvider read. onRestart (:1808-1852) and the dashboard stop/start routes (chains.ts:121-190) read for listener stacking. No PairCreated/PoolCreated backfill exists anywhere in bot.ts (searched queryFilter: only the HTTP pollers use it). No ping/heartbeat in the DEX listener path. The anti-rug detector has its own reconnect (detector.ts ~918-926, ANTIRUG slice, RC-13); not edited here.",
@@ -73,7 +78,8 @@
   "od_ref": "OD-11",
   "recommendation": "Fix together with RC-13 under card OD-11 (one per-chain WebSocket owner that notifies subscribers, destroys what it replaces, backfills the gap, detects half-open sockets and stops on shutdown); make listener registration idempotent so restart cannot stack handlers. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

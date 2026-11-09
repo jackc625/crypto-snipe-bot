@@ -105,6 +105,11 @@
       "type": "command",
       "ref": "node tx-lock-repro.js <snapshot> (Node 22.16.0, scratch folder outside the repo; loads the base-SHA snapshot of src/utils/nonceAuthority.ts via typescript.transpileModule plus ethers@6.16.0 TransactionResponse on a fake provider; no src/ import, no SQLite, no .env, no network)",
       "note": "A2 printed \"A2 caller: caller freed by race, op still queued\" and \"A2 after 3000ms: locked wait(3) = PENDING | queued sell ran = false\"; the control \"wait(3, 800): TIMEOUT after 816 ms\" shows the same tx settles when a timeout is passed"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:138-140@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): The native confirmation wait can prevent exit fallback indefinitely"
     }
   ],
   "sibling_sites_checked": "Every .wait( under src at the base SHA (git grep): passthrough.ts:140 (this slice, under the lock via submitBuyTx / submitPrivateSell / partial sell), flashbots.ts:317 (library bundle.wait, bounded at 5 min), bot.ts:750, exitEngine.ts:422 (via :871, :874, :1509, :1512), :545, :556. bloxroute.ts has no wait (it always reconciles, bounded by MEV_CONFIRM_WINDOW_MS). Out-of-process scripts (scripts/recover-sell-ladys.ts:72, :82, scripts/addLiquidity.ts, scripts/deploySepoliaTest.ts) take no in-process lock and belong to the SCRIPTS slice. The BUY rediscovery is AUD-BUY-025 and the EXIT rediscovery is AUD-EXIT-009; this entry is the canonical never-settling sub-finding the EXIT entry pointed to with rc:RC-10. Re-entrancy is the separate sub-finding AUD-TX-001.",
@@ -131,7 +136,8 @@
   "od_ref": "TX-01",
   "recommendation": "Phase 24 (card TX-01): never wait without a bound while holding the wallet lock. Give every wait() inside the lock (passthrough.ts:140, bot.ts:750, exitEngine.ts:422/:545/:556) an explicit timeout, and on timeout reconcile against chain state (receipt + latest nonce) the way reconcileInclusion does, then decide replace/cancel/keep-waiting outside the lock or with a bounded replacement. Keep the lock until the nonce is settled or explicitly replaced, because releasing it while a public tx is still pending would let the next op sign the same nonce (ethers contract sends take nonce \"pending\", strategies take \"latest\"). Prove it in Phase 23 with a never-mined tx on a local chain. Nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-20 executor)"
+    "claude (22-20 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",

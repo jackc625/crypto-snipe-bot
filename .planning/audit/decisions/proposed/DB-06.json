@@ -25,7 +25,8 @@
   "behavior_impact": "Decides how settings are validated and which keys are required.",
   "findings": [
     "AUD-DB-011",
-    "AUD-DB-016"
+    "AUD-DB-016",
+    "AUD-DB-020"
   ],
   "needed_by": "Phase 27 discussion (env module), coordinated with OD-25 in Phase 24"
 }

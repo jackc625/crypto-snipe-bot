@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-002",
+    "AUD-BUY-005"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-022",
+  "title": "Promises from ethers subscribe and unsubscribe calls are discarded in the anti-rug listener",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C11"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:655-657@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on() result discarded"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 655,657p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced."
+    }
+  ],
+  "sibling_sites_checked": "detector.ts:644, :1850, :1909 have the same shape. bot.ts sites are AUD-BUY-005.",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: failures here are rare, but a rejected subscription means no protection and no error signal.",
+  "recommendation": "Await or catch these calls. No behaviour change. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-16"
+  ]
+}

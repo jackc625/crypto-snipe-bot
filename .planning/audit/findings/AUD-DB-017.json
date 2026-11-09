@@ -5,7 +5,8 @@
   "duplicate_of": null,
   "escalation_ref": null,
   "reported_by": [
-    "claude (22-21 executor)"
+    "claude (22-21 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -45,6 +46,11 @@
       "type": "code",
       "ref": "src/preflight.ts:553-562@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "passthrough chains (Base, Arbitrum) always pass MEV health (no private path by design)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:675-676@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Infinity passes configuration checks and disables RPC freshness protection"
     }
   ],
   "sibling_sites_checked": "All nine preflight checks read: wallet balance and entry affordability fail closed on RPC error (:220-233, :462-477); chainId compares exactly; the anti-rug 7-day gate is time-based (SC-11, ANTIRUG slice); stale-data never blocks by design. With ENABLED_CHAINS unset the registry itself still exits on a missing FLASHBOTS_AUTH_KEY (chainRegistry.ts:948-951), so rule 1 is covered there.",

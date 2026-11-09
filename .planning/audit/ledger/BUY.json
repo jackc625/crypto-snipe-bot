@@ -30,7 +30,11 @@
       "AUD-BUY-022",
       "AUD-BUY-023",
       "AUD-BUY-025",
-      "AUD-BUY-026"
+      "AUD-BUY-026",
+      "AUD-BUY-027",
+      "AUD-BUY-028",
+      "AUD-BUY-029",
+      "AUD-BUY-030"
     ]
   },
   {
@@ -104,20 +108,25 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-BUY-016",
-      "AUD-BUY-026"
+      "AUD-BUY-026",
+      "AUD-BUY-028",
+      "AUD-BUY-032"
     ]
   },
   {
     "path": "src/utils/safetyProviders/honeypotIs.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
-      "AUD-BUY-026"
+      "AUD-BUY-026",
+      "AUD-BUY-032"
     ]
   },
   {
     "path": "src/utils/safetyProviders/mudra.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-    "findings": "none"
+    "findings": [
+      "AUD-BUY-028"
+    ]
   },
   {
     "path": "src/utils/safetyProviders/types.ts",
@@ -128,7 +137,9 @@
     "path": "src/utils/safetyProviders/unicrypt.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
-      "AUD-BUY-016"
+      "AUD-BUY-016",
+      "AUD-BUY-028",
+      "AUD-BUY-031"
     ]
   },
   {
@@ -139,7 +150,9 @@
       "AUD-BUY-012",
       "AUD-BUY-013",
       "AUD-BUY-016",
-      "AUD-BUY-026"
+      "AUD-BUY-026",
+      "AUD-BUY-027",
+      "AUD-BUY-031"
     ]
   }
 ]

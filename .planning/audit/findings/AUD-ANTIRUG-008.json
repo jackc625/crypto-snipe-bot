@@ -12,7 +12,8 @@
   "escalation_ref": null,
   "od_ref": "ANTIRUG-06",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -88,6 +89,11 @@
       "type": "code",
       "ref": "src/anti-rug/allowlist.ts:135-148@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "verify is a serial getCode per entry; an entry with no code ends the process with exit(1)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:904-907@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Notification failures can terminate websocket recovery"
     }
   ],
   "sibling_sites_checked": "Every chain_ws_health_change broadcast (detector.ts:689, :800, :864, :908, :1244) and every sendCtxAlert in the slice (detector.ts:904, :974, :1064; exitTrigger.ts:195, :288; circuitBreaker.ts:156). The dashboard side of the badge (dashboard/src) is the DASH slice and was not read here.",

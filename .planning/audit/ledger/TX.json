@@ -3,7 +3,8 @@
     "path": "src/utils/gasManager.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
-      "AUD-TX-013"
+      "AUD-TX-013",
+      "AUD-TX-019"
     ]
   },
   {
@@ -31,7 +32,8 @@
       "AUD-TX-010",
       "AUD-TX-012",
       "AUD-TX-014",
-      "AUD-TX-017"
+      "AUD-TX-017",
+      "AUD-TX-020"
     ]
   },
   {
@@ -46,7 +48,9 @@
       "AUD-TX-011",
       "AUD-TX-014",
       "AUD-TX-016",
-      "AUD-TX-017"
+      "AUD-TX-017",
+      "AUD-TX-022",
+      "AUD-TX-023"
     ]
   },
   {
@@ -62,7 +66,12 @@
       "AUD-TX-011",
       "AUD-TX-012",
       "AUD-TX-016",
-      "AUD-TX-017"
+      "AUD-TX-017",
+      "AUD-TX-018",
+      "AUD-TX-019",
+      "AUD-TX-020",
+      "AUD-TX-021",
+      "AUD-TX-025"
     ]
   },
   {
@@ -88,7 +97,8 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-ANTIRUG-002",
-      "AUD-TX-008"
+      "AUD-TX-008",
+      "AUD-TX-024"
     ]
   },
   {

@@ -33,6 +33,11 @@
       "type": "code",
       "ref": "src/exitEngine.ts:1058-1075@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the decoded amountOut is written to the sell trade row; realized P&L and the dashboard daily loss read from trades (api/routes/risk.ts:90, health.ts:64-66)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:81-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Unrelated WETH events can replace the decoded sell proceeds"
     }
   ],
   "sibling_sites_checked": "Both callers: exitEngine.ts:1059 (full sell) and :1546 (partial sell), each after a confirmed hash (private landed / guard included / public wait() that throws on status 0). Whether the risk manager's daily-loss limit (riskManager.ts, BUY/DB slice) reads amount_out was not traced here; that is why the entry is a candidate.",
@@ -50,7 +55,8 @@
   "od_ref": null,
   "recommendation": "Phase 29: match the Withdrawal whose src is the router used (V2) or the Transfer whose from is the pool (V3), or compute proceeds from the wallet balance delta; trace whether any limit is computed from amount_out.",
   "reported_by": [
-    "claude (22-20 executor)"
+    "claude (22-20 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

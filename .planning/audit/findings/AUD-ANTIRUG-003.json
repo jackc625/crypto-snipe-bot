@@ -17,7 +17,8 @@
   "escalation_ref": "ESC-ANTIRUG-01",
   "od_ref": "ANTIRUG-01",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -101,6 +102,21 @@
       "type": "code",
       "ref": "test/fork/antiRugDetector.fork.test.ts:337-397@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the fork tests build one synthetic log per case; the HORSE replay (:808-826) dispatches only the Burn log of the rug transaction, so the full log set of a removal is never dispatched in any test"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1967-1982@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Multiple logs from one withdrawal create independent exit triggers"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:221-232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Concurrent exits bypass the circuit-breaker threshold"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:471-487@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Unregistering a trade leaves its delayed exits active"
     }
   ],
   "sibling_sites_checked": "Every path into triggerAntiRugExit: the confirm gate (detector.ts:1834, :1900) reached from the live WS dispatcher (:652), the HTTP poller (:1297), the backfill replay (:1155, AUD-ANTIRUG-005) and the V3 grace watcher (:2140). Every call site of incrementCircuitBreaker (exitTrigger.ts:316 only) and isCircuitBreakerTripped (exitTrigger.ts:221, api/routes/antiRug.ts:59). Multipliers of the count: duplicate subscriptions (AUD-ANTIRUG-001), stacked HTTP pollers (AUD-ANTIRUG-007), backfill replays (AUD-ANTIRUG-005), stale gates of closed positions (this entry).",

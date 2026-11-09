@@ -55,6 +55,11 @@
       "type": "code",
       "ref": "src/bot.ts:1836-1845@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "onRestart calls startDexListener again; for an HTTP chain that starts a second poller, so every event is dispatched twice (feeds AUD-BUY-004)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1835-1839@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Chain restart accumulates listeners and uncancellable polling intervals"
     }
   ],
   "sibling_sites_checked": "Every buy entry point checked for a stop check: V2 WS listener, V3 WS listener, both HTTP pollers, Telegram -> alphaDrop -> both handlers, onRestart. None checks stoppedChains. The pause flag is checked at CP1/CP2 in both handlers (bot.ts:1034-1040, :1066-1072, :1351-1357, :1401-1407). The API slice owns chains.ts; it is read, not edited.",
@@ -76,7 +81,8 @@
   "od_ref": "BUY-04",
   "recommendation": "Make \"stopped\" a state every buy entry point honours (handlers, pollers and Telegram routing), keep the poller handle so stop clears it and start cannot duplicate it, or remove the per-chain stop/start in favour of the global pause. Card BUY-04. Until fixed, use the global pause, not per-chain stop, to halt buying. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

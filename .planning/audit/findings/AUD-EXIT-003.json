@@ -14,7 +14,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-02",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -64,6 +65,16 @@
       "type": "code",
       "ref": "src/exitEngine.ts:1709-1712@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "a null quote returns continue before every check, including the 30-minute urgency exit (:1801)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1866-1869@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Native buy wei are used as raw token quote input"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1708-1712@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Quote failure suppresses the unconditional urgency exit"
     }
   ],
   "sub_claims": [

@@ -14,7 +14,8 @@
   "escalation_ref": "ESC-ANTIRUG-01",
   "od_ref": "ANTIRUG-02",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -85,6 +86,16 @@
       "type": "code",
       "ref": "src/bot.ts:432-440@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "armPositionMonitoring awaits registerAntiRugPosition, so the buy path waits for the backfill (and, with confirmBlocks 0, for any exit it starts: detector.ts:1832-1843)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1155-1159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Backfill invokes an evaluator that dispatches live exits"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:647-655@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Healthy websocket operation never advances the persisted cursor"
     }
   ],
   "sibling_sites_checked": "Every caller of backfillSinceLastSeen (detector.ts:718 only) and every caller of startChainAntiRugListener (detector.ts:447, :943; bot.ts:2144). Every writer of chain_state.last_seen_block (detector.ts:1018, :1040, :1079, :1093, :1199, :1235, :1271, :1302 and db.ts setAntirugDryRunStarted, which inserts 0 on first insert). The HTTP poller is LIVE by design and advances the block every tick; its own defects are AUD-ANTIRUG-007. The restart window has the same bound: it starts at the last subscription of the previous run, not at shutdown.",

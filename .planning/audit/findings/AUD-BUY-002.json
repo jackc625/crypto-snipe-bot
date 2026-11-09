@@ -143,6 +143,36 @@
       "type": "code",
       "ref": "src/bot.ts:431-451@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "anti-rug baseline/register failure is caught and logged only; with no lp_baseline row the position is excluded from anti-rug resume forever (INNER JOIN, see resumeAntiRugMonitoring :2032-2051)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177-1190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Post-buy setup errors mark successfully acquired positions failed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1100-1112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Buy submission precedes any recoverable trade record"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1934-1938@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restart abandons pending buys without reconciling settlement"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:555-559@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Submission exceptions bypass reconciliation after a possible broadcast"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:558-559@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Earlier replacement hashes are discarded before their outcome is known"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:605-613@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A reconciliation timeout abandons transactions that can still execute"
     }
   ],
   "sibling_sites_checked": "V2 handleNewPairForChain (bot.ts:1087-1191) and V3 handleNewV3PoolForChain (bot.ts:1379-1516) both checked: same single try/catch, same catch body; V3 arms monitoring inline (:1481-1507), V2 via armPositionMonitoring (:413-452). The deliberate path (executeDeliberateBuy, :485-761) records and arms outside any catch (its own defect is AUD-BUY-001). Every submit strategy reachable from submitBuyTx was traced for \"throws after a broadcast\": flashbots fanout (flashbots.ts:303-309), shared reconcile loop (reconciliation.ts:476-497, :576-628), passthrough send (passthrough.ts:130); bloxroute.ts was not traced line by line and is left to the TX slice (22-20). Both resume queries were read (db.ts:597-604 and the lp_baseline INNER JOIN used at bot.ts:2043). The pause read, recordSnipe, insertTrade, alert, balanceOf, trade-id lookup and both arming helpers were each checked as separate throw points.",
@@ -169,7 +199,8 @@
   "od_ref": "BUY-02",
   "recommendation": "Phase 24 (after a Phase 23 real-path proof of at least the balanceOf-throw and earlier-attempt-landed traces): separate \"did money leave the wallet\" from \"did bookkeeping succeed\". Once a submit may have broadcast, never run the zero-spend branch: reconcile against chain truth (token balance delta plus nonce, like the deliberate guard at bot.ts:617-662), record the row, and arm monitoring with retries; on any post-landing failure alert loudly that a position is held and unprotected. The direction (intent row before broadcast vs reconcile-on-throw, retry policy) is a behaviour decision on card BUY-02. Nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",

@@ -12,7 +12,8 @@
   "escalation_ref": null,
   "od_ref": null,
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -62,6 +63,16 @@
       "type": "code",
       "ref": "src/anti-rug/detector.ts:1242-1249@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "healthState connected is set once at start, before any poll succeeds; poll errors only log (:1307-1316)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:587-600@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Every HTTP-mode registration starts another polling interval"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1261-1264@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Async HTTP polling cycles overlap and replay the same events"
     }
   ],
   "sibling_sites_checked": "Every setInterval in the slice: detector.ts:782 (heartbeat, cleared on close and replaced on re-arm) and :1261 (this poller, never cleared). RC-21 owns the setInterval(async) overlap pattern; the exit-engine sites are AUD-EXIT-005 and the bot.ts factory pollers are AUD-BUY-011 (start adds a second poller); this is the anti-rug site named in RC-21 (detector.ts:1261).",

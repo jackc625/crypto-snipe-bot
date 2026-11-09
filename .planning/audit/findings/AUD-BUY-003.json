@@ -40,6 +40,16 @@
       "type": "code",
       "ref": "src/bot.ts:711-729@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "sibling in the same file already fails CLOSED: the deliberate public leg returns null on a quote failure"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1048-1055@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Quote or slippage-conversion failures turn into unrestricted buys"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1050@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A configured zero-slippage limit becomes five percent"
     }
   ],
   "sibling_sites_checked": "V2 snipe (bot.ts:1048-1056) and V3 snipe (:1362-1377) both fail open. Deliberate private leg (:527-543) also defaults privMinOut to 0 on a quote failure; that is documented intent (comment :533-538: private, un-sandwichable routing) and is recorded here as a sibling for card OD-15, not as a separate defect. Deliberate public leg (:711-729) fails closed (correct). tokenSafety simulateSwap/simulateSwapForChain use amountOutMin 0 only inside .staticCall (simulation, no money). Exit-side minOut belongs to the EXIT slice (RC-03).",
@@ -61,7 +71,8 @@
   "od_ref": "OD-15",
   "recommendation": "Decide on card OD-15 whether a snipe whose quote fails is skipped (fail closed) or sent unprotected. Separately keep the slippage math in bigint basis points so a fractional percent can never throw into the fail-open catch. Phase 24, after a Phase 23 proof; nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

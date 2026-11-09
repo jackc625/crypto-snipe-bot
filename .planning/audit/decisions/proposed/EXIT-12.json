@@ -24,7 +24,8 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
   "behavior_impact": "Decides what the bot does with an out-of-range exit setting.",
   "findings": [
-    "AUD-EXIT-016"
+    "AUD-EXIT-016",
+    "AUD-EXIT-022"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

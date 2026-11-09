@@ -1,0 +1,68 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-016"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-03",
+  "od_ref": "BUY-05",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-028",
+  "title": "The liquidity-lock gate passes on any active lock, however small a share of the LP tokens it covers",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [],
+  "files": [
+    "src/utils/safetyProviders/goplus.ts",
+    "src/utils/safetyProviders/mudra.ts",
+    "src/utils/safetyProviders/unicrypt.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/goplus.ts:63-69@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "any holder with is_locked and a future end time passes; holder.percent is never read"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/unicrypt.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "locks.some(unlock_date > now): any unexpired lock passes"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/mudra.ts:27@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "locks.some(unlockDate > now): any unexpired lock passes"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:977@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "live V2 snipe gate"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n of the three provider files at the base SHA (22-27 merge)",
+      "note": "Claude verification: none of the three providers compares the locked share with the total LP supply."
+    }
+  ],
+  "sibling_sites_checked": "All three providers in isLiquidityLockedForChain (tokenSafety.ts:320-326), used on all four chains; the legacy isLiquidityLocked (tokenSafety.ts:76) accepts any active lock too. V3 has no lock check (bot.ts:1291).",
+  "status": "confirmed",
+  "severity_rationale": "S1: locking a sliver of LP and keeping the rest withdrawable is a known rug pattern. The gate exists to reject that case and passes it, on every V2 snipe. Graded LOSS. The anti-rug watcher is separate protection and defaults to dry-run.",
+  "recommendation": "Require a minimum locked share of total LP supply (a number to decide in card BUY-05, with its AC-37 threshold row at that point). Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-11"
+  ]
+}

@@ -12,7 +12,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "OD-14",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -66,6 +67,11 @@
       "type": "code",
       "ref": "src/chainRegistry.ts:327@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "Base mevStrategy is passthrough (direct submission to the sequencer); :384 Arbitrum also passthrough; :201 ETH flashbots, :270 BSC bloxroute. On Base and Arbitrum the \"private\" sell is a normal sequencer submission with no floor"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Private full and partial sells accept zero minimum output"
     }
   ],
   "sibling_sites_checked": "Every swap builder in the slice: buildV2SellTx (:351-372, minOut 0), buildV3SellTx (:378-407, minOut 0), executePublicFallbackSell (:508-564, bounded minOut via computePublicMinOut, :520-523). Callers: executeFullSell V3 (:871-872) and V2 (:874-875), executePartialSell V3 (:1509-1510) and V2 (:1512-1513). No other amountOutMin/minOut in the slice (sweep C04). The buy-side sibling (snipe minOut 0 on a failed quote) is AUD-BUY-003 / card OD-15; the deliberate private buy leg with a documented 0 floor is recorded there too.",

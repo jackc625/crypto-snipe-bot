@@ -8,7 +8,8 @@
   "escalation_ref": null,
   "od_ref": null,
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -45,6 +46,11 @@
       "type": "command",
       "ref": "git grep -n -E \"(tryAcquireSellLock|releaseSellLock|clearAllTimersForToken|registerStopLoss|registerTakeProfit|registerTimedSell)\\(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
       "note": "every caller at the base SHA uses the two-argument form (exitEngine.ts :669, :832, :1169, :1483, :1590; exitTrigger.ts:240; controls.ts:92, :167); registerStopLoss/TakeProfit/TimedSell have no callers"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitManager.ts:120-122@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Legacy timer registration loses previously registered live handles"
     }
   ],
   "sibling_sites_checked": "All overloads in exitManager.ts and every caller in src/ and scripts/ at the base SHA (command evidence). tryEnqueuePosition and hasExitMonitorTimer are two-argument only.",

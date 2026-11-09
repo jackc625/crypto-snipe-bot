@@ -19,17 +19,19 @@
       "result": [
         "AUD-EXIT-002",
         "AUD-EXIT-003",
-        "AUD-EXIT-015"
+        "AUD-EXIT-015",
+        "AUD-EXIT-022"
       ],
-      "search": "grep -nE \"decimals|parseEther|parseUnits|formatUnits\" over the EXIT snapshot (no decimals() read anywhere); traced the probe amount from parseEther(buyAmountNative) :1866/:1962 into queryPrice amountIn :328/:337 and every source of buyAmountNative (bot.ts:422, :1483, :1948, :1955; exitEngine.ts:731)"
+      "search": "grep -nE \"decimals|parseEther|parseUnits|formatUnits\" over the EXIT snapshot (no decimals() read anywhere); traced the probe amount from parseEther(buyAmountNative) :1866/:1962 into queryPrice amountIn :328/:337 and every source of buyAmountNative (bot.ts:422, :1483, :1948, :1955; exitEngine.ts:731) | 22-27 merge: AUD-EXIT-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C04": {
       "result": [
         "AUD-EXIT-001",
         "AUD-EXIT-006",
-        "AUD-EXIT-011"
+        "AUD-EXIT-011",
+        "AUD-EXIT-026"
       ],
-      "search": "grep -nE \"amountOutMin|amountOutMinimum|minOut|slippage|swapExact|exactInput\" over the EXIT snapshot; read buildV2SellTx :351-372, buildV3SellTx :378-407, executePublicFallbackSell :508-564, fallbackSlippagePct :464-476, computePublicMinOut :483-497"
+      "search": "grep -nE \"amountOutMin|amountOutMinimum|minOut|slippage|swapExact|exactInput\" over the EXIT snapshot; read buildV2SellTx :351-372, buildV3SellTx :378-407, executePublicFallbackSell :508-564, fallbackSlippagePct :464-476, computePublicMinOut :483-497 | 22-27 merge: AUD-EXIT-026 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C05": {
       "result": [
@@ -39,9 +41,10 @@
     },
     "C06": {
       "result": [
-        "AUD-EXIT-004"
+        "AUD-EXIT-004",
+        "AUD-EXIT-024"
       ],
-      "search": "grep -nE \"approve|allowance\" over the EXIT snapshot; read ensureApproval :409-424 and its four callers (:871, :874, :1509, :1512) and the public-fallback approve :540-547; fee population checked in ethers@6.16.0 abstract-signer.js:98-132"
+      "search": "grep -nE \"approve|allowance\" over the EXIT snapshot; read ensureApproval :409-424 and its four callers (:871, :874, :1509, :1512) and the public-fallback approve :540-547; fee population checked in ethers@6.16.0 abstract-signer.js:98-132 | 22-27 merge: AUD-EXIT-024 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C07": {
       "result": [
@@ -80,9 +83,10 @@
         "AUD-EXIT-009",
         "AUD-EXIT-018",
         "AUD-EXIT-019",
-        "AUD-EXIT-021"
+        "AUD-EXIT-021",
+        "AUD-EXIT-023"
       ],
-      "search": "grep -nE \"setInterval|setTimeout|clearInterval|clearTimeout|unref|timeout\" over the EXIT snapshot; read both poll intervals (:1906, :2007), registerExitMonitor / clearAllTimersForToken / hasExitMonitorTimer (exitManager.ts:161-212), the watchdog timer (exitWatchdog.ts:54-58, :84-87), withTimeout (withTimeout.ts:40-55), every early return after a caller cleared timers (:829, :878, :1036), awaited alerts with no timeout (notifier.ts:75-87)"
+      "search": "grep -nE \"setInterval|setTimeout|clearInterval|clearTimeout|unref|timeout\" over the EXIT snapshot; read both poll intervals (:1906, :2007), registerExitMonitor / clearAllTimersForToken / hasExitMonitorTimer (exitManager.ts:161-212), the watchdog timer (exitWatchdog.ts:54-58, :84-87), withTimeout (withTimeout.ts:40-55), every early return after a caller cleared timers (:829, :878, :1036), awaited alerts with no timeout (notifier.ts:75-87) | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C13": {
       "result": [
@@ -98,9 +102,12 @@
         "AUD-EXIT-013",
         "AUD-EXIT-014",
         "AUD-EXIT-017",
-        "AUD-EXIT-018"
+        "AUD-EXIT-018",
+        "AUD-EXIT-022",
+        "AUD-EXIT-023",
+        "AUD-EXIT-025"
       ],
-      "search": "read every path through executeFullSell (:809-1171) and executePartialSell (:1473-1592) for repeated or dropped exits: sell lock, position queue (ExitWorker.enqueue :1322-1353), routine pause (:824-830), every return false, the teardown helpers; callers exitTrigger.ts:240-270 and controls.ts:84-112/:160-185 cross-read at the base SHA"
+      "search": "read every path through executeFullSell (:809-1171) and executePartialSell (:1473-1592) for repeated or dropped exits: sell lock, position queue (ExitWorker.enqueue :1322-1353), routine pause (:824-830), every return false, the teardown helpers; callers exitTrigger.ts:240-270 and controls.ts:84-112/:160-185 cross-read at the base SHA | 22-27 merge: AUD-EXIT-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-EXIT-025 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C15": {
       "result": [
@@ -108,9 +115,10 @@
         "AUD-EXIT-008",
         "AUD-EXIT-011",
         "AUD-EXIT-012",
-        "AUD-EXIT-014"
+        "AUD-EXIT-014",
+        "AUD-EXIT-023"
       ],
-      "search": "grep -nE \"tryAcquireSellLock|releaseSellLock|tryEnqueuePosition|releasePositionQueue|isRoutinePaused|balanceOf\" over the EXIT snapshot; read check-then-act sequences: balance read -> approve -> sell (:839-909), allowance check outside the lock (:541-542), quote -> approve wait -> swap (:520-555), the legacy overload key spaces (exitManager.ts:16-34)"
+      "search": "grep -nE \"tryAcquireSellLock|releaseSellLock|tryEnqueuePosition|releasePositionQueue|isRoutinePaused|balanceOf\" over the EXIT snapshot; read check-then-act sequences: balance read -> approve -> sell (:839-909), allowance check outside the lock (:541-542), quote -> approve wait -> swap (:520-555), the legacy overload key spaces (exitManager.ts:16-34) | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C16": {
       "result": [

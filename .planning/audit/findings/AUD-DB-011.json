@@ -5,7 +5,8 @@
   "duplicate_of": null,
   "escalation_ref": null,
   "reported_by": [
-    "claude (22-21 executor)"
+    "claude (22-21 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -57,6 +58,11 @@
       "type": "command",
       "ref": "git grep -n \"CONFIG\\.\\(factoryAddress\\|routerAddress\\|wethAddress\\|gasMultiplier\\|snipeAmountETH\\)\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
       "note": "consumers: tokenSafety.ts legacy functions (not called on the multi-chain path; bot.ts imports simulateSwap but never calls it), gasManager.ts:41 (unreachable, SC-19), pairDiscovery.ts:11-14 (unreachable, SC-20), scripts/addLiquidity.ts"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): RPC validation contradicts the supported per-chain URL configuration"
     }
   ],
   "sibling_sites_checked": "All rpc / address duplicates in the slice listed in evidence. Outside: provider.ts:16-19 uses CONFIG.network / CONFIG.rpc as the legacy fallback key (TX slice). The multi-chain buy and exit paths read ctx.chain (CHAIN_TEMPLATES) only; no live path was found using the legacy addresses.",

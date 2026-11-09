@@ -15,7 +15,8 @@
   "escalation_ref": "ESC-ANTIRUG-01",
   "od_ref": "EXIT-11",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -96,6 +97,16 @@
       "type": "code",
       "ref": "src/exitEngine.ts:782-789@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the private escalation holds the wallet nonce lock for the whole ladder, so an anti-rug exit of another token waits there and can overrun its 60 s budget (RC-11 sibling owned by the TX slice; AUD-EXIT-014)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1871-1881@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A transient confirmation RPC error permanently consumes the trigger"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:270-286@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Watchdog timeout does not restore the exit timers it cleared"
     }
   ],
   "sibling_sites_checked": "Every way a dispatch can end without a sell: sell-lock refusal (exitEngine.ts:832), routine-pause check (bypassed for anti-rug, :824), budget overrun (exitTrigger.ts:263-296), executeFullSell returning false on its own paths (AUD-EXIT-007), confirm re-read error (detector.ts:1871), evaluator error (:1991, :2078), circuit breaker (exitTrigger.ts:221) and dry-run (:179). Every way a dispatch can recur: a new matching log on the pair or pool (dispatchEvent :1341), a backfill replay (:1007, AUD-ANTIRUG-005), the V3 grace timeout (:2123-2141, once per Burn). No other trigger exists in the slice.",

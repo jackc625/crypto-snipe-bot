@@ -11,7 +11,8 @@
   "escalation_ref": null,
   "od_ref": null,
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -54,6 +55,11 @@
       "type": "code",
       "ref": "src/anti-rug/detector.ts:2129-2140@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "on the grace timeout only the stored (last) position is evaluated"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2106-2119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): V3 pending Burns collide across trades and chains"
     }
   ],
   "sibling_sites_checked": "The Collect path (detector.ts:2174-2204) evaluates every position because each call runs evaluateV3MultiSignal whether or not a pending entry exists; only the Burn-without-Collect path is affected. Two positions on one pool arise from the double-buy race AUD-BUY-004.",

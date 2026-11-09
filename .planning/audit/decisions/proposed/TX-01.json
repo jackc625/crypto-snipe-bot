@@ -32,7 +32,8 @@
     "AUD-TX-002",
     "AUD-TX-008",
     "AUD-TX-011",
-    "AUD-TX-012"
+    "AUD-TX-012",
+    "AUD-TX-020"
   ],
   "decided": null,
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"

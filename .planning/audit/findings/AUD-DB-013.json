@@ -5,7 +5,8 @@
   "duplicate_of": null,
   "escalation_ref": null,
   "reported_by": [
-    "claude (22-21 executor)"
+    "claude (22-21 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -45,6 +46,11 @@
       "type": "code",
       "ref": "src/utils/db.ts:449@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "join on token + chain + s.timestamp >= b.timestamp: a second buy of the same token joins every earlier sell (same-token rebuys, AUD-EXIT-018)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:443-449@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Daily loss subtracts the entire buy cost for every partial sale"
     }
   ],
   "sibling_sites_checked": "getPnLQuery (:351-384) and getPnLChartDataQuery (:463-485) use the same join; api/routes/risk.ts:66 pro-rates the buy cost per event for its chart (API slice), so the dashboard and the breaker compute loss differently. These defects remain after AUD-DB-002 is fixed, so they are a separate entry.",

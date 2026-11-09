@@ -39,6 +39,11 @@
       "type": "command",
       "ref": "git grep -n -F \"maybeApproveForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
       "note": "only the definition at bot.ts:222; no caller"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:274-277@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Legacy sell simulation signs an approval outside the nonce authority"
     }
   ],
   "sibling_sites_checked": "All approve( sites in the slice: bot.ts:226 (dead maybeApproveForChain, inside the nonce lock), tokenSafety.ts:277 (dead simulateSell, outside the lock); abis.ts:31 is the ABI fragment. Exit-side approvals belong to the EXIT slice. The other legacy single-chain helpers imported at bot.ts:4-18 are recorded in AUD-BUY-026; the key-handling defect in checkHoneypot is AUD-BUY-012.",
@@ -61,7 +66,8 @@
   "od_ref": null,
   "recommendation": "Delete simulateSell, its import at bot.ts:17 and maybeApproveForChain (no caller, so no behaviour change). Phase 29 hygiene unless Phase 24 touches the file first.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

@@ -14,7 +14,8 @@
   "escalation_ref": null,
   "od_ref": "ANTIRUG-04",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -75,6 +76,11 @@
       "type": "command",
       "ref": "git grep -n resetCircuitBreaker 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
       "note": "only api/routes/antiRug.ts calls it; the CLI reset named in the header does not exist"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:73-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restarting the process clears a manual-reset-only breaker"
     }
   ],
   "sibling_sites_checked": "All module-local anti-rug state: circuitBreaker.ts:73-83 and detector.ts:192 (positionRegistry), :197 (chainState), :247 (pendingV3Burn). The registry and pending maps are rebuilt at boot by resumeAntiRugMonitoring (bot.ts:1989-2145); the breaker is not. A duplicate module load would split all of these maps (RC-17, owned by the TX slice, noted here only). _resetRegistryForTesting (detector.ts:301) and _resetForTesting (circuitBreaker.ts:228) have no production caller (git grep at the base).",

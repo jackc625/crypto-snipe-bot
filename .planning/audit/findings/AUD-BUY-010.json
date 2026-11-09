@@ -48,6 +48,11 @@
       "type": "code",
       "ref": "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "exposure read from pending buy rows only"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:139-152@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Risk approval reserves no capacity for an in-flight buy"
     }
   ],
   "sibling_sites_checked": "Both handler call sites of canSnipe and recordSnipe checked; the deliberate path calls recordSnipe (bot.ts:772) without canSnipe (operator-run, by design). riskManager.ts belongs to the DB slice (22-21); read for the state each gate uses, not edited. NaN fail-open of the risk env values is recorded on threshold TH-BUY-27. Same-token double buys are AUD-BUY-004.",
@@ -67,7 +72,8 @@
   "od_ref": "BUY-03",
   "recommendation": "Reserve the risk budget synchronously when a handler passes canSnipe (count, exposure and cooldown) and release it on a fail-clean, or serialize the buy pipeline per chain. Card BUY-03. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

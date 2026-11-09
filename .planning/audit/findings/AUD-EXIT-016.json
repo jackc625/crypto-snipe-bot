@@ -10,7 +10,8 @@
   "escalation_ref": null,
   "od_ref": "EXIT-12",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -59,6 +60,16 @@
       "type": "code",
       "ref": "src/exitEngine.ts:80-101@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "PARTIAL_SELL_TARGETS accepts a multiple below 1 (for example 0.5x), which sells that tier at the first tick"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:615-617@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Unbounded dust configuration can disable protection for full holdings"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:300-302@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Exit settings can export unusable stop percentages"
     }
   ],
   "sibling_sites_checked": "Every env-derived exit number (thresholds/EXIT.json TH-EXIT rows). Guarded: MEV_SELL_FALLBACK_ATTEMPTS and the two slippage knobs (never NaN, never negative, slippage clamped to 99% at :492), PARTIAL_SELL_TARGETS total < 100 and positive entries (throws at load). Unguarded: the trailing trio, the stop-loss range, the dust bps upper bound, the routine-failure floor. CONFIG.slippagePercent is hard-coded 5, so `|| 5` (:470) cannot hide a 0 today.",

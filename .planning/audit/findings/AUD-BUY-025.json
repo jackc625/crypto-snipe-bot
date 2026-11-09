@@ -28,6 +28,11 @@
       "type": "command",
       "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1138",
       "note": "a status-0 receipt makes wait() throw CALL_EXCEPTION, so a revert leaves executeDeliberateBuy by a throw (no record, which is correct: no tokens)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-750@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A dropped public buy can hold the wallet nonce lock indefinitely"
     }
   ],
   "sibling_sites_checked": "The only wait( in the slice is bot.ts:750 (C09 search). The snipe submits go through sendTxWithRetry/strategies (TX slice, owner of RC-10). The deliberate private leg runs escalatePrivateBuy under the lock (:558), which is the TX slice's reconcile machinery.",
@@ -50,7 +55,8 @@
   "od_ref": null,
   "recommendation": "Covered by the RC-10 fix (bounded wait or no wait inside the lock) planned for Phase 24 in the TX slice; apply it to this site too.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

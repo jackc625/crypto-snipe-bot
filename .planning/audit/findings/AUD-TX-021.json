@@ -1,0 +1,52 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-007"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "TX-02",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-021",
+  "title": "The exit reserve counts only buffered base fee, with no priority fee or Base L1 data fee",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:280-286@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reserve = gas limit x buffered base fee"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 278,288p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Partly offset by the doubled base fee (AUD-TX-007) and by the per-chain gas buffer."
+    }
+  ],
+  "sibling_sites_checked": "reconciliation.ts:322, :328, and receiptDecoder.ts:62 (recorded gas cost also omits Base L1 data).",
+  "status": "confirmed",
+  "severity_rationale": "S3: needs a wallet funded very thinly and costs above the buffers, which over-reserve in normal conditions.",
+  "recommendation": "Include the priority fee and Base L1 data fee in the reserve; decide in card TX-02. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-12"
+  ]
+}

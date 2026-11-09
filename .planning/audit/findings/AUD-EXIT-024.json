@@ -1,0 +1,57 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-004"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-03",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-EXIT-024",
+  "title": "Sell approvals replace a non-zero allowance directly, which fails on tokens that require a reset to zero first",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C06"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:419-423@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "approve(amount) when allowance is below amount, no reset to zero"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:541-546@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public fallback does the same"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 415,424p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Exact-amount approvals (AUD-EXIT-004) make leftover allowances uncommon."
+    }
+  ],
+  "sibling_sites_checked": "All approve sites in the exit slice (:421, :544). Buy-side approve bot.ts:225-227 has the same shape.",
+  "status": "confirmed",
+  "severity_rationale": "S3: needs a zero-first token, which is uncommon among new launches, and a leftover non-zero allowance.",
+  "recommendation": "Reset to zero when a non-zero allowance is too small; decide with approvals in card EXIT-03. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-EXIT-13"
+  ]
+}

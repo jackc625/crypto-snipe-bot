@@ -13,7 +13,8 @@
   "escalation_ref": null,
   "od_ref": "ANTIRUG-03",
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -68,6 +69,11 @@
       "type": "code",
       "ref": "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json:24@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the V3 rug fixture is not block-pinned (\"Block-pin pending\"), so V3 detection has never been replayed against a real rug"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1754-1764@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): V3 slippage compares raw amounts of different assets"
     }
   ],
   "sibling_sites_checked": "V2 path read for the same faults: signal 3 there compares each reserve with its own baseline (detector.ts:1618-1631, same units), so no unit mismatch; but either reserve under 50 % also trips on a 4x price move in either direction (constant product), which makes it redundant with signal 1 rather than wrong. V2 signal 2 uses the Burn or Transfer to field (:1521-1532); a lock is an LP Transfer to the locker, which does not reduce totalSupply, so signal 1 does not trip on it anyway. raceTelemetry.ts:206-243 has a V3 quote too but is dead code (AUD-ANTIRUG-014).",

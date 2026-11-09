@@ -1,0 +1,51 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-012",
+    "AUD-ANTIRUG-006"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "ANTIRUG-03",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-019",
+  "title": "An unrelated Collect consumes the pending V3 Burn, because the Collect is not matched to the Burn owner or range",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2179-2205@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "any Collect on the pool removes the pending entry, then evaluates the Collect"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 2179,2205p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced. Needs a Collect by an allowlisted owner inside the grace window."
+    }
+  ],
+  "sibling_sites_checked": "Pending entries are keyed per pool (AUD-ANTIRUG-012). Position NFT owners appear as the manager contract on both events.",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: needs an allowlisted Collect in the same few blocks as a malicious Burn.",
+  "recommendation": "Match a Collect to the Burn owner and range before cancelling the pending check; decide in card ANTIRUG-03. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-10"
+  ]
+}

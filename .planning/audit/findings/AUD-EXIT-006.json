@@ -13,7 +13,8 @@
   "escalation_ref": null,
   "od_ref": "EXIT-05",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -56,6 +57,11 @@
       "type": "code",
       "ref": "src/utils/mevStrategies/flashbots.ts:220-249@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "strategies simulate before submit (also passthrough.ts:115-125, bloxroute.ts:131-141), so a reverting private sell is not sent and the ladder falls through quickly"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Transfer-tax tokens cannot execute the standard V2 partial-sale path"
     }
   ],
   "sibling_sites_checked": "All three sell builders: buildV2SellTx (:351-372, non-FoT), buildV3SellTx (:378-407, exactInputSingle), executePublicFallbackSell (:508-564, FoT-safe). The buy side allows taxed tokens up to the per-chain max sell tax (TH-BUY-19), so taxed positions are reachable. Simulate-before-submit in all three strategies means no gas is burned on the reverting private attempts.",

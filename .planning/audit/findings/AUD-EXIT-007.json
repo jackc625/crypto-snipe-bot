@@ -13,7 +13,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-06",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -63,6 +64,11 @@
       "type": "code",
       "ref": "src/exitEngine.ts:687-732@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "contrast: keepMonitoringFailedHeld is the path that persists exit_failed_held and re-arms the timer when it was cleared; these early returns skip it"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1036@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Early full-sell returns bypass failed-held recovery"
     }
   ],
   "sibling_sites_checked": "Every return false in executeFullSell: :829 (routine pause), :834 (sell lock held by another exit; the in-flight exit owns the outcome), :878 (unknown dex), :996 (inconclusive, goes through keepMonitoringFailedHeld, correct), :1036 (V3 no fallback), :1111 and :1167 (both through keepMonitoringFailedHeld, correct), :1156 (closed, correct). Callers that clear timers first: exitTrigger.ts:240, controls.ts:92, controls.ts:167. The worker path (routine triggers) never clears the timer, so for it the timer survives. The dashboard emergency-sell / force-sell selection gap for failed-held positions is the sibling owned by 22-22 under ESC-PRE-04 (key:API:failed-held-sell-selection); it is referenced here and not escalated again.",

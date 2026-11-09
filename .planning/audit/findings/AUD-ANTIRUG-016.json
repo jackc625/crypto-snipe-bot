@@ -11,7 +11,8 @@
   "escalation_ref": null,
   "od_ref": null,
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -55,6 +56,11 @@
       "type": "code",
       "ref": "src/anti-rug/detector.ts:852-862@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the reconnecting guard keeps the extra close handlers from starting parallel loops"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:710-712@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Listener refresh accumulates raw websocket handlers"
     }
   ],
   "sibling_sites_checked": "All listener additions on the raw socket in the slice (detector.ts:710, :771, :809). The bot.ts close handlers stack the same way on dashboard restart (AUD-BUY-008).",

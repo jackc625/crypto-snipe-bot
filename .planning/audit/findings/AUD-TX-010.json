@@ -75,6 +75,16 @@
       "type": "code",
       "ref": "src/utils/mevStrategies/reconciliation.ts:321-328@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "on the sell leg (value 0, buyGasLimit = sell gas limit) the bound still subtracts a reserve for \"the eventual sell\", i.e. a second sell that does not exist"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Private sells use the buy priority-fee ceiling"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:321-328@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Selling requires funds for another future sell"
     }
   ],
   "sibling_sites_checked": "All four buildReconcileConfig callers (flashbots.ts:182, passthrough.ts:83, bloxroute.ts:104 with no leg; bot.ts:577 \"buy\" and exitEngine.ts:940 \"sell\", both only for a guard reconcile window). All reads of the ceiling keys: MEV_BUY_MAX_PRIORITY_FEE_GWEI (reconciliation.ts:193), MEV_SELL_MAX_PRIORITY_FEE_GWEI (:192, reached only from exitEngine.ts:940), MEV_MAX_PRIORITY_FEE_GWEI (none). Operator texts naming the dead knobs: reconciliation.ts:607, exitEngine.ts:536. Cross-slice note for 22-28: TH-EXIT-23 records MEV_SELL_MAX_PRIORITY_FEE_GWEI as capping \"the escalated priority fee of private sell attempts\"; at the base SHA it does not (this entry); I did not edit the EXIT file.",
@@ -97,7 +107,8 @@
   "od_ref": "TX-02",
   "recommendation": "Phase 24 (card TX-02): pass the leg to the strategy (sendTransaction option) so sells use the sell ceiling and no second-sell reserve; decide what MEV_MAX_PRIORITY_FEE_GWEI means (remove it or make it the hard cap); correct the two operator messages. Behaviour-changing (fee ceilings), so it is a card decision.",
   "reported_by": [
-    "claude (22-20 executor)"
+    "claude (22-20 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",

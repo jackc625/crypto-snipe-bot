@@ -1,0 +1,36 @@
+{
+  "id": "BUY-09",
+  "area": "BUY",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Whether the deliberate public buy may use a new nonce after a private attempt",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "If a private attempt lands after the not-landed guard and before the public send, the public buy takes the next nonce and buys a second time (AUD-BUY-030)."
+    },
+    {
+      "id": "pin-nonce",
+      "name": "Send the public buy on the private attempt nonce",
+      "behavior_impact": "The public buy can only replace the private attempt, so at most one of them lands.",
+      "risk": "The public fee must exceed the private bid by the node replacement bump, or the public send is refused."
+    },
+    {
+      "id": "wait-for-expiry",
+      "name": "Wait until the private attempt can no longer land",
+      "behavior_impact": "The fallback starts later, after the last targeted block passes.",
+      "risk": "A slower fallback on a time-sensitive buy."
+    }
+  ],
+  "recommendation": "pin-nonce.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S1 candidate pending the Phase 23 reproduction attempt.",
+  "behavior_impact": "Decides whether the operator deliberate buy can buy twice.",
+  "findings": [
+    "AUD-BUY-030"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes)"
+}

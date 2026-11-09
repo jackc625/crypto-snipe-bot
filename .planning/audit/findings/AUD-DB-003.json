@@ -5,7 +5,8 @@
   "duplicate_of": null,
   "escalation_ref": "ESC-DB-01",
   "reported_by": [
-    "claude (22-21 executor)"
+    "claude (22-21 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -52,6 +53,11 @@
       "type": "code",
       "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the restart scan already treats exit_status = 'exit_failed_held' as still open (UNION with pending); the risk queries do not"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:420-421@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Still-held failed exits disappear from risk accounting"
     }
   ],
   "sibling_sites_checked": "All five updateTradeStatus.run sites (git grep at the base SHA): bot.ts:1189 and :1514 (buy catch, AUD-BUY-002), bot.ts:1937 (restart: zero balance -> failed, correct), exitEngine.ts:668 (sold) and exitEngine.ts:1163 (still-held failed exit -> failed, this finding). All risk SQL in db.ts and riskManager.ts filters on status = 'pending'; none reads exit_state.exit_status. The restart-resume queries getResumeExitMonitorTrades / getResumeAntiRugTrades (db.ts:597-620) do include exit_failed_held.",

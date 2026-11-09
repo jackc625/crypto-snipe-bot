@@ -30,7 +30,8 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides whether a rug that happened during a WebSocket outage is sold, alerted, or missed.",
   "findings": [
-    "AUD-ANTIRUG-005"
+    "AUD-ANTIRUG-005",
+    "AUD-ANTIRUG-018"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

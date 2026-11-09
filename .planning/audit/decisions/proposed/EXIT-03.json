@@ -36,7 +36,9 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
   "behavior_impact": "Decides how much delay and public signal stand in front of every exit.",
   "findings": [
-    "AUD-EXIT-004"
+    "AUD-EXIT-004",
+    "AUD-BUY-029",
+    "AUD-EXIT-024"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

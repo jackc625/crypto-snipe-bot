@@ -13,7 +13,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-02",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -62,6 +63,11 @@
       "type": "code",
       "ref": "src/exitEngine.ts:1714@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "priceMultiple = current probe output / stored entry output"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restart replaces the original buy cost with the current snipe amount"
     }
   ],
   "sibling_sites_checked": "All probe sources: startExitMonitor via bot.ts:422 (buy amount) and :1483 (snipeAmount), resume via bot.ts:1948/:1955 (snipeAmount), re-arm via exitEngine.ts:731 (snipeAmount). For snipes the entry probe is the snipe amount at buy time, so only a changed <PREFIX>_SNIPE_AMOUNT between runs breaks them; for a deliberate buy any amount other than the snipe amount breaks the first resume or re-arm.",

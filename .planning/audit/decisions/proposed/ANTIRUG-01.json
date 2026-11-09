@@ -31,7 +31,8 @@
   "behavior_impact": "Decides how many exit attempts and breaker counts one rug produces.",
   "findings": [
     "AUD-ANTIRUG-003",
-    "AUD-ANTIRUG-004"
+    "AUD-ANTIRUG-004",
+    "AUD-ANTIRUG-021"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

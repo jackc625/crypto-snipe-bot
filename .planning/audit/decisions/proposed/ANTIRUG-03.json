@@ -30,7 +30,9 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract).",
   "behavior_impact": "Decides when a V3 position gets an emergency sell.",
   "findings": [
-    "AUD-ANTIRUG-006"
+    "AUD-ANTIRUG-006",
+    "AUD-ANTIRUG-019",
+    "AUD-ANTIRUG-020"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

@@ -1,0 +1,65 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-014",
+    "AUD-EXIT-018"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-08",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-EXIT-023",
+  "title": "Closing a trade does not cancel queued exits or in-flight polls, which can still act on or re-write state for that token",
+  "severity": "S3",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C12",
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:667-675@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "teardown clears timers and deletes state only"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1399@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queued exit runs with no lifecycle check"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1829@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an in-flight poll can re-write exit_state after teardown"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n of those ranges in the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced. The loss path needs a re-entry into the same token."
+    }
+  ],
+  "sibling_sites_checked": "Timer callbacks at exitEngine.ts:1906 and :2007 have the same lifetime. A second open trade of one token is AUD-EXIT-018. Normal snipes are blocked by the already-sniped check; deliberate buys are not.",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: mostly stale state. Loss needs a re-entry into the same token before stale work settles.",
+  "recommendation": "Check the trade is still open before queued or in-flight work acts or persists; decide with card EXIT-08. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-EXIT-12"
+  ]
+}

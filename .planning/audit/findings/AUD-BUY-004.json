@@ -81,6 +81,11 @@
       "type": "code",
       "ref": "src/utils/db.ts:549-551@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "getTradeIdForPendingToken orders by second-resolution timestamp, so two rows of one token in one second are ambiguous (AUD-BUY-020)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:881-885@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Concurrent signals can buy the same token repeatedly"
     }
   ],
   "sibling_sites_checked": "Both handler entry checks (bot.ts:881, :1211) and both inserts (:1127, :1451) checked. Concurrency sources found: V2 PairCreated and V3 PoolCreated for one token; the same token on two V2 DEXes of a chain; Telegram alpha routing (telegramListener.ts:120-124 -> alphaDrop.ts:36/:47) concurrent with factory events; overlapping HTTP-poll cycles (:1636-1651, :1660-1676); duplicate listeners after dashboard stop/start or a WS drop (AUD-BUY-008, AUD-BUY-011). The deliberate path has a separate structural guard (nonce + balance delta, :617-662) and is not affected by this race within one process. The risk-gate race across DIFFERENT tokens is a separate mechanism, AUD-BUY-010.",
@@ -105,7 +110,8 @@
   "od_ref": "BUY-03",
   "recommendation": "Phase 24: claim the token synchronously (before the first await) in an in-process set keyed by chain+token, and re-check the claim and the DB inside the nonce lock before submitting; release the claim on a genuine fail-clean. The exact mechanism and whether risk budget is reserved at the same time is card BUY-03. Nothing is changed in Phase 22.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

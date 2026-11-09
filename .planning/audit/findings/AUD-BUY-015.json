@@ -25,6 +25,16 @@
       "type": "code",
       "ref": "src/bot.ts:1232-1238@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "the only gate on V3 pool depth before the buy (the V2-only liquidity checks are skipped for V3, :1290-1292)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:200-210@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Successful V3 quoting does not enforce minimum liquidity"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:417-418@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): V2 liquidity checks ignore the chain's configured threshold"
     }
   ],
   "sibling_sites_checked": "V2 uses a reserve comparison against a hard-coded 1 native (tokenSafety.ts:417-421, threshold row TH-BUY-09) instead of the configured threshold; V3 uses the configured threshold through this quote-success test. No other V3 depth check exists in the slice.",
@@ -44,7 +54,8 @@
   "od_ref": "BUY-05",
   "recommendation": "Measure V3 depth directly (in-range liquidity or the WETH balance of the pool, or compare the quoted output against an expected price) and use one threshold semantics for V2 and V3. Behaviour change on card BUY-05.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

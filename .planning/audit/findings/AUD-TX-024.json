@@ -1,0 +1,53 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-005",
+    "AUD-BUY-008"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-024",
+  "title": "WebSocket provider destroy() returns a promise that is neither awaited nor caught",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C11"
+  ],
+  "files": [
+    "src/utils/provider.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:49-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "provider.destroy() result discarded"
+    },
+    {
+      "type": "command",
+      "ref": "grep destroy node_modules/ethers/lib.esm/providers/provider-websocket.d.ts",
+      "note": "Claude verification: declared destroy(): Promise<void> at :35. With no unhandledRejection handler (AUD-BUY-005) a rejection would end the process."
+    }
+  ],
+  "sibling_sites_checked": "removeWsProvider is the only destroy site in the slice.",
+  "status": "confirmed",
+  "severity_rationale": "S3: destroy rarely rejects, but the failure mode is process exit with positions open.",
+  "recommendation": "Catch and log the rejection. No behaviour change. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-15"
+  ]
+}

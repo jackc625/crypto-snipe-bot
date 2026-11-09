@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-004",
+    "AUD-TX-019"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "EXIT-03",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-029",
+  "title": "The deliberate public buy and buy approvals are sent with ethers default fees and no gas or fee ceiling",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-749@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "router call passes only { value }"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:225-227@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "approve with no overrides, under the nonce lock"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 744,750p and 225,229p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: no fee override exists on either call."
+    }
+  ],
+  "sibling_sites_checked": "Sell side is AUD-EXIT-004. tokenSafety.ts:277 (dead simulateSell, AUD-BUY-007). Operator scripts are AUD-SCRIPTS-002 and AUD-SCRIPTS-003.",
+  "status": "confirmed",
+  "severity_rationale": "S2: a fee spike raises the cost of one deliberate or approval transaction, bounded by the wallet and the single transaction. Same grade as the sell-side twin AUD-EXIT-004.",
+  "recommendation": "Apply the same fee ceiling as the private path to these sends; decide it together with the sell side in card EXIT-03. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-06"
+  ]
+}

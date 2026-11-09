@@ -23,7 +23,7 @@
       "effort": "CLI default"
     }
   },
-  "status": "sends complete; merge in progress",
+  "status": "merge complete; three new BUY S1 entries escalated in ESC-BUY-03; awaiting operator reply at the blocking checkpoint",
   "source_code_sent": true,
   "confinement": [
     {
@@ -239,8 +239,1850 @@
       "stderr_sha256": "763d67b26c3ffde04b1902ec405d10ad51403bb0b5a0409374a5bde951b2ab9a"
     }
   ],
-  "external_findings": [],
-  "cards_added": [],
+  "external_findings": [
+    {
+      "ext_id": "codex-BUY-01",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/telegramListener.ts",
+      "line_start": 77,
+      "line_end": 80,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C18",
+        "C20"
+      ],
+      "title": "Leaving either Telegram whitelist empty accepts every source",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-006",
+      "dedup_reason": "Same defect, same lines (telegramListener.ts:77-80): empty sender or channel list means allow."
+    },
+    {
+      "ext_id": "codex-BUY-02",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 881,
+      "line_end": 885,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C15"
+      ],
+      "title": "Concurrent signals can buy the same token repeatedly",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-004",
+      "dedup_reason": "Same double-buy race, same check at bot.ts:881-885; the risk-check window it mentions as a sibling is AUD-BUY-010."
+    },
+    {
+      "ext_id": "codex-BUY-03",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1177,
+      "line_end": 1190,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C13"
+      ],
+      "title": "Post-buy setup errors mark successfully acquired positions failed",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "Same mechanism: the buy catch at bot.ts:1177-1190 flips a landed buy to failed."
+    },
+    {
+      "ext_id": "codex-BUY-04",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1100,
+      "line_end": 1112,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C13"
+      ],
+      "title": "Buy submission precedes any recoverable trade record",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "Same mechanism: no trades row exists until after submission returns (also AUD-DB-004)."
+    },
+    {
+      "ext_id": "codex-BUY-05",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 746,
+      "line_end": 750,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "A dropped public buy can hold the wallet nonce lock indefinitely",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-025",
+      "dedup_reason": "Same defect, same lines: public-buy stx.wait() with no timeout inside the nonce lock."
+    },
+    {
+      "ext_id": "codex-BUY-06",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 747,
+      "line_end": 748,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C16"
+      ],
+      "title": "The public fallback bypasses configured transaction fee ceilings",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-029",
+      "verification_note": "bot.ts:746-749 re-read: the deliberate public buy passes only { value } and bot.ts:225-227 approves with default fees, so ethers default fees and gas apply. Register covered the sell side (AUD-EXIT-004) and the operator scripts, not this buy path."
+    },
+    {
+      "ext_id": "codex-BUY-07",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 746,
+      "line_end": 749,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C07",
+        "C15"
+      ],
+      "title": "The public fallback is not pinned to the private buy's nonce",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-030",
+      "verification_note": "bot.ts:635-636 re-read: the nonce guard runs before later awaits, and the router call at :747 carries no nonce. A private attempt that lands after the guard and before the public send makes the public buy take the next nonce and buy again. Not reproduced."
+    },
+    {
+      "ext_id": "codex-BUY-08",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1048,
+      "line_end": 1055,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C01",
+        "C04"
+      ],
+      "title": "Quote or slippage-conversion failures turn into unrestricted buys",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-003",
+      "dedup_reason": "Same defect, same lines (bot.ts:1048-1055): quote failure leaves minOut 0. The BigInt(slippage) branch is already noted there as latent."
+    },
+    {
+      "ext_id": "codex-BUY-09",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1050,
+      "line_end": 1050,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C02",
+        "C04"
+      ],
+      "title": "A configured zero-slippage limit becomes five percent",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-003",
+      "dedup_reason": "AUD-BUY-003 already notes CONFIG.slippagePercent || 5 at these sites, and TH-BUY-03 records the fallback. CONFIG.slippagePercent is hard-coded 5, so an explicit zero cannot reach this code today."
+    },
+    {
+      "ext_id": "codex-BUY-10",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 878,
+      "line_end": 879,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C03"
+      ],
+      "title": "Factory events are processed without requiring a wrapped-native pair",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-027",
+      "verification_note": "bot.ts:878-879, :1008, :1042 and tokenSafety.ts:413-417 re-read; the listeners at :1582-1584 pass every pair. No check requires either token to be wrapped native. For A/B the checks read the A/B pair and treat B reserve as native while the buy path is WETH to A."
+    },
+    {
+      "ext_id": "codex-BUY-11",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/safetyProviders/goplus.ts",
+      "line_start": 63,
+      "line_end": 69,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [],
+      "title": "A tiny locked LP allocation passes the liquidity-lock gate",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-028",
+      "verification_note": "goplus.ts:63-69, unicrypt.ts:29 and mudra.ts:27 re-read: each passes on any active lock and none reads the locked share. This gate is live for V2 snipes (bot.ts:977) on all four chains (chainRegistry.ts safetyApis)."
+    },
+    {
+      "ext_id": "codex-BUY-12",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 200,
+      "line_end": 210,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Successful V3 quoting does not enforce minimum liquidity",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-015",
+      "dedup_reason": "Same defect, same function (bot.ts:179-215): a V3 quote that did not revert proves nothing about liquidity."
+    },
+    {
+      "ext_id": "codex-BUY-13",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 417,
+      "line_end": 418,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "V2 liquidity checks ignore the chain's configured threshold",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-015",
+      "dedup_reason": "Recorded in AUD-BUY-015 sibling sites and TH-BUY-09 (tokenSafety.ts:417-421 hard-codes 1 native)."
+    },
+    {
+      "ext_id": "codex-BUY-14",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1943,
+      "line_end": 1948,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [],
+      "title": "Restart monitoring selects the first DEX instead of the trade's DEX",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-013",
+      "dedup_reason": "Same defect and lines (bot.ts:1943-1948, :1950): restart picks the first DEX of the type. Anti-rug sibling is AUD-ANTIRUG-011."
+    },
+    {
+      "ext_id": "codex-BUY-15",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1948,
+      "line_end": 1948,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [],
+      "title": "Restart replaces the original buy cost with the current snipe amount",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-015",
+      "dedup_reason": "Same defect: resume uses the current snipe amount at bot.ts:1948."
+    },
+    {
+      "ext_id": "codex-BUY-16",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1934,
+      "line_end": 1938,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C08",
+        "C09",
+        "C13"
+      ],
+      "title": "Restart abandons pending buys without reconciling settlement",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "Same class: a buy that can still land is marked failed. bot.ts:1934-1938 is also traced in AUD-EXIT-013 and AUD-EXIT-017."
+    },
+    {
+      "ext_id": "codex-BUY-17",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 38,
+      "line_end": 48,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C17"
+      ],
+      "title": "Legacy honeypot fallback can write the wallet private key to logs",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-012",
+      "dedup_reason": "Same defect, same lines (tokenSafety.ts:37-48): private key passed as recipient in dead code."
+    },
+    {
+      "ext_id": "codex-BUY-18",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1539,
+      "line_end": 1543,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C11"
+      ],
+      "title": "Listener callbacks discard rejecting handler promises",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-005",
+      "dedup_reason": "Same defect, same listener sites (bot.ts:1542, :1583, :1644, :1669)."
+    },
+    {
+      "ext_id": "codex-BUY-19",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1835,
+      "line_end": 1839,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C12"
+      ],
+      "title": "Chain restart accumulates listeners and uncancellable polling intervals",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-011",
+      "dedup_reason": "Same mechanism: AUD-BUY-011 and AUD-BUY-008 both record onRestart adding a second poller or listener."
+    },
+    {
+      "ext_id": "codex-BUY-20",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 1561,
+      "line_end": 1569,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [
+        "C10"
+      ],
+      "title": "DEX reconnects never backfill events missed during disconnection",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-008",
+      "dedup_reason": "AUD-BUY-008 includes no backfill on DEX reconnect, same lines (bot.ts:1561-1576)."
+    },
+    {
+      "ext_id": "codex-BUY-21",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/bot.ts",
+      "line_start": 149,
+      "line_end": 155,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [
+        "C10"
+      ],
+      "title": "V3 liquidity waiting misses liquidity established before subscription",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-017",
+      "dedup_reason": "Same defect (alphaDrop.ts:43-49, bot.ts:150-176): existing V3 pools passed with block 0 miss earlier Mints."
+    },
+    {
+      "ext_id": "codex-BUY-22",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 274,
+      "line_end": 277,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C06",
+        "C07"
+      ],
+      "title": "Legacy sell simulation signs an approval outside the nonce authority",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-007",
+      "dedup_reason": "Same defect, same lines (tokenSafety.ts:269-299): dead simulateSell sends a real approve outside the nonce lock."
+    },
+    {
+      "ext_id": "codex-BUY-23",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 498,
+      "line_end": 503,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C01"
+      ],
+      "title": "Risk thresholds are evaluated after rounding raw uint256 amounts",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-031",
+      "verification_note": "tokenSafety.ts:499-503 re-read: Number(limit) / Number(totalSupply). The rounding is real and immaterial (about 1 part in 1e16 of a 1 percent boundary). The threshold itself is TH-BUY-24."
+    },
+    {
+      "ext_id": "codex-BUY-24",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 332,
+      "line_end": 335,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Blacklist selector scanning includes an impossible interior 0x prefix",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-013",
+      "dedup_reason": "Same defect, same lines (tokenSafety.ts:331-340): selectors with an impossible 0x prefix."
+    },
+    {
+      "ext_id": "codex-BUY-25",
+      "slice": "BUY",
+      "assistant": "codex",
+      "file": "src/utils/safetyProviders/goplus.ts",
+      "line_start": 53,
+      "line_end": 54,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Incomplete honeypot API responses are interpreted as safe",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-BUY-032",
+      "verification_note": "goplus.ts:53-54 and honeypotIs.ts re-read: a partial response reads as not-honeypot. The adapters are not on the live path (checkHoneypotForChain has no live caller, isHoneypot is hard-coded false, AUD-BUY-009)."
+    },
+    {
+      "ext_id": "codex-EXIT-01",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 363,
+      "line_end": 365,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C04"
+      ],
+      "title": "Private full and partial sells accept zero minimum output",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-001",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:363-365, :395)."
+    },
+    {
+      "ext_id": "codex-EXIT-02",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1531,
+      "line_end": 1546,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C13",
+        "C14"
+      ],
+      "title": "Post-submission errors can repeat an already executed partial sale",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-017",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:1531-1575): a partial tier can be re-sold after a crash in this window."
+    },
+    {
+      "ext_id": "codex-EXIT-03",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/utils/exitWatchdog.ts",
+      "line_start": 60,
+      "line_end": 63,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07",
+        "C14"
+      ],
+      "title": "Watchdog expiry leaves the underlying sell lock held",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-009",
+      "dedup_reason": "AUD-EXIT-009 records at exitWatchdog.ts:59-82 that the watchdog frees the drain loop but both locks stay held."
+    },
+    {
+      "ext_id": "codex-EXIT-04",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1866,
+      "line_end": 1869,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C03"
+      ],
+      "title": "Native buy wei are used as raw token quote input",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-003",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:1866-1869): the buy amount is reused as a raw token probe."
+    },
+    {
+      "ext_id": "codex-EXIT-05",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 618,
+      "line_end": 621,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C03",
+        "C14"
+      ],
+      "title": "The fixed dust floor can classify whole positions as closed",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-EXIT-022",
+      "verification_note": "exitEngine.ts:615-622 re-read: absoluteFloor is a fixed 1000 raw units whatever the decimals, which is a different defect from the unbounded basis-points setting in AUD-EXIT-016. Reachable only for tokens with very few decimals and small holdings."
+    },
+    {
+      "ext_id": "codex-EXIT-06",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 615,
+      "line_end": 617,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C14",
+        "C18"
+      ],
+      "title": "Unbounded dust configuration can disable protection for full holdings",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-016",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:615-622): EXIT_DUST_THRESHOLD_BPS has no upper bound."
+    },
+    {
+      "ext_id": "codex-EXIT-07",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1022,
+      "line_end": 1036,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C14"
+      ],
+      "title": "Early full-sell returns bypass failed-held recovery",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-007",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:1022-1037, :876-879, :824-830)."
+    },
+    {
+      "ext_id": "codex-EXIT-08",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1870,
+      "line_end": 1873,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C14"
+      ],
+      "title": "One initial quote failure leaves a purchased position without monitoring",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-002",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:1866-1873, :1978-1984)."
+    },
+    {
+      "ext_id": "codex-EXIT-09",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1708,
+      "line_end": 1712,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C14"
+      ],
+      "title": "Quote failure suppresses the unconditional urgency exit",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-003",
+      "dedup_reason": "AUD-EXIT-003 notes at exitEngine.ts:1708-1712 that a null quote skips the urgency exit; TH-EXIT-08 and card EXIT-02 cover it."
+    },
+    {
+      "ext_id": "codex-EXIT-10",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 553,
+      "line_end": 555,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C16"
+      ],
+      "title": "Direct approvals and public fallback bypass transaction fee ceilings",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-004",
+      "dedup_reason": "AUD-EXIT-004 covers both the sell approvals and the public fallback swap at exitEngine.ts:553-555."
+    },
+    {
+      "ext_id": "codex-EXIT-11",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1099,
+      "line_end": 1102,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C08"
+      ],
+      "title": "Unfinalized balances trigger irreversible monitoring teardown",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-020",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:1099-1105): teardown trusts one balance read at one confirmation."
+    },
+    {
+      "ext_id": "codex-EXIT-12",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 667,
+      "line_end": 674,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C12",
+        "C14",
+        "C15"
+      ],
+      "title": "Closing a trade does not invalidate queued or in-flight exit work",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-EXIT-023",
+      "verification_note": "exitEngine.ts:667-675, :1399 and :1829 re-read: teardown clears timers but queued work and an in-flight poll still run, and the poll re-writes exit_state. The LOSS path needs a re-entry into the same token; normal snipes are blocked by the already-sniped check, deliberate buys are not. Not reproduced."
+    },
+    {
+      "ext_id": "codex-EXIT-13",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 419,
+      "line_end": 422,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C06"
+      ],
+      "title": "Increasing a nonzero allowance fails for zero-first tokens",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-EXIT-024",
+      "verification_note": "exitEngine.ts:419-423 and :541-546 re-read: an insufficient non-zero allowance is replaced directly with no reset to zero. Only zero-first tokens are affected, after a partial approval was left unused."
+    },
+    {
+      "ext_id": "codex-EXIT-14",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 470,
+      "line_end": 470,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C02",
+        "C04"
+      ],
+      "title": "A zero slippage setting silently becomes five percent",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-011",
+      "dedup_reason": "Same floor computation (exitEngine.ts:464-476, TH-EXIT-13). CONFIG.slippagePercent is hard-coded 5, so an explicit zero cannot reach this code today."
+    },
+    {
+      "ext_id": "codex-EXIT-15",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 1568,
+      "line_end": 1575,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C14"
+      ],
+      "title": "Completed tier indices change meaning when configuration changes",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-EXIT-025",
+      "verification_note": "exitEngine.ts:288-294 and :1568-1575 re-read: completed tiers persist as array indices with no record of the tier list they refer to, so changing PARTIAL_SELL_TARGETS while positions are open reinterprets them."
+    },
+    {
+      "ext_id": "codex-EXIT-16",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 363,
+      "line_end": 365,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Transfer-tax tokens cannot execute the standard V2 partial-sale path",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-006",
+      "dedup_reason": "Same defect, same lines (exitEngine.ts:363-365, :1512-1513)."
+    },
+    {
+      "ext_id": "codex-EXIT-17",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/exitEngine.ts",
+      "line_start": 492,
+      "line_end": 496,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C04"
+      ],
+      "title": "Whole-percent rounding can exceed configured fractional slippage",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-EXIT-026",
+      "verification_note": "exitEngine.ts:492-496 re-read: Math.round to a whole percent. Only a fractional MEV_SELL_ANTIRUG_SLIPPAGE_PCT reaches it (routine slippage is hard-coded 5) and the effect is at most half a percent either way."
+    },
+    {
+      "ext_id": "codex-EXIT-18",
+      "slice": "EXIT",
+      "assistant": "codex",
+      "file": "src/utils/exitManager.ts",
+      "line_start": 120,
+      "line_end": 122,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C12"
+      ],
+      "title": "Legacy timer registration loses previously registered live handles",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-012",
+      "dedup_reason": "AUD-EXIT-012 covers the legacy registerStopLoss, TakeProfit and TimedSell overloads, which have no callers."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-01",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1754,
+      "line_end": 1764,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C03"
+      ],
+      "title": "V3 slippage compares raw amounts of different assets",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-006",
+      "dedup_reason": "Same defect, same lines (detector.ts:1750-1764)."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-02",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1155,
+      "line_end": 1159,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C10"
+      ],
+      "title": "Backfill invokes an evaluator that dispatches live exits",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-005",
+      "dedup_reason": "Same defect, same lines (detector.ts:1146-1159): backfill fires live exits through the evaluator."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-03",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 647,
+      "line_end": 655,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C10"
+      ],
+      "title": "Healthy websocket operation never advances the persisted cursor",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-005",
+      "dedup_reason": "AUD-ANTIRUG-005 records that dispatchEvent never advances last_seen_block on the WS path."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-04",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1279,
+      "line_end": 1291,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C10"
+      ],
+      "title": "HTTP polling can become permanently stuck beyond the RPC log-range cap",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-018",
+      "verification_note": "detector.ts:1279-1300 re-read: getLogs requests the whole range since lastBlock with no chunking, and a failure keeps lastBlock, so the next range is larger. Not the same defect as the repeat-range overlap in AUD-ANTIRUG-007."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-05",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 587,
+      "line_end": 600,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C12",
+        "C14"
+      ],
+      "title": "Every HTTP-mode registration starts another polling interval",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-007",
+      "dedup_reason": "Same defect, same lines (detector.ts:587-601, :1261)."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-06",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1261,
+      "line_end": 1264,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C14",
+        "C15"
+      ],
+      "title": "Async HTTP polling cycles overlap and replay the same events",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-007",
+      "dedup_reason": "AUD-ANTIRUG-007 records the async poller with no in-flight guard."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-07",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1967,
+      "line_end": 1982,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C14"
+      ],
+      "title": "Multiple logs from one withdrawal create independent exit triggers",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-003",
+      "dedup_reason": "Same defect: each log of one LP removal is its own trigger and counts toward the breaker."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-08",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 221,
+      "line_end": 232,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C15"
+      ],
+      "title": "Concurrent exits bypass the circuit-breaker threshold",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-003",
+      "dedup_reason": "The C15 sweep cell cites this check-then-increment race at exitTrigger.ts:221-319 to AUD-ANTIRUG-003."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-09",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2106,
+      "line_end": 2119,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "V3 pending Burns collide across trades and chains",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-012",
+      "dedup_reason": "Same defect, same lines (detector.ts:2106, :2117-2120): pending Burns keyed by pool."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-10",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2179,
+      "line_end": 2190,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "An unrelated Collect cancels the pending V3 Burn",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-019",
+      "verification_note": "detector.ts:2179-2205 re-read: any Collect from the pool consumes the pending Burn with no owner or tick match, then evaluates the Collect event. Not reproduced."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-11",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2117,
+      "line_end": 2124,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Repeated V3 Burns can postpone evaluation indefinitely",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-020",
+      "verification_note": "detector.ts:2106-2125 re-read: each Burn replaces the previous watcher and restarts the 5-block grace, with no limit from the first Burn. Withdrawn funds still need a Collect, and a Collect triggers evaluation, which limits the benefit. Not reproduced."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-12",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 471,
+      "line_end": 487,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C12",
+        "C14"
+      ],
+      "title": "Unregistering a trade leaves its delayed exits active",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-003",
+      "dedup_reason": "AUD-ANTIRUG-003 records that unregister leaves pending confirm gates and V3 grace watchers running."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-13",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1871,
+      "line_end": 1881,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C14"
+      ],
+      "title": "A transient confirmation RPC error permanently consumes the trigger",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-004",
+      "dedup_reason": "Same defect, same lines (detector.ts:1850, :1871): an unsafe verdict is not retried after an RPC error."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-14",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 270,
+      "line_end": 286,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C12",
+        "C14"
+      ],
+      "title": "Watchdog timeout does not restore the exit timers it cleared",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-004",
+      "dedup_reason": "AUD-ANTIRUG-004 covers refused, timed-out or failed escapes, including exitTrigger.ts:255-262; timer clearing is also in AUD-EXIT-007."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-15",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 904,
+      "line_end": 907,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C10",
+        "C11"
+      ],
+      "title": "Notification failures can terminate websocket recovery",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-008",
+      "dedup_reason": "AUD-ANTIRUG-008 records the awaited alerts at detector.ts:904-907 and :974-977. notifier.ts:80-88 catches Telegram errors, so only a throw from broadcast could reach this."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-16",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 655,
+      "line_end": 657,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C10",
+        "C11"
+      ],
+      "title": "Ethers subscription promises are discarded",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-022",
+      "verification_note": "detector.ts:655 and siblings re-read: the promises returned by ethers .on and .off are not awaited or caught. AUD-BUY-005 covers bot.ts sites and AUD-ANTIRUG-002 the socket error crash, not this."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-17",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1845,
+      "line_end": 1857,
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "classes": [
+        "C08"
+      ],
+      "title": "Confirmation delay never verifies that the triggering event survived a reorg",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-013",
+      "dedup_reason": "Same defect, same lines (detector.ts:1845-1849, :1341-1396): reorged logs are ignored by the gate."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-18",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/circuitBreaker.ts",
+      "line_start": 73,
+      "line_end": 83,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C13"
+      ],
+      "title": "Restarting the process clears a manual-reset-only breaker",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-010",
+      "dedup_reason": "Same defect, same lines (circuitBreaker.ts:72-83)."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-19",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2251,
+      "line_end": 2253,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "LP Transfer handling defeats the V2 withdrawal allowlist",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-021",
+      "verification_note": "detector.ts:1527-1531 and :2251-2253 re-read: each LP Transfer is evaluated with its own to address as the destination, so during a router removal the destination checked is the pair or zero address. Not the same point as the counting problem in AUD-ANTIRUG-003. Not reproduced."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-20",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 710,
+      "line_end": 712,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [
+        "C12"
+      ],
+      "title": "Listener refresh accumulates raw websocket handlers",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-016",
+      "dedup_reason": "Same defect, same lines (detector.ts:706-719, :771-774)."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-21",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/lpBaseline.ts",
+      "line_start": 110,
+      "line_end": 119,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C15"
+      ],
+      "title": "Baseline reads are not pinned to their recorded snapshot block",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-013",
+      "dedup_reason": "AUD-ANTIRUG-013 records the unpinned re-reads (detector.ts:1576-1579, lpBaseline.ts)."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-22",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 101,
+      "line_end": 107,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "Flashbots simulation is sent through the ordinary chain RPC provider",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-014",
+      "dedup_reason": "Same file and lines (raceTelemetry.ts:101-107); the module is production-dead."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-23",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 114,
+      "line_end": 120,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "A positive miner payment is incorrectly reported as a race win",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-014",
+      "dedup_reason": "Same file and lines (raceTelemetry.ts:109-124); production-dead."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-24",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 189,
+      "line_end": 203,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [
+        "C03"
+      ],
+      "title": "V2 recovery telemetry fabricates a WETH amount from reserve1",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-014",
+      "dedup_reason": "Same file and lines (raceTelemetry.ts:189-203); production-dead."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-25",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 207,
+      "line_end": 218,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "V3 post-hoc telemetry can quote a different DEX pool",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-014",
+      "dedup_reason": "Same file and lines (raceTelemetry.ts:206-220); production-dead."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-26",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 229,
+      "line_end": 242,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "Every V3 historical quote error is classified as a drained pool",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-ANTIRUG-014",
+      "dedup_reason": "Same module (raceTelemetry.ts:229-242); production-dead."
+    },
+    {
+      "ext_id": "codex-ANTIRUG-27",
+      "slice": "ANTIRUG",
+      "assistant": "codex",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 172,
+      "line_end": 174,
+      "severity": "S3",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "Circuit-breaker events identify the destination as the pool",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-ANTIRUG-023",
+      "verification_note": "exitTrigger.ts:173 and :318 re-read: pairAddress is assigned signals.destination and is stored as the event pair."
+    },
+    {
+      "ext_id": "codex-TX-01",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 57,
+      "line_end": 62,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C01"
+      ],
+      "title": "BigNumberish assertions do not convert amounts to bigint",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-022",
+      "verification_note": "passthrough.ts:57, :62 re-read: type assertions only. Latent: every in-repo builder passes bigint or omits the field."
+    },
+    {
+      "ext_id": "codex-TX-02",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 86,
+      "line_end": 90,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [],
+      "title": "Repricing retains incompatible transaction fee fields",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-023",
+      "verification_note": "passthrough.ts:86-90, :104-105 re-read: incoming gasPrice is not removed. Latent: no in-repo caller passes gasPrice (getGasOptions is unreachable, AUD-TX-013)."
+    },
+    {
+      "ext_id": "codex-TX-03",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 555,
+      "line_end": 559,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "Submission exceptions bypass reconciliation after a possible broadcast",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "Same mechanism: a submit that throws after broadcast (reconciliation.ts:557); AUD-TESTU-014 names this RED case for AUD-BUY-002."
+    },
+    {
+      "ext_id": "codex-TX-04",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 558,
+      "line_end": 559,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "Earlier replacement hashes are discarded before their outcome is known",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "AUD-BUY-002 records that only the latest attempt hash is reconciled, so an earlier same-nonce attempt reads as landed-not-ours (also TH-TX-11)."
+    },
+    {
+      "ext_id": "codex-TX-05",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 605,
+      "line_end": 613,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "A reconciliation timeout abandons transactions that can still execute",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-002",
+      "dedup_reason": "AUD-BUY-002 is the buy that can still land after a not-landed verdict (reconciliation.ts:605-613)."
+    },
+    {
+      "ext_id": "codex-TX-06",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 138,
+      "line_end": 140,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "The native confirmation wait can prevent exit fallback indefinitely",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-002",
+      "dedup_reason": "Same defect, same lines (passthrough.ts:130-150, reconciliation.ts:557): tx.wait with no timeout."
+    },
+    {
+      "ext_id": "codex-TX-07",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 502,
+      "line_end": 514,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C07"
+      ],
+      "title": "Fee escalation does not ensure a valid replacement bid",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-018",
+      "verification_note": "reconciliation.ts:500-516 re-read: the bid is max(market, step x (attempt + 1)) and is not tied to the previous submitted fee, so retries can repeat a bid or miss the node bump rule. AUD-TX-016 is about the size of the floor, not replacement validity. Not reproduced against a node."
+    },
+    {
+      "ext_id": "codex-TX-08",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 569,
+      "line_end": 572,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C09"
+      ],
+      "title": "Native Flashbots inclusion bypasses receipt-status validation",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-020",
+      "verification_note": "reconciliation.ts:569-573 re-read: no receipt read on a native confirm. AUD-TX-012 is about confirmation depth, not status. Mitigated: flashbots.ts simulates first and sets no revertingTxHashes, and relays drop bundles with reverting transactions, so a status-0 inclusion should not occur. Not reproduced."
+    },
+    {
+      "ext_id": "codex-TX-09",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 371,
+      "line_end": 375,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C08"
+      ],
+      "title": "Reconciliation accepts a first-block receipt without confirmations",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-012",
+      "dedup_reason": "Same defect, same lines (reconciliation.ts:371-375, :569-573)."
+    },
+    {
+      "ext_id": "codex-TX-10",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/txManager.ts",
+      "line_start": 199,
+      "line_end": 199,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C16"
+      ],
+      "title": "Private sells use the buy priority-fee ceiling",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-010",
+      "dedup_reason": "Same defect, same lines: strategies call buildReconcileConfig with no leg."
+    },
+    {
+      "ext_id": "codex-TX-11",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 321,
+      "line_end": 328,
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C16"
+      ],
+      "title": "Selling requires funds for another future sell",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-010",
+      "dedup_reason": "AUD-TX-010 records the phantom second-sell reserve at reconciliation.ts:321-333."
+    },
+    {
+      "ext_id": "codex-TX-12",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 280,
+      "line_end": 285,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C16"
+      ],
+      "title": "The exit reserve omits public priority fees and Base data fees",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-021",
+      "verification_note": "reconciliation.ts:280-286 re-read: the reserve has base fee x buffer only, with no priority fee or Base L1 data fee. Partly offset by the doubled base fee in AUD-TX-007 and the per-chain gas buffer."
+    },
+    {
+      "ext_id": "codex-TX-13",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/gasManager.ts",
+      "line_start": 14,
+      "line_end": 18,
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "classes": [
+        "C16"
+      ],
+      "title": "RPC fee quotes have no absolute total-price ceiling",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-019",
+      "verification_note": "gasManager.ts:14-18 and reconciliation.ts:311-333 re-read: ceilings cap the priority fee only; the base component is bounded by wallet balance. Register held the sell public-fallback and priority-ceiling cases (AUD-EXIT-004, AUD-TX-010), not this missing total ceiling."
+    },
+    {
+      "ext_id": "codex-TX-14",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/bloxroute.ts",
+      "line_start": 186,
+      "line_end": 188,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C17"
+      ],
+      "title": "Raw Axios errors can expose relay credentials and signed transactions",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-014",
+      "dedup_reason": "Same defect, same lines (bloxroute.ts:186-189, :66-67)."
+    },
+    {
+      "ext_id": "codex-TX-15",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/provider.ts",
+      "line_start": 49,
+      "line_end": 50,
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C11"
+      ],
+      "title": "WebSocket destruction drops a rejecting promise",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-024",
+      "verification_note": "provider.ts:49 re-read, and ethers WebSocketProvider.destroy() is declared Promise<void> (node_modules/ethers provider-websocket.d.ts:35). The result is neither awaited nor caught. The no-handler risk itself is AUD-BUY-005."
+    },
+    {
+      "ext_id": "codex-TX-16",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/receiptDecoder.ts",
+      "line_start": 81,
+      "line_end": 83,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Unrelated WETH events can replace the decoded sell proceeds",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-TX-015",
+      "dedup_reason": "Same defect, same lines (receiptDecoder.ts:74-102): first WETH Withdrawal or Transfer wins."
+    },
+    {
+      "ext_id": "codex-TX-17",
+      "slice": "TX",
+      "assistant": "codex",
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 398,
+      "line_end": 400,
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C18"
+      ],
+      "title": "Polling configuration can exceed the promised confirmation window",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-TX-025",
+      "verification_note": "reconciliation.ts:398-400 re-read: sleeps the whole pollMs and is not bounded by the remaining window. Needs an operator setting far from default; thresholds TH-TX-01 and TH-TX-02 exist."
+    },
+    {
+      "ext_id": "codex-DB-01",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/riskManager.ts",
+      "line_start": 28,
+      "line_end": 32,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C18"
+      ],
+      "title": "Malformed numeric settings silently disable risk limits",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-001",
+      "dedup_reason": "Same defect, same lines (riskManager.ts:26-36)."
+    },
+    {
+      "ext_id": "codex-DB-02",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 420,
+      "line_end": 421,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Still-held failed exits disappear from risk accounting",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-003",
+      "dedup_reason": "Same defect, same lines (db.ts:420-438)."
+    },
+    {
+      "ext_id": "codex-DB-03",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/riskManager.ts",
+      "line_start": 139,
+      "line_end": 152,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C15"
+      ],
+      "title": "Risk approval reserves no capacity for an in-flight buy",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-BUY-010",
+      "dedup_reason": "Same defect: risk limits checked with no reservation; card BUY-03."
+    },
+    {
+      "ext_id": "codex-DB-04",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/chainRegistry.ts",
+      "line_start": 669,
+      "line_end": 669,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C18"
+      ],
+      "title": "A negative gas buffer defeats both wallet funding floors",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-DB-020",
+      "verification_note": "chainRegistry.ts:669, preflight.ts:201-202 and :433-435 re-read; ethers parseEther(\"-0.1\") run locally returns a negative value, so the floor is reduced."
+    },
+    {
+      "ext_id": "codex-DB-05",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/preflight.ts",
+      "line_start": 289,
+      "line_end": 294,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C18"
+      ],
+      "title": "Gas buffer multipliers below one underfund the promised exit",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-DB-020",
+      "verification_note": "preflight.ts:289-304 re-read: any finite positive value is accepted, including below 1. Same settings-range defect as the gas-buffer entry."
+    },
+    {
+      "ext_id": "codex-DB-06",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/config.ts",
+      "line_start": 300,
+      "line_end": 302,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C18"
+      ],
+      "title": "Exit settings can export unusable stop percentages",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-EXIT-016",
+      "dedup_reason": "Same defect (config.ts:290-302, consumed in the exit engine)."
+    },
+    {
+      "ext_id": "codex-DB-07",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 100,
+      "line_end": 102,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C13"
+      ],
+      "title": "Interrupted schema migrations can prevent every subsequent restart",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-012",
+      "dedup_reason": "Same defect, same lines (db.ts:83-107, :232)."
+    },
+    {
+      "ext_id": "codex-DB-08",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 20,
+      "line_end": 22,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C13"
+      ],
+      "title": "Acknowledged position writes are not durable across host failure",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-DB-021",
+      "verification_note": "db.ts:20-22 re-read: WAL with synchronous=NORMAL. Durability of the latest commits is not guaranteed on power loss or OS crash, and no critical write forces it. The money effect needs that timing. The register had the row-ordering window (AUD-DB-004), not durability."
+    },
+    {
+      "ext_id": "codex-DB-09",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 282,
+      "line_end": 285,
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C13"
+      ],
+      "title": "Failed legacy-state migration continues with an empty position database",
+      "cited_lines_re_read_at_base": true,
+      "new_id": "AUD-DB-022",
+      "verification_note": "db.ts:282-285 re-read: any JSON or import error is logged and startup continues. Legacy path only; a .bak exists already per AUD-DB-019."
+    },
+    {
+      "ext_id": "codex-DB-10",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 259,
+      "line_end": 260,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [],
+      "title": "Imported live buys count as zero deployed capital",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-019",
+      "dedup_reason": "Same import path and lines (db.ts:258-277); adds that its rows have NULL amount_in and therefore count as zero exposure."
+    },
+    {
+      "ext_id": "codex-DB-11",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/notifier.ts",
+      "line_start": 49,
+      "line_end": 50,
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C17"
+      ],
+      "title": "Telegram request failures disclose the bot token in logs",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-009",
+      "dedup_reason": "Same defect, same lines (notifier.ts:10, :43-51)."
+    },
+    {
+      "ext_id": "codex-DB-12",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/utils/db.ts",
+      "line_start": 443,
+      "line_end": 449,
+      "severity": "S2",
+      "capital_impact": "none",
+      "classes": [],
+      "title": "Daily loss subtracts the entire buy cost for every partial sale",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-013",
+      "dedup_reason": "Same defect, same lines (db.ts:441-459)."
+    },
+    {
+      "ext_id": "codex-DB-13",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/chainRegistry.ts",
+      "line_start": 675,
+      "line_end": 676,
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "classes": [
+        "C18"
+      ],
+      "title": "Infinity passes configuration checks and disables RPC freshness protection",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-017",
+      "dedup_reason": "Same defect, same lines (chainRegistry.ts:675-676, preflight.ts:526-528)."
+    },
+    {
+      "ext_id": "codex-DB-14",
+      "slice": "DB",
+      "assistant": "codex",
+      "file": "src/config.ts",
+      "line_start": 16,
+      "line_end": 16,
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "classes": [
+        "C18"
+      ],
+      "title": "RPC validation contradicts the supported per-chain URL configuration",
+      "cited_lines_re_read_at_base": true,
+      "matched_id": "AUD-DB-011",
+      "dedup_reason": "Same defect, same lines (config.ts:16, chainRegistry.ts:934-938, preflight.ts:762-780)."
+    }
+  ],
+  "cards_added": [
+    {
+      "id": "BUY-09",
+      "new": true,
+      "findings": [
+        "AUD-BUY-030"
+      ]
+    },
+    {
+      "id": "DB-07",
+      "new": true,
+      "findings": [
+        "AUD-DB-021"
+      ]
+    },
+    {
+      "id": "BUY-05",
+      "new": false,
+      "findings": [
+        "AUD-BUY-027"
+      ]
+    },
+    {
+      "id": "BUY-05",
+      "new": false,
+      "findings": [
+        "AUD-BUY-028"
+      ]
+    },
+    {
+      "id": "EXIT-03",
+      "new": false,
+      "findings": [
+        "AUD-BUY-029"
+      ]
+    },
+    {
+      "id": "BUY-05",
+      "new": false,
+      "findings": [
+        "AUD-BUY-032"
+      ]
+    },
+    {
+      "id": "EXIT-12",
+      "new": false,
+      "findings": [
+        "AUD-EXIT-022"
+      ]
+    },
+    {
+      "id": "EXIT-08",
+      "new": false,
+      "findings": [
+        "AUD-EXIT-023"
+      ]
+    },
+    {
+      "id": "EXIT-03",
+      "new": false,
+      "findings": [
+        "AUD-EXIT-024"
+      ]
+    },
+    {
+      "id": "EXIT-08",
+      "new": false,
+      "findings": [
+        "AUD-EXIT-025"
+      ]
+    },
+    {
+      "id": "EXIT-09",
+      "new": false,
+      "findings": [
+        "AUD-EXIT-026"
+      ]
+    },
+    {
+      "id": "TX-02",
+      "new": false,
+      "findings": [
+        "AUD-TX-018"
+      ]
+    },
+    {
+      "id": "TX-02",
+      "new": false,
+      "findings": [
+        "AUD-TX-019"
+      ]
+    },
+    {
+      "id": "TX-01",
+      "new": false,
+      "findings": [
+        "AUD-TX-020"
+      ]
+    },
+    {
+      "id": "TX-02",
+      "new": false,
+      "findings": [
+        "AUD-TX-021"
+      ]
+    },
+    {
+      "id": "ANTIRUG-02",
+      "new": false,
+      "findings": [
+        "AUD-ANTIRUG-018"
+      ]
+    },
+    {
+      "id": "ANTIRUG-03",
+      "new": false,
+      "findings": [
+        "AUD-ANTIRUG-019"
+      ]
+    },
+    {
+      "id": "ANTIRUG-03",
+      "new": false,
+      "findings": [
+        "AUD-ANTIRUG-020"
+      ]
+    },
+    {
+      "id": "ANTIRUG-01",
+      "new": false,
+      "findings": [
+        "AUD-ANTIRUG-021"
+      ]
+    },
+    {
+      "id": "DB-06",
+      "new": false,
+      "findings": [
+        "AUD-DB-020"
+      ]
+    },
+    {
+      "id": "DB-03",
+      "new": false,
+      "findings": [
+        "AUD-DB-022"
+      ]
+    }
+  ],
   "thresholds_added": [],
   "containment_ruling": {
     "operator_words": "codex a, agy c",
@@ -269,5 +2111,415 @@
       "why": "operator ruling: codex a, agy c",
       "sent": "no source code"
     }
-  ]
+  ],
+  "thresholds_note": "No new money-or-timing number. Numbers touched by new findings are already recorded: TH-BUY-09, TH-BUY-24, TH-EXIT-10, TH-EXIT-13, TH-TX-01, TH-TX-02, TH-ANTIRUG-06, TH-EXIT-26 and the per-chain gas buffer row. A number proposed for a new gate (locked-share minimum, total fee ceiling) belongs to its card and is not in the code yet.",
+  "severity_disagreements": [
+    {
+      "ext_id": "codex-BUY-06",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-BUY-029"
+    },
+    {
+      "ext_id": "codex-BUY-12",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-BUY-015"
+    },
+    {
+      "ext_id": "codex-BUY-13",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-BUY-015"
+    },
+    {
+      "ext_id": "codex-BUY-17",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-BUY-012"
+    },
+    {
+      "ext_id": "codex-BUY-21",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-BUY-017"
+    },
+    {
+      "ext_id": "codex-BUY-23",
+      "codex": "S2",
+      "register": "S4",
+      "id": "AUD-BUY-031"
+    },
+    {
+      "ext_id": "codex-BUY-25",
+      "codex": "S2",
+      "register": "S4",
+      "id": "AUD-BUY-032"
+    },
+    {
+      "ext_id": "codex-EXIT-02",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-017"
+    },
+    {
+      "ext_id": "codex-EXIT-05",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-EXIT-022"
+    },
+    {
+      "ext_id": "codex-EXIT-06",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-016"
+    },
+    {
+      "ext_id": "codex-EXIT-10",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-004"
+    },
+    {
+      "ext_id": "codex-EXIT-11",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-EXIT-020"
+    },
+    {
+      "ext_id": "codex-EXIT-12",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-EXIT-023"
+    },
+    {
+      "ext_id": "codex-EXIT-13",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-EXIT-024"
+    },
+    {
+      "ext_id": "codex-EXIT-14",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-011"
+    },
+    {
+      "ext_id": "codex-EXIT-15",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-025"
+    },
+    {
+      "ext_id": "codex-EXIT-16",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-006"
+    },
+    {
+      "ext_id": "codex-EXIT-17",
+      "codex": "S2",
+      "register": "S4",
+      "id": "AUD-EXIT-026"
+    },
+    {
+      "ext_id": "codex-EXIT-18",
+      "codex": "S2",
+      "register": "S4",
+      "id": "AUD-EXIT-012"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-01",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-006"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-04",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-018"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-05",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-007"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-06",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-007"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-09",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-012"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-10",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-019"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-11",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-020"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-15",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-008"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-16",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-022"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-17",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-013"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-18",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-ANTIRUG-010"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-19",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-021"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-20",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-016"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-21",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-013"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-22",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-014"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-23",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-014"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-24",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-014"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-25",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-014"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-26",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-ANTIRUG-014"
+    },
+    {
+      "ext_id": "codex-ANTIRUG-27",
+      "codex": "S3",
+      "register": "S4",
+      "id": "AUD-ANTIRUG-023"
+    },
+    {
+      "ext_id": "codex-TX-01",
+      "codex": "S1",
+      "register": "S4",
+      "id": "AUD-TX-022"
+    },
+    {
+      "ext_id": "codex-TX-02",
+      "codex": "S1",
+      "register": "S4",
+      "id": "AUD-TX-023"
+    },
+    {
+      "ext_id": "codex-TX-07",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-TX-018"
+    },
+    {
+      "ext_id": "codex-TX-08",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-TX-020"
+    },
+    {
+      "ext_id": "codex-TX-09",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-TX-012"
+    },
+    {
+      "ext_id": "codex-TX-10",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-TX-010"
+    },
+    {
+      "ext_id": "codex-TX-12",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-TX-021"
+    },
+    {
+      "ext_id": "codex-TX-13",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-TX-019"
+    },
+    {
+      "ext_id": "codex-TX-14",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-TX-014"
+    },
+    {
+      "ext_id": "codex-TX-15",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-TX-024"
+    },
+    {
+      "ext_id": "codex-TX-16",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-TX-015"
+    },
+    {
+      "ext_id": "codex-TX-17",
+      "codex": "S2",
+      "register": "S4",
+      "id": "AUD-TX-025"
+    },
+    {
+      "ext_id": "codex-DB-04",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-DB-020"
+    },
+    {
+      "ext_id": "codex-DB-05",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-DB-020"
+    },
+    {
+      "ext_id": "codex-DB-06",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-EXIT-016"
+    },
+    {
+      "ext_id": "codex-DB-07",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-DB-012"
+    },
+    {
+      "ext_id": "codex-DB-08",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-DB-021"
+    },
+    {
+      "ext_id": "codex-DB-09",
+      "codex": "S1",
+      "register": "S4",
+      "id": "AUD-DB-022"
+    },
+    {
+      "ext_id": "codex-DB-10",
+      "codex": "S1",
+      "register": "S3",
+      "id": "AUD-DB-019"
+    },
+    {
+      "ext_id": "codex-DB-11",
+      "codex": "S1",
+      "register": "S2",
+      "id": "AUD-DB-009"
+    },
+    {
+      "ext_id": "codex-DB-13",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-DB-017"
+    },
+    {
+      "ext_id": "codex-DB-14",
+      "codex": "S2",
+      "register": "S3",
+      "id": "AUD-DB-011"
+    }
+  ],
+  "merge_summary": {
+    "external_total": 101,
+    "matched_existing": 72,
+    "mapped_to_new": 29,
+    "new_findings": [
+      "AUD-BUY-027",
+      "AUD-BUY-028",
+      "AUD-BUY-029",
+      "AUD-BUY-030",
+      "AUD-BUY-031",
+      "AUD-BUY-032",
+      "AUD-EXIT-022",
+      "AUD-EXIT-023",
+      "AUD-EXIT-024",
+      "AUD-EXIT-025",
+      "AUD-EXIT-026",
+      "AUD-TX-018",
+      "AUD-TX-019",
+      "AUD-TX-020",
+      "AUD-TX-021",
+      "AUD-TX-022",
+      "AUD-TX-023",
+      "AUD-TX-024",
+      "AUD-TX-025",
+      "AUD-ANTIRUG-018",
+      "AUD-ANTIRUG-019",
+      "AUD-ANTIRUG-020",
+      "AUD-ANTIRUG-021",
+      "AUD-ANTIRUG-022",
+      "AUD-ANTIRUG-023",
+      "AUD-DB-020",
+      "AUD-DB-021",
+      "AUD-DB-022"
+    ],
+    "new_by_severity": {
+      "S1": 3,
+      "S2": 6,
+      "S4": 8,
+      "S3": 11
+    }
+  }
 }

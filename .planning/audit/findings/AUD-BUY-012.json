@@ -47,6 +47,11 @@
       "type": "command",
       "ref": "git grep -n -F \"checkHoneypot(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
       "note": "only the definition at tokenSafety.ts:19: no caller"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:38-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Legacy honeypot fallback can write the wallet private key to logs"
     }
   ],
   "sibling_sites_checked": "All key references in the slice: only tokenSafety.ts:41. Signers elsewhere in the slice come from ctx.wallet (getWallet, src/utils/provider.ts:59, DB/infra slice). The other legacy single-chain helpers are dead too (AUD-BUY-026). Test files only mock checkHoneypot (vi.fn), they do not call it.",
@@ -69,7 +74,8 @@
   "od_ref": null,
   "recommendation": "Delete checkHoneypot (no caller, so no behaviour change), and add a static check that CONFIG.walletPrivateKey is referenced only where the Wallet is constructed. Phase 29 hygiene, or earlier if Phase 24 touches tokenSafety.ts.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

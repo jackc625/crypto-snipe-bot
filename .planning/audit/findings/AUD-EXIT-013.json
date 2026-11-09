@@ -12,7 +12,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-10",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -61,6 +62,11 @@
       "type": "code",
       "ref": "src/exitEngine.ts:723-732@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "a failed dashboard sell re-arms the monitor with the dex it was given, so the wrong dex then sticks for that process"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1943-1948@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restart monitoring selects the first DEX instead of the trade's DEX"
     }
   ],
   "sibling_sites_checked": "Every place a dex is chosen for an existing position: bot.ts resume (:1940-1956, first of type), controls.ts findDex (:33-40, first of type), exitEngine.ts re-arm (:731, passes through whatever dex the failed exit had), the in-process monitor started at buy time (correct dex). If the wrong router has no pair for the token the quote reverts (null every tick, no exit at all, not even urgency, AUD-EXIT-003) and the sell reverts. If it has a different pool, exits run on that pool. Sibling noted for the BUY/DB slices: the aerodrome router (chainRegistry.ts:315-318) is typed v2 but its router takes Route[] rather than address[] paths, so the V2 ROUTER_ABI calls cannot match it (candidate, not verified against its ABI here).",

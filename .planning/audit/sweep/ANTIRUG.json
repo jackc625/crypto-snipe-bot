@@ -56,15 +56,18 @@
         "AUD-ANTIRUG-005",
         "AUD-ANTIRUG-007",
         "AUD-ANTIRUG-008",
-        "AUD-ANTIRUG-016"
+        "AUD-ANTIRUG-016",
+        "AUD-ANTIRUG-018",
+        "AUD-ANTIRUG-022"
       ],
-      "search": "grep -nE \"wsProvider|WebSocketProvider|removeWsProvider|on\\('close'|ping|pong|backfill|last_seen|getLogs\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); plus git show 23a6461 of src/bot.ts (:1524-1618, :1808-1852, :1989-2145), src/api/routes/chains.ts (:121-227) and src/utils/provider.ts; ethers@6.16.0 provider-websocket.js and abstract-provider.js removeAllListeners; ws@8.17.1 websocket.js error paths; loopback reconnect repro (command evidence on AUD-ANTIRUG-002)."
+      "search": "grep -nE \"wsProvider|WebSocketProvider|removeWsProvider|on\\('close'|ping|pong|backfill|last_seen|getLogs\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); plus git show 23a6461 of src/bot.ts (:1524-1618, :1808-1852, :1989-2145), src/api/routes/chains.ts (:121-227) and src/utils/provider.ts; ethers@6.16.0 provider-websocket.js and abstract-provider.js removeAllListeners; ws@8.17.1 websocket.js error paths; loopback reconnect repro (command evidence on AUD-ANTIRUG-002). | 22-27 merge: AUD-ANTIRUG-018 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-ANTIRUG-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C11": {
       "result": [
-        "AUD-ANTIRUG-002"
+        "AUD-ANTIRUG-002",
+        "AUD-ANTIRUG-022"
       ],
-      "search": "grep -nE \"void |\\.catch\\(|await sendCtxAlert|process.exit|uncaught\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); git grep -n -e uncaughtException -e onerror -e \"on('error'\" over src at the base (none). void dispatchEvent (:652) and void handleWsClose (:711) were followed: dispatchEvent catches per position; handleWsClose catches around the rebuild, and sendCtxAlert swallows its own errors (notifier.ts:79-87). Uncaught: the ws error event (AUD-ANTIRUG-002). Boot-time rejections from resumeAntiRugMonitoring (bot.ts:2120, :2144 not in try) reach the entry point, which is AUD-BUY-005."
+      "search": "grep -nE \"void |\\.catch\\(|await sendCtxAlert|process.exit|uncaught\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); git grep -n -e uncaughtException -e onerror -e \"on('error'\" over src at the base (none). void dispatchEvent (:652) and void handleWsClose (:711) were followed: dispatchEvent catches per position; handleWsClose catches around the rebuild, and sendCtxAlert swallows its own errors (notifier.ts:79-87). Uncaught: the ws error event (AUD-ANTIRUG-002). Boot-time rejections from resumeAntiRugMonitoring (bot.ts:2120, :2144 not in try) reach the entry point, which is AUD-BUY-005. | 22-27 merge: AUD-ANTIRUG-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C12": {
       "result": [

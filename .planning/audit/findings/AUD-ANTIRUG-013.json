@@ -10,7 +10,8 @@
   "escalation_ref": null,
   "od_ref": null,
   "reported_by": [
-    "claude (22-19 executor)"
+    "claude (22-19 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -59,6 +60,16 @@
       "type": "command",
       "ref": "node_modules/ethers/lib.commonjs/providers/subscriber-polling.js:53-83 (ethers@6.16.0)",
       "note": "block events come from a 4 s poll and are emitted once per block number, so the gate fires at the first poll at or after confirmBlock"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1845-1857@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Confirmation delay never verifies that the triggering event survived a reorg"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/lpBaseline.ts:110-119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Baseline reads are not pinned to their recorded snapshot block"
     }
   ],
   "sibling_sites_checked": "All block-number uses in the slice: detector.ts:1013, :1234, :1263, :1845, :2107, lpBaseline.ts:110, raceTelemetry.ts:158 (dead code). A reorged-out removal is self-correcting in practice because the gate re-reads live state, which no longer shows the removal.",

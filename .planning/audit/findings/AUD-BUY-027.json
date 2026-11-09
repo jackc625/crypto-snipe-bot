@@ -1,0 +1,69 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-015",
+    "AUD-BUY-016"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-03",
+  "od_ref": "BUY-05",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-027",
+  "title": "Factory events are not filtered to wrapped-native pairs: for an A/B pair the safety checks read the A/B pair and treat B reserve as native while the buy goes through WETH to A",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C03"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/tokenSafety.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:878-879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "target is token1 only if token0 is WETH, otherwise token0, with no check that the other token is WETH"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1582-1584@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "PairCreated listener forwards every pair"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:413-417@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reserve1 is taken as the WETH reserve whenever token0 is not WETH, compared with 1 native"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1042@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the buy path is WETH to target, which is not the pair that was checked"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 878,879p / 411,420p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read at the base SHA; no filter on the pair exists anywhere between listener and submit."
+    }
+  ],
+  "sibling_sites_checked": "V3 selection (bot.ts:1207) and the V3 listener (:1539) have the same shape; the legacy liquidity check (tokenSafety.ts:176) makes the same reserve assumption. bot.ts:1008 repeats it for the alert.",
+  "status": "confirmed",
+  "severity_rationale": "S1: a factory event for a pair with no wrapped-native side is routine. The lock and liquidity checks then describe a different pair from the one bought through, so the entry limits do not apply to the actual trade. Graded EXPOSURE because the buy reverts where no WETH pair exists and costs gas, and proceeds only where one does.",
+  "recommendation": "Require that exactly one side of the pair is the chain wrapped-native token before any check runs, and drop the event otherwise. Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-10"
+  ]
+}

@@ -55,6 +55,11 @@
       "type": "command",
       "ref": "node -e \"const j=require('./.planning/baselines/safe01-offmachine.json');console.log(JSON.stringify({files_hit:j.scan.files_hit,exact_value_check:j.exact_value_check}))\" (Node 22.16.0; baseline file last changed in 29cb750)",
       "note": "Context added 2026-11-07 at the 22-20 Task 3 close-out, supplied by the execute-phase orchestrator (not the operator, and not a check this executor ran on any log): the orchestrator listed file names only and found that the only persisted log files on disk are data/bot-capture-21-07.log, data/capture-21-07.log and data/capture-21-07b.log. The executor re-read .planning/baselines/safe01-offmachine.json: scan.files_hit names exactly those three files inside the backup archive, and the operator's D-22 exact-value check (22-03, run by the operator against the real .env with scripts/nac01-exact-value-check.ts, exit 0, result clean) returned \"no\" in both the backup folder and the archive for BLOXROUTE_AUTH_HEADER, ALCHEMY_URL, ETH_RPC_URL, BSC_RPC_URL, BASE_RPC_URL, ARB_RPC_URL, SEPOLIA_RPC_URL, ETH_FORK_RPC_URL, ETH_WS_URL and BSC_WS_URL; ARB_WS_URL and BASE_WS_URL are \"unset\" (present but empty in the .env), so they hold no value to leak; the archive is byte-identical to the Google Drive copy (bound_to_downloaded_bytes). So the backup copies of the persisted logs contain none of those exact values. Limits: it is an exact-string match of each whole value, made on the backup copies; terminal-only output that was never written to a file cannot be checked. No file under data/ was opened by the executor."
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:186-188@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Raw Axios errors can expose relay credentials and signed transactions"
     }
   ],
   "sibling_sites_checked": "Every log call with an err field in the slice: bloxroute.ts:66, :140, :187; flashbots.ts:136, :247, :362; passthrough.ts:124, :147. The bloXroute ones carry the auth header (axios config); the ethers ones carry the RPC URL on HTTP-status errors (SERVER_ERROR). The Flashbots auth key itself is never logged (only its address, flashbots.ts:133, and per-body signatures). The wallet key is not logged anywhere in the slice; its presence on module-level CONFIG (provider.ts:59) is section C I1, owned by the config slice.",
@@ -72,7 +77,8 @@
   "od_ref": "TX-04",
   "recommendation": "Phase 29 (card TX-04 for the log policy): add pino redact paths (err.config.headers.Authorization, err.config.data, err.request, err.info.requestUrl and similar) or log err.message/code only at these sites; decide on card TX-04 whether the operator should check existing log files and rotate the bloXroute header and RPC keys.",
   "reported_by": [
-    "claude (22-20 executor)"
+    "claude (22-20 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"

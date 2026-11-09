@@ -66,9 +66,11 @@
         "AUD-DB-015",
         "AUD-DB-003",
         "AUD-DB-019",
-        "AUD-DB-007"
+        "AUD-DB-007",
+        "AUD-DB-021",
+        "AUD-DB-022"
       ],
-      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for transaction(|db.exec|pragma|synchronous|journal_mode|user_version|INSERT|UPDATE|DELETE|prepare( (emphasis): synchronous=NORMAL under WAL and no buy intent row (AUD-DB-004, RC-14), unconditional user_version write and writes on every import (AUD-DB-006, RC-25), migrations 1-5 outside transactions (AUD-DB-012), no wallet scoping or DB lock (AUD-DB-015), risk queries keyed on trades.status instead of the exit lifecycle (AUD-DB-003), cwd-relative state (AUD-DB-007, AUD-DB-019); markExitFailedHeld + updateTradeStatus as two statements without a transaction live in exitEngine.ts (EXIT slice); buy row then exit_state then lp_baseline in bot.ts is SC-06 (BUY slice)"
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for transaction(|db.exec|pragma|synchronous|journal_mode|user_version|INSERT|UPDATE|DELETE|prepare( (emphasis): synchronous=NORMAL under WAL and no buy intent row (AUD-DB-004, RC-14), unconditional user_version write and writes on every import (AUD-DB-006, RC-25), migrations 1-5 outside transactions (AUD-DB-012), no wallet scoping or DB lock (AUD-DB-015), risk queries keyed on trades.status instead of the exit lifecycle (AUD-DB-003), cwd-relative state (AUD-DB-007, AUD-DB-019); markExitFailedHeld + updateTradeStatus as two statements without a transaction live in exitEngine.ts (EXIT slice); buy row then exit_state then lp_baseline in bot.ts is SC-06 (BUY slice) | 22-27 merge: AUD-DB-021 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-DB-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C14": {
       "result": [
@@ -104,9 +106,10 @@
         "AUD-DB-014",
         "AUD-DB-016",
         "AUD-DB-017",
-        "AUD-DB-019"
+        "AUD-DB-019",
+        "AUD-DB-020"
       ],
-      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for process.env (every static and template read, listed in thresholds/DB.json discovery) (emphasis): NaN fail-open risk parsers classified per site (AUD-DB-001, RC-06), LOG_LEVEL never applied (AUD-DB-005, RC-23), cwd-relative DB_PATH incl. the shipped template value (AUD-DB-007, SC-21), ALCHEMY_URL / ETH_RPC_URL contradiction and duplicate config (AUD-DB-011, SC-14), max capital documented but not enforced (AUD-DB-014), validateEnvVars presence-only and out of sync (AUD-DB-016), preflight acceptance gaps (AUD-DB-017), cwd-relative JSON import (AUD-DB-019)"
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for process.env (every static and template read, listed in thresholds/DB.json discovery) (emphasis): NaN fail-open risk parsers classified per site (AUD-DB-001, RC-06), LOG_LEVEL never applied (AUD-DB-005, RC-23), cwd-relative DB_PATH incl. the shipped template value (AUD-DB-007, SC-21), ALCHEMY_URL / ETH_RPC_URL contradiction and duplicate config (AUD-DB-011, SC-14), max capital documented but not enforced (AUD-DB-014), validateEnvVars presence-only and out of sync (AUD-DB-016), preflight acceptance gaps (AUD-DB-017), cwd-relative JSON import (AUD-DB-019) | 22-27 merge: AUD-DB-020 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C19": {
       "result": "checked, none",

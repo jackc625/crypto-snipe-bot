@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-013"
+  ],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-023",
+  "title": "Strategies add EIP-1559 fields without removing an incoming gasPrice or legacy type",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/utils/mevStrategies/passthrough.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:86-90@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "spreads the incoming request"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:104-105@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "adds EIP-1559 fees"
+    },
+    {
+      "type": "command",
+      "ref": "grep gasPrice across exitEngine.ts and bot.ts in the base snapshot (22-27 merge)",
+      "note": "Claude verification: latent; no caller passes gasPrice."
+    }
+  ],
+  "sibling_sites_checked": "flashbots.ts:210 and bloxroute.ts:117 mix fee fields the same way.",
+  "status": "candidate",
+  "severity_rationale": "S4: unreachable today because no builder sets gasPrice.",
+  "recommendation": "Strip incompatible fee fields in the strategy. No behaviour change for current callers. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-02"
+  ]
+}

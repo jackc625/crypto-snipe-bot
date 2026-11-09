@@ -30,7 +30,8 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract); no capital effect.",
   "behavior_impact": "Decides whether loading the database can import an old JSON state file.",
   "findings": [
-    "AUD-DB-019"
+    "AUD-DB-019",
+    "AUD-DB-022"
   ],
   "needed_by": "Phase 29 discussion (S2-S4 fixes)"
 }

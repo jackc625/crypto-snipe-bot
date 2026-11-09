@@ -1,0 +1,21 @@
+{
+  "id": "ESC-BUY-03",
+  "date": "2026-11-09",
+  "tier": "area-batch",
+  "tags": [
+    "capital",
+    "external-second-opinion"
+  ],
+  "items": [
+    "AUD-BUY-027",
+    "AUD-BUY-028",
+    "AUD-BUY-030"
+  ],
+  "resolved_items": [],
+  "summary": "New S1 entries from the 22-27 independent second opinion (codex, gpt-6.1-sol, run in a locked-down container with no file or shell tools), presented together once the merge was complete. Three entries, all in the BUY area. AUD-BUY-027: new-pair events are not limited to pairs with the wrapped-native token, so the checks can read one pair and the buy use another. AUD-BUY-028: the liquidity-lock gate passes on any active lock, however small a share of the LP tokens it covers. AUD-BUY-030 (candidate, not reproduced): the deliberate public buy is not pinned to the private attempt nonce, so a late private landing can make it a second buy.",
+  "presented_at": "2026-11-09 session: the 22-27 Task 3 area-batch blocking checkpoint (gate blocking-human), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": null,
+  "acknowledgement_evidence": "Awaiting the operator reply at the 22-27 Task 3 area-batch blocking checkpoint; the continuation executor records the verbatim reply here and in operator_response.",
+  "ruling": "none",
+  "phase_continued": true
+}

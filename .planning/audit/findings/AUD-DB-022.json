@@ -1,0 +1,51 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-019"
+  ],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": "DB-03",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-DB-022",
+  "title": "A failed import of the old state file is only logged, and startup continues with an empty position table",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:282-285@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "catch logs a warning and continues"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 280,286p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Legacy path; a .bak of the file exists per AUD-DB-019."
+    }
+  ],
+  "sibling_sites_checked": "Only the migrateJsonState path (AUD-DB-019).",
+  "status": "candidate",
+  "severity_rationale": "S4: legacy path that card DB-03 proposes to retire.",
+  "recommendation": "Remove with the import, per card DB-03. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-DB-09"
+  ]
+}

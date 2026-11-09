@@ -12,7 +12,8 @@
   "escalation_ref": "ESC-EXIT-01",
   "od_ref": "EXIT-01",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -63,6 +64,11 @@
       "type": "code",
       "ref": "src/bot.ts:1482-1483@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "V3 snipe path: same call, same silent return"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1870-1873@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): One initial quote failure leaves a purchased position without monitoring"
     }
   ],
   "sibling_sites_checked": "All three monitor entry points: startExitMonitor (:1857-1946, returns on null at :1870-1873), resumeExitMonitor no-row branch (:1978-1984, same), resumeExitMonitor with a row (:1968-1977, no quote needed, starts). Callers at the base SHA: bot.ts:422 (armPositionMonitoring, V2 snipe and deliberate buy), bot.ts:1483 (V3 snipe), bot.ts:1948/:1955 (restart resume), exitEngine.ts:731 (re-arm after a failed exit; has a row, so it starts). The parseEther(buyAmountNative) at :1866 throws instead of returning for an invalid amount, which rejects armPositionMonitoring before the anti-rug registration (BUY slice, AUD-BUY-002 family).",

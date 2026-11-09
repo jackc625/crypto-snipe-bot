@@ -1,0 +1,55 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-006"
+  ],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": "ANTIRUG-01",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-021",
+  "title": "LP Transfer logs use their own to address as the withdrawal destination, so an allowlisted withdrawal can still trip the exit",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1527-1531@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Transfer destination is its own to address"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2251-2253@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Burn and Transfer both evaluated as a V2 multi-signal"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 1521,1533p and 2247,2256p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced."
+    }
+  ],
+  "sibling_sites_checked": "AUD-ANTIRUG-003 records that each log counts separately. An LP lock to a locker does not reduce supply, so signal 1 does not trip on it (AUD-ANTIRUG-006).",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: a false positive selling a position that did not need to exit, and only for allowlisted withdrawals.",
+  "recommendation": "Take the allowlist destination from the Burn of the same removal; decide in card ANTIRUG-01. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-19"
+  ]
+}

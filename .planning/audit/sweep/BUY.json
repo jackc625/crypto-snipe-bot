@@ -5,9 +5,10 @@
   "cells": {
     "C01": {
       "result": [
-        "AUD-BUY-003"
+        "AUD-BUY-003",
+        "AUD-BUY-031"
       ],
-      "search": "grep -rnE \"BigInt\\(|Number\\(|parseFloat|parseInt|toFixed\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read every money-adjacent hit (bot.ts:1053/:1374 BigInt(slippage); checkerContract.ts:134-136 Number() of tax bps; unicrypt.ts:41, tokenSafety.ts:93/:249/:499 float ratios of bigint LP/limit amounts)"
+      "search": "grep -rnE \"BigInt\\(|Number\\(|parseFloat|parseInt|toFixed\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read every money-adjacent hit (bot.ts:1053/:1374 BigInt(slippage); checkerContract.ts:134-136 Number() of tax bps; unicrypt.ts:41, tokenSafety.ts:93/:249/:499 float ratios of bigint LP/limit amounts) | 22-27 merge: AUD-BUY-031 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C02": {
       "result": [
@@ -16,8 +17,10 @@
       "search": "grep -rnE \"\\|\\| \" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); classified each numeric or env default (bot.ts:529/:703/:1050/:1373 CONFIG.slippagePercent || 5; telegramListener.ts:54/:57 allowlist || ''); env reads in chainRegistry.ts:663-696 (|| defaults) read as definition sites"
     },
     "C03": {
-      "result": "checked, none",
-      "search": "grep -rn \"decimals\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:988-997/:1322-1331 (display only, default 18), tokenSafety.ts:124/:358 (6..18 bound, bigint compared with number is exact); no decimals-scaled money math in the slice"
+      "result": [
+        "AUD-BUY-027"
+      ],
+      "search": "grep -rn \"decimals\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); bot.ts:988-997/:1322-1331 (display only, default 18), tokenSafety.ts:124/:358 (6..18 bound, bigint compared with number is exact); no decimals-scaled money math in the slice | 22-27 merge: AUD-BUY-027 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C04": {
       "result": [
@@ -42,9 +45,10 @@
         "AUD-BUY-002",
         "AUD-BUY-004",
         "AUD-BUY-007",
-        "AUD-BUY-025"
+        "AUD-BUY-025",
+        "AUD-BUY-030"
       ],
-      "search": "grep -rnE \"nonce|withNonceLock|getTransactionCount\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read submitBuyTx (bot.ts:263-268), the deliberate guard (:576-662), the public leg lock (:746-756), and the reconcile loop it relies on (reconciliation.ts:454-628, TX slice)"
+      "search": "grep -rnE \"nonce|withNonceLock|getTransactionCount\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files); read submitBuyTx (bot.ts:263-268), the deliberate guard (:576-662), the public leg lock (:746-756), and the reconcile loop it relies on (reconciliation.ts:454-628, TX slice) | 22-27 merge: AUD-BUY-030 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C08": {
       "result": [
@@ -100,15 +104,17 @@
       "result": [
         "AUD-BUY-004",
         "AUD-BUY-010",
-        "AUD-BUY-020"
+        "AUD-BUY-020",
+        "AUD-BUY-030"
       ],
-      "search": "traced every check-then-act pair in the buy handlers: isTokenSniped (bot.ts:881/:1211) vs insertTrade (:1127/:1451); canSnipe (:909/:1248) vs recordSnipe (:1125/:1449) against riskManager.ts:75-148; getTradeIdForPendingToken (db.ts:549-551); pause CP1/CP2 (documented TOCTOU, kill-switch, not a capital overspend)"
+      "search": "traced every check-then-act pair in the buy handlers: isTokenSniped (bot.ts:881/:1211) vs insertTrade (:1127/:1451); canSnipe (:909/:1248) vs recordSnipe (:1125/:1449) against riskManager.ts:75-148; getTradeIdForPendingToken (db.ts:549-551); pause CP1/CP2 (documented TOCTOU, kill-switch, not a capital overspend) | 22-27 merge: AUD-BUY-030 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C16": {
       "result": [
-        "AUD-BUY-002"
+        "AUD-BUY-002",
+        "AUD-BUY-029"
       ],
-      "search": "grep -rnE \"maxFeePerGas|gasPrice|ceiling|maxPriorityFee|gasLimit\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (no hits: fee ceilings live in the TX slice); read the ceiling-hit throw (reconciliation.ts:606-614) for its effect on the buy catch"
+      "search": "grep -rnE \"maxFeePerGas|gasPrice|ceiling|maxPriorityFee|gasLimit\" over the slice snapshot at 23a64617 (slice-files.ts --snapshot BUY, 19 files) (no hits: fee ceilings live in the TX slice); read the ceiling-hit throw (reconciliation.ts:606-614) for its effect on the buy catch | 22-27 merge: AUD-BUY-029 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
     },
     "C17": {
       "result": [

@@ -1,0 +1,59 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-001",
+    "AUD-BUY-002"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-03",
+  "od_ref": "BUY-09",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-030",
+  "title": "The deliberate public buy is not pinned to the private attempt nonce, so a late private landing makes the public buy a second buy",
+  "severity": "S1",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C07",
+    "C15"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:635-636@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the guard reads the private nonce here, before later awaits"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-749@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the router call supplies no nonce, so ethers uses the next one"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 630,640p and 744,750p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced. The window depends on how long a not-landed private submission stays eligible (TX-05 discussion in AUD-BUY-002: Flashbots may target up to 8 future blocks against a 45 s confirmation window)."
+    }
+  ],
+  "sibling_sites_checked": "Only the deliberate buy path has this private-then-public shape on the buy side. The snipe path has no public fallback. The sell public fallback is AUD-EXIT-011.",
+  "status": "candidate",
+  "severity_rationale": "S1 candidate: the guard itself says a double buy is the unrecoverable harm, and it is a check-then-act gap. The window is narrow and the path is operator-run, so it stays candidate until Phase 23 tries to reproduce it.",
+  "recommendation": "Pin the public send to the private attempt nonce so it can only replace that attempt; decide in card BUY-09. Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-07"
+  ]
+}

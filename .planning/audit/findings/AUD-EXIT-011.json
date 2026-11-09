@@ -13,7 +13,8 @@
   "escalation_ref": null,
   "od_ref": "EXIT-09",
   "reported_by": [
-    "claude (22-18 executor)"
+    "claude (22-18 executor)",
+    "codex"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -52,6 +53,11 @@
       "type": "code",
       "ref": "src/exitEngine.ts:464-476@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "routine slippage 5%, anti-rug max(15, 10, routine)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:470@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A zero slippage setting silently becomes five percent"
     }
   ],
   "sibling_sites_checked": "Only one public sell exists (:508-564). The private legs have no floor at all (AUD-EXIT-001). After a revert the catch keeps the position monitored and re-arms the timer; the retry then runs as a routine exit (routine slippage, two private attempts first), because anti-rug fires again only on a new pool event (ANTIRUG slice).",

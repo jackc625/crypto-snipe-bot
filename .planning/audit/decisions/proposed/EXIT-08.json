@@ -26,7 +26,9 @@
   "findings": [
     "AUD-EXIT-010",
     "AUD-EXIT-017",
-    "AUD-EXIT-020"
+    "AUD-EXIT-020",
+    "AUD-EXIT-023",
+    "AUD-EXIT-025"
   ],
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
 }

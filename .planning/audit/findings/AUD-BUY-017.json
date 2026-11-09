@@ -26,6 +26,11 @@
       "type": "code",
       "ref": "src/bot.ts:162-176@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "then waits up to 30 s for a new Mint before dropping the opportunity"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:149-155@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): V3 liquidity waiting misses liquidity established before subscription"
     }
   ],
   "sibling_sites_checked": "The V2 alpha path (alphaDrop.ts:27-38) checks the pair exists and goes straight to the handler; it does not have this defect. The factory-event V3 path passes the real event block (bot.ts:1541, :1669).",
@@ -43,7 +48,8 @@
   "od_ref": "BUY-06",
   "recommendation": "For an alpha drop, check current pool liquidity instead of waiting for a new Mint, and choose the fee tier by depth. Behaviour change (more alpha buys), card BUY-06.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "codex"
   ],
   "found_date": "2026-11-06",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
