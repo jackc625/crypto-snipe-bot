@@ -8,7 +8,8 @@
 //
 // Usage:
 //   node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts \
-//       [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] -- <command> [args...]
+//       [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] \
+//       [--report <vitest json>] [--evidence-out <file>] -- <command> [args...]
 //   node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --self-test
 //
 // What it does:
@@ -35,7 +36,13 @@
 //      samples are reduced to the connections owned by a descendant of this process, and any whose
 //      remote address is not loopback fails the run. It covers the Vitest MAIN process, which is
 //      deliberately not railed (22-08). It is sampled, so it can miss a very short connection.
-//   8. Prints one verdict line naming the run id and the summary path.
+//   8. --report (plan 22-15): after the command, reads the Vitest JSON report and records its SHA-256
+//      and test totals. A report that is missing, unparseable, older than this run, or that shows
+//      failures for a command that exited 0 fails the run.
+//   9. --evidence-out (plan 22-15): writes one JSON document binding all of the above to this run
+//      id (AC-19). It needs --report, --manifest, --require-ledger and --net-watch, so the evidence
+//      can never be partial. The document is the wrapper's own output and is never hand-edited.
+//  10. Prints one verdict line naming the run id and the summary path.
 //
 // Behavior (exit codes):
 //   - bad usage / no command                                -> usage to stderr, exit 1
@@ -552,6 +559,108 @@ function finishNetWatch(h: NetWatchHandle, o: Omit<AnalyzeOptions, 'samplerPid'>
 }
 
 // ---------------------------------------------------------------------------
+// --report and --evidence-out
+// ---------------------------------------------------------------------------
+
+export interface ReportTotals {
+    numPassedTests: number;
+    numFailedTests: number;
+    numPendingTests: number;
+    numTodoTests: number;
+}
+
+export interface ReportCheck extends GateResult {
+    path: string;
+    sha256: string | null;
+    totals: ReportTotals | null;
+}
+
+// A report is written after the command starts. The slack only covers coarse file-time resolution.
+const REPORT_FILE_TIME_SLACK_MS = 1000;
+
+function posixPath(p: string): string {
+    return path.resolve(p).replace(/\\/g, '/');
+}
+
+export function checkReport(reportPath: string, childStartedMs: number, childStatus: number | null): ReportCheck {
+    const shown = posixPath(reportPath);
+    const fail = (why: string): ReportCheck => ({ ok: false, problems: [why], path: shown, sha256: null, totals: null });
+    let bytes: Buffer;
+    let mtimeMs: number;
+    try {
+        bytes = fs.readFileSync(reportPath);
+        mtimeMs = fs.statSync(reportPath).mtimeMs;
+    } catch (e) {
+        return fail(`test report missing or unreadable: ${shown} (${e instanceof Error ? e.message : String(e)})`);
+    }
+    let parsed: Record<string, unknown>;
+    try {
+        parsed = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
+    } catch (e) {
+        return fail(`test report is not JSON: ${shown} (${e instanceof Error ? e.message : String(e)})`);
+    }
+    const problems: string[] = [];
+    if (mtimeMs < childStartedMs - REPORT_FILE_TIME_SLACK_MS) problems.push(`test report ${shown} is older than this run, so it cannot be this run's report`);
+    const keys = ['numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests'] as const;
+    for (const k of keys) if (typeof parsed[k] !== 'number') problems.push(`test report field ${k} is ${JSON.stringify(parsed[k])} (must be a number)`);
+    if (problems.some((x) => x.startsWith('test report field'))) return { ok: false, problems, path: shown, sha256: createHash('sha256').update(bytes).digest('hex'), totals: null };
+    const totals: ReportTotals = { numPassedTests: parsed.numPassedTests as number, numFailedTests: parsed.numFailedTests as number, numPendingTests: parsed.numPendingTests as number, numTodoTests: parsed.numTodoTests as number };
+    if (childStatus === 0 && totals.numFailedTests > 0) problems.push(`the command exited 0 but the report shows ${totals.numFailedTests} failed tests`);
+    return { ok: problems.length === 0, problems, path: shown, sha256: createHash('sha256').update(bytes).digest('hex'), totals };
+}
+
+export const EVIDENCE_BASIS =
+    'The choke-point ledger counts allows by construction (TCP connect, DNS, UDP). Net-watch is a sampled OS connection check that can miss very short connections. The spawn gate and the audit cover the remaining bypass classes (worker threads, native sockets).';
+
+const DB_FILES = ['bot.db', 'bot.db-wal', 'bot.db-shm'];
+
+function dbFacts(snap: Snapshot): Record<string, { sha256: string | undefined; size: number | undefined; mtimeMs: number | undefined } | null> {
+    const out: Record<string, { sha256: string | undefined; size: number | undefined; mtimeMs: number | undefined } | null> = {};
+    for (const f of DB_FILES) {
+        const e = snap.entries.find((x) => x.rel === f);
+        out[f] = e ? { sha256: e.sha256, size: e.size, mtimeMs: e.mtimeMs } : null;
+    }
+    return out;
+}
+
+function listing(snap: Snapshot): string {
+    return JSON.stringify(snap.entries.map((e) => [e.rel, e.type]));
+}
+
+function npmVersion(): string | null {
+    const env: NodeJS.ProcessEnv = { ...process.env, npm_config_update_notifier: 'false' };
+    const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
+    env[pathKey] = path.dirname(process.execPath) + path.delimiter + (env[pathKey] || '');
+    const r = spawnSync('npm --version', { env, shell: true, encoding: 'utf8', windowsHide: true });
+    return r.status === 0 ? r.stdout.trim() : null;
+}
+
+function ledgerEvidence(ledger: (GateResult & { summaryPath: string }) | undefined): Record<string, unknown> | null {
+    if (!ledger || !fs.existsSync(ledger.summaryPath)) return null;
+    const bytes = fs.readFileSync(ledger.summaryPath);
+    let s: { projects?: unknown; workersByProject?: Record<string, unknown>; countsByKind?: Record<string, number>; nonLoopbackAllowed?: unknown; telegramAllowed?: unknown };
+    try {
+        s = JSON.parse(bytes.toString('utf8'));
+    } catch {
+        return { summary_path: posixPath(ledger.summaryPath), summary_sha256: createHash('sha256').update(bytes).digest('hex'), unparseable: true };
+    }
+    const projects = Array.isArray(s.projects) ? s.projects.map((p) => (p && typeof p === 'object' ? (p as { project?: unknown }).project : p)) : [];
+    const workers: Record<string, number> = {};
+    for (const [k, v] of Object.entries(s.workersByProject || {})) workers[k] = Array.isArray(v) ? v.length : 0;
+    const counts = s.countsByKind || {};
+    return {
+        summary_path: posixPath(ledger.summaryPath),
+        summary_sha256: createHash('sha256').update(bytes).digest('hex'),
+        projects,
+        workers_by_project_counts: workers,
+        countsByKind: counts,
+        nonLoopbackAllowed: s.nonLoopbackAllowed,
+        telegramAllowed: s.telegramAllowed,
+        notifier_refused: counts['notifier-refused'] ?? 0,
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Running the wrapped command
 // ---------------------------------------------------------------------------
 
@@ -587,6 +696,8 @@ export interface WrapOptions {
     ledgerRoot?: string;
     quiet?: boolean;
     netWatch?: boolean;
+    reportPath?: string;
+    evidenceOut?: string;
 }
 
 export interface WrapResult {
@@ -596,6 +707,7 @@ export interface WrapResult {
     manifest?: GateResult;
     ledger?: GateResult & { summaryPath: string };
     netWatch?: NetWatchResult;
+    report?: ReportCheck;
     childStatus: number | null;
     verdictLine: string;
     before: Snapshot;
@@ -608,8 +720,10 @@ export function runWrapped(o: WrapOptions): WrapResult {
     const before = snapshot(o.dataDir);
     log(`verify-prod-untouched: run ${o.runId} — snapshot before: ${before.entries.length} entries under ${o.dataDir}`);
     const watch = o.netWatch ? startNetWatch(o.runId) : undefined;
+    const startedAt = new Date().toISOString();
     const childStartedMs = Date.now();
     const child = runCommand(o.command, o.runId);
+    const finishedAt = new Date().toISOString();
     const durationMs = Date.now() - childStartedMs;
     const requireVitestMain = /(^|[\s\\/])vitest(\.mjs)?(\s|$)|\bnpm(\.cmd)?\s+(test|run\s+test)/i.test(o.command.join(' '));
     const netWatch = watch ? finishNetWatch(watch, { rootPid: process.pid, requireVitestMain, durationMs }) : undefined;
@@ -621,6 +735,7 @@ export function runWrapped(o: WrapOptions): WrapResult {
     let ledger: (GateResult & { summaryPath: string }) | undefined;
     const ledgerRoot = o.ledgerRoot || LEDGER_ROOT;
     if (o.requireLedger) ledger = checkLedger(ledgerRoot, o.runId, o.expectProjects || []);
+    const report = o.reportPath ? checkReport(o.reportPath, childStartedMs, child.status) : undefined;
 
     for (const d of diffs) log(`verify-prod-untouched: DATA CHANGED: ${d}`);
     if (manifest) {
@@ -633,10 +748,11 @@ export function runWrapped(o: WrapOptions): WrapResult {
     }
     if (ledger) for (const p of ledger.problems) log(`verify-prod-untouched: LEDGER GATE: ${p}`);
     if (netWatch) for (const p of netWatch.problems) log(`verify-prod-untouched: NET-WATCH: ${p}`);
+    if (report) for (const p of report.problems) log(`verify-prod-untouched: REPORT: ${p}`);
 
     const childFailed = child.status !== 0;
     let exitCode: number;
-    if (!untouched || (manifest && !manifest.ok) || (ledger && !ledger.ok) || (netWatch && !netWatch.ok)) exitCode = 1;
+    if (!untouched || (manifest && !manifest.ok) || (ledger && !ledger.ok) || (netWatch && !netWatch.ok) || (report && !report.ok)) exitCode = 1;
     else if (child.status === null) exitCode = 1;
     else exitCode = child.status;
 
@@ -650,12 +766,40 @@ export function runWrapped(o: WrapOptions): WrapResult {
         ...(netWatch
             ? [`net-watch: ${netWatch.ok ? 'ok' : 'FAIL'} (${netWatch.samples} samples, max descendants ${netWatch.max_descendants}, vitest main seen in ${netWatch.vitest_main_samples}, loopback sightings ${netWatch.loopback_connections_seen}, non-loopback ${netWatch.non_loopback_observed.length})`]
             : []),
+        ...(report
+            ? [`report: ${report.ok ? 'ok' : 'FAIL'}${report.totals ? ` (${report.totals.numPassedTests} passed, ${report.totals.numFailedTests} failed, ${report.totals.numPendingTests} skipped, ${report.totals.numTodoTests} todo)` : ''}`]
+            : []),
         `summary ${summaryPath}`,
     ];
     const verdictLine = `verify-prod-untouched: ${parts.join(' | ')}`;
     log(verdictLine);
     if (childFailed && untouched) log('verify-prod-untouched: (the wrapped command failed; its exit status is passed through)');
-    return { exitCode, untouched, diffs, manifest, ledger, netWatch, childStatus: child.status, verdictLine, before };
+    if (o.evidenceOut) {
+        const doc = {
+            run_id: o.runId,
+            command: o.command,
+            exit_code: exitCode,
+            child_status: child.status,
+            verdict: untouched ? 'untouched' : 'TOUCHED',
+            started_at: startedAt,
+            finished_at: finishedAt,
+            node_version: process.version,
+            npm_version: npmVersion(),
+            before: dbFacts(before),
+            after: dbFacts(after),
+            data_diffs: diffs,
+            manifest_match: manifest ? manifest.ok : null,
+            data_listing_unchanged: listing(before) === listing(after),
+            ledger: ledgerEvidence(ledger),
+            net_watch: netWatch ?? null,
+            report: report ? { path: report.path, sha256: report.sha256, totals: report.totals } : null,
+            evidence_basis: EVIDENCE_BASIS,
+        };
+        fs.mkdirSync(path.dirname(path.resolve(o.evidenceOut)), { recursive: true });
+        fs.writeFileSync(o.evidenceOut, JSON.stringify(doc, null, 2) + '\n');
+        log(`verify-prod-untouched: evidence written to ${o.evidenceOut}`);
+    }
+    return { exitCode, untouched, diffs, manifest, ledger, netWatch, report, childStatus: child.status, verdictLine, before };
 }
 
 // ---------------------------------------------------------------------------
@@ -806,6 +950,34 @@ function selfTest(): number {
         const live = runWrapped({ dataDir: fakeData, command: [node, '-e', hold], runId: newRunId(), quiet: true, netWatch: true });
         const lw = live.netWatch;
         rec('net-watch: live sampler sees the wrapped child and its loopback connection', live.exitCode === 0 && !!lw && lw.ok && lw.samples > 0 && lw.max_descendants >= 1 && lw.loopback_connections_seen > 0 && lw.non_loopback_observed.length === 0, JSON.stringify(lw));
+
+        // (12) --report and --evidence-out: a fabricated report is bound into the evidence by hash
+        const repPath = path.join(tmp, 'fake-report.json');
+        const evPath = path.join(tmp, 'evidence', 'ev.json');
+        const fakeTotals = { numPassedTests: 7, numFailedTests: 0, numPendingTests: 0, numTodoTests: 0 };
+        const fakeReport = JSON.stringify({ success: true, ...fakeTotals });
+        const reportWriter = `${writer};fs.writeFileSync(${JSON.stringify(repPath.replace(/\\/g, '/'))},${JSON.stringify(fakeReport)})`;
+        const r8 = newRunId();
+        const ev = runWrapped({ dataDir: fakeData, command: [node, '-e', reportWriter], runId: r8, manifest: mk(), requireLedger: true, expectProjects: ['unit'], ledgerRoot, quiet: true, reportPath: repPath, evidenceOut: evPath });
+        const evDoc = JSON.parse(fs.readFileSync(evPath, 'utf8'));
+        const fakeSha = createHash('sha256').update(fakeReport).digest('hex');
+        const summaryBytes = fs.readFileSync(path.join(ledgerRoot, r8, 'summary.json'));
+        rec('evidence: a fabricated report is bound by its SHA-256 and totals', ev.exitCode === 0 && evDoc.report.sha256 === fakeSha && JSON.stringify(evDoc.report.totals) === JSON.stringify(fakeTotals) && evDoc.report.path === posixPath(repPath), JSON.stringify(evDoc.report));
+        rec('evidence: run id, verdict and child status belong to this run', evDoc.run_id === r8 && /^vpu-/.test(evDoc.run_id) && evDoc.verdict === 'untouched' && evDoc.exit_code === 0 && evDoc.child_status === 0, JSON.stringify([evDoc.run_id, evDoc.verdict]));
+        rec('evidence: before and after hold all three DB files', DB_FILES.every((f) => evDoc.before[f]?.sha256 && evDoc.before[f].sha256 === evDoc.after[f].sha256 && evDoc.after[f].size > 0 && typeof evDoc.after[f].mtimeMs === 'number'), JSON.stringify(evDoc.after));
+        rec('evidence: manifest and listing are recorded', evDoc.manifest_match === true && evDoc.data_listing_unchanged === true, JSON.stringify([evDoc.manifest_match, evDoc.data_listing_unchanged]));
+        rec('evidence: the ledger is bound by its SHA-256', evDoc.ledger.summary_sha256 === createHash('sha256').update(summaryBytes).digest('hex') && evDoc.ledger.nonLoopbackAllowed === 0 && evDoc.ledger.telegramAllowed === 0 && evDoc.ledger.workers_by_project_counts.unit === 1, JSON.stringify(evDoc.ledger));
+        rec('evidence: the basis text and versions are written', evDoc.evidence_basis === EVIDENCE_BASIS && evDoc.node_version === process.version && typeof evDoc.npm_version === 'string', JSON.stringify([evDoc.node_version, evDoc.npm_version]));
+        const staleRun = runWrapped({ dataDir: fakeData, command: [node, '-e', '0'], runId: newRunId(), quiet: true, reportPath: (() => { fs.utimesSync(repPath, new Date(1e12), new Date(1e12)); return repPath; })() });
+        rec('report: a report older than the run -> FAIL', staleRun.exitCode === 1 && !!staleRun.report && staleRun.report.problems.some((x) => x.includes('older than this run')), staleRun.verdictLine);
+        const noReport = runWrapped({ dataDir: fakeData, command: [node, '-e', '0'], runId: newRunId(), quiet: true, reportPath: path.join(tmp, 'absent.json') });
+        rec('report: a missing report -> FAIL', noReport.exitCode === 1 && !!noReport.report && !noReport.report.ok, noReport.verdictLine);
+        const liar = JSON.stringify({ numPassedTests: 1, numFailedTests: 2, numPendingTests: 0, numTodoTests: 0 });
+        const liarRun = runWrapped({ dataDir: fakeData, command: [node, '-e', `require('fs').writeFileSync(${JSON.stringify(repPath.replace(/\\/g, '/'))},${JSON.stringify(liar)})`], runId: newRunId(), quiet: true, reportPath: repPath });
+        rec('report: failures in the report of a command that exited 0 -> FAIL', liarRun.exitCode === 1 && !!liarRun.report && liarRun.report.problems.some((x) => x.includes('failed tests')), liarRun.verdictLine);
+        const noField = JSON.stringify({ numPassedTests: 1 });
+        const noFieldRun = runWrapped({ dataDir: fakeData, command: [node, '-e', `require('fs').writeFileSync(${JSON.stringify(repPath.replace(/\\/g, '/'))},${JSON.stringify(noField)})`], runId: newRunId(), quiet: true, reportPath: repPath });
+        rec('report: a report with no totals -> FAIL', noFieldRun.exitCode === 1 && !!noFieldRun.report && noFieldRun.report.totals === null, noFieldRun.verdictLine);
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -825,7 +997,7 @@ function selfTest(): number {
 function usage(msg?: string): never {
     if (msg) console.error(`verify-prod-untouched: ${msg}`);
     console.error(
-        'Usage: verify-prod-untouched.ts [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] -- <command> [args...]\n' +
+        'Usage: verify-prod-untouched.ts [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] [--report <vitest json>] [--evidence-out <file>] -- <command> [args...]\n' +
             '       verify-prod-untouched.ts --self-test',
     );
     process.exit(1);
@@ -843,6 +1015,8 @@ function main(): void {
     let requireLedger = false;
     let expectProjects: string[] = [];
     let netWatch = false;
+    let reportPath: string | undefined;
+    let evidenceOut: string | undefined;
     for (let i = 0; i < opts.length; i++) {
         const a = opts[i];
         if (a === '--manifest') {
@@ -856,14 +1030,21 @@ function main(): void {
             expectProjects = v.split(',').map((s) => s.trim()).filter((s) => s !== '');
         } else if (a === '--net-watch') {
             netWatch = true;
+        } else if (a === '--report') {
+            reportPath = opts[++i];
+            if (!reportPath) usage('--report needs a path');
+        } else if (a === '--evidence-out') {
+            evidenceOut = opts[++i];
+            if (!evidenceOut) usage('--evidence-out needs a path');
         } else {
             usage(`unknown option ${a}`);
         }
     }
     if (expectProjects.length > 0 && !requireLedger) usage('--expect-projects requires --require-ledger');
     if (requireLedger && expectProjects.length === 0) usage('--require-ledger requires --expect-projects');
+    if (evidenceOut && (!reportPath || !manifest || !requireLedger || !netWatch)) usage('--evidence-out requires --report, --manifest, --require-ledger and --net-watch');
     const repoRoot = findRepoRoot(__dirname);
-    const r = runWrapped({ dataDir: path.join(repoRoot, 'data'), command, runId: newRunId(), manifest, requireLedger, expectProjects, netWatch });
+    const r = runWrapped({ dataDir: path.join(repoRoot, 'data'), command, runId: newRunId(), manifest, requireLedger, expectProjects, netWatch, reportPath, evidenceOut });
     process.exit(r.exitCode);
 }
 
