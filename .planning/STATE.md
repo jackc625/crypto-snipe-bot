@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
 Plan: 29 of 29
-Status: All plans complete — phase sealed, awaiting verification
+Status: All plans complete and sealed; verification human_needed, run /gsd-verify-work 22 to close
 Last activity: 2026-11-09 — Plan 22-29 complete (phase sealed on 93d9029)
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
@@ -53,6 +53,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 
 ## Blockers / Concerns
 
+- **Phase 24 item (found by the 22 security audit after the seal):** the startup DB probe copies a WAL-mode database to the OS temp folder, and a crash or failed cleanup can leave that copy behind (trade data, no keys). Not in the sealed register; see 22-SECURITY.md.
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
 
