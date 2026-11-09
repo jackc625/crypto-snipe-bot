@@ -6,7 +6,7 @@
   "tags": [
     "test-quality"
   ],
-  "duplicate_of": null,
+  "duplicate_of": "AUD-TESTU-023",
   "escalation_ref": null,
   "od_ref": null,
   "rc": [],
@@ -46,5 +46,5 @@
   "sibling_sites_checked": "The vi.mock specifier gate (scripts/check-vi-mock-paths.ts) checks every call: 583 resolved, this one did not.",
   "fixed_by": "27f21a8",
   "red_proof": "SAFE-06 gate (INDEX rows 27 and 28)",
-  "recommendation": "Done. Keep the SAFE-06 gate in CI."
+  "recommendation": "Done for the path: 27f21a8 corrected the specifier. The factory still names statements src/utils/db no longer exports; the canonical entry AUD-TESTU-023 carries that remainder. Keep the SAFE-06 gate in CI."
 }

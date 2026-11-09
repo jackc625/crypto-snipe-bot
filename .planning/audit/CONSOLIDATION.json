@@ -117,6 +117,11 @@
       "duplicate": "AUD-ANTIRUG-011",
       "canonical": "AUD-EXIT-013",
       "reason": "Same defect: the restart path picks the first dex of the pool type instead of the stored dex_name; the exit-monitor site is bot.ts:1940-1956 and the anti-rug site is bot.ts:2096-2098. One root cause and one fix (card EXIT-10), so one entry, with the anti-rug site recorded as a sibling. Canonical is AUD-EXIT-013 because the EXIT slice owns the wider resume and dashboard rule and its escalation record is the earlier one."
+    },
+    {
+      "duplicate": "AUD-TESTQ-002",
+      "canonical": "AUD-TESTU-023",
+      "reason": "Same site, same defect: vi.doMock(\"../../src/db\") in test/unit/configEnvVar.test.ts named a module that does not exist. AUD-TESTU-023 is the earlier entry and carries the wider remainder (the stale statement names), so it is canonical."
     }
   ],
   "reconciliations": [
@@ -209,6 +214,11 @@
       "item": "card findings lists",
       "kind": "card-findings-completed",
       "outcome": "Added findings whose od_ref named a card that did not list them: OD-25 (AUD-API-003), OD-6 (AUD-TX-009), DB-01 (AUD-API-016, 017), TX-04 (AUD-DB-009, 010), BUY-03 (AUD-EXIT-018), EXIT-11 (AUD-ANTIRUG-004). AUD-ANTIRUG-011 is a duplicate and is not listed. Findings shared by two cards keep their single od_ref (AUD-TX-002, AUD-BUY-002, AUD-BUY-008, AUD-ANTIRUG-001, AUD-ANTIRUG-004); AUD-BUY-020 stays od_ref null because its own fix changes no behaviour."
+    },
+    {
+      "item": "AUD-TESTU-023 / AUD-TESTQ-002",
+      "kind": "duplicate-merge",
+      "outcome": "AUD-TESTU-023 canonical: severity S3 (both S3), union of reported_by, evidence and sibling sites. No escalation or card on either. The duplicate keeps its id, its input_refs and its status fixed for the specifier; the canonical stays confirmed because the stale statement names in the factory are not fixed."
     }
   ],
   "alias_resolutions": {
@@ -3436,5 +3446,12 @@
       "slice": "SCRIPTS",
       "title": "What happens to the one-off and broken signing scripts (addLiquidity, deploySepoliaTest, recover-sell-ladys)?"
     }
-  ]
+  ],
+  "re_run_22_29": {
+    "plan": "22-29 step 3a",
+    "date": "2026-11-09",
+    "assign_cards": "self-test PASS; assigned=0, files_written=0 (no proposed card was added or left unnumbered by the re-audit)",
+    "dedup_review": "Each of the 48 findings added by 22-29 Task 1 was compared with every earlier finding by title and by shared file path. The one pair describing the same defect (AUD-TESTQ-002 and AUD-TESTU-023) was read in full and merged above. The closest other pairs were judged different from their titles: AUD-BUY-035 and AUD-DB-005 (the rail-era boot change, the original LOG_LEVEL ordering), AUD-TESTQ-003 and AUD-TESTQ-034 (the test move, the unrun obligation), AUD-TESTQ-006..009 and AUD-TESTI-011/014 (the accommodation edits, the base-state claims), AUD-REAUDIT-001 and AUD-RAIL-002 (the rehearsal config fault, the base-state RC-19).",
+    "check_stage": "check.ts --stage consolidation: PASS after this merge (fail=0 pending=0 warn=0)"
+  }
 }

@@ -24,26 +24,38 @@
       "type": "code",
       "ref": "src/exitEngine.ts:13@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "exitEngine imports ./utils/db, which the mis-pathed mock does not intercept"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/configEnvVar.test.ts:146@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "corrected specifier"
+    },
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#1",
+      "note": "with the broken specifier one run added three files to the per-worker test-DB folder; with the fix, none; the same ten tests pass both ways"
     }
   ],
-  "sibling_sites_checked": "mockspec.js resolved all 349 vi.mock / vi.doMock / vi.unmock / vi.doUnmock specifiers in the 84 files (308 relative) against the base-SHA tree: this is the only one that resolves to no file. The SAFE-06 specifier gate (22-11) is the rail for this class.",
+  "sibling_sites_checked": "mockspec.js resolved all 349 vi.mock / vi.doMock / vi.unmock / vi.doUnmock specifiers in the 84 files (308 relative) against the base-SHA tree: this is the only one that resolves to no file. The SAFE-06 specifier gate (22-11) is the rail for this class. Merged from AUD-TESTQ-002: The vi.mock specifier gate (scripts/check-vi-mock-paths.ts) checks every call: 583 resolved, this one did not.",
   "status": "confirmed",
   "origin": "independent",
   "rc": [],
   "research_suggested_severity": null,
-  "severity_rationale": "S3: the case still asserts the right config value; the defect is a silent mock miss that let the real DB module load (the reach is counted in AUD-TESTU-001) and will be caught by the SAFE-06 gate.",
+  "severity_rationale": "S3: the case still asserts the right config value; the defect is a silent mock miss that let the real DB module load (the reach is counted in AUD-TESTU-001) and will be caught by the SAFE-06 gate. Merged with AUD-TESTQ-002 (the same defect, registered from the 22-14 rails discovery); both are S3, so the merged severity stays S3.",
   "duplicate_of": null,
   "related": [
-    "AUD-TESTU-001"
+    "AUD-TESTU-001",
+    "AUD-TESTQ-002"
   ],
   "tags": [
     "test-quality"
   ],
   "escalation_ref": null,
   "od_ref": null,
-  "recommendation": "Phase 28: point the mock at ../../src/utils/db with the current statement names (the SAFE-06 gate should already flag it).",
+  "recommendation": "The path half is fixed: 27f21a8 (22-14) points the mock at ../../src/utils/db and the SAFE-06 gate (red-proofs INDEX rows 27 and 28) guards it. Status stays confirmed because the other half is open: the factory still names insertExitState and updateExitState, which src/utils/db no longer exports, while src/exitEngine.ts imports upsertExitState and deleteExitState; the case passes only because it never touches them. Phase 28: give the mock the current statement names.",
   "reported_by": [
-    "claude (22-23 executor)"
+    "claude (22-23 executor)",
+    "claude (22-29 executor)"
   ],
   "found_date": "2026-11-07",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
