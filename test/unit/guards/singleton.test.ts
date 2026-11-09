@@ -63,7 +63,7 @@ interface DuplicateError {
 
 function runProbe(mode: string, relPaths: string[], nodeOptions: string[] = []): { line: string; detail: string } {
     const result = spawnRailedChild(process.execPath, [PROBE, mode, ...relPaths], { nodeOptions, timeoutMs: CHILD_TIMEOUT_MS });
-    const line = RESULT_LINE.exec(result.stdout)?.[0]?.trim() ?? '';
+    const line = result.stdout.match(RESULT_LINE)?.[0]?.trim() ?? '';
     return { line, detail: `probe line: ${JSON.stringify(line)}; exit ${result.status}; stderr: ${result.stderr.slice(0, 2000)}` };
 }
 

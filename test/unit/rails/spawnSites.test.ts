@@ -7,7 +7,8 @@
 //       worker escapes the per-process rails) or a third-party spawner: static import, namespace,
 //       renamed or destructured binding, export-from, import-equals, dynamic import(), require,
 //       createRequire(...)(...), vi.importActual / vi.importMock;
-//   (b) any require / import() whose specifier is not a string literal (it cannot be checked);
+//   (b) any require / import() whose specifier is not a string literal (it cannot be checked),
+//       except a plain require of a computed path in the files named in COMPUTED_REQUIRE_FILES;
 //   (c) any call named spawn, spawnSync, exec, execSync, execFile, execFileSync or fork, bare
 //       or as a member access.
 //
@@ -44,6 +45,13 @@ const ALLOWED_FILES = new Map<string, string>([
     ['test/rails/spawnRailedChild.ts', 'the railed spawner itself'],
     ['test/fork/setup.ts', 'the single documented exemption: starts Hardhat, which needs the network; children get buildHardhatChildEnv'],
     ['test/rails/selfcheck.cjs', 'the plain-Node proof of the rails, run outside Vitest; its only child hashes and deletes a temp fake root with a minimal env built from scratch'],
+]);
+
+// Repo-relative POSIX paths allowed a plain `require(<computed path>)`, each with the reason.
+// Only that one check is relaxed: a literal banned module, any other computed load form and
+// every spawn call in these files are still flagged.
+const COMPUTED_REQUIRE_FILES = new Map<string, string>([
+    ['test/rails/probes/duplicateLoadProbe.cjs', 'the SAFE-03 probe has to load a guarded module through a casing or junction alias path computed at run time; it runs only as a railed child'],
 ]);
 
 interface Offence {
@@ -84,7 +92,7 @@ function collectRequireBindings(sf: ts.SourceFile): { requires: Set<string>; cre
 }
 
 /** The scanner: every offence in one source text. Used on real files and on the fixtures. */
-function scanSource(file: string, source: string): Offence[] {
+function scanSource(file: string, source: string, allowComputedRequire = false): Offence[] {
     const ext = path.extname(file);
     const kind = ext === '.ts' || ext === '.cts' || ext === '.mts' ? ts.ScriptKind.TS : ts.ScriptKind.JS;
     const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
@@ -116,7 +124,8 @@ function scanSource(file: string, source: string): Offence[] {
                 (ts.isPropertyAccessExpression(callee) && callee.name.text === 'require') ||
                 (ts.isCallExpression(callee) && createRequires.has(calleeName(callee.expression) ?? ''))
             ) {
-                checkSpecifier(node, node.arguments[0], 'require');
+                const computedPlainRequire = ts.isIdentifier(callee) && callee.text === 'require' && literalOf(node.arguments[0]) === undefined;
+                if (!(allowComputedRequire && computedPlainRequire)) checkSpecifier(node, node.arguments[0], 'require');
             } else if (ts.isPropertyAccessExpression(callee) && (name === 'importActual' || name === 'importMock')) {
                 const value = literalOf(node.arguments[0]);
                 if (value !== undefined && BANNED_MODULES.has(value)) add(node, `vi.${name} of ${value}`);
@@ -161,10 +170,11 @@ describe('spawn-site gate (SAFE-02 D-03)', () => {
         expect(scanned.length).toBeGreaterThan(100);
         expect(scanned).toContain('test/integration/pauseCli.test.ts');
         for (const allowed of ALLOWED_FILES.keys()) expect(scanned).toContain(allowed);
+        for (const allowed of COMPUTED_REQUIRE_FILES.keys()) expect(scanned).toContain(allowed);
 
         const offences = files
             .filter((f) => !ALLOWED_FILES.has(relPosix(f)))
-            .flatMap((f) => scanSource(relPosix(f), fs.readFileSync(f, 'utf8')))
+            .flatMap((f) => scanSource(relPosix(f), fs.readFileSync(f, 'utf8'), COMPUTED_REQUIRE_FILES.has(relPosix(f))))
             .map((o) => `${o.file}:${o.line} ${o.why}`);
         expect(offences).toEqual([]);
     }, 60_000);
@@ -206,6 +216,17 @@ describe('spawn-site gate (SAFE-02 D-03)', () => {
         expect(flagged('await import(dynamicName);\n')).toBe(true);
         expect(flagged("proc.fork('x');\n")).toBe(true);
         expect(flagged("unknownThing.exec('ls');\n")).toBe(true);
+    });
+
+    it('the computed-require allowance relaxes only a plain require of a computed path', () => {
+        const flagged = (source: string): boolean => scanSource('fixture.cjs', source, true).length > 0;
+        expect(flagged('require(aliasPath);\n')).toBe(false);
+        expect(flagged("require('child_process');\n")).toBe(true);
+        expect(flagged("spawnSync('x', []);\n")).toBe(true);
+        expect(flagged('await import(aliasPath);\n')).toBe(true);
+        expect(flagged('const r = require;\nr(aliasPath);\n')).toBe(true);
+        expect(flagged('module.require(aliasPath);\n')).toBe(true);
+        expect(flagged("require('module').createRequire(__filename)(aliasPath);\n")).toBe(true);
     });
 
     it('does not flag ordinary code', () => {
