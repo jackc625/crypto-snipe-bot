@@ -1,0 +1,54 @@
+{
+  "kind": "finding",
+  "classes": [],
+  "capital_impact": "none",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "related": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (PR #2 CI fix)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "status": "fixed",
+  "fixed_by": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "id": "AUD-TESTQ-037",
+  "title": "The first test in deliberateBuyArmMonitoring.test.ts paid for the first import of src/bot and exceeded the unit project 5 s limit under parallel load in a clean-clone replay; a later test in the file then saw two calls where one was expected",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "origin": "rails-discovery",
+  "tags": [
+    "test-quality"
+  ],
+  "severity_rationale": "S4: the first test pays for a cold import of src/bot under load; no assertion changed. The later count failure is consistent with the timed-out test still running but was not separately proven.",
+  "files": [
+    "test/unit/bot/deliberateBuyArmMonitoring.test.ts"
+  ],
+  "input_refs": [
+    "rails-test-edits.json#18"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "clean-clone replay of the CI steps at 776858c on Windows, Node 22.16.0",
+      "note": "First test 6295 ms against the 5000 ms limit; the other tests in the file 61-90 ms. The same tests passed on the real CI run."
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/deliberateBuyArmMonitoring.test.ts:295@6739bd4f9e04ed85f0b71dbb2271560122c43044",
+      "note": "The first dynamic import of src/bot happens inside the first test."
+    },
+    {
+      "type": "command",
+      "ref": "four clean-clone unit runs with the fix",
+      "note": "First test 80-97 ms; no failure in this file."
+    }
+  ],
+  "sibling_sites_checked": "Six unit files import src/bot inside a test. noDoubleBuyReconcile.test.ts already carries a 30 s limit (36d5671, AUD-TESTQ-019). Over five clean-clone unit runs the slowest test in each of the other four was buyNonceLock 5626 ms, snipeFailClean 3731 ms, deliberateBuyAffordability 3576 ms and exitFailedHeldResume 1120 ms. None failed and they were left unchanged; buyNonceLock is close enough to the limit that it may need the same hook. Integration files have a 15 s limit and fork files 120 s.",
+  "red_proof": "Before the fix the first test timed out at 6295 ms; after it, 80-97 ms over four full parallel runs.",
+  "recommendation": "Done for this file: ea193b8 moves the cold import into a beforeAll hook and keeps the 5 s limit on every test."
+}

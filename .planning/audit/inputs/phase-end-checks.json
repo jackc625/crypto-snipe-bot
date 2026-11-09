@@ -1,9 +1,9 @@
 {
   "phase": "22-safety-rails-audit",
   "plan": "22-29",
-  "recorded_at": "2026-11-09T06:44:32.004Z",
+  "recorded_at": "2026-11-09T14:29:16.075Z",
   "branch": "phase-22-safety-rails-audit",
-  "head_sha_at_check": "47153bedfa36476cf26b79ceb8de9118c0a80b7d",
+  "head_sha_at_check": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
   "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
   "backup_manifest": "C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json",
   "checks": {
@@ -18,7 +18,7 @@
           "test/.env.test"
         ],
         "sentinel_values": "test/unit/rails/envExampleSync.test.ts run vpu-20261109T064413-4140-796ee7: 4 tests passed (private-key sentinels are distinct small integers and not Hardhat #0; secret-like sentinels at most 3.0 bits per character)",
-        "wrapper_verdict": "verdict: untouched | run vpu-20261109T064413-4140-796ee7 | child exit 0 | manifest: equal | ledger: ok | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T064413-4140-796ee7\\summary.json"
+        "wrapper_verdict": "verdict: untouched | run vpu-20261109T142906-15784-a10660 | child exit 0 | manifest: equal | ledger: ok | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T142906-15784-a10660\\summary.json"
       },
       "pass": true,
       "note": "The git ls-files commands were run from a node script with the file name built at runtime because the machine secret guard refuses the literal name in shell filters. The result is the same list the plan commands would print."
@@ -26,7 +26,7 @@
     "NAC-03": {
       "command": "verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json -- node -e 0",
       "output": {
-        "wrapper_verdict": "verdict: untouched | run vpu-20261109T064416-19940-8f67a1 | child exit 0 | manifest: equal | ledger: not required | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T064416-19940-8f67a1\\summary.json",
+        "wrapper_verdict": "verdict: untouched | run vpu-20261109T142909-4100-cb3b2b | child exit 0 | manifest: equal | ledger: not required | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T142909-4100-cb3b2b\\summary.json",
         "data_files_compared": 6
       },
       "pass": true,
@@ -85,13 +85,14 @@
         }
       ],
       "pass": true,
-      "note": "Mechanical text search of every 22-NN-SUMMARY.md only (P9: not cited as evidence of the code). Each command-shaped line is diagnosed in command_shaped_lines_diagnosis. Independent corroboration: the newest file under the Hardhat cache/ and artifacts/ folders predates phase start, so no compile or fork ran there after the phase began."
+      "note": "Mechanical text search of every 22-NN-SUMMARY.md only (P9: not cited as evidence of the code). Each command-shaped line is diagnosed in command_shaped_lines_diagnosis. Independent corroboration: the newest file under the Hardhat cache/ and artifacts/ folders predates phase start, so no compile or fork ran there after the phase began.",
+      "re_seal_note": "Re-checked for the re-seal. The post-seal CI fixes and their clean-clone replays ran npm ci, the unit and integration Vitest projects, the vi.mock gate and tsc only; none starts Hardhat."
     },
     "AC-33": {
       "command": "for every commit in 23a64617dca167976adc4645fed0e2c69e384820..HEAD whose subject names 22-04 or 22-17..22-29: git show --name-only --format= <sha> lists only .planning/",
       "output": {
-        "commits_in_range": 196,
-        "audit_wave_commits": 87,
+        "commits_in_range": 212,
+        "audit_wave_commits": 91,
         "commits_with_paths_outside_planning": [],
         "not_applicable_commits_named": [
           "f695363",
@@ -109,7 +110,7 @@
     "IGN_AC07": {
       "command": "git merge-base --is-ancestor 93f81898e21927679117f2401491a0e9ddb8f634 HEAD; for every manifest entry under ignition/deployments/: raw-byte SHA-256 of the working-tree file and of git cat-file -p HEAD:<path> equal the manifest; sorted git ls-files ignition/deployments equals the manifest subset",
       "branch": "phase-22-safety-rails-audit",
-      "head_sha": "47153bedfa36476cf26b79ceb8de9118c0a80b7d",
+      "head_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
       "od21_commit_sha": "93f81898e21927679117f2401491a0e9ddb8f634",
       "od21_is_ancestor_of_head": true,
       "file_count": 10,
@@ -178,5 +179,10 @@
       ],
       "pass": true
     }
-  }
+  },
+  "previous_run": {
+    "head_sha_at_check": "47153bedfa36476cf26b79ceb8de9118c0a80b7d",
+    "recorded_at": "2026-11-09T06:44:32.004Z"
+  },
+  "re_run_reason": "Re-run for the re-seal after the PR #2 CI fixes (ea193b8)."
 }

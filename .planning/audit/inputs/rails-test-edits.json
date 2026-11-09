@@ -178,6 +178,36 @@
       "reason": "Found by the 22-15 final run (vpu-20261109T045056-10640-6a8b4a). The first test in the file pays for the first dynamic import of src/bot, which took 4648 ms in the earlier full run and 5015 ms in this one against the unit default limit of 5000 ms (the file's other tests take 50-100 ms), so it timed out with no assertion failing. The new backupState test adds a 48 s compile to the parallel load and tipped it over.",
       "register_as": "test-quality",
       "found_in_plan": "22-15"
+    },
+    {
+      "file": "test/unit/rails/dbTripwireSetup.test.ts",
+      "test": "beforeAll, afterAll and the real-root cases that read the real data/ folder or open a database in it",
+      "it_count_before": 11,
+      "it_count_after": 11,
+      "change": "A realDataFacts() helper records the real folder state, with absent as a valid state, and replaces statFacts on the real folder. A expectRealDbOpenRefused() helper replaces four direct assertions: with the folder present it asserts RAIL_DB_TRIPWIRE as before; with it missing it asserts the library refusal and asks isProtectedDbPath. No test was removed, skipped or renamed.",
+      "reason": "Found by GitHub Actions run 42627936916 (PR #2, commit 776858c), step npm run test:unit. data/ is gitignored, so a fresh checkout has no such folder: beforeAll crashed with ENOENT and all 11 tests in the file were skipped on CI.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI"
+    },
+    {
+      "file": "test/unit/rails/dbTripwireSrc.test.ts",
+      "test": "afterAll",
+      "it_count_before": 8,
+      "it_count_after": 8,
+      "change": "The afterAll check compares fs.existsSync on the real data/ folder with its value when the file loaded, instead of requiring true. No test was changed.",
+      "reason": "Found by GitHub Actions run 42627936916 (PR #2, commit 776858c), step npm run test:unit. The check failed on a fresh checkout, where data/ does not exist.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI"
+    },
+    {
+      "file": "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+      "test": "Phase 21.3 — landed deliberate buy ARMS monitoring (STOP-THE-LINE-06) [REAL-PATH], first test",
+      "change": "A beforeAll hook imports src/bot once under its own 30 s limit. The per-test 5 s limit is kept. No assertion, title or mock changed.",
+      "it_count_before": 6,
+      "it_count_after": 6,
+      "reason": "Found by a clean-clone replay of the CI steps on Windows at 776858c. The first test pays for the first dynamic import of src/bot and took 6295 ms against the unit default limit of 5000 ms. The other tests in the file take 61-90 ms.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI replay"
     }
   ]
 }

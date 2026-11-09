@@ -271,7 +271,8 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-TESTU-001",
-      "AUD-TESTU-006"
+      "AUD-TESTU-006",
+      "AUD-TESTQ-037"
     ],
     "quality_label": {
       "claims": "A landed deliberate buy (public fallback, private, or late-landed) arms the exit monitor, the LP baseline snapshot and anti-rug registration with the right trade id, pair and amount; no-broadcast branches arm nothing.",
@@ -293,7 +294,17 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). The arming calls are spies; asserting they are called with the right arguments is the behaviour of the wiring (not hollow). Missing observable: the monitor runs in the script process that exits right after the buy (AUD-BUY-001, S0) and startExitMonitor can return without arming (AUD-EXIT-002) — AUD-TESTU-006."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "findings": [
+          "AUD-TESTQ-037"
+        ],
+        "note": "Reviewed: one beforeAll hook imports src/bot under its own 30 s limit so the cold import no longer counts against the first test. Every test keeps the 5 s limit and still re-imports after vi.resetModules(). No assertion, title or mock changed."
+      }
+    ]
   },
   {
     "path": "test/unit/bot/exitFailedHeldResume.test.ts",
@@ -2269,7 +2280,9 @@
   {
     "path": "test/unit/rails/dbTripwireSetup.test.ts",
     "audited_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
-    "findings": "none",
+    "findings": [
+      "AUD-TESTQ-036"
+    ],
     "quality_label": {
       "claims": "The DB tripwire and the data folder block fire on fake-root paths, on the real data paths (AC-14) and with VITEST deleted, and allowed databases still open.",
       "mocks_mechanism": "no",
@@ -2285,13 +2298,23 @@
         "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
         "findings": "none",
         "note": "Reviewed: The DB tripwire and the data folder block fire on fake-root paths, on the real data paths (AC-14) and with VITEST deleted, and allowed databases still open."
+      },
+      {
+        "from_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "to_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "findings": [
+          "AUD-TESTQ-036"
+        ],
+        "note": "Reviewed: the real data/ folder state is now recorded and compared, with absent as a valid state. When the folder exists the real tripwire is asserted unchanged. When it is missing, better-sqlite3 refuses before the native constructor the rail wraps, so the three open cases assert that refusal and ask isProtectedDbPath to class the exact path (protected) and a non-data path (not protected). RED: forcing the predicate either way fails those three cases."
       }
     ]
   },
   {
     "path": "test/unit/rails/dbTripwireSrc.test.ts",
     "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
-    "findings": "none",
+    "findings": [
+      "AUD-TESTQ-036"
+    ],
     "quality_label": {
       "claims": "Under Vitest, src/utils/db refuses the live data folder before the setup layer and uses a per-worker temp file when DB_PATH is empty; a linked data folder is caught.",
       "mocks_mechanism": "no",
@@ -2307,6 +2330,14 @@
         "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
         "findings": "none",
         "note": "Reviewed: Under Vitest, src/utils/db refuses the live data folder before the setup layer and uses a per-worker temp file when DB_PATH is empty; a linked data folder is caught."
+      },
+      {
+        "from_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "to_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "findings": [
+          "AUD-TESTQ-036"
+        ],
+        "note": "Reviewed: the afterAll check now compares whether data/ exists with whether it existed when the file loaded, instead of requiring it to exist. No other case changed."
       }
     ]
   },

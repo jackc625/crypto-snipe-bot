@@ -1,0 +1,52 @@
+{
+  "kind": "finding",
+  "classes": [],
+  "capital_impact": "none",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "related": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (PR #2 CI fix)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "status": "fixed",
+  "fixed_by": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "id": "AUD-CONTRACTS-006",
+  "title": "The CI dashboard type check could never pass: the test job installs only the root packages, so dashboard/tsconfig.json cannot find React; no CI run has gone green since the step was added on 2026-04-29",
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "severity": "S3",
+  "origin": "re-audit",
+  "tags": [
+    "ci"
+  ],
+  "severity_rationale": "S3: a check that cannot pass protects nothing and would have kept CI red once the earlier steps were fixed. No production path is involved.",
+  "files": [
+    ".github/workflows/test.yml"
+  ],
+  "input_refs": [],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:57@6739bd4f9e04ed85f0b71dbb2271560122c43044",
+      "note": "The step type-checks dashboard/tsconfig.json; the job has one npm ci, at the repo root."
+    },
+    {
+      "type": "command",
+      "ref": "clean-clone replay of the CI steps at 776858c, Node 22.16.0",
+      "note": "tsc exit 2 with 952 errors, led by TS2307 cannot find module react."
+    },
+    {
+      "type": "command",
+      "ref": "clean-clone replay with npm ci --prefix dashboard added",
+      "note": "tsc exit 0."
+    }
+  ],
+  "sibling_sites_checked": "The test job is the only job that reads dashboard/. The hardhat-compile, slither and mythril jobs use only the root packages.",
+  "red_proof": "Without the install step the type check exits 2 with 952 errors; with it, exit 0.",
+  "recommendation": "Done: ea193b8 adds npm ci --prefix dashboard before the type check."
+}

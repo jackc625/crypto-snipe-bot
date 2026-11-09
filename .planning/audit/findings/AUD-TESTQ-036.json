@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "classes": [],
+  "capital_impact": "none",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "related": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (PR #2 CI fix)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "status": "fixed",
+  "fixed_by": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+  "id": "AUD-TESTQ-036",
+  "title": "The two DB tripwire test files assumed the gitignored data/ folder exists, so on a fresh checkout dbTripwireSetup.test.ts crashed in beforeAll (CI skipped its 11 rail tests) and dbTripwireSrc.test.ts failed in afterAll; an empty data/ also made the setup file silently skip its final unchanged check",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "origin": "rails-discovery",
+  "tags": [
+    "test-quality"
+  ],
+  "severity_rationale": "S3: no production path is involved and a machine with data/ passed, but these rail tests did not run on CI at all.",
+  "files": [
+    "test/unit/rails/dbTripwireSetup.test.ts",
+    "test/unit/rails/dbTripwireSrc.test.ts"
+  ],
+  "input_refs": [
+    "rails-test-edits.json#16",
+    "rails-test-edits.json#17"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "GitHub Actions run 42627936916 (PR #2, commit 776858c), step npm run test:unit",
+      "note": "2 files failed: ENOENT scandir data/ in beforeAll, and expected false to be true in afterAll; 11 tests skipped."
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/rails/dbTripwireSetup.test.ts:78@6739bd4f9e04ed85f0b71dbb2271560122c43044",
+      "note": "beforeAll lists the real data/ folder unconditionally."
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/rails/dbTripwireSrc.test.ts:75@6739bd4f9e04ed85f0b71dbb2271560122c43044",
+      "note": "afterAll required the real data/ folder to exist."
+    },
+    {
+      "type": "command",
+      "ref": "clean-clone replay of the CI steps with no data/ folder, Node 22.16.0",
+      "note": "With the folder check fixed, three open cases returned \"Cannot open database because the directory does not exist\": better-sqlite3 lib/database.js:64 refuses before the native constructor the rail wraps. With the final fix, 937 of 937 unit tests pass and no data/ folder is created."
+    }
+  ],
+  "sibling_sites_checked": "Searched test/, scripts/verify-prod-untouched.ts and scripts/capture-baselines.ts for paths joined to the repo data folder. childProbe.cjs uses a fake root, childRails.test.ts passes a literal path to a pure check, and forkRails.fork.test.ts does not list or stat the real folder. selfcheck.cjs and the two scripts are not run by CI. The full unit and integration suites pass in a clean clone with no data/ folder and none of them creates one.",
+  "red_proof": "Clean clone with no data/: forcing isProtectedDbPath to return false, and separately forcing it true for a non-data path, each fails the three real-root open cases; restored, 11 of 11 pass. With a folder present the real tripwire is asserted unchanged.",
+  "recommendation": "Done: ea193b8 records the folder state instead of requiring it, and asserts the rail decision directly when the folder is missing."
+}
