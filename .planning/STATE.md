@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-15-PLAN.md
-last_updated: "2026-11-09T04:58:16.444Z"
+stopped_at: Completed 22-16-PLAN.md
+last_updated: "2026-11-09T05:20:47.448Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 53f30cf3eaf3bd9181ac02a52812e1dc9179cef5
+state_head: 4093437a0aa588040d010190ddb4f93902bcd48e
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 27
+  completed_plans: 28
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 17 of 29
+Plan: 18 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -105,11 +105,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P13 | 17min | 3 tasks | 24 files |
 | Phase 22 P14 | 8min | 2 tasks | 17 files |
 | Phase 22 P15 | 18min (continuation) | 2 tasks | 15 files |
+| Phase 22 P16 | 18min | 2 tasks | 11 files |
 
 ## Session
 
-**Last session:** 2026-11-09T04:58:16.336Z
-**Stopped at:** Completed 22-15-PLAN.md
+**Last session:** 2026-11-09T05:20:47.356Z
+**Stopped at:** Completed 22-16-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -199,3 +200,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-15: full railed npm test green, run vpu-20261109T045355-20916-8a9783: 1194 passed, 0 failed, 0 skipped, 0 todo, verdict untouched, ac19-run.json written by the wrapper
 - [Phase 22]: 22-15: the moved test uses buildChainRegistry() for its address because forkShellOnly forbids a fork test reading a key the rails replace; the precedence is unchanged
 - [Phase 22]: 22-15 for 22-29: UFV-05 must be added to the Task 1 verify, which names only UFV-01..04; 7 of the 16 triggeringTestFiles are rail tests' own deliberate denials
+- [Phase 22]: 22-16: pre-rail collected 759 unit and 216 integration from the isolated export of phase_start_sha, no collection errors; post-rail official 932 unit / 262 integration; NAC-04 holds
+- [Phase 22]: 22-16: ESLint phase_start 350/22 equals STATE.md; post_rails 351/22 (+1: src/bot.ts -1, src/main.ts +1, src/utils/repoRoot.ts +1), all from the rails' own src changes
+- [Phase 22]: 22-16 for Phase 26: npm ls exits 1 from ethers 6.16.0 vs the 6.7.1 peer of @flashbots/ethers-provider-bundle, vitest 4.1.1 vs the 4.1.2 peer of @vitest/coverage-v8, and an extraneous @emnapi/core folder
+- [Phase 22]: 22-16: the plan's tmp-path regex matches the npm registry URL of the package named tmp; data left intact, check run with URLs removed, script asserts no os.tmpdir() in outputs

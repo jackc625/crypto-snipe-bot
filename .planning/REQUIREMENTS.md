@@ -15,7 +15,7 @@
 - [x] **SAFE-04**: A second bot process for the same wallet refuses to start (single-instance process lock acquired at boot).
 - [x] **SAFE-05**: The bot refuses to boot against a DB whose `user_version` is newer than the code supports, and refuses to silently create a fresh DB in production (absolute `DB_PATH` resolution, refuse-to-create).
 - [x] **SAFE-06**: CI fails if any `vi.mock` path in the suite does not resolve to an existing module (a moved file cannot turn a mock into a silent no-op).
-- [ ] **SAFE-07**: Before/after baselines are captured and committed: `npm ls`, `npm audit`, ESLint counts by rule and file, per-project test counts, coverage file list, `data/bot.db` checksum.
+- [x] **SAFE-07**: Before/after baselines are captured and committed: `npm ls`, `npm audit`, ESLint counts by rule and file, per-project test counts, coverage file list, `data/bot.db` checksum.
 
 ### Audit (AUDIT)
 
@@ -200,7 +200,7 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | SAFE-04 | Phase 22 | Complete |
 | SAFE-05 | Phase 22 | Complete |
 | SAFE-06 | Phase 22 | Complete |
-| SAFE-07 | Phase 22 | Pending |
+| SAFE-07 | Phase 22 | Complete |
 | AUDIT-01 | Phase 22 | Pending |
 | AUDIT-02 | Phase 23 | Pending |
 | AUDIT-03 | Phase 22 | Pending |
