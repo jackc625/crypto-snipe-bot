@@ -26,6 +26,29 @@ function noWalletError(): Error & { code: string } {
     return err;
 }
 
+function vitestSetError(): Error & { code: string } {
+    const err = new Error(
+        'VITEST is set in the environment or in .env. It switches the bot to a temporary test database and mutes ' +
+            'Telegram alerts, so it must never be set on a real start. Remove it, then start again.',
+    ) as Error & { code: string };
+    err.code = 'MAIN_VITEST_SET';
+    return err;
+}
+
+/**
+ * The environment the start decision uses: the .env values under whatever the shell set, the
+ * same result as dotenv's own merge. They go into a private object so process.env stays exactly
+ * as it was: every module the bot loads afterwards sees the boot order it always did, including
+ * logger.ts reading LOG_LEVEL before config.ts loads .env. The path is a test seam only.
+ */
+export function readStartEnv(envPath?: string): NodeJS.ProcessEnv {
+    const fromFile: Record<string, string> = {};
+    if (envPath !== undefined || !process.env.VITEST) {
+        dotenv.config({ path: envPath, processEnv: fromFile, quiet: true });
+    }
+    return { ...fromFile, ...process.env };
+}
+
 /** Accepts exactly what `new ethers.Wallet(key)` accepts, so the lock key is the bot's wallet. */
 function walletAddress(env: NodeJS.ProcessEnv): string {
     const raw = env.PRIVATE_KEY;
@@ -41,6 +64,7 @@ function walletAddress(env: NodeJS.ProcessEnv): string {
 
 /** Takes the lock for this wallet, then starts the bot. Any lock error propagates (NAC-07). */
 export function runMain(opts: RunMainOptions): { lockFile: string; address: string } {
+    if (opts.env.VITEST) throw vitestSetError();
     const address = walletAddress(opts.env);
     const { lockFile } = acquireProcessLock(opts.lockDir, address);
     opts.startBot();
@@ -50,7 +74,7 @@ export function runMain(opts: RunMainOptions): { lockFile: string; address: stri
 function refusalText(err: unknown): string {
     const code = (err as { code?: unknown } | null | undefined)?.code;
     const message = err instanceof Error ? err.message : String(err);
-    if (code === 'PROCESS_LOCK_HELD' || code === 'PROCESS_LOCK_MECHANISM' || code === 'MAIN_NO_WALLET') {
+    if (code === 'PROCESS_LOCK_HELD' || code === 'PROCESS_LOCK_MECHANISM' || code === 'MAIN_NO_WALLET' || code === 'MAIN_VITEST_SET') {
         return `Refusing to start [${code}]: ${message}\n`;
     }
     // Anything else is a failure while loading the bot, where the stack is what diagnoses it.
@@ -59,10 +83,9 @@ function refusalText(err: unknown): string {
 }
 
 if (require.main === module) {
-    if (!process.env.VITEST) dotenv.config();
     try {
         runMain({
-            env: process.env,
+            env: readStartEnv(),
             lockDir: defaultLockDir(),
             startBot: () => {
                 // Loaded here, after the lock, so nothing stateful runs before it. Not awaited and

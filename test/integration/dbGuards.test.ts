@@ -4,8 +4,9 @@
 // Vitest through spawnRailedChild, so the production branch is exercised; the live data/ is
 // never named by any test here.
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'node:fs';
+import fsDefault from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -225,6 +226,21 @@ describe('the probe itself leaves no trace (no new files, no changed bytes)', ()
         expect(probe.userVersion).toBe(CURRENT_SCHEMA_VERSION);
         expect(probe.schemaObjectCount).toBeGreaterThan(0);
         expect(snapshot(dir)).toEqual(before);
+    });
+
+    it('a failed temp-copy cleanup does not turn a good probe into a failure (review WR-04)', () => {
+        const dir = tempDir();
+        const p = path.join(dir, 'wal.db');
+        buildWalWriter(p).close();
+        const rm = vi.spyOn(fsDefault, 'rmSync').mockImplementation(() => {
+            throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' });
+        });
+        try {
+            expect(probeExistingDb(p).userVersion).toBe(CURRENT_SCHEMA_VERSION);
+            expect(rm).toHaveBeenCalled();
+        } finally {
+            rm.mockRestore();
+        }
     });
 
     it('WAL-mode copy with -wal and -shm (user_version read from the WAL)', () => {

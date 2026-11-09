@@ -12,7 +12,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import { killProcessTree, readSentinels, REPO_ROOT, spawnRailedChild, spawnRailedChildAsync } from '../rails/spawnRailedChild';
-import { runMain } from '../../src/main';
+import { readStartEnv, runMain } from '../../src/main';
 import { acquireProcessLock, tryAcquireThenRelease } from '../../src/utils/processLock';
 
 const CHILD_TEST_TIMEOUT_MS = 120_000;
@@ -124,6 +124,37 @@ describe('SAFE-04 boot entry', () => {
         );
         expect(err.code).toBe('PROCESS_LOCK_MECHANISM');
         expect(started).toBe(0);
+    });
+
+    it('a set VITEST refuses the start before the lock is touched and never starts the bot (review WR-01)', () => {
+        const lockDir = path.join(tempDir(), 'locks');
+        let started = 0;
+        const err = failure(() =>
+            runMain({
+                env: { PRIVATE_KEY: KEY, VITEST: 'true' },
+                lockDir,
+                startBot: () => {
+                    started += 1;
+                },
+            }),
+        );
+        expect(err.code).toBe('MAIN_VITEST_SET');
+        expect(started).toBe(0);
+        expect(fs.existsSync(lockDir)).toBe(false);
+    });
+
+    it('readStartEnv reads the file into a private object, lets the shell win, and leaves process.env untouched (review WR-03)', () => {
+        const file = path.join(tempDir(), 'start-env-fixture.txt');
+        fs.writeFileSync(file, 'CSB_START_ENV_PROBE=from-file\nCSB_START_ENV_SHELL=from-file\n', 'utf8');
+        process.env.CSB_START_ENV_SHELL = 'from-shell';
+        try {
+            const env = readStartEnv(file);
+            expect(env.CSB_START_ENV_PROBE).toBe('from-file');
+            expect(env.CSB_START_ENV_SHELL).toBe('from-shell');
+            expect(process.env.CSB_START_ENV_PROBE).toBeUndefined();
+        } finally {
+            delete process.env.CSB_START_ENV_SHELL;
+        }
     });
 
     it('a missing or invalid PRIVATE_KEY throws MAIN_NO_WALLET, never quotes the value, and never starts the bot', () => {

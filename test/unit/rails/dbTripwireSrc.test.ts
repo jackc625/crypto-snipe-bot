@@ -134,6 +134,27 @@ describe('unset or empty DB_PATH under Vitest', () => {
     });
 });
 
+describe('a data folder that is a link', () => {
+    it('refuses a target reached through a junction or symlink at <repo>/data (review WR-05)', async () => {
+        const { assertNotProdDbUnderVitest } = await import('../../../src/utils/dbPath');
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-dbtrip-link-'));
+        const repo = path.join(root, 'repo');
+        const linked = path.join(root, 'elsewhere');
+        fs.mkdirSync(repo);
+        fs.mkdirSync(linked);
+        const link = path.join(repo, 'data');
+        fs.symlinkSync(linked, link, IS_WIN ? 'junction' : 'dir');
+        try {
+            expect(codeOf(() => assertNotProdDbUnderVitest(path.join(linked, 'bot.db'), repo))).toBe('RAIL_DB_TRIPWIRE_SRC');
+            expect(codeOf(() => assertNotProdDbUnderVitest(path.join(link, 'bot.db'), repo))).toBe('RAIL_DB_TRIPWIRE_SRC');
+            expect(codeOf(() => assertNotProdDbUnderVitest(path.join(root, 'unrelated.db'), repo))).toBe('NO-THROW');
+        } finally {
+            fs.unlinkSync(link);
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+});
+
 describe('path anchoring', () => {
     it('a relative DB_PATH resolves against the repo root, not the working directory', async () => {
         const { resolveDbPath } = await import('../../../src/utils/dbPath');

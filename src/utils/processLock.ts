@@ -73,7 +73,11 @@ function currentPin(): ProcessLockPin | undefined {
     return (globalThis as unknown as PinnedGlobal)[PIN];
 }
 
-/** The machine-global lock folder, so a second clone of the repo is blocked too. */
+/**
+ * The per-user lock folder, so a second clone of the repo is blocked too. It follows the OS user
+ * and HOME/USERPROFILE: a bot started as another user, or with those changed, gets a different
+ * lock file and is not excluded.
+ */
 export function defaultLockDir(): string {
     const home = os.homedir();
     if (process.platform === 'win32') {

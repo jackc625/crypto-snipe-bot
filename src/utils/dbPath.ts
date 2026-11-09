@@ -4,7 +4,8 @@
 // whether it may be opened. db.ts and scripts/db-init.ts share these functions so both resolve
 // the path the same way. This file holds no module-level state and opens nothing at import.
 //
-// Rails are env-independent where it matters: no env var or flag relaxes any guard here.
+// Rails are env-independent where it matters: the one selector is VITEST, and src/main.ts refuses
+// to start the bot when it is set. No other env var or flag relaxes any guard here.
 
 import fs from 'fs';
 import path from 'path';
@@ -94,9 +95,13 @@ function refusal(code: string, message: string): Error {
  */
 export function assertNotProdDbUnderVitest(p: string, repoRoot: string): void {
     if (p === MEMORY_DB) return;
-    const dataDir = comparisonForm(path.join(canonicalDbPath(repoRoot), 'data'));
+    // Both forms, because <repo>/data can itself be a junction or symlink to somewhere else.
+    const dataDirs = [
+        comparisonForm(path.join(canonicalDbPath(repoRoot), 'data')),
+        comparisonForm(canonicalDbPath(path.join(repoRoot, 'data'))),
+    ];
     const target = comparisonForm(canonicalDbPath(p));
-    if (target === dataDir || target.startsWith(dataDir + path.sep)) {
+    if (dataDirs.some((dataDir) => target === dataDir || target.startsWith(dataDir + path.sep))) {
         throw refusal(
             'RAIL_DB_TRIPWIRE_SRC',
             `RAIL_DB_TRIPWIRE_SRC: refused to open ${path.resolve(p)} under Vitest: this guard protects the live bot DB (SAFE-02, src layer)`,
@@ -186,7 +191,11 @@ function readSchemaFactsNoTouch(p: string): SchemaFacts {
         if (fs.existsSync(`${p}-wal`) && fs.existsSync(`${p}-shm`)) return readSchemaFacts(p);
         throw err;
     } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
+        try {
+            fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+        } catch {
+            // A leftover temp copy says nothing about whether the database is safe to open.
+        }
     }
 }
 
