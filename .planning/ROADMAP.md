@@ -531,7 +531,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Safety Rails & Audit | 29/29 | In Progress | - |
+| 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
 | 23. Test Safety Net (Harness, Triage, Characterization) | 0/TBD | Not started | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
