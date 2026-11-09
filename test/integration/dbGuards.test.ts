@@ -87,9 +87,10 @@ describe('AC-24 schema version guard', () => {
         buildVersion(p, CURRENT_SCHEMA_VERSION + 1);
         const before = sha(p);
         const r = runChild('boot', p);
+        // Hash first: a refused newer DB must never be written, whatever the child printed.
+        expect(sha(p)).toBe(before);
         expect(r.status, r.out).toBe(1);
         expect(refusedLine(r.out)).toMatch(/^REFUSED DB_REFUSED_NEWER_SCHEMA .*schema version 8.*up to 7/);
-        expect(sha(p)).toBe(before);
     });
 });
 
