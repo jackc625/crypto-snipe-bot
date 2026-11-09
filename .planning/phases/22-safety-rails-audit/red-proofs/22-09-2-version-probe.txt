@@ -1,0 +1,60 @@
+# RED proof 22-09-2-version-probe (AC-18, src DB layer)
+Date: 2026-11-09T02:01:47.632Z
+File neutralised (working tree only, never committed): src/utils/dbPath.ts
+sha256 before and after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1
+
+## Diff applied
+
+diff --git a/src/utils/dbPath.ts b/src/utils/dbPath.ts
+index 3ca83ad..e52a6dd 100644
+--- a/src/utils/dbPath.ts
++++ b/src/utils/dbPath.ts
+@@ -241,7 +241,7 @@ export function assertDbOpenable(p: string, probe: DbProbe, opts: OpenableCheckO
+  */
+ export function openGuardedDb(p: string, opts: OpenGuardedDbOptions): Database.Database {
+     const probe = p === MEMORY_DB ? null : probeExistingDb(p);
+-    if (probe) assertDbOpenable(p, probe, opts);
++    // if (probe) assertDbOpenable(p, probe, opts); (RED 22-09-2)
+     opts.raceHookForTests?.();
+     if (opts.vitest) return new Database(p);
+ 
+@@ -262,10 +262,10 @@ export function openGuardedDb(p: string, opts: OpenGuardedDbOptions): Database.D
+             throw refusal('DB_REFUSED_REPLACED', `DB_REFUSED_REPLACED: database at ${abs} changed identity between the version probe and the write open; refusing to open it`);
+         }
+         const version = db.pragma('user_version', { simple: true }) as number;
+-        if (version > opts.current) {
++        if (false && version > opts.current) { // RED 22-09-2
+             throw refusal('DB_REFUSED_NEWER_SCHEMA', `DB_REFUSED_NEWER_SCHEMA: database at ${abs} has schema version ${version}, this build supports up to ${opts.current}; refusing to open it`);
+         }
+-        if (version === 0) {
++        if (false && version === 0) { // RED 22-09-2
+             throw refusal('DB_REFUSED_UNINITIALISED', `DB_REFUSED_UNINITIALISED: database at ${abs} has user_version 0 at the write open (first-time creation is only through: npm run db:init)`);
+         }
+         handedOver = true;
+
+
+## Command (wrapped, ran ONLY this test file, filter -t "v8")
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects integration -- node node_modules/vitest/vitest.mjs run --project integration test/integration/dbGuards.test.ts -t v8
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 16 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020131-6820-78582d | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020131-6820-78582d\summary.json
+ FAIL   integration  test/integration/dbGuards.test.ts > AC-24 schema version guard > a v8 database (CURRENT+1) refuses and its bytes are unchanged
+AssertionError: expected '0b3939f8daa63ca08a07828d4ffb94f8cada4…' to be '1ca961e65b21a49d023d730450fd384f64d37…' // Object.is equality
+Expected: "1ca961e65b21a49d023d730450fd384f64d375336e169ffbb530f9c765876f4f"
+Received: "0b3939f8daa63ca08a07828d4ffb94f8cada4ae1f0981dbeda65c34857a7e530"
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/dbPath.ts
+sha256 after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1 (equal)
+git status --porcelain src/utils/dbPath.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 16 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020140-11188-8f6a47 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020140-11188-8f6a47\summary.json

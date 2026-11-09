@@ -1,0 +1,63 @@
+# RED proof 22-09-4-write-boundary (AC-18, src DB layer)
+Date: 2026-11-09T02:03:49.920Z
+File neutralised (working tree only, never committed): src/utils/dbPath.ts
+sha256 before and after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1
+
+## Diff applied
+
+diff --git a/src/utils/dbPath.ts b/src/utils/dbPath.ts
+index 3ca83ad..acb9a7f 100644
+--- a/src/utils/dbPath.ts
++++ b/src/utils/dbPath.ts
+@@ -248,7 +248,7 @@ export function openGuardedDb(p: string, opts: OpenGuardedDbOptions): Database.D
+     const abs = path.resolve(p);
+     let db: Database.Database;
+     try {
+-        db = new Database(p, { fileMustExist: true });
++        db = new Database(p); // RED 22-09-4
+     } catch (err) {
+         if (!fs.existsSync(p)) {
+             throw refusal('DB_REFUSED_MISSING', `DB_REFUSED_MISSING: no database at ${abs}; it vanished before the write open and is not being created (first-time creation is only through: npm run db:init)`);
+@@ -259,7 +259,7 @@ export function openGuardedDb(p: string, opts: OpenGuardedDbOptions): Database.D
+     try {
+         const after = fs.statSync(p, { bigint: true });
+         if (!probe?.identity || after.dev !== probe.identity.dev || after.ino !== probe.identity.ino) {
+-            throw refusal('DB_REFUSED_REPLACED', `DB_REFUSED_REPLACED: database at ${abs} changed identity between the version probe and the write open; refusing to open it`);
++            // identity refusal removed (RED 22-09-4)
+         }
+         const version = db.pragma('user_version', { simple: true }) as number;
+         if (version > opts.current) {
+
+
+## Command (wrapped, ran ONLY this test file, filter -t "race")
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects integration -- node node_modules/vitest/vitest.mjs run --project integration test/integration/dbGuards.test.ts -t race
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 7 passed | 9 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020324-17856-024580 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020324-17856-024580\summary.json
+ FAIL   integration  test/integration/dbGuards.test.ts > write boundary races (nothing created or migrated) > race-delete: the file vanishes after the probe and is not created
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ FAIL   integration  test/integration/dbGuards.test.ts > write boundary races (nothing created or migrated) > race-replace-other-v7: a different v7 file swapped in is refused
+AssertionError: OPENED C:\Users\jackc\AppData\Local\Temp\csb-dbguards-xaJA8X\race.db v7
+: expected +0 to be 1 // Object.is equality
+- 1
++ 0
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/dbPath.ts
+sha256 after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1 (equal)
+git status --porcelain src/utils/dbPath.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  9 passed | 9 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020337-19436-893b0b | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020337-19436-893b0b\summary.json

@@ -99,11 +99,12 @@ describe('AC-26 refuse-to-create outside Vitest', () => {
         const dir = tempDir();
         const p = path.join(dir, 'missing.db');
         const r = runChild('boot', p);
+        // Checked first: a refused missing path must never be created, whatever the child printed.
+        expect(fs.existsSync(p)).toBe(false);
         expect(r.status, r.out).toBe(1);
         expect(refusedLine(r.out)).toContain('DB_REFUSED_MISSING');
         expect(refusedLine(r.out)).toContain(p);
         expect(refusedLine(r.out)).toContain('npm run db:init');
-        expect(fs.existsSync(p)).toBe(false);
     });
 
     it('a 0-byte file refuses and stays 0 bytes', { timeout: CHILD_TIMEOUT }, () => {
@@ -149,9 +150,9 @@ describe('write boundary races (nothing created or migrated)', () => {
     it('race-delete: the file vanishes after the probe and is not created', { timeout: CHILD_TIMEOUT }, () => {
         const p = raceFixture();
         const r = runChild('race-delete', p);
+        expect(afterLine(r.out).exists).toBe(false);
         expect(r.status, r.out).toBe(1);
         expect(refusedLine(r.out)).toContain('DB_REFUSED_MISSING');
-        expect(afterLine(r.out).exists).toBe(false);
     });
 
     it('race-replace-v8: a newer DB swapped in is refused, unchanged', { timeout: CHILD_TIMEOUT }, () => {
