@@ -22,8 +22,8 @@
 - [ ] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
 - [ ] **AUDIT-02**: All 28 research-surfaced candidates (SUMMARY.md §Audit Candidates) are triaged to confirmed (RED real-path test or fork script) or NOT-A-BUG (with evidence).
 - [ ] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
-- [ ] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
-- [ ] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
+- [x] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
+- [x] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
 - [ ] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
 - [ ] **AUDIT-07**: Every confirmed S2–S4 finding in the register is fixed with a RED-then-GREEN test (real-path for money-path code) or closed by an explicit operator won't-fix decision before the re-entry gate — none deferred automatically (covers e.g. base-fee derivation, DEX-listener backfill/heartbeat, stale buy deadline, fee-on-transfer sell variant, reorg handling, `.wait()` error classification, non-transactional state changes, symbol/name injection, key/log redaction, when confirmed below S1).
 
@@ -204,8 +204,8 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | AUDIT-01 | Phase 22 | Pending |
 | AUDIT-02 | Phase 23 | Pending |
 | AUDIT-03 | Phase 22 | Pending |
-| AUDIT-04 | Phase 22 | Pending |
-| AUDIT-05 | Phase 22 | Pending |
+| AUDIT-04 | Phase 22 | Complete |
+| AUDIT-05 | Phase 22 | Complete |
 | AUDIT-06 | Phase 23 | Pending |
 | AUDIT-07 | Phase 29 | Pending |
 | CHAR-01 | Phase 23 | Pending |

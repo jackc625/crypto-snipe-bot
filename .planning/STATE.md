@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-10-PLAN.md
-last_updated: "2026-11-09T02:29:10.725Z"
+stopped_at: Completed 22-28-PLAN.md
+last_updated: "2026-11-09T03:04:26.777Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 8ba7687940d29e70b020efac6f5afc2c8088efc8
+state_head: bf6a1254b994368e3927fdd9aa105cc1aca24679
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 21
+  completed_plans: 22
   percent: 0
 ---
 
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 11 of 29
-Status: Executing Phase 22
+Plan: 12 of 29
+Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
@@ -99,11 +99,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P27 | 27h 44m | 3 tasks | 120 files |
 | Phase 22 P09 | 22min | 3 tasks | 14 files |
 | Phase 22 P10 | 11min | 3 tasks | 18 files |
+| Phase 22 P28 | 10 min | 2 tasks | 224 files |
 
 ## Session
 
-**Last session:** 2026-11-09T02:22:18.813Z
-**Stopped at:** Completed 22-10-PLAN.md
+**Last session:** 2026-11-09T03:04:26.639Z
+**Stopped at:** Completed 22-28-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -172,3 +173,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-10: the notifier refusal runs first inside the existing try of sendTelegramAlert and sendCtxAlert, so a refused send is caught by the existing log.warn, never reaches the caller, and the broadcast still runs (D-04 amended)
 - [Phase 22]: 22-10: five dotenv sites (src/config, src/utils/notifier, scripts/pause, resume, preflight) are VITEST-gated and proven by child probes; production path shown unchanged with a fake .env in a throwaway folder and a loopback fake, never the real .env or Telegram
 - [Phase 22]: 22-10: UFV-03 (AC-16 notifier refusal under the real fork project) is owned by Phase 25; rehearsal pass vpu-20261109T021405-22636-8bff56; 22-29 registers it with UFV-01 and UFV-02
+- [Phase 22]: 22-28: DB-07 linked to OD-18 rather than numbered, because OD-18 already holds the synchronous=FULL decision
+- [Phase 22]: 22-28: DB-01 numbered as OD-58 rather than linked to OD-25, so an S1 capital decision keeps its options in OPERATOR-DECISIONS.md
+- [Phase 22]: 22-28: card capital flag follows the capital_impact of its findings; BUY-05, DB-06 and TX-04 became capital
