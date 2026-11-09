@@ -37,6 +37,14 @@
       "AUD-ANTIRUG-020",
       "AUD-ANTIRUG-021",
       "AUD-ANTIRUG-022"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+        "findings": "none",
+        "note": "Two hunks: imports and registerSingleton('antiRugDetector', __filename, EPOCH) before the position registry. Registry call only (RC-17). No detection or exit logic changed."
+      }
     ]
   },
   {
