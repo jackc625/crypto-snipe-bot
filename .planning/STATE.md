@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-27-PLAN.md
-last_updated: "2026-11-09T01:42:23.231Z"
+stopped_at: Completed 22-09-PLAN.md
+last_updated: "2026-11-09T02:07:09.789Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: 834abd3ad0177588de3d4fbdb44f0da4deac14bf
+state_head: 3e5c947f1fc876f06f47a2be71758c3035422230
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 19
+  completed_plans: 20
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 20 of 29
+Plan: 21 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -97,11 +97,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P25 | 36min (continuation; incl. operator wait) | 3 tasks tasks | 33 files files |
 | Phase 22 P26 | 51min (wall-clock incl. two operator waits) | 2 tasks | 16 files |
 | Phase 22 P27 | 27h 44m | 3 tasks | 120 files |
+| Phase 22 P09 | 22min | 3 tasks | 14 files |
 
 ## Session
 
-**Last session:** 2026-11-09T01:42:23.126Z
-**Stopped at:** Completed 22-27-PLAN.md
+**Last session:** 2026-11-09T02:07:09.673Z
+**Stopped at:** Completed 22-09-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -165,3 +166,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-27: operator ruled codex a, agy c: codex ran only inside a pinned Docker container with no file or shell tools; agy was left out and sent nothing, so D-14 is only partly covered (one outside assistant, recorded as a deviation)
 - [Phase 22]: 22-27: 101 codex findings merged as 72 matches and 28 new entries; three new BUY S1 entries (AUD-BUY-027, 028, 030) in ESC-BUY-03, operator: Acknowledge continue
 - [Phase 22]: 22-27: 22-28 must re-grade all 43 entries where codex said S1 and the register says lower, against the code at the audit base, and bring the operator anything that moves up to S1 (MERGE.json consolidation_required)
+- [Phase 22]: 22-09: the DB version probe never touches the real file: WAL-mode DBs are probed through a private temp copy because a read-only open creates or rewrites -shm/-wal beside them (measured); with -wal and -shm both present and a torn copy it falls back to the direct read-only open, otherwise fails closed
+- [Phase 22]: 22-09: db.ts now anchors DB_PATH to the repo root and refuses a newer, missing or empty database outside Vitest; npm run db:init is the only creation path (never run against real data in this plan); AUD-DB-006/-007 mitigations landed and are re-audited in 22-29
