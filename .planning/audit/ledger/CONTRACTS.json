@@ -7,6 +7,16 @@
       "AUD-CONTRACTS-003",
       "AUD-ROOT-001",
       "AUD-ROOT-003"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a1ae6932ba35dae93a470d6a0644a9e8ea9fde75",
+        "findings": [
+          "AUD-CONTRACTS-005"
+        ],
+        "note": "One hunk: adds the vi.mock specifier gate. No secrets added. Reviewed. The missing job timeout predates Phase 22 (AUD-CONTRACTS-005)."
+      }
     ]
   },
   {
