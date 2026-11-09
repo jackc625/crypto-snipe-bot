@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-13-PLAN.md
-last_updated: "2026-11-09T04:02:02.248Z"
+stopped_at: Completed 22-14-PLAN.md
+last_updated: "2026-11-09T04:18:53.456Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 1f4e34cb092aad1e64253956033504801f535c68
+state_head: a1ae6932ba35dae93a470d6a0644a9e8ea9fde75
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 25
+  completed_plans: 26
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 15 of 29
+Plan: 16 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -103,11 +103,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P11 | 14min | 3 tasks | 23 files |
 | Phase 22 P12 | 11min | 3 tasks | 16 files |
 | Phase 22 P13 | 17min | 3 tasks | 24 files |
+| Phase 22 P14 | 8min | 2 tasks | 17 files |
 
 ## Session
 
-**Last session:** 2026-11-09T04:02:02.110Z
-**Stopped at:** Completed 22-13-PLAN.md
+**Last session:** 2026-11-09T04:18:53.345Z
+**Stopped at:** Completed 22-14-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -190,3 +191,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-13: src/main.ts accepts PRIVATE_KEY with or without 0x exactly as new ethers.Wallet does, so the lock key is the signing wallet; MAIN_NO_WALLET uses fixed text because ethers errors can quote the key
 - [Phase 22]: 22-13: rail for AUD-TX-005 (RC-18) is in place, register status stays with 22-29; the scripts-while-held proof does not settle card SCRIPTS-01
 - [Phase 22]: 22-13 for 22-15: test/unit/rails/spawnSites.test.ts is red at HEAD from 22-12 files (6 offences, none spawns), recorded S3 in rails-discoveries.json; the first full-suite run will hit it
+- [Phase 22]: 22-14: the vi.mock gate also accepts Node built-ins and rejects declaration-only targets, because createRequire returns a bare name for built-ins and a .d.ts-only mock intercepts nothing at run time
+- [Phase 22]: 22-14: the gate exits 2, not 0, when a scan finds no source files or no mock call, so a broken scan cannot pass as clean
