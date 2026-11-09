@@ -36,6 +36,14 @@
       "AUD-BUY-029",
       "AUD-BUY-030",
       "AUD-BUY-033"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Reviewed for the 20 classes and for the first-import direct-entry guard. Two hunks only: import './guards/directEntry' is the first statement (first-import guard, RC-18 / D-07), and the require.main block now refuses instead of starting (the refusal text matches the guard). No trading decision, tx construction or signing path changed. The remaining require.main block is unreachable because the first-import guard exits first; harmless and left as written."
+      }
     ]
   },
   {
@@ -156,6 +164,25 @@
       "AUD-BUY-026",
       "AUD-BUY-027",
       "AUD-BUY-031"
+    ]
+  },
+  {
+    "path": "src/main.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": [
+      "AUD-BUY-034",
+      "AUD-BUY-035"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": [
+          "AUD-BUY-034",
+          "AUD-BUY-035"
+        ],
+        "note": "Lock-first entry (D-07, RC-18). Lock is taken before require('./bot'); nothing stateful is imported first (only dotenv, ethers computeAddress, processLock). Read the file in full: runMain refuses VITEST before the lock, derives the wallet with the same accept rule as new ethers.Wallet (0x optional, 64 hex) and fails closed with fixed text so a rejected key is never quoted. readStartEnv keeps .env values in a private object so process.env and boot order are unchanged. Lock errors propagate as ProcessLockError codes; both refuse boot (NAC-07). startMultiChainBot is called exactly as before (not awaited; OD-6 owns that). Two defects found in code review before the seal are registered here: VITEST on a real start (AUD-BUY-034) and LOG_LEVEL taking effect from .env (AUD-BUY-035), both fixed in 5378478 and RED-proven."
+      }
     ]
   }
 ]

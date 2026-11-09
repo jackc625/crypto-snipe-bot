@@ -1,0 +1,88 @@
+{
+  "id": "AUD-REAUDIT-002",
+  "title": "Every Phase 22 script hard-codes Node ABI 127 and the direct-entry guard relies on require.main, both of which the Node upgrade must change",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "node-upgrade"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "db68184d5c1292b05640e5bfcb7a94462c3def7f",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: nothing is wrong today. The asserts fail closed and the guard works under the current runtime.",
+  "area": "scripts",
+  "slice": "REAUDIT",
+  "severity": "S4",
+  "files": [
+    "scripts/backup-state.ts",
+    "scripts/capture-baselines.ts",
+    "scripts/check-vi-mock-paths.ts",
+    "scripts/db-init.ts",
+    "scripts/forensic-db.ts",
+    "scripts/nac01-exact-value-check.ts",
+    "scripts/verify-prod-untouched.ts",
+    "src/guards/directEntry.ts",
+    "src/main.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/backup-state.ts:82@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/capture-baselines.ts:39@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/check-vi-mock-paths.ts:39@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/db-init.ts:43@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/forensic-db.ts:76@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/nac01-exact-value-check.ts:68@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/verify-prod-untouched.ts:61@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "refuses any Node other than ABI 127"
+    },
+    {
+      "type": "code",
+      "ref": "src/guards/directEntry.ts:42@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "depends on the CommonJS require.main, which does not exist in ESM"
+    },
+    {
+      "type": "code",
+      "ref": "src/main.ts:85@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "same dependency for the entry block"
+    }
+  ],
+  "sibling_sites_checked": "git grep -l process.versions.modules across scripts/ and src/: the seven scripts above and the .planning/audit tools (those tools are outside the audited universe and carry the same assert). git grep require.main in src/: bot.ts, main.ts and guards/directEntry.ts. No other ABI or CommonJS-only assumption was found in the Phase 22 files.",
+  "owner_phase": "26",
+  "recommendation": "Phase 26 (Node upgrade and ESM conversion): move every ABI assert in step with the new Node, and re-check the direct-entry guard, because require.main does not exist in ESM. A second-import guard that uses import.meta.main or an equivalent must replace it before the conversion lands."
+}

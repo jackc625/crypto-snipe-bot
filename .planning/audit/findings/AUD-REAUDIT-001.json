@@ -1,0 +1,98 @@
+{
+  "id": "AUD-REAUDIT-001",
+  "title": "The fork rehearsal Vitest config did not extend its root config, so its envDir: false never reached its project and Vite was left free to read the repo .env files in the unrailed Vitest main process during fork rehearsal runs",
+  "kind": "finding",
+  "area": "test",
+  "slice": "REAUDIT",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "test/rails/vitest.fork-rehearsal.config.ts",
+    "test/unit/rails/forkRehearsalParity.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:14@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "vitest.config.ts is not affected. Its inline projects have extends: true at :14, :27 and :40, and its root config has envDir: false at :10. The main test run never had this defect."
+    },
+    {
+      "type": "command",
+      "ref": "git log -S'extends: true' --format=%h -- vitest.config.ts",
+      "note": "Prints only d5f65b1. The extends: true lines have been in the main config since that commit, before Phase 22, so no commit in this phase changed the answer for npm test."
+    },
+    {
+      "type": "code",
+      "ref": "test/rails/vitest.fork-rehearsal.config.ts:22-27@64bc83235844077c7975ae0e0c0275cf31b73cb3",
+      "note": "The rehearsal config before the fix: envDir: false at the root (:23) and a project with its own root (:27) and no extends. This one config is what the finding is about."
+    },
+    {
+      "type": "command",
+      "ref": "read node_modules/vitest/dist/chunks/cli-api.BUXBO6jS.js:11093 (vitest 4.1.1)",
+      "note": "const configFile = ... options.extends === true ? vitest.vite.config.configFile || false : false. Without extends the project is built with configFile false, so the root envDir is never merged into it. With extends: true the project re-reads the root config file and inherits envDir: false."
+    },
+    {
+      "type": "command",
+      "ref": "read node_modules/vite/dist/node/chunks/node.js:34119-34121 and :4953-4965 (vite 8.0.2)",
+      "note": "Vite resolves envDir to the project root when it is not false, then loadEnv calls fs.readFileSync on .env, .env.local, .env.<mode> and .env.<mode>.local. It keeps only VITE_-prefixed values; NODE_ENV and BROWSER from the file have side effects on process.env. This code runs in the Vitest main process."
+    },
+    {
+      "type": "command",
+      "ref": "read node_modules/vitest/dist/chunks/*.js for loadEnv: no use other than Vite's own resolveConfig",
+      "note": "Vitest itself does not load any env file; the only path to a repo .env file in the main process is Vite's loadEnv."
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/rails/vitestEnvFile.test.ts:57-82@a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+      "note": "Added with the fix. Real Vitest runs a throwaway root holding a FAKE .env, with decoy projects that copy the extends and envDir values of every project of the two real configs, plus a control with neither. The real .env is never named or opened."
+    },
+    {
+      "type": "command",
+      "ref": ".planning/phases/22-safety-rails-audit/red-proofs/22-review-2-rehearsal-env-file.txt (INDEX row 30), RED run vpu-20261109T055843-19660-967316, GREEN run vpu-20261109T055902-2252-ef2e3a",
+      "note": "RED against the unfixed config: 1 failed, 1 passed: the case for test/rails/vitest.fork-rehearsal.config.ts got 'fake-env-marker', the case for vitest.config.ts passed. After extends: true was added, both passed. This is the proof the main config was never affected and only the rehearsal config was."
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/rails/forkRehearsalParity.test.ts:54-57@c3472c639787e144d685194643629d8fe07e867d",
+      "note": "'the rehearsal loads no .env' asserts only that the rehearsal root config has envDir false. It pins the setting, not the behaviour, and stayed green while the project ignored the setting. Replaced as evidence by the fake-file test above."
+    },
+    {
+      "type": "command",
+      "ref": "wrapped decoy Vitest runs vpu-20261109T055252-22628-3b4c14 and vpu-20261109T055256-19212-54a7fa, scratchpad decoy-envdir (verdict untouched)",
+      "note": "Accurately described: these two runs modelled a config with envDir: false at the root and a project with NO extends, which is the shape the rehearsal config had before the fix, not the shape of vitest.config.ts. First run: a decoy .env holding VITE_DECOY_MARKER and DECOY_APP_KEY; import.meta.env.VITE_DECOY_MARKER in the worker was 'decoy-marker-value' and DECOY_APP_KEY did not reach process.env in the worker. Second run: envDir: false added to the project, the marker was absent."
+    },
+    {
+      "type": "command",
+      "ref": "ls <os.tmpdir()>/crypto-snipe-bot-rail-ledger/*/projects/fork-rehearsal.json",
+      "note": "12 runs labelled fork-rehearsal are still on disk. 11 of them predate a08d650 (vpu-20261107T042012, 042054, 042757; vpu-20261109T021405, 021518, 022043, 032129; vpu-20261109T044252, 044257, 044303, 044329). The four 044xxx runs were a scratchpad rehearsal config for the moved HoneypotChecker test, whose extends setting is not recoverable from the record. vpu-20261109T055907-6892-d9a439 ran after the fix and passed 6 of 6."
+    }
+  ],
+  "sibling_sites_checked": "All Vitest and Vite configs tracked at HEAD (git ls-files): vitest.config.ts (three inline projects, each with extends: true, not affected); test/rails/vitest.fork-rehearsal.config.ts (one inline project, affected until a08d650); dashboard/vite.config.ts (not a Vitest test project). The Vitest main process stays deliberately unrailed: the worker rails in test/rails/core.cjs block .env reads only in workers and railed children, so neither the rail ledger nor verify-prod-untouched could have recorded this read. Other env loaders in the main process, searched: vitest.config.ts imports only vitest/config; test/rails/ledgerRun.ts never reads .env; test/unit/rails/forkShellOnly.test.ts scans the main-process import closure of both configs and passes.",
+  "status": "fixed",
+  "origin": "re-audit",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 from PROTOCOL section 2. Not S1 or S2: no capital path is involved, the bot was off, and nothing about this reached the bot. The wrong behaviour is confined to one non-production rehearsal config; npm test and the real fork project were never affected. Not 'test/infra drift that can hide an S0/S1': the code path keeps only VITE_-prefixed values and exposes them through import.meta.env, which no code under test reads (git grep import.meta.env finds only this finding's own test); it cannot put an app key into a worker's process.env, and the in-worker rehearsal assertions (sentinel env, Telegram refusal, fork shell keys) are therefore unchanged by it. What it is, is misleading: the config said it loaded no env file and a test appeared to prove that, while the unrailed main process remained free to read .env during those 11 runs, which a rail ledger cannot see. The 'rail' tag keeps it immediate-tier regardless of severity. Nobody observed the real .env being opened: this rests on the code path and on fake-file runs, by design, since the real file must never be touched to prove this.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-RAIL-002"
+  ],
+  "tags": [
+    "rail"
+  ],
+  "escalation_ref": "ESC-REAUDIT-01",
+  "od_ref": null,
+  "recommendation": "Done. Commit a08d650 adds extends: true to the rehearsal project and adds test/unit/rails/vitestEnvFile.test.ts, proven failing first against a fake env file (RED proof INDEX row 30). The Phase 22 note for the record: the rehearsal's in-worker results stand, because the read could only have happened in the main process and only VITE_-prefixed values could have left it; the post-fix rehearsal run vpu-20261109T055907-6892-d9a439 passed 6 of 6. Any new Vitest config must carry both envDir: false and extends: true on each inline project; the fake-file test covers both existing configs.",
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+  "fixed_by": "a08d650",
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/22-review-2-rehearsal-env-file.txt (INDEX.md row 30: 'The Vitest configs read no env file of their root'; RED run vpu-20261109T055843-19660-967316)",
+  "not_observed_note": "Nobody observed the real .env being opened. The conclusion rests on reading the Vitest and Vite code paths and on real Vitest runs against a fake .env in a throwaway root."
+}
