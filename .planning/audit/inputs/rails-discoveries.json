@@ -25,5 +25,115 @@
     "severity_estimate": "S3",
     "found_in_plan": "22-15",
     "resolution": "Operator ruling ESC-RAILS-01 (reply: b): the one test moved to the fork project in commit d66d8d0 (test/fork/honeypotDeploy.eth.fork.test.ts), assertions word for word. It has not run in its new file; the real run is obligation UFV-05, owner Phase 25. 22-29 registers this as a test-quality finding."
+  },
+  {
+    "file": "src/main.ts",
+    "line": 62,
+    "description": "A non-empty VITEST in the bot environment or .env switched a real start to test behaviour: db.ts resolved a temporary database (no open positions, unpaused) and every Telegram alert was refused, while the bot kept trading. Low likelihood, silent, affects funds.",
+    "defect_type": "production",
+    "severity_estimate": "S2",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-01",
+    "resolution": "commit 5378478: src/main.ts refuses to start when VITEST is set; RED-proven"
+  },
+  {
+    "file": "src/utils/processLock.ts",
+    "line": 77,
+    "description": "The lock folder follows the OS user and HOME/USERPROFILE, so two bots on one wallet under different users or a changed HOME each get their own lock.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-02",
+    "routing": "Documented in src/utils/processLock.ts (5378478). Needs a second bot under another OS user or a changed HOME. Registered by 22-29; a machine-wide lock location is a design choice for Phase 24."
+  },
+  {
+    "file": "src/main.ts",
+    "line": 62,
+    "description": "Loading .env before require(./bot) made LOG_LEVEL from .env take effect on the live bot, which it did not before; an invalid value would stop the boot. Undeclared boot behaviour change.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-03",
+    "resolution": "commit 5378478: src/main.ts reads .env into a private object, so process.env and boot order are unchanged; RED-proven"
+  },
+  {
+    "file": "src/utils/dbPath.ts",
+    "line": 189,
+    "description": "An exception from the unguarded temp-copy cleanup in the DB version probe replaced a successful result, turning a good database check into a boot failure.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-04",
+    "resolution": "commit 5378478: cleanup failure no longer fails the probe; RED-proven"
+  },
+  {
+    "file": "src/utils/dbPath.ts",
+    "line": 97,
+    "description": "The src-layer Vitest DB tripwire built the protected folder without resolving <repo>/data, so a data folder that is a junction or symlink was not protected at this layer. The setup-layer rail still caught it.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-05",
+    "resolution": "commit 5378478: tripwire also compares the resolved data folder; RED-proven"
+  },
+  {
+    "file": "scripts/capture-baselines.ts",
+    "line": 791,
+    "description": "A failed test collection is recorded as 0 tests and passes the NAC-04 check in --phase before mode.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-06",
+    "routing": "The false pass exists only in --phase before, which is complete; --phase after loads committed counts, so a failed collection fails NAC-04. Registered by 22-29."
+  },
+  {
+    "file": ".github/workflows/test.yml",
+    "line": 9,
+    "description": "The CI test job has no timeout.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-07",
+    "routing": "CI job timeout predates Phase 22. Registered by 22-29 for the CI work."
+  },
+  {
+    "file": "test/rails/core.cjs",
+    "line": 0,
+    "description": "process.loadEnvFile() is not covered by the .env rail.",
+    "defect_type": "test",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-01",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "test/rails/spawnRailedChild.ts",
+    "line": 0,
+    "description": "The spawn path limit does not resolve links.",
+    "defect_type": "test",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-02",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "scripts/capture-baselines.ts",
+    "line": 0,
+    "description": "capture-baselines --out with no value writes to the committed baseline folder.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-03",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "scripts/verify-prod-untouched.ts",
+    "line": 0,
+    "description": "The net-watch early-exit check cannot fire.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-04",
+    "routing": "Info. Registered by 22-29."
   }
 ]
