@@ -8,7 +8,7 @@
 //
 // Usage:
 //   node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts \
-//       [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] -- <command> [args...]
+//       [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] -- <command> [args...]
 //   node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --self-test
 //
 // What it does:
@@ -28,7 +28,14 @@
 //      and fails if it is missing or unparseable, its runId is not this run's, any
 //      --expect-projects name is absent from `projects` or has no worker in
 //      `workersByProject`, or nonLoopbackAllowed / telegramAllowed is above 0.
-//   7. Prints one verdict line naming the run id and the summary path.
+//   7. --net-watch (plan 22-15): an independent, sampled, OS-level backstop for outbound traffic.
+//      A separate sampler lists TCP connections in state Established or SynSent with their owning
+//      process id about once per second for the whole run (win32: one long-lived PowerShell with
+//      Get-NetTCPConnection and Get-CimInstance Win32_Process; Linux: ss -tnp and ps). Afterwards the
+//      samples are reduced to the connections owned by a descendant of this process, and any whose
+//      remote address is not loopback fails the run. It covers the Vitest MAIN process, which is
+//      deliberately not railed (22-08). It is sampled, so it can miss a very short connection.
+//   8. Prints one verdict line naming the run id and the summary path.
 //
 // Behavior (exit codes):
 //   - bad usage / no command                                -> usage to stderr, exit 1
@@ -56,7 +63,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
-import { spawnSync } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -96,6 +103,48 @@ interface LedgerSummary {
 interface GateResult {
     ok: boolean;
     problems: string[];
+}
+
+export interface NetWatchProc {
+    pid: number;
+    ppid: number;
+    created: number; // process creation time; pid + created identifies one process across samples
+    name: string;
+    vitestMain: boolean; // a node process whose command line runs vitest.mjs
+}
+
+export interface NetWatchConn {
+    pid: number;
+    remote: string;
+    port: number;
+    state: string;
+}
+
+export interface NetWatchSample {
+    t: string;
+    conns: NetWatchConn[];
+    procs: NetWatchProc[];
+    err?: string;
+}
+
+export interface NetWatchObservation {
+    t: string;
+    pid: number;
+    name: string;
+    remote: string;
+    port: number;
+    state: string;
+}
+
+export interface NetWatchResult extends GateResult {
+    samples: number;
+    sample_errors: number;
+    max_descendants: number;
+    non_loopback_observed: NetWatchObservation[];
+    loopback_connections_seen: number;
+    vitest_main_observed: boolean;
+    vitest_main_samples: number;
+    descendant_names_at_peak: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +293,265 @@ export function checkLedger(ledgerRoot: string, runId: string, expectProjects: s
 }
 
 // ---------------------------------------------------------------------------
+// --net-watch: sampled OS-level connection check over the wrapped process tree
+// ---------------------------------------------------------------------------
+
+export function isLoopbackAddress(address: string): boolean {
+    const a = address.trim().toLowerCase();
+    if (a === '::1') return true;
+    const v4 = a.startsWith('::ffff:') ? a.slice('::ffff:'.length) : a;
+    return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(v4);
+}
+
+export interface AnalyzeOptions {
+    rootPid: number;
+    samplerPid?: number;
+    requireVitestMain?: boolean;
+    durationMs?: number;
+}
+
+// Below this run length a process can start and exit between two samples, so seeing no descendant
+// is not evidence that the watcher is blind.
+const NET_WATCH_BLIND_AFTER_MS = 5000;
+const NET_WATCH_MAX_ERROR_FRACTION = 0.1;
+
+export function analyzeNetWatch(samples: NetWatchSample[], o: AnalyzeOptions): NetWatchResult {
+    const known = new Map<number, number>(); // descendant pid -> creation time
+    const observations = new Map<string, NetWatchObservation>();
+    let good = 0;
+    let errors = 0;
+    let rootSeen = false;
+    let maxDescendants = 0;
+    let loopbackSeen = 0;
+    let vitestSamples = 0;
+    let namesAtPeak: Record<string, number> = {};
+
+    for (const s of samples) {
+        if (s.err) {
+            errors += 1;
+            continue;
+        }
+        good += 1;
+        const byPid = new Map(s.procs.map((p) => [p.pid, p]));
+        // A pid that now belongs to a different process is no longer a descendant.
+        for (const [pid, created] of [...known]) {
+            const p = byPid.get(pid);
+            if (p && p.created !== created) known.delete(pid);
+        }
+        const root = byPid.get(o.rootPid);
+        if (root) {
+            rootSeen = true;
+            known.set(o.rootPid, root.created);
+        }
+        // Grow the tree to a fixpoint. `known` persists, so a process stays a descendant after its
+        // parent exits. The creation-time check rejects a parent pid that was reused.
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const p of s.procs) {
+                if (p.pid === o.rootPid || p.pid === o.samplerPid || known.has(p.pid)) continue;
+                const parentCreated = known.get(p.ppid);
+                if (parentCreated === undefined || p.created < parentCreated) continue;
+                known.set(p.pid, p.created);
+                changed = true;
+            }
+        }
+        const descendants = s.procs.filter((p) => p.pid !== o.rootPid && known.get(p.pid) === p.created);
+        if (descendants.length > maxDescendants) {
+            maxDescendants = descendants.length;
+            namesAtPeak = {};
+            for (const d of descendants) namesAtPeak[d.name] = (namesAtPeak[d.name] || 0) + 1;
+        }
+        if (descendants.some((d) => d.vitestMain)) vitestSamples += 1;
+        for (const c of s.conns) {
+            const created = known.get(c.pid);
+            if (created === undefined) continue;
+            const owner = byPid.get(c.pid);
+            if (owner && owner.created !== created) continue;
+            if (isLoopbackAddress(c.remote)) {
+                if (c.pid !== o.rootPid) loopbackSeen += 1;
+                continue;
+            }
+            const key = `${c.pid}|${c.remote}|${c.port}`;
+            if (!observations.has(key)) {
+                observations.set(key, { t: s.t, pid: c.pid, name: owner ? owner.name : 'unknown', remote: c.remote, port: c.port, state: c.state });
+            }
+        }
+    }
+
+    const nonLoopback = [...observations.values()];
+    const problems: string[] = [];
+    if (good === 0) problems.push('no usable net-watch sample was taken');
+    else if (!rootSeen) problems.push(`the wrapper process ${o.rootPid} never appeared in a sample, so the process tree is unknown`);
+    if (errors > 0 && errors > (good + errors) * NET_WATCH_MAX_ERROR_FRACTION) problems.push(`${errors} of ${good + errors} net-watch samples failed`);
+    if (good > 0 && maxDescendants === 0 && (o.durationMs ?? 0) >= NET_WATCH_BLIND_AFTER_MS) problems.push('no descendant of the wrapper was ever seen in a run long enough to sample');
+    if (o.requireVitestMain && vitestSamples === 0) problems.push('the Vitest main process never appeared in the watched process tree');
+    for (const n of nonLoopback) problems.push(`non-loopback connection: ${n.name} pid ${n.pid} -> ${n.remote}:${n.port} (${n.state})`);
+    return {
+        ok: problems.length === 0,
+        problems,
+        samples: good,
+        sample_errors: errors,
+        max_descendants: maxDescendants,
+        non_loopback_observed: nonLoopback,
+        loopback_connections_seen: loopbackSeen,
+        vitest_main_observed: vitestSamples > 0,
+        vitest_main_samples: vitestSamples,
+        descendant_names_at_peak: namesAtPeak,
+    };
+}
+
+function sleepSync(ms: number): void {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function psQuote(s: string): string {
+    return `'${s.replace(/'/g, "''")}'`;
+}
+
+function windowsSamplerScript(outFile: string, stopFile: string): string {
+    return [
+        `$out = ${psQuote(outFile)}`,
+        `$stop = ${psQuote(stopFile)}`,
+        "$ErrorActionPreference = 'Stop'",
+        'while (-not (Test-Path -LiteralPath $stop)) {',
+        '  try {',
+        "    $c = @(Get-NetTCPConnection -State Established,SynSent -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ pid = [int]$_.OwningProcess; remote = [string]$_.RemoteAddress; port = [int]$_.RemotePort; state = [string]$_.State } })",
+        "    $p = @(Get-CimInstance -ClassName Win32_Process | ForEach-Object { $cd = 0; if ($_.CreationDate) { $cd = $_.CreationDate.ToFileTimeUtc() }; [pscustomobject]@{ pid = [int]$_.ProcessId; ppid = [int]$_.ParentProcessId; created = [double]$cd; name = [string]$_.Name; vitestMain = [bool](($_.Name -eq 'node.exe') -and ($_.CommandLine -like '*vitest.mjs*')) } })",
+        "    $line = [pscustomobject]@{ t = [DateTime]::UtcNow.ToString('o'); conns = $c; procs = $p } | ConvertTo-Json -Compress -Depth 4",
+        '    [IO.File]::AppendAllText($out, $line + "`n")',
+        '  } catch {',
+        "    $line = [pscustomobject]@{ t = [DateTime]::UtcNow.ToString('o'); err = [string]$_.Exception.Message; conns = @(); procs = @() } | ConvertTo-Json -Compress -Depth 4",
+        '    [IO.File]::AppendAllText($out, $line + "`n")',
+        '  }',
+        '  Start-Sleep -Milliseconds 200',
+        '}',
+        '[IO.File]::AppendAllText($out, \'{"done":true}\' + "`n")',
+    ].join('\n');
+}
+
+function linuxSamplerScript(outFile: string, stopFile: string): string {
+    const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+    return [
+        `OUT=${q(outFile)}`,
+        `STOP=${q(stopFile)}`,
+        'while [ ! -e "$STOP" ]; do',
+        '  { echo "@@SAMPLE $(date -u +%Y-%m-%dT%H:%M:%SZ)"; ss -Htnp state established state syn-sent 2>&1; echo "@@PROCS"; ps -eo pid=,ppid=,lstart=,args= 2>&1; echo "@@END"; } >> "$OUT"',
+        '  sleep 1',
+        'done',
+        'echo "@@DONE" >> "$OUT"',
+    ].join('\n');
+}
+
+export function parseLinuxNetWatch(text: string): NetWatchSample[] {
+    const samples: NetWatchSample[] = [];
+    let cur: NetWatchSample | undefined;
+    let section: 'conns' | 'procs' | undefined;
+    for (const raw of text.split('\n')) {
+        const line = raw.trimEnd();
+        if (line.startsWith('@@SAMPLE ')) {
+            cur = { t: line.slice('@@SAMPLE '.length), conns: [], procs: [] };
+            section = 'conns';
+        } else if (line === '@@PROCS') {
+            section = 'procs';
+        } else if (line === '@@END') {
+            if (cur) samples.push(cur);
+            cur = undefined;
+            section = undefined;
+        } else if (cur && section === 'conns' && line.trim() !== '') {
+            const f = line.trim().split(/\s+/);
+            const remote = f[4] || '';
+            const pid = /pid=(\d+)/.exec(line);
+            const sep = remote.lastIndexOf(':');
+            if (sep === -1) continue;
+            if (!pid) continue;
+            cur.conns.push({ pid: Number(pid[1]), remote: remote.slice(0, sep).replace(/^\[|\]$/g, ''), port: Number(remote.slice(sep + 1)), state: f[0] });
+        } else if (cur && section === 'procs' && line.trim() !== '') {
+            // pid ppid  Dow Mon DD HH:MM:SS YYYY  args...
+            const f = line.trim().split(/\s+/);
+            if (f.length < 8) continue;
+            const created = Date.parse(`${f[3]} ${f[4]} ${f[6]} ${f[5]} UTC`);
+            const args = f.slice(7);
+            const name = path.basename(args[0]);
+            cur.procs.push({ pid: Number(f[0]), ppid: Number(f[1]), created, name, vitestMain: name === 'node' && args.some((a) => a.includes('vitest.mjs')) });
+        }
+    }
+    return samples;
+}
+
+interface NetWatchHandle {
+    dir: string;
+    outFile: string;
+    stopFile: string;
+    proc: ChildProcess;
+}
+
+function samplesExist(outFile: string): boolean {
+    if (!fs.existsSync(outFile)) return false;
+    const text = fs.readFileSync(outFile, 'utf8');
+    return process.platform === 'win32' ? text.includes('\n') : text.includes('@@END');
+}
+
+function startNetWatch(runId: string): NetWatchHandle {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `csb-vpu-netwatch-${runId}-`));
+    const outFile = path.join(dir, 'samples.txt');
+    const stopFile = path.join(dir, 'stop');
+    const proc =
+        process.platform === 'win32'
+            ? spawn(
+                  path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+                  ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(windowsSamplerScript(outFile, stopFile), 'utf16le').toString('base64')],
+                  { stdio: 'ignore', windowsHide: true },
+              )
+            : spawn('sh', ['-c', linuxSamplerScript(outFile, stopFile)], { stdio: 'ignore' });
+    if (proc.pid === undefined) throw new Error('net-watch: the sampler process could not be started');
+    // The wrapped command does not start until the first sample exists, so the run is covered from its first moment.
+    const deadline = Date.now() + 60000;
+    while (!samplesExist(outFile)) {
+        if (proc.exitCode !== null) throw new Error(`net-watch: the sampler exited with ${proc.exitCode} before its first sample`);
+        if (Date.now() > deadline) {
+            proc.kill();
+            throw new Error('net-watch: no sample within 60 s of starting the sampler');
+        }
+        sleepSync(100);
+    }
+    return { dir, outFile, stopFile, proc };
+}
+
+function finishNetWatch(h: NetWatchHandle, o: Omit<AnalyzeOptions, 'samplerPid'>): NetWatchResult {
+    fs.writeFileSync(h.stopFile, '');
+    const deadline = Date.now() + 30000;
+    const finished = () => {
+        const text = fs.readFileSync(h.outFile, 'utf8');
+        return process.platform === 'win32' ? text.includes('"done":true') : text.includes('@@DONE');
+    };
+    while (!finished() && Date.now() < deadline) sleepSync(100);
+    h.proc.kill();
+    const text = fs.readFileSync(h.outFile, 'utf8');
+    let samples: NetWatchSample[];
+    if (process.platform === 'win32') {
+        samples = [];
+        for (const line of text.split('\n')) {
+            if (line.trim() === '') continue;
+            let parsed: Partial<NetWatchSample> & { done?: boolean };
+            try {
+                parsed = JSON.parse(line) as Partial<NetWatchSample> & { done?: boolean };
+            } catch {
+                samples.push({ t: 'unparseable', conns: [], procs: [], err: 'unparseable sample line' });
+                continue;
+            }
+            if (parsed.done) continue;
+            samples.push({ t: parsed.t || '', conns: Array.isArray(parsed.conns) ? parsed.conns : [], procs: Array.isArray(parsed.procs) ? parsed.procs : [], err: parsed.err });
+        }
+    } else {
+        samples = parseLinuxNetWatch(text);
+    }
+    const result = analyzeNetWatch(samples, { ...o, samplerPid: h.proc.pid });
+    fs.rmSync(h.dir, { recursive: true, force: true });
+    return result;
+}
+
+// ---------------------------------------------------------------------------
 // Running the wrapped command
 // ---------------------------------------------------------------------------
 
@@ -257,6 +565,9 @@ export function runCommand(command: string[], runId: string): { status: number |
     const env: NodeJS.ProcessEnv = { ...process.env, CSB_RAIL_RUN_ID: runId };
     const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
     env[pathKey] = path.dirname(process.execPath) + path.delimiter + (env[pathKey] || '');
+    // npm checks the registry for a newer npm at most once a week, from a process the rails do not
+    // cover. Opting out keeps `npm test` from opening an outbound connection of its own.
+    env.npm_config_update_notifier = 'false';
     const isNode = cmd === 'node' || cmd === process.execPath;
     const r = isNode
         ? spawnSync(process.execPath, args, { stdio: 'inherit', env, windowsHide: true })
@@ -275,6 +586,7 @@ export interface WrapOptions {
     expectProjects?: string[];
     ledgerRoot?: string;
     quiet?: boolean;
+    netWatch?: boolean;
 }
 
 export interface WrapResult {
@@ -283,6 +595,7 @@ export interface WrapResult {
     diffs: string[];
     manifest?: GateResult;
     ledger?: GateResult & { summaryPath: string };
+    netWatch?: NetWatchResult;
     childStatus: number | null;
     verdictLine: string;
     before: Snapshot;
@@ -294,7 +607,12 @@ export function runWrapped(o: WrapOptions): WrapResult {
     };
     const before = snapshot(o.dataDir);
     log(`verify-prod-untouched: run ${o.runId} — snapshot before: ${before.entries.length} entries under ${o.dataDir}`);
+    const watch = o.netWatch ? startNetWatch(o.runId) : undefined;
+    const childStartedMs = Date.now();
     const child = runCommand(o.command, o.runId);
+    const durationMs = Date.now() - childStartedMs;
+    const requireVitestMain = /(^|[\s\\/])vitest(\.mjs)?(\s|$)|\bnpm(\.cmd)?\s+(test|run\s+test)/i.test(o.command.join(' '));
+    const netWatch = watch ? finishNetWatch(watch, { rootPid: process.pid, requireVitestMain, durationMs }) : undefined;
     const after = snapshot(o.dataDir);
     const diffs = compareSnapshots(before, after);
     const untouched = diffs.length === 0;
@@ -314,10 +632,11 @@ export function runWrapped(o: WrapOptions): WrapResult {
         }
     }
     if (ledger) for (const p of ledger.problems) log(`verify-prod-untouched: LEDGER GATE: ${p}`);
+    if (netWatch) for (const p of netWatch.problems) log(`verify-prod-untouched: NET-WATCH: ${p}`);
 
     const childFailed = child.status !== 0;
     let exitCode: number;
-    if (!untouched || (manifest && !manifest.ok) || (ledger && !ledger.ok)) exitCode = 1;
+    if (!untouched || (manifest && !manifest.ok) || (ledger && !ledger.ok) || (netWatch && !netWatch.ok)) exitCode = 1;
     else if (child.status === null) exitCode = 1;
     else exitCode = child.status;
 
@@ -328,12 +647,15 @@ export function runWrapped(o: WrapOptions): WrapResult {
         `child exit ${child.status === null ? `null (signal ${child.signal}${child.error ? `, error ${child.error}` : ''})` : child.status}`,
         `manifest: ${manifest ? (manifest.ok ? 'equal' : 'MISMATCH') : 'not checked'}`,
         `ledger: ${ledger ? (ledger.ok ? 'ok' : 'FAIL') : 'not required'}`,
+        ...(netWatch
+            ? [`net-watch: ${netWatch.ok ? 'ok' : 'FAIL'} (${netWatch.samples} samples, max descendants ${netWatch.max_descendants}, vitest main seen in ${netWatch.vitest_main_samples}, loopback sightings ${netWatch.loopback_connections_seen}, non-loopback ${netWatch.non_loopback_observed.length})`]
+            : []),
         `summary ${summaryPath}`,
     ];
     const verdictLine = `verify-prod-untouched: ${parts.join(' | ')}`;
     log(verdictLine);
     if (childFailed && untouched) log('verify-prod-untouched: (the wrapped command failed; its exit status is passed through)');
-    return { exitCode, untouched, diffs, manifest, ledger, childStatus: child.status, verdictLine, before };
+    return { exitCode, untouched, diffs, manifest, ledger, netWatch, childStatus: child.status, verdictLine, before };
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +757,55 @@ function selfTest(): number {
         rec('wrapped run writing its own summary -> ok', w1.exitCode === 0 && !!w1.ledger && w1.ledger.ok, w1.verdictLine);
         const w2 = runWrapped({ dataDir: fakeData, command: [node, '-e', '0'], runId: newRunId(), requireLedger: true, expectProjects: ['unit'], ledgerRoot, quiet: true });
         rec('wrapped run with no summary -> exit 1', w2.exitCode === 1 && !!w2.ledger && !w2.ledger.ok, w2.verdictLine);
+
+        // (10) net-watch analysis on fabricated samples: no real outbound connection is ever made here
+        const nwProc = (pid: number, ppid: number, created: number, name = 'node.exe', vitestMain = false): NetWatchProc => ({ pid, ppid, created, name, vitestMain });
+        const nwConn = (pid: number, remote: string, port = 443): NetWatchConn => ({ pid, remote, port, state: 'Established' });
+        const nwSample = (procs: NetWatchProc[], conns: NetWatchConn[] = []): NetWatchSample => ({ t: 'x', procs, conns });
+        const nwRoot = nwProc(100, 1, 1000);
+        const nwKid = nwProc(101, 100, 1100, 'node.exe', true);
+        const nwOpts = { rootPid: 100, samplerPid: 900 };
+        const nwSeen = analyzeNetWatch([nwSample([nwRoot, nwKid], [nwConn(101, '203.0.113.9')])], nwOpts);
+        rec('net-watch: descendant non-loopback connection -> FAIL', !nwSeen.ok && nwSeen.non_loopback_observed.length === 1 && nwSeen.non_loopback_observed[0].remote === '203.0.113.9', nwSeen.problems.join('; '));
+        const nested = analyzeNetWatch([nwSample([nwRoot, nwKid, nwProc(102, 101, 1200)], [nwConn(102, '203.0.113.9')])], nwOpts);
+        rec('net-watch: grandchild non-loopback connection -> FAIL', !nested.ok && nested.max_descendants === 2, nested.problems.join('; '));
+        const outsider = analyzeNetWatch([nwSample([nwRoot, nwKid, nwProc(700, 1, 500)], [nwConn(700, '203.0.113.9')])], nwOpts);
+        rec('net-watch: connection owned outside the tree is ignored', outsider.ok && outsider.non_loopback_observed.length === 0, outsider.problems.join('; '));
+        const loop = analyzeNetWatch([nwSample([nwRoot, nwKid], [nwConn(101, '127.0.0.1', 8545), nwConn(101, '::1', 8545), nwConn(101, '::ffff:127.0.0.1', 8545)])], nwOpts);
+        rec('net-watch: loopback connections are counted, not failed', loop.ok && loop.loopback_connections_seen === 3, loop.problems.join('; '));
+        rec('net-watch: 128.0.0.1 and 0.0.0.0 are not loopback', !isLoopbackAddress('128.0.0.1') && !isLoopbackAddress('0.0.0.0') && !isLoopbackAddress('::2'));
+        const selfSampler = analyzeNetWatch([nwSample([nwRoot, nwProc(900, 100, 1050, 'powershell.exe'), nwProc(901, 900, 1060, 'conhost.exe')], [nwConn(900, '203.0.113.9'), nwConn(901, '203.0.113.9')])], nwOpts);
+        rec('net-watch: the sampler and its children are not in the tree', selfSampler.ok && selfSampler.max_descendants === 0, selfSampler.problems.join('; '));
+        const reused = analyzeNetWatch([nwSample([nwRoot, nwProc(300, 100, 500)], [nwConn(300, '203.0.113.9')])], nwOpts);
+        rec('net-watch: a process older than its claimed parent is not a descendant', reused.ok && reused.max_descendants === 0, reused.problems.join('; '));
+        const orphan = analyzeNetWatch([nwSample([nwRoot, nwKid, nwProc(102, 101, 1200)]), nwSample([nwRoot, nwProc(102, 101, 1200)], [nwConn(102, '203.0.113.9')])], nwOpts);
+        rec('net-watch: a process stays in the tree after its parent exits', !orphan.ok && orphan.non_loopback_observed.length === 1, orphan.problems.join('; '));
+        const blind = analyzeNetWatch([nwSample([nwKid], [])], nwOpts);
+        rec('net-watch: wrapper never in a sample -> FAIL', !blind.ok, blind.problems.join('; '));
+        const none = analyzeNetWatch([], nwOpts);
+        rec('net-watch: zero samples -> FAIL', !none.ok && none.problems.some((p) => p.includes('no usable')), none.problems.join('; '));
+        const noVitest = analyzeNetWatch([nwSample([nwRoot, nwProc(101, 100, 1100)])], { ...nwOpts, requireVitestMain: true });
+        rec('net-watch: Vitest main required but unseen -> FAIL', !noVitest.ok, noVitest.problems.join('; '));
+        const yesVitest = analyzeNetWatch([nwSample([nwRoot, nwKid])], { ...nwOpts, requireVitestMain: true });
+        rec('net-watch: Vitest main seen -> ok', yesVitest.ok && yesVitest.vitest_main_samples === 1, yesVitest.problems.join('; '));
+        const longBlind = analyzeNetWatch([nwSample([nwRoot])], { ...nwOpts, durationMs: 60000 });
+        rec('net-watch: long run with no descendant -> FAIL', !longBlind.ok, longBlind.problems.join('; '));
+        const errored = analyzeNetWatch([nwSample([nwRoot, nwKid]), { t: 'x', conns: [], procs: [], err: 'boom' }], nwOpts);
+        rec('net-watch: too many failed samples -> FAIL', !errored.ok && errored.sample_errors === 1, errored.problems.join('; '));
+        const linux = parseLinuxNetWatch(
+            '@@SAMPLE 2026-11-08T00:00:00Z\nESTAB 0 0 10.0.0.1:50000 203.0.113.9:443 users:(("node",pid=4242,fd=18))\nSYN-SENT 0 1 [::1]:50001 [::1]:8545 users:(("node",pid=4242,fd=19))\n@@PROCS\n 4242 4000 Sun Nov  8 12:00:00 2026 /usr/bin/node node_modules/vitest/vitest.mjs run\n@@END\n@@DONE\n',
+        );
+        rec(
+            'net-watch: Linux ss and ps output parses',
+            linux.length === 1 && linux[0].conns[0].remote === '203.0.113.9' && linux[0].conns[0].port === 443 && linux[0].conns[1].remote === '::1' && linux[0].procs[0].vitestMain && linux[0].procs[0].ppid === 4000,
+            JSON.stringify(linux),
+        );
+
+        // (11) the live sampler sees a real descendant and its real loopback connection, end to end
+        const hold = `const net=require('net');const s=net.createServer(c=>c.on('error',()=>{}));s.listen(0,'127.0.0.1',()=>{const k=net.connect(s.address().port,'127.0.0.1');k.on('error',()=>{});setTimeout(()=>{k.destroy();s.close();process.exit(0)},6000)})`;
+        const live = runWrapped({ dataDir: fakeData, command: [node, '-e', hold], runId: newRunId(), quiet: true, netWatch: true });
+        const lw = live.netWatch;
+        rec('net-watch: live sampler sees the wrapped child and its loopback connection', live.exitCode === 0 && !!lw && lw.ok && lw.samples > 0 && lw.max_descendants >= 1 && lw.loopback_connections_seen > 0 && lw.non_loopback_observed.length === 0, JSON.stringify(lw));
     } finally {
         fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -454,7 +825,7 @@ function selfTest(): number {
 function usage(msg?: string): never {
     if (msg) console.error(`verify-prod-untouched: ${msg}`);
     console.error(
-        'Usage: verify-prod-untouched.ts [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] -- <command> [args...]\n' +
+        'Usage: verify-prod-untouched.ts [--manifest <MANIFEST.json>] [--require-ledger --expect-projects <p1,p2>] [--net-watch] -- <command> [args...]\n' +
             '       verify-prod-untouched.ts --self-test',
     );
     process.exit(1);
@@ -471,6 +842,7 @@ function main(): void {
     let manifest: string | undefined;
     let requireLedger = false;
     let expectProjects: string[] = [];
+    let netWatch = false;
     for (let i = 0; i < opts.length; i++) {
         const a = opts[i];
         if (a === '--manifest') {
@@ -482,6 +854,8 @@ function main(): void {
             const v = opts[++i];
             if (!v) usage('--expect-projects needs a comma-separated list');
             expectProjects = v.split(',').map((s) => s.trim()).filter((s) => s !== '');
+        } else if (a === '--net-watch') {
+            netWatch = true;
         } else {
             usage(`unknown option ${a}`);
         }
@@ -489,7 +863,7 @@ function main(): void {
     if (expectProjects.length > 0 && !requireLedger) usage('--expect-projects requires --require-ledger');
     if (requireLedger && expectProjects.length === 0) usage('--require-ledger requires --expect-projects');
     const repoRoot = findRepoRoot(__dirname);
-    const r = runWrapped({ dataDir: path.join(repoRoot, 'data'), command, runId: newRunId(), manifest, requireLedger, expectProjects });
+    const r = runWrapped({ dataDir: path.join(repoRoot, 'data'), command, runId: newRunId(), manifest, requireLedger, expectProjects, netWatch });
     process.exit(r.exitCode);
 }
 
