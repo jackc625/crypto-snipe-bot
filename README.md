@@ -31,7 +31,7 @@ The old V2 and V3 sell-simulation entry points in `src/utils/tokenSafety.ts` wer
 - V3 `waitForLiquidity` subscribes to `Mint` with a 30s deadline and also checks the same block first, because atomic launch scripts often emit `PoolCreated` and `Mint` in a single block.
 - V3 minimum-liquidity check using a `QuoterV2.quoteExactInputSingle` reference quote plus a threshold quote.
 - Per-chain `chainId` validation at startup; chains whose RPC returns a mismatched chainId are skipped, not fatal.
-- Entry point is `npx ts-node src/bot.ts`, which runs the file's bottom-of-module guard and calls `startMultiChainBot()`.
+- Entry point is `npx ts-node src/main.ts` (or `npm start`), which takes the single-instance process lock and then calls `startMultiChainBot()`. Starting `src/bot.ts` directly now refuses before it loads anything.
 
 ### Pre-Buy Safety Stack
 
@@ -151,11 +151,11 @@ These are the architectural decisions that read well in interviews:
 
 ## Architecture Overview
 
-The runtime is a single Node 22 process with several internally-isolated subsystems. Imports drive the boot order: `src/config.ts` runs env validation and `dotenv.config()` at module load, `src/utils/db.ts` opens SQLite and runs schema migrations at module load, and then `src/bot.ts` invokes `startMultiChainBot()` from its bottom-of-module `require.main === module` guard. There is no application framework holding the pieces together — the orchestrator in `bot.ts` wires the chain registry, dex listeners, exit monitors, API server, Telegram listener, and shutdown handler into one process.
+The runtime is a single Node 22 process with several internally-isolated subsystems. `src/main.ts` takes the single-instance process lock first, then loads `src/bot.ts` and calls `startMultiChainBot()`. Imports drive the rest of the boot order: `src/config.ts` runs env validation and `dotenv.config()` at module load, and `src/utils/db.ts` opens SQLite and runs schema migrations at module load. There is no application framework holding the pieces together — the orchestrator in `bot.ts` wires the chain registry, dex listeners, exit monitors, API server, Telegram listener, and shutdown handler into one process.
 
 ### Bot Orchestrator
 
-`src/bot.ts` is the entry point (roughly 950 lines). It owns the multi-chain boot sequence:
+`src/bot.ts` is the orchestrator that `src/main.ts` starts (roughly 950 lines). It owns the multi-chain boot sequence:
 
 - `buildChainRegistry()` parses `ENABLED_CHAINS`, validates each name against `{eth, bsc, base, arb}`, validates per-chain RPC URLs and MEV auth keys, parses and range-checks the tax-threshold bps, and resolves the `<CHAIN>_HONEYPOT_CHECKER_ADDRESS` env per chain.
 - For each enabled chain, `createChainContext(chain)` builds the HTTP + optional WS providers, the `Wallet`, and the chain-scoped pino logger. `provider.getNetwork()` is awaited and the chain is **skipped** (not fatal) on chainId mismatch — important when an operator accidentally points `ETH_RPC_URL` at a Goerli or Sepolia endpoint.
@@ -214,7 +214,7 @@ A new V2 candidate flows through the system in a fixed order: `WebSocketProvider
 
 - Node 22 (CI target via `actions/setup-node@v4`).
 - TypeScript 5.8.3 with `"type": "commonjs"`.
-- Entry point: `npx ts-node src/bot.ts`.
+- Entry point: `npx ts-node src/main.ts` (or `npm start`).
 
 ### Blockchain
 
@@ -498,7 +498,9 @@ Windows-host Mythril setup is non-trivial. `pip install mythril` fails on Python
 
 ## Running the Bot
 
-The entry point is `npx ts-node src/bot.ts`. The file's bottom-of-module guard checks `require.main === module` and calls `startMultiChainBot()`. There is no separate executable wrapper — the runtime is a single TypeScript file's worth of orchestration.
+The entry point is `npx ts-node src/main.ts` (or `npm start`). `src/main.ts` takes the single-instance process lock and then calls `startMultiChainBot()`. Starting `src/bot.ts` directly now refuses before it loads anything.
+
+Only one bot can run per wallet: a second bot for the same wallet refuses to start, including from another clone of the repo on the same machine. The lock file is `<home>/AppData/Local/crypto-snipe-bot/locks/<address>.lock` on Windows and `<home>/.local/state/crypto-snipe-bot/locks/<address>.lock` elsewhere. The operating system releases the lock when the process dies, so no cleanup is needed after a crash or a force-kill.
 
 Environment configuration lives in `.env` at the repo root. `.env.example` documents the 33 supported variables; `src/config.ts` mirrors them in `REQUIRED_ENV_VARS` and runs `validateEnvVars()` at module load to fail loud on missing required values. The minimum to boot is `PRIVATE_KEY`, `ALCHEMY_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, and `DASHBOARD_API_KEY`. Per-chain configuration uses the prefix triple `<ETH|BSC|BASE|ARB>_RPC_URL` / `<…>_WS_URL` / `<…>_SNIPE_AMOUNT` / `<…>_MAX_CAPITAL` / `<…>_MIN_LIQUIDITY`. MEV-strategy auth (`FLASHBOTS_AUTH_KEY` for ETH, `BLOXROUTE_AUTH_HEADER` for BSC) is required when the corresponding chain is enabled. Risk and exit-engine tuning (`MAX_OPEN_POSITIONS`, `MAX_TOTAL_EXPOSURE`, `DAILY_LOSS_PCT`, `TRAILING_STOP_PCT`, `STOP_LOSS_PCT`, `PARTIAL_SELL_TARGETS`, etc.) all have sensible defaults documented in `.env.example`.
 

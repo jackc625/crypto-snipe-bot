@@ -27,7 +27,7 @@ This is a private repository (`"private": true` in `package.json`), so contribut
    ```
 5. Run the bot entry point directly from TypeScript for development (no compile step required between edits):
    ```bash
-   npx ts-node src/bot.ts
+   npx ts-node src/main.ts
    ```
 
 Node.js 22 is used in CI (`.github/workflows/test.yml` pins `node-version: '22'`). The TypeScript target is ES2022 (`tsconfig.json`). The project is CommonJS (`"type": "commonjs"` in `package.json`).
@@ -48,7 +48,7 @@ All commands are defined in `package.json` `scripts` and run via `npm run <name>
 | `npm run test:all` | Alias for `npm test` — runs every Vitest project. |
 | `npm run test:coverage` | Runs the full suite with the v8 coverage provider; writes reports to `./coverage`. |
 
-There is no `npm start` script. The bot is started for local runs with `npx ts-node src/bot.ts` (see `README.md`). There is no dedicated `lint` or `format` script — run ESLint directly (see below).
+`npm start` runs `ts-node src/main.ts`, the same as `npx ts-node src/main.ts`: it takes the single-instance process lock and then starts the bot (see `README.md`). Starting `src/bot.ts` directly now refuses before it loads anything. There is no dedicated `lint` or `format` script — run ESLint directly (see below).
 
 Other project directories referenced by build tooling:
 - `dist/` — `tsc` output (git-ignored).

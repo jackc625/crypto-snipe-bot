@@ -210,7 +210,7 @@ The bot recreates the directory and runs all schema migrations from scratch on n
 ## 8. Go live
 
 ```bash
-npx ts-node src/bot.ts
+npx ts-node src/main.ts
 ```
 
 Confirm in the first 60 seconds of logs:
@@ -531,7 +531,7 @@ Phase 19 anti-rug runtime monitoring ships with a **7-day dry-run floor** before
 ### Action
 Once both pre-requisites are met:
 1. Edit `.env`: set `<CHAIN>_ANTIRUG_LIVE_EXECUTE=true` (exact lowercase per `D-LIVE-PER-CHAIN`; `TRUE`, `1`, `yes` all stay dry-run).
-2. Restart the bot: `Ctrl+C` + `npx ts-node src/bot.ts`.
+2. Restart the bot: `Ctrl+C` + `npx ts-node src/main.ts`.
 3. `checkAntiRugLiveGate` runs as part of `preflight()` at boot. If the 7-day floor is not met or the timestamp is missing, **the bot FATALs and refuses to start** — no silent partial live-mode possible.
 4. Once started, the dashboard's Anti-Rug Monitor tile shows the chain status as **LIVE** (no longer DRY-RUN).
 
