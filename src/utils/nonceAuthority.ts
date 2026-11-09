@@ -37,9 +37,12 @@
 // This is a pure primitive with no consumers yet. Later plans wrap every signing
 // site in it: 21.2-05 (exit worker), 21.2-06 (inclusion ladder), 21.2-07
 // (anti-rug sell), 21.2-08 (buy entry path).
+import { EPOCH } from '../guards/epoch';
+import { registerSingleton } from '../guards/singleton';
 
 // One promise-chain tail per wallet address (lowercased). The stored tail NEVER
 // rejects (see below) so a single failed op cannot poison the wallet's chain.
+registerSingleton('nonceAuthority', __filename, EPOCH);
 const chains = new Map<string, Promise<unknown>>();
 
 /**
