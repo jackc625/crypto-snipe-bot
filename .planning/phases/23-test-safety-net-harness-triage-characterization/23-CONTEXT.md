@@ -46,6 +46,7 @@ Downstream agents MUST read `23-SPEC.md` before planning or implementing. Requir
 
 ### Fake chain and clock
 - **D-01 (transport):** The fake blockchain runs **in-process** for both HTTP and WebSocket JSON-RPC, so event order is exact and runs are byte-identical (AC-12, AC-24). Real ethers still encodes, signs and decodes. HTTP goes through ethers' public `FetchRequest.registerGetUrl`. WebSocket replaces the `WebSocket` property on the `ws` package, which ethers reads afresh at each connect (`node_modules/ethers/lib.commonjs/providers/ws.js`). `vi.mock('ws')` cannot work: Vitest mocks do not reach inside packages it loads natively unless they are inlined. The swap counts as "the fake transport", so it needs no new entry on the AC-02 mock list.
+  **Corrected 2026-11-09 after research, operator-approved (23-RESEARCH.md F1):** the mechanism stated above does not work as written. Under Vitest, `src/` receives ethers' ESM build while `@flashbots/ethers-provider-bundle` gets the CJS build, and `FetchRequest` differs between them. ethers also pins its own nested `ws@8.17.1` at `node_modules/ethers/node_modules/ws`, so a swap on the top-level `ws` reaches nothing. The fake transport attaches only if the `realpath` project aliases `ethers` to its CJS build, which is what production loads, and the `WebSocket` swap targets that nested `ws`. The harness must prove at start that these seams attached. The in-process transport and the intent of D-01 are unchanged.
 - **D-02 (real-socket exception):** Tests of connection failure use the **real `ws` library on a loopback port**, because AUD-ANTIRUG-002 (a refused reconnect crashes the process) must be proven against the real library. These tests run on real time and never feed the recording.
 - **D-03 (node model):** The fake is a **small simulated node**: it accepts the real signed transaction, enforces nonce and chain ID, computes the real hash, mines blocks on command, and returns real receipts. Contract reads (prices, reserves) come from a per-scenario table keyed by address and function, encoded by real ethers. A contract call not in the table fails loudly, matching AC-03 for unknown methods.
 - **D-04 (fake data):** Chain data is **synthetic and built with real ethers encoders**. `test/fork/fixtures/realLaunches` holds only addresses and block numbers for a fork run, so there are no captured responses to replay.
@@ -63,8 +64,10 @@ Downstream agents MUST read `23-SPEC.md` before planning or implementing. Requir
 - **D-12 (storage):** **One LF-only file per scenario, with its `KEEP` or `SUSPECT(<finding-id>)` tag inside the file.** The commit check reads git directly: a new file passes, and a changed or deleted one needs a `behavior:` commit. A tag flip therefore counts as a change. — **Reversibility:** costly — changing the layout re-records every scenario, and each change needs a `behavior:` commit citing an ID under D-18.
 - **D-13 (shape):** Each recording is **one ordered timeline** of `op` logs, submitted transactions, relay bodies and DB writes, in the order they happened. Moving a DB write across a submit must fail the check (CAP-14 and CAP-04 depend on that order). — **Reversibility:** costly — same reason as D-12.
 - **D-14 (DB capture):** DB writes are captured by **test-only SQL triggers generated from the migrated schema, calling a recording function** registered with better-sqlite3's `db.function()`. This records what actually landed, including values SQLite fills in, at the right place in the timeline. The DB connection is not exported from `src/utils/db.ts`, so one new `...ForTesting` getter is needed, within the SPEC's `src/` limit. The researcher must prove this works before planning relies on it. The API's existence was confirmed from the installed package, but it has not been run.
+  **Corrected 2026-11-09 after research, operator-approved (23-RESEARCH.md F2 and Flag 4):** the premise above is false. `db` is already exported at `src/utils/db.ts:554-555`, so no `...ForTesting` getter is added and the phase's `src/` diff may be empty. The trigger capture has now been run and works.
 - **D-15 (no built-in snapshots):** The recording uses its own compare step and explicit update command, not Vitest snapshots. Outside CI, Vitest's default mode writes new snapshots on a normal run, which AC-25 forbids.
 - **D-16 (env snapshot):** The env snapshot is **one full baseline with every variable valid, plus only what each case changes or the failure it caused**. At least about 90 variables times 5 values gives 450 or more cases, and full copies could not be reviewed. Phase 24's CAP-06 changes parsing on purpose, so that diff has to be readable.
+  **Widened 2026-11-09 by operator ruling (23-RESEARCH.md F4):** the snapshot also covers `src/riskManager.ts`, where the five risk limits are parsed. See SPEC Amendment A-1.
 - **D-17 (commit check also covers the env snapshot):** Changing or removing an existing env-snapshot case needs a `behavior:` commit citing an ID. Adding a new variable passes, the same as a new scenario. **This is an operator-approved addition to SPEC Requirement 9**, which names only recorded scenarios.
 
 ### Register and seal
@@ -137,7 +140,7 @@ The operator was told these would go to the planner's judgment. They were not di
 ### Established Patterns
 - Providers are built from URLs: `src/utils/provider.ts:23`, `:37`, `src/bot.ts:1563`, `:1605`, `src/anti-rug/detector.ts:924`. Constructor injection is not available, hence D-01.
 - Flashbots relay calls use ethers `FetchRequest` (`src/utils/mevStrategies/flashbots.ts:97`), so the D-01 HTTP hook sees them. bloXroute uses axios (`src/utils/mevStrategies/bloxroute.ts:48`, `:156`), which falls under "relay HTTP" on the mock list.
-- `src/utils/db.ts` opens and migrates at import and keeps its connection private.
+- `src/utils/db.ts` opens and migrates at import, and exports its connection as `db` (corrected, see D-14).
 - `src/config.ts` runs validation at import and can `process.exit(1)`.
 - Module singletons sit behind the Phase 22 duplicate-load guard (epoch sentinel), so harness resets must be whole-graph resets.
 - Commit types in history are `docs:`, `feat:`, `test:`, `fix:` and `chore:`, and GSD tools also emit scoped forms.
@@ -146,7 +149,7 @@ The operator was told these would go to the planner's judgment. They were not di
 - `vitest.config.ts`: add the `realpath` project with the rails `setupFiles`.
 - `package.json`: `test` plus new commands for the update step, census and commit check.
 - `.github/workflows/test.yml`: new steps. `actions/checkout@v4` is shallow by default, and the commit check needs history.
-- `src/utils/db.ts`: one `...ForTesting` getter for the connection (D-14).
+- `src/utils/db.ts`: no change needed, since `db` is already exported (D-14, corrected).
 - `test/helpers/testDb.ts`: replace the hand-written schema with the real migrations.
 - `.planning/audit/tools/check.ts:320` and `seal-verify.ts` (D-19, D-21).
 

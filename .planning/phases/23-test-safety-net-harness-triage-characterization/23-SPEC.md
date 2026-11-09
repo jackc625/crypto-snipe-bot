@@ -47,7 +47,7 @@ Measured on 2026-11-09 at `7d0b7b3`:
 
 5. **Env-matrix snapshot (CHAR-03)**: A snapshot records how config and chain-registry parsing handle bad and good values.
    - Current: No snapshot exists. Several parsers treat invalid values differently (candidate 6).
-   - Target: Every environment variable read by `src/config.ts` and `src/chainRegistry.ts` is recorded for `{unset, '', '0', 'abc', valid}`.
+   - Target: Every environment variable read by `src/config.ts` and `src/chainRegistry.ts`, and by `src/riskManager.ts` under Amendment A-1, is recorded for `{unset, '', '0', 'abc', valid}`.
    - Acceptance: AC-27 to AC-29.
 
 6. **Ordering and identity tests (CHAR-04, first half)**: Tests pin boot, resume and arm ordering, listener counts, same-block event ordering, and singleton identity.
@@ -67,7 +67,7 @@ Measured on 2026-11-09 at `7d0b7b3`:
 
 9. **Commit check (AUDIT-06, widened to all commit types by operator ruling)**: A commit check protects the recording and enforces decision IDs.
    - Current: No check exists.
-   - Target: A commit of any type that changes or removes an existing recorded scenario fails unless it is a `behavior:` commit citing a real `OD-NN` or `AUD-...` ID. A `behavior:` commit without one fails. Adding a brand-new scenario does not count as a change.
+   - Target: A commit of any type that changes or removes an existing recorded scenario fails unless it is a `behavior:` commit citing a real `OD-NN` or `AUD-...` ID. A `behavior:` commit without one fails. Adding a brand-new scenario does not count as a change. Amendment A-2 applies the same rule to env-snapshot cases.
    - Acceptance: AC-39 to AC-44.
 
 ## Boundaries
@@ -142,7 +142,7 @@ Measured on 2026-11-09 at `7d0b7b3`:
 - [ ] AC-26: The recording has LF line endings on Windows and Linux, amounts as whole-number text, and no file paths, line numbers or stack traces.
 
 **Env matrix**
-- [ ] AC-27: The snapshot covers every variable read by `src/config.ts` and `src/chainRegistry.ts` for unset, empty string, `0`, `abc` and a valid value.
+- [ ] AC-27: The snapshot covers every variable read by `src/config.ts`, `src/chainRegistry.ts` and `src/riskManager.ts` (Amendment A-1) for unset, empty string, `0`, `abc` and a valid value.
 - [ ] AC-28: A value that makes parsing throw is recorded as the result and is not a test failure.
 - [ ] AC-29: Keys are sorted by name, and one variable is varied at a time with the others at valid values.
 
@@ -233,6 +233,15 @@ Measured on 2026-11-09 at `7d0b7b3`:
 | MUST NOT add a signing site to the census exception list without an operator decision ID (AC-53) | R7 | resolved | judgment: review of list changes |
 
 Canon referral: redaction of secrets in production logs (AUD-DB-009, AUD-DB-010) is owned by Phase 24 and /gsd-secure-phase, and is not minted here.
+
+## Amendments
+
+Approved by the operator on 2026-11-09, after this SPEC was written. Where an amendment differs from the text above, the amendment wins.
+
+- **A-1 (widens Requirement 5 and AC-27):** The env-matrix snapshot also covers every variable read by `src/riskManager.ts`. The five risk limits are parsed there, and Phase 24's CAP-06 changes that parsing. AC-28 and AC-29 apply to these cases too.
+- **A-2 (widens Requirement 9, from CONTEXT D-17):** The commit check also protects the env snapshot. Changing or removing an existing env-snapshot case needs a `behavior:` commit citing a real ID. Adding a new variable passes, the same as a new scenario.
+- **A-3 (narrows the expected `src/` diff, from CONTEXT D-14 as corrected):** The database connection is already exported as `db`, so no `...ForTesting` getter is added for it. The phase's `src/` diff may be empty, and AC-45 remains the limit.
+- **A-4 (fixes the transport mechanism in Requirement 1, from CONTEXT D-01 as corrected):** The fake transport requires the `realpath` Vitest project to alias `ethers` to its CommonJS build and the `WebSocket` swap to target the `ws` copy nested inside ethers. The harness proves at start that both attached. The alias selects which build of real ethers loads, so it is not a mock and needs no AC-02 mock-list entry.
 
 ## Ambiguity Report
 
