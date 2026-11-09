@@ -228,7 +228,17 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "yes: imports src/bot, which loads src/utils/db and src/config unmocked (before the rails: the live data/bot.db opened and migrated at import, real .env values in CONFIG). The real lock is used (good), but only the seam is driven: the V2/V3 buy sites are never shown to call it (AUD-TESTU-004). sendTxWithRetry resolves at once, so a never-settling wait inside the lock is out of scope."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+        "findings": [
+          "AUD-TESTQ-017"
+        ],
+        "note": "One hunk: the logger mock gains info/warn/debug/error/fatal beside child. The mechanism under test (withNonceLock) stays real. Reviewed; assertion set unchanged."
+      }
+    ]
   },
   {
     "path": "test/unit/bot/deliberateBuyAffordability.test.ts",
@@ -383,7 +393,17 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "yes: src/config is imported unmocked (before the rails CONFIG was built from the real .env). Real escalatePrivateBuy, sendTxWithRetry, passthrough strategy and submitWithReconciliation; reconcileInclusion is the controlled outcome source. Deliberate path only (the snipe sites are not covered)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "36d567175828d884f82c7766d40070d5f78b3e97",
+        "findings": [
+          "AUD-TESTQ-019"
+        ],
+        "note": "One hunk: describe timeout 30 s. No assertion, title, import or mock changed. Reviewed."
+      }
+    ]
   },
   {
     "path": "test/unit/bot/snipeFailClean.test.ts",
@@ -614,7 +634,17 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "yes: src/config, and in the exit-config case src/exitEngine with the real src/utils/db and notifier (the db mock targets a path that does not exist, AUD-TESTU-023). Sets PRIVATE_KEY, TELEGRAM_* and DASHBOARD_API_KEY placeholders and deletes them afterwards without restoring the previous values (AUD-TESTU-015)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": [
+          "AUD-TESTQ-002"
+        ],
+        "note": "One hunk: the vi.doMock specifier corrected to the real path. The factory and assertion are untouched. Reviewed."
+      }
+    ]
   },
   {
     "path": "test/unit/dashboard/anti-rug/displayComponents.test.ts",
@@ -2145,5 +2175,419 @@
       "can_reach_real_state": "no",
       "notes": "Real ABI constants and registry. Sets ENABLED_CHAINS, ETH_RPC_URL, FLASHBOTS_AUTH_KEY and PRIVATE_KEY placeholders with no cleanup at all (AUD-TESTU-015)."
     }
+  },
+  {
+    "path": "test/unit/guards/singleton.test.ts",
+    "audited_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Each guarded module is refused on a second load through casing, junction and cache aliases, a whole-graph reset is allowed, and the normal boot shape loads once.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real child processes through spawnRailedChild; the one vi.doMock passes through importOriginal."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "findings": "none",
+        "note": "Reviewed: Each guarded module is refused on a second load through casing, junction and cache aliases, a whole-graph reset is allowed, and the normal boot shape loads once."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/guards/tsconfigCasing.test.ts",
+    "audited_sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Each tsconfig sets forceConsistentCasingInFileNames.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static read of the tsconfig files."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+        "findings": "none",
+        "note": "Reviewed: Each tsconfig sets forceConsistentCasingInFileNames."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/mainEntry.test.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "runMain takes the real lock before starting the bot and refuses on lock failure, VITEST or a bad key without quoting it; readStartEnv reads into a private object; src/main.ts imports nothing stateful (AST).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "startBot (injected, so the bot is not started)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real lock files in a temp folder and a real contender child; startBot is injected because this tests the entry, not the bot."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": "none",
+        "note": "Reviewed: runMain takes the real lock before starting the bot and refuses on lock failure, VITEST or a bad key without quoting it; readStartEnv reads into a private object; src/main.ts imports nothing stateful (AST)."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/childRails.test.ts",
+    "audited_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A railed child sees sentinels, full rails, VITEST and the denials; the fork entry keeps exactly the two shell keys; every spawn limit refuses before spawning.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real railed child processes."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "findings": "none",
+        "note": "Reviewed: A railed child sees sentinels, full rails, VITEST and the denials; the fork entry keeps exactly the two shell keys; every spawn limit refuses before spawning."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/dbTripwireSetup.test.ts",
+    "audited_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The DB tripwire and the data folder block fire on fake-root paths, on the real data paths (AC-14) and with VITEST deleted, and allowed databases still open.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real better-sqlite3 addon and real rails. The real-root cases only assert the rail throws before any open."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "findings": "none",
+        "note": "Reviewed: The DB tripwire and the data folder block fire on fake-root paths, on the real data paths (AC-14) and with VITEST deleted, and allowed databases still open."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/dbTripwireSrc.test.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Under Vitest, src/utils/db refuses the live data folder before the setup layer and uses a per-worker temp file when DB_PATH is empty; a linked data folder is caught.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real import of src/utils/db in the worker."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": "none",
+        "note": "Reviewed: Under Vitest, src/utils/db refuses the live data folder before the setup layer and uses a per-worker temp file when DB_PATH is empty; a linked data folder is caught."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/dotenvSrcSkip.test.ts",
+    "audited_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The five dotenv sites load no env file under VITEST, and without VITEST the read is attempted and blocked; the production path without VITEST still loads a fake .env and posts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ts-node child processes through the rails."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "Reviewed: The five dotenv sites load no env file under VITEST, and without VITEST the read is attempted and blocked; the production path without VITEST still loads a fake .env and posts."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/envExampleSync.test.ts",
+    "audited_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+    "findings": "none",
+    "quality_label": {
+      "claims": "test/.env.test and .env.example hold the same keys; private-key sentinels are distinct small integers, never Hardhat #0; secret-like sentinels are low entropy; the .gitignore negation is one path.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static read of tracked files; never opens the real env file."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "findings": "none",
+        "note": "Reviewed: test/.env.test and .env.example hold the same keys; private-key sentinels are distinct small integers, never Hardhat #0; secret-like sentinels are low entropy; the .gitignore negation is one path."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/envSentinel.test.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The rails install before the test file, the sentinel env is in force, a planted protected-root .env is unreadable through fs and dotenv, and the scrub list covers every env read in src/ and scripts/.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real rails; the env file proven blocked is a planted fake."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed: The rails install before the test file, the sentinel env is in force, a planted protected-root .env is unreadable through fs and dotenv, and the scrub list covers every env read in src/ and scripts/."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/forkRehearsalParity.test.ts",
+    "audited_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+    "findings": [
+      "AUD-REAUDIT-001"
+    ],
+    "quality_label": {
+      "claims": "The rehearsal config matches the fork project on every setting that matters, and has only the ledger globalSetup, so it starts no Hardhat.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": "Setting pins by design. The case 'the rehearsal loads no .env' was hollow: it asserted the root setting while the project ignored it (AUD-REAUDIT-001). The behaviour is now proven by vitestEnvFile.test.ts."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+        "findings": [
+          "AUD-REAUDIT-001"
+        ],
+        "note": "Reviewed: The rehearsal config matches the fork project on every setting that matters, and has only the ledger globalSetup, so it starts no Hardhat."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/forkRpcSource.test.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "resolveForkRpcUrl has no fallback and names the variable; test/fork/setup.ts calls it first and re-exports the same function (AST).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Pure function and AST; setup() is never run."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed: resolveForkRpcUrl has no fallback and names the variable; test/fork/setup.ts calls it first and re-exports the same function (AST)."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/forkShellOnly.test.ts",
+    "audited_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Fork files read only the shell and self-assigned values, and the main-process import closure of both Vitest configs loads no env file.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static AST scanners with a self-check on planted reads."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": "none",
+        "note": "Reviewed: Fork files read only the shell and self-assigned values, and the main-process import closure of both Vitest configs loads no env file."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/hardhatChildEnv.test.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The Hardhat child env holds sentinels, OS essentials, the two shell keys and the fork rails; every child launch in test/fork/setup.ts uses it (AST).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Pure function, a real railed child and AST; Hardhat itself never runs (UFV-04)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed: The Hardhat child env holds sentinels, OS essentials, the two shell keys and the fork rails; every child launch in test/fork/setup.ts uses it (AST)."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/netDeny.test.ts",
+    "audited_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Non-loopback TCP, TLS, DNS and UDP are denied within 3 s and ledgered; loopback HTTP, fetch, ws and raw TCP still work.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real sockets against unroutable TEST-NET addresses and loopback servers."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "findings": "none",
+        "note": "Reviewed: Non-loopback TCP, TLS, DNS and UDP are denied within 3 s and ledgered; loopback HTTP, fetch, ws and raw TCP still work."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/notifierRefusal.test.ts",
+    "audited_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A Telegram send under Vitest is a recorded refusal, axios is never called, the broadcast still runs, a refused send never rejects, and the missing-token path is unchanged.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/api/ws/broadcaster",
+        "src/utils/logger",
+        "axios.post (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The mechanism under test, the refusal in src/utils/notifier.ts, is real."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+        "findings": "none",
+        "note": "Reviewed: A Telegram send under Vitest is a recorded refusal, axios is never called, the broadcast still runs, a refused send never rejects, and the missing-token path is unchanged."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/spawnSites.test.ts",
+    "audited_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+    "findings": [
+      "AUD-REAUDIT-003"
+    ],
+    "quality_label": {
+      "claims": "No script under test/ loads a spawner or spawns outside the allowed files; the scanner flags planted forms; the computed-require allowance relaxes only a plain require.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static AST gate with a self-check. Allow-list entries assessed in judgment-reviews.json. AUD-REAUDIT-003 records one gap (process.getBuiltinModule)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "findings": [
+          "AUD-REAUDIT-003"
+        ],
+        "note": "Reviewed: No script under test/ loads a spawner or spawns outside the allowed files; the scanner flags planted forms; the computed-require allowance relaxes only a plain require."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/rails/vitestEnvFile.test.ts",
+    "audited_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+    "findings": [
+      "AUD-REAUDIT-001"
+    ],
+    "quality_label": {
+      "claims": "Real Vitest against a fake .env: no project of either real config exposes it, and a control without extends proves the fake file is readable.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Added as the RED-proven fix for AUD-REAUDIT-001. Real Vitest child; the real .env is never named."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+        "findings": [
+          "AUD-REAUDIT-001"
+        ],
+        "note": "Reviewed: Real Vitest against a fake .env: no project of either real config exposes it, and a control without extends proves the fake file is readable."
+      }
+    ]
+  },
+  {
+    "path": "test/unit/viMockGate.test.ts",
+    "audited_sha": "a1ae6932ba35dae93a470d6a0644a9e8ea9fde75",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The vi.mock specifier gate reports exactly the seeded broken fixtures, passes the real suite, and handles aliases, bracket access and templates.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Static AST gate; fixtures are excluded from the suite scan."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a1ae6932ba35dae93a470d6a0644a9e8ea9fde75",
+        "findings": "none",
+        "note": "Reviewed: The vi.mock specifier gate reports exactly the seeded broken fixtures, passes the real suite, and handles aliases, bracket access and templates."
+      }
+    ]
   }
 ]
