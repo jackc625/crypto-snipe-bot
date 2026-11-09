@@ -10,8 +10,8 @@
   "fixtures_sha256": "d24e9f3db3d46caf6db1a02358f1dc4969a16acde540f71c154290194d8100e0",
   "engine": ".planning/audit/tools/seal-verify.ts --phase-scan (three-pass classification, operator ruling classify-addresses)",
   "mode": "git",
-  "range": "23a64617dca167976adc4645fed0e2c69e384820..93d90297b58a8b333519873112473156fe45d6bf",
-  "log_opts": "--full-history --diff-filter=tuxdb --diff-merges=first-parent 23a64617dca167976adc4645fed0e2c69e384820..93d90297b58a8b333519873112473156fe45d6bf",
+  "range": "23a64617dca167976adc4645fed0e2c69e384820..1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+  "log_opts": "--full-history --diff-filter=tuxdb --diff-merges=first-parent 23a64617dca167976adc4645fed0e2c69e384820..1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
   "scanner_args": [
     "git",
     "<repo root>",
@@ -45,7 +45,7 @@
     "program_matches_exe_path": true,
     "read_with": "netsh advfirewall firewall show rule name=<rule> verbose, by this tool, before the scanner ran"
   },
-  "scanned_at": "2026-11-09T06:46:00.745Z",
+  "scanned_at": "2026-11-09T14:30:23.315Z",
   "node": "v22.16.0",
   "git_version": "git version 2.56.0.windows.3",
   "range_fixture": {
@@ -84,14 +84,14 @@
     ]
   },
   "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-  "sealed_sha": "93d90297b58a8b333519873112473156fe45d6bf",
+  "sealed_sha": "1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
   "phase_start_is_ancestor_of_head": true,
   "history_rewritten": false,
-  "commits_in_range": 197,
+  "commits_in_range": 213,
   "bytes_scanned": {
-    "pass1": 7233904,
-    "pass2": 7233904,
-    "pass3": 7233904
+    "pass1": 7342932,
+    "pass2": 7342932,
+    "pass3": 7342932
   },
   "pass_counts": {
     "pass1": 0,
@@ -100,11 +100,11 @@
     "pass2_only": 0,
     "pass3_only": 0
   },
-  "raw_report_dir": "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-09/phase-scan",
+  "raw_report_dir": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw",
   "raw_reports": [
-    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-09/phase-scan/range-2026-11-09T06-45-55-325Z.pass1.json",
-    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-09/phase-scan/range-2026-11-09T06-45-55-325Z.pass2.json",
-    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-09/phase-scan/range-2026-11-09T06-45-55-325Z.pass3.json"
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass1.json",
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass2.json",
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass3.json"
   ],
   "classification_labels": {
     "non-public": "reported by all three passes",
