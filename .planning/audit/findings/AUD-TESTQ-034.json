@@ -41,5 +41,8 @@
   ],
   "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: npm run preflight (checkHoneypotCheckerCode in src/preflight.ts) performs the same live getCode check, but only when the operator runs it. Nothing in Phase 22 runs it against the real RPC, so nothing automated confirms the contract exists during this phase.",
   "escaped_regression": "A HoneypotChecker that does not exist at the configured mainnet address (wrong address, wrong chain) passes the rehearsal, because the rehearsal bytecode came from a loopback fake.",
-  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion."
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
 }

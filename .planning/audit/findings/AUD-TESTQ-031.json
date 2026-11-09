@@ -41,5 +41,8 @@
   ],
   "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: test/unit/rails/childRails.test.ts 'fork shell keys (SPEC R4 / AC-17)' cases (i)-(vii) in railsEntry 'setup-fork' children",
   "escaped_regression": "A fork worker where the real ETH_FORK_RPC_URL is lost or replaced by the sentinel under the real fork project would pass the rehearsal, because the rehearsal uses a loopback marker.",
-  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion."
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
 }

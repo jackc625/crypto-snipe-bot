@@ -48,5 +48,8 @@
   ],
   "sibling_sites_checked": "The fork project needs Hardhat, which Phase 22 may not start (AC-08). The rail assertions among these files are UFV-01 to UFV-05; the others are mechanical edits recorded in AUD-TESTQ-011 to AUD-TESTQ-016.",
   "escaped_regression": "A fork test broken by these edits (a missing import, a wrong argument order, a resolver that throws under the real project) would stay green until Phase 25 first runs the fork suite.",
-  "recommendation": "Run the whole fork suite at the first npm run test:fork of v7.0, owner Phase 25, and record the pass or fail of each file."
+  "recommendation": "Run the whole fork suite at the first npm run test:fork of v7.0, owner Phase 25, and record the pass or fail of each file.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
 }

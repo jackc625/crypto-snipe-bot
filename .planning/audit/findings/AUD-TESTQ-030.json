@@ -41,5 +41,8 @@
   ],
   "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: test/unit/rails/childRails.test.ts setup-fork child cases (railsEntry 'setup-fork': sentinel env, fork mode, Telegram deny on, DB denied; fork shell keys (i)-(v))",
   "escaped_regression": "A fork worker that received a real Telegram token or app key under the real fork project (for example from a future change to the fork setup) would pass every rehearsal, because the rehearsal has no Hardhat globalSetup.",
-  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion."
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
 }
