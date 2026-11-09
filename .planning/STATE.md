@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-14-PLAN.md
-last_updated: "2026-11-09T04:18:53.456Z"
+stopped_at: Completed 22-15-PLAN.md
+last_updated: "2026-11-09T04:58:16.444Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: a1ae6932ba35dae93a470d6a0644a9e8ea9fde75
+state_head: 53f30cf3eaf3bd9181ac02a52812e1dc9179cef5
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 26
+  completed_plans: 27
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 16 of 29
+Plan: 17 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -104,11 +104,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P12 | 11min | 3 tasks | 16 files |
 | Phase 22 P13 | 17min | 3 tasks | 24 files |
 | Phase 22 P14 | 8min | 2 tasks | 17 files |
+| Phase 22 P15 | 18min (continuation) | 2 tasks | 15 files |
 
 ## Session
 
-**Last session:** 2026-11-09T04:18:53.345Z
-**Stopped at:** Completed 22-14-PLAN.md
+**Last session:** 2026-11-09T04:58:16.336Z
+**Stopped at:** Completed 22-15-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -193,3 +194,8 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-13 for 22-15: test/unit/rails/spawnSites.test.ts is red at HEAD from 22-12 files (6 offences, none spawns), recorded S3 in rails-discoveries.json; the first full-suite run will hit it
 - [Phase 22]: 22-14: the vi.mock gate also accepts Node built-ins and rejects declaration-only targets, because createRequire returns a bare name for built-ins and a .d.ts-only mock intercepts nothing at run time
 - [Phase 22]: 22-14: the gate exits 2, not 0, when a scan finds no source files or no mock call, so a broken scan cannot pass as clean
+- [Phase 22]: 22-15 ESC-RAILS-01: operator replied b; the one live-mainnet bytecode test moved to the fork project inside this plan, obligation UFV-05 owner Phase 25; options were (a) keep it failing and escalate, (b) move it, (c) stop Phase 22
+- [Phase 22]: 22-15: AC-22 holds for the unit and integration suites with one stated exception: the moved test has NOT run in its new file; never claim every original test executed
+- [Phase 22]: 22-15: full railed npm test green, run vpu-20261109T045355-20916-8a9783: 1194 passed, 0 failed, 0 skipped, 0 todo, verdict untouched, ac19-run.json written by the wrapper
+- [Phase 22]: 22-15: the moved test uses buildChainRegistry() for its address because forkShellOnly forbids a fork test reading a key the rails replace; the precedence is unchanged
+- [Phase 22]: 22-15 for 22-29: UFV-05 must be added to the Task 1 verify, which names only UFV-01..04; 7 of the 16 triggeringTestFiles are rail tests' own deliberate denials

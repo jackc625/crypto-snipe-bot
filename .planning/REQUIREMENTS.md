@@ -11,7 +11,7 @@
 
 - [ ] **SAFE-01**: Ignition deployment state (`ignition/deployments/`, incl. gitignored `journal.jsonl` + per-future artifacts) and `data/` (`bot.db` + `-wal` + `-shm` together, or checkpoint + `db.backup()`) are backed up outside the repo with a verified hash manifest before any `npm install`, Hardhat invocation, sweep, or relocation; `ignition/deployments/` is then tracked in git (OD-21).
 - [ ] **SAFE-02**: Test runs cannot read the real `.env`, open `data/bot.db`, reach the network, or send Telegram alerts — enforced by a dummy test env, a prod-DB tripwire that throws under Vitest, an outbound-network deny, and a notifier that refuses to send under Vitest; each rail is proven by a test that fails if the rail is removed.
-- [ ] **SAFE-03**: Lock/registry singletons (`withNonceLock`, sell lock, ExitWorker, anti-rug registry) throw on duplicate load in one process (e.g. `Symbol.for` guard catching Windows path-casing aliases), and `forceConsistentCasingInFileNames` is enabled in every tsconfig.
+- [x] **SAFE-03**: Lock/registry singletons (`withNonceLock`, sell lock, ExitWorker, anti-rug registry) throw on duplicate load in one process (e.g. `Symbol.for` guard catching Windows path-casing aliases), and `forceConsistentCasingInFileNames` is enabled in every tsconfig.
 - [x] **SAFE-04**: A second bot process for the same wallet refuses to start (single-instance process lock acquired at boot).
 - [x] **SAFE-05**: The bot refuses to boot against a DB whose `user_version` is newer than the code supports, and refuses to silently create a fresh DB in production (absolute `DB_PATH` resolution, refuse-to-create).
 - [x] **SAFE-06**: CI fails if any `vi.mock` path in the suite does not resolve to an existing module (a moved file cannot turn a mock into a silent no-op).
@@ -196,7 +196,7 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 |-------------|-------|--------|
 | SAFE-01 | Phase 22 | Pending |
 | SAFE-02 | Phase 22 | Pending |
-| SAFE-03 | Phase 22 | Pending |
+| SAFE-03 | Phase 22 | Complete |
 | SAFE-04 | Phase 22 | Complete |
 | SAFE-05 | Phase 22 | Complete |
 | SAFE-06 | Phase 22 | Complete |
