@@ -1,0 +1,60 @@
+# RED proof 22-12-2-singleton-epoch (AC-18 / D-05: the epoch rule)
+Date: 2026-11-09T03:35:41.175Z
+File neutralised (working tree only, never committed): src/guards/singleton.ts
+sha256 before and after restore: 50530c6aefcafa9b5fe5761fed205054a58ba6238a249a9b282abeb7964f92d2
+
+## What this proves
+
+With every existing entry refused regardless of epoch, a whole-graph vi.resetModules re-import is refused. The epoch rule is what lets the frozen reset/doMock test files keep working.
+
+## Diff applied
+
+diff --git a/src/guards/singleton.ts b/src/guards/singleton.ts
+index 4f54ae6..f1cfe27 100644
+--- a/src/guards/singleton.ts
++++ b/src/guards/singleton.ts
+@@ -67,7 +67,7 @@ export function registerSingleton(name: string, rawIdentity: string, epoch: obje
+     const registry = getRegistry();
+     const canonicalPath = fs.realpathSync.native(rawIdentity);
+     const existing = registry.get(canonicalPath);
+-    if (existing !== undefined && (existing.rawIdentity !== rawIdentity || existing.epoch === epoch)) {
++    if (existing !== undefined) { // RED 22-12-2
+         throw duplicateError(name, canonicalPath, existing.rawIdentity, rawIdentity);
+     }
+     registry.set(canonicalPath, { name, rawIdentity, epoch });
+
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/guards/singleton.test.ts -t resetModules
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 21 skipped (29)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T033536-21520-16126d | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T033536-21520-16126d\summary.json
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > a vi.resetModules re-import is allowed, and really evaluates the module again in a new epoch
+Error: SINGLETON_DUPLICATE: module 'nonceAuthority' was loaded a second time in this process and the load was refused. Canonical file: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\nonceAuthority.ts. First loaded as: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\nonceAuthority.ts. Refused load ...
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > a vi.doMock plus vi.resetModules re-import is allowed
+Error: SINGLETON_DUPLICATE: module 'nonceAuthority' was loaded a second time in this process and the load was refused. Canonical file: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\nonceAuthority.ts. First loaded as: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\nonceAuthority.ts. Refused load ...
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > a vi.resetModules re-import is allowed, and really evaluates the module again in a new epoch
+Error: SINGLETON_DUPLICATE: module 'exitManager' was loaded a second time in this process and the load was refused. Canonical file: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. First loaded as: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. Refused load: C:\User ...
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > a vi.doMock plus vi.resetModules re-import is allowed
+Error: SINGLETON_DUPLICATE: module 'exitManager' was loaded a second time in this process and the load was refused. Canonical file: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. First loaded as: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. Refused load: C:\User ...
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > a vi.resetModules re-import is allowed, and really evaluates the module again in a new epoch
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > a vi.doMock plus vi.resetModules re-import is allowed
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > a vi.resetModules re-import is allowed, and really evaluates the module again in a new epoch
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > a vi.doMock plus vi.resetModules re-import is allowed
+Error: SINGLETON_DUPLICATE: module 'exitManager' was loaded a second time in this process and the load was refused. Canonical file: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. First loaded as: C:\Users\jackc\WebstormProjects\crypto-snipe-bot\src\utils\exitManager.ts. Refused load: C:\User ...
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/guards/singleton.ts
+sha256 after restore: 50530c6aefcafa9b5fe5761fed205054a58ba6238a249a9b282abeb7964f92d2 (equal)
+git status --porcelain src/guards/singleton.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  8 passed | 21 skipped (29)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T033539-5440-d11775 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T033539-5440-d11775\summary.json
