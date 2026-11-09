@@ -1,0 +1,47 @@
+# RED proof 22-11-1-spawn-gate (AC-18, fork RPC source, spawn gate and Hardhat child env)
+Date: 2026-11-09T03:16:12Z
+File neutralised (working tree only, never committed): test/integration/pauseCli.test.ts
+What was neutralised: a temporary spawnSync import and call appended to test/integration/pauseCli.test.ts; only spawnSites.test.ts ran, and it reads the source without executing it
+sha256 before and after restore: 139a2535ab0e1605cbc14f8cc825572278564a67d4ac09dd845f1b4683653a12 / 139a2535ab0e1605cbc14f8cc825572278564a67d4ac09dd845f1b4683653a12
+
+## Diff applied
+
+diff --git a/test/integration/pauseCli.test.ts b/test/integration/pauseCli.test.ts
+index d04783b..fa9e80f 100644
+--- a/test/integration/pauseCli.test.ts
++++ b/test/integration/pauseCli.test.ts
+@@ -369,3 +369,6 @@ describe('20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT', ()
+         });
+     }
+ });
++
++import { spawnSync } from 'child_process';
++spawnSync('x', []);
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/spawnSites.test.ts
+
+## RED result: exit 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   unit  test/unit/rails/spawnSites.test.ts > spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files
+AssertionError: expected [ …(2) ] to deeply equal []
+- []
++ [
++   "test/integration/pauseCli.test.ts:373 import of child_process",
++   "test/integration/pauseCli.test.ts:374 call to spawnSync()",
++ ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031605-20720-5150e7 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031605-20720-5150e7\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- test/integration/pauseCli.test.ts (sha256 equal: yes; git status --porcelain test empty: yes)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031609-24844-ab8593 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031609-24844-ab8593\summary.json
