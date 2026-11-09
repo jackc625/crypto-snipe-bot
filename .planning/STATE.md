@@ -2,37 +2,37 @@
 gsd_state_version: "1.0"
 milestone: v7.0
 milestone_name: Full Audit & Modernization
-current_phase: 22
-current_phase_name: Safety Rails & Audit
-status: executing
-stopped_at: Completed 22-29-PLAN.md
-last_updated: "2026-11-09T06:49:29.999Z"
-last_activity: 2026-11-08
-last_activity_desc: Phase 22 execution started
-state_head: 22255a7db3804ac70b989485dc382b1d10d29ae9
+current_phase: 23
+current_phase_name: Test Safety Net (Harness, Triage, Characterization)
+status: planning
+stopped_at: Phase 22 complete, ready to plan Phase 23
+last_updated: "2026-11-09T07:32:46.390Z"
+last_activity: 2026-11-09
+last_activity_desc: Phase 22 complete, transitioned to Phase 23
+state_head: b448b5b0b57357b9af3d9fdc5364df2ef5178605
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 29
   completed_plans: 29
-  percent: 0
+  percent: 9
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
+See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberately not edited at the Phase 22 close because it is outside the audit seal exempt list)
 
 **Core value:** Reliably detect, validate, and profitably snipe new token listings across multiple EVM chains with proper risk management — never lose money to preventable bugs, race conditions, or security flaws.
-**Current focus:** Phase 22 — Safety Rails & Audit
+**Current focus:** Phase 23 — Test Safety Net (Harness, Triage, Characterization)
 
 ## Current Position
 
-Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 29 of 29
-Status: All plans complete and sealed; verification human_needed, run /gsd-verify-work 22 to close
-Last activity: 2026-11-09 — Plan 22-29 complete (phase sealed on 93d9029)
+Phase: 23 — Test Safety Net (Harness, Triage, Characterization)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-11-09 — Phase 22 complete, transitioned to Phase 23
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
@@ -53,6 +53,8 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 
 ## Blockers / Concerns
 
+- **Merge Phase 22 before starting Phase 23:** `phase-22-safety-rails-audit` is unmerged and has no copy on GitHub, and new phase branches start from `main`. `main` tracks only 4 of the 10 `ignition/deployments/` files (see the checkout warning under Operating Notes). Run `/gsd-ship 22` first.
+- **Phase 25 owes the real fork run (UFV-01..UFV-05):** deferred at the Phase 22 UAT on 2026-11-09; Phase 25 success criterion 6 names the five checks. Until then the fork-project halves of the isolation rails are rehearsed only.
 - **Phase 24 item (found by the 22 security audit after the seal):** the startup DB probe copies a WAL-mode database to the OS temp folder, and a crash or failed cleanup can leave that copy behind (trade data, no keys). Not in the sealed register; see 22-SECURITY.md.
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
@@ -111,8 +113,8 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 
 ## Session
 
-**Last session:** 2026-11-09T06:49:29.902Z
-**Stopped at:** Completed 22-29-PLAN.md
+**Last session:** 2026-11-09T07:34:11.578Z
+**Stopped at:** Phase 22 complete, ready to plan Phase 23
 **Resume file:** None
 
 ## Decisions
@@ -209,3 +211,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 22]: Fork-project gap ruled accept-rehearsal-plus-obligation: fork halves of AC-13/AC-16/AC-17 and the AC-22 live bytecode test stay rehearsal-only until Phase 25
 - [Phase 22]: AUD-TESTQ-002 merged into AUD-TESTU-023; canonical stays confirmed because the stale statement names in the mock factory are not fixed
 - [Phase 22]: Phase 22 sealed on 93d90297b58a8b333519873112473156fe45d6bf with a clean NAC-11 scan; later bookkeeping paths are exempt by pattern but still scanned
+- [Phase 22]: UAT 2026-11-09: operator accepted one outside reviewer on the money-handling code (codex only, agy excluded) and the package.json disclosure to OpenAI during the host containment probe (D-14; this is the acknowledgement 22-SECURITY T-22-95 found missing)
+- [Phase 22]: UAT 2026-11-09: operator accepted AUD-REAUDIT-001, that 11 fork rehearsal runs before a08d650 very likely read the real env file into the Vitest main process
+- [Phase 22]: UAT 2026-11-09: operator accepted the per-user process lock for now and added CAP-18 to Phase 24 so AUD-TX-026 (S3) has a named owner
+- [Phase 22]: UAT 2026-11-09: operator deferred the real fork run to Phase 25 and had the five checks named in its success criteria

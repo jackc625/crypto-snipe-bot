@@ -105,7 +105,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 - **D-ALERTS**: structured pino (dotted `op` fields) plus Telegram on every ceiling-hit, fallback, fail-clean, and escalation, each with a remediation pointer.
 - **High-stakes-ops protocol** (Phases 30 and 32): testnet rehearsal first, step-by-step verification, and address checks at every step.
 
-- [ ] **Phase 22: Safety Rails & Audit** - Back up Ignition state and the live DB first, wall tests off from production, then a read-only audit with findings register and decision cards
+- [x] **Phase 22: Safety Rails & Audit** - Back up Ignition state and the live DB first, wall tests off from production, then a read-only audit with findings register and decision cards (completed 2026-11-09)
 - [ ] **Phase 23: Test Safety Net (Harness, Triage, Characterization)** - Real-path harness, all 28 candidates proven RED or NOT-A-BUG, golden-master trace and commit-taxonomy check
 - [ ] **Phase 24: Capital-Safety Fixes** - Every confirmed S0/S1 fixed on the current layout with RED→GREEN real-path proof: nonce/containment, buy path, exit/anti-rug
 - [ ] **Phase 25: Behavior-Neutral Cleanup & Dependencies** - Line endings and Prettier, dead code and cycles out, contracts package on Hardhat 2, all runtime deps at latest with 0 prod vulns
@@ -141,7 +141,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 **Conventions**: D-STOP-THE-LINE (any candidate that reads as S0/S1, or a rail finding such as evidence that tests already mutated the live DB, is re-surfaced to the operator at once and never filed-and-deferred); D-NONCE-AUTHORITY-ALL (the singleton guards and the process lock keep one nonce authority per wallet; the sweep includes a census of every signing call site, scripts included).
 **Operator decisions**: OD-21 during Wave 1, after the backup verifies. This phase produces the cards for OD-6, OD-9, OD-10, OD-11, OD-14 to OD-18, OD-25, and any new ones.
 **Research flag**: Yes for the audit wave (per-area deep reading; ethers v6 `getFeeData` base-fee derivation and `wait()` error semantics such as `TRANSACTION_REPLACED`/`repriced`). The rail mechanics are already specified.
-**Plans**: 29/29 plans executed in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
+**Plans**: 29/29 plans complete in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
 
 Plans:
 **Wave 1**
