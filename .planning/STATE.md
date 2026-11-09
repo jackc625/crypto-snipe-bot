@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-26-PLAN.md
-last_updated: "2026-11-07T21:45:49.080Z"
+stopped_at: Completed 22-27-PLAN.md
+last_updated: "2026-11-09T01:42:23.231Z"
 last_activity: 2026-11-06
 last_activity_desc: Phase 22 execution started
-state_head: b9153b062196056b2b3b758521cb846a39cbe92b
+state_head: 834abd3ad0177588de3d4fbdb44f0da4deac14bf
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 18
+  completed_plans: 19
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 19 of 29
+Plan: 20 of 29
 Status: Ready to execute
 Last activity: 2026-11-06 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -96,11 +96,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P24 | 33min | 2 tasks | 30 files |
 | Phase 22 P25 | 36min (continuation; incl. operator wait) | 3 tasks tasks | 33 files files |
 | Phase 22 P26 | 51min (wall-clock incl. two operator waits) | 2 tasks | 16 files |
+| Phase 22 P27 | 27h 44m | 3 tasks | 120 files |
 
 ## Session
 
-**Last session:** 2026-11-07T21:45:49.006Z
-**Stopped at:** Completed 22-26-PLAN.md
+**Last session:** 2026-11-09T01:42:23.126Z
+**Stopped at:** Completed 22-27-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -161,3 +162,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-26 ESC-CENSUS-01: operator ruled "keep s1" - AUD-CENSUS-002 (src/utils/tokenSafety.ts:277, real approve inside dead simulateSell outside withNonceLock) stays S1; 22-28 must raise canonical AUD-BUY-007 to S1 and attach ESC-CENSUS-01 (5 merge items: evidence, reported_by, severity, rationale, escalation_ref)
 - [Phase 22]: Orchestrator context (not operator): keep-s1 recommended because the fix is deleting a dead function (near-zero cost) and S1 makes sure Phase 24 removes it; a function named simulateSell that really signs is a re-wiring trap
 - [Phase 22]: 22-26 census: N = 23 tx-signing sites for the Phase 23 assertion (src 11: 10 locked, 1 unlocked; scripts 12 unlocked, out-of-process, ESC-SCRIPTS-01 / Phase 29; 4 ContractFactory.deploy included); 1 message signature (flashbots.ts:102) excluded; signing-census.ts --self-test 31/31; manual inventory reconciled with 0 differences
+- [Phase 22]: 22-27: operator ruled codex a, agy c: codex ran only inside a pinned Docker container with no file or shell tools; agy was left out and sent nothing, so D-14 is only partly covered (one outside assistant, recorded as a deviation)
+- [Phase 22]: 22-27: 101 codex findings merged as 72 matches and 28 new entries; three new BUY S1 entries (AUD-BUY-027, 028, 030) in ESC-BUY-03, operator: Acknowledge continue
+- [Phase 22]: 22-27: 22-28 must re-grade all 43 entries where codex said S1 and the register says lower, against the code at the audit base, and bring the operator anything that moves up to S1 (MERGE.json consolidation_required)

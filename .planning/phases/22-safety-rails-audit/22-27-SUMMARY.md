@@ -88,7 +88,7 @@ coverage:
     human_judgment: true
     rationale: "Set or kept by the merge executor with no second reader yet; plan 22-28 re-grades them against the code."
 
-duration: 27h 44m elapsed including rate-limit stops and three operator decisions
+duration: 27h 44m elapsed including a rate-limit stop and two operator decisions
 completed: 2026-11-09
 status: complete
 ---
@@ -99,7 +99,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 27h 44m elapsed for the continuation, including rate-limit stops and three operator decisions. The five sends took about 66 minutes.
+- **Duration:** 27h 44m elapsed for the continuation, including a rate-limit stop and two operator decisions. The five sends took about 66 minutes.
 - **Started:** 2026-11-07T21:56:41Z (continuation after Task 2)
 - **Completed:** 2026-11-09T01:41:01Z
 - **Tasks:** 3
@@ -211,7 +211,7 @@ The orchestrator recommended sending to outside assistants because a review that
 ## Issues Encountered
 
 - **43 grading disagreements:** codex rated 43 findings S1 that the register rates lower. They cover 39 register entries, 19 of them new here. Those grades were set or kept by the merge executor with no second reader yet, so they should not be taken as settled. `MERGE.json` `consolidation_required` tells plan 22-28 to re-grade all of them against the code at the audit base and to bring the operator anything that moves up to S1. Named examples: AUD-TX-020, AUD-EXIT-020, AUD-TX-012, AUD-TX-019. A further 18 findings carry smaller gaps and are in `severity_disagreements`.
-- Three API or rate-limit interruptions on the executor side, none affecting the data.
+- One API rate-limit interruption on the executor side, which did not affect the data.
 
 ## User Setup Required
 
