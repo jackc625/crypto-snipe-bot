@@ -1,0 +1,111 @@
+{
+  "run_id": "vpu-20261109T045355-20916-8a9783",
+  "command": [
+    "npm",
+    "test",
+    "--",
+    "--reporter=json",
+    "--outputFile=C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run.json"
+  ],
+  "exit_code": 0,
+  "child_status": 0,
+  "verdict": "untouched",
+  "started_at": "2026-11-09T04:53:56.883Z",
+  "finished_at": "2026-11-09T04:55:19.452Z",
+  "node_version": "v22.16.0",
+  "npm_version": "11.17.0",
+  "before": {
+    "bot.db": {
+      "sha256": "961aa8222c62fd12ee45aec5cf082ab1d76df138c8748b5c1b8d22c49f361c0c",
+      "size": 57344,
+      "mtimeMs": 1780090436817.063
+    },
+    "bot.db-wal": {
+      "sha256": "70b57264ef591190515fbe9dd4427f9f606a419af6ddab83b65ee1d3449bea36",
+      "size": 164832,
+      "mtimeMs": 1780100758836.0308
+    },
+    "bot.db-shm": {
+      "sha256": "2200a440727514ae2893386b094d64a6e2c5b1dbaa10a8b87067dbe09289ca70",
+      "size": 32768,
+      "mtimeMs": 1780100758836.0308
+    }
+  },
+  "after": {
+    "bot.db": {
+      "sha256": "961aa8222c62fd12ee45aec5cf082ab1d76df138c8748b5c1b8d22c49f361c0c",
+      "size": 57344,
+      "mtimeMs": 1780090436817.063
+    },
+    "bot.db-wal": {
+      "sha256": "70b57264ef591190515fbe9dd4427f9f606a419af6ddab83b65ee1d3449bea36",
+      "size": 164832,
+      "mtimeMs": 1780100758836.0308
+    },
+    "bot.db-shm": {
+      "sha256": "2200a440727514ae2893386b094d64a6e2c5b1dbaa10a8b87067dbe09289ca70",
+      "size": 32768,
+      "mtimeMs": 1780100758836.0308
+    }
+  },
+  "data_diffs": [],
+  "manifest_match": true,
+  "data_listing_unchanged": true,
+  "ledger": {
+    "summary_path": "C:/Users/jackc/AppData/Local/Temp/crypto-snipe-bot-rail-ledger/vpu-20261109T045355-20916-8a9783/summary.json",
+    "summary_sha256": "1758571d707f96cdd2b9fa70677093fec4f44a4fe73e8d466a41b7711636bcf4",
+    "projects": [
+      "integration",
+      "unit"
+    ],
+    "workers_by_project_counts": {
+      "integration": 34,
+      "none": 208,
+      "unit": 101
+    },
+    "countsByKind": {
+      "worker-start": 357,
+      "net-allow": 90,
+      "env-override": 61,
+      "net-deny": 16,
+      "dns-deny": 2,
+      "udp-deny": 2,
+      "fork-shell-key": 18,
+      "env-read-blocked": 12,
+      "db-tripwire": 21,
+      "data-access-blocked": 24,
+      "notifier-refused": 6
+    },
+    "nonLoopbackAllowed": 0,
+    "telegramAllowed": 0,
+    "notifier_refused": 6
+  },
+  "net_watch": {
+    "ok": true,
+    "problems": [],
+    "samples": 99,
+    "sample_errors": 0,
+    "max_descendants": 64,
+    "non_loopback_observed": [],
+    "loopback_connections_seen": 2,
+    "vitest_main_observed": true,
+    "vitest_main_samples": 97,
+    "descendant_names_at_peak": {
+      "cmd.exe": 15,
+      "node.exe": 32,
+      "conhost.exe": 16,
+      "git.exe": 1
+    }
+  },
+  "report": {
+    "path": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run.json",
+    "sha256": "03b504ce81c7fa2d032853f1e099a178f4c1ab6260cd7d83a90f8e86d07cfc4e",
+    "totals": {
+      "numPassedTests": 1194,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numTodoTests": 0
+    }
+  },
+  "evidence_basis": "The choke-point ledger counts allows by construction (TCP connect, DNS, UDP). Net-watch is a sampled OS connection check that can miss very short connections. The spawn gate and the audit cover the remaining bypass classes (worker threads, native sockets)."
+}
