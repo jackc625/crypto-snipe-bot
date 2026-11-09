@@ -1,0 +1,71 @@
+{
+  "id": "AUD-TESTU-009",
+  "title": "The D-RECORD-REAL-HASH case re-implements the buy-row persistence inside the test and asserts on its own copy, and its source check only counts text patterns, so a buy that lands without a trades row passes it",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliation.test.ts:873-918@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "persistBuyRow is defined inside the test (\"the production buy success path, reduced to its persistence wiring\") and the assertions read its own insertTradeRun spy; no src code runs"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliation.test.ts:920-959@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the source check counts txHash: realHash ?? 'mev_bundle' occurrences (>= 2) and greps for the seam"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1127-1135@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real V2 insert"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1451-1459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real V3 insert"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V2 catch that treats any error after submission as a clean failure (AUD-BUY-002)"
+    }
+  ],
+  "sibling_sites_checked": "Other tests of the buy-row recording: bot/noDoubleBuyReconcile and bot/deliberateBuy* (deliberate path, real insert call observed); bot/snipeFailClean (asserts no row on a throw, AUD-TESTU-014). No unit test runs handleNewPairForChain or handleNewV3PoolForChain to a successful insert.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a hollow test on the money path (it tests its own copy of the wiring) whose claim is the D-RECORD-REAL-HASH harm, so the registered S1 AUD-BUY-002 (landed buy with no trades row) stays invisible.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002",
+    "AUD-TESTU-014"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive the real V2 and V3 snipe handlers to a landed buy (mocked strategy edge only) and assert the inserted row and its hash; delete the in-test copy.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "D-RECORD-REAL-HASH: buy success path records trades.tx_hash === real hash, not 'mev_bundle' (insert-wiring observable)",
+    "D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)"
+  ],
+  "escaped_regression": "Move the insertTrade.run at src/bot.ts:1127 after a later await that can throw (for example the decodeReceipt call), so a landed buy that hits the error reaches the catch at :1177 with no row: the first case still passes (it never runs bot.ts) and the source check still finds two txHash: realHash ?? 'mev_bundle' literals."
+}

@@ -1,0 +1,63 @@
+{
+  "id": "AUD-BUY-009",
+  "title": "isHoneypot is hard-coded false and printed as \"Honeypot: No\" in every New-Token alert",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:984@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2: const isHoneypot = false"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1319@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3: const isHoneypot = false"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1023@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 alert prints Honeypot: Yes/No from the constant"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1341@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 alert prints it too"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1025@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the isHoneypot term in the skip condition can never be true (also :1343)"
+    }
+  ],
+  "sibling_sites_checked": "Both handlers checked. The research line hint :1000 does not hold at the base (bot.ts:1000 is a blank line after the LP contract); the re-measured sites are :984, :1319, printed at :1023/:1341. The \"Blacklist Function\" field in the same alerts is also always No, for a different reason (AUD-BUY-013).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-24"
+  ],
+  "research_suggested_severity": "S3",
+  "severity_rationale": "S3, equal to the research suggestion. The on-chain roundtrip gate has already returned safe when the alert is sent, so the printed \"No\" is not false at that point, but the field is a constant, the isHoneypot term in the skip condition is dead, and the alert implies a separate check that no longer runs.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-013"
+  ],
+  "tags": [
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Remove the constant and print the roundtrip verdict and tax figures that actually gated the buy (alert text only, no trading behaviour change). Phase 29.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

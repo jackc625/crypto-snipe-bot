@@ -1,0 +1,37 @@
+{
+  "id": "BUY-07",
+  "title": "Buy deadline across private escalation attempts",
+  "area": "BUY",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: one 60 s deadline for all attempts",
+      "behavior_impact": "none",
+      "risk": "Attempts after 60 s are doomed to revert in simulation, so the private escalation is cut short (missed snipes)."
+    },
+    {
+      "id": "rebuild-per-attempt",
+      "name": "Rebuild the tx with a fresh deadline per attempt",
+      "behavior_impact": "Every attempt is valid when sent.",
+      "risk": "Each attempt is a new signed tx; the reconcile logic must keep tracking every broadcast hash (see AUD-BUY-002 trace 2)."
+    },
+    {
+      "id": "deadline-from-budget",
+      "name": "Size one deadline to the whole escalation budget",
+      "behavior_impact": "One tx stays valid for every attempt.",
+      "risk": "A long deadline lets a late inclusion buy at a stale price (minOut still applies)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "rebuild-per-attempt, together with the TX slice fix that reconciles every broadcast hash.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). The linked finding is S3.",
+  "behavior_impact": "Decides how long a snipe stays valid while the bot escalates fees.",
+  "findings": [
+    "AUD-BUY-018"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (with the TX slice submit changes) or Phase 29",
+  "assigned_id": "OD-32"
+}

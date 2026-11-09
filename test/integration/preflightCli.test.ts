@@ -8,7 +8,9 @@
 //   - Does NOT spawn startMultiChainBot (OPS-LIVE-10 hard requirement)
 //
 // Test strategy: hybrid
-//   * Test 1 + Test 4 (subprocess invariants): spawn the real CLI via spawnSync
+//   * Test 1 + Test 4 (subprocess invariants): spawn the real CLI through the
+//     railed spawner (test/rails/spawnRailedChild.ts, SAFE-02 D-03: the child
+//     env is the sentinel test env, never the parent env)
 //     and assert the bot-startup markers never appear in stdout/stderr +
 //     exit code is bounded 0 or 1 (never 2). This proves OPS-LIVE-10 the
 //     "does NOT start the bot" hard requirement at the subprocess level.
@@ -20,40 +22,24 @@
 //     OPS-LIVE-10 invariant).
 
 import { describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { spawnRailedChild, type CliResult } from '../rails/spawnRailedChild';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const isWindows = process.platform === 'win32';
-const npxCmd = isWindows ? 'npx.cmd' : 'npx';
-
-interface CliResult {
-    status: number | null;
-    stdout: string;
-    stderr: string;
-}
 
 function runPreflight(extraEnv: Record<string, string> = {}): CliResult {
-    const result = spawnSync(npxCmd, ['ts-node', 'scripts/preflight.ts'], {
-        cwd: repoRoot,
-        env: { ...process.env, ...extraEnv },
-        shell: true,
-        encoding: 'utf8',
-        timeout: 60_000,
-    });
-    return {
-        status: result.status,
-        stdout: result.stdout ?? '',
-        stderr: result.stderr ?? '',
-    };
+    return spawnRailedChild('npx', ['ts-node', 'scripts/preflight.ts'], { envOverrides: extraEnv });
 }
 
-describe('npm run preflight CLI (OPS-LIVE-10)', () => {
-    it('Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against current .env', () => {
-        // Run preflight subprocess against the project's existing .env. The
-        // outcome depends on the operator's actual environment — what we
-        // assert is the contract: exit code 0 (all-pass) OR 1 (≥1 FATAL),
+// Each subprocess test starts the real CLI (11-13 s under the full parallel run, 60 s kill limit per
+// child); Test 4 starts two, so this file cannot live on the project's 15 s default test timeout.
+describe('npm run preflight CLI (OPS-LIVE-10)', { timeout: 150_000 }, () => {
+    it('Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env', () => {
+        // Run preflight subprocess against the committed sentinel test env
+        // (test/.env.test, every RPC on 127.0.0.1:1). This test used to read the
+        // operator's real .env, network and DB; it no longer can. What we
+        // assert is the same contract: exit code 0 (all-pass) OR 1 (≥1 FATAL),
         // never 2 (uncaught throw) and never null (timeout / crash).
         const result = runPreflight();
 
@@ -69,7 +55,7 @@ describe('npm run preflight CLI (OPS-LIVE-10)', () => {
         const result = runPreflight({
             ENABLED_CHAINS: 'eth',
             ETH_RPC_URL: 'http://127.0.0.1:1/intentionally-unreachable',
-            ETH_WS_RPC_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
+            ETH_WS_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
         });
 
         expect(result.status).toBe(1);
@@ -87,7 +73,7 @@ describe('npm run preflight CLI (OPS-LIVE-10)', () => {
         const result = runPreflight({
             ENABLED_CHAINS: 'eth',
             ETH_RPC_URL: 'http://127.0.0.1:1/intentionally-unreachable',
-            ETH_WS_RPC_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
+            ETH_WS_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
         });
 
         expect(result.status).toBe(1);
@@ -104,7 +90,7 @@ describe('npm run preflight CLI (OPS-LIVE-10)', () => {
         const failResult = runPreflight({
             ENABLED_CHAINS: 'eth',
             ETH_RPC_URL: 'http://127.0.0.1:1/intentionally-unreachable',
-            ETH_WS_RPC_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
+            ETH_WS_URL: 'ws://127.0.0.1:1/intentionally-unreachable',
         });
 
         const passCombined = passResult.stdout + passResult.stderr;

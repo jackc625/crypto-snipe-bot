@@ -1,0 +1,69 @@
+{
+  "id": "AUD-TESTU-022",
+  "title": "The dashboard unit tests are source-text greps whose case names claim runtime behaviour (the pause banner \"returns null\", the circuit-breaker reset gate requires RESET), so no dashboard behaviour is executed and the registered dashboard state defects pass them",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "test/unit/dashboard/pauseBanner.test.ts",
+    "test/unit/dashboard/anti-rug/displayComponents.test.ts",
+    "test/unit/dashboard/anti-rug/interactiveComponents.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/dashboard/pauseBanner.test.ts:1-25@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: source-text grep guards, not render tests (no @testing-library/react or jsdom)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/dashboard/pauseBanner.test.ts:47-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"Test 1: returns null when pauseState is null or paused is false\" asserts the source contains that expression"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/dashboard/anti-rug/interactiveComponents.test.ts:72-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the RESET confirm gate is checked by text only"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/dashboard/anti-rug/displayComponents.test.ts:1-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same pattern for the anti-rug badge and monitor tile"
+    }
+  ],
+  "sibling_sites_checked": "All three dashboard unit files are grep-only by design; dashboard behaviour is not covered by any test in the TESTU slice (DASH slice findings AUD-DASH-001..-003 are the runtime defects).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the files say openly that they are greps, but the case names read as behaviour; the hidden registered defects (AUD-DASH-001 anti-rug state wiped by the 5 s push, AUD-DASH-002 circuit-breaker trip not re-loaded) are S2.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DASH-001",
+    "AUD-DASH-002",
+    "AUD-DASH-003"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: rename the cases to what they check, and add a render test harness (jsdom + testing-library) for the pause banner, the anti-rug state badge and the circuit-breaker reset flow.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 1: returns null when pauseState is null or paused is false",
+    "Test 4: Resume POST does NOT setState/setPauseState locally (WS event drives unmount)",
+    "Test 21/23: RESET-text gate via ConfirmDialog requireConfirmText machinery",
+    "Test 15: renders 6 distinct badge state variants"
+  ],
+  "escaped_regression": "Keep the text if (!pauseState || !pauseState.paused) return null in PauseBanner.tsx but render the banner before it (or wipe antiRugState on every positions_update, AUD-DASH-001): the greps stay green."
+}

@@ -1,0 +1,68 @@
+{
+  "id": "AUD-DASH-008",
+  "title": "The Cumulative P&L chart on Risk & Exposure never draws: the chart is created once on mount while the loading spinner is showing (so its container does not exist yet), and is never created when the container appears",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "dashboard/src/components/PnLChart.tsx",
+    "dashboard/src/pages/RiskExposure.tsx",
+    "dashboard/src/hooks/useApi.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useApi.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loading starts true on every useApi"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/RiskExposure.tsx:16-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pnlLoading from useApi is passed to PnLChart as loading"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PnLChart.tsx:108-114@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "while loading, the spinner is rendered instead of the container div that holds containerRef"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PnLChart.tsx:18-20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the create-chart effect returns early when containerRef.current is null"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PnLChart.tsx:73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "that effect has an empty dependency list, so it never runs again when the container appears"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PnLChart.tsx:76-78@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the data effect returns early while the series refs are null, so data is never set"
+    }
+  ],
+  "sibling_sites_checked": "Every chart in the dashboard: PnLChart (lightweight-charts, this finding); ExposureDonut and FrontrunDistributionPanel (react-chartjs-2 components, rendered declaratively, not affected). Every effect that depends on a ref inside a conditionally rendered branch: only PnLChart. A range change toggles loading again and removes the container; with no chart ever created there is no leak to record.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the only P&L history view is always empty with no \"no data\" text, so the operator cannot see realized performance over time from the dashboard and may read the blank as \"no trades\". Proven from the code at the base SHA (initial loading state, conditional container, mount-only effect).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-002"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Keep the chart container mounted and overlay the spinner, or create the chart in an effect keyed on the container being present. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

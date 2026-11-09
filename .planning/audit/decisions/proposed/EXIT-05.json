@@ -1,0 +1,37 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-05",
+  "title": "Selling transfer-taxed tokens",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: private V2 and partial sells use the non-fee-on-transfer router call; V3 has no taxed-token path",
+      "behavior_impact": "none",
+      "risk": "Taxed V2 tokens always exit on the public fallback and never take partial profit; taxed V3 tokens cannot exit (AUD-EXIT-006, AUD-EXIT-007)."
+    },
+    {
+      "id": "supporting-variant",
+      "name": "Use swapExactTokensForETHSupportingFeeOnTransferTokens on every V2 sell",
+      "behavior_impact": "Taxed V2 tokens sell privately and partials work.",
+      "risk": "The supporting variant does not return amounts; receipt decoding must not rely on it."
+    },
+    {
+      "id": "refuse-taxed-v3",
+      "name": "Additionally refuse to buy taxed tokens on V3 (or route their exit through a V2 pool)",
+      "behavior_impact": "No V3 position that cannot be sold.",
+      "risk": "Fewer V3 snipes."
+    }
+  ],
+  "recommendation": "supporting-variant together with refuse-taxed-v3, after a Phase 23 fork check on a real taxed token.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
+  "behavior_impact": "Decides whether taxed tokens can be sold privately and at all on V3.",
+  "findings": [
+    "AUD-EXIT-006"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-39"
+}

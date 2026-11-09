@@ -1,0 +1,163 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-004",
+    "AUD-ANTIRUG-016"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-ANTIRUG-01",
+  "od_ref": "OD-48",
+  "reported_by": [
+    "claude (22-19 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-005",
+  "title": "Backfill does not do what its contract says: it fires live exits through the evaluator, it replays already-handled windows on every registration, and after a long healthy session any reconnect exceeds the maximum window so the real outage is never replayed",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C14",
+    "C13"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/chainRegistry.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "backfill passes every replayed log to evaluateRugSignalsShim, which is the live evaluateRugSignals (:2295)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1964-1983@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the evaluator itself schedules the confirm gate, which calls triggerAntiRugExit (:1834, :1900); V3 Burn logs arm a grace watcher (:2255-2256)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:713-718@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: backfilled triggers \"NEVER call triggerAntiRugExit per D-BACKFILL\" (also :994-999, :1146-1147)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1018@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only last_seen_block writes on the WS path are inside backfillSinceLastSeen (:1018, :1040, :1079, :1093, :1199); dispatchEvent (:1341-1396) never advances it; the HTTP poller does per tick (:1302)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:718@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every startChainAntiRugListener call runs a backfill; registerAntiRugPosition calls it on every registration (:447)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2120-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resume calls registerAntiRugPosition per position and startChainAntiRugListener once more per chain, each running a backfill"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1048-1085@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "gap > maxBackfillBlocks: alert, skip the whole replay, then advance last_seen_block to now"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:231@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "maxBackfillBlocks 7200 on every chain (also :295, :352, :409); config.ts:90 documents it as about 1 day, which holds only at 12 s blocks"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1117-1131@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a getLogs failure logs and returns with no alert; the caller carries on as if monitoring were armed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:432-440@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "armPositionMonitoring awaits registerAntiRugPosition, so the buy path waits for the backfill (and, with confirmBlocks 0, for any exit it starts: detector.ts:1832-1843)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1155-1159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Backfill invokes an evaluator that dispatches live exits"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:647-655@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Healthy websocket operation never advances the persisted cursor"
+    }
+  ],
+  "sibling_sites_checked": "Every caller of backfillSinceLastSeen (detector.ts:718 only) and every caller of startChainAntiRugListener (detector.ts:447, :943; bot.ts:2144). Every writer of chain_state.last_seen_block (detector.ts:1018, :1040, :1079, :1093, :1199, :1235, :1271, :1302 and db.ts setAntirugDryRunStarted, which inserts 0 on first insert). The HTTP poller is LIVE by design and advances the block every tick; its own defects are AUD-ANTIRUG-007. The restart window has the same bound: it starts at the last subscription of the previous run, not at shutdown.",
+  "status": "confirmed",
+  "severity_rationale": "S1. Sub-claim 3 is the capital case: a rug during a WebSocket outage that follows a long connected period is never evaluated, so no anti-rug exit fires for it; the GAP DETECTED alert only says that blocks were missed, with a count measured from the last subscription rather than the outage. At typical block times (12 s ETH, about 2 s Base, about 0.25 s Arbitrum; block times are not in the repo) 7200 blocks is about 24 h, 4 h and 30 min, so on Arbitrum any reconnect more than half an hour after the last registration skips the replay. Sub-claim 1 partly helps (a still-held position does get an exit attempt) but contradicts the documented rule and adds breaker counts (AUD-ANTIRUG-003).",
+  "sub_claims": [
+    {
+      "claim": "(1) Backfilled unsafe verdicts schedule live exits, contrary to the D-BACKFILL comments.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1146-1159@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1964-1983@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:713-718@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) On the WS path last_seen_block moves only when a (re)subscription runs a backfill, so every new registration replays every log since the previous registration, including logs that were already dispatched live.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1018@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1199@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:447@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(3) After a connected stretch longer than maxBackfillBlocks since the last registration, any reconnect (or restart) takes the gap branch and replays nothing, so the outage window itself is never evaluated.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1048-1085@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:231@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(4) A failed backfill getLogs only logs; no alert, and the listener reports connected.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1117-1131@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:678-693@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(5) With confirmBlocks 0 the replayed trigger runs inside the backfill loop and the registering buy (or the boot resume) waits for the exit, up to the 60 s budget per event.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1832-1843@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:432-440@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "traces": [
+    {
+      "scenario": "A backfill runs while an anti-rug exit for the same position is pending (double trigger or skipped trigger?)",
+      "steps": [
+        "Rug log R (block X) arrives on the live WS filter (detector.ts:655 -> dispatchEvent :1341). The V2 evaluator returns unsafe and schedules confirm gate G1 at getBlockNumber()+confirmBlocks (:1845-1909).",
+        "G1 fires: triggerAntiRugExit clears the token timers (exitTrigger.ts:240) and executeFullSell takes the sell lock (exitEngine.ts:832) and works through the private attempt and fallback, up to the 60 s budget (exitTrigger.ts:263-269).",
+        "While G1 is in flight, a backfill starts: a buy of another token on the chain registers (detector.ts:447 -> :718), or the socket closes (:943). last_seen_block still holds the block of the previous subscription, because only the backfill writes it on the WS path (:1018, :1040, :1079, :1093, :1199), so the window [last_seen+1, now] contains R.",
+        "The backfill evaluates R for the still-registered position (:1155). The evaluator returns unsafe and schedules gate G2 (:1976) before returning; the backfill then logs antirug.backfill.too-late and broadcasts outcome too-late (:1160-1183).",
+        "G2 fires on the next block: timers cleared again, executeFullSell refused because G1 holds the sell lock (exitEngine.ts:832-835), broadcast exit-fired success false (exitTrigger.ts:303-310), incrementCircuitBreaker with outcome exit-fired-failure (:312-319).",
+        "If G1 had already finished: a genuine close unregistered the position (exitEngine.ts:673), so the backfill finds no position for R and does nothing; a failed, still-held exit makes G2 an unplanned retry (helpful, but still counted)."
+      ],
+      "outcome": "A double trigger, not a skipped one. There is no double sell (the sell lock serializes), but the duplicate costs one circuit-breaker count, puts a false exit-failed state and a too-late event on the dashboard while the real exit is in flight, and clears the timers a second time. With confirmBlocks 0 the duplicate runs inside the backfill and the registering buy waits for it."
+    }
+  ],
+  "recommendation": "Advance last_seen_block from the live stream (every dispatched log block, or a block subscription) so a replay covers the real outage; decide on card ANTIRUG-02 whether backfilled unsafe verdicts for still-held positions should exit (today they do, against the comment) and make code and docs agree; alert on a failed backfill; never run a backfill inside a buy registration. Phase 24."
+}

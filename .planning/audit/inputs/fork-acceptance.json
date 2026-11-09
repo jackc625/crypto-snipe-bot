@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-09",
+  "question": "The spec asks for some safety checks to be shown \"under every test project\", including the fork project, but this phase is not allowed to start Hardhat, which the fork project needs. How should that be recorded?",
+  "affected": [
+    "AC-13 fork project",
+    "AC-16 fork project",
+    "AC-17 Hardhat child",
+    "AC-22 HONEY-03 live bytecode test (UFV-05)"
+  ],
+  "evidence": [
+    {
+      "id": "UFV-01",
+      "ac": "AC-13",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts (project fork-rehearsal: the fork project's setupFiles, fileParallelism, pool and timeouts pinned by test/unit/rails/forkRehearsalParity.test.ts, without the Hardhat globalSetup)",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts setup-fork child cases (railsEntry 'setup-fork': sentinel env, fork mode, Telegram deny on, DB denied; fork shell keys (i)-(v))",
+      "owner_phase": "25",
+      "note": "Re-run on the fixed rehearsal config as vpu-20261109T055907-6892-d9a439."
+    },
+    {
+      "id": "UFV-02",
+      "ac": "AC-17 / SPEC R4",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); ledger fork-shell-key ETH_FORK_RPC_URL preserved, ALLOW_REAL_MAINNET absent",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts 'fork shell keys (SPEC R4 / AC-17)' cases (i)-(vii) in railsEntry 'setup-fork' children",
+      "owner_phase": "25",
+      "note": "Re-run on the fixed rehearsal config as vpu-20261109T055907-6892-d9a439."
+    },
+    {
+      "id": "UFV-03",
+      "ac": "AC-16",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); axios.post spied and never called; ledger notifier-refused 2",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261109T021405-22636-8bff56",
+      "proven_meanwhile_by": "test/unit/rails/notifierRefusal.test.ts and test/integration/rails/notifierRefusalIntegration.test.ts plus the src-layer refusal in src/utils/notifier.ts (refuseUnderVitest)",
+      "owner_phase": "25",
+      "note": "Re-run on the fixed rehearsal config as vpu-20261109T055907-6892-d9a439."
+    },
+    {
+      "id": "UFV-04",
+      "ac": "AC-17 / SPEC R4 fork child env",
+      "test_file": "test/fork/setup.ts",
+      "rehearsed_by": "none (Hardhat cannot be rehearsed without starting it)",
+      "rehearsal_result": "none (cannot be rehearsed without starting Hardhat)",
+      "rehearsal_run_id": null,
+      "proven_meanwhile_by": "test/unit/rails/hardhatChildEnv.test.ts (the pure env, a railed child on the same setup-fork preload, and an AST check of every child launch in test/fork/setup.ts)",
+      "owner_phase": "25",
+      "note": "Proven only by the unit-tested Hardhat child env; no rehearsal exists because Hardhat cannot be rehearsed without starting it."
+    },
+    {
+      "id": "UFV-05",
+      "ac": "AC-22 / HONEY-03",
+      "test_file": "test/fork/honeypotDeploy.eth.fork.test.ts",
+      "rehearsed_by": "A scratchpad Vitest config with the fork project's setupFiles (test/rails/setup-fork.cjs), fileParallelism and timeout, without the Hardhat globalSetup, wrapped with --net-watch, ETH_FORK_RPC_URL pointing at a loopback fake JSON-RPC server on 127.0.0.1 and verdict untouched each time. Fake returned 402 characters of bytecode: passed, and the fake logged eth_getCode for 0x8243dbea5cad296b9e72a6ed557d7e0febee13ed on the /rehearsal-marker path, so the URL came from the resolver and not from ETH_RPC_URL (run vpu-20261109T044252-20672-15c2d6). Fake returned 0x: failed on expect(code).not.toBe (run vpu-20261109T044257-2304-03f813). Fake returned 0x6080: failed on the length assertion (run vpu-20261109T044329-5352-897f8e). ETH_FORK_RPC_URL unset: failed with the resolver's error naming the variable, and the fake got 0 requests (run vpu-20261109T044303-11500-42705a). This proves the test's wiring only. It is NOT proof the contract exists: the bytecode came from the fake.",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261109T044252-20672-15c2d6",
+      "proven_meanwhile_by": "npm run preflight (checkHoneypotCheckerCode in src/preflight.ts) performs the same live getCode check, but only when the operator runs it. Nothing in Phase 22 runs it against the real RPC, so nothing automated confirms the contract exists during this phase.",
+      "owner_phase": "25",
+      "note": "The rehearsal proves the test wiring only (a loopback fake served the bytecode). It is NOT proof the contract exists on mainnet."
+    }
+  ],
+  "latest_rehearsal_on_fixed_config": {
+    "run_id": "vpu-20261109T055907-6892-d9a439",
+    "result": "6 of 6 passed",
+    "config": "test/rails/vitest.fork-rehearsal.config.ts",
+    "note": "Run after the rehearsal config fix (ESC-REAUDIT-01, commit a08d650). It is a Hardhat-free rehearsal, not a real fork run."
+  },
+  "options_presented": [
+    "accept-rehearsal-plus-obligation (default)",
+    "amend-scope-run-fork-now",
+    "stop"
+  ],
+  "option": "accept-rehearsal-plus-obligation",
+  "operator_response": "accept-rehearsal-plus-obligation",
+  "ruling": "accept-rehearsal-plus-obligation",
+  "ruling_option_text": "Accept: rehearsal now, real fork run owned by Phase 25 (default). Stays inside this phase's rules; the gap is written down with an owner and a date. The fork halves of those three checks are proven only by rehearsal until Phase 25 runs the fork suite.",
+  "ruling_note": "Recorded by the 22-29 continuation executor from the verbatim reply relayed by the execute-phase orchestrator. The checkpoint listed five tracked fork obligations owned by Phase 25 (UFV-01..UFV-05) and no new S1 entries, because the re-audit produced none, so no ESC-REAUDIT record is made for S1 entries. Effect: the fork halves of AC-13, AC-16 and AC-17 and the AC-22 HONEY-03 live bytecode test carry rehearsal or unit evidence only and are not reported as fully met; each is a dated obligation (AUD-TESTQ-030..035) for the first real npm run test:fork of v7.0, owner Phase 25. No Hardhat command was or will be run by this plan.",
+  "obligation_findings": [
+    "AUD-TESTQ-030",
+    "AUD-TESTQ-031",
+    "AUD-TESTQ-032",
+    "AUD-TESTQ-033",
+    "AUD-TESTQ-034",
+    "AUD-TESTQ-035"
+  ],
+  "phase_continued": true
+}

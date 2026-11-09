@@ -1,0 +1,21 @@
+{
+  "id": "ESC-PRE-04",
+  "date": "2026-11-06",
+  "tier": "pre-phase",
+  "tags": [
+    "capital",
+    "d-stop-the-line"
+  ],
+  "items": [
+    "key:API:failed-held-sell-selection"
+  ],
+  "resolved_items": [
+    "AUD-API-001"
+  ],
+  "summary": "Dashboard emergency-sell and force-sell skip positions that are still held after a failed exit. When an exit fails on a position that is still held, the catch path marks the trade trades.status='failed' (src/exitEngine.ts:1163), then keepMonitoringFailedHeld marks exit_state.exit_status='exit_failed_held' (src/exitEngine.ts:700, through markExitFailedHeld at src/utils/db.ts:540-545). The dashboard's emergency-sell and force-sell controls select only status='pending' buys (prepared statements at src/api/routes/controls.ts:51-56). Force-sell uses ('pending','buy') at :70 and replies 'Trade not found or already closed' at :72. Emergency-sell uses ('pending','buy') at :126 and replies 'No open positions to sell' at :129. So both controls skip exactly those still-held positions. When those are the only open positions, emergency sell says there is nothing to sell. Restart-resume was already fixed for this same class: getResumeExitMonitorTrades unions exit_failed_held (src/utils/db.ts:597-604), and bot.ts uses it at src/bot.ts:1904 (comment :1898-1903). These two controls were not fixed. Capital impact: STRAND. The bot is OFF, so there is no live exposure. Nothing is fixed in Phase 22 (NAC-13). The behaviour-changing decision card goes to the Phase 24 capital discussion (AUDIT-05). Line references are re-measured at the base SHA 23a6461. The 22-22 API audit owns the finding (pre_phase_key failed-held-sell-selection) and links it here as a rediscovery, never a second escalation.",
+  "presented_at": "2026-11-06 plan-phase reviews session (operator ruling on consensus item 6 of the cross-AI review)",
+  "operator_response": null,
+  "acknowledgement_evidence": "operator ruling in the 2026-11-06 plan-phase reviews session, relayed as the binding decision 'Escalate early + own in 22-22'; recorded in the Review Dispositions Ledger of 22-04-PLAN.md and 22-22-PLAN.md",
+  "ruling": "Escalate early and own in 22-22; fix stays out of Phase 22 (NAC-13); decision card routed to the Phase 24 capital discussion (AUDIT-05)",
+  "phase_continued": true
+}

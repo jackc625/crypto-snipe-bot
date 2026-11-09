@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [
+    "AUD-DB-016",
+    "AUD-DB-011",
+    "AUD-TX-008",
+    "AUD-API-007",
+    "AUD-TESTI-019"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-004",
+  "title": ".env.example drift (D-ENV-EXAMPLE): keys the code reads are missing (ETH_FORK_RPC_URL, NODE_ENV), and keys it ships are read nowhere (TEST_WALLET_PRIVATE_KEY, three explorer keys, RPC_TIMEOUT_MS, the two coinbase-bribe flags)",
+  "area": "src",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    ".env.example",
+    "src/api/middleware/auth.ts",
+    "hardhat.config.ts",
+    "scripts/capture-launch.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "comm of the .env.example keys (git show <base>:.env.example, 145 keys) against literal process.env reads in src, scripts, hardhat.config.ts, vitest.config.ts and dashboard/src at the base, followed by a per-key git grep -lw of each candidate over src scripts test hardhat.config.ts vitest.config.ts dashboard",
+      "note": "read but undocumented: ETH_FORK_RPC_URL (hardhat.config.ts:98, scripts/capture-launch.ts:195, test/fork/setup.ts:8), NODE_ENV (src/api/middleware/auth.ts:64, the cookie Secure flag); documented but read nowhere: TEST_WALLET_PRIVATE_KEY (.env.example:290), BSCSCAN_API_KEY/BASESCAN_API_KEY/ARBISCAN_API_KEY (:115-117, marked deprecated), RPC_TIMEOUT_MS (:237; only a registry descriptor at src/config.ts:180), MEV_BUY_COINBASE_BRIBE_ENABLED and MEV_SELL_COINBASE_BRIBE_ENABLED (:281, :249, marked reserved); per-chain keys are read through prefix templates and were not counted as unused"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/middleware/auth.ts:64@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isProduction = NODE_ENV === \"production\"; .env.example never mentions NODE_ENV (AUD-API-007)"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:715-717@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the research hint named MEV_STRATEGY as read but missing; re-measured: only a comment saying MEV_STRATEGY is not consulted, so it is not a missing key"
+    }
+  ],
+  "sibling_sites_checked": "The registered env-contract findings: AUD-DB-016 (validateEnvVars list vs code, 18 unregistered keys), AUD-DB-011 (ALCHEMY_URL vs ETH_RPC_URL, NETWORK default), AUD-TX-008 (RPC_TIMEOUT_MS read nowhere), AUD-TESTI-019 (STOP_LOSS_PERCENT used by one fork test; src reads STOP_LOSS_PCT, which .env.example:70 documents). This entry adds only what those do not cover.",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: documentation drift; the behaviour-relevant cases are already registered at their own severity (AUD-TX-008, AUD-API-007, AUD-DB-016).",
+  "recommendation": "Phase 25 (cleanup): add ETH_FORK_RPC_URL (shell-only note, plan 22-05/22-11 already adds it) and NODE_ENV, delete or wire the unused keys, and add a sync test of .env.example against the keys the code reads (the 22-05 test/.env.test sync test is the model)."
+}

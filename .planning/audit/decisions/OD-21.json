@@ -1,0 +1,32 @@
+{
+  "id": "OD-21",
+  "title": "Track ignition/deployments/ in git (public deployment data)",
+  "area": "CONTRACTS",
+  "capital": false,
+  "status": "decided",
+  "options": [
+    {
+      "id": "track",
+      "name": "Track all of ignition/deployments/ in git after the SAFE-01 backup verifies",
+      "behavior_impact": "No trading behavior change. The deployment journals and artifacts become versioned, through scoped un-ignore rules for ignition/deployments/** only (NAC-02).",
+      "risk": "Public deployment data (addresses, bytecode, build info, journals) enters git history permanently. None of it is secret; the NAC-01 scans cover the backup set."
+    },
+    {
+      "id": "keep-current",
+      "name": "Keep current behavior: journals and artifacts stay untracked",
+      "behavior_impact": "none",
+      "risk": "Irreplaceable deployment state exists only on one disk"
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Track, after the SAFE-01 backup verifies (research recommendation).",
+  "default": "Keep current (untracked) until the SAFE-01 backup verifies",
+  "behavior_impact": "None on trading; repository content only",
+  "findings": [],
+  "decided": {
+    "date": "2026-11-06",
+    "ruling": "track all of ignition/deployments/ in git after the SAFE-01 backup verifies",
+    "source": "operator decision recorded in 22-SPEC.md AC-38 and the 22-CONTEXT.md in-scope list (2026-11-06)"
+  },
+  "needed_by": "Phase 22 (plan 22-07, after the SAFE-01 backup verifies)"
+}

@@ -1,0 +1,171 @@
+# API Surface
+
+> Generated from `.planning/intel/api-map.json`. Do not edit by hand.
+
+## `GET /health`
+
+- **method:** GET
+- **path:** /health
+- **params:** 
+- **file:** src/api/routes/health.ts
+- **description:** Unauthenticated health status incl. chains and Telegram status
+
+## `POST /api/auth/login`
+
+- **method:** POST
+- **path:** /api/auth/login
+- **params:** 
+- **file:** src/api/routes/auth.ts
+- **description:** Dashboard login (loginHandler, session cookie)
+
+## `GET /api/positions`
+
+- **method:** GET
+- **path:** /api/positions
+- **params:** 
+- **file:** src/api/routes/positions.ts
+- **description:** Open positions (auth)
+
+## `GET /api/trades`
+
+- **method:** GET
+- **path:** /api/trades
+- **params:** query filters
+- **file:** src/api/routes/trades.ts
+- **description:** Trade history (auth)
+
+## `GET /api/trades/export`
+
+- **method:** GET
+- **path:** /api/trades/export
+- **params:** 
+- **file:** src/api/routes/trades.ts
+- **description:** Export trade history (auth)
+
+## `GET /api/risk/exposure`
+
+- **method:** GET
+- **path:** /api/risk/exposure
+- **params:** 
+- **file:** src/api/routes/risk.ts
+- **description:** Portfolio exposure
+
+## `GET /api/risk/pnl`
+
+- **method:** GET
+- **path:** /api/risk/pnl
+- **params:** 
+- **file:** src/api/routes/risk.ts
+- **description:** PnL / chart data
+
+## `GET /api/risk/limits`
+
+- **method:** GET
+- **path:** /api/risk/limits
+- **params:** 
+- **file:** src/api/routes/risk.ts
+- **description:** Configured risk limits
+
+## `GET /api/chains`
+
+- **method:** GET
+- **path:** /api/chains
+- **params:** 
+- **file:** src/api/routes/chains.ts
+- **description:** List chain contexts and status
+
+## `POST /api/chains/:name/stop`
+
+- **method:** POST
+- **path:** /api/chains/:name/stop
+- **params:** name
+- **file:** src/api/routes/chains.ts
+- **description:** Stop a chain
+
+## `POST /api/chains/:name/start`
+
+- **method:** POST
+- **path:** /api/chains/:name/start
+- **params:** name
+- **file:** src/api/routes/chains.ts
+- **description:** Restart a chain
+
+## `POST /api/controls/force-sell/:tradeId`
+
+- **method:** POST
+- **path:** /api/controls/force-sell/:tradeId
+- **params:** tradeId
+- **file:** src/api/routes/controls.ts
+- **description:** Force-sell one position
+
+## `POST /api/controls/emergency-sell`
+
+- **method:** POST
+- **path:** /api/controls/emergency-sell
+- **params:** 
+- **file:** src/api/routes/controls.ts
+- **description:** Sell all open positions
+
+## `POST /api/controls/pause`
+
+- **method:** POST
+- **path:** /api/controls/pause
+- **params:** 
+- **file:** src/api/routes/controls.ts
+- **description:** Pause new entries
+
+## `POST /api/controls/resume`
+
+- **method:** POST
+- **path:** /api/controls/resume
+- **params:** 
+- **file:** src/api/routes/controls.ts
+- **description:** Resume entries
+
+## `GET /api/controls/pause`
+
+- **method:** GET
+- **path:** /api/controls/pause
+- **params:** 
+- **file:** src/api/routes/controls.ts
+- **description:** Pause state
+
+## `POST /api/anti-rug/circuit-breaker/:chain/reset`
+
+- **method:** POST
+- **path:** /api/anti-rug/circuit-breaker/:chain/reset
+- **params:** chain
+- **file:** src/api/routes/antiRug.ts
+- **description:** Reset anti-rug circuit breaker
+
+## `GET /api/anti-rug/events/:chain`
+
+- **method:** GET
+- **path:** /api/anti-rug/events/:chain
+- **params:** chain
+- **file:** src/api/routes/antiRug.ts
+- **description:** Recent anti-rug events
+
+## `GET /{*path}`
+
+- **method:** GET
+- **path:** /{*path}
+- **params:** 
+- **file:** src/api/server.ts
+- **description:** SPA fallback serving dashboard/dist
+
+## `WS`
+
+- **method:** WS
+- **path:** websocket
+- **params:** 
+- **file:** src/api/ws/handler.ts
+- **description:** Live event broadcast via src/api/ws/broadcaster.ts
+
+## `CLI npm run preflight|pause|resume`
+
+- **method:** CLI
+- **path:** scripts/preflight.ts, scripts/pause.ts, scripts/resume.ts
+- **params:** 
+- **file:** package.json
+- **description:** Operator scripts

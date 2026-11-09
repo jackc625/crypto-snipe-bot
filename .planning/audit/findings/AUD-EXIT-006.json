@@ -1,0 +1,85 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-007",
+    "AUD-EXIT-001"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-39",
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-006",
+  "title": "Private V2 sells (full and partial) use the non-fee-on-transfer swapExactTokensForETH and V3 sells cannot handle transfer-taxed tokens, so taxed tokens never sell privately and never take partial profit",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C04",
+    "C09"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "private V2 sell encodes swapExactTokensForETH"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:553-555@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public fallback uses swapExactTokensForETHSupportingFeeOnTransferTokens; the comment at :501-503 calls it the fee-on-transfer-safe variant"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1512-1513@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial sells always use the non-FoT V2 builder and have no public fallback"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1037@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 has no fee-on-transfer-safe fallback (\"V3 has no fee-on-transfer-safe public router analog wired here\")"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:220-249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "strategies simulate before submit (also passthrough.ts:115-125, bloxroute.ts:131-141), so a reverting private sell is not sent and the ladder falls through quickly"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Transfer-tax tokens cannot execute the standard V2 partial-sale path"
+    }
+  ],
+  "sibling_sites_checked": "All three sell builders: buildV2SellTx (:351-372, non-FoT), buildV3SellTx (:378-407, exactInputSingle), executePublicFallbackSell (:508-564, FoT-safe). The buy side allows taxed tokens up to the per-chain max sell tax (TH-BUY-19), so taxed positions are reachable. Simulate-before-submit in all three strategies means no gas is burned on the reverting private attempts.",
+  "status": "candidate",
+  "severity_rationale": "S2. The router choice is a code fact. That swapExactTokensForETH and exactInputSingle revert for a transfer-taxed token is standard Uniswap router behaviour, not provable from library source in this repo, so the entry stays candidate for a Phase 23 fork check. Effect if confirmed: V2 full exits of a taxed token always lose MEV protection (they go to the public fallback, sandwichable on ETH at 5% slippage), V2 partial take-profit sells never succeed and re-alert every cycle, and V3 taxed positions can never exit (the strand itself is recorded in AUD-EXIT-007).",
+  "recommendation": "Use the supporting-fee-on-transfer variant on the private V2 leg and partial sells, and decide what a V3 taxed position does (refuse at buy time, or route its exit through a V2 pool). Card EXIT-05 (Phase 24, fork-proven).",
+  "traces": [
+    {
+      "scenario": "partial-exit",
+      "steps": [
+        "Tick: priceMultiple >= an unfilled tier multiple -> getUnfilledTiers (:1732); the partial is only detected here and dispatched at the end of the tick if no full exit fired (:1817-1826)",
+        "dispatchPartialSell (:1621-1655) calls executePartialSell without awaiting; a .catch guards the detached promise",
+        "executePartialSell (:1473): per-token sell lock (:1483-1486; a held lock skips this cycle), balanceOf and clamp to the held balance (:1490-1497)",
+        "Approval for exactly the partial amount under the nonce lock (:1509/:1512, public, no timeout on the wait) then the alert (:1521), then withNonceLock(sendTxWithRetry(txBuilder)) with amountOutMin 0 and, on V2, the non-FoT router call (:1531)",
+        "decodeReceipt (:1545-1547), insertTrade(action partial_sell, status sold) (:1550-1565), tiers added to state.completedTierIndices (:1568-1570) and persisted synchronously (:1575); the dispatcher persists again on success (:1646)",
+        "Failure (any throw, including a revert of the non-FoT call on a taxed token): warn only, the position stays open, the tier is re-detected on the next tick and retried (:1585-1588)"
+      ],
+      "outcome": "State written on success: a trades row (action partial_sell, status sold) and exit_state.partial_tiers_completed updated; the high-water mark is not reset. On failure nothing is written and the same tier retries every 5 s with a new alert; for a transfer-taxed V2 token it never succeeds. A crash between the landed tx and the tier persist re-sells the tier after restart (AUD-EXIT-017)."
+    }
+  ]
+}

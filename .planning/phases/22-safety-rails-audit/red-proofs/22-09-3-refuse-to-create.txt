@@ -1,0 +1,89 @@
+# RED proof 22-09-3-refuse-to-create (AC-18, src DB layer)
+Date: 2026-11-09T02:03:22.512Z
+File neutralised (working tree only, never committed): src/utils/dbPath.ts
+sha256 before and after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1
+
+## Precursor run: only the refusal branches removed (fileMustExist left in)
+
+diff --git a/src/utils/dbPath.ts b/src/utils/dbPath.ts
+index 3ca83ad..0286ec1 100644
+--- a/src/utils/dbPath.ts
++++ b/src/utils/dbPath.ts
+@@ -217,10 +217,10 @@ export function assertDbOpenable(p: string, probe: DbProbe, opts: OpenableCheckO
+     const abs = path.resolve(p);
+     const initHint = 'first-time creation is only through: npm run db:init';
+     if (!opts.vitest) {
+-        if (!probe.exists) {
++        if (false && !probe.exists) { // RED 22-09-3 precursor
+             throw refusal('DB_REFUSED_MISSING', `DB_REFUSED_MISSING: no database at ${abs}; refusing to create one at boot (${initHint})`);
+         }
+-        if (probe.size === 0) {
++        if (false && probe.size === 0) { // RED 22-09-3 precursor
+             throw refusal('DB_REFUSED_EMPTY', `DB_REFUSED_EMPTY: database at ${abs} is 0 bytes; refusing to create a schema at boot (${initHint})`);
+         }
+         if (probe.userVersion === 0) {
+
+
+RESULT exit 0 (GREEN expected: the write-open fileMustExist is a second, independent layer that
+refuses the same missing path, so removing one layer alone is not RED):
+ Test Files  1 passed (1)
+      Tests  2 passed | 16 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020308-7588-68c722 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020308-7588-68c722\summary.json
+
+## Diff applied
+
+diff --git a/src/utils/dbPath.ts b/src/utils/dbPath.ts
+index 3ca83ad..50e7ced 100644
+--- a/src/utils/dbPath.ts
++++ b/src/utils/dbPath.ts
+@@ -217,10 +217,10 @@ export function assertDbOpenable(p: string, probe: DbProbe, opts: OpenableCheckO
+     const abs = path.resolve(p);
+     const initHint = 'first-time creation is only through: npm run db:init';
+     if (!opts.vitest) {
+-        if (!probe.exists) {
++        if (false && !probe.exists) { // RED 22-09-3
+             throw refusal('DB_REFUSED_MISSING', `DB_REFUSED_MISSING: no database at ${abs}; refusing to create one at boot (${initHint})`);
+         }
+-        if (probe.size === 0) {
++        if (false && probe.size === 0) { // RED 22-09-3
+             throw refusal('DB_REFUSED_EMPTY', `DB_REFUSED_EMPTY: database at ${abs} is 0 bytes; refusing to create a schema at boot (${initHint})`);
+         }
+         if (probe.userVersion === 0) {
+@@ -248,7 +248,7 @@ export function openGuardedDb(p: string, opts: OpenGuardedDbOptions): Database.D
+     const abs = path.resolve(p);
+     let db: Database.Database;
+     try {
+-        db = new Database(p, { fileMustExist: true });
++        db = new Database(p); // RED 22-09-3
+     } catch (err) {
+         if (!fs.existsSync(p)) {
+             throw refusal('DB_REFUSED_MISSING', `DB_REFUSED_MISSING: no database at ${abs}; it vanished before the write open and is not being created (first-time creation is only through: npm run db:init)`);
+
+
+## Command (wrapped, ran ONLY this test file, filter -t "missing")
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects integration -- node node_modules/vitest/vitest.mjs run --project integration test/integration/dbGuards.test.ts -t missing
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 16 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020313-7724-7f563e | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020313-7724-7f563e\summary.json
+ FAIL   integration  test/integration/dbGuards.test.ts > AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/dbPath.ts
+sha256 after restore: 687bf6dbbd3af14f13430cd51537049735bffdf7a7df44af517175ed1c566ac1 (equal)
+git status --porcelain src/utils/dbPath.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 16 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020318-18080-3b19c2 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020318-18080-3b19c2\summary.json

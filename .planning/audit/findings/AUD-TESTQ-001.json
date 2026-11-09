@@ -1,0 +1,51 @@
+{
+  "id": "AUD-TESTQ-001",
+  "title": "The spawn-site gate was red from 22-12 to f695363 and nobody noticed, because 22-12 did not run it",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S3: a gate that went unrun; no process was spawned.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#0"
+  ],
+  "files": [
+    "test/unit/rails/spawnSites.test.ts",
+    "test/rails/probes/duplicateLoadProbe.cjs",
+    "test/unit/guards/singleton.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#0",
+      "note": "six offences: five non-literal requires in duplicateLoadProbe.cjs and one RegExp.exec on an unlisted receiver; none was a spawn"
+    },
+    {
+      "type": "command",
+      "ref": "git show f695363",
+      "note": "fix commit: duplicateLoadProbe.cjs allowed a plain computed require through COMPUTED_REQUIRE_FILES; singleton.test.ts uses String.match"
+    }
+  ],
+  "sibling_sites_checked": "After f695363 the gate passes on the full suite.",
+  "fixed_by": "f695363",
+  "red_proof": "rails-discoveries.json#0 records the RED state",
+  "recommendation": "Done (f695363). Plans should run the rail gates that exist at the time they finish."
+}

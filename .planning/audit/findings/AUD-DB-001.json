@@ -1,0 +1,343 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": "ESC-DB-01",
+  "reported_by": [
+    "claude (22-21 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-001",
+  "title": "RC-06 malformed risk settings switch the risk limits off: a non-numeric MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT, SNIPE_COOLDOWN_MS, MAX_POSITION_SIZE or per-chain max capital parses to NaN and every comparison against it is false; the same defaults are written out at four sites with three different parsers",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C18",
+    "C02"
+  ],
+  "files": [
+    "src/riskManager.ts",
+    "src/preflight.ts",
+    "src/chainRegistry.ts",
+    "src/config.ts",
+    "src/api/routes/risk.ts",
+    "src/api/routes/chains.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:26-36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loadRiskConfig parses once at import with parseInt/parseFloat and `|| default`; no isNaN or range check"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:81-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every check is a plain > / >= / <= / < comparison; with a NaN operand each one is false, so the refusing branch never runs"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the only re-validation: MAX_OPEN_POSITIONS via Number() + Number.isInteger, fail-closed at boot"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:674-682@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: block-age tolerance is explicitly rejected on NaN or <= 0 with log.fatal (fail-closed), as are the tax bps (:701-714) and the anti-rug overlays (:730-865)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:663-665@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "snipe amount, max capital and min liquidity pass through with || and no validation"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/risk.ts:80-82@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sibling site (API slice): the dashboard parses the same keys again with the same literals"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:88-90@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sibling site (API slice): raw strings with the same defaults"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"MAX_OPEN_POSITIONS\\|MAX_TOTAL_EXPOSURE\\|MAX_POSITION_SIZE\\|DAILY_LOSS_PCT\\|SNIPE_COOLDOWN_MS\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts dashboard .env.example",
+      "note": "definition sites: riskManager.ts:28-32, preflight.ts:185, api/routes/risk.ts:80-82, api/routes/chains.ts:88-90, plus the descriptions in config.ts:57-61 and .env.example:58-63; no other parser"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Malformed numeric settings silently disable risk limits"
+    }
+  ],
+  "sibling_sites_checked": "Every env parser in the seven DB slice files is classified site by site in sub_claims (16 entries). Fail-open sites: riskManager.ts:29 MAX_TOTAL_EXPOSURE, :30 DAILY_LOSS_PCT (non-numeric), :31 SNIPE_COOLDOWN_MS, :32 MAX_POSITION_SIZE (non-numeric), the per-chain <PREFIX>_MAX_CAPITAL (chainRegistry.ts:664 -> riskManager.ts:96), <PREFIX>_BLOCK_AGE_TOLERANCE_SEC only for Infinity, and config.ts:300-302 TRAILING_* (consumer in EXIT). Fail-closed sites: MAX_OPEN_POSITIONS (preflight re-parse at boot), <PREFIX>_SNIPE_AMOUNT and <PREFIX>_GAS_BUFFER (preflight parseEther), block age NaN/<=0 (chainRegistry.ts:676), tax bps (:701-714), anti-rug overlays (:730-865), LIVE_EXECUTE strict match, LOG_LEVEL / NETWORK / ENABLED_CHAINS. Default (bad value silently replaced): EXIT_GATE_SELL_GAS_BUFFER, DELIBERATE_BUY_GAS_BUFFER, STALE_*, STOP_LOSS_PCT, SIGINT_GRACE_MS (bot.ts:2305-2307, BUY row TH-BUY-15). Display-only: api/routes/risk.ts:80-82 and chains.ts:88-90 (API slice owns those files). Parsers outside this slice are owned by their slices (reconciliation.ts, exitEngine.ts, bot.ts).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-06"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. A typo or unit in .env (for example MAX_TOTAL_EXPOSURE=10ETH works by luck, MAX_TOTAL_EXPOSURE=ten does not) turns off the exposure cap, the daily-loss breaker, the cooldown or the per-trade cap with no log line and no boot refusal; the dashboard then shows NaN or the raw text. The research claim is narrowed site by site: MAX_OPEN_POSITIONS does NOT fail open in the running system because preflight re-parses it strictly and refuses boot, and the chain-registry parsers named in the review (block age, tax bps, anti-rug overlays) reject bad values with log.fatal. The fail-open set is the four riskManager keys other than MAX_OPEN_POSITIONS plus the per-chain max capital.",
+  "related": [
+    "AUD-DB-002",
+    "AUD-DB-016",
+    "AUD-BUY-010",
+    "AUD-BUY-005"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "OD-25",
+  "recommendation": "One typed settings module that parses every risk and money key once at boot, refuses to start on a non-numeric, non-finite or out-of-range value (the chainRegistry.ts:676 pattern), and is the only source for riskManager, preflight and the dashboard routes. Which defaults and which strictness is card OD-25 (option align-one-parser). Phase 24; nothing is changed in Phase 22.",
+  "sub_claims": [
+    {
+      "claim": "riskManager.ts:28 MAX_OPEN_POSITIONS: unset -> 10; '' -> 10 (|| turns '' into '10'); non-numeric -> parseInt -> NaN, count >= NaN is false, so canSnipe never refuses (fail-open at this site); '10abc' -> 10, '7.9' -> 7. At boot preflight checkWalletBalance re-parses with Number() + Number.isInteger and returns passed:false for any of these, and preflight() exits FATAL before any chain context exists (bot.ts:1710), so the combined system refuses to start",
+      "evidence": [
+        "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1710@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:28 MAX_OPEN_POSITIONS",
+      "consumer": "canSnipe: posResult.count >= maxOpenPositions -> refuse",
+      "unset": "10",
+      "empty": "10 (|| turns '' into '10')",
+      "non_numeric": "parseInt -> NaN, count >= NaN is false, so canSnipe never refuses (fail-open at this site); '10abc' -> 10, '7.9' -> 7. At boot preflight checkWalletBalance re-parses with Number() + Number.isInteger and returns passed:false for any of these, and preflight() exits FATAL before any chain context exists (bot.ts:1710), so the combined system refuses to start",
+      "outcome": "fail-closed (system, via preflight at boot); fail-open (riskManager site alone)"
+    },
+    {
+      "claim": "riskManager.ts:29 MAX_TOTAL_EXPOSURE: unset -> 10.0; '' -> 10.0; non-numeric -> parseFloat -> NaN, total + amount > NaN is false: the exposure cap never refuses; '5ETH' -> 5 (prefix accepted). Nothing else validates it",
+      "evidence": [
+        "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:29 MAX_TOTAL_EXPOSURE",
+      "consumer": "canSnipe: total + amount > maxTotalExposure -> refuse",
+      "unset": "10.0",
+      "empty": "10.0",
+      "non_numeric": "parseFloat -> NaN, total + amount > NaN is false: the exposure cap never refuses; '5ETH' -> 5 (prefix accepted). Nothing else validates it",
+      "outcome": "fail-open"
+    },
+    {
+      "claim": "riskManager.ts:30 DAILY_LOSS_PCT: unset -> 10; '' -> 10; non-numeric -> NaN -> lossThreshold NaN, total_loss <= NaN is false: the daily-loss breaker never trips. '0' -> threshold -0 and 0 <= -0 is true, so every snipe is refused even with no loss; a negative value refuses every snipe",
+      "evidence": [
+        "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:30 DAILY_LOSS_PCT",
+      "consumer": "canSnipe: total_loss <= -(maxCapital * pct / 100) -> refuse",
+      "unset": "10",
+      "empty": "10",
+      "non_numeric": "NaN -> lossThreshold NaN, total_loss <= NaN is false: the daily-loss breaker never trips. '0' -> threshold -0 and 0 <= -0 is true, so every snipe is refused even with no loss; a negative value refuses every snipe",
+      "outcome": "fail-open (non-numeric); fail-closed (0 or negative)"
+    },
+    {
+      "claim": "riskManager.ts:31 SNIPE_COOLDOWN_MS: unset -> 30000; '' -> 30000; non-numeric -> NaN -> Date.now() - last < NaN is false: no cooldown at all; '0' is an explicit no-cooldown",
+      "evidence": [
+        "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:31 SNIPE_COOLDOWN_MS",
+      "consumer": "canSnipe: Date.now() - last < cooldown -> refuse",
+      "unset": "30000",
+      "empty": "30000",
+      "non_numeric": "NaN -> Date.now() - last < NaN is false: no cooldown at all; '0' is an explicit no-cooldown",
+      "outcome": "fail-open"
+    },
+    {
+      "claim": "riskManager.ts:32 MAX_POSITION_SIZE: unset -> null (no cap; documented default); '' -> null (no cap; '' is falsy); non-numeric -> parseFloat -> NaN (not null), amount > NaN is false: the cap the operator set silently does nothing; '0' refuses every snipe",
+      "evidence": [
+        "src/riskManager.ts:32@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:81-89@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:32 MAX_POSITION_SIZE",
+      "consumer": "canSnipe: maxPositionSize !== null && amount > maxPositionSize -> refuse",
+      "unset": "null (no cap; documented default)",
+      "empty": "null (no cap; '' is falsy)",
+      "non_numeric": "parseFloat -> NaN (not null), amount > NaN is false: the cap the operator set silently does nothing; '0' refuses every snipe",
+      "outcome": "fail-open (non-numeric); default (unset/empty means no cap by design)"
+    },
+    {
+      "claim": "riskManager.ts:76/:96 snipe amount and per-chain max capital passed to canSnipe: unset -> template default per chain; '' -> template default (||); non-numeric -> snipeAmount: preflight parseEther(chain.snipeAmount) throws inside its try -> passed:false -> FATAL at boot (fail-closed). maxCapital: never validated anywhere; NaN -> lossThreshold NaN -> daily-loss breaker disabled for that chain",
+      "evidence": [
+        "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/riskManager.ts:96-99@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:663-664@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:198-202@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "riskManager.ts:76/:96 snipe amount and per-chain max capital passed to canSnipe",
+      "consumer": "parseFloat(snipeAmount) in the size and exposure checks; parseFloat(maxCapital) scales the daily-loss threshold",
+      "unset": "template default per chain",
+      "empty": "template default (||)",
+      "non_numeric": "snipeAmount: preflight parseEther(chain.snipeAmount) throws inside its try -> passed:false -> FATAL at boot (fail-closed). maxCapital: never validated anywhere; NaN -> lossThreshold NaN -> daily-loss breaker disabled for that chain",
+      "outcome": "fail-closed (snipe amount, via preflight); fail-open (max capital)"
+    },
+    {
+      "claim": "chainRegistry.ts:669 <PREFIX>_GAS_BUFFER: unset -> template default; '' -> template default (||); non-numeric -> parseEther throws; both callers catch and return passed:false (boot FATAL; snipe refused at the entry gate)",
+      "evidence": [
+        "src/chainRegistry.ts:669@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:200-202@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:433@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "chainRegistry.ts:669 <PREFIX>_GAS_BUFFER",
+      "consumer": "preflight wallet floor and entry-affordability cushion: parseEther(gasBuffer)",
+      "unset": "template default",
+      "empty": "template default (||)",
+      "non_numeric": "parseEther throws; both callers catch and return passed:false (boot FATAL; snipe refused at the entry gate)",
+      "outcome": "fail-closed"
+    },
+    {
+      "claim": "chainRegistry.ts:674-682 <PREFIX>_BLOCK_AGE_TOLERANCE_SEC: unset -> template default (300/60/30/30); '' -> template default ('' is falsy before Number()); non-numeric -> Number -> NaN -> log.fatal + process.exit(1) (explicit rejection, fail-closed); '0' and negatives also rejected. Accepted although unsafe: 'Infinity' (passes > 0, so the staleness check can never fail) and any huge value",
+      "evidence": [
+        "src/chainRegistry.ts:674-682@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:526-528@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "chainRegistry.ts:674-682 <PREFIX>_BLOCK_AGE_TOLERANCE_SEC",
+      "consumer": "preflight checkRpcBlockAge: nowSec - block.timestamp <= tolerance -> pass",
+      "unset": "template default (300/60/30/30)",
+      "empty": "template default ('' is falsy before Number())",
+      "non_numeric": "Number -> NaN -> log.fatal + process.exit(1) (explicit rejection, fail-closed); '0' and negatives also rejected. Accepted although unsafe: 'Infinity' (passes > 0, so the staleness check can never fail) and any huge value",
+      "outcome": "fail-closed (non-numeric, zero, negative); fail-open only for Infinity / huge values"
+    },
+    {
+      "claim": "chainRegistry.ts:695-714 <PREFIX>_MAX_BUY_TAX_BPS / _MAX_SELL_TAX_BPS: unset -> 1000; '' -> 1000 (||); non-numeric -> parseInt NaN -> log.fatal exit (fail-closed); out of [0,10000] -> fatal; '10abc' -> 10 and '1.5' -> 1 are accepted (prefix parse)",
+      "evidence": [
+        "src/chainRegistry.ts:695-714@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "chainRegistry.ts:695-714 <PREFIX>_MAX_BUY_TAX_BPS / _MAX_SELL_TAX_BPS",
+      "consumer": "honeypot checker tax gate (BUY slice, TH-BUY-19)",
+      "unset": "1000",
+      "empty": "1000 (||)",
+      "non_numeric": "parseInt NaN -> log.fatal exit (fail-closed); out of [0,10000] -> fatal; '10abc' -> 10 and '1.5' -> 1 are accepted (prefix parse)",
+      "outcome": "fail-closed (prefix-parsed values accepted)"
+    },
+    {
+      "claim": "chainRegistry.ts:726-865 anti-rug numeric overlays (?? then Number): unset -> template defaults; '' -> ?? keeps '' and Number('') is 0: LP_REMOVAL_PCT=0 and CONFIRM_BLOCKS=0 are accepted (any LP decrease trips; no confirm delay); CB triggers, CB window, gas multiplier, backfill cap '' -> 0 -> fatal; MAX_BACKFILL '' -> 0 < cap -> fatal; non-numeric -> NaN -> log.fatal + exit for every key",
+      "evidence": [
+        "src/chainRegistry.ts:726-865@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "chainRegistry.ts:726-865 anti-rug numeric overlays (?? then Number)",
+      "consumer": "anti-rug detector thresholds (ANTIRUG slice rows TH-ANTIRUG-01..07)",
+      "unset": "template defaults",
+      "empty": "?? keeps '' and Number('') is 0: LP_REMOVAL_PCT=0 and CONFIRM_BLOCKS=0 are accepted (any LP decrease trips; no confirm delay); CB triggers, CB window, gas multiplier, backfill cap '' -> 0 -> fatal; MAX_BACKFILL '' -> 0 < cap -> fatal",
+      "non_numeric": "NaN -> log.fatal + exit for every key",
+      "outcome": "fail-closed (non-numeric); empty string accepted as 0 for two keys (over-trigger, not under-protect)"
+    },
+    {
+      "claim": "chainRegistry.ts:724 and preflight.ts:630 <PREFIX>_ANTIRUG_LIVE_EXECUTE: unset -> false (dry-run); '' -> false; non-numeric -> anything but the exact string 'true' is dry-run",
+      "evidence": [
+        "src/chainRegistry.ts:721-724@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:629-638@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "chainRegistry.ts:724 and preflight.ts:630 <PREFIX>_ANTIRUG_LIVE_EXECUTE",
+      "consumer": "live-execute switch and the 7-day gate",
+      "unset": "false (dry-run)",
+      "empty": "false",
+      "non_numeric": "anything but the exact string 'true' is dry-run",
+      "outcome": "fail-closed (strict match)"
+    },
+    {
+      "claim": "preflight.ts:289-305 EXIT_GATE_SELL_GAS_BUFFER / DELIBERATE_BUY_GAS_BUFFER: unset -> 2.0; '' -> 2.0; non-numeric -> not finite or <= 0 -> 2.0",
+      "evidence": [
+        "src/preflight.ts:289-305@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "preflight.ts:289-305 EXIT_GATE_SELL_GAS_BUFFER / DELIBERATE_BUY_GAS_BUFFER",
+      "consumer": "entry-affordability floor multipliers",
+      "unset": "2.0",
+      "empty": "2.0",
+      "non_numeric": "not finite or <= 0 -> 2.0",
+      "outcome": "default"
+    },
+    {
+      "claim": "preflight.ts:837-838 STALE_WARN_SEC / STALE_ERROR_SEC: unset -> 120 / 600; '' -> 120 / 600; non-numeric -> Number() || default -> default; '0' also -> default",
+      "evidence": [
+        "src/preflight.ts:837-838@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "preflight.ts:837-838 STALE_WARN_SEC / STALE_ERROR_SEC",
+      "consumer": "stale pending-position log scan (log only, never blocks)",
+      "unset": "120 / 600",
+      "empty": "120 / 600",
+      "non_numeric": "Number() || default -> default; '0' also -> default",
+      "outcome": "default"
+    },
+    {
+      "claim": "config.ts:290-302 exit-strategy parsers (STOP_LOSS_PCT, TRAILING_*): unset -> 25 / 15 / 5 / 40; '' -> defaults (||); non-numeric -> STOP_LOSS_PCT has an isNaN guard -> 25; TRAILING_STOP_PCT / MIN / MAX parseFloat -> NaN stored in CONFIG unguarded (outcome in the exit engine: TH-EXIT-02 records that the trailing stop then never fires)",
+      "evidence": [
+        "src/config.ts:290-302@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "config.ts:290-302 exit-strategy parsers (STOP_LOSS_PCT, TRAILING_*)",
+      "consumer": "exit engine (EXIT slice rows TH-EXIT-01..04)",
+      "unset": "25 / 15 / 5 / 40",
+      "empty": "defaults (||)",
+      "non_numeric": "STOP_LOSS_PCT has an isNaN guard -> 25; TRAILING_STOP_PCT / MIN / MAX parseFloat -> NaN stored in CONFIG unguarded (outcome in the exit engine: TH-EXIT-02 records that the trailing stop then never fires)",
+      "outcome": "default (STOP_LOSS_PCT); fail-open (TRAILING_*, consumer in EXIT slice)"
+    },
+    {
+      "claim": "api/routes/risk.ts:80-82 and api/routes/chains.ts:88-90 (sibling display sites, API slice): unset -> same defaults as riskManager (10, 10.0, 10); '' -> same defaults; non-numeric -> risk.ts shows NaN limits; chains.ts shows the raw string; neither tells the operator the limit is not enforced",
+      "evidence": [
+        "src/api/routes/risk.ts:80-82@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/api/routes/chains.ts:88-90@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "api/routes/risk.ts:80-82 and api/routes/chains.ts:88-90 (sibling display sites, API slice)",
+      "consumer": "dashboard /limits and chain cards (display only, never enforce)",
+      "unset": "same defaults as riskManager (10, 10.0, 10)",
+      "empty": "same defaults",
+      "non_numeric": "risk.ts shows NaN limits; chains.ts shows the raw string; neither tells the operator the limit is not enforced",
+      "outcome": "display-only (no enforcement); the defaults agree with riskManager today but are written out four times"
+    },
+    {
+      "claim": "logger.ts:7 LOG_LEVEL / config.ts:258 NETWORK / chainRegistry.ts:644-652 ENABLED_CHAINS / db.ts:9 DB_PATH (non-numeric controls): unset -> info / sepolia / eth / cwd/data/bot.db; '' -> same defaults (||); non-numeric -> unknown LOG_LEVEL makes pino throw at the first import (process does not start); unknown NETWORK or chain name -> log.fatal exit; DB_PATH has no validation (relative paths resolve against the cwd, AUD-DB-007)",
+      "evidence": [
+        "src/utils/logger.ts:7@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:258-263@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:644-652@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:9@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed",
+      "site": "logger.ts:7 LOG_LEVEL / config.ts:258 NETWORK / chainRegistry.ts:644-652 ENABLED_CHAINS / db.ts:9 DB_PATH (non-numeric controls)",
+      "consumer": "logger level, legacy network key, enabled chains, database file",
+      "unset": "info / sepolia / eth / cwd/data/bot.db",
+      "empty": "same defaults (||)",
+      "non_numeric": "unknown LOG_LEVEL makes pino throw at the first import (process does not start); unknown NETWORK or chain name -> log.fatal exit; DB_PATH has no validation (relative paths resolve against the cwd, AUD-DB-007)",
+      "outcome": "fail-closed (LOG_LEVEL, NETWORK, ENABLED_CHAINS); DB_PATH see AUD-DB-007"
+    }
+  ],
+  "fail_open_sites": [
+    "riskManager.ts:29 MAX_TOTAL_EXPOSURE",
+    "riskManager.ts:30 DAILY_LOSS_PCT (non-numeric)",
+    "riskManager.ts:31 SNIPE_COOLDOWN_MS",
+    "riskManager.ts:32 MAX_POSITION_SIZE (non-numeric)",
+    "chainRegistry.ts:664 <PREFIX>_MAX_CAPITAL (via riskManager.ts:96)",
+    "chainRegistry.ts:675 <PREFIX>_BLOCK_AGE_TOLERANCE_SEC=Infinity",
+    "config.ts:300-302 TRAILING_* (EXIT consumer)"
+  ],
+  "fail_closed_sites": [
+    "preflight.ts:185-197 MAX_OPEN_POSITIONS (covers riskManager.ts:28 at boot)",
+    "preflight.ts:201 / :433 <PREFIX>_SNIPE_AMOUNT and <PREFIX>_GAS_BUFFER (parseEther in try)",
+    "chainRegistry.ts:676 block age NaN / <= 0",
+    "chainRegistry.ts:701-714 tax bps",
+    "chainRegistry.ts:730-865 anti-rug overlays",
+    "chainRegistry.ts:724 + preflight.ts:630 LIVE_EXECUTE",
+    "logger.ts:7 LOG_LEVEL",
+    "config.ts:260 NETWORK",
+    "chainRegistry.ts:647 ENABLED_CHAINS"
+  ]
+}

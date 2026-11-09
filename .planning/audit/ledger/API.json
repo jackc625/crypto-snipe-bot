@@ -1,0 +1,120 @@
+[
+  {
+    "path": "src/api/helpers/positions.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-012",
+      "AUD-API-016"
+    ]
+  },
+  {
+    "path": "src/api/middleware/auth.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-005",
+      "AUD-API-007"
+    ]
+  },
+  {
+    "path": "src/api/middleware/errorHandler.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-014"
+    ]
+  },
+  {
+    "path": "src/api/routes/antiRug.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-014"
+    ]
+  },
+  {
+    "path": "src/api/routes/auth.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-007"
+    ]
+  },
+  {
+    "path": "src/api/routes/chains.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-002",
+      "AUD-API-003",
+      "AUD-API-014"
+    ]
+  },
+  {
+    "path": "src/api/routes/controls.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-004",
+      "AUD-API-014",
+      "AUD-API-015"
+    ]
+  },
+  {
+    "path": "src/api/routes/health.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-010",
+      "AUD-API-011"
+    ]
+  },
+  {
+    "path": "src/api/routes/positions.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-012"
+    ]
+  },
+  {
+    "path": "src/api/routes/risk.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001",
+      "AUD-API-003",
+      "AUD-API-017"
+    ]
+  },
+  {
+    "path": "src/api/routes/trades.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-001"
+    ]
+  },
+  {
+    "path": "src/api/server.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-005",
+      "AUD-API-006",
+      "AUD-API-008",
+      "AUD-API-010",
+      "AUD-API-012"
+    ]
+  },
+  {
+    "path": "src/api/ws/broadcaster.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-009",
+      "AUD-API-013"
+    ]
+  },
+  {
+    "path": "src/api/ws/handler.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-API-006",
+      "AUD-API-007",
+      "AUD-API-008",
+      "AUD-API-009"
+    ]
+  }
+]

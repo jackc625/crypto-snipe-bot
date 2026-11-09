@@ -1,0 +1,66 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-003"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-53",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-017",
+  "title": "Anti-rug numeric settings: an empty LP_REMOVAL_PCT or CONFIRM_BLOCKS silently becomes 0, GAS_MULTIPLIER has no upper bound, and WATCHDOG_BUDGET_MS turns a unit suffix into a tiny number",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C02",
+    "C18",
+    "C16"
+  ],
+  "files": [
+    "src/chainRegistry.ts",
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:726-745@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "process.env[KEY] ?? default keeps an empty string; Number(\"\") is 0, accepted by the 0..100 check, so signal 1 trips on any LP decrease"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:746-765@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CONFIRM_BLOCKS \"\" becomes 0, accepted, so dispatch is immediate with no confirmation"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:806-824@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "GAS_MULTIPLIER must be >= 1.0 and has no upper bound"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:786-805@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the breaker window must be an integer number of hours"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "parseInt(\"60s\") is 60, so WATCHDOG_BUDGET_MS=60s gives a 60 ms budget: every live anti-rug exit is reported failed at once and counted by the breaker while the sell runs unbounded in the background"
+    }
+  ],
+  "sibling_sites_checked": "Every anti-rug env read: chainRegistry.ts:721-861 (LIVE_EXECUTE, LP_REMOVAL_PCT, CONFIRM_BLOCKS, CIRCUIT_BREAKER_TRIGGERS, CIRCUIT_BREAKER_WINDOW_HOURS, GAS_MULTIPLIER, BACKFILL_CAP_BLOCKS, MAX_BACKFILL_BLOCKS), :881-932 (ALLOWLIST_EXTRA, _V2, _V3), exitTrigger.ts:78 (WATCHDOG_BUDGET_MS, also read by the worker watchdog in bot.ts, BUY row TH-BUY-14). Empty TRIGGERS, WINDOW, GAS_MULTIPLIER, BACKFILL_CAP and MAX_BACKFILL become 0 and fail loud (exit 1), which is correct.",
+  "status": "confirmed",
+  "severity_rationale": "S2: needs an operator configuration mistake, but the mistakes are ordinary (an empty line in .env, a unit suffix) and the effects are silent: emergency sells on any LP movement, no confirmation, an unbounded gas bid, or every exit reported failed. Bounded per position.",
+  "recommendation": "Treat an empty value as unset or reject it; reject 0 for LP_REMOVAL_PCT; cap GAS_MULTIPLIER; parse durations strictly (Number and an integer check) and fail loud. How strict is card ANTIRUG-07. Phase 24."
+}

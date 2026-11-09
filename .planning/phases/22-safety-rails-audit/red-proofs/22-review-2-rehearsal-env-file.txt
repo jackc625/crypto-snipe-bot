@@ -1,0 +1,19 @@
+AUD-REAUDIT-001: the fork rehearsal config read the repo env file. The new test was run against the unfixed config, then one line was added and the same test re-run.
+
+=== RED: unfixed config
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   unit  test/unit/rails/vitestEnvFile.test.ts > no Vitest config reads the .env files of its root > test/rails/vitest.fork-rehearsal.config.ts
+AssertionError: project fork-rehearsal: expected 'fake-env-marker' to be 'undefined' // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T055843-19660-967316 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T055843-19660-967316\summary.json
+
+=== GREEN: extends: true added to the fork-rehearsal project
+ Test Files  4 passed (4)
+      Tests  20 passed (20)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T055902-2252-ef2e3a | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T055902-2252-ef2e3a\summary.json
+
+=== Fork rehearsal after the fix
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T055907-6892-d9a439 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T055907-6892-d9a439\summary.json

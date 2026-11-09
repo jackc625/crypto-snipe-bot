@@ -1,0 +1,74 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-009",
+  "title": "The Telegram bot token is written to the logs on every failed alert: the token is part of the request URL, the axios error is logged whole as err, and its config.url carries the URL (reproduced offline); a token symbol that breaks the Markdown is enough to cause a failure",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17",
+    "C20"
+  ],
+  "files": [
+    "src/utils/notifier.ts",
+    "src/utils/logger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:43-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "axios.post(TELEGRAM_API, ...) and on any error log.warn({ err: error }, 'Telegram alert error')"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:79-87@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendCtxAlert: the same"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/logger.ts:6-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no redact configuration; pino serializes err with its enumerable properties"
+    },
+    {
+      "type": "command",
+      "ref": "node tg-log-repro.js (scratch folder outside the repo (Node 22.16.0; no src/ import, no .env, no live DB; loopback 127.0.0.1 only); axios 1.10.0 CJS build and pino 10.3.1 from the repo node_modules with the logger.ts options; fake sentinel token; POST to 127.0.0.1:1)",
+      "note": "output: token present in log line: true; the line carries \"url\":\"http://127.0.0.1:1/bot<fake token>/sendMessage\" inside err.config"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:49-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Telegram request failures disclose the bot token in logs"
+    }
+  ],
+  "sibling_sites_checked": "Both Telegram send sites in the slice (notifier.ts:44 and :80) use the same URL and the same err logging. Ways a send fails: network errors, Telegram 429, and HTTP 400 when parse_mode Markdown meets an unbalanced * or _ (the deployer-chosen token symbol goes in unescaped, AUD-BUY-022). Where logs go: stdout, persisted when the operator redirects it (the data/*capture*.log files; AUD-TX-014 records that the backup copies passed the D-22 exact-value check, which includes TELEGRAM_BOT_TOKEN). No axios timeout is set (AUD-EXIT-021).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 EXPOSURE, the same class and grade as AUD-TX-014: a credential crosses into the logs under ordinary failures, and an outsider can trigger the failure through a token name. The bot token lets whoever reads the logs send messages as the bot and read the bot chat; it does not move funds.",
+  "related": [
+    "AUD-TX-014",
+    "AUD-BUY-022",
+    "AUD-EXIT-021",
+    "AUD-DB-008"
+  ],
+  "tags": [
+    "credential-exposure"
+  ],
+  "od_ref": "OD-57",
+  "recommendation": "Log only error.message / code / response status for Telegram failures and add logger-level redaction (card TX-04); check persisted logs and rotate the bot token if any contains it."
+}

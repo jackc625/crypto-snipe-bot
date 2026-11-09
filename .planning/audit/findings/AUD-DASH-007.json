@@ -1,0 +1,55 @@
+{
+  "id": "AUD-DASH-007",
+  "title": "Trade History shows every buy and sell time as a date in January 1970: the API sends Unix seconds and the table passes them to new Date() as milliseconds",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C01"
+  ],
+  "files": [
+    "dashboard/src/components/TradeTable.tsx",
+    "src/api/routes/trades.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/trades.ts:107-109@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buyTime / sellTime are trades.buy_time / sell_time (Unix seconds); durationHeld is their difference in seconds"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/trades.ts:170-171@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the CSV export of the same fields multiplies by 1000 before new Date(), confirming the unit"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/TradeTable.tsx:96-104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "formatDate(timestamp) = new Date(timestamp).toLocaleDateString(...) with no * 1000"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:48-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: the positions table treats buyTime as seconds (Date.now() / 1000 - buyTime)"
+    }
+  ],
+  "sibling_sites_checked": "Every time rendering in the dashboard: TradeTable formatDate (this finding); PositionTable time held (seconds, correct); formatTimeAgo for notifications, anti-rug events, CB triggers and heartbeats (all produced with Date.now() in milliseconds: broadcaster.ts:42, exitTrigger.ts:140, detector.ts:1074, circuitBreaker.ts:106; correct); PauseBanner pausedAt (seconds, multiplied by 1000, correct); TradeHistory range filter (ISO date, correct); formatDuration of durationHeld (seconds, correct).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the trade history is the operator's record of when positions were opened and closed; every row shows a 1970 date, so ordering by eye and matching against chain explorers or logs is impossible from the dashboard. No money path.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Multiply by 1000 in formatDate (or send milliseconds and say so in the type). Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

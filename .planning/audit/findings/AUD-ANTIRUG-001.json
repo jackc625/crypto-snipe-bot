@@ -1,0 +1,184 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-008",
+    "AUD-BUY-011",
+    "AUD-ANTIRUG-002",
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-ANTIRUG-01",
+  "od_ref": "OD-11",
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-13"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "research-candidate",
+  "id": "AUD-ANTIRUG-001",
+  "title": "Three reconnect paths (anti-rug handleWsClose, one bot.ts loop per DEX, dashboard onRestart) each rewrite ctx.wsProvider, so the anti-rug rug-log subscription can vanish after a dashboard stop, be duplicated after a reconnect, or be left on a provider nothing destroys",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C12"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/bot.ts",
+    "src/api/routes/chains.ts",
+    "src/utils/provider.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:916-944@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "handleWsClose: removeWsProvider(chain), new WebSocketProvider (:921), ctx.wsProvider = new (:925), state.wsProvider = new (:926), activeDispatcher/activeFilter nulled (:941-942), then startChainAntiRugListener (:943)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:643-657@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "re-subscribe calls off(activeFilter, activeDispatcher) and on(filter) on whatever ctx.wsProvider is NOW; when the earlier subscription lives on another provider the off() is a no-op and the old dispatcher keeps running"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:678@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "state.wsProvider follows ctx.wsProvider, not the provider the previous dispatcher is attached to"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1552-1576@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 per-DEX reconnect: removeWsProvider, new WebSocketProvider (:1561), ctx.wsProvider = new (:1562), PoolCreated re-subscribed on it (:1564), close handler on its socket (:1568); one such loop per DEX close handler (:1576)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1593-1618@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 per-DEX reconnect, same shape (:1603-1606, close handler :1618)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1808-1852@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onRestart: replaces ctx.wsProvider only when it is missing or destroyed (:1812-1817, through getWsProvider, which caches it), re-runs startDexListener for every dex (:1836-1845); it never calls startChainAntiRugListener"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:136-142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dashboard stop: stoppedChains.add, then ctx.wsProvider.removeAllListeners() (\"Do NOT destroy the provider -- exit monitors may need it\")"
+    },
+    {
+      "type": "command",
+      "ref": "node_modules/ethers/lib.commonjs/providers/abstract-provider.js:1159-1176 (ethers@6.16.0)",
+      "note": "removeAllListeners() with no event stops and deletes every subscription on the provider, so it removes the anti-rug log filter installed at detector.ts:655 as well as the factory listeners"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:33-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getWsProvider caches one provider per chain; removeWsProvider destroys only that cached entry. Providers built with new WebSocketProvider in the three loops are never cached, so nothing ever destroys them; and the provider cached by onRestart can be destroyed by an unrelated loop"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:782-807@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "heartbeat keeps broadcasting chain_ws_health_change connected every 30 s while the raw socket answers pings, whether or not a rug-log subscription exists"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:885@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "while (true) with no shutdown or stopped-chain check (same at bot.ts:1557 and :1598)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1013@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "backfillSinceLastSeen calls getBlockNumber outside any try; a rejection there propagates out of startChainAntiRugListener into the reconnect loop catch (:945) after the new subscription was already installed"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"new WebSocketProvider\\|new ethers.WebSocketProvider\\|ctx.wsProvider = \" 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "writers of ctx.wsProvider: detector.ts:925, bot.ts:1562, bot.ts:1604, bot.ts:1816; constructors: detector.ts:921, bot.ts:1561, bot.ts:1603, provider.ts:37"
+    }
+  ],
+  "sibling_sites_checked": "Every writer of ctx.wsProvider at the base (detector.ts:925, bot.ts:1562, :1604, :1816), every provider constructor (detector.ts:921, bot.ts:1561, :1603, provider.ts:37), every remover (chains.ts:141 removeAllListeners; bot.ts:2333-2336 shutdown removeAllListeners plus destroy) and every removeWsProvider caller (detector.ts:920, bot.ts:1555, :1596, :1814). Subscribers that live on ctx.wsProvider: the anti-rug log filter (detector.ts:655), the V3 and V2 factory listeners (bot.ts:1545, :1586 and the reconnect copies :1564, :1606) and the V3 Mint wait (bot.ts:163-172). The DEX-listener consequences (double buys, no PairCreated backfill, leaked providers, stop not stopping buys) are AUD-BUY-008 and AUD-BUY-011 and are not repeated here; this entry is the anti-rug consumer of the same shared handle. The process exit on a failed reconnect attempt is AUD-ANTIRUG-002. Card OD-11 (single WebSocket owner) is owned by the API slice (22-22).",
+  "status": "confirmed",
+  "severity_rationale": "S1, as the research suggested. The vanish case (sub-claim 1) needs only an operator stop and start from the dashboard and leaves every open position on that chain without rug protection while the health badge keeps saying connected. The duplicate and orphan cases need a socket drop, which is routine. Not S0: each case needs an operator stop or a socket drop, and the routine exit monitor still runs.",
+  "sub_claims": [
+    {
+      "claim": "(1) Dashboard Stop removes the anti-rug rug-log subscription together with the factory listeners, and Start (onRestart) does not re-subscribe it. Monitoring returns only on the next registerAntiRugPosition on that chain (a new buy, detector.ts:447) or the next socket close (detector.ts:943). Meanwhile the heartbeat reports connected.",
+      "evidence": [
+        "src/api/routes/chains.ts:139-142@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1808-1852@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:782-807@23a64617dca167976adc4645fed0e2c69e384820",
+        "ethers@6.16.0 abstract-provider.js:1159-1176"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) After one socket close each loop builds its own provider. The anti-rug subscription sits on the anti-rug loop provider while ctx.wsProvider ends on whichever loop wrote last. The next startChainAntiRugListener call (any new registration) runs off() against the wrong provider and adds a second subscription, so each rug log of the earlier positions is dispatched twice.",
+      "evidence": [
+        "src/anti-rug/detector.ts:643-657@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:925@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1562@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1604@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(3) Replaced providers are never destroyed: removeWsProvider destroys only the cached entry and none of the loop-built providers is cached. Their sockets and any subscription still attached stay alive (orphan).",
+      "evidence": [
+        "src/utils/provider.ts:46-52@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:921@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(4) The anti-rug loop removeWsProvider(chain) destroys whatever provider is cached under the chain name. After an onRestart that rebuilt the provider through getWsProvider (cached), a close of the separate anti-rug socket destroys that live provider and every DEX listener on it.",
+      "evidence": [
+        "src/anti-rug/detector.ts:920@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1814-1816@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(5) No loop checks shutdown or the dashboard stopped state, so a reconnect during a stop re-subscribes the factory listeners (buying resumes, AUD-BUY-011) and the anti-rug filter.",
+      "evidence": [
+        "src/anti-rug/detector.ts:885@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1557@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1598@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(6) A backfill RPC error right after a successful re-subscribe (detector.ts:1013 is outside any try) is caught by the reconnect loop as a failed attempt. The next pass builds another provider and subscribes again without removing the first subscription (activeDispatcher was nulled at :941), which is one more duplicate and orphan.",
+      "evidence": [
+        "src/anti-rug/detector.ts:941-956@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1013@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "traces": [
+    {
+      "scenario": "WS reconnect while the dashboard stops and starts the chain (does the rug-log subscription survive, get duplicated, or vanish?)",
+      "steps": [
+        "Boot: ctx.wsProvider = P0 from getWsProvider (cached in provider.ts). Factory listeners on P0 (bot.ts:1545, :1586); anti-rug log filter on P0 (detector.ts:655). Close handlers on the P0 socket: one per DEX (bot.ts:1576, :1618), one per startChainAntiRugListener call (detector.ts:710) and one from setupHeartbeat (detector.ts:809).",
+        "Operator clicks Stop: chains.ts:141 ctx.wsProvider.removeAllListeners() stops and deletes every ethers subscription on P0 (abstract-provider.js:1167-1173), the anti-rug filter included. The raw socket stays open, so the heartbeat (detector.ts:782-807) keeps pinging and broadcasting connected. chainState.activeDispatcher/activeFilter still name the removed subscription.",
+        "Case A, no socket drop while stopped. Operator clicks Start: chains.ts:176 onRestart. P0 is not destroyed, so bot.ts:1812 skips the rebuild; startDexListener runs for each dex (bot.ts:1836-1845) and adds factory listeners plus one more close handler per DEX on P0. Nothing calls startChainAntiRugListener.",
+        "Case A result: the rug-log subscription is GONE. It comes back only when a new position on that chain registers (detector.ts:447 -> :643-657, which re-installs the filter for every registered address) or the socket next closes (detector.ts:943). Until then a rug on any open position of that chain triggers nothing, and the dashboard shows connected.",
+        "Case B, the socket drops while stopped: every close handler on P0 runs. handleWsClose (detector.ts:852-862, connected -> reconnecting) waits 1 s, removeWsProvider destroys the cached P0, builds P1, sets ctx.wsProvider = P1, nulls activeDispatcher/activeFilter and calls startChainAntiRugListener, which installs the filter on P1 (stoppedChains is never consulted). Each DEX loop (bot.ts:1557-1574, :1598-1615) builds its own P2..Pk, re-subscribes its factory listener there (buying resumes while the dashboard says stopped) and writes ctx.wsProvider; the last writer wins.",
+        "Case B, then Start: onRestart sees a live ctx.wsProvider (say P2, a DEX loop provider) and adds every factory listener again on P2, so the DEX whose own listener is on P2 now has two and the others gain a copy on P2 (AUD-BUY-008 doubling). The anti-rug filter stays on P1.",
+        "Case B, next buy on the chain: registerAntiRugPosition -> startChainAntiRugListener calls P2.off(old filter, old dispatcher) (no-op, the dispatcher is on P1) and P2.on(new filter) (detector.ts:643-657). Two live rug-log subscriptions now exist (P1 with the old address set, P2 with all addresses); every rug log of the older positions is dispatched twice, which doubles evaluations, confirm gates and circuit-breaker counts (AUD-ANTIRUG-003). The sell lock keeps the sells serialized.",
+        "Afterwards P1 is never destroyed (provider.ts:46-52 only destroys the cached entry), and the heartbeat now pings P2 only (setupHeartbeat replaced the interval), so a half-open P1 socket goes unnoticed: P1 is an orphan."
+      ],
+      "outcome": "All three outcomes occur depending on order. VANISH: stop, then start with no drop in between, leaves the chain without rug-log monitoring until the next buy or socket close, while the dashboard shows connected. DUPLICATE: a drop during the stop, then a new registration, yields two live subscriptions and double dispatch of every rug log. ORPHAN: the replaced anti-rug provider is never destroyed. The subscription never survives cleanly through the stop: it is either removed (Case A) or rebuilt by the reconnect loop against the stop (Case B)."
+    }
+  ],
+  "recommendation": "One owner for each chain WebSocket (card OD-11): a single reconnect loop that rebuilds the provider, re-attaches every consumer (factory listeners and the anti-rug filter) on that same provider, destroys the old provider, honours shutdown and the stopped state, and makes dashboard Stop remove only the factory listeners and never the anti-rug filter (what Stop should do to anti-rug is card ANTIRUG-05). Phase 24, after a Phase 23 real-path test of stop/start and a socket drop with an open position (no mocked provider)."
+}

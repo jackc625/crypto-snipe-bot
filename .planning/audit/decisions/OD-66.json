@@ -1,0 +1,40 @@
+{
+  "id": "OD-66",
+  "title": "Dashboard trust boundary: accept only known Host names and Origins (HTTP and WebSocket), limit login attempts, mark the cookie Secure outside loopback, add logout, and move money fields out of the public /health",
+  "area": "API",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "A DNS-rebinding page passes CORS and can read /health and guess the key without limit (AUD-API-005); a same-site page can read the live feed over /ws (AUD-API-006); session cookies travel over plain http in remote mode and cannot be revoked (AUD-API-007); /health discloses positions and P&L and spends RPC calls for anyone (AUD-API-010)."
+    },
+    {
+      "id": "harden-all",
+      "name": "Host allowlist and Origin check on HTTP and /ws, login backoff, Secure cookie whenever not loopback, logout and session revocation, money fields behind the session",
+      "behavior_impact": "Requests with an unexpected Host or Origin are refused; remote setups must list their public name (DASHBOARD_ALLOWED_ORIGINS or a new host list); monitoring of /health keeps liveness only.",
+      "risk": "A remote or proxied setup that is not listed stops working until configured; the vite dev proxy host must be in the list."
+    },
+    {
+      "id": "loopback-only",
+      "name": "Refuse to bind anything but loopback; remote access only through an SSH tunnel or proxy that sets a fixed Host",
+      "behavior_impact": "DASHBOARD_HOST=0.0.0.0 is no longer allowed.",
+      "risk": "Removes a documented feature; rebinding (AUD-API-005) still needs the Host check because it works against loopback."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "harden-all, before the dashboard is ever exposed beyond 127.0.0.1; the Host check is needed even at loopback because rebinding targets loopback.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); the items are S2/S3.",
+  "behavior_impact": "Decides which browsers, pages and hosts can read or drive the dashboard API.",
+  "findings": [
+    "AUD-API-005",
+    "AUD-API-006",
+    "AUD-API-007",
+    "AUD-API-010"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 discussion (S2-S4 fixes), or earlier if the dashboard will be reachable from anything but 127.0.0.1 before then",
+  "proposed_from": "API-03"
+}

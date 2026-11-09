@@ -1,0 +1,37 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-01",
+  "title": "What happens when the exit monitor cannot take its first price",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: log and return, no monitor until a restart",
+      "behavior_impact": "none",
+      "risk": "A held position has no stop-loss, trailing or 30-minute exit, and the operator is not alerted (AUD-EXIT-002)."
+    },
+    {
+      "id": "retry-with-backoff",
+      "name": "Retry the first quote with backoff inside a bounded window, then alert loudly if it still fails",
+      "behavior_impact": "The monitor usually starts within seconds; a persistent failure is visible.",
+      "risk": "If every retry fails the position is still unmonitored, only now announced."
+    },
+    {
+      "id": "arm-unbaselined",
+      "name": "Persist exit_state with no entry price and arm the interval; baseline on the first good quote, urgency counts from the buy",
+      "behavior_impact": "Every landed buy always has an armed monitor and a persisted row.",
+      "risk": "Needs the poll loop to handle a missing baseline everywhere it divides by it."
+    }
+  ],
+  "recommendation": "arm-unbaselined, with an alert after N consecutive null quotes.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a landed buy can ever be left without an exit monitor.",
+  "findings": [
+    "AUD-EXIT-002"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-35"
+}

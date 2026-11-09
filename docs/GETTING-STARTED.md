@@ -68,10 +68,12 @@ exact failure mode when a required variable is missing.
 Start the bot from the repository root using `ts-node`:
 
 ```bash
-npx ts-node src/bot.ts
+npx ts-node src/main.ts
 ```
 
-`src/bot.ts` is the canonical entry point — it loads `src/config.ts` (which calls
+`src/main.ts` is the canonical entry point (starting `src/bot.ts` directly now refuses
+before it loads anything): it takes the single-instance process lock and then starts
+`src/bot.ts`, which loads `src/config.ts` (which calls
 `validateEnvVars()` and exits the process with a fatal log if any required variable
 is missing), constructs the multi-chain registry from `src/chainRegistry.ts`, starts
 the dashboard API server (`src/api/server.ts`), starts the Telegram alpha-signal

@@ -1,0 +1,190 @@
+[
+  {
+    "path": "src/utils/gasManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-013",
+      "AUD-TX-019"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/bloxroute.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-010",
+      "AUD-TX-014",
+      "AUD-TX-016",
+      "AUD-TX-017"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/flashbots.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-006",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-009",
+      "AUD-TX-010",
+      "AUD-TX-012",
+      "AUD-TX-014",
+      "AUD-TX-017",
+      "AUD-TX-020"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/passthrough.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-002",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-010",
+      "AUD-TX-011",
+      "AUD-TX-014",
+      "AUD-TX-016",
+      "AUD-TX-017",
+      "AUD-TX-022",
+      "AUD-TX-023"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/reconciliation.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-002",
+      "AUD-TX-003",
+      "AUD-TX-005",
+      "AUD-TX-007",
+      "AUD-TX-008",
+      "AUD-TX-010",
+      "AUD-TX-011",
+      "AUD-TX-012",
+      "AUD-TX-016",
+      "AUD-TX-017",
+      "AUD-TX-018",
+      "AUD-TX-019",
+      "AUD-TX-020",
+      "AUD-TX-021",
+      "AUD-TX-025"
+    ]
+  },
+  {
+    "path": "src/utils/mevStrategies/types.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-010"
+    ]
+  },
+  {
+    "path": "src/utils/nonceAuthority.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-001",
+      "AUD-TX-002",
+      "AUD-TX-003",
+      "AUD-TX-004",
+      "AUD-TX-005"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "findings": "none",
+        "note": "Two hunks: imports and registerSingleton('nonceAuthority', __filename, EPOCH) before the chains Map. Registry call only (RC-17, AUD-TX-004). withNonceLock is unchanged."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/provider.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-ANTIRUG-002",
+      "AUD-TX-008",
+      "AUD-TX-024"
+    ]
+  },
+  {
+    "path": "src/utils/receiptDecoder.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TX-015"
+    ]
+  },
+  {
+    "path": "src/utils/retry.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "src/utils/txManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-BUY-018",
+      "AUD-TX-002",
+      "AUD-TX-003",
+      "AUD-TX-010"
+    ]
+  },
+  {
+    "path": "src/guards/directEntry.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Reviewed in full. Imports only fs and path, reads no env var, and exits 1 only when the process entry file is the bot file (canonical comparison, case-folded on win32, realpath so a link or a different casing cannot defeat it). Depends on require.main, which ESM removes (AUD-REAUDIT-002). Exact path comparison with an extension taken from __filename covers ts-node and the compiled dist build."
+      }
+    ]
+  },
+  {
+    "path": "src/guards/epoch.ts",
+    "audited_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "findings": "none",
+        "note": "Reviewed in full. A frozen object whose identity is the signal. Holds no state beyond one Date.now(); no env, no I/O."
+      }
+    ]
+  },
+  {
+    "path": "src/guards/singleton.ts",
+    "audited_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "findings": "none",
+        "note": "Reviewed in full. Registry on globalThis under Symbol.for, so a second copy of this file sees the same registry. Keyed by realpathSync.native, so casing, junction and symlink aliases converge on one entry. Rules correct: different raw identity or same epoch throws; same raw identity with a new epoch is the allowed whole-graph reset. No env var, no reset export (P5). Fail-closed if realpath throws (a guarded module file that does not exist cannot be loaded anyway)."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/processLock.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": [
+      "AUD-TX-026"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": [
+          "AUD-TX-026"
+        ],
+        "note": "Reviewed in full against the STL-5 pin, the mechanism and NAC-07. EXCLUSIVE locking_mode plus BEGIN EXCLUSIVE keeps the OS lock after COMMIT. The handle is pinned on globalThis, so garbage collection cannot release it. Any non-busy error refuses as PROCESS_LOCK_MECHANISM; a busy that survives the retry budget refuses as PROCESS_LOCK_HELD. tryAcquireThenRelease refuses inside the pinned process and is documented as a status query only. Lock file path derives from a validated address. One open defect registered: the lock location follows the OS user and HOME (AUD-TX-026, routed to Phase 24); no other defect."
+      }
+    ]
+  }
+]

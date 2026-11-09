@@ -1,0 +1,3457 @@
+{
+  "plan": "22-28",
+  "audit_base_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "written_by": "plan 22-28 Task 1 consolidation (single writer)",
+  "universe": {
+    "sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "total_tracked": 861,
+    "unassigned": [],
+    "multiply_assigned": [],
+    "result": "clean at the base SHA on the first run (slice-files.ts --universe); no assignment or scope change was needed",
+    "resolutions": [],
+    "slice_checks": "slice-files.ts --check passed for BUY, EXIT, ANTIRUG, TX, DB, API, DASH, TESTU, TESTI, SCRIPTS, CONTRACTS, ROOT"
+  },
+  "rc_map": {
+    "RC-01": [
+      "AUD-BUY-002"
+    ],
+    "RC-02": [
+      "AUD-BUY-003"
+    ],
+    "RC-03": [
+      "AUD-EXIT-001"
+    ],
+    "RC-04": [
+      "AUD-BUY-004"
+    ],
+    "RC-05": [
+      "AUD-BUY-005"
+    ],
+    "RC-06": [
+      "AUD-DB-001"
+    ],
+    "RC-07": [
+      "AUD-EXIT-002"
+    ],
+    "RC-08": [
+      "AUD-EXIT-003"
+    ],
+    "RC-09": [
+      "AUD-BUY-006"
+    ],
+    "RC-10": [
+      "AUD-BUY-025",
+      "AUD-EXIT-009",
+      "AUD-TX-001",
+      "AUD-TX-002"
+    ],
+    "RC-11": [
+      "AUD-TX-003"
+    ],
+    "RC-12": [
+      "AUD-API-002"
+    ],
+    "RC-13": [
+      "AUD-ANTIRUG-001"
+    ],
+    "RC-14": [
+      "AUD-DB-004",
+      "AUD-DB-021"
+    ],
+    "RC-15": [
+      "AUD-EXIT-004"
+    ],
+    "RC-16": [
+      "AUD-BUY-007"
+    ],
+    "RC-17": [
+      "AUD-TX-004"
+    ],
+    "RC-18": [
+      "AUD-TX-005"
+    ],
+    "RC-19": [
+      "AUD-RAIL-002",
+      "AUD-TESTI-011",
+      "AUD-TESTU-001"
+    ],
+    "RC-20": [
+      "AUD-BUY-008"
+    ],
+    "RC-21": [
+      "AUD-EXIT-005"
+    ],
+    "RC-22": [
+      "AUD-TX-007"
+    ],
+    "RC-23": [
+      "AUD-DB-005"
+    ],
+    "RC-24": [
+      "AUD-BUY-009"
+    ],
+    "RC-25": [
+      "AUD-DB-006"
+    ],
+    "RC-26": [
+      "AUD-TX-006"
+    ],
+    "RC-27": [
+      "AUD-SCRIPTS-001"
+    ],
+    "RC-28": [
+      "AUD-TESTI-001"
+    ]
+  },
+  "rc_map_notes": {
+    "RC-14": "carried by AUD-DB-004 (the crash window) and AUD-DB-021 (synchronous=NORMAL durability, the second clause of the RC text); AUD-DB-021 was linked at 22-28.",
+    "RC-16": "canonical is AUD-BUY-007 (S1 after the merge with AUD-CENSUS-002)."
+  },
+  "duplicates": [
+    {
+      "duplicate": "AUD-CENSUS-002",
+      "canonical": "AUD-BUY-007",
+      "reason": "Same site, same defect: the real approve inside dead simulateSell at tokenSafety.ts:277, outside the nonce lock. Canonical is the owning BUY slice entry; severity S1 comes from the census rule and the operator ruling at ESC-CENSUS-01."
+    },
+    {
+      "duplicate": "AUD-ANTIRUG-011",
+      "canonical": "AUD-EXIT-013",
+      "reason": "Same defect: the restart path picks the first dex of the pool type instead of the stored dex_name; the exit-monitor site is bot.ts:1940-1956 and the anti-rug site is bot.ts:2096-2098. One root cause and one fix (card EXIT-10), so one entry, with the anti-rug site recorded as a sibling. Canonical is AUD-EXIT-013 because the EXIT slice owns the wider resume and dashboard rule and its escalation record is the earlier one."
+    },
+    {
+      "duplicate": "AUD-TESTQ-002",
+      "canonical": "AUD-TESTU-023",
+      "reason": "Same site, same defect: vi.doMock(\"../../src/db\") in test/unit/configEnvVar.test.ts named a module that does not exist. AUD-TESTU-023 is the earlier entry and carries the wider remainder (the stale statement names), so it is canonical."
+    }
+  ],
+  "reconciliations": [
+    {
+      "item": "AUD-BUY-007 / AUD-CENSUS-002",
+      "kind": "duplicate-merge",
+      "outcome": "AUD-BUY-007 canonical: severity S1 (highest of the set), union of reported_by and evidence, classes already identical, single escalation ESC-CENSUS-01, od_ref null on both, capital_impact set to STRAND following the census rationale. The operator words on ESC-CENSUS-01 (\"keep s1\") are the ruling. The duplicate keeps its id and escalation_ref equal to the canonical."
+    },
+    {
+      "item": "AUD-EXIT-013 / AUD-ANTIRUG-011",
+      "kind": "duplicate-merge",
+      "outcome": "Decided as one defect (see duplicates). Both were already S1 STRAND with the same od_ref EXIT-10. ESC-ANTIRUG-01 keeps AUD-ANTIRUG-011 in its immutable items and gains the canonical in resolved_items; the duplicate escalation_ref now equals the canonical ESC-EXIT-01 (the earlier record), and ESC-EXIT-01 lists the duplicate in resolved_items."
+    },
+    {
+      "item": "AUD-TX-009 and AUD-ANTIRUG-002",
+      "kind": "link-not-merge",
+      "outcome": "Not the same defect: one is a Flashbots library throw in an async block listener, the other a ws error event on a failed reconnect. Same class (uncaught crash, no process handler) and same policy home (card OD-6, with OD-11 for the socket owner), so they are cross-linked in related and their fixes belong together."
+    },
+    {
+      "item": "AUD-EXIT-014 status",
+      "kind": "status-update",
+      "outcome": "Set to confirmed. The mechanism it left open is confirmed by AUD-ANTIRUG-004 sub_claim 1, re-read at the base at 22-28: a refused or timed-out rug escape does not fire again."
+    },
+    {
+      "item": "TH-EXIT-23",
+      "kind": "threshold-correction",
+      "outcome": "Corrected: MEV_SELL_MAX_PRIORITY_FEE_GWEI never caps private sells (AUD-TX-010); the row now says so, gains the no-effect flag, and names the two cards involved (TX-02 for the ceiling wiring, EXIT-03 for approvals and the public fallback)."
+    },
+    {
+      "item": "AUD-BUY-002 open bloxroute.ts item",
+      "kind": "open-item-closed",
+      "outcome": "The latest-attempt-only bloXroute trace recorded in sweep/TX.json cell C07 (bloxroute.ts:179-190, reconciliation.ts:476-497, :576-603) answers it; it is the same mechanism as sub_claim 3, and the sibling text and evidence were updated."
+    },
+    {
+      "item": "AUD-DB-021 / RC-14",
+      "kind": "rc-link",
+      "outcome": "RC-14 names both the buy-to-row crash window (AUD-DB-004) and synchronous=NORMAL (AUD-DB-021); the entry now carries the RC with a written below-suggestion rationale."
+    },
+    {
+      "item": "AUD-EXIT-017 rationale",
+      "kind": "rationale-correction",
+      "outcome": "No grade change. The condition was wider than the register said (one RPC error from decodeReceipt, not only a crash); the over-sale is at market on held tokens, so S2 stands."
+    },
+    {
+      "item": "AUD-BUY-015 raised to S1",
+      "kind": "regrade",
+      "outcome": "Moved up by the code-level re-grade; see regrade and ESC-BUY-04."
+    },
+    {
+      "item": "DB-07 / OD-18",
+      "kind": "card-link",
+      "outcome": "Linked, not numbered. DB-07 asks whether to run synchronous=FULL, which OD-18 already holds (its title and the full-only and intent-row-and-full options). Two cards would allow contradictory rulings on one setting. AUD-DB-021 moves to OD-18, and the one option OD-18 lacked (flush after critical writes only) is carried over as critical-flush-only."
+    },
+    {
+      "item": "DB-01 / OD-25",
+      "kind": "card-unlink",
+      "outcome": "Numbered, and the earlier linked_od to OD-25 (set at 22-21) is replaced by related_od. They are separate decisions: DB-01 is what the risk limits measure (units, open positions, partial sells), OD-25 is their values and parsing. OD-25 has no accounting option and depends on DB-01 being decided first. Left linked, DB-01 would have been reduced to a table row in OPERATOR-DECISIONS.md, losing an S1 capital decision and its options."
+    },
+    {
+      "item": "BUY-02 / OD-18",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "One shared option (write an intent row first), but BUY-02 decides the failure handling after a broadcast (reconcile on throw, split bookkeeping), which OD-18 does not cover. Kept separate, related_od set, and the recommendation tells the operator to decide them together."
+    },
+    {
+      "item": "TX-01 / OD-17",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Both touch the nonce lock and AUD-TX-002, but TX-01 decides how long one op may hold it and OD-17 decides who gets it next. Kept separate, related_od set, cross-reference added."
+    },
+    {
+      "item": "BUY-04 / ANTIRUG-05",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Both concern dashboard Stop chain, but one decides whether buying stops and the other whether anti-rug monitoring continues: different recommended behaviour, so not merged."
+    },
+    {
+      "item": "EXIT-03 / TX-02",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Fee ceilings on two different paths: TX-02 covers the private-submit ceiling wiring, EXIT-03 covers approvals and the public fallback (see the TH-EXIT-23 reconciliation). Not merged."
+    },
+    {
+      "item": "ANTIRUG-07 / EXIT-12 / DB-06 / OD-25",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Each validates a different group of settings and they are owned by different phases (24, 27), so not merged; DB-06 already sequences itself with OD-25."
+    },
+    {
+      "item": "BUY-05, DB-06, TX-04",
+      "kind": "card-capital-flag",
+      "outcome": "capital set to true because linked findings carry a capital_impact: BUY-05 (AUD-BUY-015, 027, 028, all S1), DB-06 (AUD-DB-020 STRAND), TX-04 (AUD-TX-014, AUD-DB-009, AUD-DB-010 EXPOSURE). BUY-05 now covers S1 findings, so its default and needed_by no longer allow Phase 29 or resting on the default."
+    },
+    {
+      "item": "card findings lists",
+      "kind": "card-findings-completed",
+      "outcome": "Added findings whose od_ref named a card that did not list them: OD-25 (AUD-API-003), OD-6 (AUD-TX-009), DB-01 (AUD-API-016, 017), TX-04 (AUD-DB-009, 010), BUY-03 (AUD-EXIT-018), EXIT-11 (AUD-ANTIRUG-004). AUD-ANTIRUG-011 is a duplicate and is not listed. Findings shared by two cards keep their single od_ref (AUD-TX-002, AUD-BUY-002, AUD-BUY-008, AUD-ANTIRUG-001, AUD-ANTIRUG-004); AUD-BUY-020 stays od_ref null because its own fix changes no behaviour."
+    },
+    {
+      "item": "AUD-TESTU-023 / AUD-TESTQ-002",
+      "kind": "duplicate-merge",
+      "outcome": "AUD-TESTU-023 canonical: severity S3 (both S3), union of reported_by, evidence and sibling sites. No escalation or card on either. The duplicate keeps its id, its input_refs and its status fixed for the specifier; the canonical stays confirmed because the stale statement names in the factory are not fixed."
+    }
+  ],
+  "alias_resolutions": {
+    "related_placeholders": [
+      {
+        "finding": "AUD-BUY-001",
+        "alias": "rc:RC-18",
+        "resolved_to": [
+          "AUD-TX-005"
+        ]
+      },
+      {
+        "finding": "AUD-BUY-002",
+        "alias": "rc:RC-07",
+        "resolved_to": [
+          "AUD-EXIT-002"
+        ]
+      },
+      {
+        "finding": "AUD-BUY-008",
+        "alias": "rc:RC-13",
+        "resolved_to": [
+          "AUD-ANTIRUG-001"
+        ]
+      },
+      {
+        "finding": "AUD-EXIT-009",
+        "alias": "rc:RC-10",
+        "resolved_to": [
+          "AUD-BUY-025",
+          "AUD-TX-001",
+          "AUD-TX-002"
+        ]
+      },
+      {
+        "finding": "AUD-TESTU-017",
+        "alias": "rc:RC-28",
+        "resolved_to": [
+          "AUD-TESTI-001"
+        ]
+      },
+      {
+        "finding": "AUD-TESTU-018",
+        "alias": "rc:RC-28",
+        "resolved_to": [
+          "AUD-TESTI-001"
+        ]
+      },
+      {
+        "finding": "AUD-TESTU-019",
+        "alias": "rc:RC-28",
+        "resolved_to": [
+          "AUD-TESTI-001"
+        ]
+      }
+    ],
+    "escalation_aliases": [
+      {
+        "record": "ESC-PRE-02",
+        "alias": "rc:RC-10",
+        "resolved_to": [
+          "AUD-BUY-025",
+          "AUD-EXIT-009",
+          "AUD-TX-001",
+          "AUD-TX-002"
+        ]
+      },
+      {
+        "record": "ESC-PRE-04",
+        "alias": "key:API:failed-held-sell-selection",
+        "resolved_to": [
+          "AUD-API-001"
+        ]
+      }
+    ],
+    "note": "Escalation items were not edited; resolved_items carries the resolutions."
+  },
+  "contrib_folds": [
+    {
+      "contribution": "SECRET",
+      "area": "src",
+      "class": "C17",
+      "ids": [
+        "AUD-SECRET-001",
+        "AUD-SECRET-003",
+        "AUD-SECRET-004"
+      ],
+      "folded_into": "sweep/BUY.json cell C17"
+    },
+    {
+      "contribution": "SECRET",
+      "area": "dashboard",
+      "class": "C17",
+      "ids": [
+        "AUD-SECRET-005"
+      ],
+      "folded_into": "sweep/DASH.json cell C17"
+    },
+    {
+      "contribution": "SECRET",
+      "area": "test",
+      "class": "C17",
+      "ids": [
+        "AUD-SECRET-002"
+      ],
+      "folded_into": "sweep/TESTU.json cell C17"
+    },
+    {
+      "contribution": "SECRET",
+      "area": "scripts",
+      "class": "C17",
+      "ids": [],
+      "folded_into": "sweep/SCRIPTS.json cell C17"
+    },
+    {
+      "contribution": "SECRET",
+      "area": "contracts",
+      "class": "C17",
+      "ids": [],
+      "folded_into": "sweep/CONTRACTS.json cell C17"
+    },
+    {
+      "contribution": "CENSUS",
+      "area": "src",
+      "class": "C07",
+      "ids": [
+        "AUD-CENSUS-001",
+        "AUD-CENSUS-002"
+      ],
+      "folded_into": "sweep/BUY.json cell C07"
+    },
+    {
+      "contribution": "CENSUS",
+      "area": "src",
+      "class": "C06",
+      "ids": [
+        "AUD-CENSUS-002"
+      ],
+      "folded_into": "sweep/BUY.json cell C06"
+    },
+    {
+      "contribution": "CENSUS",
+      "area": "scripts",
+      "class": "C07",
+      "ids": [
+        "AUD-CENSUS-001"
+      ],
+      "folded_into": "sweep/SCRIPTS.json cell C07"
+    }
+  ],
+  "additional_sweep_folds": [
+    {
+      "id": "AUD-FORENSIC-001",
+      "cell": "src x C13",
+      "reason": "findings-only slice, placed in sweep/DB.json cell C13 (db.ts)"
+    },
+    {
+      "id": "AUD-RAIL-001",
+      "cell": "test x C17, C18",
+      "reason": "findings-only slice, placed in sweep/TESTU.json"
+    },
+    {
+      "id": "AUD-RAIL-002",
+      "cell": "test x C13, C17, C18",
+      "reason": "findings-only slice, placed in sweep/TESTU.json"
+    }
+  ],
+  "threshold_links": [
+    {
+      "key": "DAILY_LOSS_PCT",
+      "rows": [
+        "TH-API-06",
+        "TH-BUY-27",
+        "TH-DB-04"
+      ],
+      "differing": true,
+      "note": "Parsers differ: riskManager and risk.ts use parseFloat of the value with a \"10\" default while chains.ts shows the raw string; the default 10 itself matches.",
+      "definition_sites": 15
+    },
+    {
+      "key": "MAX_OPEN_POSITIONS",
+      "rows": [
+        "TH-API-04",
+        "TH-BUY-27",
+        "TH-DB-01",
+        "TH-DB-18"
+      ],
+      "differing": true,
+      "note": "Parsers differ: riskManager and risk.ts use parseInt with a \"10\" default, preflight uses Number()+Number.isInteger, chains.ts shows the raw string.",
+      "definition_sites": 24
+    },
+    {
+      "key": "MAX_TOTAL_EXPOSURE",
+      "rows": [
+        "TH-API-05",
+        "TH-BUY-27",
+        "TH-DB-02"
+      ],
+      "differing": true,
+      "note": "Parsers differ: risk.ts parseFloat with \"10.0\" default, chains.ts raw string; riskManager parseFloat.",
+      "definition_sites": 29
+    },
+    {
+      "key": "SNIPE_COOLDOWN_MS",
+      "rows": [
+        "TH-BUY-27",
+        "TH-DB-05"
+      ],
+      "differing": false,
+      "note": "Same read (riskManager.ts:31).",
+      "definition_sites": 32
+    },
+    {
+      "key": "DELIBERATE_BUY_GAS_BUFFER",
+      "rows": [
+        "TH-DB-21",
+        "TH-SCRIPTS-03",
+        "TH-DB-19"
+      ],
+      "differing": false,
+      "note": "Same parser (preflight.ts:300-304); TH-DB-19 is the derived floor that uses it.",
+      "definition_sites": 10
+    },
+    {
+      "key": "DELIBERATE_BUY_PRIVATE_ATTEMPTS",
+      "rows": [
+        "TH-BUY-06",
+        "TH-SCRIPTS-02"
+      ],
+      "differing": false,
+      "note": "Same read (bot.ts:557).",
+      "definition_sites": 6
+    },
+    {
+      "key": "DELIBERATE_BUY_SLIPPAGE_PCT",
+      "rows": [
+        "TH-BUY-03",
+        "TH-SCRIPTS-01"
+      ],
+      "differing": false,
+      "note": "Same read (bot.ts:529, :703).",
+      "definition_sites": 6
+    },
+    {
+      "key": "EXIT_GATE_SELL_GAS_BUFFER",
+      "rows": [
+        "TH-EXIT-26",
+        "TH-DB-19"
+      ],
+      "differing": false,
+      "note": "Same parser (preflight.ts:289-294); TH-DB-19 is the derived floor.",
+      "definition_sites": 13
+    },
+    {
+      "key": "MEV_CONFIRM_POLL_MS",
+      "rows": [
+        "TH-EXIT-22",
+        "TH-TX-02"
+      ],
+      "differing": false,
+      "note": "Same parser (reconciliation.ts:679-683).",
+      "definition_sites": 9
+    },
+    {
+      "key": "MEV_CONFIRM_WINDOW_MS",
+      "rows": [
+        "TH-EXIT-22",
+        "TH-TX-01"
+      ],
+      "differing": false,
+      "note": "Same parser (reconciliation.ts:679-683).",
+      "definition_sites": 15
+    },
+    {
+      "key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT",
+      "rows": [
+        "TH-ANTIRUG-20",
+        "TH-EXIT-14"
+      ],
+      "differing": false,
+      "note": "Same read (exitEngine.ts:472).",
+      "definition_sites": 6
+    },
+    {
+      "key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
+      "rows": [
+        "TH-EXIT-23",
+        "TH-TX-04"
+      ],
+      "differing": false,
+      "note": "Both rows describe the same dead knob after the TH-EXIT-23 correction; the ceiling is applied only with leg \"sell\", which no strategy passes (AUD-TX-010).",
+      "definition_sites": 6
+    },
+    {
+      "key": "SIGINT_GRACE_MS",
+      "rows": [
+        "TH-BUY-15",
+        "TH-DB-14"
+      ],
+      "differing": false,
+      "note": "Same read (bot.ts:2305-2307).",
+      "definition_sites": 4
+    },
+    {
+      "key": "WATCHDOG_BUDGET_MS",
+      "rows": [
+        "TH-ANTIRUG-18",
+        "TH-BUY-14",
+        "TH-EXIT-21"
+      ],
+      "differing": false,
+      "note": "Two read sites (bot.ts:2178-2180, exitTrigger.ts:77-81) use the same parse, 60000 ms default.",
+      "definition_sites": 8
+    },
+    {
+      "key": "<PREFIX>_SNIPE_AMOUNT",
+      "rows": [
+        "TH-BUY-01",
+        "TH-DB-06",
+        "TH-EXIT-24"
+      ],
+      "differing": false,
+      "note": "Same env key; TH-EXIT-24 is the probe amount derived from it.",
+      "definition_sites": 32
+    },
+    {
+      "key": "<PREFIX>_MAX_CAPITAL",
+      "rows": [
+        "TH-BUY-28",
+        "TH-DB-07"
+      ],
+      "differing": false,
+      "note": "Same env key.",
+      "definition_sites": 15
+    },
+    {
+      "key": "<PREFIX>_ANTIRUG_GAS_MULTIPLIER",
+      "rows": [
+        "TH-ANTIRUG-05",
+        "TH-EXIT-20"
+      ],
+      "differing": false,
+      "note": "Same env key and template default.",
+      "definition_sites": 9
+    },
+    {
+      "key": "CONFIG.slippagePercent (constant 5)",
+      "rows": [
+        "TH-BUY-02",
+        "TH-EXIT-13"
+      ],
+      "differing": false,
+      "note": "Same hard-coded value (config.ts:282), used by buys and the routine public sell.",
+      "definition_sites": 7
+    },
+    {
+      "key": "sendTxWithRetry default retries (constant 3)",
+      "rows": [
+        "TH-BUY-16",
+        "TH-TX-13"
+      ],
+      "differing": false,
+      "note": "Same default (txManager.ts:107-108): 3 retries, 4 submissions.",
+      "definition_sites": 7
+    },
+    {
+      "key": "24 h daily window (constant)",
+      "rows": [
+        "TH-API-07",
+        "TH-DB-17"
+      ],
+      "differing": false,
+      "note": "Same 24 h window; the API spells it 86400000 ms and the breaker 86400 s, a unit difference only, no value difference.",
+      "definition_sites": 3
+    },
+    {
+      "key": "per-chain gas template (constant)",
+      "rows": [
+        "TH-DB-24",
+        "TH-EXIT-19"
+      ],
+      "differing": false,
+      "note": "Same chain gas limits; TH-EXIT-19 is the gas limit field of the template.",
+      "definition_sites": 7
+    }
+  ],
+  "discovery_completeness": {
+    "sources": [
+      "git grep -ohE \"process\\.env\\.[A-Z0-9_]+\" <base sha> -- src scripts",
+      ".env.example at the base sha",
+      "discovery sections of thresholds/{API,DB,EXIT,SCRIPTS}.json"
+    ],
+    "keys_checked": 153,
+    "unmapped": [],
+    "keys": [
+      {
+        "key": "ALCHEMY_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL secret (AUD-DB-011)"
+      },
+      {
+        "key": "ALLOW_REAL_MAINNET",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "boolean test-harness gate for the fork tests, not a money or timing number (D-19)"
+      },
+      {
+        "key": "ARBISCAN_API_KEY",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "block-explorer credential for contract verification, not a money or timing number (D-19)"
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_CONFIRM_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_GAS_MULTIPLIER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-05",
+          "TH-EXIT-20"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_LIVE_EXECUTE",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_LP_REMOVAL_PCT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_BLOCK_AGE_TOLERANCE_SEC",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_GAS_BUFFER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-08",
+          "TH-DB-18",
+          "TH-DB-19"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_HONEYPOT_CHECKER_ADDRESS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "ARB_MAX_BUY_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_MAX_CAPITAL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-28",
+          "TH-DB-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_MAX_SELL_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-10"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_MIN_LIQUIDITY",
+        "sources": [
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_RPC_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "ARB_SNIPE_AMOUNT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-01",
+          "TH-DB-06",
+          "TH-DB-18",
+          "TH-EXIT-24"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ARB_WS_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BASESCAN_API_KEY",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "block-explorer credential for contract verification, not a money or timing number (D-19)"
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_CONFIRM_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_GAS_MULTIPLIER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-05",
+          "TH-EXIT-20"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_LIVE_EXECUTE",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_LP_REMOVAL_PCT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_BLOCK_AGE_TOLERANCE_SEC",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_GAS_BUFFER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-08",
+          "TH-DB-18",
+          "TH-DB-19"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_HONEYPOT_CHECKER_ADDRESS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "BASE_MAX_BUY_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_MAX_CAPITAL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-28",
+          "TH-DB-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_MAX_SELL_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-10"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_MIN_LIQUIDITY",
+        "sources": [
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_RPC_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BASE_SNIPE_AMOUNT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-01",
+          "TH-DB-06",
+          "TH-DB-18",
+          "TH-EXIT-24"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BASE_WS_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BLOXROUTE_AUTH_HEADER",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric secret"
+      },
+      {
+        "key": "BSCSCAN_API_KEY",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "block-explorer credential for contract verification, not a money or timing number (D-19)"
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_CONFIRM_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_GAS_MULTIPLIER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-05",
+          "TH-EXIT-20"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_LIVE_EXECUTE",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_LP_REMOVAL_PCT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_BLOCK_AGE_TOLERANCE_SEC",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_GAS_BUFFER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-08",
+          "TH-DB-18",
+          "TH-DB-19"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_HONEYPOT_CHECKER_ADDRESS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "BSC_MAX_BUY_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_MAX_CAPITAL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-28",
+          "TH-DB-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_MAX_SELL_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-10"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_MIN_LIQUIDITY",
+        "sources": [
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_RPC_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "BSC_SNIPE_AMOUNT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-01",
+          "TH-DB-06",
+          "TH-DB-18",
+          "TH-EXIT-24"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "BSC_WS_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "CAPTURE_ARCHIVE_RPC_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "endpoints, not money or timing numbers (network targeting is recorded in AUD-SCRIPTS-001)"
+      },
+      {
+        "key": "DAILY_LOSS_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-API-06",
+          "TH-BUY-27",
+          "TH-DB-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "DASHBOARD_ALLOWED_ORIGINS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "list of origins, not a money or timing number (trust boundary: AUD-API-005)"
+      },
+      {
+        "key": "DASHBOARD_API_KEY",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "credential, not a number (handling: AUD-API-007)"
+      },
+      {
+        "key": "DASHBOARD_HOST",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "bind address, not a number (exposure context for AUD-API-008 / AUD-API-010)"
+      },
+      {
+        "key": "DASHBOARD_PORT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "TCP port, not a money or timing number"
+      },
+      {
+        "key": "DASHBOARD_TRUST_PROXY_PROTO",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "boolean flag, not a number"
+      },
+      {
+        "key": "DASHBOARD_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "address and credential, not money or timing (AUD-SCRIPTS-008)"
+      },
+      {
+        "key": "DB_PATH",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric file path (AUD-DB-007)"
+      },
+      {
+        "key": "DELIBERATE_BUY_GAS_BUFFER",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-19",
+          "TH-DB-21",
+          "TH-SCRIPTS-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "DELIBERATE_BUY_PRIVATE_ATTEMPTS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-06",
+          "TH-SCRIPTS-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "DELIBERATE_BUY_SLIPPAGE_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-03",
+          "TH-SCRIPTS-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "DEPLOY_PRIVATE_KEY",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "deployment signer key, a credential not a money or timing number (D-19); key handling is AUD-CONTRACTS-004"
+      },
+      {
+        "key": "ENABLED_CHAINS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric (chain list); the default drift between the two sites is AUD-DB-017"
+      },
+      {
+        "key": "ETHERSCAN_API_KEY",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "block-explorer credential for contract verification, not a money or timing number (D-19)"
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V3",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_CONFIRM_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_GAS_MULTIPLIER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-05",
+          "TH-EXIT-20"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_LIVE_EXECUTE",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_LP_REMOVAL_PCT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_BLOCK_AGE_TOLERANCE_SEC",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_FORK_RPC_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "endpoints, not money or timing numbers (network targeting is recorded in AUD-SCRIPTS-001)"
+      },
+      {
+        "key": "ETH_GAS_BUFFER",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-08",
+          "TH-DB-18",
+          "TH-DB-19"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_HONEYPOT_CHECKER_ADDRESS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric contract address"
+      },
+      {
+        "key": "ETH_MAX_BUY_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-09"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_MAX_CAPITAL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-28",
+          "TH-DB-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_MAX_SELL_TAX_BPS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-19",
+          "TH-DB-10"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_MIN_LIQUIDITY",
+        "sources": [
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-08"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_RPC_URL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "ETH_SNIPE_AMOUNT",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-01",
+          "TH-DB-06",
+          "TH-DB-18",
+          "TH-EXIT-24"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "ETH_WS_URL",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric URL"
+      },
+      {
+        "key": "EXIT_DUST_THRESHOLD_BPS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-10"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "EXIT_GATE_SELL_GAS_BUFFER",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-19",
+          "TH-EXIT-26"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "EXIT_ROUTINE_MAX_FAILURES",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "FLASHBOTS_AUTH_KEY",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric secret"
+      },
+      {
+        "key": "LOG_LEVEL",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric, not money-or-timing (AUD-DB-005, card OD-10)"
+      },
+      {
+        "key": "MAX_OPEN_POSITIONS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-API-04",
+          "TH-BUY-27",
+          "TH-DB-01",
+          "TH-DB-18"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MAX_POSITION_SIZE",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-27",
+          "TH-DB-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MAX_TOTAL_EXPOSURE",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-API-05",
+          "TH-BUY-27",
+          "TH-DB-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_BUILDERS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-12"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_BUY_COINBASE_BRIBE_ENABLED",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-26"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_BUY_MAX_PRIORITY_FEE_GWEI",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_BUY_TARGET_BLOCKS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-11"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_CONFIRM_POLL_MS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-22",
+          "TH-TX-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_CONFIRM_WINDOW_MS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-22",
+          "TH-TX-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_MAX_PRIORITY_FEE_GWEI",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-05"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_PRIORITY_FEE_STEP_GWEI",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-TX-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_RESERVE_SELL_GAS",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-TX-07"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-20",
+          "TH-EXIT-14"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_SELL_COINBASE_BRIBE_ENABLED",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-26"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_SELL_FALLBACK_ATTEMPTS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-12"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_SELL_MAX_PRIORITY_FEE_GWEI",
+        "sources": [
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-23",
+          "TH-TX-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "MEV_STRATEGY",
+        "sources": [
+          "src-or-scripts-static-read",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "not a read: named in a comment (WR-08 note)"
+      },
+      {
+        "key": "MID_RUN_CHECK_INTERVAL_SEC",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-13"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "NETWORK",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric (legacy provider key)"
+      },
+      {
+        "key": "NODE_ENV",
+        "sources": [
+          "src-or-scripts-static-read",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "string mode switch for the cookie Secure flag, not a number (AUD-API-007)"
+      },
+      {
+        "key": "PARTIAL_SELL_TARGETS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-06"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "PRIVATE_KEY",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric secret (AUD-DB-008)"
+      },
+      {
+        "key": "RPC_TIMEOUT_MS",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-TX-20"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "SEPOLIA_RPC_URL",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "test-network endpoint URL, not a money or timing number (D-19)"
+      },
+      {
+        "key": "SIGINT_GRACE_MS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": [
+          "TH-BUY-15",
+          "TH-DB-14"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "SNIPE_COOLDOWN_MS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-BUY-27",
+          "TH-DB-05"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "STALE_ERROR_SEC",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-13"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "STALE_WARN_SEC",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-DB-12"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "STOP_LOSS_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-01"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "TELEGRAM_ALLOWED_CHANNELS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "allow-list of channel identities, not a number (D-19); trust behaviour is AUD-BUY-006"
+      },
+      {
+        "key": "TELEGRAM_ALLOWED_SENDERS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "allow-list of sender identities, not a number (D-19); trust behaviour is AUD-BUY-006"
+      },
+      {
+        "key": "TELEGRAM_API_HASH",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TELEGRAM_API_ID",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TELEGRAM_BOT_TOKEN",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric credential (AUD-DB-009)"
+      },
+      {
+        "key": "TELEGRAM_CHAT_ID",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric identifier"
+      },
+      {
+        "key": "TELEGRAM_SESSION",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "non-numeric credential"
+      },
+      {
+        "key": "TEST_WALLET_PRIVATE_KEY",
+        "sources": [
+          ".env.example"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "test signer key read nowhere in src, a credential not a money or timing number (D-19); drift is AUD-ROOT-004"
+      },
+      {
+        "key": "TRAILING_MAX_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-04"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "TRAILING_MIN_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-03"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "TRAILING_STOP_PCT",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-EXIT-02"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "WATCHDOG_BUDGET_MS",
+        "sources": [
+          "src-or-scripts-static-read",
+          ".env.example",
+          "thresholds-discovery"
+        ],
+        "mapped_to": [
+          "TH-ANTIRUG-18",
+          "TH-BUY-14",
+          "TH-EXIT-21"
+        ],
+        "excluded_reason": null
+      },
+      {
+        "key": "X",
+        "sources": [
+          "src-or-scripts-static-read",
+          "thresholds-discovery"
+        ],
+        "mapped_to": null,
+        "excluded_reason": "not a read: the text process.env.X sits in a comment"
+      }
+    ],
+    "note": "Dynamic reads (process.env[`${prefix}_...`] in chainRegistry.ts) are covered through the DB slice discovery section and the <PREFIX> threshold rows."
+  },
+  "escalation_audit": {
+    "required_entries": [
+      {
+        "id": "AUD-ANTIRUG-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-ANTIRUG-01"
+      },
+      {
+        "id": "AUD-ANTIRUG-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-ANTIRUG-01"
+      },
+      {
+        "id": "AUD-ANTIRUG-003",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-ANTIRUG-01"
+      },
+      {
+        "id": "AUD-ANTIRUG-004",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-ANTIRUG-01"
+      },
+      {
+        "id": "AUD-ANTIRUG-005",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-ANTIRUG-01"
+      },
+      {
+        "id": "AUD-API-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-04"
+      },
+      {
+        "id": "AUD-API-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-API-01"
+      },
+      {
+        "id": "AUD-API-008",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-API-01"
+      },
+      {
+        "id": "AUD-BUY-001",
+        "severity": "S0",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-01"
+      },
+      {
+        "id": "AUD-BUY-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-003",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-004",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-005",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-006",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-007",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-CENSUS-01"
+      },
+      {
+        "id": "AUD-BUY-008",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-010",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-011",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-02"
+      },
+      {
+        "id": "AUD-BUY-015",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-BUY-04"
+      },
+      {
+        "id": "AUD-BUY-025",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-02"
+      },
+      {
+        "id": "AUD-BUY-027",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-03"
+      },
+      {
+        "id": "AUD-BUY-028",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-BUY-03"
+      },
+      {
+        "id": "AUD-BUY-030",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-BUY-03"
+      },
+      {
+        "id": "AUD-BUY-033",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-BUY-05"
+      },
+      {
+        "id": "AUD-DB-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-DB-01"
+      },
+      {
+        "id": "AUD-DB-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-DB-01"
+      },
+      {
+        "id": "AUD-DB-003",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-DB-01"
+      },
+      {
+        "id": "AUD-DB-004",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-DB-01"
+      },
+      {
+        "id": "AUD-DB-007",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-DB-01"
+      },
+      {
+        "id": "AUD-EXIT-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-003",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-007",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-008",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-009",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-02"
+      },
+      {
+        "id": "AUD-EXIT-013",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-014",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-EXIT-015",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-EXIT-01"
+      },
+      {
+        "id": "AUD-FORENSIC-001",
+        "severity": "S2",
+        "status": "candidate",
+        "escalation_ref": "ESC-FORENSIC-01"
+      },
+      {
+        "id": "AUD-RAIL-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-01"
+      },
+      {
+        "id": "AUD-RAIL-002",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-PRE-03"
+      },
+      {
+        "id": "AUD-SCRIPTS-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-SCRIPTS-01"
+      },
+      {
+        "id": "AUD-SECRET-004",
+        "severity": "S4",
+        "status": "NOT-A-BUG",
+        "escalation_ref": "ESC-SECRET-02"
+      },
+      {
+        "id": "AUD-SECRET-005",
+        "severity": "S4",
+        "status": "NOT-A-BUG",
+        "escalation_ref": "ESC-SECRET-02"
+      },
+      {
+        "id": "AUD-TESTI-011",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-PRE-03"
+      },
+      {
+        "id": "AUD-TESTU-001",
+        "severity": "S1",
+        "status": "candidate",
+        "escalation_ref": "ESC-PRE-03"
+      },
+      {
+        "id": "AUD-TX-001",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-02"
+      },
+      {
+        "id": "AUD-TX-002",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-PRE-02"
+      },
+      {
+        "id": "AUD-TX-003",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-TX-01"
+      },
+      {
+        "id": "AUD-TX-004",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-TX-01"
+      },
+      {
+        "id": "AUD-TX-005",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-TX-01"
+      },
+      {
+        "id": "AUD-TX-009",
+        "severity": "S1",
+        "status": "confirmed",
+        "escalation_ref": "ESC-TX-01"
+      }
+    ],
+    "count": 52,
+    "none_deferred": true,
+    "note": "Every S0, S1, rail, non-public secret and test-origin row has exactly one escalation_ref resolving to a record that lists it in items or resolved_items; duplicates point to the canonical record."
+  },
+  "regrade": {
+    "instruction": "Orchestrator obligation 1: re-grade all 43 external findings where codex said S1 and the register said S2, S3 or S4, reading the code at the audit base first and accepting neither side.",
+    "entries": [
+      {
+        "ext_id": "codex-BUY-06",
+        "finding_id": "AUD-BUY-029",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/bot.ts:747-748@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:226@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:675-690@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The public buy passes only value, so ethers uses market fees and a node gas estimate with no cap. It runs only on the operator-invoked deliberate path (snipes stay private at bot.ts:1431) and spends one transaction of market gas behind the affordability re-check, so the capital effect is bounded: S2, not S1."
+      },
+      {
+        "ext_id": "codex-BUY-12",
+        "finding_id": "AUD-BUY-015",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S1",
+        "code_read_at_base": [
+          "src/bot.ts:179-215@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:1362-1377@23a64617dca167976adc4645fed0e2c69e384820",
+          "contracts/honeypot/HoneypotChecker.sol:280-324@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Quoting the threshold as an exact input proves nothing about depth: an exact-input quote on a thin V3 pool fills what it can and does not revert, so every V3 pool with any active liquidity passes the minimum-liquidity gate on an ordinary condition. The register's stated bound does not hold (minOut comes from the same thin-pool quote and the honeypot roundtrip measures tax against the quote at trade size), so a capital risk limit is bypassed: S1."
+      },
+      {
+        "ext_id": "codex-BUY-13",
+        "finding_id": "AUD-BUY-015",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S1",
+        "code_read_at_base": [
+          "src/utils/tokenSafety.ts:417-421@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/chainRegistry.ts:209@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/chainRegistry.ts:278@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/chainRegistry.ts:335@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/chainRegistry.ts:392@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The V2 check hardcodes 1 native, which equals the BSC default and is stricter than the ETH, Base and Arbitrum defaults (0.5, 0.1, 0.1), so at defaults it refuses more, never less; only a chain configured above 1 native is under-enforced (S3 on its own). The entry's grade is S1 from codex-BUY-12."
+      },
+      {
+        "ext_id": "codex-BUY-17",
+        "finding_id": "AUD-BUY-012",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/tokenSafety.ts:19-48@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:8@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "checkHoneypot has no caller at the base (git grep for checkHoneypot( matches only its definition; bot.ts:8 only imports it), so the key-in-error path cannot run today and codex's S1 needs a caller that does not exist. Held at S2, not S3, because a single added call would put the private key in a warn log."
+      },
+      {
+        "ext_id": "codex-EXIT-02",
+        "finding_id": "AUD-EXIT-017",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:1531-1575@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:1585-1588@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/receiptDecoder.ts:44@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The catch at :1585-1588 also handles a single RPC error from decodeReceipt (receiptDecoder.ts:44 has no try) or a SQLite error, so no crash is needed and the register's condition was too narrow; rationale corrected. The repeat sale still executes at market for tokens the wallet holds and the proceeds return to the wallet, so it over-liquidates a position above its tier rather than losing principal: S2."
+      },
+      {
+        "ext_id": "codex-EXIT-05",
+        "finding_id": "AUD-EXIT-022",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/exitEngine.ts:615-621@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:1143@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The 1000-raw-unit floor only matters for a whole position below 1000 raw units, which needs a 0 to 2 decimal token and a failed sale; 9 and 18 decimal launches get a negligible floor. A rare token shape, so S3 stands."
+      },
+      {
+        "ext_id": "codex-EXIT-06",
+        "finding_id": "AUD-EXIT-016",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:615-617@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:1143-1153@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "EXIT_DUST_THRESHOLD_BPS has no upper bound, so 10000 tears down a held position after a failed sale, but it needs an operator to set an out-of-range value (default 1 = 0.01%). Misconfiguration-only with a sane default: S2."
+      },
+      {
+        "ext_id": "codex-EXIT-10",
+        "finding_id": "AUD-EXIT-004",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:419-422@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:544@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:553-555@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Approvals and the public fallback carry no fee or gas override, but each pays market gas for one transaction and the private leg still applies its ceiling; no configured cap is exceeded by more than one transaction of market gas. S2 stands."
+      },
+      {
+        "ext_id": "codex-EXIT-11",
+        "finding_id": "AUD-EXIT-020",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/exitEngine.ts:1099-1105@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:556@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Teardown does trust latest-state balance at one confirmation, as codex says. A reorg that removes a mined sell and does not re-mine it is rare on these four chains, so S3 stands (AUD-TX-012 is the transaction-layer twin)."
+      },
+      {
+        "ext_id": "codex-EXIT-12",
+        "finding_id": "AUD-EXIT-023",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/exitEngine.ts:667-674@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:881-885@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:1210-1214@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/db.ts:341-347@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Teardown does not cancel queued work, but isTokenSniped blocks re-entry into a token already traded, so stale work finds zero balance and cleans up; the only path around it is the double-buy race already escalated as AUD-BUY-004. S3 stands."
+      },
+      {
+        "ext_id": "codex-EXIT-13",
+        "finding_id": "AUD-EXIT-024",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/exitEngine.ts:419-422@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:541@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Approvals do not reset to zero first, so a zero-first token with a leftover nonzero allowance reverts the approve. Both conditions together are uncommon for new launches; S3 stands."
+      },
+      {
+        "ext_id": "codex-EXIT-14",
+        "finding_id": "AUD-EXIT-011",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:470@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Codex's claim cannot happen: slippagePercent is the literal 5 at config.ts:282 (not an env value), so the || 5 fallback never fires. The entry's actual concern (quoting before an approve with no timeout) is unaffected and stays S2."
+      },
+      {
+        "ext_id": "codex-EXIT-15",
+        "finding_id": "AUD-EXIT-025",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:1568-1575@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:285-300@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:240-250@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Completed tiers are stored as array indices and re-read against a re-parsed sorted list, so inserting a tier while positions are open repeats a sale. It needs an operator to change PARTIAL_SELL_TARGETS across a restart and the repeat is a sale at market above the tier: S2."
+      },
+      {
+        "ext_id": "codex-EXIT-16",
+        "finding_id": "AUD-EXIT-006",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/exitEngine.ts:363-365@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:1511-1513@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/passthrough.ts:118-128@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/bloxroute.ts:137-145@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/flashbots.ts:235-250@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Private V2 partials use swapExactTokensForETH, so a taxed token reverts and partial take-profit never fires, as codex says. All three strategies simulate before sending, so the retries burn no gas, and the position keeps its routine exits and the FoT public fallback; the effect is bounded: S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-01",
+        "finding_id": "AUD-ANTIRUG-006",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:1754-1775@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Signal 3 divides raw WETH out by raw tokens in, so for 18-decimal tokens priced below 0.5 WETH it always trips (the signal is inert) and for few-decimal tokens it rarely trips, leaving signals 1 and 2 to decide V3 exits; a complete liquidity pull still trips through the quoter revert at :1766-1775. The result is a wrongful or missed V3 emergency exit on one position, bounded: S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-04",
+        "finding_id": "AUD-ANTIRUG-018",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:1261-1310@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "HTTP polling requests the whole outstanding range and keeps lastBlock on failure, so a gap above the provider limit never clears; it applies only to chains with no WebSocket URL and the routine exit monitor runs independently. One protection layer lost, not every exit: S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-05",
+        "finding_id": "AUD-ANTIRUG-007",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:587-600@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/detector.ts:1261@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Each HTTP-mode registration adds another never-stopped poller, so a rug log is dispatched N times; the sell lock still serializes the sells. The consequence that can hurt money (breaker over-count) is carried at S1 by AUD-ANTIRUG-003, so this entry stays S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-06",
+        "finding_id": "AUD-ANTIRUG-007",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:1261-1264@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/detector.ts:1300@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Same entry: with no in-flight guard a slow tick can re-dispatch a range and move the cursor back. The sell lock prevents a double sell; breaker over-counting is AUD-ANTIRUG-003 at S1. S2 stands."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-09",
+        "finding_id": "AUD-ANTIRUG-012",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:2106-2124@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "pendingV3Burn is keyed by pool only, so a second position on the same pool replaces the first watcher; that needs two positions on one pool (the AUD-BUY-004 double buy) and the Collect path still evaluates each. S3 stands."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-10",
+        "finding_id": "AUD-ANTIRUG-019",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:2179-2190@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Any Collect consumes the pending Burn, as codex says, but the withdrawn funds only leave on a Collect that is then evaluated with its own owner, so an unrelated allowlisted Collect delays evaluation rather than skipping the real one. S3 stands."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-11",
+        "finding_id": "AUD-ANTIRUG-020",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:2117-2124@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Repeated Burns do restart the five-block grace with no limit, as codex says, but the withdrawal needs a Collect, which is evaluated when it arrives. Delay only: S3."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-15",
+        "finding_id": "AUD-ANTIRUG-008",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:904-907@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/detector.ts:974-977@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/notifier.ts:80-88@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/api/ws/broadcaster.ts:39-50@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Codex's crash path needs an alert to reject, but sendCtxAlert catches Telegram errors (notifier.ts:80-88) and broadcast skips closed sockets, so the reconnect loop survives. The entry's actual concern (signals report connected while no subscription exists) stays S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-16",
+        "finding_id": "AUD-ANTIRUG-022",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:655-657@23a64617dca167976adc4645fed0e2c69e384820",
+          "node_modules/ethers/lib.commonjs/providers/abstract-provider.js (ethers@6.16.0)"
+        ],
+        "reason": "ethers v6 on() builds the subscription with no network call and starts it without awaiting, so a discarded on() promise does not reject on an RPC or socket failure; only an invalid filter would, and the filter here is hex addresses. S3 stands; the process-crash class is AUD-TX-009 and AUD-ANTIRUG-002."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-17",
+        "finding_id": "AUD-ANTIRUG-013",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:1845-1857@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/detector.ts:1341-1396@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The gate ignores removed logs but re-evaluates live pool state at confirm time, so a reorged-out withdrawal can only sell if the pool still trips all three signals then. No capital effect was found beyond a false positive that needs a reorg: S3."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-18",
+        "finding_id": "AUD-ANTIRUG-010",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/anti-rug/circuitBreaker.ts:73-83@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The breaker is memory-only, as codex says, so a restart clears a trip and up to the threshold of further anti-rug sells can run before it trips again. It needs a restart during a misfiring detector and each sell is one position: S2."
+      },
+      {
+        "ext_id": "codex-ANTIRUG-19",
+        "finding_id": "AUD-ANTIRUG-021",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/anti-rug/detector.ts:1527-1531@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/anti-rug/detector.ts:2251-2253@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "LP Transfer logs use their own recipient, so an allowlisted withdrawal through the router can trip the pair and zero-address transfer evaluations, but only for allowlisted LP flows and as a false-positive sale at market. S3 stands."
+      },
+      {
+        "ext_id": "codex-TX-01",
+        "finding_id": "AUD-TX-022",
+        "codex_grade": "S1",
+        "prior_register_grade": "S4",
+        "new_grade": "S4",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/passthrough.ts:57-62@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:328@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The cast would fail only for number or string gas and value, but every builder passes bigint (maxGasLimit is bigint, buy value is parseEther output at bot.ts:1044 and :1359). No caller reaches the failing case: S4."
+      },
+      {
+        "ext_id": "codex-TX-02",
+        "finding_id": "AUD-TX-023",
+        "codex_grade": "S1",
+        "prior_register_grade": "S4",
+        "new_grade": "S4",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/passthrough.ts:86-105@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/flashbots.ts:210-218@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:1431-1437@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Buy builders go through wallet.populateTransaction and sell builders set only gasLimit, and each strategy overrides the fee fields from its own feeData snapshot; a mismatch needs the RPC fee model to change between the two calls, so it is unreachable in practice: S4 (rationale corrected)."
+      },
+      {
+        "ext_id": "codex-TX-07",
+        "finding_id": "AUD-TX-018",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/reconciliation.ts:502-514@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/bloxroute.ts:115@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Bids can repeat when the market priority exceeds the escalation step and can miss a node replacement bump, so a retry may be refused, as codex says. Sells then fall through to the public fallback and buys fail clean, so this delays rather than loses: S2."
+      },
+      {
+        "ext_id": "codex-TX-08",
+        "finding_id": "AUD-TX-020",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/reconciliation.ts:569-572@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/flashbots.ts:374@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:1099-1105@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "BundleIncluded returns success with no status check, as codex says, but the exit path re-reads balanceOf before teardown, so a status-0 sell is caught and the position stays monitored; codex's close-without-selling outcome is not reachable on the sell path. The remaining effect is a mis-recorded buy: S3."
+      },
+      {
+        "ext_id": "codex-TX-09",
+        "finding_id": "AUD-TX-012",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/reconciliation.ts:371-375@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:406@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "A first-block receipt is accepted with no reorg handling, as codex says, but a reorg deep enough to drop a mined transaction is rare on these chains and a dropped transaction usually re-lands. S3 stands."
+      },
+      {
+        "ext_id": "codex-TX-10",
+        "finding_id": "AUD-TX-010",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/txManager.ts:199@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/passthrough.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:178-193@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Confirmed: the strategies call buildReconcileConfig with no leg, so sells use the buy priority ceiling. The defaults are equal (25 gwei both) and the affordability clamp still bounds spend, so the effect is a non-default ceiling that does nothing: S2."
+      },
+      {
+        "ext_id": "codex-TX-12",
+        "finding_id": "AUD-TX-021",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/reconciliation.ts:280-285@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/preflight.ts:433-435@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/chainRegistry.ts:354@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The reserve omits priority and Base L1 data fees, as codex says, but the entry gate also adds the per-chain fixed cushion and sizing uses maxGasLimit (several times a real sell), so only a wallet funded to the floor is short. S3 stands."
+      },
+      {
+        "ext_id": "codex-TX-13",
+        "finding_id": "AUD-TX-019",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/gasManager.ts:14-18@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/reconciliation.ts:502-514@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "No code path checks an absolute gas price (no such guard exists in src), as codex says. The bid is base fee plus the clamped priority, so a spike costs market gas for one transaction at a time and no configured ceiling is exceeded: S2."
+      },
+      {
+        "ext_id": "codex-TX-14",
+        "finding_id": "AUD-TX-014",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/mevStrategies/bloxroute.ts:186-188@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/mevStrategies/bloxroute.ts:163@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "A failed relay call logs the whole axios error, so the Authorization header and a signed transaction can reach local logs, as codex says. It moves no funds and needs log access: S2, same grade as the sibling credential leaks."
+      },
+      {
+        "ext_id": "codex-DB-04",
+        "finding_id": "AUD-DB-020",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/chainRegistry.ts:669@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/preflight.ts:200-202@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/preflight.ts:433-435@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "A negative per-chain buffer is accepted and lowers both floors, as codex says, but only an operator setting a negative number reaches it (the template defaults are positive). S3 stands."
+      },
+      {
+        "ext_id": "codex-DB-05",
+        "finding_id": "AUD-DB-020",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/preflight.ts:289-294@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/preflight.ts:300-304@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Multipliers below 1 pass parseExitGateBuffer (finite and above 0), so 0.1 underfunds the reserve, but it needs a non-default operator value. S3 stands, as DB-04."
+      },
+      {
+        "ext_id": "codex-DB-06",
+        "finding_id": "AUD-EXIT-016",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/config.ts:291-302@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/exitEngine.ts:113-115@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "parseFloat turns a non-numeric TRAILING value into NaN and disables that trailing check, as codex says, but it needs a non-numeric typo with sane defaults and parseFloat tolerates forms like 15%. Misconfiguration-only: S2."
+      },
+      {
+        "ext_id": "codex-DB-07",
+        "finding_id": "AUD-DB-012",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/utils/db.ts:83-107@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "The v3 rebuild is not transactional and a crash mid-way would leave a half-migrated file, as codex says, but it is one historical step, later steps are transactional, and the bot refuses to boot rather than trade on a bad schema. S3 stands."
+      },
+      {
+        "ext_id": "codex-DB-08",
+        "finding_id": "AUD-DB-021",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/db.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/db.ts:738@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:1787@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "WAL with synchronous=NORMAL can lose the last commits on power loss or an OS crash, as codex says, but not on a process crash, and only within the OS write-back window after a write. A real but narrow condition with no battery guarantee: S2."
+      },
+      {
+        "ext_id": "codex-DB-09",
+        "finding_id": "AUD-DB-022",
+        "codex_grade": "S1",
+        "prior_register_grade": "S4",
+        "new_grade": "S4",
+        "code_read_at_base": [
+          "src/utils/db.ts:241-285@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "A failed parse of a legacy .bot-state.json only logs and continues, but the path needs a pre-Phase-4 file next to an empty database, which no current install has. Legacy path: S4."
+      },
+      {
+        "ext_id": "codex-DB-10",
+        "finding_id": "AUD-DB-019",
+        "codex_grade": "S1",
+        "prior_register_grade": "S3",
+        "new_grade": "S3",
+        "code_read_at_base": [
+          "src/utils/db.ts:258-277@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/db.ts:425-438@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Legacy-imported rows have NULL amount_in and count as zero exposure, as codex says, but this needs the same stale state file next to an empty database. S3 stands."
+      },
+      {
+        "ext_id": "codex-DB-11",
+        "finding_id": "AUD-DB-009",
+        "codex_grade": "S1",
+        "prior_register_grade": "S2",
+        "new_grade": "S2",
+        "code_read_at_base": [
+          "src/utils/notifier.ts:10@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/notifier.ts:49-50@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/utils/notifier.ts:85-86@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "reason": "Every failed Telegram call logs the whole axios error, which carries the request URL and bot token, as codex says. That needs log access and the token does not move funds (only the notifier uses it): S2."
+      }
+    ],
+    "moved_up_to_s1": [
+      "AUD-BUY-015"
+    ],
+    "new_s1_from_the_regrade": [
+      "AUD-BUY-033"
+    ],
+    "grades_kept": 41,
+    "operator_batch": {
+      "tier": "area-batch (S1)",
+      "records": [
+        "ESC-BUY-04",
+        "ESC-BUY-05"
+      ],
+      "status": "presented at the end of Task 1 through a blocking checkpoint"
+    },
+    "s0_or_rail_found": false
+  },
+  "deviations": [
+    {
+      "id": "P9-slip-22-17-to-22-22",
+      "description": "The orchestrator listed phase SUMMARYs as required reading for the 22-17..22-22 auditors. Checked 2026-11-07: all slices pass check.ts and no finding cites a SUMMARY or VERIFICATION document. Residual risk is soft anchoring only."
+    },
+    {
+      "id": "D-14-partial-coverage",
+      "description": "D-14 (external second opinion) was only partly covered: codex only (Docker, no tools, code embedded in the prompt); agy was excluded by the operator ruling \"codex a, agy c\" (recorded in .planning/audit/external/MERGE.json)."
+    }
+  ],
+  "card_assignments": [
+    {
+      "proposed_id": "BUY-01",
+      "assigned_id": "OD-26",
+      "slice": "BUY",
+      "title": "Protection of a deliberately bought position after the operator script exits"
+    },
+    {
+      "proposed_id": "BUY-02",
+      "assigned_id": "OD-27",
+      "slice": "BUY",
+      "title": "What the snipe path does when something fails after the buy may have been broadcast"
+    },
+    {
+      "proposed_id": "BUY-03",
+      "assigned_id": "OD-28",
+      "slice": "BUY",
+      "title": "Buy-entry concurrency: double buys of one token and risk limits across concurrent handlers"
+    },
+    {
+      "proposed_id": "BUY-04",
+      "assigned_id": "OD-29",
+      "slice": "BUY",
+      "title": "What dashboard \"stop chain\" means for buying"
+    },
+    {
+      "proposed_id": "BUY-05",
+      "assigned_id": "OD-30",
+      "slice": "BUY",
+      "title": "Token safety gates that do not test what they are named for"
+    },
+    {
+      "proposed_id": "BUY-06",
+      "assigned_id": "OD-31",
+      "slice": "BUY",
+      "title": "Telegram alpha intake: cooldown, processed set, V3 pools that already have liquidity"
+    },
+    {
+      "proposed_id": "BUY-07",
+      "assigned_id": "OD-32",
+      "slice": "BUY",
+      "title": "Buy deadline across private escalation attempts"
+    },
+    {
+      "proposed_id": "BUY-08",
+      "assigned_id": "OD-33",
+      "slice": "BUY",
+      "title": "Factory event processing and chain reorgs"
+    },
+    {
+      "proposed_id": "BUY-09",
+      "assigned_id": "OD-34",
+      "slice": "BUY",
+      "title": "Whether the deliberate public buy may use a new nonce after a private attempt"
+    },
+    {
+      "proposed_id": "EXIT-01",
+      "assigned_id": "OD-35",
+      "slice": "EXIT",
+      "title": "What happens when the exit monitor cannot take its first price"
+    },
+    {
+      "proposed_id": "EXIT-02",
+      "assigned_id": "OD-36",
+      "slice": "EXIT",
+      "title": "How the exit engine measures price"
+    },
+    {
+      "proposed_id": "EXIT-03",
+      "assigned_id": "OD-37",
+      "slice": "EXIT",
+      "title": "How and when sell approvals are sent, and which fee ceiling applies to them and to the public fallback"
+    },
+    {
+      "proposed_id": "EXIT-04",
+      "assigned_id": "OD-38",
+      "slice": "EXIT",
+      "title": "Exit-path liveness: overlapping polls, quote timeout, awaited alerts, watchdog order"
+    },
+    {
+      "proposed_id": "EXIT-05",
+      "assigned_id": "OD-39",
+      "slice": "EXIT",
+      "title": "Selling transfer-taxed tokens"
+    },
+    {
+      "proposed_id": "EXIT-06",
+      "assigned_id": "OD-40",
+      "slice": "EXIT",
+      "title": "What a failed exit with no further route does (V3 no fallback, unknown dex, paused)"
+    },
+    {
+      "proposed_id": "EXIT-07",
+      "assigned_id": "OD-41",
+      "slice": "EXIT",
+      "title": "Operator manual sells versus the routine retry pause"
+    },
+    {
+      "proposed_id": "EXIT-08",
+      "assigned_id": "OD-42",
+      "slice": "EXIT",
+      "title": "Exit bookkeeping and teardown confirmation"
+    },
+    {
+      "proposed_id": "EXIT-09",
+      "assigned_id": "OD-43",
+      "slice": "EXIT",
+      "title": "Freshness of the public-fallback floor"
+    },
+    {
+      "proposed_id": "EXIT-10",
+      "assigned_id": "OD-44",
+      "slice": "EXIT",
+      "title": "Which dex an existing position is monitored and sold on"
+    },
+    {
+      "proposed_id": "EXIT-11",
+      "assigned_id": "OD-45",
+      "slice": "EXIT",
+      "title": "Anti-rug precedence over in-flight exits and nonce-lock hold time"
+    },
+    {
+      "proposed_id": "EXIT-12",
+      "assigned_id": "OD-46",
+      "slice": "EXIT",
+      "title": "Validating exit settings at load"
+    },
+    {
+      "proposed_id": "ANTIRUG-01",
+      "assigned_id": "OD-47",
+      "slice": "ANTIRUG",
+      "title": "Anti-rug trigger dedupe, retry and circuit-breaker counting"
+    },
+    {
+      "proposed_id": "ANTIRUG-02",
+      "assigned_id": "OD-48",
+      "slice": "ANTIRUG",
+      "title": "What a backfill does with an unsafe verdict, and how its window is measured"
+    },
+    {
+      "proposed_id": "ANTIRUG-03",
+      "assigned_id": "OD-49",
+      "slice": "ANTIRUG",
+      "title": "V3 rug signals: sell-impact check and the meaning of a lock"
+    },
+    {
+      "proposed_id": "ANTIRUG-04",
+      "assigned_id": "OD-50",
+      "slice": "ANTIRUG",
+      "title": "Circuit-breaker trip across a restart"
+    },
+    {
+      "proposed_id": "ANTIRUG-05",
+      "assigned_id": "OD-51",
+      "slice": "ANTIRUG",
+      "title": "What dashboard Stop chain does to anti-rug monitoring"
+    },
+    {
+      "proposed_id": "ANTIRUG-06",
+      "assigned_id": "OD-52",
+      "slice": "ANTIRUG",
+      "title": "A chain whose anti-rug allowlist verification failed at boot"
+    },
+    {
+      "proposed_id": "ANTIRUG-07",
+      "assigned_id": "OD-53",
+      "slice": "ANTIRUG",
+      "title": "Validation of anti-rug numeric settings"
+    },
+    {
+      "proposed_id": "TX-01",
+      "assigned_id": "OD-54",
+      "slice": "TX",
+      "title": "What a signing op may wait for while it holds the wallet nonce lock: wait() and RPC timeouts, and what happens on a timeout, a replacement or a reorg"
+    },
+    {
+      "proposed_id": "TX-02",
+      "assigned_id": "OD-55",
+      "slice": "TX",
+      "title": "Private-submit fee model: which ceiling caps buys and sells, what base fee the affordability math uses, and per-chain escalation steps"
+    },
+    {
+      "proposed_id": "TX-03",
+      "assigned_id": "OD-56",
+      "slice": "TX",
+      "title": "Keep, move or remove the Flashbots getBundleStatsV2 telemetry"
+    },
+    {
+      "proposed_id": "TX-04",
+      "assigned_id": "OD-57",
+      "slice": "TX",
+      "title": "Log redaction for relay and RPC errors, and whether to check existing logs and rotate the bloXroute header and RPC keys"
+    },
+    {
+      "proposed_id": "DB-01",
+      "assigned_id": "OD-58",
+      "slice": "DB",
+      "title": "Risk accounting basis: units of stored amounts, which positions count as open, how partial sells and gas count, and whether per-chain max capital is a cap"
+    },
+    {
+      "proposed_id": "DB-02",
+      "assigned_id": "OD-59",
+      "slice": "DB",
+      "title": "One database per wallet: record the wallet on every trade, or lock the database file, or refuse a database owned by another wallet"
+    },
+    {
+      "proposed_id": "DB-03",
+      "assigned_id": "OD-60",
+      "slice": "DB",
+      "title": "Retire the one-time .bot-state.json import that runs on every database load"
+    },
+    {
+      "proposed_id": "DB-04",
+      "assigned_id": "OD-61",
+      "slice": "DB",
+      "title": "Preflight strictness: finite block-age tolerance, future blocks, checker bytecode, one ENABLED_CHAINS parse"
+    },
+    {
+      "proposed_id": "DB-05",
+      "assigned_id": "OD-62",
+      "slice": "DB",
+      "title": "Always broadcast alerts to the dashboard, whether or not Telegram is configured"
+    },
+    {
+      "proposed_id": "DB-06",
+      "assigned_id": "OD-63",
+      "slice": "DB",
+      "title": "Env contract: one typed schema for every key (required-when, type, range, default), ETH_RPC_URL as the required key, legacy CONFIG removed"
+    },
+    {
+      "proposed_id": "API-01",
+      "assigned_id": "OD-64",
+      "slice": "API",
+      "title": "Should the dashboard's emergency-sell and force-sell controls reach failed-held positions?"
+    },
+    {
+      "proposed_id": "API-02",
+      "assigned_id": "OD-65",
+      "slice": "API",
+      "title": "How should Emergency Sell All run: in the HTTP request one position after another (today), or as a bounded background job, and should it pause buying first?"
+    },
+    {
+      "proposed_id": "API-03",
+      "assigned_id": "OD-66",
+      "slice": "API",
+      "title": "Dashboard trust boundary: accept only known Host names and Origins (HTTP and WebSocket), limit login attempts, mark the cookie Secure outside loopback, add logout, and move money fields out of the public /health"
+    },
+    {
+      "proposed_id": "DASH-01",
+      "assigned_id": "OD-67",
+      "slice": "DASH",
+      "title": "What evidence must exist before a chain's anti-rug is switched from dry-run to live selling, given the dashboard review panel shows only one browser session?"
+    },
+    {
+      "proposed_id": "SCRIPTS-01",
+      "assigned_id": "OD-68",
+      "slice": "SCRIPTS",
+      "title": "How do out-of-process signing scripts exclude the running bot?"
+    },
+    {
+      "proposed_id": "SCRIPTS-02",
+      "assigned_id": "OD-69",
+      "slice": "SCRIPTS",
+      "title": "Which bot guards apply to a deliberate buy, and how does the operator confirm before it signs?"
+    },
+    {
+      "proposed_id": "SCRIPTS-03",
+      "assigned_id": "OD-70",
+      "slice": "SCRIPTS",
+      "title": "What happens to the one-off and broken signing scripts (addLiquidity, deploySepoliaTest, recover-sell-ladys)?"
+    }
+  ],
+  "re_run_22_29": {
+    "plan": "22-29 step 3a",
+    "date": "2026-11-09",
+    "assign_cards": "self-test PASS; assigned=0, files_written=0 (no proposed card was added or left unnumbered by the re-audit)",
+    "dedup_review": "Each of the 48 findings added by 22-29 Task 1 was compared with every earlier finding by title and by shared file path. The one pair describing the same defect (AUD-TESTQ-002 and AUD-TESTU-023) was read in full and merged above. The closest other pairs were judged different from their titles: AUD-BUY-035 and AUD-DB-005 (the rail-era boot change, the original LOG_LEVEL ordering), AUD-TESTQ-003 and AUD-TESTQ-034 (the test move, the unrun obligation), AUD-TESTQ-006..009 and AUD-TESTI-011/014 (the accommodation edits, the base-state claims), AUD-REAUDIT-001 and AUD-RAIL-002 (the rehearsal config fault, the base-state RC-19).",
+    "check_stage": "check.ts --stage consolidation: PASS after this merge (fail=0 pending=0 warn=0)"
+  }
+}

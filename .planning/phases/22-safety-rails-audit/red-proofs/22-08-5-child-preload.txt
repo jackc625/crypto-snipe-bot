@@ -1,0 +1,89 @@
+RED proof 22-08-5 — child-preload
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:25:25.870Z at HEAD 4cfd7dde19757c8a9f93e38e0fd2ad6ba8d7798c.
+Neutralised file: test/rails/spawnRailedChild.ts (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/spawnRailedChild.ts b/test/rails/spawnRailedChild.ts
+index 4636cbb..559ac43 100644
+--- a/test/rails/spawnRailedChild.ts
++++ b/test/rails/spawnRailedChild.ts
+@@ -343,7 +343,7 @@ function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan
+ 
+     const entry = RAILS_ENTRIES[o.railsEntry || 'preload'];
+     if (!entry) refuse('railsEntry', `${JSON.stringify(o.railsEntry)} is not 'preload' or 'setup-fork'`);
+-    const parts = [`--require ${JSON.stringify(entry)}`];
++    const parts: string[] = []; // RED 22-08-5: the rails --require is omitted
+     let overridesDir: string | null = null;
+     if (overrides !== undefined) {
+         overridesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-child-overrides-'));
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/childRails.test.ts
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/childRails.test.ts (28 tests | 9 failed) 3080ms
+       × a child sees the sentinel token, full rails, VITEST, the 192.0.2.1 deny, the data deny and the parent run id 107ms
+       × envOverrides {DASHBOARD_API_KEY: ''} reaches the child and is ledgered by key only 91ms
+       × the preload reaches a ts-node process started through npx --no ts-node (Pattern 4) 2221ms
+       × a railsEntry 'setup-fork' child runs fork mode: network deny off, Telegram deny on, sentinel env, DB denied 116ms
+       × (i) setup-fork keeps the planted fork URL and ALLOW_REAL_MAINNET; ALCHEMY_URL and the token become sentinels 114ms
+       × (ii) the same planted values under the full preload end as sentinels 116ms
+       × (iii) setup-fork with nothing planted: ETH_FORK_RPC_URL absent, ALLOW_REAL_MAINNET empty 97ms
+       × (iv) a protected-root .env with ALLOW_REAL_MAINNET=1 cannot open the gate even through dotenv override 95ms
+       × (v) a test-written value followed by a re-install is reset to the first-captured value 96ms
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/childRails.test.ts > railed child processes (D-03) > a child sees the sentinel token, full rails, VITEST, the 192.0.2.1 deny, the data deny and the parent run id
+  AssertionError: expected false to be true // Object.is equality
+  - Expected
+  + Received
+   FAIL   unit  test/unit/rails/childRails.test.ts > railed child processes (D-03) > envOverrides {DASHBOARD_API_KEY: ''} reaches the child and is ledgered by key only
+  Error: childProbe failed (status 1): C:\Users\jackc\WebstormProjects\crypto-snipe-bot\test\rails\core.cjs:145
+  Error: SAFE-02 rails are not installed: call installRails() first
+       46|     if (r.status !== 0 || !line) throw new Error(`childProbe failed (s…
+   FAIL   unit  test/unit/rails/childRails.test.ts > railed child processes (D-03) > the preload reaches a ts-node process started through npx --no ts-node (Pattern 4)
+  AssertionError: expected false to be true // Object.is equality
+  - Expected
+  + Received
+   FAIL   unit  test/unit/rails/childRails.test.ts > railed child processes (D-03) > a railsEntry 'setup-fork' child runs fork mode: network deny off, Telegram deny on, sentinel env, DB denied
+  AssertionError: expected false to be true // Object.is equality
+  - Expected
+  + Received
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (i) setup-fork keeps the planted fork URL and ALLOW_REAL_MAINNET; ALCHEMY_URL and the token become sentinels
+  AssertionError: expected null to be 'fork' // Object.is equality
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (ii) the same planted values under the full preload end as sentinels
+  AssertionError: expected null to be 'full' // Object.is equality
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (iii) setup-fork with nothing planted: ETH_FORK_RPC_URL absent, ALLOW_REAL_MAINNET empty
+  AssertionError: expected 'http://127.0.0.1:1' to be null
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (iv) a protected-root .env with ALLOW_REAL_MAINNET=1 cannot open the gate even through dotenv override
+  AssertionError: expected undefined to be 'attempted' // Object.is equality
+  - Expected:
+  + Received:
+   FAIL   unit  test/unit/rails/childRails.test.ts > fork shell keys (SPEC R4 / AC-17) > (v) a test-written value followed by a re-install is reset to the first-captured value
+  AssertionError: expected undefined to be 'attempted' // Object.is equality
+  - Expected:
+  + Received:
+   Test Files  1 failed (1)
+        Tests  9 failed | 19 passed (28)
+     Duration  3.70s (transform 69ms, setup 80ms, import 255ms, tests 3.08s, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042515-20360-76e45d | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042515-20360-76e45d\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/spawnRailedChild.ts
+git status --porcelain test/rails/spawnRailedChild.ts => (empty)
+sha256 before neutralising 20dab6b1bd0fcaababc1ae4e20fc4f72b74b39ca144f5c0ccf08fd5140585e4c == after restore 20dab6b1bd0fcaababc1ae4e20fc4f72b74b39ca144f5c0ccf08fd5140585e4c
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  28 passed (28)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042521-19940-ba95fb | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042521-19940-ba95fb\summary.json

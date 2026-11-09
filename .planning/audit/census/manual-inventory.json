@@ -1,0 +1,439 @@
+{
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "method": "Grep floor at audited_sha (grep_floor.command), then a manual read of every file that the grep or the census shows signing, at the base snapshot (listed in files_read). Each site below was confirmed by hand with its lock reading; the wrapper call sites (sendTxWithRetry, escalatePrivateBuy/Sell, ensureApproval, submitWithReconciliation) were checked by git grep for any caller outside a withNonceLock op (none). scripts/deliberate-buy.ts holds no signing call of its own: it calls executeDeliberateBuy in src/bot.ts, whose sites (the bot.ts:558 chain and bot.ts:747) are listed under src/.",
+  "files_read": [
+    "src/bot.ts",
+    "src/exitEngine.ts",
+    "src/utils/tokenSafety.ts",
+    "src/utils/txManager.ts",
+    "src/utils/nonceAuthority.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/types.ts",
+    "src/utils/abis.ts",
+    "scripts/addLiquidity.ts",
+    "scripts/deploySepoliaTest.ts",
+    "scripts/recover-sell-ladys.ts",
+    "scripts/deliberate-buy.ts",
+    "scripts/deploy-honeypot-checker.ts",
+    "contracts/FakeToken.sol"
+  ],
+  "grep_floor": {
+    "command": "git grep -n -E \"sendTransaction\\(|signTransaction\\(|\\.deploy\\(|sendBundle\\(|signBundle\\(|rawSendBundle\\(|sendRawBundle\\(|sendPrivateTransaction\\(|signMessage\\(|signTypedData\\(|\\.approve\\(|\\.swap[A-Za-z]*\\(|\\.mint\\(|\\.deposit\\(|\\.addLiquidity[A-Za-z]*\\(|\\.createPair\\(|\\.send\\(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+    "hit_count": 36,
+    "tx_signing_sites": 23,
+    "hits": [
+      {
+        "at": "scripts/addLiquidity.ts:35",
+        "class": "tx-signing site",
+        "api": "contract.mint"
+      },
+      {
+        "at": "scripts/addLiquidity.ts:43",
+        "class": "tx-signing site",
+        "api": "contract.deposit"
+      },
+      {
+        "at": "scripts/addLiquidity.ts:48",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "scripts/addLiquidity.ts:53",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "scripts/addLiquidity.ts:58",
+        "class": "tx-signing site",
+        "api": "contract.addLiquidity"
+      },
+      {
+        "at": "scripts/deploySepoliaTest.ts:22",
+        "class": "tx-signing site",
+        "api": "ContractFactory.deploy"
+      },
+      {
+        "at": "scripts/deploySepoliaTest.ts:32",
+        "class": "tx-signing site",
+        "api": "ContractFactory.deploy"
+      },
+      {
+        "at": "scripts/deploySepoliaTest.ts:42",
+        "class": "tx-signing site",
+        "api": "ContractFactory.deploy"
+      },
+      {
+        "at": "scripts/deploySepoliaTest.ts:52",
+        "class": "tx-signing site",
+        "api": "ContractFactory.deploy"
+      },
+      {
+        "at": "scripts/deploySepoliaTest.ts:61",
+        "class": "tx-signing site",
+        "api": "contract.createPair"
+      },
+      {
+        "at": "scripts/recover-sell-ladys.ts:70",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "scripts/recover-sell-ladys.ts:78",
+        "class": "tx-signing site",
+        "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens"
+      },
+      {
+        "at": "src/anti-rug/raceTelemetry.ts:101",
+        "class": "not a signing site",
+        "why": "provider.send(\"eth_callBundle\"): a bundle simulation RPC, nothing signed"
+      },
+      {
+        "at": "src/api/routes/trades.ts:196",
+        "class": "not a signing site",
+        "why": "express res.send(csv): HTTP response"
+      },
+      {
+        "at": "src/api/ws/broadcaster.ts:47",
+        "class": "not a signing site",
+        "why": "WebSocket client.send: dashboard push"
+      },
+      {
+        "at": "src/bot.ts:226",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "src/bot.ts:747",
+        "class": "tx-signing site",
+        "api": "contract.swapExactETHForTokensSupportingFeeOnTransferTokens"
+      },
+      {
+        "at": "src/exitEngine.ts:421",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "src/exitEngine.ts:544",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "src/exitEngine.ts:553",
+        "class": "tx-signing site",
+        "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens"
+      },
+      {
+        "at": "src/utils/mevStrategies/bloxroute.ts:72",
+        "class": "not a signing site",
+        "why": "declaration of BloxrouteMevStrategy.sendTransaction (its signing call is :128)"
+      },
+      {
+        "at": "src/utils/mevStrategies/bloxroute.ts:128",
+        "class": "tx-signing site",
+        "api": "signer.signTransaction"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:74",
+        "class": "comment"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:84",
+        "class": "not a signing site",
+        "why": "declaration of rawSendBundle (its call site is :305)"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:99",
+        "class": "comment"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:102",
+        "class": "message-signing site",
+        "api": "signer.signMessage"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:105",
+        "class": "not a signing site",
+        "why": "FetchRequest.send: the HTTP POST of the relay request built in rawSendBundle"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:141",
+        "class": "not a signing site",
+        "why": "declaration of FlashbotsMevStrategy.sendTransaction"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:232",
+        "class": "tx-signing site",
+        "api": "flashbots.signBundle"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:263",
+        "class": "tx-signing site",
+        "api": "flashbots.sendBundle"
+      },
+      {
+        "at": "src/utils/mevStrategies/flashbots.ts:305",
+        "class": "tx-signing site",
+        "api": "rawSendBundle"
+      },
+      {
+        "at": "src/utils/mevStrategies/passthrough.ts:44",
+        "class": "not a signing site",
+        "why": "declaration of PassthroughMevStrategy.sendTransaction"
+      },
+      {
+        "at": "src/utils/mevStrategies/passthrough.ts:130",
+        "class": "tx-signing site",
+        "api": "signer.sendTransaction"
+      },
+      {
+        "at": "src/utils/mevStrategies/types.ts:45",
+        "class": "not a signing site",
+        "why": "MevStrategy interface member declaration"
+      },
+      {
+        "at": "src/utils/tokenSafety.ts:277",
+        "class": "tx-signing site",
+        "api": "contract.approve"
+      },
+      {
+        "at": "src/utils/txManager.ts:114",
+        "class": "not a signing site",
+        "why": "delegation: strategy.sendTransaction on the MevStrategy interface; the strategies hold the counted signing calls (census delegations list)"
+      }
+    ]
+  },
+  "sites": [
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 35,
+      "api": "contract.mint",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "FakeToken.mint through a Wallet-runner Contract (:21); the ABI comes from an untracked artifacts/ JSON import, so the census cannot read it; mint is a state-changing external function (contracts/FakeToken.sol:9@23a64617dca167976adc4645fed0e2c69e384820). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 43,
+      "api": "contract.deposit",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "WETH deposit (payable, sends value) through a Wallet-runner Contract (:22); ABI from an untracked artifact import. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 48,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "token approve through a Wallet-runner Contract (:21); ERC-20 approve is state-changing. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 53,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "WETH approve through a Wallet-runner Contract (:22). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 58,
+      "api": "contract.addLiquidity",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "router addLiquidity through a Wallet-runner Contract (:23), gasLimit 300000. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "line": 73,
+      "api": "contract.getPair",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "factory getPair through a Wallet-runner Contract (:19); a read, excluded by the auditor (the census could not read the artifact ABI).",
+      "exclude": {
+        "reason": "getPair is a view function (the Uniswap V2 factory public mapping getter): an eth_call, no transaction, no nonce",
+        "evidence": "src/utils/abis.ts:8@23a64617dca167976adc4645fed0e2c69e384820 declares \"function getPair(address tokenA, address tokenB) external view returns (address pair)\""
+      }
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 22,
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "WETH deployment, ContractFactory runner = deployer Wallet (:16, :21). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 32,
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "FakeToken deployment (runner deployer Wallet, :27-31). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 42,
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "UniswapV2Factory deployment (runner deployer Wallet, :37-41). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 52,
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "UniswapV2Router02 deployment (runner deployer Wallet, :47-51). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 61,
+      "api": "contract.createPair",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "factory createPair through a Wallet-runner Contract (:60); state-changing: the script reads the PairCreated event from its receipt (:62-75). ABI from an untracked artifact import. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 70,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "LADYS approve through a Wallet-runner Contract (:44); the inline ERC20_ABI (:31) declares approve state-changing. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 78,
+      "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "public-mempool LADYS sell through a Wallet-runner router (:45, ABI :26). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 223,
+      "api": "contract.allowance",
+      "kind": "tx-signing",
+      "lock_status": "unknown",
+      "note": "allowance read inside maybeApproveForChain; the census cannot trace the tokenContract parameter because the function has no caller. A read, excluded by the auditor.",
+      "exclude": {
+        "reason": "allowance is a view function in every ERC-20 ABI in the program, and maybeApproveForChain is not exported and has no reference anywhere in src/ or scripts/, so this line never runs",
+        "evidence": "src/utils/abis.ts:32@23a64617dca167976adc4645fed0e2c69e384820 declares \"function allowance(address owner, address spender) view returns (uint256)\"; git grep -n -F \"maybeApproveForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts returns only the declaration src/bot.ts:222"
+      }
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 226,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (lexical): the approve is the op body of withNonceLock(ctx.wallet.address, ...) at :225. The enclosing maybeApproveForChain has no caller (dead code, recorded in AUD-BUY-007), so the census cannot trace the runner; counted because it is an approve."
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 747,
+      "api": "contract.swapExactETHForTokensSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (lexical): the deliberate public-mempool buy is the op body of withNonceLock(ctx.wallet.address, ...) at :746; router = Wallet-runner Contract (:501). executeDeliberateBuy is reached from scripts/deliberate-buy.ts, a separate process whose own lock does not serialize with the bot process (AUD-SCRIPTS-002)."
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 421,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): ensureApproval (:413) is called only at :871, :874, :1509 and :1512, each as the awaited op body of withNonceLock(ctx.wallet.address, ...); token = Wallet-runner Contract (:838, :1489). Read by hand: git grep \"ensureApproval(\" shows no other caller."
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 544,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (lexical): op body of withNonceLock(ctx.wallet.address, ...) at :543 (public-fallback sell approve); token is the Wallet-runner Contract passed in from :838 via :1021."
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 553,
+      "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (lexical): the public-fallback sell is the op body of withNonceLock(ctx.wallet.address, ...) at :552; router = Wallet-runner Contract (:516). The never-settling wait inside this lock is AUD-TX-002."
+    },
+    {
+      "file": "src/utils/mevStrategies/bloxroute.ts",
+      "line": 128,
+      "api": "signer.signTransaction",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): runs in the submit closure that submitWithReconciliation awaits directly (reconciliation.ts:557); BloxrouteMevStrategy.sendTransaction is reached only through strategy.sendTransaction in sendTxWithRetry (txManager.ts:114), whose callers are the withNonceLock ops at bot.ts:267, bot.ts:558 (via escalatePrivateBuy, txManager.ts:304), exitEngine.ts:788 (via escalatePrivateSell, txManager.ts:199) and exitEngine.ts:1531. The signed bytes go to the bloXroute relay over HTTP."
+    },
+    {
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 102,
+      "api": "signer.signMessage",
+      "kind": "message-signing",
+      "note": "message-signing: the X-Flashbots-Signature relay auth header, signed by authSigner = new Wallet(this.authKey) (:151); no transaction, no nonce; never a D-NONCE-AUTHORITY-ALL violation."
+    },
+    {
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 232,
+      "api": "flashbots.signBundle",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): signs the bot-wallet tx once per attempt inside the submit closure awaited by submitWithReconciliation; same four lock entries as bloxroute.ts:128 (bot.ts:267, bot.ts:558, exitEngine.ts:788, exitEngine.ts:1531)."
+    },
+    {
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 263,
+      "api": "flashbots.sendBundle",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): the library sendBundle receives {signer: wallet, transaction} and signs again inside the library; same submit closure and lock entries as :232."
+    },
+    {
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 305,
+      "api": "rawSendBundle",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): the multi-builder eth_sendBundle fanout of the bytes signed at :232 (the relay auth signature inside it is the message-signing site :102); same submit closure and lock entries as :232."
+    },
+    {
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line": 130,
+      "api": "signer.sendTransaction",
+      "kind": "tx-signing",
+      "lock_status": "locked",
+      "note": "locked (transitive): wallet.sendTransaction in the passthrough submit closure awaited by submitWithReconciliation (passthrough.ts:155 -> reconciliation.ts:557); same four lock entries. The tx.wait(3) inside the lock is AUD-TX-002."
+    },
+    {
+      "file": "src/utils/tokenSafety.ts",
+      "line": 277,
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "lock_status": "unlocked",
+      "note": "UNLOCKED: simulateSell builds a Wallet-runner ERC-20 Contract (:274) and sends a real approve of the whole balance to CONFIG.routerAddress with no withNonceLock. simulateSell is exported and imported by src/bot.ts:17 but never called anywhere in src/ or scripts/ (git grep \"simulateSell(\" returns only the declaration); tests only mock it. Unreachable today, one call away from live. Same defect as AUD-BUY-007; registered as AUD-CENSUS-002 (duplicate) and escalated at ESC-CENSUS-01."
+    }
+  ],
+  "manual_tx_signing": 23,
+  "manual_message_signing": 1,
+  "auditor_exclusions": 2,
+  "out_of_program_signers": [
+    {
+      "file": "scripts/deploy-honeypot-checker.ts",
+      "line": 91,
+      "what": "spawnSync(\"npx\", [\"hardhat\", \"ignition\", \"deploy\", \"ignition/modules/HoneypotChecker.ts\", \"--network\", <network>]) with env: {...process.env}",
+      "explanation": "Not a call site the census can count: the HoneypotChecker deployment is signed by Hardhat Ignition in a child process, with the DEPLOY_PRIVATE_KEY account that hardhat.config.ts builds; no ethers signing call exists in this file (manual read at 23a64617dca167976adc4645fed0e2c69e384820). The script refuses to run when DEPLOY_PRIVATE_KEY equals PRIVATE_KEY (:75), so the deploy is meant to use a different wallet and never the bot nonce; that comparison is raw-string (a 0x-prefix or case difference passes it) and the child inherits the bot key, which AUD-CONTRACTS-004 and AUD-CONTRACTS-001 record. Cross-linked from AUD-CENSUS-001, not duplicated."
+    }
+  ],
+  "missing_from_census": [],
+  "missing_from_manual": [],
+  "reconciliation_note": "Both lists are empty: every hand-confirmed transaction-signing site is in the census and every census-counted site is in this inventory (signing-census.ts --manual fails on any mismatch). The grep floor holds exactly the 23 counted sites; the census additionally reads two calls the grep patterns cannot match (getPair, allowance), both reads, listed here as auditor exclusions with evidence. The census-excluded reads (view fragments, staticCall) need no manual entry."
+}

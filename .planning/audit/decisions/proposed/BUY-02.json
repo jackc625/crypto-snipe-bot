@@ -1,0 +1,45 @@
+{
+  "id": "BUY-02",
+  "title": "What the snipe path does when something fails after the buy may have been broadcast",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: one catch treats every error as a clean zero-spend failure",
+      "behavior_impact": "none",
+      "risk": "A landed buy can end with no row, a failed row, or no exit and anti-rug monitoring, never re-armed even after restart, while the operator is told nothing was spent (AUD-BUY-002 traces)."
+    },
+    {
+      "id": "reconcile-on-throw",
+      "name": "On any throw after the submit started, reconcile against chain truth (token balance delta and nonce) before deciding",
+      "behavior_impact": "If tokens arrived, record the row and arm monitoring; only a proven non-landing is reported as zero spend.",
+      "risk": "Extra RPC reads in the failure path; a wrong reconcile result must fail toward \"held\"."
+    },
+    {
+      "id": "intent-row-first",
+      "name": "Write a pending intent row before broadcasting, then confirm or fail it from chain truth",
+      "behavior_impact": "A broadcast buy always has a row, so dedup, risk limits and boot resume see it even if the process dies mid-buy.",
+      "risk": "Rows for buys that never landed must be cleaned up correctly, or they block the token and count against limits."
+    },
+    {
+      "id": "split-try-with-retries",
+      "name": "Split submit from bookkeeping: post-landing steps retry and alert, never mark failed",
+      "behavior_impact": "Bookkeeping errors after a returned hash become loud \"held and unprotected\" alerts with retries instead of a failed row.",
+      "risk": "Does not cover the strategy-throws-but-landed cases (trace 2) on its own."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "intent-row-first together with reconcile-on-throw (covers every trace, including the strategy throwing after a broadcast), using the inserted row id for all later links (AUD-BUY-020) and one transaction for the post-buy writes where possible. Overlaps OD-18 on the intent row: decide the two together so the row is designed once.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides how the bot records and protects a buy whose bookkeeping fails.",
+  "findings": [
+    "AUD-BUY-002",
+    "AUD-BUY-020"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "related_od": "OD-18",
+  "assigned_id": "OD-27"
+}

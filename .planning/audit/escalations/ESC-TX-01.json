@@ -1,0 +1,25 @@
+{
+  "id": "ESC-TX-01",
+  "date": "2026-11-07",
+  "tier": "area-batch",
+  "tags": [
+    "capital"
+  ],
+  "items": [
+    "AUD-TX-003",
+    "AUD-TX-004",
+    "AUD-TX-005",
+    "AUD-TX-009"
+  ],
+  "resolved_items": [],
+  "summary": "TX area S1 batch (22-20 Task 3, D-16 area-batch tier), presented together once the TX slice audit (nonce authority, txManager, gas, provider, retry, receipt decoding and the five MEV strategy files), thresholds and cards were complete. Four new S1 entries, each a way a buy or sell could be stuck, duplicated or block the emergency sell under a realistic condition: AUD-TX-003 (RC-11, STRAND) head-of-line blocking: a snipe buy holds the wallet nonce lock through every private attempt (about 4 minutes at default settings when the bundle does not land), so an anti-rug emergency sell of another position cannot start, times out after 60 s and is left queued to run minutes later (src/bot.ts:264-268; src/utils/txManager.ts:107-108; src/utils/mevStrategies/reconciliation.ts:476-621; card OD-17); AUD-TX-004 (RC-17, LOSS) the nonce authority is plain module state with no duplicate-load guard, so a second copy of the module is a second, independent lock for the same wallet (src/utils/nonceAuthority.ts:43, :60-75); being closed in this phase by the planned rail 22-12 and re-audited in 22-29; AUD-TX-005 (RC-18, LOSS) no single-instance process lock: a second bot process on the same wallet has its own nonce authority, so both can fetch the same nonce and sign competing transactions (git grep at the base SHA finds no lock; src/utils/nonceAuthority.ts:41-43); being closed in this phase by the planned rail 22-13 and re-audited in 22-29; AUD-TX-009 (independent, STRAND) one RPC hiccup during a Flashbots bundle wait crashes the whole bot: the library throws inside an async block listener, ethers does not catch it, and src has no unhandledRejection handler; reproduced offline (src/utils/mevStrategies/flashbots.ts:317; @flashbots/ethers-provider-bundle@1.0.0 build/index.js:369-405; card OD-6). Already escalated, listed at the checkpoint and not asked again: the two RC-10 stuck-nonce-lock sub-findings AUD-TX-001 (re-entrancy deadlock) and AUD-TX-002 (an operation that never settles: wait() with timeout 0 inside the lock) stay on ESC-PRE-02 through its resolved_items. No S0, no rail, test-origin-db-row or non-public-secret item was found in the TX slice, and the one-nonce-authority-per-wallet rule (D-NONCE-AUTHORITY-ALL) holds at the audit base within one process (sweep/TX.json cell C07 records the search of every withNonceLock site and every signing call under src); the two ways it can still be broken, a second copy of the module and a second process, are AUD-TX-004 and AUD-TX-005. The bot is OFF for all of v7.0, so none of these can cause a loss now. Nothing is changed in Phase 22 (NAC-13): each item is proven with a real-path test in Phase 23 and fixed in Phase 24 unless a rail closes it first. The operator was asked to acknowledge and say whether any item needs its own urgent decimal phase before Phase 24, or to stop the phase.",
+  "presented_at": "2026-11-07 session (after commit 74032f6 at 2026-11-07T16:46:03Z UTC): the 22-20 Task 3 area-batch blocking checkpoint (checkpoint:decision, gate blocking-human), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Acknowledge continue",
+  "operator_response_recorded_at": "2026-11-07T17:04:47Z",
+  "operator_response_channel": "typed by the operator at the 22-20 Task 3 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-20 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-20 Task 3 blocking checkpoint (gate blocking-human).",
+  "ruling": "none",
+  "ruling_option_text": "acknowledge-continue: Acknowledge and continue (default plan). The audit keeps going; all items wait for Phase 23 proof and Phase 24 fixes with the bot off.",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: the operator chose the acknowledge-continue option for all four S1 entries. No severity was changed, no decimal phase is inserted, and Phase 22 continues. Context, attributed to the execute-phase orchestrator and NOT to the operator (shown to the operator with the checkpoint): AUD-TX-004 and AUD-TX-005 are being closed in this phase by plans 22-12 (singleton guard) and 22-13 (process lock), which 22-29 re-audits; AUD-TX-009 is the same crash class as AUD-ANTIRUG-002 (an unhandled error event or rejection ends the process), and their fixes belong together in Phase 24. As S1 capital findings, none of these can rest on a keep-current default; each blocks the live re-entry gate until it is fixed (or, for AUD-TX-004 and AUD-TX-005, until the rail is re-audited and the entry moves forward on evidence).",
+  "phase_continued": true
+}

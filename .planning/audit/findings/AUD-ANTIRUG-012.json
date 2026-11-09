@@ -1,0 +1,69 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-004",
+    "AUD-ANTIRUG-003"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-012",
+  "title": "V3 Burn grace state is keyed by pool, not by position: with two positions on one pool the second Burn handling cancels the first position grace watcher, so on a Burn without a Collect only one position is evaluated",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12",
+    "C14"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2106@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pendingV3Burn key = pool address"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2117-2120@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a prior pending entry for the pool has its watcher removed"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2146-2153@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the entry stores a single position"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1376-1383@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dispatchEvent calls the evaluator once per position on the pool, so the second position call replaces the first entry for the same Burn"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2129-2140@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on the grace timeout only the stored (last) position is evaluated"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2106-2119@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): V3 pending Burns collide across trades and chains"
+    }
+  ],
+  "sibling_sites_checked": "The Collect path (detector.ts:2174-2204) evaluates every position because each call runs evaluateV3MultiSignal whether or not a pending entry exists; only the Burn-without-Collect path is affected. Two positions on one pool arise from the double-buy race AUD-BUY-004.",
+  "status": "confirmed",
+  "severity_rationale": "S3: needs two positions on one V3 pool (the AUD-BUY-004 double buy) and a rug whose Collect comes more than 5 blocks after the Burn, or never; the first position then gets no anti-rug evaluation for that Burn. The routine exit monitor still runs.",
+  "recommendation": "Key pending Burns by pool and position (or keep a list per pool) and cancel them on unregister. Phase 29."
+}

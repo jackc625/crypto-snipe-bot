@@ -2,22 +2,21 @@
 // Plan 18-07 (HONEY-03): asserts that the ETH HoneypotChecker contract is
 // deployed and Etherscan-verifiable at the canonical address committed in
 // `src/chainRegistry.ts CHAIN_TEMPLATES.eth.defaultHoneypotCheckerAddress`
-// (iter-2 Blocker #3). The first test confirms live bytecode on-chain; the
-// second cross-checks the resolved address against the Hardhat Ignition
-// deployment artifact (T-18-25 mitigation — detects env/template drift).
+// (iter-2 Blocker #3). This test cross-checks the resolved address against the
+// Hardhat Ignition deployment artifact (T-18-25 mitigation — detects
+// env/template drift). The live bytecode check moved to
+// test/fork/honeypotDeploy.eth.fork.test.ts in plan 22-15 by operator ruling
+// (ESC-RAILS-01), because it needs a real mainnet RPC.
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { JsonRpcProvider } from 'ethers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 describe('HONEY-03: HoneypotChecker deployed on ETH', () => {
-    let provider: JsonRpcProvider | null = null;
     let resolvedAddress: string | null = null;
 
     beforeAll(async () => {
         if (!process.env.ETH_RPC_URL) return;
-        provider = new JsonRpcProvider(process.env.ETH_RPC_URL);
 
         // Resolution precedence matches buildChainRegistry(): env override → template default.
         // Reading the template directly (not the runtime registry) avoids requiring
@@ -30,17 +29,6 @@ describe('HONEY-03: HoneypotChecker deployed on ETH', () => {
         const { CHAIN_TEMPLATES } = await import('../../src/chainRegistry');
         resolvedAddress = CHAIN_TEMPLATES.eth.defaultHoneypotCheckerAddress;
     });
-
-    it.skipIf(!process.env.ETH_RPC_URL)(
-        'has bytecode at deployedAddress (not 0x)',
-        async () => {
-            expect(provider).not.toBeNull();
-            expect(resolvedAddress).not.toBeNull();
-            const code = await provider!.getCode(resolvedAddress!);
-            expect(code).not.toBe('0x');
-            expect(code.length).toBeGreaterThan(100);
-        },
-    );
 
     const ignitionPath = path.resolve(
         __dirname,

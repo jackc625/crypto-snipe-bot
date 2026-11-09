@@ -1,0 +1,47 @@
+{
+  "id": "AUD-TESTQ-004",
+  "title": "process.loadEnvFile() is not covered by the .env rail",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: nothing uses it.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#10"
+  ],
+  "files": [
+    "test/rails/core.cjs"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#10 (IN-01)",
+      "note": "process.loadEnvFile reads the file through native code, not the wrapped fs"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n loadEnvFile -- src scripts test",
+      "note": "no use in the repo"
+    }
+  ],
+  "sibling_sites_checked": "node --env-file is refused by spawnRailedChild. dotenv goes through fs and is blocked. No other loader was found.",
+  "recommendation": "Add a process.loadEnvFile wrapper to core.cjs if the rails are extended."
+}

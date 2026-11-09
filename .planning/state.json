@@ -1,0 +1,68 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v7.0 — Full Audit & Modernization",
+  "phases": [
+    {
+      "number": "22",
+      "name": "Safety Rails & Audit",
+      "status": "in_progress"
+    },
+    {
+      "number": "23",
+      "name": "Test Safety Net (Harness, Triage, Characterization)",
+      "status": "pending"
+    },
+    {
+      "number": "24",
+      "name": "Capital-Safety Fixes",
+      "status": "pending"
+    },
+    {
+      "number": "25",
+      "name": "Behavior-Neutral Cleanup & Dependencies",
+      "status": "pending"
+    },
+    {
+      "number": "26",
+      "name": "Toolchain & ESM",
+      "status": "pending"
+    },
+    {
+      "number": "27",
+      "name": "Domain Restructure & Runtime Seams",
+      "status": "pending"
+    },
+    {
+      "number": "28",
+      "name": "Lint-Zero & Real-Path Test Quality",
+      "status": "pending"
+    },
+    {
+      "number": "29",
+      "name": "Remaining Findings, Relay Client & Dashboard",
+      "status": "pending"
+    },
+    {
+      "number": "30",
+      "name": "Hardhat 3 & ETH Checker Redeploy",
+      "status": "pending"
+    },
+    {
+      "number": "31",
+      "name": "Blocking CI Gates & Docs",
+      "status": "pending"
+    },
+    {
+      "number": "32",
+      "name": "Re-Entry Gate (Fork Rehearsal & Live ETH Roundtrip)",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step (plan phase 23)",
+    "reason": "Phase 2 of 11 — needs a plan"
+  },
+  "updated_at": "2026-11-09T07:32:46.463Z"
+}

@@ -1,0 +1,139 @@
+{
+  "slice": "ANTIRUG",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": "checked, none",
+      "search": "grep -nE \"Number\\(|BigInt\\(|parseFloat|parseInt|toFixed\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); read every bps computation (detector.ts:1598-1602, :1618-1630, :1692-1695, :1758-1763): integer bigint basis points, converted to Number only as bounded percentages; raceTelemetry.ts:119 BigInt(coinbaseDiff) on a hex string. No precision-losing mix found. The unit mismatch in the V3 ratio is a units fault, recorded under C03."
+    },
+    "C02": {
+      "result": [
+        "AUD-ANTIRUG-017"
+      ],
+      "search": "grep -nE \"\\|\\||\\?\\?\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461) plus git show of src/chainRegistry.ts:721-861 (the anti-rug env parse); every ?? on an env value read with Number(): an empty string survives ?? and becomes 0 (LP_REMOVAL_PCT, CONFIRM_BLOCKS accepted at 0). detector.ts:1591 ?? '0' is a documented vacuous pass for legacy rows."
+    },
+    "C03": {
+      "result": [
+        "AUD-ANTIRUG-006"
+      ],
+      "search": "grep -nE \"decimals|parseEther|parseUnits|formatUnits\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461) (no decimals read anywhere); traced the V3 probe amount (token base units, detector.ts:1740) into the quote ratio against WETH base units (:1758-1764)."
+    },
+    "C04": {
+      "result": [
+        "AUD-ANTIRUG-006"
+      ],
+      "search": "grep -nE \"minOut|amountOutMin|slippage\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): the slice builds no swap; its only slippage logic is the signal-3 sell simulation (V3 :1750-1764, broken by units) and the V2 reserve check (:1618-1631). The emergency-sell minOut and the anti-rug fallback slippage are EXIT rows (AUD-EXIT-001, TH-EXIT-14)."
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "grep -nE \"deadline|Date.now\\(\\) ?\\+|setTimeout\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): no transaction deadline is built in the slice (deadlines are set in exitEngine.ts, EXIT slice). The only time budget is the 60 s anti-rug wall-clock bound (exitTrigger.ts:77-81, :263-296), recorded under C16/C18 as AUD-ANTIRUG-017."
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep -nE \"approve|allowance\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): no approval is built or sent in the slice; the anti-rug exit approval happens in executeFullSell (EXIT slice, AUD-EXIT-004)."
+    },
+    "C07": {
+      "result": [
+        "AUD-ANTIRUG-004"
+      ],
+      "search": "grep -nE \"nonce|withNonceLock|wallet|sendTransaction\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): the slice signs nothing; the anti-rug escape reaches the wallet nonce lock inside executeFullSell (exitEngine.ts:782-789, :871-874) and can sit behind a routine private escalation past its 60 s budget. Head-of-line blocking itself is RC-11 (TX slice) and AUD-EXIT-014; the anti-rug consequence (no retry) is AUD-ANTIRUG-004."
+    },
+    "C08": {
+      "result": [
+        "AUD-ANTIRUG-013"
+      ],
+      "search": "grep -nE \"removed|blockNumber|getBlockNumber|blockTag\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): no log removed check; the confirm gate counts from getBlockNumber at scheduling (detector.ts:1845); re-reads at latest; the baseline snapshot reads are not pinned to one block (lpBaseline.ts:110-140)."
+    },
+    "C09": {
+      "result": "checked, none",
+      "search": "grep -nE \"receipt|\\.status|wait\\(\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): no receipt is read in the slice; the anti-rug path sees only executeFullSell's boolean (exitTrigger.ts:263-296). Receipt handling is in exitEngine.ts (EXIT slice)."
+    },
+    "C10": {
+      "result": [
+        "AUD-ANTIRUG-001",
+        "AUD-ANTIRUG-002",
+        "AUD-ANTIRUG-005",
+        "AUD-ANTIRUG-007",
+        "AUD-ANTIRUG-008",
+        "AUD-ANTIRUG-016",
+        "AUD-ANTIRUG-018",
+        "AUD-ANTIRUG-022"
+      ],
+      "search": "grep -nE \"wsProvider|WebSocketProvider|removeWsProvider|on\\('close'|ping|pong|backfill|last_seen|getLogs\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); plus git show 23a6461 of src/bot.ts (:1524-1618, :1808-1852, :1989-2145), src/api/routes/chains.ts (:121-227) and src/utils/provider.ts; ethers@6.16.0 provider-websocket.js and abstract-provider.js removeAllListeners; ws@8.17.1 websocket.js error paths; loopback reconnect repro (command evidence on AUD-ANTIRUG-002). | 22-27 merge: AUD-ANTIRUG-018 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-ANTIRUG-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C11": {
+      "result": [
+        "AUD-ANTIRUG-002",
+        "AUD-ANTIRUG-022"
+      ],
+      "search": "grep -nE \"void |\\.catch\\(|await sendCtxAlert|process.exit|uncaught\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); git grep -n -e uncaughtException -e onerror -e \"on('error'\" over src at the base (none). void dispatchEvent (:652) and void handleWsClose (:711) were followed: dispatchEvent catches per position; handleWsClose catches around the rebuild, and sendCtxAlert swallows its own errors (notifier.ts:79-87). Uncaught: the ws error event (AUD-ANTIRUG-002). Boot-time rejections from resumeAntiRugMonitoring (bot.ts:2120, :2144 not in try) reach the entry point, which is AUD-BUY-005. | 22-27 merge: AUD-ANTIRUG-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C12": {
+      "result": [
+        "AUD-ANTIRUG-001",
+        "AUD-ANTIRUG-003",
+        "AUD-ANTIRUG-004",
+        "AUD-ANTIRUG-007",
+        "AUD-ANTIRUG-008",
+        "AUD-ANTIRUG-012",
+        "AUD-ANTIRUG-016"
+      ],
+      "search": "grep -nE \"setInterval|setTimeout|clearInterval|\\.on\\(|\\.off\\(\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): heartbeat interval (:782, replaced per re-arm, cleared on close), HTTP poller (:1261, never cleared), confirm-gate and grace block handlers (:1909, :2167, removed on fire or replace, not on unregister), raw socket close/pong handlers (:710, :771, :809, added per re-arm); clearAllTimersForToken before the exit (exitTrigger.ts:240) and its re-arm paths in exitEngine.ts."
+    },
+    "C13": {
+      "result": [
+        "AUD-ANTIRUG-005",
+        "AUD-ANTIRUG-010",
+        "AUD-ANTIRUG-013",
+        "AUD-ANTIRUG-015"
+      ],
+      "search": "grep -nE \"\\.run\\(|\\.get\\(|\\.all\\(|transaction|upsert|delete\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461); read the chain_state, lp_baseline and antirug_dry_run_started statements in src/utils/db.ts (:123-191, :606-709) at the base: every write is a single statement (no multi-statement transaction needed); state that should survive a restart but does not: the breaker (AUD-ANTIRUG-010); last_seen_block written only at subscription time (AUD-ANTIRUG-005); unpinned baseline reads (AUD-ANTIRUG-013); dead clearLpBaseline (AUD-ANTIRUG-015). The crash window between a landed buy and its baseline is AUD-BUY-002."
+    },
+    "C14": {
+      "result": [
+        "AUD-ANTIRUG-003",
+        "AUD-ANTIRUG-004",
+        "AUD-ANTIRUG-005",
+        "AUD-ANTIRUG-007",
+        "AUD-ANTIRUG-010",
+        "AUD-ANTIRUG-011",
+        "AUD-ANTIRUG-012"
+      ],
+      "search": "Traced every path into and out of triggerAntiRugExit (detector.ts:1834, :1900 from the WS dispatcher, the HTTP poller, the backfill and the V3 grace watcher) and every return path of executeFullSell for reason anti-rug (exitEngine.ts:809-1170): duplicate dispatches, refusals, budget overruns, retries and the dex used on resume."
+    },
+    "C15": {
+      "result": [
+        "AUD-ANTIRUG-003"
+      ],
+      "search": "Looked for check-then-act across awaits: isCircuitBreakerTripped then exit then increment (exitTrigger.ts:221-319) lets concurrent triggers all pass the check; dispatchEvent snapshots the bucket before awaiting (detector.ts:1376, correct); registry mutation during backfill iterates live perChain.get (detector.ts:1150-1153; a position unregistered mid-loop is skipped, harmless)."
+    },
+    "C16": {
+      "result": [
+        "AUD-ANTIRUG-017"
+      ],
+      "search": "grep -nE \"gas|fee|multiplier\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461) and git show of src/chainRegistry.ts:806-824 and src/utils/mevStrategies/types.ts:61 (applyGasMultiplier): the anti-rug gas multiplier has a lower bound only; the sell-leg priority-fee ceiling is EXIT (TH-EXIT-23)."
+    },
+    "C17": {
+      "result": [
+        "AUD-ANTIRUG-014"
+      ],
+      "search": "grep -nE \"privateKey|signer|signTransaction|signed|wallet\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): the slice holds no key; the only signed-transaction handling is raceTelemetry.flashbotsRaceVerdict, which would send a signed sell to the chain RPC (dead code)."
+    },
+    "C18": {
+      "result": [
+        "AUD-ANTIRUG-009",
+        "AUD-ANTIRUG-017"
+      ],
+      "search": "git grep -n \"ANTIRUG\\|WATCHDOG_BUDGET_MS\" 23a6461 -- src/config.ts src/chainRegistry.ts src/anti-rug src/preflight.ts: every anti-rug key, its parse and its fail-loud check (chainRegistry.ts:721-932), the strict LIVE_EXECUTE match (:724), the 7-day gate (preflight.ts:628-697) and exitTrigger.ts:78. .env.example was not read (secret-read guard); keys were taken from config.ts:83-132 instead."
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "The slice exposes no HTTP surface; the breaker reset route is src/api/routes/antiRug.ts (API slice, read only for its calls into circuitBreaker.ts:59-88)."
+    },
+    "C20": {
+      "result": "checked, none",
+      "search": "grep -nE \"sendCtxAlert|Markdown|\\`\\$\\{\" over the ANTIRUG snapshot (slice-files.ts --snapshot ANTIRUG, 8 files at 23a6461): alert texts interpolate token and pair addresses from logs, chain names and numeric signals only; no token symbol or name and no inbound Telegram input reaches the slice."
+    }
+  }
+}

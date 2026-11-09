@@ -1,0 +1,49 @@
+{
+  "id": "SCRIPTS-01",
+  "title": "How do out-of-process signing scripts exclude the running bot?",
+  "area": "SCRIPTS",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: no exclusion",
+      "behavior_impact": "none: a script signs with the bot wallet whether or not the bot is running, and ignores the pause switch",
+      "risk": "With the bot running on the same wallet the two processes pick nonces independently (one transaction replaces or blocks the other, a bot exit can fail and leave a position held), a recovery sell can race the bot exit of the same tokens (double sell), and a deliberate buy goes out while the bot is paused (AUD-SCRIPTS-002, S1)."
+    },
+    {
+      "id": "query-then-sign",
+      "name": "Check with tryAcquireThenRelease, then sign (D-06 as written)",
+      "behavior_impact": "the script asks once whether the lock is free (the query takes the lock and releases it at once) and refuses if the bot holds it; then it signs without the lock",
+      "risk": "Check-then-act window: after the query releases the lock the bot can start and take it before the script signs, so both sign again; it also cannot stop the bot starting during a long script run (a private deliberate-buy leg can take minutes). It reports \"bot not running\" when that may no longer be true: false assurance."
+    },
+    {
+      "id": "hold-lock",
+      "name": "Hold acquireProcessLock for the whole script run, and check the pause state while holding it",
+      "behavior_impact": "the script takes the bot wallet lock (plan 22-13 API, keyed by the wallet address derived from the key) before building any transaction and keeps it until it exits; a running bot makes the script refuse with a clear message, the bot refuses to start while a script is signing, and a buy refuses while paused",
+      "risk": "The operator has to stop the bot to run a signing script and start it again afterwards (for a deliberate buy this matches the BUY-01 interim rule); a long-running or hung script blocks bot start until it exits or is killed; a crashed script releases the lock automatically (the operating system drops it)."
+    },
+    {
+      "id": "bot-performs-operation",
+      "name": "Scripts stop signing: the running bot performs manual operations on request",
+      "behavior_impact": "manual buys and sells become authenticated commands to the running bot (for example through the dashboard API), executed inside its own nonce lock and pause rules; signing scripts are removed",
+      "risk": "Larger change: a new command surface on the money path with its own authentication and tests; nothing can be done manually while the bot is off unless a held-lock script remains as a fallback."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "hold-lock for every script that signs with the bot wallet. It is the only option that excludes the bot for the whole time the script can sign, and it uses the lock that plan 22-13 builds anyway. This questions the premise of D-06 in 22-CONTEXT.md (\"the query API for Phase 29 scripts is try-acquire-then-release\"): that query is a point-in-time status check and cannot guard signing. Decide together with BUY-01: if BUY-01 picks handing a deliberate buy to the running bot, the deliberate buy has to become a bot-performed operation (option bot-performs-operation for that one script), because a held-lock script is refused while the bot runs.",
+  "default": "Keep current behaviour until the owning phase rules (milestone contract); nothing changes in Phase 22. This card covers an S1 capital finding (AUD-SCRIPTS-002), which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a manual signing script can run while the bot runs, and how the two are kept from signing for the same wallet at the same time.",
+  "findings": [
+    "AUD-SCRIPTS-002"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 HYG-03 discussion, the decision owner per operator ruling ESC-SCRIPTS-01 (\"decide in Phase 29\"): rule on this card before the script changes are planned, together with card BUY-01 (still open; owned by the Phase 24 capital discussion, which comes before Phase 29), because the BUY-01 outcome decides whether the deliberate buy is still a separate signing script",
+  "premise_challenge": "D-06 (22-CONTEXT.md): \"The query API for Phase 29 scripts is try-acquire-then-release.\" Re-surfaced per D-STOP-THE-LINE at 22-25 Task 3; not filed and deferred. Operator ruling at that checkpoint (ESC-SCRIPTS-01, verbatim \"Acknowledge. Decide in phase 29\"): the question is left open, undecided, for the Phase 29 discussion; D-06 is not reworded now.",
+  "operator_input": "\"Acknowledge. Decide in phase 29\" (the operator's words, verbatim, 2026-11-07, at the 22-25 Task 3 blocking checkpoint; record ESC-SCRIPTS-01). Meaning: AUD-SCRIPTS-002 is acknowledged and option decide-in-phase-29 was chosen; no preference between keep-current, query-then-sign, hold-lock and bot-performs-operation was given, so the question stays open for the Phase 29 (HYG-03) discussion. The hold-lock recommendation stays on record. This input does not change status.",
+  "decision_owner": "Phase 29 (HYG-03) discussion: must rule on this card before the HYG-03 script changes are planned, with the outcome of card BUY-01 (deliberate-buy protection, Phase 24 capital discussion) in front of it. If BUY-01 picks handoff-to-running-bot, the deliberate buy becomes a bot-performed operation and no separate script signs for it; if BUY-01 picks refuse-while-running-and-prompt, that matches hold-lock here. The D-06 wording in 22-CONTEXT.md (\"the query API for Phase 29 scripts is try-acquire-then-release\") stays unchanged until Phase 29 rules.",
+  "related_cards": [
+    "BUY-01"
+  ],
+  "assigned_id": "OD-68"
+}

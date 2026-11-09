@@ -1,0 +1,262 @@
+{
+  "files_reviewed": [
+    "src/utils/gasManager.ts",
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/types.ts",
+    "src/utils/nonceAuthority.ts",
+    "src/utils/provider.ts",
+    "src/utils/receiptDecoder.ts",
+    "src/utils/retry.ts",
+    "src/utils/txManager.ts"
+  ],
+  "findings": [
+    {
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 57,
+      "line_end": 62,
+      "class_ids": ["C01"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "BigNumberish assertions do not convert amounts to bigint",
+      "explanation": "TransactionRequest permits numeric strings and numbers for gasLimit and value. The assertions at src/utils/mevStrategies/passthrough.ts:57 and :62 leave those runtime types unchanged. The bigint arithmetic at src/utils/mevStrategies/reconciliation.ts:328 then throws for valid requests such as gasLimit: 500000 or value: '0'. If an omitted exit builder supplies these supported ethers types, selling fails before broadcast.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/bloxroute.ts:84 unchecked gasLimit assertion",
+        "src/utils/mevStrategies/bloxroute.ts:91 unchecked value assertion",
+        "src/utils/mevStrategies/flashbots.ts:161 unchecked gasLimit assertion",
+        "src/utils/mevStrategies/flashbots.ts:166 unchecked value assertion"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 86,
+      "line_end": 90,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Repricing retains incompatible transaction fee fields",
+      "explanation": "The spread at src/utils/mevStrategies/passthrough.ts:87 preserves an incoming gasPrice and explicit legacy transaction type, but :104-105 add EIP-1559 fees without removing incompatible fields or changing the type. A valid legacy request on Base or Arbitrum can therefore become invalid and be rejected by ethers. The provided legacy gas helper returns precisely such gasPrice options at src/utils/gasManager.ts:44-46. An omitted exit builder using those options cannot sell through this path.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/flashbots.ts:210 adds EIP-1559 fees and type 2 without deleting incoming gasPrice",
+        "src/utils/mevStrategies/bloxroute.ts:117 preserves incoming EIP-1559 fields while adding legacy gasPrice"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 555,
+      "line_end": 559,
+      "class_ids": ["C07"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Submission exceptions bypass reconciliation after a possible broadcast",
+      "explanation": "At src/utils/mevStrategies/reconciliation.ts:557, any submit exception immediately escapes; the helper only captures the result and enters reconciliation after submit resolves. Flashbots or a node can accept a transaction and then lose the response, and Flashbots fanout or wait can fail after an acknowledged broadcast. A landed buy can consequently be reported failed, with an empty handle on first-send transport failures. Preventing an untracked position requires an omitted caller to recover and reconcile the actual signed hash independently.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/flashbots.ts:263 relay submission can fail after acceptance but before hash capture",
+        "src/utils/mevStrategies/flashbots.ts:305 fanout can throw after the initial bundle was submitted",
+        "src/utils/mevStrategies/flashbots.ts:317 wait rejection escapes after broadcast",
+        "src/utils/mevStrategies/passthrough.ts:130 node acceptance followed by a transport error loses the transaction response"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 558,
+      "line_end": 559,
+      "class_ids": ["C07"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Earlier replacement hashes are discarded before their outcome is known",
+      "explanation": "Each retry overwrites the sole remembered hash at src/utils/mevStrategies/reconciliation.ts:558-559. An earlier same-nonce transaction can still win inclusion after a later replacement is submitted, particularly across private builders. Only the later hash is then probed; its receipt is absent while the nonce has advanced, so :598-602 classify the bot's earlier successful transaction as 'landed-not-ours' and throw. A real buy or sell is reported failed because the helper no longer checks its known earlier hashes.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:565 BroadcastHandle also overwrites the previous hash",
+        "src/utils/mevStrategies/flashbots.ts:289 early broadcast handle retains only the newest bundle transaction",
+        "src/utils/txManager.ts:213 sell fallback receives only the last attempt",
+        "src/utils/txManager.ts:318 buy fallback receives only the last attempt"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 605,
+      "line_end": 613,
+      "class_ids": ["C07"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "A reconciliation timeout abandons transactions that can still execute",
+      "explanation": "Receipt absence through the window is treated as terminal failure at src/utils/mevStrategies/reconciliation.ts:605-613 without cancellation or proof that every submission has expired. For example, Flashbots permits eight future target blocks while the default confirmation window is only 45 seconds, so a budget-exhausted attempt can remain eligible after rejection. If its router deadline remains valid, it can buy after the caller has rejected the snipe. An omitted caller must retain pending state and reconcile until inclusion, cancellation, or proven expiry to avoid untracked funds.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/flashbots.ts:302 up to eight future target blocks can outlive reconciliation",
+        "src/utils/mevStrategies/bloxroute.ts:159 submission specifies no explicit expiry"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line_start": 138,
+      "line_end": 140,
+      "class_ids": ["C07"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "The native confirmation wait can prevent exit fallback indefinitely",
+      "explanation": "src/utils/mevStrategies/passthrough.ts:140 calls tx.wait(3) without a timeout. A dropped or permanently pending transaction can leave this promise unresolved indefinitely. The bounded reconciliation window does not help because src/utils/mevStrategies/reconciliation.ts:557 waits for the entire submit closure first. Consequently, even a one-attempt private sell may never return to the public fallback, and an enclosing nonce lock would also block subsequent wallet operations.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:557 submit is awaited outside the bounded confirmation window",
+        "src/utils/mevStrategies/flashbots.ts:317 native relay wait runs before bounded reconciliation"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 502,
+      "line_end": 514,
+      "class_ids": ["C07"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Fee escalation does not ensure a valid replacement bid",
+      "explanation": "The bid at src/utils/mevStrategies/reconciliation.ts:502-514 is derived from attempt count and a fixed market floor rather than the previous submitted fees. A market priority of at least four gwei produces identical bids across all four default attempts. Even when priority increases, adding one gwei to a large fixed base component can fall below an RPC's usual percentage replacement requirement for gasPrice or both EIP-1559 fee fields. A pending exit's retry can therefore be rejected as already known or replacement-underpriced instead of replacing the stuck transaction.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/bloxroute.ts:115 fixed base plus additive priority determines replacement gasPrice",
+        "src/utils/mevStrategies/flashbots.ts:210 priority changes without a proportional maxFeePerGas bump",
+        "src/utils/mevStrategies/passthrough.ts:104 same EIP-1559 replacement fee construction"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 569,
+      "line_end": 572,
+      "class_ids": ["C09"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Native Flashbots inclusion bypasses receipt-status validation",
+      "explanation": "src/utils/mevStrategies/reconciliation.ts:569-572 returns success without checking a receipt whenever nativeConfirmed is true. Flashbots sets that flag solely from bundle.wait() returning zero. If that external library resolution establishes transaction inclusion rather than successful EVM execution, an included status-0 transaction is returned as a successful trade. An omitted exit consumer trusting this success can close a position whose tokens were never sold.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/flashbots.ts:374 nativeConfirmed is based solely on BundleIncluded resolution"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 371,
+      "line_end": 375,
+      "class_ids": ["C08"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Reconciliation accepts a first-block receipt without confirmations",
+      "explanation": "src/utils/mevStrategies/reconciliation.ts:371-375 immediately accepts any status-1 receipt without checking confirmation depth or canonicality again. This is the normal BSC path because bloXroute always requests reconciliation, and it also weakens passthrough recovery relative to its three-confirmation native wait. A reorg can remove a buy or sell after success has been returned. Unless omitted consumers separately delay durable state changes and recover reorgs, a position can be missing protection or incorrectly marked closed.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:406 final receipt probe also accepts immediate inclusion",
+        "src/utils/mevStrategies/flashbots.ts:319 target-block inclusion is accepted without further confirmations"
+      ]
+    },
+    {
+      "file": "src/utils/txManager.ts",
+      "line_start": 199,
+      "line_end": 199,
+      "class_ids": ["C16"],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "Private sells use the buy priority-fee ceiling",
+      "explanation": "The sell dispatch at src/utils/txManager.ts:199 reaches strategy configuration calls that omit the leg argument. buildReconcileConfig therefore defaults to 'buy' at src/utils/mevStrategies/reconciliation.ts:178 and reads MEV_BUY_MAX_PRIORITY_FEE_GWEI instead of MEV_SELL_MAX_PRIORITY_FEE_GWEI. A lower configured sell ceiling is bypassed, including on elevated anti-rug bids; conversely, raising only the sell ceiling cannot help an underbid exit.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/bloxroute.ts:104 configuration always defaults to the buy leg",
+        "src/utils/mevStrategies/flashbots.ts:182 configuration always defaults to the buy leg",
+        "src/utils/mevStrategies/passthrough.ts:83 configuration always defaults to the buy leg"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 321,
+      "line_end": 328,
+      "class_ids": ["C16"],
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "title": "Selling requires funds for another future sell",
+      "explanation": "The affordability calculation at src/utils/mevStrategies/reconciliation.ts:321-328 always subtracts a future sell reserve when reserveSellGas is enabled, including actual sell requests dispatched by src/utils/txManager.ts:199. No sell-specific override disables this default. A wallet funded sufficiently for its current exit, but not for an additional exit, is rejected at :330-332 before submission. Direct sell callers are blocked; callers using the omitted public fallback are forced out of an otherwise affordable private exit.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/bloxroute.ts:104 uses reserve-enabled default configuration for every transaction",
+        "src/utils/mevStrategies/flashbots.ts:182 uses reserve-enabled default configuration for every transaction",
+        "src/utils/mevStrategies/passthrough.ts:83 uses reserve-enabled default configuration for every transaction"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 280,
+      "line_end": 285,
+      "class_ids": ["C16"],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "The exit reserve omits public priority fees and Base data fees",
+      "explanation": "src/utils/mevStrategies/reconciliation.ts:280-285 reserves only buffered base fees. Normal nonzero public priority fees are absent, and Base additionally charges L1 data fees outside L2 execution gas. During low-base/high-tip periods, or elevated Base data fees, the reserve can be below the cost of an ordinary exit. The clamp at :328 can allow a buy to consume everything except that insufficient reserve. This strands thin-wallet positions if omitted entry gates or public exit builders do not independently budget these missing components.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:322 affordability relies on the incomplete exit reserve",
+        "src/utils/mevStrategies/reconciliation.ts:328 buy affordability also omits Base L1 data fees",
+        "src/utils/receiptDecoder.ts:62 recorded gas cost likewise omits Base L1 data fees"
+      ]
+    },
+    {
+      "file": "src/utils/gasManager.ts",
+      "line_start": 14,
+      "line_end": 18,
+      "class_ids": ["C16"],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "RPC fee quotes have no absolute total-price ceiling",
+      "explanation": "src/utils/gasManager.ts:14-18 scales the RPC's maxFeePerGas without checking an absolute gas-price or transaction-cost ceiling. The legacy branches do the same for gasPrice. maxGasLimit bounds gas units, not their price. The reconciliation strategies also cap only priority fees while leaving the base component unconstrained. A fee spike can therefore consume much more native currency than the trading amount when the wallet can afford it. Any effective total-price limit would have to be enforced by omitted callers.",
+      "sibling_sites": [
+        "src/utils/gasManager.ts:23 uncapped chain-aware legacy gasPrice",
+        "src/utils/gasManager.ts:40 uncapped global legacy gasPrice",
+        "src/utils/mevStrategies/reconciliation.ts:311 ceiling applies only to priority fees",
+        "src/utils/mevStrategies/bloxroute.ts:115 uncapped base component enters total gasPrice",
+        "src/utils/mevStrategies/flashbots.ts:211 uncapped base component enters maxFeePerGas",
+        "src/utils/mevStrategies/passthrough.ts:105 uncapped base component enters maxFeePerGas"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/bloxroute.ts",
+      "line_start": 186,
+      "line_end": 188,
+      "class_ids": ["C17"],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Raw Axios errors can expose relay credentials and signed transactions",
+      "explanation": "The relay failure logger at src/utils/mevStrategies/bloxroute.ts:187 receives the complete Axios error. Axios errors retain request configuration, including Authorization from :163 and the signed transaction body from :159. Unless the omitted logger explicitly redacts Axios configuration, ordinary timeouts or network failures can write relay credentials and still-executable signed transactions to logs or downstream log services.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/bloxroute.ts:67 health-check Axios errors can expose the Authorization header"
+      ]
+    },
+    {
+      "file": "src/utils/provider.ts",
+      "line_start": 49,
+      "line_end": 50,
+      "class_ids": ["C11"],
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "title": "WebSocket destruction drops a rejecting promise",
+      "explanation": "ethers v6 WebSocketProvider.destroy() returns a promise, but src/utils/provider.ts:49 discards it and removes the cached provider immediately. A teardown rejection becomes unhandled and cannot be caught by a synchronous caller of removeWsProvider. Under Node's default unhandled-rejection behavior, a reconnect or cleanup failure can terminate the bot and leave open positions without their watchers.",
+      "sibling_sites": []
+    },
+    {
+      "file": "src/utils/receiptDecoder.ts",
+      "line_start": 81,
+      "line_end": 83,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Unrelated WETH events can replace the decoded sell proceeds",
+      "explanation": "src/utils/receiptDecoder.ts:81-83 accepts the first canonical-WETH Withdrawal without checking its source or relation to the router payout. An untrusted token's transfer hook can generate its own WETH withdrawal, including a zero-value withdrawal, before the real swap output. The decoder then records that amount instead of the wallet's proceeds, even on a V3 sell. If omitted consumers use these recorded proceeds for P&L or risk limits, the token can corrupt that accounting.",
+      "sibling_sites": [
+        "src/utils/receiptDecoder.ts:97 first Transfer-to-wallet wins without identifying the actual swap-output transfer"
+      ]
+    },
+    {
+      "file": "src/utils/mevStrategies/reconciliation.ts",
+      "line_start": 398,
+      "line_end": 400,
+      "class_ids": ["C18"],
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "title": "Polling configuration can exceed the promised confirmation window",
+      "explanation": "src/utils/mevStrategies/reconciliation.ts:399 sleeps for the entire pollMs rather than the remaining deadline. The parser at :180-181 accepts any positive interval without checking its relationship to confirmWindowMs. For example, a one-second window with the default four-second poll still waits four seconds, while a large interval can delay fallback far longer. A pending private exit can therefore hold the inclusion ladder beyond its configured confirmation budget.",
+      "sibling_sites": [
+        "src/utils/mevStrategies/reconciliation.ts:679 positive-integer parsing has no interval upper bound"
+      ]
+    }
+  ]
+}

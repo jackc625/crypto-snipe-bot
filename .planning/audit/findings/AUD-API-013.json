@@ -1,0 +1,69 @@
+{
+  "id": "AUD-API-013",
+  "title": "Section C J4 (API leg): every alert text, including the deployer-chosen token symbol, is broadcast to the dashboard unmodified, and the notification severity and category are guessed from keywords in that text, so a token named for example \"FAILED\" or \"SOLD\" changes how the operator's event feed colours and files the alert",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C20"
+  ],
+  "files": [
+    "src/api/ws/broadcaster.ts",
+    "src/utils/notifier.ts",
+    "src/bot.ts",
+    "dashboard/src/components/EventFeed.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:988-993@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "symbol and name are read from the token contract (deployer-controlled)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1023@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the New Token alert embeds the symbol raw"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:16-31@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "inferSeverity / inferCategory: substring matches on the whole message ('fail' -> error, 'sold' -> success, 'risk' -> warning, ...)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:91-97@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendCtxAlert broadcasts { severity: inferSeverity(message), message, category: inferCategory(message) }"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/ws/broadcaster.ts:39-50@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "broadcast forwards the JSON to every client with no length cap or sanitising"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/EventFeed.tsx:100@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "rendered as React text ({evt.message}), so no HTML injection"
+    }
+  ],
+  "sibling_sites_checked": "Every broadcast() caller at the base SHA (git grep \"broadcast(\" -- src): notifier.ts:54 and :91 carry free text; circuitBreaker.ts, detector.ts, exitTrigger.ts, chains.ts, controls.ts and server.ts send structured fields (addresses, numbers, enums). The Telegram Markdown injection of the same symbol is AUD-BUY-022 (BUY slice, SC-10), the canonical entry for the unescaped symbol; this entry is the dashboard-transport and severity-guessing leg owned by the API slice. Dashboard rendering of the text (React escaping) is audited in the DASH slice.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading operator display only; the text is escaped when rendered and nothing in the bot acts on the guessed severity.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-022"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Send severity and category as explicit fields from each alert site instead of guessing from the text, and clip and sanitise token-controlled strings at the source (sanitize.ts already exists). Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

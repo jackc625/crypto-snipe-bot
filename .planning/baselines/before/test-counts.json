@@ -1,0 +1,81 @@
+{
+  "fork": {
+    "each_caveat": "a .each or .skipIf/.runIf call counts once, however many cases it expands to at run time; a fixture alias created with test.extend is not counted.",
+    "method": "static TypeScript AST count of test/fork/**/*.test.ts at the git tree: every call expression whose callee is it/test or a property chain on it/test (.only .skip .todo .each .skipIf .runIf .concurrent ...); no Hardhat, no network, no import of any test file.",
+    "phase_start": {
+      "count": 33,
+      "files": {
+        "test/fork/antiRugDetector.fork.test.ts": 3,
+        "test/fork/captureRehearsal.fork.test.ts": 2,
+        "test/fork/deliberateBuyReplay.fork.test.ts": 2,
+        "test/fork/exitStatePersistence.fork.test.ts": 3,
+        "test/fork/honeypotChecker.fork.test.ts": 4,
+        "test/fork/honeypotMultiAmount.fork.test.ts": 2,
+        "test/fork/realLaunchReplay.fork.test.ts": 2,
+        "test/fork/realMainnetGate.fork.test.ts": 8,
+        "test/fork/snipeLifecycle.test.ts": 7
+      }
+    },
+    "post_rails": {
+      "count": 40,
+      "files": {
+        "test/fork/antiRugDetector.fork.test.ts": 3,
+        "test/fork/captureRehearsal.fork.test.ts": 2,
+        "test/fork/deliberateBuyReplay.fork.test.ts": 2,
+        "test/fork/exitStatePersistence.fork.test.ts": 3,
+        "test/fork/honeypotChecker.fork.test.ts": 4,
+        "test/fork/honeypotDeploy.eth.fork.test.ts": 1,
+        "test/fork/honeypotMultiAmount.fork.test.ts": 2,
+        "test/fork/rails/forkRails.fork.test.ts": 6,
+        "test/fork/realLaunchReplay.fork.test.ts": 2,
+        "test/fork/realMainnetGate.fork.test.ts": 8,
+        "test/fork/snipeLifecycle.test.ts": 7
+      }
+    }
+  },
+  "list_caveat": "vitest list drops tests whose collected state is skipped (it.skip, it.todo, it.skipIf with a true condition); a file that fails collection makes it write no JSON at all, recorded here as a collection error.",
+  "nac04": {
+    "checks": {
+      "integration": {
+        "ok": true,
+        "post_rail": 263,
+        "pre_rail": 216
+      },
+      "unit": {
+        "ok": true,
+        "post_rail": 937,
+        "pre_rail": 759
+      }
+    },
+    "ok": true
+  },
+  "post_rail": {
+    "integration": 263,
+    "unit": 937
+  },
+  "post_rail_collection_errors": {
+    "integration": [],
+    "unit": []
+  },
+  "post_rail_method": "vitest list --project <p> --json in the main checkout (railed by the project setupFiles and the preload)",
+  "post_rail_tree": "post_rails",
+  "pre_rail": {
+    "integration": 216,
+    "unit": 759
+  },
+  "pre_rail_collection_errors": {
+    "integration": [],
+    "unit": []
+  },
+  "pre_rail_method": "vitest list --project <p> --json in the isolated export, through spawnRailedChild",
+  "pre_rail_not_in_post_rail": {
+    "integration": [
+      "test/integration/honeypotDeploy.eth.test.ts\tHONEY-03: HoneypotChecker deployed on ETH > has bytecode at deployedAddress (not 0x)",
+      "test/integration/preflightCli.test.ts\tnpm run preflight CLI (OPS-LIVE-10) > Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against current .env"
+    ],
+    "unit": []
+  },
+  "pre_rail_not_in_post_rail_note": "file + test title present in the pre-rail count but not in the post-rail list. Every such entry must be a recorded rename or an operator-ruled move in .planning/audit/inputs/test-identity.json; a title absent from a project is not by itself a NAC-04 failure, the count comparison below is.",
+  "pre_rail_source": null,
+  "pre_rail_tree": "phase_start"
+}

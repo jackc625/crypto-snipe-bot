@@ -1,0 +1,71 @@
+{
+  "id": "AUD-TESTI-009",
+  "title": "The V3 kill-switch checkpoint cases hedge every assertion behind \"if the log fired\", so a V3 buy path where pause never stops the buy, or where CP3 never records the trade, passes; only the V2 cases actually prove the kill switch",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C15"
+  ],
+  "files": [
+    "test/integration/killswitchCheckpoints.test.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:518-524@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 CP1: \"if (cp1) expect(feeTier)\"; the only unconditional assertion is sendTxWithRetry not called, which also holds if the handler returned before CP1 for any reason"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:561-567@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 CP2: conditional feeTier check; the comment says quoteExactInputSingle \"was called\" but nothing asserts it"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:604-609@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 CP3: every assertion, including \"insertTrade STILL called\", is inside if (cp3): zero assertions run when CP3 is not reached"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:623-642@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 happy path asserts only that no killswitch log fired; it never asserts the buy was sent"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:435-456@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: the V2 CP3 case asserts the log, sendTxWithRetry, insertTrade and startExitMonitor unconditionally"
+    }
+  ],
+  "sibling_sites_checked": "All eight cases of the file and pauseFlow Test 9 (V2 CP1 only); v3HoneypotIntegration Test 4 shows the V3 buy path can reach sendTxWithRetry with equivalent mocks, so the hedging is not forced by the harness. No fork test exercises pause on a V3 buy.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the kill switch is a capital control (pause must stop new buys); four V3 cases are hollow, so a V3 regression would buy while paused with the suite green.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-014"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: make the V3 cases assert unconditionally that the handler reached the checkpoint (the killswitch log with feeTier), that the quoter was called for CP2, and that CP3 records the trade; make the V3 happy path assert the buy was sent.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "paused=1 → pino info { op: killswitch.cp1, feeTier } + sendTxWithRetry NEVER called",
+    "paused flips between CP1 and CP2 on V3 path → pino info { op: killswitch.cp2, feeTier } + V3 quoteExactInputSingle WAS called",
+    "paused=1 ONLY at V3 CP3 (post-submit) → pino info { op: killswitch.cp3, feeTier } + insertTrade STILL called",
+    "paused=0 throughout → no killswitch.* log fires on V3 path"
+  ],
+  "escaped_regression": "Delete the CP2 pause read from handleNewV3PoolForChain: a V3 pool found just before a pause is still bought after the pause, and the V3 CP2 case stays green (its feeTier check is skipped and sendTxWithRetry not being called is not asserted against a reached CP2)."
+}

@@ -1,0 +1,61 @@
+# RED proof 22-11-4-fork-inworker-rpc (AC-18, fork RPC source, spawn gate and Hardhat child env)
+Date: 2026-11-09T03:20:05Z
+File neutralised (working tree only, never committed): test/fork/exitStatePersistence.fork.test.ts
+What was neutralised: the old fallback is reinstated at the module-scope FORK_RPC line of exitStatePersistence.fork.test.ts
+sha256 before and after restore: 1b181501d24c58978a983049e9d196423dbbf10fbaf927f73e99d8fa24aa4da9 / 1b181501d24c58978a983049e9d196423dbbf10fbaf927f73e99d8fa24aa4da9
+
+## Diff applied
+
+diff --git a/test/fork/exitStatePersistence.fork.test.ts b/test/fork/exitStatePersistence.fork.test.ts
+index bec3ee5..c422943 100644
+--- a/test/fork/exitStatePersistence.fork.test.ts
++++ b/test/fork/exitStatePersistence.fork.test.ts
+@@ -76,7 +76,7 @@ import { requireRealMainnetGate, FORK_ONLY_TEST_KEY } from './helpers/realMainne
+ import { resolveForkRpcUrl } from './helpers/forkRpcUrl';
+ 
+ const PROVIDER_URL = 'http://127.0.0.1:8545';
+-const FORK_RPC = resolveForkRpcUrl();
++const FORK_RPC = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL;
+ const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
+ const UNISWAP_V2_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
+ 
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/forkShellOnly.test.ts
+
+## RED result: exit 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   unit  test/unit/rails/forkShellOnly.test.ts > fork project reads only the shell and itself (AC-17) > (a) no .ts file under test/fork names the fallback variable
+AssertionError: expected [ Array(1) ] to deeply equal []
+- []
++ [
++   "test/fork/exitStatePersistence.fork.test.ts:79 identifier names the fallback variable",
++ ]
+ FAIL   unit  test/unit/rails/forkShellOnly.test.ts > fork project reads only the shell and itself (AC-17) > (b) only the helper and the rails tests read ETH_FORK_RPC_URL
+AssertionError: expected [ Array(1) ] to deeply equal []
+- []
++ [
++   "test/fork/exitStatePersistence.fork.test.ts:79 direct read of ETH_FORK_RPC_URL",
++ ]
+ FAIL   unit  test/unit/rails/forkShellOnly.test.ts > fork project reads only the shell and itself (AC-17) > (c) every in-worker env read is self-assigned or a fork shell key
+AssertionError: expected [ …(2) ] to deeply equal []
+- []
++ [
++   "test/fork/exitStatePersistence.fork.test.ts:79 reads process.env.ETH_FORK_RPC_URL, which this file does not assign and the fork rails replace",
++   "test/fork/exitStatePersistence.fork.test.ts:79 reads process.env.ALCHEMY_URL, which this file does not assign and the fork rails replace",
++ ]
+ Test Files  1 failed (1)
+      Tests  3 failed | 6 passed (9)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031959-7980-02904f | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031959-7980-02904f\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- test/fork/exitStatePersistence.fork.test.ts (sha256 equal: yes; git status --porcelain test empty: yes)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T032003-10640-6c3b7a | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T032003-10640-6c3b7a\summary.json

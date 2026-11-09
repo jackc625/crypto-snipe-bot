@@ -1,0 +1,457 @@
+{
+  "_meta": {
+    "updated_at": "2026-11-06T18:52:13.186Z",
+    "version": 3
+  },
+  "entries": {
+    "src/bot.ts": {
+      "exports": [
+        "waitForLiquidity",
+        "submitBuyTx",
+        "executeDeliberateBuy",
+        "handleNewPairForChain",
+        "handleNewV3PoolForChain",
+        "startDexListener",
+        "startMultiChainBot",
+        "resumeMultiChainMonitoring",
+        "resumeAntiRugMonitoring",
+        "createTwoStageShutdown",
+        "makeExitWatchdog"
+      ],
+      "imports": [
+        "./anti-rug/detector",
+        "./anti-rug/allowlist",
+        "./anti-rug/lpBaseline",
+        "./api/server",
+        "./exitEngine",
+        "./telegramListener",
+        "./utils/exitWatchdog"
+      ],
+      "type": "entry-point"
+    },
+    "src/config.ts": {
+      "exports": [
+        "rpc",
+        "CONFIG"
+      ],
+      "imports": [
+        "./utils/logger"
+      ],
+      "type": "config"
+    },
+    "src/chainRegistry.ts": {
+      "exports": [
+        "CHAIN_TEMPLATES",
+        "buildChainRegistry",
+        "getEnabledChains",
+        "createChainContext",
+        "isDexV2",
+        "isDexV3",
+        "HARDCODED_V2_ALLOWLIST",
+        "HARDCODED_V3_ALLOWLIST"
+      ],
+      "imports": [
+        "./utils/provider",
+        "./utils/logger",
+        "ethers"
+      ],
+      "type": "module"
+    },
+    "src/riskManager.ts": {
+      "exports": [
+        "canSnipe",
+        "recordSnipe",
+        "getPortfolioExposure"
+      ],
+      "imports": [
+        "./utils/db",
+        "./utils/logger"
+      ],
+      "type": "module"
+    },
+    "src/exitEngine.ts": {
+      "exports": [
+        "parsePartialSellTargets",
+        "buildExitConfig",
+        "computeUrgencyMultiplier",
+        "computeEffectiveTrailingPct",
+        "getUnfilledTiers",
+        "calculatePartialSellAmount",
+        "serializeExitState",
+        "deserializeExitState",
+        "queryPrice",
+        "privateAttemptBudget",
+        "fallbackSlippagePct"
+      ],
+      "imports": [
+        "./utils/txManager",
+        "./utils/nonceAuthority",
+        "./utils/exitManager",
+        "./utils/db",
+        "./utils/receiptDecoder",
+        "./utils/mevStrategies/reconciliation",
+        "./anti-rug/detector"
+      ],
+      "type": "module"
+    },
+    "src/alphaDrop.ts": {
+      "exports": [
+        "handleAlphaDropForChain"
+      ],
+      "imports": [
+        "./chainRegistry",
+        "./utils/notifier",
+        "ethers"
+      ],
+      "type": "module"
+    },
+    "src/telegramListener.ts": {
+      "exports": [
+        "startTelegramListener"
+      ],
+      "imports": [
+        "./alphaDrop",
+        "telegram"
+      ],
+      "type": "module"
+    },
+    "src/preflight.ts": {
+      "exports": [
+        "checkWalletBalance",
+        "computeWorstCasePublicExitGas",
+        "checkEntryExitAffordability",
+        "checkRpcChainId",
+        "checkRpcBlockAge",
+        "checkMevHealth",
+        "checkHoneypotCheckerCode",
+        "checkAntiRugLiveGate",
+        "validateCrossEnvRules",
+        "checkStaleData",
+        "preflightDryRun"
+      ],
+      "imports": [
+        "./chainRegistry",
+        "./utils/db",
+        "./utils/txManager"
+      ],
+      "type": "module"
+    },
+    "src/api/server.ts": {
+      "exports": [
+        "startApiServer"
+      ],
+      "imports": [
+        "express",
+        "helmet",
+        "cors",
+        "cookie-parser",
+        "./middleware/auth",
+        "./routes/*",
+        "./ws/broadcaster",
+        "./ws/handler"
+      ],
+      "type": "module"
+    },
+    "src/api/middleware/auth.ts": {
+      "exports": [
+        "loginHandler",
+        "validateSession",
+        "authMiddleware",
+        "SESSION_TTL_MS",
+        "sessions",
+        "_sessionCleanupTimer"
+      ],
+      "imports": [
+        "crypto",
+        "uuid",
+        "express"
+      ],
+      "type": "module"
+    },
+    "src/api/ws/broadcaster.ts": {
+      "exports": [
+        "addClient",
+        "removeClient",
+        "getClientCount",
+        "broadcast"
+      ],
+      "imports": [
+        "ws"
+      ],
+      "type": "module"
+    },
+    "src/utils/db.ts": {
+      "exports": [
+        "db",
+        "insertTrade",
+        "updateTradeStatus",
+        "isTokenSniped",
+        "getOpenPositionCount",
+        "getTotalExposure",
+        "getDailyRealizedLoss",
+        "getPnL",
+        "getPnLChartData",
+        "closeDb",
+        "forceWalCheckpoint",
+        "normalizeLegacyMainnetRows",
+        "makeIsTokenSnipedStmt"
+      ],
+      "imports": [
+        "better-sqlite3",
+        "./logger"
+      ],
+      "type": "module"
+    },
+    "src/utils/txManager.ts": {
+      "exports": [
+        "createMevStrategy",
+        "sendTxWithRetry",
+        "escalatePrivateSell",
+        "escalatePrivateBuy"
+      ],
+      "imports": [
+        "./mevStrategies/flashbots",
+        "./mevStrategies/bloxroute",
+        "./mevStrategies/passthrough"
+      ],
+      "type": "module"
+    },
+    "src/utils/mevStrategies/reconciliation.ts": {
+      "exports": [
+        "buildReconcileConfig",
+        "computePublicExitReserveWei",
+        "computeAffordablePriorityFee",
+        "reconcileInclusion",
+        "submitWithReconciliation",
+        "SELL_GAS_BASEFEE_BUFFER",
+        "MEV_RECONCILE_DEFAULTS"
+      ],
+      "imports": [
+        "ethers",
+        "./types"
+      ],
+      "type": "module"
+    },
+    "src/utils/mevStrategies/flashbots.ts": {
+      "exports": [
+        "FlashbotsMevStrategy"
+      ],
+      "imports": [
+        "@flashbots/ethers-provider-bundle",
+        "./reconciliation"
+      ],
+      "type": "module"
+    },
+    "src/utils/mevStrategies/bloxroute.ts": {
+      "exports": [
+        "BloxrouteMevStrategy"
+      ],
+      "imports": [
+        "axios",
+        "./reconciliation"
+      ],
+      "type": "module"
+    },
+    "src/utils/exitManager.ts": {
+      "exports": [
+        "tryAcquireSellLock",
+        "releaseSellLock",
+        "tryEnqueuePosition",
+        "releasePositionQueue",
+        "registerStopLoss",
+        "registerTakeProfit",
+        "registerTimedSell",
+        "registerExitMonitor",
+        "hasExitMonitorTimer",
+        "clearAllTimersForToken"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/utils/exitWatchdog.ts": {
+      "exports": [
+        "makeExitWatchdog"
+      ],
+      "imports": [
+        "../exitEngine",
+        "./notifier"
+      ],
+      "type": "module"
+    },
+    "src/utils/tokenSafety.ts": {
+      "exports": [
+        "checkHoneypot",
+        "isBlacklistedToken",
+        "isLiquidityLocked",
+        "checkTokenMetadata",
+        "simulateSwap",
+        "isLiquiditySufficient",
+        "isKnownBadToken",
+        "hasMaxWalletOrTxLimits",
+        "simulateSell",
+        "checkHoneypotForChain",
+        "isLiquidityLockedForChain"
+      ],
+      "imports": [
+        "./safetyProviders/goplus",
+        "./safetyProviders/honeypotIs",
+        "./safetyProviders/mudra",
+        "./safetyProviders/unicrypt"
+      ],
+      "type": "module"
+    },
+    "src/utils/honeypot/index.ts": {
+      "exports": [
+        "simulateHoneypotRoundtrip"
+      ],
+      "imports": [
+        "./checkerContract",
+        "./simulator"
+      ],
+      "type": "module"
+    },
+    "src/utils/provider.ts": {
+      "exports": [
+        "getProvider",
+        "getWsProvider",
+        "removeWsProvider",
+        "getWallet"
+      ],
+      "imports": [
+        "../config",
+        "ethers"
+      ],
+      "type": "module"
+    },
+    "src/utils/notifier.ts": {
+      "exports": [
+        "sendTelegramAlert",
+        "sendChainAlert",
+        "sendCtxAlert"
+      ],
+      "imports": [
+        "../api/ws/broadcaster"
+      ],
+      "type": "module"
+    },
+    "src/utils/gasManager.ts": {
+      "exports": [
+        "getGasOptionsForChain",
+        "getGasOptions"
+      ],
+      "imports": [
+        "../chainRegistry"
+      ],
+      "type": "module"
+    },
+    "src/utils/receiptDecoder.ts": {
+      "exports": [
+        "decodeReceipt"
+      ],
+      "imports": [
+        "./abis",
+        "ethers"
+      ],
+      "type": "module"
+    },
+    "src/utils/nonceAuthority.ts": {
+      "exports": [
+        "withNonceLock",
+        "_resetNonceChainsForTesting"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/utils/logger.ts": {
+      "exports": [
+        "logger"
+      ],
+      "imports": [
+        "pino"
+      ],
+      "type": "module"
+    },
+    "src/utils/abis.ts": {
+      "exports": [
+        "FACTORY_ABI",
+        "ROUTER_ABI",
+        "ERC20_ABI",
+        "PAIR_ABI",
+        "V3_FACTORY_ABI",
+        "V3_POOL_ABI",
+        "V3_SWAP_ROUTER_ABI",
+        "V3_QUOTER_V2_ABI",
+        "WETH_ABI"
+      ],
+      "imports": [],
+      "type": "data"
+    },
+    "src/anti-rug/detector.ts": {
+      "exports": [
+        "registerAntiRugPosition",
+        "unregisterAntiRugPosition",
+        "getRegisteredPositions",
+        "startChainAntiRugListener",
+        "getLogsForBackfill"
+      ],
+      "imports": [
+        "./exitTrigger",
+        "./lpBaseline",
+        "./allowlist",
+        "./events"
+      ],
+      "type": "module"
+    },
+    "src/anti-rug/exitTrigger.ts": {
+      "exports": [
+        "triggerAntiRugExit"
+      ],
+      "imports": [
+        "../exitEngine",
+        "./circuitBreaker",
+        "../utils/exitManager"
+      ],
+      "type": "module"
+    },
+    "src/anti-rug/circuitBreaker.ts": {
+      "exports": [
+        "incrementCircuitBreaker",
+        "isCircuitBreakerTripped",
+        "resetCircuitBreaker",
+        "getRecentTriggers"
+      ],
+      "imports": [
+        "../utils/notifier"
+      ],
+      "type": "module"
+    },
+    "scripts/preflight.ts": {
+      "exports": [],
+      "imports": [
+        "../src/preflight"
+      ],
+      "type": "script"
+    },
+    "contracts/honeypot/HoneypotChecker.sol": {
+      "exports": [],
+      "imports": [],
+      "type": "module"
+    },
+    "src/utils/retry.ts": {
+      "exports": [
+        "retry"
+      ],
+      "imports": [
+        "./logger"
+      ],
+      "type": "util"
+    },
+    "src/utils/withTimeout.ts": {
+      "exports": [
+        "withTimeout"
+      ],
+      "imports": [],
+      "type": "util"
+    }
+  }
+}

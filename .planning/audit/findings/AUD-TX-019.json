@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-007",
+    "AUD-TX-010",
+    "AUD-EXIT-004",
+    "AUD-BUY-029"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-55",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-019",
+  "title": "No total ceiling on gas price: configured ceilings cap only the priority fee, so a base-fee spike is limited only by the wallet balance",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/gasManager.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:311-333@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ceiling applies to priority fee; headroom is wallet balance only"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/gasManager.ts:14-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "scaled RPC fee, no absolute cap (this file is unreachable, AUD-TX-013)"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 321,332p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read."
+    }
+  ],
+  "sibling_sites_checked": "flashbots.ts:169-172, bloxroute.ts:115, passthrough.ts:63-66 take the base component uncapped.",
+  "status": "confirmed",
+  "severity_rationale": "S2: spending stays within the wallet and each transaction, but no setting limits total gas cost during a spike.",
+  "recommendation": "Add a total fee ceiling per chain; its number and threshold row belong in card TX-02. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-13"
+  ]
+}

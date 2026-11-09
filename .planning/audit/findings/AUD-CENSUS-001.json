@@ -1,0 +1,93 @@
+{
+  "id": "AUD-CENSUS-001",
+  "title": "Signing-site census (AC-36 / E31, D-NONCE-AUTHORITY-ALL): N = 23 transaction-signing call sites at the base (src 11: 10 locked, 1 unlocked in dead code; scripts 12: all unlocked, each in its own process), including 4 ContractFactory deployments; 1 message-signing site listed separately; 0 unknown",
+  "kind": "finding",
+  "area": "src",
+  "slice": "CENSUS",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C07"
+  ],
+  "files": [
+    ".planning/audit/census/signing-sites.json",
+    ".planning/audit/census/manual-inventory.json",
+    ".planning/audit/tools/signing-census.ts",
+    "src/utils/nonceAuthority.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node node_modules/ts-node/dist/bin.js .planning/audit/tools/signing-census.ts --self-test",
+      "note": "seeded fixture project in os.tmpdir(): 31 of 31 cases pass (the 9 plan cases plus 22 extra: view exclusion, provider runner, not-awaited, higher-order, interface dispatch, parameter runner, recursion, mixed callers, fire-and-forget, stored callback, event callback, nested invocation, cycle-only, memo order, computed calls, two call sites, four bundle cases); behaviour mutants of the tool (lock op, await rule, followable callback, nested invocation, unlocked dominance, back-edge, cycle-tainted memo, event entries, no-caller rule, lexical evidence, deploy, view, provider runner, signer type, any receivers, bundle APIs, rawSendBundle, global trace set) each fail the self-test"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node node_modules/ts-node/dist/bin.js .planning/audit/tools/signing-census.ts --root <git archive 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts tsconfig.json tsconfig.bot.json package.json, node_modules = per-entry junctions> --sha 23a64617dca167976adc4645fed0e2c69e384820 --out .planning/audit/census/signing-sites.json --manual .planning/audit/census/manual-inventory.json",
+      "note": "signing-sites.json sha256 75beaf34f50fd831c5c3b2dd1c0f4073b308b2d41b49d3162101596582bd5cad; manual-inventory.json sha256 8b05b92086320fede20324effd1be748ad2fcd150d9c2f0147abc0240a30e12c; signing-census.ts sha256 2890ac4ade7c313e53fb0b57af25d0cd96e2e39c35b12b5efc27c88598d4499e. 50 sites: N = 23 counted, 1 message-signing, 26 excluded (24 census reads: view fragments, staticCall; 2 auditor reads with evidence), 1 delegation (txManager.ts:114 MevStrategy.sendTransaction), 12 withNonceLock calls all keyed ctx.wallet.address. Reconciliation with the manual inventory: 23 = 23, missing_from_census [], missing_from_manual [] (the tool fails on any difference, proven by a dropped, an invented and a disagreeing manual entry)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:60-73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withNonceLock: one in-process promise chain per lowercased wallet address; the op runs after the previous op settles"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:114@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the single delegation point: strategy.sendTransaction(tx, ctx.wallet, ...); every chain to the four strategy signing sites runs through here"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:267@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lock entry: submitBuyTx -> sendTxWithRetry"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lock entry: deliberate private leg -> escalatePrivateBuy"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:788@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lock entry: submitPrivateSell -> escalatePrivateSell"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1531@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lock entry: partial sell -> sendTxWithRetry"
+    }
+  ],
+  "sibling_sites_checked": "Every CallExpression in src/ (dashboard API included: no signing call under src/api/) and scripts/ at 23a64617dca167976adc4645fed0e2c69e384820, 75 program files. Counted src sites (all keyed on ctx.wallet.address): locked lexical bot.ts:226 (dead maybeApproveForChain), bot.ts:747, exitEngine.ts:544, exitEngine.ts:553; locked transitive exitEngine.ts:421 (ensureApproval, called only inside the locks at :871/:874/:1509/:1512), bloxroute.ts:128, flashbots.ts:232, flashbots.ts:263, flashbots.ts:305, passthrough.ts:130 (each through submitWithReconciliation <- sendTxWithRetry <- the four lock entries bot.ts:267, bot.ts:558, exitEngine.ts:788, exitEngine.ts:1531); unlocked tokenSafety.ts:277 (dead simulateSell, AUD-CENSUS-002). Script sites: addLiquidity.ts:35/43/48/53/58, deploySepoliaTest.ts:22/32/42/52/61, recover-sell-ladys.ts:70/78 (AUD-SCRIPTS-002, AUD-SCRIPTS-001). Message-signing: flashbots.ts:102 (relay auth header). Out-of-program signer: deploy-honeypot-checker.ts:91 spawns Hardhat Ignition with DEPLOY_PRIVATE_KEY (AUD-CONTRACTS-004, AUD-CONTRACTS-001). Grep floor: 36 hits, 23 of them exactly the counted sites.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 record (AC-36): the census itself is not a defect; the one src violation candidate is AUD-CENSUS-002. Scope limits recorded, not graded: (1) the lock is per process, so the 12 script sites are unlocked by construction against a running bot (AUD-SCRIPTS-002; the signer-exclusion decision is Phase 29, ESC-SCRIPTS-01) and the src-only count Phase 23 can assert under the in-process lock is 11; (2) the census proves each counted site runs inside a withNonceLock op, not that the op settles (AUD-TX-002, RC-10b), not head-of-line blocking (AUD-TX-003, RC-11), not re-entrancy (AUD-TX-001, RC-10a) and not module or process duplication (AUD-TX-004 RC-17, AUD-TX-005 RC-18); (3) test/ is outside the census (src and scripts only).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-CENSUS-002",
+    "AUD-SCRIPTS-002",
+    "AUD-SCRIPTS-001",
+    "AUD-TX-001",
+    "AUD-TX-002",
+    "AUD-TX-003",
+    "AUD-TX-004",
+    "AUD-TX-005",
+    "AUD-BUY-007",
+    "AUD-CONTRACTS-004",
+    "AUD-CONTRACTS-001"
+  ],
+  "tags": [
+    "census",
+    "d-nonce-authority-all"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 23 asserts against .planning/audit/census/signing-sites.json: total_tx_signing = 23 (src 11, scripts 12); every src site locked once AUD-CENSUS-002 is resolved (deleting simulateSell removes one site, giving src 10). Re-run signing-census.ts --self-test and the census on the new base for any change that adds a signing call. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-26 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "input_refs": []
+}

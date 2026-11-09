@@ -1,0 +1,70 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-001",
+    "AUD-DB-016"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-63",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-DB-020",
+  "title": "Gas buffer settings accept values that remove their protection: a negative per-chain buffer and multipliers below 1",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/chainRegistry.ts",
+    "src/preflight.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:669@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buffer read with no sign check"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:199-203@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "parseEther(gasBuffer) is added to the floor"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:433-435@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same at the entry floor"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:289-304@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "multipliers accept any finite positive value"
+    },
+    {
+      "type": "command",
+      "ref": "node -e parseEther(\"-0.1\") using the repo ethers (22-27 merge)",
+      "note": "Claude verification: returns -100000000000000000n, so a negative buffer lowers the floor."
+    }
+  ],
+  "sibling_sites_checked": "EXIT_GATE_SELL_GAS_BUFFER and DELIBERATE_BUY_GAS_BUFFER both use the same parser pattern; AUD-DB-001 lists the other malformed-setting cases.",
+  "status": "confirmed",
+  "severity_rationale": "S3: an unusual operator setting (a negative value or a multiplier under 1) with no typo path of the kind AUD-DB-001 has.",
+  "recommendation": "Reject negative buffers and multipliers below 1 at load, in the env contract of card DB-06. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-DB-04",
+    "codex-DB-05"
+  ]
+}

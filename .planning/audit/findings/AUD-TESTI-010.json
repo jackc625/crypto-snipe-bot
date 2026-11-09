@@ -1,0 +1,87 @@
+{
+  "id": "AUD-TESTI-010",
+  "title": "The integration \"exit trigger correctness\" and \"connection failure\" cases recompute the stop-loss and trailing thresholds inside the test or assert literals, and the ECONNRESET case passes an empty provider object, so no exit decision of the real poll loop is executed and the registered exit-signal S1s pass green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C03",
+    "C14"
+  ],
+  "files": [
+    "test/integration/exitMonitor.test.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/exitMonitor.test.ts:200-229@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "trailing stop: computeEffectiveTrailingPct is real, but the trigger price and \"currentPrice <= triggerPrice\" are computed in the test; comment \"This verifies executeFullSell WOULD be called\""
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/exitMonitor.test.ts:231-274@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "stop-loss and no-premature-sell: pure arithmetic on local constants"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/exitMonitor.test.ts:276-294@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice returning null: asserts nullPrice === null"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/exitMonitor.test.ts:379-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ECONNRESET case: httpProvider is {} (:432), so the router Contract call fails with a missing-method error, not ECONNRESET; queryPrice returns null for any error"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/exitMonitor.test.ts:461-617@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "stale-price and consecutive-failure cases run in-test loops and VolatilityTracker only"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:315-345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice returns null on any error"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1866-1873@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor returns without arming when the first quote is null (AUD-EXIT-002)"
+    }
+  ],
+  "sibling_sites_checked": "Every exit-decision case in the TESTI slice: exitMonitor.test.ts (this), multiSignalEnd2End (exit mocked), the fork exit tests realLaunchReplay / exitStatePersistence / captureRehearsal (Task 2). The sell-lock cases in the same file (lines 11-139, 626-679) run the real exitManager and are sound.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: hollow cases that claim exit-trigger correctness on the money path; they hide the registered S1s AUD-EXIT-002 (monitor never starts when the first quote fails) and AUD-EXIT-003 (the exit price signal is not a price).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-002",
+    "AUD-EXIT-003",
+    "AUD-TESTU-007"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive startExitMonitor / pollExitStrategy with fake timers and a scripted router quote sequence and assert executeFullSell is (or is not) called with the trigger reason; add a case where the first quote fails and assert the monitor still arms or alerts (RED today per AUD-EXIT-002).",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "trailing stop fires at correct threshold: HWM=300, trigger=270, price=265",
+    "stop-loss fires at correct threshold: entry=100, stopLossPrice=70, price=65",
+    "no premature sell for stable prices above stop-loss and below trailing activation",
+    "queryPrice returning null does not trigger a sell",
+    "queryPrice returns null on ECONNRESET error (does not crash)",
+    "stale price data recovery: null cycles followed by valid price",
+    "multiple consecutive connection failures do not corrupt exit state"
+  ],
+  "escaped_regression": "Invert the stop-loss comparison in pollExitStrategy (sell when price rises above the stop): every case in \"Exit trigger correctness\" stays green because none of them runs pollExitStrategy."
+}

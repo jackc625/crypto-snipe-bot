@@ -229,7 +229,9 @@ beforeEach(async () => {
 // Tests
 // -----------------------------------------------------------------------------
 
-describe('Phase 21.3 — no-double-buy guard (STOP-THE-LINE-05-C) [REAL-PATH]', () => {
+// Whichever test runs first pays for the first import of src/bot, which takes about 5 s under a
+// full parallel run. The unit project's default limit is 5 s (found by 22-15).
+describe('Phase 21.3 — no-double-buy guard (STOP-THE-LINE-05-C) [REAL-PATH]', { timeout: 30_000 }, () => {
     it('REAL-PATH: the guard reconciles the hash the strategy ACTUALLY broadcast (BroadcastHandle.signedTxHash) — HASH EQUALITY, never a pre-signed phantom', async () => {
         // not-landed everywhere → the private leg surfaces lastSignedHash = H and the
         // guard 2a reconciles it. balanceOf 0 + nonce unconsumed → the public buy

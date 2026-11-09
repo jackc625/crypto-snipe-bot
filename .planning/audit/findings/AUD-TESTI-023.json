@@ -1,0 +1,76 @@
+{
+  "id": "AUD-TESTI-023",
+  "title": "The honeypot fork cases that expect \"not safe\" can pass for the wrong reason: for V2 modes 1 and 2 and the multi-amount Test 7 the liquidity add itself fails, so the checker returns unsafe because no pool exists, and the V3 contrived case proves only that a token with no V3 pool is unsafe; no fork case shows the checker detecting a V3 honeypot",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/honeypotMultiAmount.fork.test.ts",
+    "test/fixtures/contracts/Honeypot.sol"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:148-197@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "addLiquidityETH in a try/catch; the comment says modes 1 and 2 revert there and \"the wrapper still fails-closed ... (no pool → router reverts → unsafe verdict)\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:236-241@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "assertion: verdict not \"safe\" and three probe results, which a no-pool revert satisfies"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:357-402@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 contrived case: \"No V3 pool exists for HPV3/WETH on the fork\", asserts not \"safe\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotMultiAmount.fork.test.ts:157-165@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mode-4 LP add caught \"expected if threshold is low\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotMultiAmount.fork.test.ts:199-232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 7 uses a 30-token threshold while the LP add transfers 100,000 tokens, so the pool is never created and the not-safe verdict comes from the missing pool, not from the amount-tier probes"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotMultiAmount.fork.test.ts:49-53@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: \"Vitest may run fork test files in parallel\" (stale: vitest.config.ts:44 sets fileParallelism false)"
+    }
+  ],
+  "sibling_sites_checked": "All honeypot fork cases: V2 modes 0 and 3 build a pool (their unsafe verdict is meaningful); honeypotMultiAmount Test 8 asserts \"safe\" for a permissive threshold (meaningful, the only positive case). The integration honeypot tests (honeypotDispatch, honeypotUnknownFailsClosed) decode scripted reverts and are sound for what they claim.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the honeypot gate is the buy-side capital control; three of its fork proofs would stay green if the checker contract stopped detecting the pattern, as long as pool creation keeps failing first.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-021"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25: assert that the pool exists (getReserves > 0) before calling the checker for each mode, and assert the specific reason (BUY_BAL_ZERO, SELL_ETH_ZERO, AMOUNT_TIER_BLOCKED) instead of \"not safe\"; create a V3 pool for the V3 contrived token.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "V2 mode 1 / V2 mode 2: verdict !== 'safe' when deployed against real Uniswap V2 on fork",
+    "Test 7: amountTierThreshold between 1% and 50% probe sizes → 50%+100% probes revert → overall unsafe",
+    "exercises simulateViaContractV3 dispatch — verdict !== safe for a Honeypot.sol mode-0 token"
+  ],
+  "escaped_regression": "Remove the amount-tier detection from HoneypotChecker.sol: Test 7 stays green because its token never gets a pool and the checker reverts on the missing pool."
+}

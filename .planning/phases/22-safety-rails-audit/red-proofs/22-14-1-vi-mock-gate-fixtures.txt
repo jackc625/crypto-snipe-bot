@@ -1,0 +1,24 @@
+# RED proof 22-14-1-vi-mock-gate-fixtures (AC-27 / SAFE-06, the gate fails on the broken fixtures)
+Date: 2026-11-09T04:13:31.000Z
+
+## What this proves
+
+The gate exits 1 and names all four seeded violations, covering all three kinds and a broken mock behind a renamed vi import, while the valid fixtures produce nothing. The same gate exits 0 on the real suite.
+
+## Fixture run
+
+Command: node node_modules/ts-node/dist/bin.js scripts/check-vi-mock-paths.ts --root test/fixtures/viMockGate
+Exit code: 1
+
+test/fixtures/viMockGate/broken-aliased.fixture.ts:5 v.mock(./also-missing) unresolved-relative
+test/fixtures/viMockGate/broken-bare.fixture.ts:4 vi.mock(no-such-package-csb-gate) unresolved-bare
+test/fixtures/viMockGate/broken-relative.fixture.ts:4 vi.mock(./does-not-exist) unresolved-relative
+test/fixtures/viMockGate/non-literal.fixture.ts:5 vi.doMock(someVariable) non-literal
+check-vi-mock-paths: 11 mock calls checked in 8 files, 4 violations
+
+## Real-suite run
+
+Command: node node_modules/ts-node/dist/bin.js scripts/check-vi-mock-paths.ts
+Exit code: 0
+
+check-vi-mock-paths: 584 mock calls checked in 170 files, 0 violations

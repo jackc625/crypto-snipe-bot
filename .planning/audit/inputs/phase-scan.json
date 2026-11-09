@@ -1,0 +1,133 @@
+{
+  "tool": "betterleaks",
+  "version": "1.10.0",
+  "binary_sha256": "16600f87ef27eed53f7bcb80d56bd7c9e5730c9088c8d30ef57867b6a1fec6cf",
+  "config_sha256": {
+    "extended": "109020a5bfdc2fd1e0375f794409786b092a671e4e4fbe0761e2850268a649a6",
+    "known_public": "14e53bda7d285b867758963d6e25490ed32ed3aef358693632efbca94196e493",
+    "public_address": "72063e891bd369a77d5340c49d71230eb3833758bc7e20564f0049c581ee9edf"
+  },
+  "fixtures_sha256": "d24e9f3db3d46caf6db1a02358f1dc4969a16acde540f71c154290194d8100e0",
+  "engine": ".planning/audit/tools/seal-verify.ts --phase-scan (three-pass classification, operator ruling classify-addresses)",
+  "mode": "git",
+  "range": "23a64617dca167976adc4645fed0e2c69e384820..1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+  "log_opts": "--full-history --diff-filter=tuxdb --diff-merges=first-parent 23a64617dca167976adc4645fed0e2c69e384820..1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+  "scanner_args": [
+    "git",
+    "<repo root>",
+    "--log-opts=<log_opts>",
+    "--config",
+    "<extended.toml|known-public.toml|public-address.toml>",
+    "--max-archive-depth",
+    "2",
+    "--redact",
+    "--no-banner",
+    "--no-color",
+    "--report-format",
+    "json",
+    "--report-path",
+    "<report.json>",
+    "--exit-code",
+    "9",
+    "--ignore-gitleaks-allow",
+    "--gitleaks-ignore-path",
+    "<empty temp dir>"
+  ],
+  "env_belt": "HTTPS_PROXY=HTTP_PROXY=ALL_PROXY=http://127.0.0.1:1 (belt only, not an enforced network boundary)",
+  "network_boundary": {
+    "kind": "firewall-rule",
+    "rule": "csb-betterleaks-outbound-block",
+    "enabled": "Yes",
+    "direction": "Out",
+    "action": "Block",
+    "profiles": "Domain,Private,Public",
+    "program": "C:\\Users\\jackc\\tools\\betterleaks-1.10.0\\betterleaks.exe",
+    "program_matches_exe_path": true,
+    "read_with": "netsh advfirewall firewall show rule name=<rule> verbose, by this tool, before the scanner ran"
+  },
+  "scanned_at": "2026-11-09T14:30:23.315Z",
+  "node": "v22.16.0",
+  "git_version": "git version 2.56.0.windows.3",
+  "range_fixture": {
+    "pass": true,
+    "cases": [
+      {
+        "id": "range-excludes-earlier-commit",
+        "pass": true,
+        "observed": "a.ts hits 0"
+      },
+      {
+        "id": "range-includes-inner-commit",
+        "pass": true,
+        "observed": "c.ts non-public,non-public"
+      },
+      {
+        "id": "range-known-public",
+        "pass": true,
+        "observed": "h.ts known-public:hardhat-0,known-public:hardhat-0"
+      },
+      {
+        "id": "range-public-address",
+        "pass": true,
+        "observed": "m.log public-address"
+      },
+      {
+        "id": "range-pass-subset",
+        "pass": true,
+        "observed": "{\"pass1\":5,\"pass2\":3,\"pass3\":2,\"pass2_only\":0,\"pass3_only\":0}"
+      },
+      {
+        "id": "range-redaction",
+        "pass": true,
+        "observed": "planted values in raw reports: 0"
+      }
+    ]
+  },
+  "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sealed_sha": "1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+  "phase_start_is_ancestor_of_head": true,
+  "history_rewritten": false,
+  "commits_in_range": 213,
+  "bytes_scanned": {
+    "pass1": 7342932,
+    "pass2": 7342932,
+    "pass3": 7342932
+  },
+  "pass_counts": {
+    "pass1": 0,
+    "pass2": 0,
+    "pass3": 0,
+    "pass2_only": 0,
+    "pass3_only": 0
+  },
+  "raw_report_dir": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw",
+  "raw_reports": [
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass1.json",
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass2.json",
+    "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/d61f8f14-79f5-4e9e-98d7-969bbff0dbc4/scratchpad/reseal-raw/range-2026-11-09T14-30-18-657Z.pass3.json"
+  ],
+  "classification_labels": {
+    "non-public": "reported by all three passes",
+    "known-public:hardhat-0": "reported by pass 1, removed by the pass-2 Hardhat #0 allowlist",
+    "public-address": "reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling \"classify-addresses\", ESC-SECRET-01)"
+  },
+  "classification_key": [
+    "rule id",
+    "file",
+    "commit",
+    "line",
+    "start column",
+    "end column"
+  ],
+  "hit_counts": {
+    "total": 0,
+    "non-public": 0,
+    "known-public:hardhat-0": 0,
+    "public-address": 0
+  },
+  "hits": [],
+  "value_policy": "hits hold rule id, file, commit, line, column, type and classification only; raw redacted reports stay in raw_report_dir outside the repo",
+  "phase": "22-safety-rails-audit",
+  "plan": "22-29",
+  "requirement": "NAC-11"
+}

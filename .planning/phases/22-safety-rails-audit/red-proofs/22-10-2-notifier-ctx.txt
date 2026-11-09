@@ -1,0 +1,42 @@
+# RED proof 22-10-2-notifier-ctx (AC-18, src notifier + dotenv layers)
+Date: 2026-11-09T02:19:11Z
+File neutralised (working tree only, never committed): src/utils/notifier.ts
+What was neutralised: the refuseUnderVitest() call inside sendCtxAlert is removed; the axios.post spy is mocked to resolve, so nothing leaves the machine
+sha256 before and after restore: a3a06c9782e2f9c082f581a27e0ff7fcde537bfa7f469b97af6b680e094a5b06
+
+## Diff applied
+
+diff --git a/src/utils/notifier.ts b/src/utils/notifier.ts
+index 1e6fa78..98abf94 100644
+--- a/src/utils/notifier.ts
++++ b/src/utils/notifier.ts
+@@ -100,7 +100,6 @@ export async function sendCtxAlert(ctx: ChainContext, message: string) {
+         log.warn('Telegram alert skipped: missing chat ID or bot token');
+     } else {
+         try {
+-            refuseUnderVitest();
+             await axios.post(TELEGRAM_API, {
+                 chat_id: process.env.TELEGRAM_CHAT_ID,
+                 text: `${ctx.chain.displayName} ${message}`,
+
+## Command (wrapped, ran ONLY this test file, filtered to one rail)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/notifierRefusal.test.ts -t "sendCtxAlert"
+
+## RED result: exit 1
+
+ FAIL   unit  test/unit/rails/notifierRefusal.test.ts > notifier refusal under Vitest (SAFE-02 src layer, D-04 amended) > sendCtxAlert is refused through its catch path: no post, broadcast keeps the chain, ledger entry
+AssertionError: expected 1 to be +0 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 3 skipped (5)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T021907-17540-dc7f64 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T021907-17540-dc7f64\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/notifier.ts (sha256 equal; git status --porcelain src scripts empty)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 3 skipped (5)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T021910-25536-8dafe6 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T021910-25536-8dafe6\summary.json

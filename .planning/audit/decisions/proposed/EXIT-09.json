@@ -1,0 +1,32 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-09",
+  "title": "Freshness of the public-fallback floor",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: quote, wait for the approve, swap with the old floor",
+      "behavior_impact": "none",
+      "risk": "In a draining pool the fallback reverts and costs a full retry cycle (AUD-EXIT-011)."
+    },
+    {
+      "id": "requote-after-approve",
+      "name": "Re-quote right before the swap",
+      "behavior_impact": "The floor matches the pool at send time.",
+      "risk": "One more RPC call in the fallback."
+    }
+  ],
+  "recommendation": "requote-after-approve (or remove the approve from the path, card EXIT-03).",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
+  "behavior_impact": "Decides whether the guaranteed exit uses a current floor.",
+  "findings": [
+    "AUD-EXIT-011",
+    "AUD-EXIT-026"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-43"
+}

@@ -1,0 +1,28 @@
+{
+  "files": {
+    "bot.db": {
+      "mtimeMs": 1780090436817.063,
+      "sha256": "961aa8222c62fd12ee45aec5cf082ab1d76df138c8748b5c1b8d22c49f361c0c",
+      "size": 57344,
+      "status": "PRESENT"
+    },
+    "bot.db-shm": {
+      "mtimeMs": 1780100758836.0308,
+      "sha256": "2200a440727514ae2893386b094d64a6e2c5b1dbaa10a8b87067dbe09289ca70",
+      "size": 32768,
+      "status": "PRESENT"
+    },
+    "bot.db-wal": {
+      "mtimeMs": 1780100758836.0308,
+      "sha256": "70b57264ef591190515fbe9dd4427f9f606a419af6ddab83b65ee1d3449bea36",
+      "size": 164832,
+      "status": "PRESENT"
+    }
+  },
+  "label": "live_db",
+  "phase_start_manifest": {
+    "compared_with": ".planning/baselines/backup-record.json",
+    "differences": [],
+    "matches": true
+  }
+}

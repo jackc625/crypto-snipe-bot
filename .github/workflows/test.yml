@@ -17,6 +17,12 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run test:unit
       - run: npm run test:integration
+      - name: vi.mock specifier gate (SAFE-06)
+        # SAFE-06: a moved file must not turn a mock into a silent no-op. AST check of
+        # vi.mock / vi.doMock / vi.unmock / vi.doUnmock: each specifier must be a literal that
+        # resolves to a real module from the file that contains the call. The deliberately
+        # broken fixtures under test/fixtures/viMockGate are excluded from the suite scan.
+        run: npm run check:vi-mock
       - name: Ban .todo test stubs
         run: |
           # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.
@@ -47,6 +53,10 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.json
       - name: TypeScript check (tsconfig.bot.json)
         run: npx tsc --noEmit -p tsconfig.bot.json
+      - name: Install dashboard dependencies
+        # dashboard/ has its own package.json and lockfile. The root install above does not
+        # cover them, and without them the type check below cannot find React.
+        run: npm ci --prefix dashboard
       - name: TypeScript check (dashboard/tsconfig.json)
         run: npx tsc --noEmit -p dashboard/tsconfig.json
 

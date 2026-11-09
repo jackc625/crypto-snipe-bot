@@ -1,0 +1,81 @@
+{
+  "id": "AUD-TESTU-005",
+  "title": "The restart-resume test for exit_failed_held positions mocks the SQL that is the S-1 fix and never checks which dex or amount the position is resumed with, so the S-1 regression and the registered wrong-dex and wrong-probe defects all pass it",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C03",
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "test/unit/bot/exitFailedHeldResume.test.ts",
+    "src/utils/db.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/bot/exitFailedHeldResume.test.ts:101-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeExitMonitorTrades and getResumeAntiRugTrades are vi.fn statements; the rows are injected by each test"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/exitFailedHeldResume.test.ts:236-260@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test A asserts call[2] (token) and call[5] (tradeId) only; call[1] (dex) and call[4] (amount) are never checked"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/exitFailedHeldResume.test.ts:192-195@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the fixture chain has exactly one V2 and one V3 dex, so \"first dex of the pool type\" is always the right one"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeExitMonitorTrades: the union that re-adds exit_failed_held rows (the S-1 fix) is never executed by a unit test"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:612@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeAntiRugTrades: same"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1943-1955@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resume picks ctx.chain.dexes.find(isDexV3 / isDexV2) and passes ctx.chain.snipeAmount (AUD-EXIT-013, AUD-EXIT-015)"
+    }
+  ],
+  "sibling_sites_checked": "git grep getResumeExitMonitorTrades / getResumeAntiRugTrades over test/unit at the base SHA: only the bot/ tests that mock db.ts reference them; db.test.ts and db/exitFailedHeldMigration.test.ts never run these two statements. Integration tests that reference them (botWiring, midRunWalletCheck, pauseFlow, preflightInvocation) are TESTI scope (22-24).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the test claims the restart re-protects failed-held positions (an S1 stranded-position fix) while the SQL that does it is mocked; the registered S1s AUD-EXIT-013, AUD-ANTIRUG-011 and AUD-EXIT-015 are invisible to its assertions.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-013",
+    "AUD-ANTIRUG-011",
+    "AUD-EXIT-015"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: run the real getResumeExitMonitorTrades / getResumeAntiRugTrades against a temp DB seeded with a failed-held row, a pending row and a sold row, and assert the dex (by router address) and the probe amount each resumed position gets on a chain with two V2 dexes.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test A (re-monitor): an exit_failed_held row (trades.status=failed) with balanceOf>0 is RE-ENTERED into exit monitoring on restart",
+    "Test B (re-register anti-rug): the same exit_failed_held position has its anti-rug RE-REGISTERED on restart",
+    "Test D (no regression — exit monitor): a normal status=pending buy with NO exit_state resumes exactly as before",
+    "Test D (no regression — anti-rug): a normal status=pending buy is re-registered exactly as before, and a closed/sold one is not in the scan"
+  ],
+  "escaped_regression": "Change getResumeExitMonitorTrades at src/utils/db.ts:597 back to WHERE status = 'pending' AND action = 'buy' (the S-1 bug that dropped failed-held positions on reboot): every case stays green because the statement is mocked. Also green today: resuming a position bought on the second V2 dex through the first one (src/bot.ts:1950) and with the current snipe amount (:1955)."
+}

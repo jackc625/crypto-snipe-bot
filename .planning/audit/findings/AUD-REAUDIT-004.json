@@ -1,0 +1,51 @@
+{
+  "id": "AUD-REAUDIT-004",
+  "title": "spawnRailedChild's railsEntry option can put any test's child in fork mode, which turns off the general non-loopback deny for that child",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "db68184d5c1292b05640e5bfcb7a94462c3def7f",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: it is a test-code option, not an env var or flag, so it is not a bypass under NAC-05. A fork-mode child's env is still sentinels, its .env and data blocks and DB tripwire are still installed, and Telegram is still denied. It could reach the general network only if a test passed a real URL literally.",
+  "area": "test",
+  "slice": "REAUDIT",
+  "severity": "S4",
+  "files": [
+    "test/rails/spawnRailedChild.ts",
+    "test/unit/rails/childRails.test.ts",
+    "test/unit/rails/hardhatChildEnv.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/rails/spawnRailedChild.ts:79@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "the option is limited to the two entries but not restricted by caller"
+    },
+    {
+      "type": "code",
+      "ref": "test/rails/spawnRailedChild.ts:355@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "the fork entry installs mode fork, where only Telegram is denied"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n railsEntry -- test",
+      "note": "used only by childRails.test.ts and hardhatChildEnv.test.ts, both rail proofs"
+    }
+  ],
+  "sibling_sites_checked": "Every other spawnRailedChild option was checked in judgment-reviews.json (inheritedEnv, envOverrides, homeOverride, nodeOptions, ledgerRunId, cwd, withVitestEnv). This is the only option that changes which rail mode a child gets. The module header names it (\"which rails entry preloads\") but does not list it as a limit.",
+  "recommendation": "Extend the spawn-site gate so railsEntry: setup-fork is accepted only in the rail proof test files, in the same way the computed-require allowance is limited."
+}

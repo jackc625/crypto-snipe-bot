@@ -1,0 +1,454 @@
+{
+  "slice": "BUY",
+  "assistant": "codex",
+  "model": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "cli_version": "codex-cli 0.163.0",
+  "raw_sha256": "7767a072c9553f04131a8724da6a238ace574d9dd5c5149314dbf24fa664ad9c",
+  "files_reviewed": [
+    "src/alphaDrop.ts",
+    "src/bot.ts",
+    "src/telegramListener.ts",
+    "src/utils/abis.ts",
+    "src/utils/blocklist.ts",
+    "src/utils/honeypot/abi.ts",
+    "src/utils/honeypot/bytecodeScan.ts",
+    "src/utils/honeypot/checkerContract.ts",
+    "src/utils/honeypot/index.ts",
+    "src/utils/honeypot/sanitize.ts",
+    "src/utils/honeypot/simulator.ts",
+    "src/utils/honeypot/types.ts",
+    "src/utils/pairDiscovery.ts",
+    "src/utils/safetyProviders/goplus.ts",
+    "src/utils/safetyProviders/honeypotIs.ts",
+    "src/utils/safetyProviders/mudra.ts",
+    "src/utils/safetyProviders/types.ts",
+    "src/utils/safetyProviders/unicrypt.ts",
+    "src/utils/tokenSafety.ts"
+  ],
+  "findings": [
+    {
+      "ext_id": "codex-BUY-01",
+      "file": "src/telegramListener.ts",
+      "line_start": 77,
+      "line_end": 80,
+      "class_ids": [
+        "C18",
+        "C20"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Leaving either Telegram whitelist empty accepts every source",
+      "explanation": "An empty sender list makes senderAllowed true, and an empty channel list makes channelAllowed true. The rejection at src/telegramListener.ts:80 requires both to be false. Consequently, configuring only one whitelist disables source restrictions entirely; leaving both unset also accepts everything. Any incoming Telegram source can then supply addresses that reach the funded buy handlers through src/telegramListener.ts:121.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-BUY-02",
+      "file": "src/bot.ts",
+      "line_start": 881,
+      "line_end": 885,
+      "class_ids": [
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "Concurrent signals can buy the same token repeatedly",
+      "explanation": "The deduplication check precedes many asynchronous safety checks, while the trade is inserted only after submission at src/bot.ts:1127. Concurrent factory, polling, or Telegram handlers can therefore both observe no trade and proceed. The nonce lock at src/bot.ts:267 serializes submissions but never repeats the token check, so both buys can execute with successive nonces. Similarly, risk checks at src/bot.ts:909 can race if the omitted canSnipe implementation checks limits without reserving capacity.",
+      "sibling_sites": [
+        "src/bot.ts:1211 V3 performs the same pre-await token deduplication",
+        "src/bot.ts:909 V2 risk check occurs before asynchronous work and recording",
+        "src/bot.ts:1248 V3 risk check has the same reservation window"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-03",
+      "file": "src/bot.ts",
+      "line_start": 1177,
+      "line_end": 1190,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Post-buy setup errors mark successfully acquired positions failed",
+      "explanation": "This catch covers submission, persistence, notifications, balance reads, and monitor initialization. For example, if the notification at src/bot.ts:1147 or balance read at src/bot.ts:1159 rejects after a successful buy, the code marks the trade failed and never arms monitoring. The documented restart scan includes pending buys or exit_failed_held positions, so this newly failed buy can also disappear from restart recovery despite the wallet holding tokens.",
+      "sibling_sites": [
+        "src/bot.ts:1508 V3 catch also marks post-buy setup failures as failed transactions",
+        "src/bot.ts:827 Deliberate monitoring initialization can stop after recording when balanceOf rejects",
+        "src/bot.ts:589 Late-landed deliberate buy awaits a notification before recording or arming protection"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-04",
+      "file": "src/bot.ts",
+      "line_start": 1100,
+      "line_end": 1112,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Buy submission precedes any recoverable trade record",
+      "explanation": "The funded transaction is submitted here, but no trade row exists until src/bot.ts:1127. A crash or database error between those operations can leave purchased tokens without a row for either restart monitor to discover. Deliberate buys have the same ordering. This becomes an orphaned position unless the omitted transaction helpers independently persist and recover a durable buy-intent journal; no such recovery is visible in these files.",
+      "sibling_sites": [
+        "src/bot.ts:1431 V3 submits before inserting its trade",
+        "src/bot.ts:558 Deliberate private buy submits before recordAndArmDeliberateBuy",
+        "src/bot.ts:746 Deliberate public buy settles before recording at line 759"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-05",
+      "file": "src/bot.ts",
+      "line_start": 746,
+      "line_end": 750,
+      "class_ids": [
+        "C07"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "A dropped public buy can hold the wallet nonce lock indefinitely",
+      "explanation": "The public fallback holds withNonceLock while awaiting stx.wait() with no timeout, fee replacement, or dropped-transaction recovery. If the transaction remains pending or disappears from the mempool, this callback can remain unresolved indefinitely. Because the same wallet lock protects sells and anti-rug submissions, an unsuccessful new entry can block exits for existing positions. The exit-worker watchdog cannot resolve this underlying public-buy wait.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-BUY-06",
+      "file": "src/bot.ts",
+      "line_start": 747,
+      "line_end": 748,
+      "class_ids": [
+        "C16"
+      ],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "The public fallback bypasses configured transaction fee ceilings",
+      "explanation": "This direct router submission supplies only value: no capped gas price, maxFeePerGas, priority fee, or gas limit. It bypasses the transaction strategy used by private submissions. A fee spike or expensive token execution can therefore produce a transaction above configured fee or gas ceilings. The earlier affordability calculation at src/bot.ts:675 does not constrain the fees ultimately populated and signed here.",
+      "sibling_sites": [
+        "src/bot.ts:226 Approval submission also supplies no fee or gas ceiling",
+        "src/utils/tokenSafety.ts:277 Legacy sell simulation submits an uncapped approval"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-07",
+      "file": "src/bot.ts",
+      "line_start": 746,
+      "line_end": 749,
+      "class_ids": [
+        "C07",
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "The public fallback is not pinned to the private buy's nonce",
+      "explanation": "The private nonce is checked at src/bot.ts:635-636, followed by affordability checks, quoting, and an awaited alert. The final router call supplies no nonce. If a private submission remains eligible after the omitted reconciliation code reports not-landed, it can land during this gap; the public call can then populate the next nonce and buy again. The lock cannot prevent on-chain inclusion. Safety therefore depends on the omitted private strategy guaranteeing that every previous submission is permanently expired or cancelled before fallback.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-BUY-08",
+      "file": "src/bot.ts",
+      "line_start": 1048,
+      "line_end": 1055,
+      "class_ids": [
+        "C01",
+        "C04"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Quote or slippage-conversion failures turn into unrestricted buys",
+      "explanation": "minOut starts at zero and remains zero after any quote or calculation error. A fractional slippage setting such as 0.5 also makes BigInt(slippage) throw, unless rejected by omitted configuration validation, and the catch silently removes protection. The resulting transaction accepts arbitrarily poor execution. Private routing does not protect against adverse pool changes, depleted liquidity, or unfavorable builder ordering.",
+      "sibling_sites": [
+        "src/bot.ts:1362 V3 quote and BigInt conversion failures also retain zero minOut",
+        "src/bot.ts:527 Deliberate private quote failures also retain zero minOut"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-09",
+      "file": "src/bot.ts",
+      "line_start": 1050,
+      "line_end": 1050,
+      "class_ids": [
+        "C02",
+        "C04"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "A configured zero-slippage limit becomes five percent",
+      "explanation": "CONFIG.slippagePercent || 5 replaces an explicit zero with five, allowing worse execution than the configured limit. Both deliberate legs repeat this fallback. Additionally, parsePositiveNumberDefault at src/bot.ts:338-341 rejects an explicit DELIBERATE_BUY_SLIPPAGE_PCT of zero and substitutes a positive fallback, including on the public mempool path.",
+      "sibling_sites": [
+        "src/bot.ts:1373 V3 replaces zero slippage with five",
+        "src/bot.ts:529 Deliberate private slippage fallback replaces zero",
+        "src/bot.ts:703 Deliberate public slippage fallback replaces zero"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-10",
+      "file": "src/bot.ts",
+      "line_start": 878,
+      "line_end": 879,
+      "class_ids": [
+        "C03"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Factory events are processed without requiring a wrapped-native pair",
+      "explanation": "Neither listener nor handler verifies that either token is the chain's wrapped native asset. For an A/B pair, this chooses A, checks locks and reserves on A/B, but buys A through WETH/A. src/utils/tokenSafety.ts:413-417 then treats B's raw reserve as native wei. An unrelated locked pair with large B reserves can therefore satisfy checks for an unlocked or illiquid WETH/A purchase, and anti-rug registration watches the wrong pair. V3 has the same pool-selection mismatch.",
+      "sibling_sites": [
+        "src/bot.ts:1207 V3 chooses a target without verifying the other token is wrapped native",
+        "src/bot.ts:1539 V3 listener forwards every factory pool",
+        "src/bot.ts:1582 V2 listener forwards every factory pair",
+        "src/utils/tokenSafety.ts:413 Chain-aware liquidity check assumes reserve1 is native when token0 is not",
+        "src/utils/tokenSafety.ts:176 Legacy liquidity check makes the same reserve assumption"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-11",
+      "file": "src/utils/safetyProviders/goplus.ts",
+      "line_start": 63,
+      "line_end": 69,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "A tiny locked LP allocation passes the liquidity-lock gate",
+      "explanation": "The check accepts any locked holder and ignores holder.percent, which is explicitly available in this file's response type. A creator can lock a negligible LP allocation while retaining nearly all withdrawable liquidity, and the bot still treats the pool as locked at src/bot.ts:1025. Mudra and Unicrypt likewise accept any active lock without verifying the fraction of total LP it protects, allowing the remaining liquidity to be removed after entry.",
+      "sibling_sites": [
+        "src/utils/safetyProviders/mudra.ts:27 Any unexpired lock is accepted",
+        "src/utils/safetyProviders/unicrypt.ts:29 Any unexpired lock is accepted",
+        "src/utils/tokenSafety.ts:76 Legacy lock check accepts any active lock"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-12",
+      "file": "src/bot.ts",
+      "line_start": 200,
+      "line_end": 210,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Successful V3 quoting does not enforce minimum liquidity",
+      "explanation": "The check submits a quote with threshold as the input amount, discards the result, and treats non-reversion as proof of sufficient liquidity. A very small V3 pool can quote a large input by moving the price drastically or exhausting available ranges. Quote success does not establish that the pool contains threshold native liquidity. Consequently, the configured minimum-liquidity gate can admit positions with little realizable exit liquidity.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-BUY-13",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 417,
+      "line_end": 418,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "V2 liquidity checks ignore the chain's configured threshold",
+      "explanation": "The chain-aware V2 check hardcodes one native coin, whereas src/bot.ts:185 reads ctx.chain.minLiquidityThreshold for V3. If a chain is configured to require more than one native coin, V2 pools below that configured floor still pass and can be purchased. A lower configured threshold is also ignored, unnecessarily rejecting opportunities.",
+      "sibling_sites": [
+        "src/utils/tokenSafety.ts:180 Legacy liquidity check also hardcodes one native coin"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-14",
+      "file": "src/bot.ts",
+      "line_start": 1943,
+      "line_end": 1948,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Restart monitoring selects the first DEX instead of the trade's DEX",
+      "explanation": "Trades record dexName at src/bot.ts:1145 and src/bot.ts:1469, but restart lookup selects only the first DEX of the matching type. With multiple V2 or V3 DEXes, a position bought on another DEX resumes against the wrong router or factory. Exits can repeatedly revert or use an unrelated pool. This money effect requires the omitted monitor/detector helpers to use the supplied DEX rather than independently correcting it from the trade ID.",
+      "sibling_sites": [
+        "src/bot.ts:1950 V2 exit resume selects the first V2 DEX",
+        "src/bot.ts:2098 Anti-rug resume selects the first DEX matching pool_type"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-15",
+      "file": "src/bot.ts",
+      "line_start": 1948,
+      "line_end": 1948,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Restart replaces the original buy cost with the current snipe amount",
+      "explanation": "Resume passes ctx.chain.snipeAmount instead of the recorded trade amount. Deliberate buys explicitly support different sizes and initially pass their actual amount at src/bot.ts:860-861; configuration changes can also change the ordinary snipe amount between runs. If the omitted resumeExitMonitor uses its buy-amount argument to reconstruct profit, stop-loss, or trailing thresholds, restart silently changes those thresholds and can cause premature sales or delayed protective exits.",
+      "sibling_sites": [
+        "src/bot.ts:1955 V2 resume also passes the current configured snipe amount"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-16",
+      "file": "src/bot.ts",
+      "line_start": 1934,
+      "line_end": 1938,
+      "class_ids": [
+        "C08",
+        "C09",
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Restart abandons pending buys without reconciling settlement",
+      "explanation": "One zero balance permanently marks the buy failed without checking its transaction receipt or pending state. If a strategy returns before mining, as documented at src/bot.ts:1149-1155, or a recent inclusion is reorganized, the transaction can subsequently land after monitoring has been discarded. The documented resume set excludes this failed buy unless it has exit_failed_held state. A rejected balance read is likewise only logged, with no retry to arm the position.",
+      "sibling_sites": [
+        "src/bot.ts:1957 Rejected balance or monitor initialization is logged without a retry"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-17",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 38,
+      "line_end": 48,
+      "class_ids": [
+        "C17"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Legacy honeypot fallback can write the wallet private key to logs",
+      "explanation": "The fallback passes CONFIG.walletPrivateKey as the swap recipient at src/utils/tokenSafety.ts:41. A private key is not a valid recipient address; ethers argument-resolution errors can include the invalid value verbatim, and the catch logs the error message at lines 47-48. No supplied call site invokes this legacy export, so exposure requires an omitted caller to invoke checkHoneypot while its primary API fails.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-BUY-18",
+      "file": "src/bot.ts",
+      "line_start": 1539,
+      "line_end": 1543,
+      "class_ids": [
+        "C11"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Listener callbacks discard rejecting handler promises",
+      "explanation": "The callback invokes an async buy handler without returning, awaiting, or catching its promise. Errors before the handler's inner submission try/catch, such as notification failures or rejected safety checks, become unhandled rejections. Under Node's default behavior these can terminate the process and stop protection for all held positions. HTTP polling's surrounding try/catch cannot catch its similarly discarded handler promises.",
+      "sibling_sites": [
+        "src/bot.ts:1531 Async HTTP-listener startup is not awaited",
+        "src/bot.ts:1583 V2 WebSocket callback discards the buy-handler promise",
+        "src/bot.ts:1644 V2 polling discards the buy-handler promise",
+        "src/bot.ts:1669 V3 polling discards the buy-handler promise",
+        "src/bot.ts:1740 Async health interval has no rejection handler",
+        "src/bot.ts:1774 Async balance interval has no rejection handler",
+        "src/bot.ts:1554 Async close callback can reject before entering its retry catch",
+        "src/bot.ts:1595 V2 close callback has the same rejection gap",
+        "src/bot.ts:1545 V3 subscription promise is not awaited or caught",
+        "src/bot.ts:1564 V3 resubscription promise is not awaited or caught",
+        "src/bot.ts:1586 V2 subscription promise is not awaited or caught",
+        "src/bot.ts:1606 V2 resubscription promise is not awaited or caught",
+        "src/bot.ts:170 Mint subscription promise is not awaited or caught",
+        "src/bot.ts:165 Mint-listener cleanup promise is not caught",
+        "src/bot.ts:172 Successful Mint-listener cleanup promise is not caught",
+        "src/bot.ts:2360 Orchestrator startup promise has no rejection handler"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-19",
+      "file": "src/bot.ts",
+      "line_start": 1835,
+      "line_end": 1839,
+      "class_ids": [
+        "C12"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Chain restart accumulates listeners and uncancellable polling intervals",
+      "explanation": "Restart calls startDexListener again without disposing existing DEX listeners. When HTTP polling is used, each call creates another interval whose handle is discarded at src/bot.ts:1636 or src/bot.ts:1660, leaving no supplied way to stop it. Repeated restarts therefore accumulate independent dispatchers. They can keep processing a stopped chain or concurrently dispatch duplicate buys through the non-atomic deduplication check.",
+      "sibling_sites": [
+        "src/bot.ts:1636 V2 polling interval is neither stored nor returned",
+        "src/bot.ts:1660 V3 polling interval is neither stored nor returned",
+        "src/bot.ts:1545 V3 factory listener is attached without retaining a disposer",
+        "src/bot.ts:1586 V2 factory listener is attached without retaining a disposer"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-20",
+      "file": "src/bot.ts",
+      "line_start": 1561,
+      "line_end": 1569,
+      "class_ids": [
+        "C10"
+      ],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "DEX reconnects never backfill events missed during disconnection",
+      "explanation": "Reconnect creates a provider and subscribes to future PoolCreated events, but retains no last-seen block and performs no historical query. Pools created during the outage or subscription gap are permanently missed. The V2 reconnect has the same behavior. This affects discovery reliability; the provided anti-rug lifecycle is separate, so this finding does not establish loss of existing-position protection.",
+      "sibling_sites": [
+        "src/bot.ts:1603 V2 reconnect also subscribes without a cursor or backfill"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-21",
+      "file": "src/bot.ts",
+      "line_start": 149,
+      "line_end": 155,
+      "class_ids": [
+        "C10"
+      ],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "V3 liquidity waiting misses liquidity established before subscription",
+      "explanation": "The helper checks Mint logs only in the supplied creation block, then subscribes to future Mints at src/bot.ts:170. A Mint in an intervening block or between query and subscription is missed even though the pool is funded. Alpha-drop routing makes this systematic for existing pools by passing blockNumber 0 at src/alphaDrop.ts:47: normally neither a genesis-block Mint nor another Mint within 30 seconds exists, so a valid opportunity is discarded.",
+      "sibling_sites": [
+        "src/alphaDrop.ts:47 Existing V3 pool is passed with creation block zero",
+        "src/bot.ts:170 Subscription begins only after the historical query"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-22",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 274,
+      "line_end": 277,
+      "class_ids": [
+        "C06",
+        "C07"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Legacy sell simulation signs an approval outside the nonce authority",
+      "explanation": "This supposedly simulated operation broadcasts a real approval from the hot wallet, spends gas, and bypasses withNonceLock. It also waits only for broadcast before running the static sell at src/utils/tokenSafety.ts:286, which can observe the old allowance and falsely fail. If an omitted caller uses this export alongside live trading, its approval can race other wallet submissions. The provided bot imports but does not invoke this legacy helper.",
+      "sibling_sites": [
+        "src/bot.ts:225 Chain-aware approval uses the lock but releases it without waiting for approval confirmation"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-23",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 498,
+      "line_end": 503,
+      "class_ids": [
+        "C01"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Risk thresholds are evaluated after rounding raw uint256 amounts",
+      "explanation": "Number(limit) and Number(totalSupply) discard integer precision for ordinary large token supplies before enforcing the one-percent threshold. Values immediately below the threshold can round to the same floating-point ratio as the threshold and escape the strict comparison. Burn checks use the same pattern around ninety percent. The discrepancy is small, but these are avoidable inaccuracies in risk-gating decisions; integer cross-multiplication would preserve the specified boundaries.",
+      "sibling_sites": [
+        "src/utils/tokenSafety.ts:249 Legacy max-limit check converts both raw amounts to Number",
+        "src/utils/tokenSafety.ts:93 Legacy burn check computes a rounded floating-point ratio",
+        "src/utils/safetyProviders/unicrypt.ts:41 Chain-aware burn check computes the same rounded ratio"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-24",
+      "file": "src/utils/tokenSafety.ts",
+      "line_start": 332,
+      "line_end": 335,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Blacklist selector scanning includes an impossible interior 0x prefix",
+      "explanation": "Every searched selector includes 0x, but getCode returns one hex string with 0x only at its beginning. A selector embedded in normal runtime bytecode therefore cannot match. The blacklist gate used at src/bot.ts:976 and src/bot.ts:1314 consequently reports false for the intended embedded selectors. The separate mutable-selector scan has a different table and does not make this check work.",
+      "sibling_sites": [
+        "src/utils/tokenSafety.ts:58 Legacy blacklist scan searches the same prefixed selectors"
+      ]
+    },
+    {
+      "ext_id": "codex-BUY-25",
+      "file": "src/utils/safetyProviders/goplus.ts",
+      "line_start": 53,
+      "line_end": 54,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Incomplete honeypot API responses are interpreted as safe",
+      "explanation": "A successful response containing an empty or partial token object passes because undefined is not equal to '1'. honeypot.is likewise returns false when neither supported response field contains a verified boolean result. Unsupported or not-yet-indexed tokens can therefore be reported safe instead of unknown. These adapters are excluded from the supplied live safety banks, so a live bypass requires an omitted caller to rely on their exported results.",
+      "sibling_sites": [
+        "src/utils/safetyProviders/honeypotIs.ts:25 Partial nested results are treated as non-honeypots",
+        "src/utils/safetyProviders/honeypotIs.ts:30 Missing fallback result is treated as non-honeypot",
+        "src/utils/tokenSafety.ts:31 Legacy API response is returned without validating that a verdict exists"
+      ]
+    }
+  ]
+}

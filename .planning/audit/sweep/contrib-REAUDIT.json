@@ -1,0 +1,47 @@
+{
+  "name": "REAUDIT",
+  "contributions": [
+    {
+      "class": "C18",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-034",
+        "AUD-BUY-035"
+      ],
+      "search": "22-29 re-audit of src/main.ts and every VITEST and dotenv read in src/ (git grep process.env.VITEST, dotenv)"
+    },
+    {
+      "class": "C15",
+      "area": "src",
+      "ids": [
+        "AUD-TX-026",
+        "AUD-DB-024"
+      ],
+      "search": "22-29 re-audit of src/utils/processLock.ts and src/utils/dbPath.ts (lock location, tripwire path comparison)"
+    },
+    {
+      "class": "C13",
+      "area": "src",
+      "ids": [
+        "AUD-DB-023"
+      ],
+      "search": "22-29 re-audit of the temp-copy probe in src/utils/dbPath.ts"
+    },
+    {
+      "class": "C17",
+      "area": "test",
+      "ids": [
+        "AUD-REAUDIT-001"
+      ],
+      "search": "22-29 re-audit of the Vitest configs and Vite env loading path (vitest cli-api 11093, vite node.js 34119, 4953)"
+    },
+    {
+      "class": "C18",
+      "area": "test",
+      "ids": [
+        "AUD-REAUDIT-001"
+      ],
+      "search": "22-29 re-audit of the Vitest configs and Vite env loading path (vitest cli-api 11093, vite node.js 34119, 4953)"
+    }
+  ]
+}

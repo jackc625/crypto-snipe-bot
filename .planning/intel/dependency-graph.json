@@ -1,0 +1,172 @@
+{
+  "_meta": {
+    "updated_at": "2026-11-06T18:51:04.222Z",
+    "version": 2
+  },
+  "entries": {
+    "ethers": {
+      "version": "6.16.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/chainRegistry.ts",
+        "src/exitEngine.ts",
+        "src/utils/provider.ts",
+        "src/anti-rug/detector.ts"
+      ]
+    },
+    "@flashbots/ethers-provider-bundle": {
+      "version": "1.0.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/utils/mevStrategies/flashbots.ts"
+      ]
+    },
+    "axios": {
+      "version": "1.10.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/utils/mevStrategies/bloxroute.ts",
+        "src/utils/safetyProviders/"
+      ]
+    },
+    "better-sqlite3": {
+      "version": "^12.8.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/utils/db.ts"
+      ]
+    },
+    "express": {
+      "version": "^5.2.1",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/server.ts",
+        "src/api/routes/"
+      ]
+    },
+    "helmet": {
+      "version": "^8.1.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/server.ts"
+      ]
+    },
+    "cors": {
+      "version": "^2.8.6",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/server.ts"
+      ]
+    },
+    "cookie-parser": {
+      "version": "^1.4.7",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/server.ts"
+      ]
+    },
+    "ws": {
+      "version": "^8.20.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/ws/broadcaster.ts",
+        "src/api/ws/handler.ts"
+      ]
+    },
+    "uuid": {
+      "version": "^13.0.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/api/middleware/auth.ts"
+      ]
+    },
+    "pino": {
+      "version": "^10.3.1",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/utils/logger.ts"
+      ]
+    },
+    "telegram": {
+      "version": "2.26.22",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/telegramListener.ts"
+      ]
+    },
+    "dotenv": {
+      "version": "17.2.0",
+      "type": "production",
+      "invocation": "require",
+      "used_by": [
+        "src/config.ts"
+      ]
+    },
+    "@openzeppelin/contracts": {
+      "version": "^5.4.0",
+      "type": "production",
+      "invocation": "implicit",
+      "used_by": [
+        "contracts/"
+      ]
+    },
+    "vitest": {
+      "version": "^4.1.1",
+      "type": "development",
+      "invocation": "npm test",
+      "used_by": [
+        "test",
+        "test:unit",
+        "test:integration",
+        "test:fork",
+        "test:coverage"
+      ]
+    },
+    "hardhat": {
+      "version": "2.26.0",
+      "type": "development",
+      "invocation": "implicit",
+      "used_by": [
+        "hardhat.config.ts"
+      ]
+    },
+    "typescript": {
+      "version": "5.8.3",
+      "type": "development",
+      "invocation": "npm run build",
+      "used_by": [
+        "build"
+      ]
+    },
+    "ts-node": {
+      "version": "10.9.2",
+      "type": "development",
+      "invocation": "npm run preflight",
+      "used_by": [
+        "preflight",
+        "pause",
+        "resume"
+      ]
+    },
+    "eslint": {
+      "version": "^9.39.4",
+      "type": "development",
+      "invocation": "implicit",
+      "used_by": [
+        "eslint.config.mjs"
+      ]
+    }
+  }
+}

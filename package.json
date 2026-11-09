@@ -6,15 +6,20 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --reporter=verbose",
+    "start": "ts-node src/main.ts",
+    "test": "vitest run --project unit --project integration --reporter=verbose",
     "test:unit": "vitest run --project unit --reporter=verbose",
     "test:integration": "vitest run --project integration --reporter=verbose",
     "test:fork": "vitest run --project fork --reporter=verbose",
     "test:all": "vitest run --reporter=verbose",
-    "test:coverage": "vitest run --coverage --reporter=verbose",
+    "test:coverage": "vitest run --coverage --project unit --project integration --reporter=verbose",
+    "backup:state": "ts-node scripts/backup-state.ts",
+    "baselines:capture": "ts-node scripts/capture-baselines.ts",
     "preflight": "ts-node scripts/preflight.ts",
     "pause": "ts-node scripts/pause.ts",
-    "resume": "ts-node scripts/resume.ts"
+    "resume": "ts-node scripts/resume.ts",
+    "db:init": "ts-node scripts/db-init.ts",
+    "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",

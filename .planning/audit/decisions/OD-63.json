@@ -1,0 +1,33 @@
+{
+  "id": "OD-63",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Env contract: one typed schema for every key (required-when, type, range, default), ETH_RPC_URL as the required key, legacy CONFIG removed",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep the presence-only list and the legacy CONFIG",
+      "behavior_impact": "none",
+      "risk": "The list and .env.example drift from what the code reads (AUD-DB-016); ALCHEMY_URL is required while preflight demands ETH_RPC_URL (AUD-DB-011); dead constants remain two sources of truth."
+    },
+    {
+      "id": "typed-schema",
+      "name": "Generate validation, the env list and an .env.example sync test from one schema; make ETH_RPC_URL required with ALCHEMY_URL as an alias; delete the legacy CONFIG addresses and constants",
+      "behavior_impact": "Boot refuses malformed or contradictory settings with one clear message; documentation matches the code.",
+      "risk": "A broad refactor of config loading (Phase 27 territory); a .env that boots today may refuse to boot."
+    }
+  ],
+  "recommendation": "typed-schema, sequenced with card OD-25 (align-one-parser) so the risk keys and the rest share one module.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S3.",
+  "behavior_impact": "Decides how settings are validated and which keys are required.",
+  "findings": [
+    "AUD-DB-011",
+    "AUD-DB-016",
+    "AUD-DB-020"
+  ],
+  "needed_by": "Phase 27 discussion (env module), coordinated with OD-25 in Phase 24",
+  "proposed_from": "DB-06"
+}

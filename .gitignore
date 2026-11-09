@@ -19,6 +19,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+# Committed SAFE-02 test-rail sentinel env: every value is an inert TEST-SENTINEL (D-02)
+!test/.env.test
 cookies.txt
 *.pem
 *.key
@@ -34,6 +36,8 @@ data/
 # Hardhat cache (runtime generated)
 cache/
 artifacts/
+# OD-21 (Phase 22, 22-07): Ignition per-future artifacts are tracked deployment state, not build output
+!ignition/deployments/*/artifacts/
 typechain-types/
 
 # Build output
@@ -66,3 +70,13 @@ Thumbs.db
 # .js files in this tree are Vite/TS transpilation artifacts, not hand-written source.
 # If a legitimate .js file is ever needed here, use !dashboard/src/path/to/file.js to un-ignore.
 dashboard/src/**/*.js
+
+# GSD research fetch cache (local, regenerated)
+.planning/research/.cache/
+
+# graphify build output — derived from source, rebuild with /gsd-graphify build.
+# graphify-out/ is graphify's raw output; .planning/graphs/ is GSD's copy
+# (graph.json, graph.html, GRAPH_REPORT.md, local diff snapshot). Not tracked:
+# it churns heavily per rebuild and conflicts across per-phase branches.
+graphify-out/
+.planning/graphs/

@@ -1,0 +1,57 @@
+# RED proof 22-13-1-lock-pin (AC-18 / STL-5, the globalThis pin)
+Date: 2026-11-09T03:57:33.114Z
+File neutralised (working tree only, never committed): src/utils/processLock.ts
+sha256 before and after restore: a746adf78eb00ac25c4c59f335519d0251b9cacfc82fcd23a9cc73ed9e16581f
+
+## What this proves
+
+Without the pin the handle is unreferenced, so the forced collections close it and silently release the OS lock: a contender then acquires while the first holder is still alive.
+
+## Diff applied
+
+diff --git a/src/utils/processLock.ts b/src/utils/processLock.ts
+index 9ba9cb0..db7f1b6 100644
+--- a/src/utils/processLock.ts
++++ b/src/utils/processLock.ts
+@@ -188,7 +188,7 @@ export function acquireProcessLock(lockDir: string, address: string): ProcessLoc
+     }
+     const info: ProcessLockInfo = { lockFile, address: normalized, acquiredAt: Date.now() };
+     // STL-5: the strong reference that keeps the OS lock alive across garbage collections.
+-    (globalThis as unknown as PinnedGlobal)[PIN] = { ...info, db, pid: process.pid };
++    // RED 22-13-1: the pin is removed
+     return info;
+ }
+ 
+
+
+## Command (wrapped, ran ONLY this test, selected with -t)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects integration -- node node_modules/vitest/vitest.mjs run --project integration test/integration/processLock.test.ts -t gc
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035718-8856-08b824 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035718-8856-08b824\summary.json
+ FAIL   integration  test/integration/processLock.test.ts > SAFE-04 single-instance process lock (real holder processes) > gc: a holder that forces garbage collection keeps refusing a contender (STL-5)
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+
+## Wrapper verdict during RED
+
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035718-8856-08b824 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035718-8856-08b824\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/processLock.ts
+sha256 after restore: a746adf78eb00ac25c4c59f335519d0251b9cacfc82fcd23a9cc73ed9e16581f
+git status --porcelain src: (empty)
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 6 skipped (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035727-23136-2e2f76 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035727-23136-2e2f76\summary.json

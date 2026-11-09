@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-005",
+  "title": "RC-23 LOG_LEVEL in .env is never applied: the logger is created when config.ts imports it, one line before config.ts calls dotenv.config(), and bot.ts imports config first",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/config.ts",
+    "src/utils/logger.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "import dotenv; import { logger } from './utils/logger'; then dotenv.config(): the logger module runs before .env is loaded"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/logger.ts:6-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pino({ level: process.env.LOG_LEVEL || 'info' }) evaluated once at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1-2@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bot.ts imports ethers, then './config' as its first project module, so config.ts is the first importer of the logger on the bot path"
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"pino({level:'verbose'})\" with the repo pino 10.3.1 (Node 22.16.0, scratch folder)",
+      "note": "an unknown level throws 'default level:verbose must be included in custom levels' at construction; 'DEBUG' is accepted as debug"
+    }
+  ],
+  "sibling_sites_checked": "dotenv.config() call sites at the base SHA: src/config.ts:4 and src/utils/notifier.ts:6 in src, and every script under scripts/ (git grep \"dotenv\"). A LOG_LEVEL set in the shell is honoured (the logger reads process.env at import). Scripts that call dotenv.config() before importing a src module would honour .env; scripts are the SCRIPTS slice. 14 debug-level log sites exist in src (git grep -c \".debug(\"), including { err } logs of failed RPC calls at bot.ts:996, :1011, :1330 and exitEngine.ts:342 (every 5 s per position on a failing price query).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-23"
+  ],
+  "research_suggested_severity": "S3",
+  "severity_rationale": "S3, equal to the research suggestion: misleading configuration (the documented key in .env.example:91 does nothing), no capital effect. Fixing it is a behaviour change because debug output includes whole ethers error objects, which carry the RPC URL (and so the provider API key, AUD-TX-014) on HTTP errors, at a volume of one line per position every 5 s.",
+  "related": [
+    "AUD-TX-014",
+    "AUD-DB-009"
+  ],
+  "tags": [],
+  "od_ref": "OD-10",
+  "recommendation": "Load .env before the logger is first imported (or make the logger read the level lazily), after redaction is in place for err objects. Card OD-10. Phase 29 unless the card says otherwise."
+}

@@ -1,0 +1,306 @@
+{
+  "slice": "EXIT",
+  "assistant": "codex",
+  "model": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "cli_version": "codex-cli 0.163.0",
+  "raw_sha256": "bf1ecf3e8323ace95f1105dd22e88a0a3e354896062531283b15c0cb4c6a50f3",
+  "files_reviewed": [
+    "src/exitEngine.ts",
+    "src/utils/exitManager.ts",
+    "src/utils/exitWatchdog.ts",
+    "src/utils/withTimeout.ts"
+  ],
+  "findings": [
+    {
+      "ext_id": "codex-EXIT-01",
+      "file": "src/exitEngine.ts",
+      "line_start": 363,
+      "line_end": 365,
+      "class_ids": [
+        "C04"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Private full and partial sells accept zero minimum output",
+      "explanation": "The V2 builder encodes amountOutMin=0 at src/exitEngine.ts:363-365; the V3 builder likewise uses zero at :395. Both full and partial sells use these builders. Adverse reserve changes or transaction ordering can therefore exchange the entire input for negligible proceeds. Private submission does not itself enforce an output floor, and the protected minimum calculated for the public fallback does not protect these transactions.",
+      "sibling_sites": [
+        "src/exitEngine.ts:395 V3 amountOutMinimum is also zero"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-02",
+      "file": "src/exitEngine.ts",
+      "line_start": 1531,
+      "line_end": 1546,
+      "class_ids": [
+        "C13",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Post-submission errors can repeat an already executed partial sale",
+      "explanation": "After the swap succeeds at src/exitEngine.ts:1531, receipt decoding and trade insertion occur before tier completion is persisted at :1568-1575. A decoding error, database error, or crash in this window leaves the tier uncompleted; the catch at :1585-1588 permits retry. A completed 50% sale can consequently sell the remaining 50% again. Clamping to the wallet balance prevents insufficient-balance execution, but does not prevent excessive liquidation.",
+      "sibling_sites": [
+        "src/exitEngine.ts:1550 trade insertion can fail after execution but before tier completion"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-03",
+      "file": "src/utils/exitWatchdog.ts",
+      "line_start": 60,
+      "line_end": 63,
+      "class_ids": [
+        "C07",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Watchdog expiry leaves the underlying sell lock held",
+      "explanation": "Promise.race at src/utils/exitWatchdog.ts:60 stops awaiting execution without cancelling it. executeFullSell acquired its sell lock at src/exitEngine.ts:832 and releases it only in finally at :1168-1169. A permanently stalled RPC therefore leaves subsequent routine and anti-rug exits rejected by that lock, despite the watchdog claiming retries remain available. If the stall occurs inside withNonceLock and the omitted mutex retains ownership until its callback settles, signing for other positions is also blocked.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-04",
+      "file": "src/exitEngine.ts",
+      "line_start": 1866,
+      "line_end": 1869,
+      "class_ids": [
+        "C03"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Native buy wei are used as raw token quote input",
+      "explanation": "src/exitEngine.ts:1866 converts the native spend with parseEther, then passes it to queryPrice, which uses that value as token amountIn at :328 and :337. It does not use the received token amount. For a six-decimal token, a 0.01-native purchase probes ten billion tokens. Such quotes can saturate available liquidity or fail, so their ratios can materially misrepresent price movements and bypass stop-loss or profit thresholds.",
+      "sibling_sites": [
+        "src/exitEngine.ts:1962 resume also constructs token quote input from native spend",
+        "src/exitEngine.ts:731 failed-held recovery supplies configured native spend as the quote baseline"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-05",
+      "file": "src/exitEngine.ts",
+      "line_start": 618,
+      "line_end": 621,
+      "class_ids": [
+        "C03",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "The fixed dust floor can classify whole positions as closed",
+      "explanation": "The absolute floor at src/exitEngine.ts:620 is 1,000 raw token units, regardless of decimals or value. For a zero-decimal token this means 1,000 whole tokens. A failed sale of a position below that amount can retain its entire balance yet satisfy the close test at :1143, causing :1153 to mark it sold, delete exit state, and remove both routine and anti-rug protection.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-06",
+      "file": "src/exitEngine.ts",
+      "line_start": 615,
+      "line_end": 617,
+      "class_ids": [
+        "C14",
+        "C18"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Unbounded dust configuration can disable protection for full holdings",
+      "explanation": "EXIT_DUST_THRESHOLD_BPS is accepted without an upper bound at src/exitEngine.ts:616. A value of 10,000 makes the threshold equal to the original position. After a failed exit, an unchanged full balance then passes the genuine-close condition at :1143 and is torn down at :1153. An out-of-range configuration can therefore mark completely unsold positions as sold and remove their exit protection.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-07",
+      "file": "src/exitEngine.ts",
+      "line_start": 1022,
+      "line_end": 1036,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Early full-sell returns bypass failed-held recovery",
+      "explanation": "When a V3 private sell does not land, src/exitEngine.ts:1036 returns without calling keepMonitoringFailedHeld. If the omitted anti-rug caller cleared the routine timer before invoking the sell, as described at :719-731, this path never rearms it. The position loses routine stops and its timed exit. The same omission occurs when entry is rejected by the sell lock or DEX validation; it is particularly harmful when an in-flight partial sale owns the lock and cannot rearm the cleared timer.",
+      "sibling_sites": [
+        "src/exitEngine.ts:832 sell-lock denial returns without recovery",
+        "src/exitEngine.ts:876 unsupported or incomplete DEX configuration returns without recovery"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-08",
+      "file": "src/exitEngine.ts",
+      "line_start": 1870,
+      "line_end": 1873,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "One initial quote failure leaves a purchased position without monitoring",
+      "explanation": "An initial quote failure makes startExitMonitor return normally at src/exitEngine.ts:1870-1873, before exit state is persisted or an interval is registered. No retry is scheduled and the caller receives no failure result. An already purchased token consequently has no routine stop-loss, profit-taking, or urgency exit unless an unprovided caller independently detects this and repeats setup.",
+      "sibling_sites": [
+        "src/exitEngine.ts:1981 resume without an existing state row also abandons setup after a failed quote"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-09",
+      "file": "src/exitEngine.ts",
+      "line_start": 1708,
+      "line_end": 1712,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Quote failure suppresses the unconditional urgency exit",
+      "explanation": "src/exitEngine.ts:1708-1712 returns before checking the urgency deadline at :1800-1814 whenever quoting fails. A stalled quote likewise never reaches that check. Thus an expired holding-time limit cannot initiate a sale during a quoter or eth_call outage, even if transaction submission and the swap router remain usable. The time-based protection depends on obtaining a price that it does not need.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-10",
+      "file": "src/exitEngine.ts",
+      "line_start": 553,
+      "line_end": 555,
+      "class_ids": [
+        "C16"
+      ],
+      "severity": "S1",
+      "capital_impact": "OVERSPEND",
+      "title": "Direct approvals and public fallback bypass transaction fee ceilings",
+      "explanation": "The public fallback at src/exitEngine.ts:553-555 calls the router without gas-limit or fee overrides and bypasses the transaction manager. Approval calls likewise provide no caps. With an ordinary ethers wallet, RPC fee estimates and token gas estimates determine spending, so a fee spike or expensive token implementation can consume substantially more native currency than the configured transaction limits permit. Any protection here would have to be imposed by the omitted wallet implementation.",
+      "sibling_sites": [
+        "src/exitEngine.ts:421 private-path approval has no gas or fee cap",
+        "src/exitEngine.ts:544 public-fallback approval has no gas or fee cap"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-11",
+      "file": "src/exitEngine.ts",
+      "line_start": 1099,
+      "line_end": 1102,
+      "class_ids": [
+        "C08"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Unfinalized balances trigger irreversible monitoring teardown",
+      "explanation": "The public fallback waits for ethers' default single confirmation at src/exitEngine.ts:556. The latest balance at :1099 then triggers teardown at :1102, which marks the trade sold, deletes exit state, and unsubscribes protection at :668-674. A shallow reorg removing that sale restores the tokens after their monitoring and restart state have been removed. No finality or deeper confirmation check is performed on this visible path.",
+      "sibling_sites": [
+        "src/exitEngine.ts:841 initial zero balance triggers immediate teardown",
+        "src/exitEngine.ts:985 inconclusive inclusion is resolved using an unfinalized balance",
+        "src/exitEngine.ts:1143 catch-path balance triggers immediate teardown"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-12",
+      "file": "src/exitEngine.ts",
+      "line_start": 667,
+      "line_end": 674,
+      "class_ids": [
+        "C12",
+        "C14",
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Closing a trade does not invalidate queued or in-flight exit work",
+      "explanation": "Teardown at src/exitEngine.ts:667-674 clears future timers but neither removes queued exits nor cancels callbacks already awaiting a quote. Old queued work still executes at :1399, and an old poll can resume at :1708 and recreate deleted state at :1829. If the omitted buy-side code permits re-entry before this work settles, executeFullSell reads the new wallet balance at :839 and can liquidate the new position using the old trade's trigger and ID.",
+      "sibling_sites": [
+        "src/exitEngine.ts:1399 queued work executes without validating the trade lifecycle",
+        "src/exitEngine.ts:1906 initial-monitor callbacks can outlive timer cancellation",
+        "src/exitEngine.ts:2007 resumed-monitor callbacks have the same lifetime issue"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-13",
+      "file": "src/exitEngine.ts",
+      "line_start": 419,
+      "line_end": 422,
+      "class_ids": [
+        "C06"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Increasing a nonzero allowance fails for zero-first tokens",
+      "explanation": "src/exitEngine.ts:419-422 replaces an insufficient nonzero allowance directly with another nonzero value. Tokens requiring a zero-first approval reject this. A plausible trigger is a partial-sale approval followed by a failed swap: the smaller allowance remains, and a subsequent full exit cannot increase it. The public fallback repeats the same approval pattern, leaving no working exit through these paths.",
+      "sibling_sites": [
+        "src/exitEngine.ts:541 public fallback also changes an insufficient allowance without resetting it"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-14",
+      "file": "src/exitEngine.ts",
+      "line_start": 470,
+      "line_end": 470,
+      "class_ids": [
+        "C02",
+        "C04"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "A zero slippage setting silently becomes five percent",
+      "explanation": "CONFIG.slippagePercent || 5 at src/exitEngine.ts:470 replaces a valid zero with five. Routine public fallback then computes a 95% minimum instead of the requested 100% at :522-523. If the omitted configuration layer permits zero slippage, this silently bypasses that risk limit and allows adverse execution that should have reverted.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-15",
+      "file": "src/exitEngine.ts",
+      "line_start": 1568,
+      "line_end": 1575,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Completed tier indices change meaning when configuration changes",
+      "explanation": "Completed tiers are persisted as array indices at src/exitEngine.ts:1568-1575 and interpreted against the newly parsed, sorted configuration after restart. Adding or reordering targets can therefore repeat an already executed sale. For example, after completing index 0 of '2x:50,5x:25', inserting '1.5x:10' moves the 2x tier to index 1; it becomes uncompleted and can sell the remaining 50% again.",
+      "sibling_sites": [
+        "src/exitEngine.ts:291 persisted indices are restored without a configuration identity",
+        "src/exitEngine.ts:243 completion checks use current array indices"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-16",
+      "file": "src/exitEngine.ts",
+      "line_start": 363,
+      "line_end": 365,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Transfer-tax tokens cannot execute the standard V2 partial-sale path",
+      "explanation": "The builder at src/exitEngine.ts:363 uses swapExactTokensForETH. On standard V2 routers, this precomputes output assuming the full input reaches the pair; a tax on the wallet-to-pair transfer makes the swap revert. executePartialSell selects this builder at :1511-1513 and only retries the same route after failure at :1585-1588. Unlike full sells, partial sells never reach the fee-on-transfer-safe fallback, so configured profit-taking remains unexecuted while the position stays exposed.",
+      "sibling_sites": [
+        "src/exitEngine.ts:875 full private sells share the standard V2 method before their separate fallback"
+      ]
+    },
+    {
+      "ext_id": "codex-EXIT-17",
+      "file": "src/exitEngine.ts",
+      "line_start": 492,
+      "line_end": 496,
+      "class_ids": [
+        "C04"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Whole-percent rounding can exceed configured fractional slippage",
+      "explanation": "src/exitEngine.ts:495 rounds the retained percentage to an integer. With slippagePct=0.6, it retains 99% rather than 99.4%, permitting 1% slippage. Fractional values are accepted by the anti-rug parser at :472 and by this exported helper. The resulting minimum can therefore authorize more loss than the supplied percentage permits.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-EXIT-18",
+      "file": "src/utils/exitManager.ts",
+      "line_start": 120,
+      "line_end": 122,
+      "class_ids": [
+        "C12"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Legacy timer registration loses previously registered live handles",
+      "explanation": "A second registration for the same key overwrites the old timer handle at src/utils/exitManager.ts:120-122 without clearing it. Cleanup at :207-211 and :219-223 can subsequently cancel only the replacement. If unprovided callers register a stop-loss, take-profit, or timed sell twice, the orphaned callback can continue issuing exit work after cleanup or shutdown, causing unintended execution or gas spending.",
+      "sibling_sites": [
+        "src/utils/exitManager.ts:137 take-profit registration also overwrites a live handle",
+        "src/utils/exitManager.ts:154 timed-sell registration also overwrites a live handle"
+      ]
+    }
+  ]
+}

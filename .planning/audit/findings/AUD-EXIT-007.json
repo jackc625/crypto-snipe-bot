@@ -1,0 +1,96 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-006",
+    "AUD-EXIT-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-EXIT-01",
+  "od_ref": "OD-40",
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-007",
+  "title": "Exits that end with nowhere to go (V3 private not landed, unknown dex/feeTier, routine pause) return false without marking the position failed-held or re-arming its poll timer, after anti-rug and dashboard callers already cleared that timer",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C14",
+    "C12"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/api/routes/controls.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1037@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 private escalation not landed: error log + alert \"Position stays held + monitored\", then return false; no markExitFailedHeld, no keepMonitoringFailedHeld, no timer re-arm"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:876-879@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a dex that is neither V3-with-feeTier nor V2 (for example a V3 dex with feeTier null) logs \"Unknown DEX type\" and returns false the same way"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:824-830@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "routine-paused positions return false for any routine reason before any work"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:240@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug clears all timers for the token BEFORE calling executeFullSell"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:92@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dashboard force-sell clears timers first (:167 emergency-sell does the same)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:687-732@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: keepMonitoringFailedHeld is the path that persists exit_failed_held and re-arms the timer when it was cleared; these early returns skip it"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1022-1036@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Early full-sell returns bypass failed-held recovery"
+    }
+  ],
+  "sibling_sites_checked": "Every return false in executeFullSell: :829 (routine pause), :834 (sell lock held by another exit; the in-flight exit owns the outcome), :878 (unknown dex), :996 (inconclusive, goes through keepMonitoringFailedHeld, correct), :1036 (V3 no fallback), :1111 and :1167 (both through keepMonitoringFailedHeld, correct), :1156 (closed, correct). Callers that clear timers first: exitTrigger.ts:240, controls.ts:92, controls.ts:167. The worker path (routine triggers) never clears the timer, so for it the timer survives. The dashboard emergency-sell / force-sell selection gap for failed-held positions is the sibling owned by 22-22 under ESC-PRE-04 (key:API:failed-held-sell-selection); it is referenced here and not escalated again.",
+  "status": "confirmed",
+  "severity_rationale": "S1. Proven by the code. Plausible condition: an anti-rug or dashboard exit of a V3 position whose private sell does not land (no relay inclusion, or a transfer-taxed V3 token, AUD-EXIT-006). The position is then held with anti-rug still registered but no routine poll at all, while the alert says it stays monitored. Bounded below S0 because a restart resumes it (the trade row is still pending) and anti-rug stays registered.",
+  "recommendation": "Route every non-closing return through the same balance-truth handling as the catch (persist exit_failed_held, re-arm the timer, alert truthfully), or make the callers re-arm when the sell returns false. Card EXIT-06 decides what a V3 position with no fallback should do. Phase 24.",
+  "traces": [
+    {
+      "scenario": "failed-held-exit",
+      "steps": [
+        "executeFullSell throws anywhere after the sell lock (approve revert, wait() CALL_EXCEPTION or TRANSACTION_REPLACED, RPC error, reconcile error) -> catch (:1112)",
+        "balanceOf is re-fetched (:1128-1130); if that fails the balance is treated as held (sentinel -1n, :1131-1140)",
+        "balance <= dust -> teardownGenuineClose, the trade is marked sold, alert \"sell reported failure but position closed\" (:1143-1157)",
+        "balance > dust (or unknown): updateTradeStatus(\"failed\", token, chain) (:1163) moves every pending row of that token on that chain to trades.status=failed (db.ts:325-327)",
+        "keepMonitoringFailedHeld (:687): markExitFailedHeld (:700) sets exit_state.exit_status=exit_failed_held and exit_failure_count+1 (db.ts:540-545); exit_state is kept; anti-rug stays registered",
+        "If the poll timer was cleared (anti-rug or dashboard path) it is re-armed through resumeExitMonitor with ctx.chain.snipeAmount (:723-732; probe mismatch for deliberate buys, AUD-EXIT-015)",
+        "Routine reason and failure count >= EXIT_ROUTINE_MAX_FAILURES (5): routine retries are paused in memory with a hard alert (:738-749); anti-rug bypasses the pause",
+        "After a restart getResumeExitMonitorTrades unions exit_failed_held rows (db.ts:597-604), so the position is resumed; the in-memory pause is gone and returns after the next failure",
+        "Sibling, owned by 22-22 under ESC-PRE-04 (key:API:failed-held-sell-selection): the dashboard emergency-sell and force-sell select only status pending, so this failed-held position is not offered for a manual sell",
+        "A later genuine close calls updateTradeStatus(\"sold\"), which matches pending rows only, so the buy row stays failed while deleteExitState removes the row"
+      ],
+      "outcome": "State written: trades.status=failed on the buy row(s) of that token; exit_state.exit_status=exit_failed_held with an incremented failure count; anti-rug kept; timer re-armed. The early returns this finding names (:829, :878, :1036) write none of this."
+    }
+  ]
+}

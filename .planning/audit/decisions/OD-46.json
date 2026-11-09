@@ -1,0 +1,32 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-46",
+  "title": "Validating exit settings at load",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: accept any value; NaN falls back for some keys and silently disables the trailing stop for others",
+      "behavior_impact": "none",
+      "risk": "A typo can disable the trailing stop, sell at once, or tear down protection on a held position (AUD-EXIT-016)."
+    },
+    {
+      "id": "fail-loud",
+      "name": "Range-check every exit setting at load and refuse to start on a bad value",
+      "behavior_impact": "A bad value stops the bot at boot with a clear message.",
+      "risk": "A config that runs today may refuse to start."
+    }
+  ],
+  "recommendation": "fail-loud.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
+  "behavior_impact": "Decides what the bot does with an out-of-range exit setting.",
+  "findings": [
+    "AUD-EXIT-016",
+    "AUD-EXIT-022"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "EXIT-12"
+}

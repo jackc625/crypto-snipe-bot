@@ -1,0 +1,730 @@
+{
+  "tool": "betterleaks",
+  "version": "1.10.0",
+  "binary_sha256": "16600f87ef27eed53f7bcb80d56bd7c9e5730c9088c8d30ef57867b6a1fec6cf",
+  "config_sha256": {
+    "extended": "109020a5bfdc2fd1e0375f794409786b092a671e4e4fbe0761e2850268a649a6",
+    "known_public": "14e53bda7d285b867758963d6e25490ed32ed3aef358693632efbca94196e493",
+    "public_address": "72063e891bd369a77d5340c49d71230eb3833758bc7e20564f0049c581ee9edf"
+  },
+  "fixtures_sha256": "d24e9f3db3d46caf6db1a02358f1dc4969a16acde540f71c154290194d8100e0",
+  "engine": ".planning/audit/tools/betterleaks/fixture-check.ts --git-scan (three-pass classification, operator ruling classify-addresses)",
+  "mode": "git",
+  "log_opts": "--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent",
+  "scanner_args": [
+    "git",
+    "<repo root>",
+    "--log-opts=--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent",
+    "--config",
+    "<extended.toml|known-public.toml|public-address.toml>",
+    "--max-archive-depth",
+    "2",
+    "--redact",
+    "--no-banner",
+    "--no-color",
+    "--report-format",
+    "json",
+    "--report-path",
+    "<report.json>",
+    "--exit-code",
+    "9",
+    "--ignore-gitleaks-allow",
+    "--gitleaks-ignore-path",
+    "<empty temp dir>"
+  ],
+  "env_belt": "HTTPS_PROXY=HTTP_PROXY=ALL_PROXY=http://127.0.0.1:1 (belt only, not an enforced network boundary)",
+  "scanned_at": "2026-11-07T21:02:31.330Z",
+  "node": "v22.16.0",
+  "git_version": "git version 2.56.0.windows.3",
+  "git_fixture": {
+    "pass": true,
+    "history_hit": true,
+    "reflog_hit": true,
+    "stash_reflog_hit": true,
+    "ref_without_reflog_hit": true,
+    "known_public_hit": true,
+    "public_address_hit": true,
+    "reflog_only_proven": true,
+    "stash_only_proven": true,
+    "ref_without_reflog_proven": true,
+    "commits_all": 5,
+    "commits_all_reflog": 7,
+    "pass_counts": {
+      "pass1": 11,
+      "pass2": 9,
+      "pass3": 8,
+      "pass2_only": 0,
+      "pass3_only": 0
+    },
+    "bytes_scanned": {
+      "pass1": 598,
+      "pass2": 598,
+      "pass3": 598
+    },
+    "cases": [
+      {
+        "id": "git-history",
+        "expected": "a random key added in commit A and deleted in commit B: an evm-private-key hit at A, every a.ts hit non-public at A",
+        "observed": "evm-private-key:non-public@6605b1b:L1C1, generic-api-key:non-public@6605b1b:L1C9",
+        "pass": true,
+        "note": "expected commit 6605b1b"
+      },
+      {
+        "id": "git-reflog",
+        "expected": "a random key in commit C after reset --hard back to B (C reachable only from the reflog): an evm-private-key hit at C, every c.ts hit non-public",
+        "observed": "evm-private-key:non-public@f58e428:L1C1, generic-api-key:non-public@f58e428:L1C9",
+        "pass": true,
+        "note": "expected commit f58e428"
+      },
+      {
+        "id": "git-stash-reflog",
+        "expected": "a random key in the older stash (stash@{1}, not reachable from --all): an evm-private-key hit at that stash commit, every s.ts hit non-public",
+        "observed": "evm-private-key:non-public@0025d45:L1C1, generic-api-key:non-public@0025d45:L1C9",
+        "pass": true,
+        "note": "expected commit 0025d45"
+      },
+      {
+        "id": "git-ref-no-reflog",
+        "expected": "a random key in commit D reachable only from refs/backup/d, a ref with no reflog (not from HEAD, not from any reflog): an evm-private-key hit at D, every d.ts hit non-public",
+        "observed": "evm-private-key:non-public@be69732:L1C1, generic-api-key:non-public@be69732:L1C9",
+        "pass": true,
+        "note": "expected commit be69732"
+      },
+      {
+        "id": "git-known-public",
+        "expected": "Hardhat #0 in commit A: an evm-private-key hit, every h.ts hit known-public:hardhat-0",
+        "observed": "evm-private-key:known-public:hardhat-0@6605b1b:L1C30, generic-api-key:known-public:hardhat-0@6605b1b:L1C37",
+        "pass": true,
+        "note": "the pass-2 allowlist works in git mode"
+      },
+      {
+        "id": "git-public-address",
+        "expected": "an exact 0x+40hex after \"token\" in commit A: flagged, every m.log hit public-address",
+        "observed": "generic-api-key:public-address@6605b1b:L1C35",
+        "pass": true,
+        "note": "the pass-3 allowlist works in git mode"
+      },
+      {
+        "id": "git-no-stray",
+        "expected": "no hit outside the six case files",
+        "observed": "no hits",
+        "pass": true,
+        "note": ""
+      },
+      {
+        "id": "git-redaction",
+        "expected": "no planted value in any raw report or scanner output; every Secret field is REDACTED",
+        "observed": "planted values found in raw output: 0; non-REDACTED Secret fields: 0",
+        "pass": true,
+        "note": "5 planted values checked (never printed)"
+      },
+      {
+        "id": "git-pass-subset",
+        "expected": "each allowlist only removes hits: zero pass-2-only and zero pass-3-only hits, pass3 <= pass2 <= pass1",
+        "observed": "pass1 11, pass2 9, pass3 8, pass2-only 0, pass3-only 0",
+        "pass": true,
+        "note": ""
+      },
+      {
+        "id": "git-bytes-scanned",
+        "expected": "the same non-zero byte count for all three passes",
+        "observed": "pass1 598, pass2 598, pass3 598",
+        "pass": true,
+        "note": "parsed from \"scanned ~N bytes\""
+      },
+      {
+        "id": "git-temp-clean",
+        "expected": "no betterleaks-git-* folder left in the temp folder after the three runs",
+        "observed": "0 left",
+        "pass": true,
+        "note": "the scanner copies the git dir to a temp folder for each run"
+      }
+    ],
+    "log_opts": "--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent",
+    "generated_at": "2026-11-07T21:02:22.240Z"
+  },
+  "head_sha": "c63967615533b2bc5f3ee0103236d7083db1972e",
+  "commits_all": 1044,
+  "commits_all_reflog": 1053,
+  "refs": [
+    "refs/backup/master-pre-rename",
+    "refs/heads/main",
+    "refs/heads/phase-22-safety-rails-audit",
+    "refs/remotes/origin/HEAD",
+    "refs/remotes/origin/main",
+    "refs/remotes/origin/renovate/configure",
+    "refs/stash",
+    "refs/tags/v6.16",
+    "refs/tags/v6.17"
+  ],
+  "ref_count": 9,
+  "stash_count": 5,
+  "hits_outside_commit_universe": 0,
+  "bytes_scanned": {
+    "pass1": 26987890,
+    "pass2": 26987890,
+    "pass3": 26987890
+  },
+  "pass_counts": {
+    "pass1": 50,
+    "pass2": 40,
+    "pass3": 4,
+    "pass2_only": 0,
+    "pass3_only": 0
+  },
+  "raw_report_dir": "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-07/history",
+  "raw_reports": [
+    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-07/history/history-2026-11-07T21-02-22-859Z.pass1.json",
+    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-07/history/history-2026-11-07T21-02-22-859Z.pass2.json",
+    "C:/Users/jackc/crypto-snipe-bot-backups/scans/2026-11-07/history/history-2026-11-07T21-02-22-859Z.pass3.json"
+  ],
+  "classification_labels": {
+    "non-public": "reported by all three passes",
+    "known-public:hardhat-0": "reported by pass 1, removed by the pass-2 Hardhat #0 allowlist",
+    "public-address": "reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling \"classify-addresses\", ESC-SECRET-01)"
+  },
+  "classification_key": [
+    "rule id",
+    "file",
+    "commit",
+    "line",
+    "start column",
+    "end column"
+  ],
+  "hit_counts": {
+    "total": 50,
+    "non-public": 4,
+    "known-public:hardhat-0": 10,
+    "public-address": 36
+  },
+  "hits": [
+    {
+      "rule_id": "evm-private-key",
+      "file": ".planning/phases/09-testing-infrastructure/09-04-PLAN.md",
+      "commit": "1148d678cab88be1b10a92f4217890f78a96b32a",
+      "line": 319,
+      "column": 134,
+      "type": "EVM (secp256k1) private key as 64 hex characters next to a key-like keyword",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "evm-private-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-PATTERNS.md",
+      "commit": "b778cef4319e563c92287e34c69926092cfe2d5c",
+      "line": 823,
+      "column": 16,
+      "type": "EVM (secp256k1) private key as 64 hex characters next to a key-like keyword",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "evm-private-key",
+      "file": ".planning/phases/21-exit-engine-live-runtime-hardening/21-PATTERNS.md",
+      "commit": "dece1a90de98daee3a4eec88e249208baf5b1fa1",
+      "line": 126,
+      "column": 16,
+      "type": "EVM (secp256k1) private key as 64 hex characters next to a key-like keyword",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "evm-private-key",
+      "file": "test/fork/snipeLifecycle.test.ts",
+      "commit": "9cbb4f8047f6802282b5e8194174fddb57371695",
+      "line": 12,
+      "column": 16,
+      "type": "EVM (secp256k1) private key as 64 hex characters next to a key-like keyword",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/intel/.last-refresh.json",
+      "commit": "b6156507b887402199d147957162ac253821eff9",
+      "line": 4,
+      "column": 6,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "non-public"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-PLAN.md",
+      "commit": "2df912137d82f5f072f6ff4869275a708786bd4c",
+      "line": 168,
+      "column": 147,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-PLAN.md",
+      "commit": "2df912137d82f5f072f6ff4869275a708786bd4c",
+      "line": 170,
+      "column": 126,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-PLAN.md",
+      "commit": "2df912137d82f5f072f6ff4869275a708786bd4c",
+      "line": 181,
+      "column": 128,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-PLAN.md",
+      "commit": "2df912137d82f5f072f6ff4869275a708786bd4c",
+      "line": 182,
+      "column": 107,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-SUMMARY.md",
+      "commit": "4b03c1f95891419c0a34b0e65c902032c1c29e06",
+      "line": 85,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-01-SUMMARY.md",
+      "commit": "4b03c1f95891419c0a34b0e65c902032c1c29e06",
+      "line": 89,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/18-honeypot-detection-rebuild/18-PATTERNS.md",
+      "commit": "b778cef4319e563c92287e34c69926092cfe2d5c",
+      "line": 823,
+      "column": 24,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/21-exit-engine-live-runtime-hardening/21-07-CAPTURE-ARTIFACTS.md",
+      "commit": "60583893f8449bf2c2d179a5fe6b74fe0391b1e3",
+      "line": 9,
+      "column": 1,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/21-exit-engine-live-runtime-hardening/21-07-CAPTURE-ARTIFACTS.md",
+      "commit": "db876c71c93b062a0e3f0875b62f3cb45b22e4f2",
+      "line": 9,
+      "column": 1,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": ".planning/phases/21-exit-engine-live-runtime-hardening/21-PATTERNS.md",
+      "commit": "dece1a90de98daee3a4eec88e249208baf5b1fa1",
+      "line": 126,
+      "column": 24,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "src/addresses.json",
+      "commit": "bc7cad40ff24d91e873a0cbec5ae9f07a2f5435e",
+      "line": 4,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/honeypots/eth-max-wallet.json",
+      "commit": "d33f32f56ad9b6fcd5a52d09540237903b225201",
+      "line": 4,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/honeypots/eth-sell-revert.json",
+      "commit": "d33f32f56ad9b6fcd5a52d09540237903b225201",
+      "line": 4,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+      "commit": "87dc4ea99b7ee208a554f3f4e72bf56221f4eea1",
+      "line": 5,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+      "commit": "d5aee1f061f508b1b70b6b95bf4dca3a0ed5adf2",
+      "line": 5,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+      "commit": "87dc4ea99b7ee208a554f3f4e72bf56221f4eea1",
+      "line": 5,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+      "commit": "d5aee1f061f508b1b70b6b95bf4dca3a0ed5adf2",
+      "line": 5,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/fixtures/realLaunches/eth-v3-trailing.json",
+      "commit": "87dc4ea99b7ee208a554f3f4e72bf56221f4eea1",
+      "line": 5,
+      "column": 4,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/fork/snipeLifecycle.test.ts",
+      "commit": "9cbb4f8047f6802282b5e8194174fddb57371695",
+      "line": 12,
+      "column": 24,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotDispatch.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 110,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotDispatch.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 112,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotDispatch.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 83,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotDispatch.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 85,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 104,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 106,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 63,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 65,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 75,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 77,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 92,
+      "column": 74,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "commit": "7d8f957214831ee727e83fe642b56935a50d85e0",
+      "line": 94,
+      "column": 71,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/bot/deliberateBuyAffordability.test.ts",
+      "commit": "dc09e981e3b9297e588f469179de64a7a063e9fa",
+      "line": 127,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+      "commit": "1cd8a8879051d0e5a98a1cb352e30b747eb1fbeb",
+      "line": 166,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/bot/noDoubleBuyReconcile.test.ts",
+      "commit": "58ebdabc4c913d1a46a9cd90b44db9860c4d9940",
+      "line": 121,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/exitEngine/antiRugBounded.test.ts",
+      "commit": "bc219069c7248cae0ee92cf47a3ca1650aa86d5f",
+      "line": 61,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/exitEngine/exitInclusionLadder.test.ts",
+      "commit": "1161a702446741e465ecf2f2cc632bcf3f9a13e3",
+      "line": 190,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+      "commit": "096d8ff5291deea1bacdd1acfcb6061ae216dd11",
+      "line": 142,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/exitEngine/noDoubleSellReconcile.test.ts",
+      "commit": "5f8bc6d0913adcb371914190c18a349ef8f26697",
+      "line": 169,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/honeypotDispatch.test.ts",
+      "commit": "e1cd8da19a3412fc508df1b748a7d8caef81318e",
+      "line": 60,
+      "column": 54,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "public-address"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/mevStrategies/flashbotsBundleHash.test.ts",
+      "commit": "912199c42297bbc97329bd87ebda428e6569f60b",
+      "line": 71,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
+      "commit": "1685f54dfaf173d5240a2406b7d56d22abf70e34",
+      "line": 141,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-api-key",
+      "file": "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+      "commit": "7e0871d3b51d1b33db68f8dca70b81c0bd8996e1",
+      "line": 94,
+      "column": 7,
+      "type": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations.",
+      "classification": "known-public:hardhat-0"
+    },
+    {
+      "rule_id": "generic-credential-uri",
+      "file": ".planning/phases/20-going-live-ops-hardening/20-REVIEW-FIX.md",
+      "commit": "8fa26e5788941214fba3eed77d5d87e140861c05",
+      "line": 70,
+      "column": 20,
+      "type": "Detected a password embedded in a service connection URI, which may expose direct access to the referenced service.",
+      "classification": "non-public"
+    },
+    {
+      "rule_id": "generic-credential-uri",
+      "file": ".planning/phases/20-going-live-ops-hardening/20-REVIEW.md",
+      "commit": "511a0f722709959b32d7cbd02369ca5ddd9c37a5",
+      "line": 222,
+      "column": 24,
+      "type": "Detected a password embedded in a service connection URI, which may expose direct access to the referenced service.",
+      "classification": "non-public"
+    },
+    {
+      "rule_id": "generic-credential-uri",
+      "file": ".planning/phases/20-going-live-ops-hardening/20-REVIEW.md",
+      "commit": "511a0f722709959b32d7cbd02369ca5ddd9c37a5",
+      "line": 44,
+      "column": 23,
+      "type": "Detected a password embedded in a service connection URI, which may expose direct access to the referenced service.",
+      "classification": "non-public"
+    }
+  ],
+  "phase": "22-safety-rails-audit",
+  "plan": "22-26",
+  "requirement": [
+    "AUDIT-03"
+  ],
+  "acceptance": [
+    "AC-35"
+  ],
+  "decision": "D-17 (amended 2026-11-06): betterleaks v1.10.0, full history with explicitly restated --log-opts incl. --reflog, --redact, JSON, metadata-only hits",
+  "session_date": "2026-11-07",
+  "network_boundary": {
+    "kind": "firewall-rule",
+    "as_recorded_in": ".planning/audit/inputs/nac01-backup-scan.json network_boundary (22-02)",
+    "rule": {
+      "display_name": "csb-betterleaks-outbound-block",
+      "name": "{2c55ed8b-1b54-45ca-8125-dbc748f0ef69}",
+      "enabled": true,
+      "direction": "Outbound",
+      "action": "Block",
+      "profile": "Any",
+      "primary_status": "OK",
+      "policy_store_source": "PersistentStore",
+      "program": "C:\\Users\\jackc\\tools\\betterleaks-1.10.0\\betterleaks.exe",
+      "program_matches_exe_path_exactly": true,
+      "matching_rule_count": 1
+    },
+    "profiles": [
+      {
+        "name": "Domain",
+        "enabled": true,
+        "default_outbound_action": "NotConfigured"
+      },
+      {
+        "name": "Private",
+        "enabled": true,
+        "default_outbound_action": "NotConfigured"
+      },
+      {
+        "name": "Public",
+        "enabled": true,
+        "default_outbound_action": "NotConfigured"
+      }
+    ],
+    "active_network": {
+      "name": "baddiegirl",
+      "category": "Public",
+      "covered_by_rule_profile": true
+    },
+    "read_back": {
+      "by": "executor (22-26 Task 1), before the first scanner execution of this plan",
+      "shell": "non-admin PowerShell (powershell.exe -NoProfile)",
+      "date": "2026-11-07T20:56Z",
+      "commands": [
+        "Get-NetFirewallRule -DisplayName 'csb-betterleaks-outbound-block'",
+        "Get-NetFirewallRule -DisplayName 'csb-betterleaks-outbound-block' | Get-NetFirewallApplicationFilter",
+        "Get-NetFirewallProfile",
+        "Get-NetConnectionProfile"
+      ],
+      "result": "Enabled=True, Direction=Outbound, Action=Block, Profile=Any, PrimaryStatus=OK, PolicyStoreSource=PersistentStore; Program exactly C:\\Users\\jackc\\tools\\betterleaks-1.10.0\\betterleaks.exe; 1 matching rule; Domain/Private/Public Enabled=True; active network Public; identical to the 22-02 record"
+    }
+  },
+  "prechecks": {
+    "exe_sha256_recomputed": "16600f87ef27eed53f7bcb80d56bd7c9e5730c9088c8d30ef57867b6a1fec6cf (equals TOOL.json and FIXTURES.json)",
+    "config_sha256_recomputed": "extended 109020a5..., known_public 14e53bda..., public_address 72063e89... (equal to FIXTURES.json; files i/lf w/lf)",
+    "dir_mode_regression": "fixture-check.ts dir-mode fixture proof re-run after the git-mode extension, output to a scratch file (FIXTURES.json not rewritten): 18/18 required cases pass, config hashes and scanner_args identical to FIXTURES.json",
+    "git_mode_mutants": "log-opts mutants each fail at least one git case: without --reflog (git-reflog, git-stash-reflog), without --all (git-ref-no-reflog), without --diff-merges=first-parent (git-stash-reflog), with modifications excluded (git-stash-reflog)",
+    "archives_in_history": "git log --all --reflog --name-only: no .zip/.tar/.gz/.tgz/.7z/.jar path in history (--max-archive-depth 2 has nothing to open)",
+    "repo_ignore_files": "no .betterleaksignore, .gitleaksignore, .betterleaks.toml or .gitleaks.toml at the repo root; --gitleaks-ignore-path points at an empty temp folder"
+  },
+  "never_passed": [
+    "--validation",
+    "--trust-local-git-config",
+    "--unsafe-auto-load-config",
+    "--baseline-path"
+  ],
+  "scanner_temp_copy_note": "betterleaks git mode copies the git dir to %TEMP%\\betterleaks-git-* for each run (seen in its debug log: git --git-dir=<temp copy> log -p -U0 <log-opts>); the engine checks that no such folder is left after the three passes (git-temp-clean, and a hard error on the real scan)",
+  "history_rewritten": false,
+  "value_policy": "hits hold rule id, file, commit, line, column, type and classification only; raw redacted reports stay in raw_report_dir outside the repo"
+}

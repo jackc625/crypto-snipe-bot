@@ -1,0 +1,83 @@
+{
+  "id": "AUD-TESTU-008",
+  "title": "The compile-gate tests that lock the fail-closed verdict types (@ts-expect-error on a vacuous \"safe\") are never type-checked: Vitest does not type-check and no tsconfig includes test/, so weakening the verdict types keeps them green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [],
+  "files": [
+    "test/unit/anti-rug/types.test.ts",
+    "vitest.config.ts",
+    "tsconfig.json",
+    "tsconfig.bot.json",
+    "src/anti-rug/types.ts",
+    "test/unit/honeypotTypes.test.ts",
+    "src/utils/honeypot/types.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/types.test.ts:111-123@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 5: // @ts-expect-error then const vacuous: RugEvaluation = { verdict: 'safe' }; the runtime assertions only read the test's own literal"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/types.test.ts:94-109@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 4: same pattern for the unknown variant"
+    },
+    {
+      "type": "code",
+      "ref": "tsconfig.json:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "include is [\"src/**/*\", \"hardhat.config.ts\"]: test/ is not type-checked by the CI tsc step"
+    },
+    {
+      "type": "code",
+      "ref": "tsconfig.bot.json:12@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "include is [\"src\"]"
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:6-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no typecheck option: Vitest transpiles tests without type-checking, so an unused @ts-expect-error is never reported"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/honeypotTypes.test.ts:7-13@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"The test PASSING means tsc --noEmit passed ... tsc will fail and this test file will fail to load\" (neither is true)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/honeypotTypes.test.ts:19-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "four @ts-expect-error gates; every runtime assertion reads the test's own literal"
+    }
+  ],
+  "sibling_sites_checked": "git grep @ts-expect-error over test/unit at the base SHA: anti-rug/types.test.ts:107 and :117, honeypotTypes.test.ts:20, :27, :46 (the HoneypotResult compile gate; labelled in Task 2). .github/workflows/test.yml runs tsc --noEmit only for tsconfig.json, tsconfig.bot.json and dashboard/tsconfig.json, none of which include test/.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the gate exists to make a vacuous \"safe\" anti-rug or honeypot verdict unrepresentable (a vacuous honeypot pass is a buy into a honeypot, an S0/S1 loss); it is silently not running, so the discipline it claims to lock can erode with a green suite.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28 / Phase 31: add the test tree to a type-checked project (a tsconfig.test.json in the CI tsc step, or Vitest typecheck mode) and prove the gate RED once by removing the @ts-expect-error.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 4: RugEvaluation accepts { verdict:'unknown', reason } with NO signals field",
+    "Test 5: Vacuous { verdict:\"safe\" } without signals fails TypeScript compilation (vacuous-pass unrepresentable)",
+    "honeypotTypes.test.ts: Test 1: literal { verdict: 'safe', evidence: {} } fails tsc --noEmit",
+    "honeypotTypes.test.ts: Test 2: literal { verdict: 'safe', evidence: { method: ... } } (missing tax fields) fails tsc --noEmit",
+    "honeypotTypes.test.ts: Test 4: literal { verdict: 'unsafe', evidence: { method: ... } } (missing reason) fails tsc --noEmit"
+  ],
+  "escaped_regression": "Make signals optional on the safe variant of RugEvaluation in src/anti-rug/types.ts: Test 5 stays green (the @ts-expect-error is never compiled and the runtime check reads the literal), and the src tsc step still passes."
+}

@@ -1,0 +1,49 @@
+{
+  "id": "AUD-BUY-035",
+  "title": "Loading .env before require(./bot) made LOG_LEVEL from .env take effect on the live bot, an undeclared boot behaviour change; an invalid value would stop the boot",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [
+    "C18"
+  ],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S3, equal to the estimate: an undeclared boot behaviour change. No capital path.",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#5"
+  ],
+  "files": [
+    "src/main.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/main.ts:44@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the fix: .env is read into a private object, so process.env and boot order are unchanged"
+    },
+    {
+      "type": "command",
+      "ref": "red-proofs/22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+      "note": "RED-proven in test/unit/mainEntry.test.ts"
+    }
+  ],
+  "sibling_sites_checked": "logger.ts reads LOG_LEVEL before config.ts runs dotenv; src/main.ts is the only code that runs before bot.ts loads.",
+  "fixed_by": "5378478",
+  "red_proof": "22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+  "recommendation": "Done (5378478)."
+}

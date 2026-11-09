@@ -1,0 +1,64 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [],
+  "related": [
+    "AUD-ROOT-003"
+  ],
+  "slice": "ROOT",
+  "id": "AUD-ROOT-006",
+  "title": "ESLint is configured with type-aware rules, including the BigInt/Number mixing guard (restrict-plus-operands, the C01 lint layer), but nothing runs it: no lint script, no CI step, and the type-aware parser cannot see scripts/ or test/ because no tsconfig includes them",
+  "area": "src",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C01"
+  ],
+  "files": [
+    "eslint.config.mjs",
+    "package.json",
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "eslint.config.mjs:3-21@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "recommendedTypeChecked with projectService; restrict-plus-operands with allowNumberAndString false (\"D-07: Flag BigInt/Number mixing at lint time\"); no-unsafe-argument warn"
+    },
+    {
+      "type": "code",
+      "ref": "eslint.config.mjs:22-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ignores dist, artifacts, cache, typechain-types, node_modules only"
+    },
+    {
+      "type": "code",
+      "ref": "package.json:7-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no lint script"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:8-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the test job has no lint step"
+    }
+  ],
+  "sibling_sites_checked": "eslint.config.mjs is the only ESLint config at the base (no .eslintrc*). The lint error count is measured by plan 22-16 (counted, not gated, per the SPEC); the projectService limitation for files outside every tsconfig follows from AUD-ROOT-003 and is not exercised here (ESLint was not run in this plan).",
+  "status": "confirmed",
+  "severity_rationale": "S4: a guard that exists only on paper; the C01 defects it would flag are audited by the src slices directly.",
+  "external_od_refs": [
+    {
+      "id": "OD-23",
+      "owner_phase": "26"
+    }
+  ],
+  "recommendation": "Phase 26/28 (OD-23 strictness target, lint-zero) and Phase 31 (blocking gate): add a lint script, cover scripts/ and test/ through a tsconfig, and run it in CI."
+}

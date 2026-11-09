@@ -1,0 +1,143 @@
+{
+  "slice": "TESTU",
+  "area": "test",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-TESTU-017"
+      ],
+      "search": "tests asserting BigInt/Number arithmetic (grep Number(, BigInt(, parseUnits, formatEther, toBeGreaterThan on bigints) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); money-path tests compare bigints with toBe on bigint literals; no test coerces wei to Number. Remaining files: ethersV6BigIntArithmetic scans src/scripts for BigNumber and checks getGasOptions returns bigints (real); db.test.ts risk fixtures store sell amounts as decimal ETH while production stores wei, hiding the AUD-DB-002 unit mix (AUD-TESTU-017)."
+    },
+    "C02": {
+      "result": "checked, none",
+      "search": "tests of || vs ?? defaulting with 0, 0n or empty values (grep \"|| \", \"??\" in assertions and fixtures) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); exitEngine/attemptBudget proves the explicit-0 retries fix on the real loop (WR-04), mevStrategies/inclusionReconciliationConfig proves malformed/negative ceilings fall back. Remaining files: configEnvVar (non-numeric STOP_LOSS_PCT falls back), chainRegistry and antiRugConfig (NaN / out-of-range values exit fatally) are real; none found that pins a wrong || default."
+    },
+    "C03": {
+      "result": [
+        "AUD-TESTU-005",
+        "AUD-TESTU-007",
+        "AUD-TESTU-017"
+      ],
+      "search": "tests touching token decimals, probe amounts and price (grep decimals, getAmountsOut, snipeAmount, buyAmountNative, entryPrice) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); every exit fixture uses an 18-decimal token and a fixed getAmountsOut, so the probe/price defects AUD-EXIT-002/-003/-015 are not observable; AUD-TESTU-005 (resume amount never asserted) and AUD-TESTU-007 (failed first quote pinned as expected). Remaining files: receiptDecoder shows amountOut is a wei string; positionsHelper quotes the held token amount (21.4 regression, real); db.test.ts decimal sell fixtures (AUD-TESTU-017)."
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "slippage/minOut assertions (grep minOut, amountOutMin, slippage) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); exitEngine/computePublicMinOut and exitInclusionLadder Test 5 assert the public-sell minOut on real code; no test asserts the private-sell minOut (AUD-EXIT-001 is not claimed by any test) or the snipe-buy minOut (AUD-BUY-003). Remaining files: safetyBank/simulateSwapForChain and tokenSafety simulateSwap cover the staticCall gate only; no minOut claims."
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "deadline arguments (grep deadline) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); deadlines appear only as fixture values; no test claims deadline behaviour. Remaining files: v3Abis asserts the multicall deadline parameter exists in the ABI (static); no runtime deadline claim."
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "approval tests (grep approve, allowance) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); exitEngine/exitWorkerRealPath forces a real approval under the real lock (allowance 0), exitInclusionLadder counts approve calls; approval lock membership is part of AUD-TESTU-003 (class C07). Remaining files: exitEngineZeroBalance and exitEngineSell stub allowance; no approval claim."
+    },
+    "C07": {
+      "result": [
+        "AUD-TESTU-002",
+        "AUD-TESTU-003",
+        "AUD-TESTU-004"
+      ],
+      "search": "tests touching nonce / withNonceLock (grep withNonceLock, nonceAuthority, getTransactionCount, submitBuyTx, submitPrivateSell) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461), and whether each uses the real lock: real lock in bot/buyNonceLock, exitEngine/sellNonceLock, exitWorkerRealPath, noDoubleSellReconcile, partialSellDecoupled, pollTelemetry, bot/watchdog Test 2 (executor replaced); recording spy over the real lock in exitWorker; pass-through mock in exitInclusionLadder, antiRugReason, failedExitBalanceTruth. Remaining files: utils/nonceAuthority proves the real mutex (re-entry and never-settling ops are not claimed: AUD-TX-001, AUD-TX-002); exitEngineSell uses a pass-through lock without a lock claim."
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "reorg handling (grep reorg, removed, blockHash, confirmations) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); no test claims reorg behaviour; the anti-rug confirm-after-N-blocks gate (detectorEvaluator Tests 11-13) re-evaluates signals, not reorgs. Remaining files: none."
+    },
+    "C09": {
+      "result": [
+        "AUD-TESTU-014"
+      ],
+      "search": "receipt status assertions (grep status: 0, reverted, receipt) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); mevStrategies/inclusionReconciliation proves mined-but-reverted throws on the real helper and the flashbots strategy; bot/snipeFailClean treats a submit throw as zero spend without observing any receipt (AUD-TESTU-014). Remaining files: receiptDecoder covers missing receipts and spoofed / malformed logs (real); exitEngineSell records decoded values; no status-0 claims beyond those."
+    },
+    "C10": {
+      "result": [
+        "AUD-TESTU-020",
+        "AUD-TESTU-022"
+      ],
+      "search": "WebSocket reconnect/backfill tests (grep wsProvider, WebSocket, reconnect, backfill, getLogsForBackfill) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); anti-rug tests use a stub wsProvider with no error or close events, so the registered reconnect defects AUD-ANTIRUG-001/-002 and AUD-BUY-008 are not claimed by any of these files; detectorRegistry Tests A6-A8 prove only the chunked getLogs primitive. Remaining files: chainRestart.test.ts is fully hollow over the restart path (AUD-TESTU-020); dashboard greps claim WS-driven UI behaviour without running it (AUD-TESTU-022); preflight/rpcHealth covers chain id and block age only."
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "floating promises and unhandled rejections in tests (grep void , .then( without await, new Promise(() => {}) left pending) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); antiRugBounded uses void p.then to observe settlement and awaits p; watchdog Test 2 settles its hung promise before exit; no test leaves an un-awaited rejecting promise. No test claims process-level unhandledRejection behaviour (AUD-BUY-005). Remaining files: chainRestart catches its own mock rejection; positionsHelper awaits its Promise.all; none leaves an unhandled rejection."
+    },
+    "C12": {
+      "result": [
+        "AUD-TESTU-002",
+        "AUD-TESTU-006",
+        "AUD-TESTU-007",
+        "AUD-TESTU-016"
+      ],
+      "search": "timer leaks and fake timers (grep useFakeTimers / useRealTimers, setInterval, clearInterval, unref, getTimerCount) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); every useFakeTimers is paired with useRealTimers in afterEach or the case; opEnrichment and partialSellDecoupled clear the intervals they register; liveness and monitor-start findings: AUD-TESTU-002, -006, -007, -016. Remaining files: telegramListener, receiptDecoder, withTimeout pair fake timers with useRealTimers; withTimeout proves timer cleanup (real)."
+    },
+    "C13": {
+      "result": [
+        "AUD-TESTU-001",
+        "AUD-TESTU-005",
+        "AUD-TESTU-009",
+        "AUD-TESTU-010",
+        "AUD-TESTU-014",
+        "AUD-TESTU-017",
+        "AUD-TESTU-018",
+        "AUD-TESTU-019",
+        "AUD-TESTU-023",
+        "AUD-RAIL-002"
+      ],
+      "search": "tests touching SQLite state (grep src/utils/db mocks, prepare(, better-sqlite3, insertTrade, markExitFailedHeld, getResume*) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461): which use the real statement, which mock it, which mirror it, and which open the real DB unmocked. Remaining files: db.test.ts runs SQL copies on the v4 helper schema (AUD-TESTU-017, AUD-TESTU-018) and imports src/utils/db unmocked (AUD-TESTU-001); the three db/*Migration files run replicas of migrateSchema and their own statement SQL and import src/utils/db unmocked (AUD-TESTU-019, AUD-TESTU-001); configEnvVar mis-paths its db mock (AUD-TESTU-023); riskManager and preflight/* mock the statements. | 22-28 consolidation: AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
+    },
+    "C14": {
+      "result": [
+        "AUD-TESTU-002",
+        "AUD-TESTU-005",
+        "AUD-TESTU-006",
+        "AUD-TESTU-009",
+        "AUD-TESTU-014",
+        "AUD-TESTU-016",
+        "AUD-TESTU-017"
+      ],
+      "search": "idempotent / repeated / dropped exit and buy tests (grep enqueueExit, tryAcquireSellLock, exit_failed_held, resume, no-double-sell, no-double-buy) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the no-double-sell and no-double-buy guards are real-path (noDoubleSellReconcile, noDoubleBuyReconcile); the gaps are listed. Remaining files: exitEngineZeroBalance (zero balance closes once, real), riskManager max-positions count mocked (failed-held exclusion AUD-DB-003 invisible, AUD-TESTU-017)."
+    },
+    "C15": {
+      "result": "checked, none",
+      "search": "TOCTOU / race tests (grep concurrent, Promise.all, race, interleave, isTokenSniped) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); buyNonceLock and sellNonceLock prove the seam serializes; no test claims the already-sniped check or the risk check race (AUD-BUY-004, AUD-BUY-010) or the anti-rug sell-lock refusal (AUD-EXIT-014). Remaining files: positionsHelper Promise.all pricing only; none."
+    },
+    "C16": {
+      "result": [
+        "AUD-TESTU-011",
+        "AUD-TESTU-012"
+      ],
+      "search": "gas/fee ceiling tests (grep maxPriorityFeePerGas, maxFeePerGas, ceiling, gasMultiplier, MEV_*_MAX_PRIORITY_FEE_GWEI) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the CR-01 clamp is real in gasMultiplier and inclusionReconciliation; AUD-TESTU-011 (sell ceiling never on a live path), AUD-TESTU-012 (anti-rug multiplier wiring only regex-checked). Remaining files: ethersV6BigIntArithmetic getGasOptions multiplier, preflight/exitAffordability gas floor math (real, bigint exact); none found hiding a ceiling defect."
+    },
+    "C17": {
+      "result": [
+        "AUD-TESTU-001",
+        "AUD-SECRET-002",
+        "AUD-RAIL-001",
+        "AUD-RAIL-002"
+      ],
+      "search": "hard-coded keys and key handling (grep 0x+64 hex, PRIVATE_KEY, AUTH_KEY, new Wallet) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the only key material is the known-public Hardhat #0 key used as the Flashbots auth signer (flashbotsMultiBuilder.test.ts:153, inclusionReconciliation.test.ts:137; known-public, not escalated, AC-35) and 0x11..11 placeholders; the real PRIVATE_KEY reached tests only through the pre-rail .env load (AUD-TESTU-001). Remaining files: chainRegistry, antiRugConfig, configEnvVar, v3Abis, provider, tokenSafety use 0x11..11 placeholder keys; crossEnvRules uses placeholder secrets; no real key material in the slice. | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists; known-public Hardhat #0 and public-address hits in test files | 22-28 consolidation: AUD-RAIL-001 and AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
+    },
+    "C18": {
+      "result": [
+        "AUD-TESTU-001",
+        "AUD-TESTU-011",
+        "AUD-TESTU-015",
+        "AUD-TESTU-021",
+        "AUD-RAIL-001",
+        "AUD-RAIL-002"
+      ],
+      "search": "environment manipulation patterns (envscan.js: env assignments, deletes and save/restore idioms per file) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); save-and-restore in deliberateBuy*, noDoubleBuyReconcile, exitInclusionLadder, noDoubleSellReconcile, inclusionReconciliation; delete-only or no cleanup in the AUD-TESTU-015 files. Remaining files: configEnvVar, chainRegistry, antiRugConfig, v3Abis, riskManager and preflight/antiRugLiveGate overwrite or delete keys without restoring (AUD-TESTU-015); telegramListener pins the allow-all allowlist env semantics (AUD-TESTU-021); crossEnvRules, exitAffordability, staleData, walletBalance and telegramListener snapshot and restore correctly. | 22-28 consolidation: AUD-RAIL-001 and AUD-RAIL-002 (RAIL findings-only slice, area test) folded in"
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "API auth/CORS tests (grep Authorization, apiKey, cookie, cors, requireAuth) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); none of these files exercise API auth. Remaining files: api/antiRug.test.ts mounts the anti-rug router alone on a 127.0.0.1 listener without the auth middleware (it claims route behaviour, not auth); no unit test covers API auth, CORS or the WS upgrade (AUD-API-008 is not claimed by any unit test)."
+    },
+    "C20": {
+      "result": [
+        "AUD-TESTU-021"
+      ],
+      "search": "Telegram trust tests (grep TELEGRAM_, telegram, allowedSenders, alphaDrop) over all 84 test/unit files of the slice-files.ts --snapshot TESTU tree at 23a6461 (each read in full; the src files they target read from a git archive of 23a6461); the money-path files only mock the outbound notifier; inbound Telegram trust is not claimed by any of them. Remaining files: telegramListener.test.ts requires allow-all on empty lists and sender-OR-channel matching (AUD-TESTU-021, encoding AUD-BUY-006); preflight/crossEnvRules checks the five Telegram keys are set together."
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "DB-05",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Always broadcast alerts to the dashboard, whether or not Telegram is configured",
+  "capital": false,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "Alerts sent through sendTelegramAlert never reach the dashboard when Telegram is not configured, and always show as info (AUD-DB-018)."
+    },
+    {
+      "id": "always-broadcast",
+      "name": "Broadcast first, then try Telegram; infer severity in both senders",
+      "behavior_impact": "The dashboard feed shows every alert with its severity.",
+      "risk": "Under the test rails the broadcast runs where it was skipped before (D-04 amended already expects the catch path)."
+    }
+  ],
+  "recommendation": "always-broadcast.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S3.",
+  "behavior_impact": "Decides whether the dashboard depends on Telegram for alerts.",
+  "findings": [
+    "AUD-DB-018"
+  ],
+  "needed_by": "Phase 29 discussion (S2-S4 fixes)",
+  "assigned_id": "OD-62"
+}

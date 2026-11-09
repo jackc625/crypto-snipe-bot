@@ -1,0 +1,134 @@
+{
+  "slice": "TX",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-TX-022"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for BigInt(|Number(|parseInt|parseFloat|Math\\.|toFixed|\\* 100: applyGasMultiplier rounds the multiplier to integer percent (types.ts:61-65, bigint math after), gweiToWei uses toFixed(9) then parseUnits (reconciliation.ts:697-701; a value >= 1e21 gwei prints in exponent form and parseUnits would throw, a config-only edge recorded in thresholds TH-TX-04), bundle nonce is a number from the library (flashbots.ts:280), receipt gasUsed x gasPrice is bigint (receiptDecoder.ts:62), targetBlock is number arithmetic on getBlockNumber (flashbots.ts:218, :304); no bigint/number mixing found | 22-27 merge: AUD-TX-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C02": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for \\|\\| and \\?\\?: flashbots.ts:119-122 and bloxroute.ts:36-38 (config fallbacks, strings), flashbots.ts:161/:193 and passthrough.ts:57/:88 and bloxroute.ts:84/:119 (gasLimit: ?? for the affordability input, || for the submitted value; a 0n gasLimit would make the strategy refuse as unaffordable, but every caller passes ctx.chain.gas.maxGasLimit), provider.ts:16/:19, txManager.ts:107-108 (?? keeps an explicit 0 or -1 budget, correct), reconciliation.ts:679-694 parsers treat '' as unset; no wrong-default case on a money path"
+    },
+    "C03": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for decimals|formatUnits|parseUnits|1e18|10n \\*\\*: only parseUnits(gwei) for fees (reconciliation.ts:700); receiptDecoder returns raw wei strings; no token-decimal math in the slice"
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for minOut|amountOutMin|slippage: the slice builds no swap; sendTxWithRetry calls txBuilder once (txManager.ts:113), so whatever minOut the caller encoded is reused on every attempt (buy side AUD-BUY-003/-018, sell side AUD-EXIT-001); the strategies' simulate-before-submit (flashbots.ts:231-251, passthrough.ts:120-128, bloxroute.ts:136-144) only refuses reverting txs"
+    },
+    "C05": {
+      "result": [
+        "AUD-BUY-018"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for deadline|Date.now|txBuilder\\(: the tx (and its deadline) is built once per sendTxWithRetry (txManager.ts:113) and reused for every escalation attempt; the BUY entry AUD-BUY-018 owns the deadline effect; no other deadline in the slice"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for approve|allowance: no approval in the slice; the dead maybeApproveForChain (bot.ts:222-229) and the exit approvals (AUD-EXIT-004) are outside it"
+    },
+    "C07": {
+      "result": [
+        "AUD-TX-001",
+        "AUD-TX-002",
+        "AUD-TX-003",
+        "AUD-TX-004",
+        "AUD-TX-005",
+        "AUD-TX-006",
+        "AUD-TX-008",
+        "AUD-BUY-002",
+        "AUD-TX-018"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for nonce|withNonceLock|getTransactionCount|NonceManager plus git grep of every withNonceLock site and every signing call (sendTransaction|signTransaction|approve\\(|router\\.swap) under src at the base SHA; read nonceAuthority.ts in full and followed each lock op body; checked \"pending\" vs \"latest\" nonce sources (ethers@6.16.0 abstract-signer.js:69 takes \"pending\" for contract sends; the strategies take \"latest\"): no in-process path leaves a public tx pending after its lock op returns, so no mismatch is reachable today (AUD-TX-002 recommendation keeps it that way). bloXroute trace for 22-28 (AUD-BUY-002 left it to TX): a relay transport failure defers to reconcile (bloxroute.ts:179-190, correct), but after a not-landed attempt the next attempt re-signs the same nonce and only the latest hash is reconciled (reconciliation.ts:476-497, :576-603), so an earlier accepted attempt that mines reads as landed-not-ours, the same mechanism as AUD-BUY-002 sub_claim 3 | 22-27 merge: AUD-TX-018 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C08": {
+      "result": [
+        "AUD-TX-012"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for reorg|confirm|blockHash|removed: inclusion decided at the first status-1 receipt (reconciliation.ts:371-375) or the library BundleIncluded (flashbots.ts:319); only passthrough waits for 3 confirmations (:140); ethers@6.16.0 provider.js:1044 confirms default 1"
+    },
+    "C09": {
+      "result": [
+        "AUD-TX-002",
+        "AUD-TX-011",
+        "AUD-TX-015",
+        "AUD-TX-017",
+        "AUD-TX-020"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for \\.wait\\(|status|receipt|CALL_EXCEPTION|TRANSACTION_REPLACED: passthrough.ts:139-150 catch-all, reconciliation.ts:371-378/:404-408 (status 1 included, 0 reverted, null keeps polling), receiptDecoder.ts:44-110 (status not read; first WETH event wins); ethers@6.16.0 provider.js:1043-1210 re-read | 22-27 merge: AUD-TX-020 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C10": {
+      "result": [
+        "AUD-ANTIRUG-002"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for WebSocketProvider|websocket|reconnect|destroy: provider.ts:33-41 builds the WebSocketProvider with no error listener (the crash on a refused reconnect is AUD-ANTIRUG-002, reproduced there); removeWsProvider destroys and forgets (:46-52); the reconnect loops are in bot.ts/detector.ts (AUD-BUY-008, AUD-ANTIRUG-001)"
+    },
+    "C11": {
+      "result": [
+        "AUD-TX-009",
+        "AUD-TX-024"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for async listeners, .on(|.once(|then(|catch(|void and the library code they reach: flashbots bundle.wait (library waitForBundleInclusion async block handler, reproduced crash), retry.ts (awaited), receiptDecoder (awaited); git grep unhandledRejection|uncaughtException at the base SHA: none | 22-27 merge: AUD-TX-024 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C12": {
+      "result": [
+        "AUD-TX-002"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for setTimeout|setInterval|on\\(|once\\(|removeListener: reconciliation sleep (:675-677) and retry/receiptDecoder delays are awaited one-shots; the library bundle.wait timer is unref'd and cleared; a never-settling wait(3) (passthrough.ts:140) keeps its hash listener and per-block replacement scanner alive forever (ethers@6.16.0 provider.js:1188-1210)"
+    },
+    "C13": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for db|sqlite|prepare|transaction\\(: no database access in the slice"
+    },
+    "C14": {
+      "result": [
+        "AUD-TX-003"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for landed|broadcast|BroadcastHandle|escalatePrivate: escalatePrivateSell/Buy turn every throw into landed:false (txManager.ts:201-214, :306-319) and expose only the last attempt's hash; the exit guard then fails safe on landed-not-ours (exitEngine.ts:955-972, cross-read); an anti-rug exit freed by withTimeout stays queued and runs later (AUD-TX-003)"
+    },
+    "C15": {
+      "result": [
+        "AUD-TX-004",
+        "AUD-TX-005"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) plus git grep at the base SHA for Symbol.for|registerSingleton|processLock|lockfile|locking_mode|single-instance: none; the nonce read-then-sign is safe only while one module instance in one process holds the lock"
+    },
+    "C16": {
+      "result": [
+        "AUD-TX-007",
+        "AUD-TX-010",
+        "AUD-TX-013",
+        "AUD-TX-016",
+        "AUD-TX-019",
+        "AUD-TX-021"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for maxFeePerGas|maxPriorityFeePerGas|gasPrice|ceiling|affordab|reserve|multiplier|MEV_.*_GWEI: every fee path in flashbots.ts:156-216, passthrough.ts:53-113, bloxroute.ts:80-115, reconciliation.ts:174-339 and :499-553, gasManager.ts; ethers@6.16.0 abstract-provider.js:597-637 re-read (2 x latest base fee + priority, 1 gwei fallback) | 22-27 merge: AUD-TX-019 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-TX-021 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C17": {
+      "result": [
+        "AUD-TX-014"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for authKey|authHeader|Authorization|privateKey|signMessage|log\\.(info|warn|error)\\(.*err: the Flashbots auth key is used only as a signer (flashbots.ts:151, :102) and only its address is logged (:133); the bloXroute header and RPC URLs reach logs through err objects (reproduced on loopback, AUD-TX-014); provider.ts:59 passes CONFIG.walletPrivateKey to new Wallet (module-level key is section C I1, config slice)"
+    },
+    "C18": {
+      "result": [
+        "AUD-TX-008",
+        "AUD-TX-010",
+        "AUD-TX-025"
+      ],
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for process.env and every env key the slice reads (MEV_BUILDERS, MEV_BUY_TARGET_BLOCKS, MEV_CONFIRM_WINDOW_MS, MEV_CONFIRM_POLL_MS, MEV_BUY_MAX_PRIORITY_FEE_GWEI, MEV_SELL_MAX_PRIORITY_FEE_GWEI, MEV_PRIORITY_FEE_STEP_GWEI, MEV_RESERVE_SELL_GAS, FLASHBOTS_AUTH_KEY, BLOXROUTE_AUTH_HEADER) plus git grep for the registered-but-unread keys (MEV_MAX_PRIORITY_FEE_GWEI, RPC_TIMEOUT_MS, MEV_BUY/SELL_COINBASE_BRIBE_ENABLED); parsers fall back on unset, empty and non-numeric (reconciliation.ts:679-694, flashbots.ts:42-64); full table in thresholds/TX.json | 22-27 merge: AUD-TX-025 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for express|cors|origin|apiKey|auth middleware: no HTTP server or API auth in the slice (outbound relay auth only, see C17)"
+    },
+    "C20": {
+      "result": "checked, none",
+      "search": "grep over the TX snapshot (slice-files.ts --snapshot TX at 23a6461, 11 files) for telegram|sendCtxAlert|notifier: the slice sends no Telegram message itself; submitWithReconciliation's alert parameter defaults to a no-op and every strategy passes undefined (flashbots.ts:387, passthrough.ts:162, bloxroute.ts:204), so its alert text never reaches the operator"
+    }
+  }
+}

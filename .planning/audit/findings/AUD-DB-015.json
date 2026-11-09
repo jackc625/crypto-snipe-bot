@@ -1,0 +1,66 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-015",
+  "title": "Two bots with different wallets can share one database (nothing records the wallet on a trade and nothing locks the database file), and on its next start each bot marks the other bot's open positions failed because its own wallet holds none of those tokens, so the owner stops monitoring them after its own restart",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13",
+    "C15"
+  ],
+  "files": [
+    "src/utils/db.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:33-47@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "trades has no wallet column (nor do exit_state, lp_baseline, pause_state, chain_state at :67-190)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH alone picks the file; WAL + busy_timeout let several processes open it at once; no file lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1933-1938@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "restart: for every pending buy, balanceOf(this bot's wallet) === 0 -> updateTradeStatus.run('failed', token, chain)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the resume scan reads every pending buy regardless of who bought it"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:420-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "open-position count, exposure and daily loss are shared totals across both wallets; pause_state is one row for both"
+    }
+  ],
+  "sibling_sites_checked": "Scope boundary: the same-wallet second process is AUD-TX-005 / RC-18, closed by the 22-13 process lock keyed by wallet address; that lock does not see a second bot on a different wallet, so this entry stays separate. How two bots end up on one file: a second process started from the same checkout with PRIVATE_KEY overridden in the shell (dotenv never overrides shell values) or any process with the same absolute DB_PATH. Dedup (isTokenSniped, db.ts:341-347) is shared, which blocks the second bot from buying a token the first one holds. Exit monitors at runtime are in memory per process; the damage lands on the owner's next restart.",
+  "status": "candidate",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 STRAND: a deliberate but unsupported setup (one database, two wallets) silently drops the other bot's positions out of restart-resume after a restart of each; candidate because the setup is not used today and the trace is by code reading. Registered because the CONTEXT deferred idea asked for it and the code allows it.",
+  "related": [
+    "AUD-TX-005",
+    "AUD-DB-007"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "OD-59",
+  "recommendation": "Either record the wallet address on every trade and scope every query by it, or lock the database file for one wallet (a second lock keyed by DB path), or refuse a database whose recorded owner differs. Card DB-02. Phase 24 or 29."
+}

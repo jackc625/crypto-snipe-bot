@@ -1,0 +1,62 @@
+{
+  "captured_at": "2026-11-09T06:02:30.191Z",
+  "head_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+  "measured_trees": {
+    "coverage-files.txt": [
+      "phase_start",
+      "post_rails"
+    ],
+    "db-hashes.json": [
+      "live_db (compared with the phase-start manifest)"
+    ],
+    "eslint-by-file.json": [
+      "phase_start",
+      "post_rails"
+    ],
+    "eslint-by-rule.json": [
+      "phase_start",
+      "post_rails"
+    ],
+    "npm-audit.json": [
+      "dependency_tree"
+    ],
+    "npm-ls.json": [
+      "dependency_tree"
+    ],
+    "test-counts.json:fork.phase_start": [
+      "phase_start"
+    ],
+    "test-counts.json:fork.post_rails": [
+      "post_rails"
+    ],
+    "test-counts.json:post_rail": [
+      "post_rails"
+    ],
+    "test-counts.json:pre_rail": [
+      "phase_start"
+    ],
+    "tree-hashes.json": [
+      "main checkout"
+    ]
+  },
+  "methods": {
+    "coverage_files": "tracked files at the tree matching that tree vitest.config.ts coverage include minus exclude; static, no coverage run",
+    "db_hashes": "raw-byte SHA-256 of data/bot.db, bot.db-wal, bot.db-shm; never opened through SQLite",
+    "eslint": "node eslint.js src --format json --output-file, per tree, in the export and the checkout",
+    "fork_count": "static TypeScript AST count; see test-counts.json",
+    "post_rail_count": "vitest list per project in the main checkout",
+    "pre_rail_count": "git archive export of phase_start_sha, junctioned node_modules, no env file but the tracked example and sentinel, no data folder, scrubbed env and rails preload via spawnRailedChild (D-13)",
+    "tree_hash": "sha256 over sorted relpath\\tsize\\tmtimeMs lines of node_modules, excluding .vite, .vite-temp, .cache: Vitest and Vite write these caches during `vitest list`; they are not part of the installed dependency tree, so including them would make the NAC-08 hash change on every run (RESEARCH STL-2)."
+  },
+  "node_abi": "127",
+  "node_version": "v22.16.0",
+  "npm_version": "11.17.0",
+  "phase": "before",
+  "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "pre_rail_source": null,
+  "script_blob_sha": "d51fdc111fd346185f09a3df6ac03aea80007239",
+  "time_varying_fields": [
+    "meta.json:captured_at",
+    "npm-audit.json:advisory data (metadata, vulnerabilities, advisories)"
+  ]
+}

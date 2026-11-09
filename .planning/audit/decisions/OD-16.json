@@ -1,0 +1,42 @@
+{
+  "id": "OD-16",
+  "title": "Telegram allowlist default and AND/OR semantics",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: empty list means allow, and sender OR channel is enough",
+      "behavior_impact": "none",
+      "risk": "With no lists (the default), or with only one list set, every message the account can see is accepted, so anyone posting in any visible chat can push a token into the buy pipeline (the safety gates still run)."
+    },
+    {
+      "id": "fail-closed-and",
+      "name": "Fail closed by default (no lists = Telegram intake off) and require both lists when both are set (AND)",
+      "behavior_impact": "Only messages from an allowed sender in an allowed chat are used.",
+      "risk": "A trusted source posting from a new chat is ignored until configured."
+    },
+    {
+      "id": "fail-closed-explicit-mode",
+      "name": "Fail closed by default and add an explicit mode setting (sender, channel, both, either)",
+      "behavior_impact": "Semantics are stated in config instead of implied by which lists are empty.",
+      "risk": "One more setting to get right; a wrong mode is still possible but visible."
+    },
+    {
+      "id": "sender-only",
+      "name": "Fail closed and allow by sender only (channels ignored)",
+      "behavior_impact": "Trust follows people, wherever they post.",
+      "risk": "A compromised or impersonated sender account is trusted in any chat."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Fail closed by default with explicit semantics (research recommendation): fail-closed-explicit-mode, or fail-closed-and if a single fixed rule is preferred.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides which Telegram messages can trigger a buy.",
+  "findings": [
+    "AUD-BUY-006"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+}

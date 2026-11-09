@@ -1,0 +1,38 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "EXIT-02",
+  "title": "How the exit engine measures price",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: quote a fixed probe (the ETH buy amount reused as a raw token amount) and compare outputs",
+      "behavior_impact": "none",
+      "risk": "The signal is not a price: thresholds mean different moves per token, a 0 or Infinity baseline sells at the wrong time, a null quote skips even the urgency exit, and a changed probe after restart or re-arm fires false exits (AUD-EXIT-003, AUD-EXIT-015)."
+    },
+    {
+      "id": "decimals-aware-probe",
+      "name": "Read decimals once and quote a small fixed fraction of the held position; persist the probe with the entry",
+      "behavior_impact": "Thresholds track the real sell value of the position; restart compares like with like.",
+      "risk": "Still a quote-based signal (one RPC call per tick), sensitive to quoter reverts."
+    },
+    {
+      "id": "reserves-spot-price",
+      "name": "Compute spot price from pool reserves (V2) or slot0 (V3) and compare prices",
+      "behavior_impact": "Exit thresholds become true price moves.",
+      "risk": "Spot price ignores price impact of selling the whole position; needs per-dex reserve/slot0 reads."
+    }
+  ],
+  "recommendation": "decimals-aware-probe sized to the held position (it measures what the exit would actually receive), with a 0/non-finite baseline rejected and the urgency exit firing even on a null quote; measure on a Phase 23 fork with low-decimal and high-supply tokens before deciding.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides what number the stop-loss, trailing stop and partial tiers compare against.",
+  "findings": [
+    "AUD-EXIT-003",
+    "AUD-EXIT-015"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-36"
+}

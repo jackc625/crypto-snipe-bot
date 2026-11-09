@@ -1,0 +1,8 @@
+# Paths graphify must not ingest as source (merged after .gitignore).
+
+# GSD's canonical copy of graphify's own output. graphify auto-excludes
+# graphify-out/ but not this copy, so without this line each rebuild
+# re-ingests the previous GRAPH_REPORT.md / graph.html as fake nodes.
+# .gitignore also excludes it today; this line is kept on purpose so graphify
+# stays correct even if part of that folder is ever git-tracked.
+.planning/graphs/

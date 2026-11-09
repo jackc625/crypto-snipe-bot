@@ -1,0 +1,122 @@
+{
+  "slice": "DASH",
+  "area": "dashboard",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-DASH-006",
+        "AUD-DASH-007",
+        "AUD-API-016",
+        "AUD-API-017"
+      ],
+      "search": "grep for toFixed|parseFloat|Number(|formatEth|formatPnL|new Date(|* 1000|/ 1000: 4-decimal cut and wrong Total P&L sum (AUD-DASH-006), seconds read as milliseconds in Trade History (AUD-DASH-007); the dashboard renders the wrong-unit position values (AUD-API-016) and divides the daily-loss amount by a percentage (AUD-API-017); no BigInt is used in the dashboard over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C02": {
+      "result": [
+        "AUD-DASH-004",
+        "AUD-DASH-005"
+      ],
+      "search": "grep for \\?\\? and \\|\\| defaults: unknown anti-rug state defaults to the \"rug detected, exit pending\" dialog (AUD-DASH-004); a missing exposure load defaults to 0 (AUD-DASH-005); limitPct || 100 (Overview.tsx:112) only changes the gauge when the limit is 0; the other ?? defaults (pause fields, \"unknown\") are display-safe over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C03": {
+      "result": [
+        "AUD-DASH-006",
+        "AUD-API-016"
+      ],
+      "search": "grep for decimals|1e18|parseUnits|formatUnits|ETH|BNB: the dashboard does no token-decimal math; it prints every amount without a unit, the probe-quote high-water mark as ETH and a cross-chain native sum (AUD-DASH-006); the API-side wrong-unit fallbacks are AUD-API-016 over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (the dashboard sends sell requests with no body; slippage is chosen inside executeFullSell (EXIT slice)); searched for slippage|minOut|amountOutMin|body: over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (no transactions are built in the browser); searched for deadline|Date.now() + over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (no approvals are built in the browser); searched for approve|allowance over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C07": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (no nonces exist in the browser; server-side dashboard sells and withNonceLock are AUD-API-004); searched for nonce|withNonceLock over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (the dashboard reads no blocks; lastBlock is display only (ChainStatusCard.tsx:122-125)); searched for reorg|confirmations|blockNumber|lastBlock over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C09": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (the dashboard reads no receipts; the anti-rug dialog never receives transaction details (AUD-DASH-004)); searched for receipt|status === 1|txHash over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C10": {
+      "result": [
+        "AUD-DASH-001",
+        "AUD-DASH-002",
+        "AUD-DASH-003",
+        "AUD-DASH-005",
+        "AUD-DASH-009",
+        "AUD-API-002"
+      ],
+      "search": "for WebSocket|onclose|reconnect|refreshFromRest|positions_update|cb_tripped|chain_ws_health_change|antirug_event: anti-rug state overwritten by the 5 s push (AUD-DASH-001); trips, socket health and gaps never re-loaded on connect (AUD-DASH-002); session-only dry-run evidence (AUD-DASH-003); frozen views on disconnect (AUD-DASH-005); leaked reconnecting socket (AUD-DASH-009); the Stop dialog promising positions stay monitored while anti-rug is removed (AUD-API-002) over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "for fetch(|await|.then(|.catch(|try {|JSON.parse: every fetch and JSON.parse is inside try/catch or .catch (useApi.ts:32-60, useWebSocket.ts:62-96 and :127-283, App.tsx:16-24, ChainControls.tsx handlers, Overview.tsx:79-98, PauseBanner.tsx:55-70, CircuitBreakerResetModal.tsx:80-102, TradeHistory.tsx:70-86, LoginForm.tsx:17-40); the one uncaught promise is navigator.clipboard.writeText (AntiRugExitDetailModal.tsx:80, try catches only a synchronous throw), which can only log a browser console error; none over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C12": {
+      "result": [
+        "AUD-DASH-008",
+        "AUD-DASH-009"
+      ],
+      "search": "for setTimeout|setInterval|clearTimeout|useEffect(|addEventListener|removeEventListener: the reconnect timer re-armed after cleanup (AUD-DASH-009); the mount-only chart effect that never creates the chart (AUD-DASH-008); copy-toast timer (2 s, harmless) and the chart resize listener (removed on unmount) are correct over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C13": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (the dashboard has no database); searched for sqlite|db.|transaction over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C14": {
+      "result": [
+        "AUD-API-001",
+        "AUD-API-004"
+      ],
+      "search": "for force-sell|emergency-sell|disabled=|submitting|resuming: the sell buttons cannot reach failed-held positions, which the table does not even list (AUD-API-001); Emergency Sell stays clickable and the Force Sell confirm stays enabled while their requests run (AUD-API-004, which carries the dashboard evidence); circuit-breaker reset (submitting) and Resume (resuming) are guarded; chain Stop/Start repeats are refused by the server (400) over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C15": {
+      "result": [
+        "AUD-DASH-001"
+      ],
+      "search": "for state written from two sources (setPositions, setChainStatuses, setPauseState): the merged anti-rug fields are overwritten by the next positions_update (AUD-DASH-001); chain statuses and pause state each have one authoritative writer per update and are correct over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C16": {
+      "result": "checked, none",
+      "search": "not applicable to a browser front end (no fees are set in the browser); searched for gasPrice|maxFeePerGas|gasLimit over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C17": {
+      "result": [
+        "AUD-SECRET-005"
+      ],
+      "search": "for apiKey|localStorage|sessionStorage|document.cookie|password|Authorization: the API key is typed into a password field, POSTed once to /api/auth/login (LoginForm.tsx:18-23) and never stored; auth is the server-set session cookie sent with credentials: include; localStorage holds only the sidebar flag (Layout.tsx:16, :28) and gap-banner dismissals (GapDetectedBanner.tsx:34-55); cookie flags and session lifetime are AUD-API-007; none in the dashboard over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full) | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists; the Phase 20 dashboard host-check review strings (AUD-SECRET-005)"
+    },
+    "C18": {
+      "result": [
+        "AUD-API-003"
+      ],
+      "search": "for import.meta.env|process.env|VITE_: the dashboard reads no environment variables (no import.meta.env use); it shows the API's re-parsed copies of the risk limits on the chain cards and gauges (AUD-API-003) over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C19": {
+      "result": [
+        "AUD-DASH-010",
+        "AUD-API-005"
+      ],
+      "search": "for dangerouslySetInnerHTML|innerHTML|eval(|new Function|href=|https://|proxy|changeOrigin: no XSS sink (all token, symbol and alert text is React text); external Google Fonts with CSP off (AUD-DASH-010); the Vite dev proxy forwards /api, /health and /ws to 127.0.0.1:8080 without changeOrigin, so the API sees the Vite host, which its Host-derived same-origin check accepts (AUD-API-005); the Vite dev server binds localhost by default over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    },
+    "C20": {
+      "result": [
+        "AUD-API-013"
+      ],
+      "search": "for notification|message|severity|category|telegram: alert text (including deployer-chosen symbols) is rendered as plain text with its keyword-guessed severity and category (EventFeed.tsx:93-100; AUD-API-013); the Telegram status is a boolean; no inbound Telegram input reaches the dashboard over the 45 dashboard files of the slice-files.ts --snapshot API,DASH snapshot at 23a6461 (all read in full)"
+    }
+  }
+}

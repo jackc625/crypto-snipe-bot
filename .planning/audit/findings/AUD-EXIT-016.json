@@ -1,0 +1,79 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-46",
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-016",
+  "title": "Exit settings are not range-checked: a typo silently disables the trailing stop, and some values tear down protection on a still-held position or sell at once",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C02",
+    "C18"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/config.ts:300-302@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "TRAILING_STOP_PCT / TRAILING_MIN_PCT / TRAILING_MAX_PCT = parseFloat(env || default) with no NaN guard"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:220-230@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "computeEffectiveTrailingPct: Math.max(min, Math.min(max, NaN)) is NaN, so triggerPrice at :1751 is NaN and currentPrice <= NaN is never true: the trailing stop never fires, and stop-loss is already off once trailing activated (:1781)"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:290-293@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "STOP_LOSS_PCT has a NaN guard only: 0 sells at the first tick at or below entry, a negative value sells at once, 100 or more never sells"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:615-622@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "EXIT_DUST_THRESHOLD_BPS has no upper bound: 10000 or more makes any balance up to the original amount read as dust, so a failed exit is torn down as a genuine close (anti-rug unsubscribed, exit_state deleted, timers cleared, :1143-1153)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:599-602@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "EXIT_ROUTINE_MAX_FAILURES accepts 0 (n >= 0): routine retries pause after the first failure"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:80-101@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "PARTIAL_SELL_TARGETS accepts a multiple below 1 (for example 0.5x), which sells that tier at the first tick"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:615-617@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Unbounded dust configuration can disable protection for full holdings"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:300-302@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Exit settings can export unusable stop percentages"
+    }
+  ],
+  "sibling_sites_checked": "Every env-derived exit number (thresholds/EXIT.json TH-EXIT rows). Guarded: MEV_SELL_FALLBACK_ATTEMPTS and the two slippage knobs (never NaN, never negative, slippage clamped to 99% at :492), PARTIAL_SELL_TARGETS total < 100 and positive entries (throws at load). Unguarded: the trailing trio, the stop-loss range, the dust bps upper bound, the routine-failure floor. CONFIG.slippagePercent is hard-coded 5, so `|| 5` (:470) cannot hide a 0 today.",
+  "status": "confirmed",
+  "severity_rationale": "S2: misconfiguration-only (the defaults are sane), so bounded. The trailing NaN case is silent (no error at load) and leaves a 2x-plus position with only the 30-minute urgency exit; the dust case strips anti-rug from a still-held position after a failed exit.",
+  "recommendation": "Validate every exit setting at load with explicit ranges and fail loud (stop-loss 0-100 exclusive, trailing min <= base <= max, dust bps well below 10000, routine failures >= 1, tier multiples > 1). Card EXIT-12 (it changes what the bot accepts at boot). Phase 24 for the capital ones."
+}

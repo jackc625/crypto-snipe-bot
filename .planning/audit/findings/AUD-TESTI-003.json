@@ -1,0 +1,76 @@
+{
+  "id": "AUD-TESTI-003",
+  "title": "The passthrough \"wait-timeout reconcile\" test fakes a tx.wait(3) rejection that ethers 6.16.0 cannot produce: with no timeout argument the real wait never times out, so the test proves a recovery path for a failure that does not happen and stays green over the registered S1 where that wait hangs inside the nonce lock",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C09"
+  ],
+  "files": [
+    "test/integration/mevStrategies.test.ts",
+    "src/utils/mevStrategies/passthrough.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/mevStrategies.test.ts:409-439@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "case \"reconciles a wait-timeout to a landed tx\": wallet.sendTransaction resolves { hash, wait: mockRejectedValue(new Error(\"tx.wait timeout under RPC lag\")) } and asserts one submit and the returned hash"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/mevStrategies.test.ts:410-415@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the comment says \"when the native tx.wait(3) TIMES OUT (the Base/Arb LADYS class)\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:133-150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tx.wait(3) with no timeout; the comment claims it \"may TIME OUT / reject under RPC lag\""
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1043-1045",
+      "note": "timeout defaults to 0"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1165-1178",
+      "note": "no timer is armed when timeout is 0, so wait(3) can only settle by reaching 3 confirmations, by CALL_EXCEPTION (status 0) or by TRANSACTION_REPLACED; an RPC-lag timeout is not one of its outcomes"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitWithReconciliation awaits the submit closure with no bound (AUD-TX-002)"
+    }
+  ],
+  "sibling_sites_checked": "Every integration case that injects a wait() result (git grep -n \"wait:\" test/integration at the base SHA): mevStrategies.test.ts:81, :126, :176, :209 (Flashbots bundle wait 0), :377 (passthrough status 1), :428 (this case); txManager.test.ts:303 (bundle wait 1), :341. Only :428 injects a rejection, and it is a timeout shape ethers does not emit. No integration case leaves wait() pending, which is the real outcome.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: a money-path test that encodes a false model of the library (it agrees with the wrong source comment at passthrough.ts:133-137), so the registered S1 AUD-TX-002 (ESC-PRE-02) passes green on the exact site it names.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-002",
+    "AUD-TESTI-002",
+    "AUD-BUY-025"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: drive this case with a real ethers TransactionResponse on a scripted provider: (a) never mined: assert the submit returns or fails within a bounded time (fails today, RED proof for the Phase 24 fix); (b) status 0: assert CALL_EXCEPTION leads to a reverted outcome; (c) repriced replacement: assert the replacement hash is reconciled. Correct the passthrough.ts comment when the Phase 24 fix lands.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "PassthroughMevStrategy: reconciles a wait-timeout to a landed tx and returns the real hash (no resubmit)"
+  ],
+  "escaped_regression": "The current code already escapes: on Base or Arbitrum a passthrough buy or sell whose tx is never mined leaves tx.wait(3) pending forever inside withNonceLock, blocking every later buy and exit of the wallet (AUD-TX-002), and this case stays green because it replaces the hang with an immediate rejection."
+}

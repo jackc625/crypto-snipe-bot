@@ -1,0 +1,100 @@
+{
+  "id": "AUD-DASH-006",
+  "title": "Amount presentation can misstate money: \"Total P&L\" adds only the realized P&L of still-open positions (unrealized and closed trades are left out), the high-water mark (a probe quote) is printed as an ETH amount, every amount is cut to 4 decimals with no unit, and the sell confirmations show no amount at all",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C01",
+    "C03"
+  ],
+  "files": [
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/components/PositionTable.tsx",
+    "dashboard/src/components/StatCard.tsx",
+    "dashboard/src/components/ExposureDonut.tsx",
+    "dashboard/src/components/EmergencyConfirmDialog.tsx",
+    "dashboard/src/utils/formatters.ts",
+    "src/api/helpers/positions.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:61-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Total P&L = sum of p.pnl over the open positions"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:159-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "p.pnl is trades.realized_pnl (partial-sell proceeds only for an open position); unrealizedPnl is a separate field the stat ignores"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:204-208@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "High-Water Mark rendered with formatEth from exitState.highWaterMark"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:91@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "highWaterMark is the raw exit_state.high_water_mark (the engine's probe quote, AUD-EXIT-003), not an ETH amount"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/utils/formatters.ts:5-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "formatPnL / formatEth: toFixed(4), no unit; anything below 0.00005 prints 0.0000 and a tiny loss prints \"-0.0000\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/StatCard.tsx:8-10@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"-0.0000\" is coloured as a loss, \"+0.0000\" as a profit"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:64-70@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Total Exposure printed with toFixed(4) and no unit"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/PositionTable.tsx:246-253@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Buy Cost and Gas Cost at 4 decimals (L2 gas usually reads 0.0000)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/ExposureDonut.tsx:49-53@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the donut centre adds the per-chain native amounts into one number"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:243-257@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Force Sell dialog names the token by address prefix and chain; no amount, value or estimated proceeds"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/EmergencyConfirmDialog.tsx:11-21@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Emergency Sell All dialog shows no position count or value"
+    }
+  ],
+  "sibling_sites_checked": "Every formatter call in the dashboard (formatEth in PositionTable, TradeTable, ExposureDonut; formatPnL in Overview, PositionTable, TradeTable; raw toFixed in Overview.tsx:70, :199, PositionTable.tsx:222, :242, RiskExposure.tsx:57, AntiRugExitDetailModal.tsx:185, :191). The values themselves: Current price and unrealized P&L fallbacks are AUD-API-016; the daily-loss gauge dividing an amount by a percentage is AUD-API-017; mixed-unit sums behind exposure, realized P&L and sell revenue are AUD-DB-002; failed-held positions left out of counts and exposure are AUD-API-001 (all linked, not repeated). The cross-chain sum (ETH plus BNB) is latent while only ETH is enabled. Layout numbers (sizes, colours, chart heights) are cosmetic and excluded, stated once here.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: operationally relevant presentation (never cosmetic): the headline Total P&L can read +0.0000 while every open position is losing, the high-water mark is a different unit printed as ETH, and small amounts vanish to 0.0000; the operator reads these next to the sell buttons. Not S2: the bot's own decisions do not use these numbers, and the larger unit defects underneath are registered separately at their own severity.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-016",
+    "AUD-API-017",
+    "AUD-API-001"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Compute Total P&L from unrealized plus realized (and say which); label every amount with its unit and chain; show small amounts with significant digits instead of a fixed 4 decimals; do not print the engine high-water mark as ETH; show the position size and last known value in the Force Sell and Emergency Sell dialogs. Phase 29 (with the unit fixes of AUD-DB-002 / AUD-API-016 in Phase 24).",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

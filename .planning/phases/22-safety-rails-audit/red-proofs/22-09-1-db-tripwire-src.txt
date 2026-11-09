@@ -1,0 +1,56 @@
+# RED proof 22-09-1-db-tripwire-src (AC-18, src DB layer)
+Date: 2026-11-09T02:01:21.153Z
+File neutralised (working tree only, never committed): src/utils/db.ts
+sha256 before and after restore: 1a95c5db3f1f5fb55216507ffb6ca0c23cf0c5dd171647157efa8bb5ede5c0cc
+
+## Diff applied
+
+diff --git a/src/utils/db.ts b/src/utils/db.ts
+index 3f6af28..e17a4c9 100644
+--- a/src/utils/db.ts
++++ b/src/utils/db.ts
+@@ -17,7 +17,7 @@ const DB_PATH = resolveDbPath(process.env.DB_PATH, repoRoot, { vitest });
+ if (vitest) {
+     // Src-layer tripwire (SAFE-02): under Vitest the live data folder can never be opened from
+     // here, independently of the setup-layer rails.
+-    assertNotProdDbUnderVitest(DB_PATH, repoRoot);
++    // assertNotProdDbUnderVitest(DB_PATH, repoRoot); (RED 22-09-1)
+     // Tests create fresh DBs; a temp folder may not exist yet.
+     const dbDir = path.dirname(DB_PATH);
+     if (!fs.existsSync(dbDir)) {
+
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/dbTripwireSrc.test.ts
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 3 passed (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020117-24832-8548ef | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020117-24832-8548ef\summary.json
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db
+AssertionError: expected Error: RAIL_DB_TRIPWIRE: refused to open … { code: '…' } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
+- Expected
++ Received
+- {
+-   "code": "RAIL_DB_TRIPWIRE_SRC",
++ Error {
++   "code": "RAIL_DB_TRIPWIRE",
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > the absolute <repo>/data/bot.db
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > an upper-cased variant (win32 only; the plain path elsewhere)
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > <repo>/data/bot.db-wal
+AssertionError: expected Error: RAIL_DATA_TRIPWIRE: refused fs.ope… { …(2) } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
++   "code": "RAIL_DATA_TRIPWIRE",
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/utils/db.ts
+sha256 after restore: 1a95c5db3f1f5fb55216507ffb6ca0c23cf0c5dd171647157efa8bb5ede5c0cc (equal)
+git status --porcelain src/utils/db.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T020119-23464-c5e9cb | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T020119-23464-c5e9cb\summary.json

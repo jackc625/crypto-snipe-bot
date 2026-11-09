@@ -1,0 +1,78 @@
+{
+  "id": "AUD-TESTI-014",
+  "title": "The operator-control CLI and pause tests claim more than they run: pauseCli re-implements the CLI HTTP flow in the test, preflightCli's header promises mocked unit tests that do not exist and its honeypot-checker case passes on any failure line, and the pauseFlow restart case asserts neither listeners nor exit monitors",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18",
+    "C19"
+  ],
+  "files": [
+    "test/integration/pauseCli.test.ts",
+    "test/integration/preflightCli.test.ts",
+    "test/integration/pauseFlow.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/pauseCli.test.ts:12-16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: Tests 1, 2, 5 prove \"the END-TO-END ... flow that the CLI exercises\""
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseCli.test.ts:150-181@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "loginAndPost re-implements scripts/pause.ts with axios in the test (\"structurally IDENTICAL\"); scripts/pause.ts and resume.ts are only grepped (:307-392) and spawned once for the missing-key exit (:263-299)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/preflightCli.test.ts:10-17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"Test 2 + Test 3 (unit-level exit-code semantics): static-import the scripts/preflight.ts code path via a mocked preflightDryRun\"; all four tests spawn the real CLI instead"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/preflightCli.test.ts:81-99@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 3 \"prints honeypot-checker FAIL when getCode returns 0x\" uses an unreachable RPC and accepts /honeypot-checker-code|Preflight failed|FAIL /"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseFlow.test.ts:496@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "title: \"chain listeners attached AND dashboard reachable AND exit monitors running AND ... CP1 fires\""
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/pauseFlow.test.ts:719-759@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "assertions: preflight, buildChainRegistry and startApiServer called, CP1 log, no submit, and startExitMonitor NOT called; startDexListenerSpy (:515) is never wired or asserted; the pause state comes from a mocked getPauseState, not a persisted row"
+    }
+  ],
+  "sibling_sites_checked": "The three operator-control test files (pause/resume CLI, preflight CLI, pause flow) and midRunWalletCheck (auto-pause wiring, sound). The CLI scripts themselves are SCRIPTS-slice scope.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading assurance on operator controls; the kill-switch buy gate itself is covered by the V2 killswitch cases and the dashboard routes by real-route tests with mocked statements.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-009",
+    "AUD-TESTI-001",
+    "AUD-TESTI-011"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: run scripts/pause.ts and resume.ts as children (through spawnRailedChild) against the loopback test server; make preflightCli Test 3 assert the honeypot-checker-code line specifically with a reachable stub RPC that returns 0x; give the pauseFlow restart case a persisted pause row and assertions on listeners and resumed monitors; correct the headers.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "pauseCli Tests 1, 2, 3, 5",
+    "preflightCli Test 3: subprocess prints honeypot-checker FAIL when getCode returns 0x",
+    "pauseFlow D-PAUSED-RESTART positive observable"
+  ]
+}

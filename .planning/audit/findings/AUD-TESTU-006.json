@@ -1,0 +1,75 @@
+{
+  "id": "AUD-TESTU-006",
+  "title": "The deliberate-buy arming test proves the three arming calls happen inside one process, but the only production caller is a script that exits right after the buy, so the registered S0 (deliberate buy left unprotected) passes it green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12",
+    "C14"
+  ],
+  "files": [
+    "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+    "src/bot.ts",
+    "scripts/deliberate-buy.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/bot/deliberateBuyArmMonitoring.test.ts:86-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor, snapshotLpBaseline and registerAntiRugPosition are spies that resolve at once"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/bot/deliberateBuyArmMonitoring.test.ts:290-328@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "case (a) asserts the three calls and their arguments; nothing observes a running monitor"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:142-150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the production caller runs executeDeliberateBuy and then process.exit(0)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:413-422@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "armPositionMonitoring awaits startExitMonitor; the monitor is an in-process interval"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1870-1872@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor returns without arming when the first quote fails (AUD-EXIT-002); the spy cannot show it"
+    }
+  ],
+  "sibling_sites_checked": "Other tests of deliberate-buy protection: bot/deliberateBuyAffordability (gate only), bot/noDoubleBuyReconcile (no-double-buy guard only). No unit or integration-scope test in the TESTU slice runs scripts/deliberate-buy.ts.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the file header claims it closes the \"held position left UNMONITORED / RUG-UNPROTECTED\" harm, while the registered S0 AUD-BUY-001 (that same harm, through the script lifetime) and the S1 AUD-EXIT-002 pass it green.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-001",
+    "AUD-EXIT-002"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28 (after the Phase 24 fix for AUD-BUY-001): test the protection where it must live, for example that a landed deliberate buy is recorded so the main bot's restart scan arms it, or that the script hands the position to a running bot; keep the arming-call test as a unit check only.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "(a) public-fallback landed buy ARMS startExitMonitor + snapshotLpBaseline + registerAntiRugPosition (resolved tradeId + V2 pair + deliberate amount)",
+    "(b) private-landed buy ARMS the same monitoring trio",
+    "(c) late-land included buy (no-double-buy guard reconciles included) ARMS the same monitoring trio",
+    "(e) anti-rug baseline failure (snapshotLpBaseline throws) STILL arms the exit monitor + logs antirug.baseline-snapshot-failed"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-BUY-001): scripts/deliberate-buy.ts:150 calls process.exit(0) right after the buy, so the monitor dies with the process, and every case stays green. A concrete code change that also stays green: make startExitMonitor return before registerExitMonitor for any reason (as it does at src/exitEngine.ts:1870-1872 on a failed quote); the spy still records one call."
+}

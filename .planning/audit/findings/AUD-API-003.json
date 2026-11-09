@@ -1,0 +1,77 @@
+{
+  "id": "AUD-API-003",
+  "title": "RC-06 sibling: the dashboard re-reads MAX_OPEN_POSITIONS, MAX_TOTAL_EXPOSURE and DAILY_LOSS_PCT with its own copies of the parsers instead of asking the enforcing risk manager, so a malformed value that switches a limit off is shown as null or as the raw text, never as \"limit off\"",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C02",
+    "C18"
+  ],
+  "files": [
+    "src/api/routes/risk.ts",
+    "src/api/routes/chains.ts",
+    "src/riskManager.ts",
+    "dashboard/src/pages/Overview.tsx",
+    "dashboard/src/pages/RiskExposure.tsx"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/risk.ts:80-82@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "GET /limits: parseInt(process.env.MAX_OPEN_POSITIONS || \"10\"), parseFloat(MAX_TOTAL_EXPOSURE || \"10.0\"), parseFloat(DAILY_LOSS_PCT || \"10\"), re-read on every request"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:88-90@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "GET /chains riskLimits: the raw env strings with the same || defaults, no parsing at all"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:26-36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the enforcing copy: loadRiskConfig() once at import with the same parsers; a non-numeric value gives NaN and every comparison against it is false (limit off, AUD-DB-001 sub_claims 1-3)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/risk.ts:101-114@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "NaN goes into res.json, which serializes NaN as null"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:183@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the gauge text becomes \"<used> / null\""
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:108-110@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "positionPct = used / null -> Infinity (or NaN at 0 / null) -> clamped to 100 (a full red bar)"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/RiskExposure.tsx:45-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "RiskGauge with max null -> pct 0 (an empty bar)"
+    }
+  ],
+  "sibling_sites_checked": "All env reads of risk limits in src/api (grep process.env over the snapshot): risk.ts:80-82 and chains.ts:88-90 only; the other dashboard numbers come from engine objects (chains.ts:83-85 ctx.chain, :93-96 exitConfig). The DB slice already records these two sites as RC-06 sub_claim 15 of AUD-DB-001 (the enforcement-side entry, card OD-25); MAX_POSITION_SIZE, SNIPE_COOLDOWN_MS and the per-chain max capital limits are enforced but not shown on the risk page. Threshold rows TH-API-04..06 (this slice) point at TH-DB-01..03.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 (misleading display): the dashboard cannot show that a limit is switched off; it shows null, a full red bar, an empty bar or the raw text depending on the page. The enforcement defect itself is AUD-DB-001 (RC-06, S1, ESC-DB-01). MAX_OPEN_POSITIONS is fail-closed at boot (preflight), so that one cannot reach the dashboard malformed.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-001",
+    "AUD-DB-002"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": "OD-25",
+  "recommendation": "Expose the effective, parsed limits from riskManager through one function and have both routes return those values plus an explicit \"disabled/invalid\" state; show every enforced limit (including position size, cooldown and per-chain capital). Decide together with OD-25 (one typed parser). Phase 29 unless Phase 24 folds it into OD-25.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,72 @@
+{
+  "id": "AUD-TX-017",
+  "title": "The reconcile helper's operator alerts (unaffordable, mined-but-reverted, landed-not-ours, ceiling-hit) are wired to a no-op by all three strategies, so none of those messages reaches Telegram; the operator only sees each caller's generic text",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/bloxroute.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:468-470@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "alert parameter defaults to async () => {}"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:527-543@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "unaffordable: the message tells the operator to top up the wallet, then await alert(msg)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:592-614@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reverted / landed-not-ours / ceiling-hit each await alert(msg); also :627, :653, :659, :667"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:378-390@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passes undefined for alert, with the comment \"(no-op until ctx-bound)\""
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:155-165@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passes undefined for alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:197-207@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passes undefined for alert"
+    }
+  ],
+  "sibling_sites_checked": "All submitWithReconciliation callers (the three strategies; no other caller at the base SHA). What the operator sees instead: a snipe that throws reaches the buy catch, which reports \"zero ETH spent\" whatever the reason (AUD-BUY-002); a private sell that throws becomes landed:false and the exit path sends its own fallback alert (exitEngine.ts:533-537), and the no-double-sell guard alerts on landed-not-ours itself (:955-972). So a mined-but-reverted buy (gas spent) or a landed-not-ours buy (nonce taken by an earlier attempt that may have bought) is never named to the operator.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading operator telemetry; the log lines (op: mev.*) are still written, and the capital consequences of the hidden outcomes are owned by AUD-BUY-002 (buy) and the exit guard (sell).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002",
+    "AUD-TX-010"
+  ],
+  "tags": [
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 29 (or with the Phase 24 AUD-BUY-002 fix): bind the helper alert to sendCtxAlert(ctx, ...) through sendTxWithRetry, so landed-not-ours and reverted outcomes are named to the operator.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

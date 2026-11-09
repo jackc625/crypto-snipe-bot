@@ -1,0 +1,54 @@
+{
+  "id": "AUD-REAUDIT-003",
+  "title": "The spawn-site gate does not see process.getBuiltinModule, and its .exec carve-out is keyed by receiver name",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "db68184d5c1292b05640e5bfcb7a94462c3def7f",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: it is a static gate against accidental spawns and nothing uses this form. The rails stay in force in workers and railed children either way.",
+  "area": "test",
+  "slice": "REAUDIT",
+  "severity": "S4",
+  "files": [
+    "test/unit/rails/spawnSites.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/rails/spawnSites.test.ts:37@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "the call forms the gate flags: spawn, exec, fork and friends, by name"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/rails/spawnSites.test.ts:141@db68184d5c1292b05640e5bfcb7a94462c3def7f",
+      "note": "a member .exec is accepted when the receiver is named db, mockDb, fileDb, mem, w, attachRe, vacRe or entryRe, or is a RegExp literal"
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"console.log(typeof process.getBuiltinModule)\" under Node 22.16.0",
+      "note": "prints function: process.getBuiltinModule exists, loads a module with no import or require call, and no check in the gate matches it"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n getBuiltinModule -- test src scripts",
+      "note": "no output: nothing uses it today"
+    }
+  ],
+  "sibling_sites_checked": "Each allow-list entry was assessed: ALLOWED_FILES (test/rails/spawnRailedChild.ts is the railed spawner; test/fork/setup.ts starts Hardhat with buildHardhatChildEnv and has its own AST check in hardhatChildEnv.test.ts; test/rails/selfcheck.cjs has one unrailed child whose arguments are its own literal code and a temp fake root), COMPUTED_REQUIRE_FILES (duplicateLoadProbe.cjs only, limited to a plain require), SAFE_EXEC_RECEIVERS (all database handles or RegExp objects as used today; a variable of that name cannot hold child_process unless a banned-module load already got past the gate).",
+  "recommendation": "Add process.getBuiltinModule to the banned forms in the gate. The .exec carve-out can stay named-receiver because getting a child_process object into one of those names requires a load the gate already flags, once getBuiltinModule is covered."
+}

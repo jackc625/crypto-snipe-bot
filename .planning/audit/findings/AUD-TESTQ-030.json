@@ -1,0 +1,48 @@
+{
+  "id": "AUD-TESTQ-030",
+  "title": "UFV-01 (AC-13): this fork assertion has not run under the real fork project",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality",
+    "unrun-verification"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S2 by the plan: an unexecuted rail assertion can hide a fork-mode leak. Capital none: no fork test runs against live funds and the bot is off.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S2",
+  "owner_phase": "25",
+  "input_refs": [
+    "unrun-fork-verifications.json#0"
+  ],
+  "files": [
+    "test/fork/rails/forkRails.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "unrun-fork-verifications.json#0",
+      "note": "Assertion: fork project rails (SPEC R4) > module scope: the Telegram token and every test/.env.test key except the fork shell keys equal their sentinels (AC-13) Why not run: npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08) Rehearsal: test/rails/vitest.fork-rehearsal.config.ts (project fork-rehearsal: the fork project's setupFiles, fileParallelism, pool and timeouts pinned by test/unit/rails/forkRehearsalParity.test.ts, without the Hardhat globalSetup) Result: pass (vpu-20261107T042012-23448-c57d66)"
+    }
+  ],
+  "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: test/unit/rails/childRails.test.ts setup-fork child cases (railsEntry 'setup-fork': sentinel env, fork mode, Telegram deny on, DB denied; fork shell keys (i)-(v))",
+  "escaped_regression": "A fork worker that received a real Telegram token or app key under the real fork project (for example from a future change to the fork setup) would pass every rehearsal, because the rehearsal has no Hardhat globalSetup.",
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
+}

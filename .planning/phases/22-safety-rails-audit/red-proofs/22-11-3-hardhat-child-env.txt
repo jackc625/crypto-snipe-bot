@@ -1,0 +1,59 @@
+# RED proof 22-11-3-hardhat-child-env (AC-18, fork RPC source, spawn gate and Hardhat child env)
+Date: 2026-11-09T03:16:59Z
+File neutralised (working tree only, never committed): test/fork/helpers/hardhatChildEnv.ts
+What was neutralised: buildHardhatChildEnv starts from a copy of parentEnv and the NODE_OPTIONS preload line is removed
+sha256 before and after restore: 41d0582c0fade1b851691b260869bc8c1ca3bfa77c360231bf94b64d6d3cc3f3 / 41d0582c0fade1b851691b260869bc8c1ca3bfa77c360231bf94b64d6d3cc3f3
+
+## Diff applied
+
+diff --git a/test/fork/helpers/hardhatChildEnv.ts b/test/fork/helpers/hardhatChildEnv.ts
+index 87ae05e..135f4f3 100644
+--- a/test/fork/helpers/hardhatChildEnv.ts
++++ b/test/fork/helpers/hardhatChildEnv.ts
+@@ -28,7 +28,7 @@ const SHELL_KEYS = Object.freeze(['ETH_FORK_RPC_URL', 'ALLOW_REAL_MAINNET']);
+ 
+ /** The env for a Hardhat child: sentinels, OS essentials, the two shell keys, the fork rails. */
+ export function buildHardhatChildEnv(parentEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+-    const env: NodeJS.ProcessEnv = { ...parse(fs.readFileSync(path.join(REPO_ROOT, 'test', '.env.test'))) };
++    const env: NodeJS.ProcessEnv = { ...parentEnv };
+     for (const key of OS_ESSENTIAL_KEYS) {
+         const value = parentEnv[key];
+         if (typeof value === 'string') env[key] = value;
+@@ -37,7 +37,5 @@ export function buildHardhatChildEnv(parentEnv: NodeJS.ProcessEnv): NodeJS.Proce
+         const value = parentEnv[key];
+         if (typeof value === 'string' && value !== '') env[key] = value;
+     }
+-    // Applied last: nothing above can remove the rails preload.
+-    env.NODE_OPTIONS = `--require ${JSON.stringify(path.join(REPO_ROOT, 'test', 'rails', 'setup-fork.cjs'))}`;
+     return env;
+ }
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/hardhatChildEnv.test.ts
+
+## RED result: exit 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   unit  test/unit/rails/hardhatChildEnv.test.ts > buildHardhatChildEnv > (a) replaces app keys with sentinels, keeps the two shell keys, drops anything else, and loads the fork rails
+AssertionError: expected 'planted-not-sentinel' to be '0x00000000000000000000000000000000000…' // Object.is equality
+ FAIL   unit  test/unit/rails/hardhatChildEnv.test.ts > buildHardhatChildEnv > (a) contains every test/.env.test key and leaves the shell keys at their sentinels when the shell has none
+AssertionError: expected false to be true // Object.is equality
+- true
++ false
+ FAIL   unit  test/unit/rails/hardhatChildEnv.test.ts > buildHardhatChildEnv > (a) an empty shell value does not overwrite the sentinel
+AssertionError: expected '' to be 'http://127.0.0.1:1' // Object.is equality
+- http://127.0.0.1:1
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031651-22280-164ba5 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031651-22280-164ba5\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- test/fork/helpers/hardhatChildEnv.ts (sha256 equal: yes; git status --porcelain test empty: yes)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031656-19128-31e81f | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031656-19128-31e81f\summary.json

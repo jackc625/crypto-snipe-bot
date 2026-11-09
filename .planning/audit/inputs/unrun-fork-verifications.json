@@ -1,0 +1,79 @@
+{
+  "description": "Fork-project assertions written in Phase 22 that Phase 22 never runs under the real fork project (npm run test:fork starts Hardhat; Phase 22 runs no Hardhat command, AC-08). Each is a dated obligation for 22-29 to register; whichever phase first runs npm run test:fork must check these assertions by name under the real fork project.",
+  "registered_by_plan": "22-08",
+  "entries": [
+    {
+      "id": "UFV-01",
+      "ac": "AC-13",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > module scope: the Telegram token and every test/.env.test key except the fork shell keys equal their sentinels (AC-13)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts setup-fork child cases (railsEntry 'setup-fork': sentinel env, fork mode, Telegram deny on, DB denied; fork shell keys (i)-(v))",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts (project fork-rehearsal: the fork project's setupFiles, fileParallelism, pool and timeouts pinned by test/unit/rails/forkRehearsalParity.test.ts, without the Hardhat globalSetup)",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project",
+      "registered": "2026-11-06",
+      "registered_by_plan": "22-08"
+    },
+    {
+      "id": "UFV-02",
+      "ac": "AC-17 / SPEC R4",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > in-worker fork shell key: ETH_FORK_RPC_URL is present, non-empty, not the sentinel, and preserved (AC-17)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/childRails.test.ts 'fork shell keys (SPEC R4 / AC-17)' cases (i)-(vii) in railsEntry 'setup-fork' children",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); ledger fork-shell-key ETH_FORK_RPC_URL preserved, ALLOW_REAL_MAINNET absent",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261107T042012-23448-c57d66",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project, with the operator's real fork URL in the shell",
+      "registered": "2026-11-06",
+      "registered_by_plan": "22-08"
+    },
+    {
+      "id": "UFV-03",
+      "ac": "AC-16",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > a Telegram send through the notifier is a recorded refusal, not a network call, and the broadcast runs (AC-16)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/notifierRefusal.test.ts and test/integration/rails/notifierRefusalIntegration.test.ts plus the src-layer refusal in src/utils/notifier.ts (refuseUnderVitest)",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); axios.post spied and never called; ledger notifier-refused 2",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261109T021405-22636-8bff56",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project",
+      "registered": "2026-11-08",
+      "registered_by_plan": "22-10"
+    },
+    {
+      "id": "UFV-04",
+      "ac": "AC-17 / SPEC R4 fork child env",
+      "test_file": "test/fork/setup.ts",
+      "assertion": "the first real npm run test:fork starts Hardhat with the sanitized env from buildHardhatChildEnv, the fork works, and the Hardhat child's ledger records a blocked .env read (the child env carries no CSB_RAIL_RUN_ID, so its ledger is under <tmp>/crypto-snipe-bot-rail-ledger/no-run)",
+      "why_unrun": "starting Hardhat is out of Phase 22 scope (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/hardhatChildEnv.test.ts (the pure env, a railed child on the same setup-fork preload, and an AST check of every child launch in test/fork/setup.ts)",
+      "rehearsed_by": "none (Hardhat cannot be rehearsed without starting it)",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this by name, with the operator's real fork URL in the shell",
+      "registered": "2026-11-08",
+      "registered_by_plan": "22-11"
+    },
+    {
+      "id": "UFV-05",
+      "ac": "AC-22 / HONEY-03",
+      "test_file": "test/fork/honeypotDeploy.eth.fork.test.ts",
+      "assertion": "HONEY-03: HoneypotChecker deployed on ETH > has bytecode at deployedAddress (not 0x): the ETH HoneypotChecker has real code on mainnet (the code is not 0x and is longer than 100 characters). Moved from test/integration/honeypotDeploy.eth.test.ts by operator ruling ESC-RAILS-01; it has not run in its new file.",
+      "why_unrun": "The test needs a real mainnet RPC through ETH_FORK_RPC_URL under the fork project, and npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts). Phase 22 runs no Hardhat command (AC-08).",
+      "proven_meanwhile_by": "npm run preflight (checkHoneypotCheckerCode in src/preflight.ts) performs the same live getCode check, but only when the operator runs it. Nothing in Phase 22 runs it against the real RPC, so nothing automated confirms the contract exists during this phase.",
+      "rehearsed_by": "A scratchpad Vitest config with the fork project's setupFiles (test/rails/setup-fork.cjs), fileParallelism and timeout, without the Hardhat globalSetup, wrapped with --net-watch, ETH_FORK_RPC_URL pointing at a loopback fake JSON-RPC server on 127.0.0.1 and verdict untouched each time. Fake returned 402 characters of bytecode: passed, and the fake logged eth_getCode for 0x8243dbea5cad296b9e72a6ed557d7e0febee13ed on the /rehearsal-marker path, so the URL came from the resolver and not from ETH_RPC_URL (run vpu-20261109T044252-20672-15c2d6). Fake returned 0x: failed on expect(code).not.toBe (run vpu-20261109T044257-2304-03f813). Fake returned 0x6080: failed on the length assertion (run vpu-20261109T044329-5352-897f8e). ETH_FORK_RPC_URL unset: failed with the resolver's error naming the variable, and the fake got 0 requests (run vpu-20261109T044303-11500-42705a). This proves the test's wiring only. It is NOT proof the contract exists: the bytecode came from the fake.",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261109T044252-20672-15c2d6",
+      "owner_phase": "25",
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this test by name, with the operator's real fork URL in the shell",
+      "registered": "2026-11-09",
+      "registered_by_plan": "22-15"
+    }
+  ]
+}

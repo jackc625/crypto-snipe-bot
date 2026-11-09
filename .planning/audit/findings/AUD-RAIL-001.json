@@ -1,0 +1,48 @@
+{
+  "id": "AUD-RAIL-001",
+  "title": "Vitest ran in the main checkout on 2026-11-06 at 11:21:39 with the real .env loaded (STL-2)",
+  "kind": "finding",
+  "area": "test",
+  "slice": "RAIL",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": ["C17", "C18"],
+  "files": ["vitest.config.ts"],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "stat -c '%n %y %s' node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json",
+      "note": "re-observed by 22-04 on 2026-11-06: mtime 2026-11-06 11:21:39.32 -0500, 12314 bytes; the only hash folder under node_modules/.vite/vitest/ (Vitest 4.1.1 results cache in the main checkout)"
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"const r=require('./node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json'); r.results.filter(([k,v])=>v.failed&&v.duration===0)\"",
+      "note": "results is an array of [key, {duration, failed}] pairs: 131 entries (unit 87, integration 27, fork 9, unprefixed 8), 9 failed, 3 failed with duration 0: unit:test/unit/db.test.ts, unit:test/unit/bot/twoStageSigint.test.ts, unit:test/unit/anti-rug/dryRunTimestamp.test.ts (collection-time failures, consistent with better-sqlite3 failing to load on Node 24). The cache accumulates across runs, so it cannot show which projects the 11:21 run included."
+    },
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "import { config } from 'dotenv'; config(); at config load, so every Vitest process loads the real .env"
+    },
+    {
+      "type": "command",
+      "ref": "node -p \"require('./.planning/baselines/backup-record.json').db_set\"",
+      "note": "22-01 raw-byte backup (2026-11-07T00:50Z, after the run): data/bot.db mtime 2026-05-29 17:33:56 local, bot.db-wal and bot.db-shm 2026-05-29 20:25:58 local, so the 11:21 run did not write the live DB (the DB-importing files crashed at load)"
+    }
+  ],
+  "sibling_sites_checked": "Other sites that load the real .env in a test or tool process at the base SHA: git grep dotenv in src shows src/config.ts:4 and src/utils/notifier.ts:6 (import-time dotenv.config()), so any test process importing either also reaches the real credentials. src/utils/notifier.ts:10 builds the api.telegram.org URL from TELEGRAM_BOT_TOKEN and posts with axios at :44 and :80 with no VITEST guard. The fork project spawns Hardhat from .env (test/fork/setup.ts), and the cache cannot show whether the 11:21 run included it. Only one Vitest cache folder exists. Whether any non-DB test made a network or Telegram call at 11:21 cannot be determined from disk.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 EXPOSURE: a test run happened with real credentials in reach of non-loopback network code. No capital moved: the bot is OFF and the live DB is unchanged by mtime. Cause per the operator (22-CONTEXT.md D-23 (a)): an automated tool or agent.",
+  "duplicate_of": null,
+  "related": ["AUD-RAIL-002"],
+  "tags": ["rail"],
+  "escalation_ref": "ESC-PRE-01",
+  "od_ref": null,
+  "recommendation": "The SAFE-02 rails (22-05, 22-07..22-10) close this class: scrub-then-replace env, a blocked .env read, the DB tripwire, the network deny and the notifier refusal, at both layers. Until they land, no Vitest command runs in the main checkout (D-13). The operator may check the bot's Telegram chat around 11:21 on 2026-11-06 for an unexpected message. Nothing is fixed in Phase 22 beyond the planned rails (NAC-13).",
+  "reported_by": ["claude (22-04 executor)", "claude (22 phase researcher, STL-2)"],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

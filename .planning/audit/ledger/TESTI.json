@@ -1,0 +1,2284 @@
+[
+  {
+    "path": "test/fixtures/api.fixtures.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-008"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/chainConfig.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/contracts/Honeypot.sol",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-023"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/contracts/RugPull.sol",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-022"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/exitEngine.fixtures.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-001"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/mythril/sample-clean.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/mythril/sample-high.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/receipt.fixtures.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/tokenSafety.fixtures.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fixtures/txManager.fixtures.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ],
+    "fixture_provenance": "synthetic"
+  },
+  {
+    "path": "test/fork/antiRugDetector.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-022",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "Anti-rug detector on a fork: RugPull.sol modes 0-4 (V2 burn to EOA unsafe, to UNCX locker or dead allowlisted, V3 burn+collect unsafe, V3 burn-only held), and the real HORSE V2 rug replayed from its LP-removal receipt gives unsafe with all three signals.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine (executeFullSell resolves true)",
+        "src/utils/db",
+        "src/utils/provider",
+        "ethers Contract (scripted reserves, supply, liquidity, quote, balanceOf)"
+      ],
+      "mocked_mechanism_detail": "The chain reads the detector depends on are mocked; RugPull.sol is never deployed; logs are synthesised; only the HORSE receipt is read from the fork.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Signs nothing itself (Hardhat #0 constant declared). Every src dependency that could reach state is mocked. A tripped gate, missing fixture or failed hardhat_reset returns green (AUD-TESTI-021)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-016",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Fork RPC read routed through resolveForkRpcUrl and the fallback removed. Skip guard keeps its behaviour (NAC-04). Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/captureRehearsal.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "Rehearses the live capture on a fork: the real V2 handler buys LADYS, a tight STOP_LOSS_PCT plus a whale dump makes the engine's own poll loop fire a stop-loss full sell through the serial ExitWorker, the sell row has a decoded amount_out, and balance-truth teardown deletes exit_state and unregisters anti-rug.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path: real handler, real exit engine, real receiptDecoder, isolated temp DB (DB_PATH set before any src import). Before the rails src/config and src/utils/notifier load the real .env (Telegram alerts would post to the operator chat) and the safety bank calls live Unicrypt/GoPlus/honeypot.is (AUD-TESTI-011/-017). Signs with Hardhat #0 on the local node only. The second case is a typeof check (AUD-TESTI-025)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-014",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/deliberateBuyReplay.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025",
+      "AUD-TESTI-027"
+    ],
+    "quality_label": {
+      "claims": "The real executeDeliberateBuy lands on a fork (passthrough leg), records a trades row with the real hash, registers anti-rug and arms the exit monitor.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path in-process; cannot observe that the production caller (scripts/deliberate-buy.ts) exits after the buy (AUD-TESTI-027 / AUD-BUY-001). Real .env loaded through src/config and the notifier before the rails (AUD-TESTI-011). Temp DB. The second case is a typeof check."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-012",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/exitStatePersistence.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-026"
+    ],
+    "quality_label": {
+      "claims": "exit_state reloads identically after a module-level restart (state written by serializeExitState and by the real poll loop), and an exit_failed_held row is found by the production resume statements and re-enters monitoring and anti-rug.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "Test 3 re-implements the resume loop (first dex of the type, ctx.chain.snipeAmount) instead of calling resumeMultiChainMonitoring / resumeAntiRugMonitoring, and sets failed-held through the statement directly.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "reloads identical high_water_mark / trailing_activated / partial_tiers_completed after a module-level restart",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "reloads identical columns when state was advanced by the REAL exit-monitor poll loop",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "a restart resumes an exit_failed_held row into monitoring + re-registers anti-rug",
+          "mocks_mechanism": "partial",
+          "hollow": "no",
+          "missing_observable": "which dex and probe amount production resume uses (AUD-EXIT-013/-015, AUD-ANTIRUG-011)"
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real SQL on an isolated temp DB (the strongest DB-real fork test). Real .env through src/config and the notifier before the rails (AUD-TESTI-011)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-011",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-max-wallet.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-sell-revert.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/honeypots/eth-v3-honeypot.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/realLaunches/eth-v3-trailing.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-019"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/README.md",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/eth-v2-horse.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-021"
+    ],
+    "fixture_provenance": "public-historical"
+  },
+  {
+    "path": "test/fork/helpers/realMainnetGate.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024"
+    ]
+  },
+  {
+    "path": "test/fork/honeypotChecker.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-021",
+      "AUD-TESTI-023",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "The deployed HoneypotChecker, through simulateViaContractV2/V3, never returns safe for Honeypot.sol modes 0-3 on real Uniswap V2, returns the expected verdict for the real V3 honeypot fixture, and fails closed on the V3 dispatch path.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "V2 mode 0 / V2 mode 3: verdict !== 'safe' when deployed against real Uniswap V2 on fork",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "V2 mode 1 / V2 mode 2: verdict !== 'safe' when deployed against real Uniswap V2 on fork",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a pool to probe: the LP add fails, so unsafe comes from the missing pool"
+        },
+        {
+          "name": "V3 honeypot fixture: forkBlockNumber resolved → verdict === unsafe; null → skip",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "the fixture is unpinned, so the case returns green without running"
+        },
+        {
+          "name": "exercises simulateViaContractV3 dispatch — verdict !== safe for a Honeypot.sol mode-0 token",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a V3 pool: proves only \"no pool is unsafe\""
+        },
+        {
+          "name": "HONEYPOT_CHECKER_ABI Interface accepts the checker contract address",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real contracts and real checker on the fork; imports only the ABI and checkerContract (no config, DB or notifier). Hardhat #0 signer. Inline copy of the chainId predicate (AUD-TESTI-024)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-015",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Inline jsonRpcUrl routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/honeypotMultiAmount.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-021",
+      "AUD-TESTI-023",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "D-AGGREGATION on the fork with Honeypot.sol mode 4: a threshold between the 1% and 50% probes makes the verdict not safe; a threshold above every probe gives safe with three probe results.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 7: amountTierThreshold between 1% and 50% probe sizes → 50%+100% probes revert → overall unsafe",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "a pool: the 30-token threshold blocks the 100,000-token LP add"
+        },
+        {
+          "name": "Test 8 (tightened): amountTierThreshold ABOVE 100% probe → no probe reverts → overall safe",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Hardhat account #1 signer (known-public, AUD-TESTI-018). Stale parallelism comment (fileParallelism is false)."
+    }
+  },
+  {
+    "path": "test/fork/realLaunchReplay.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-019",
+      "AUD-TESTI-020",
+      "AUD-TESTI-021",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "Three real ETH launches (LADYS V2 partial-sell, BOBO V2 trailing-stop, PEPE V3 stop-loss) replayed through the real handlers: each buys and the exit monitor later writes a sell or partial_sell row with amount_out.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real handlers and exit engine on an isolated temp DB. Sets STOP_LOSS_PERCENT, which src never reads (AUD-TESTI-019); accepts any sell row, so the named exit path is unasserted; the risk caps it does not set come from the operator .env (its own comment, :36-39). Real .env through src/config and the notifier before the rails (AUD-TESTI-011). Uses the shared gate helper (:153)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-013",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/realMainnetGate.fork.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024"
+    ],
+    "quality_label": {
+      "claims": "requireRealMainnetGate throws for chainId 1 unless ALLOW_REAL_MAINNET is exactly \"1\" and passes for 31337; isHardhatFork returns the matching booleans; FORK_ONLY_TEST_KEY is the Hardhat #0 key.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "provider (stub getNetwork)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Pure predicate test with stub providers (the stub is the input, not the mechanism); restores ALLOW_REAL_MAINNET after each case. Lives in the fork project, so it only runs after globalSetup spawns Hardhat."
+    }
+  },
+  {
+    "path": "test/fork/setup.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-017",
+      "AUD-TESTI-024"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": [
+          "AUD-TESTQ-033",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Reviewed in full. rpcUrl now comes from resolveForkRpcUrl with no fallback; compile and the Hardhat node both get buildHardhatChildEnv. Main-process globalSetup stays unrailed by design. Never executed in Phase 22 (UFV-04, owner Phase 25)."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/snipeLifecycle.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-018",
+      "AUD-TESTI-024",
+      "AUD-TESTI-025"
+    ],
+    "quality_label": {
+      "claims": "A snipe lifecycle on forked mainnet: deploy FakeToken, create a pair, add liquidity, buy, check price, sell, and end with no tokens and nearly the starting ETH.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "execution": "not executed in Phase 22; first execution owner Phase 25",
+      "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Runs no bot code (manual router calls with amountOutMin 0); included in the fork project by the test/fork/**/*.test.ts glob although not named *.fork.test.ts; cases share state and depend on order; no per-file chainId gate."
+    }
+  },
+  {
+    "path": "test/fork/teardown.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-016"
+    ]
+  },
+  {
+    "path": "test/helpers/mockProvider.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-002"
+    ]
+  },
+  {
+    "path": "test/helpers/testDb.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-001"
+    ]
+  },
+  {
+    "path": "test/integration/anti-rug/botWiring.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-006"
+    ],
+    "quality_label": {
+      "claims": "bot.ts arms snapshotLpBaseline before registerAntiRugPosition after a buy (V2 helper and V3 branch), and resumeAntiRugMonitoring re-registers every open position from the trades JOIN lp_baseline scan, verifies the allowlist and starts one listener per chain.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/detector",
+        "src/anti-rug/allowlist",
+        "src/anti-rug/lpBaseline",
+        "src/utils/db (resume statements injected)",
+        "src/utils/tokenSafety",
+        "src/utils/honeypot",
+        "src/utils/notifier",
+        "src/utils/provider",
+        "src/utils/txManager",
+        "src/utils/exitManager",
+        "src/exitEngine",
+        "src/chainRegistry (partial)",
+        "src/riskManager",
+        "src/api/server",
+        "src/telegramListener",
+        "src/utils/gasManager",
+        "src/config"
+      ],
+      "mocked_mechanism_detail": "The resume SQL (getResumeAntiRugTrades) is mocked and its rows injected without dex_name; registerAntiRugPosition is a spy whose dex argument is never asserted.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Tests 22-26: source-text wiring guards",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "runtime ordering and arguments; only substrings of src/bot.ts are checked"
+        },
+        {
+          "name": "Test 27: queries trades JOIN lp_baseline and re-registers each row via registerAntiRugPosition",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "which dex the position is re-registered with (AUD-ANTIRUG-011)"
+        },
+        {
+          "name": "Test 28: calls verifyAllowlistAtStartup once per chain BEFORE the re-register loop",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "the claimed ordering"
+        },
+        {
+          "name": "Test 29: calls startChainAntiRugListener per chain after re-registering positions",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "ordering after registration"
+        },
+        {
+          "name": "Test 30: does NOT crash when trades JOIN lp_baseline returns zero rows",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 31: pre-Phase-19 trades (no lp_baseline) are excluded by INNER JOIN",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "the JOIN is regex-matched, never executed"
+        }
+      ],
+      "notes": "src/config is mocked here, so no real-state reach."
+    }
+  },
+  {
+    "path": "test/integration/anti-rug/multiSignalEnd2End.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-005"
+    ],
+    "quality_label": {
+      "claims": "The full anti-rug pipeline: a Burn log with all three signals tripped dispatches a dry-run alert or a live exit (timers cleared first), an allowlisted destination or a partial signal does not, RPC failure gives unknown, confirm blocks de-trip, the circuit breaker suppresses the fourth exit, and partial sell / full close keep or end the subscription.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/anti-rug/lpBaseline",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine (executeFullSell resolves true)",
+        "src/utils/db",
+        "src/utils/provider",
+        "ethers Contract (scripted reserves/supply)"
+      ],
+      "mocked_mechanism_detail": "The evaluator, confirm gate, exit trigger and circuit breaker are real; the exit itself (executeFullSell) is mocked to succeed and exitManager is mocked, so refusal, failure and lock contention never occur.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 15: dry-run path — all 3 signals trip → would-have-sold broadcast + [DRY-RUN] alert + NO executeFullSell",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 16: live path — all 3 signals trip → clearAllTimersForToken THEN executeFullSell with reason=anti-rug",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "an exit that returns false or throws (AUD-ANTIRUG-004); sell-lock contention (AUD-EXIT-014)"
+        },
+        {
+          "name": "Test 17: allowlist suppression — destination IS a UNCX locker → verdict=allowlisted, NO triggerAntiRugExit",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 18: partial-signal — LP-removed below threshold → verdict=safe, no exit",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 19: vacuous-pass guard — getReserves rejects → verdict=unknown, no exit, evaluator error log",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 20: confirm-blocks de-trip — reserves recover during delay → no exit, signal-detripped log",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 21: circuit-breaker trip — 3 successful exits → CB tripped → 4th evaluation returns early",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "several logs for one rug counted as several dispatches (AUD-ANTIRUG-003)"
+        },
+        {
+          "name": "Test 22: partial sell preserves subscription — entry remains; subsequent Burn still dispatches",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "no partial sell is executed; last assertion is toBeDefined on an import"
+        },
+        {
+          "name": "Test 23: full close terminates subscription — unregisterAntiRugPosition called → subsequent Burn finds no position",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "the test calls unregister itself; the exitEngine full-close hook never runs"
+        }
+      ],
+      "notes": "Fixture addresses are synthetic hex labels (0xPair15..., 0xScammer...); the UNCX locker address is the public ETH UniLockerV2."
+    }
+  },
+  {
+    "path": "test/integration/anti-rug/wsReconnectBackfill.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-004"
+    ],
+    "quality_label": {
+      "claims": "Anti-rug WebSocket lifecycle: heartbeat terminate and reconnect, re-subscription with the same filter, chunked backfill from chain_state, fail-closed gap alert, backfilled events never exit, HTTP polling fallback, and the reconnect-failed and >60 s disconnect alerts.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/notifier",
+        "src/api/ws/broadcaster",
+        "src/utils/provider",
+        "src/anti-rug/exitTrigger",
+        "src/anti-rug/lpBaseline",
+        "src/utils/db",
+        "ethers WebSocketProvider (class mock)",
+        "ethers Contract",
+        "the evaluator (Test 25, via _setEvaluateRugSignalsForTesting)"
+      ],
+      "mocked_mechanism_detail": "Reconnect failure is modelled as a synchronous constructor throw (ethers never does this); the backfill no-exit case replaces the real evaluator with a test double.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Test 21: heartbeat-dead path — isAlive=false at next interval → ws.terminate() → close fires reconnect",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 22: reconnect re-subscribes with the same filter (address-union + topic-union) on the new wsProvider",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 27: 3 consecutive WebSocketProvider construction failures → WS RECONNECT FAILED Telegram alert (D-VIS-WS-HEALTH)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real failure mode: async ws error event with no listener (AUD-ANTIRUG-002)"
+        },
+        {
+          "name": "Test 28: disconnect duration >60s → WS DISCONNECTED >60s alert (D-VIS-WS-HEALTH)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "same as Test 27"
+        },
+        {
+          "name": "Test 23: post-reconnect backfill calls getLogsForBackfill with (lastSeen+1, current, addresses, topics) — chunked via cap=10",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 24: backfill gap > maxBackfillBlocks → FAIL CLOSED (no getLogs calls); GAP DETECTED alert + broadcast",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 25: backfilled events with verdict=unsafe log antirug.backfill.too-late + broadcast outcome=too-late; NEVER call triggerAntiRugExit",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real evaluator, which schedules the confirm gate and exits (AUD-ANTIRUG-005)"
+        },
+        {
+          "name": "Test 29: GAP DETECTED alert format matches CONTEXT.md D-VIS-WS-HEALTH wording",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "Test 26: ctx.wsProvider===null → startChainAntiRugListener uses HTTP polling; updates chain_state.last_seen_block per poll",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "Fake timers throughout; afterEach clears timers and resets the registry."
+    }
+  },
+  {
+    "path": "test/integration/api/auth.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-015"
+    ],
+    "quality_label": {
+      "claims": "POST /api/auth/login accepts the configured key and sets a session cookie, rejects a wrong key, and authMiddleware rejects requests without a session and accepts them with one.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/riskManager"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real login handler and middleware on a 127.0.0.1:0 server; synthetic key from api.fixtures. Sets and deletes DASHBOARD_API_KEY (AUD-TESTI-015)."
+    }
+  },
+  {
+    "path": "test/integration/api/chains.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-008"
+    ],
+    "quality_label": {
+      "claims": "GET /api/chains lists chain status, connection and params; POST stop/start toggle the stopped set, return warnings from the restart callback, and broadcast chain_status_change.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/exitEngine (exitConfig)",
+        "src/utils/logger",
+        "src/api/ws/broadcaster",
+        "test/fixtures/api.fixtures (wsProvider with only removeAllListeners)"
+      ],
+      "mocked_mechanism_detail": "The provider is a fixture with no subscriptions, so what stop actually removes is unobservable; the stop case requires the removeAllListeners call that is the registered defect.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real route; the 50 ms real-time waits for the fire-and-forget broadcast are wall-clock dependent."
+    }
+  },
+  {
+    "path": "test/integration/api/controls.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-007"
+    ],
+    "quality_label": {
+      "claims": "Dashboard force-sell clears timers and calls executeFullSell for a pending trade (404/409/400/500 paths), and emergency-sell sells every open position and reports failures.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/db (prepare stub routed by SQL substring)",
+        "src/utils/exitManager",
+        "src/exitEngine (executeFullSell)",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "Which positions are \"open\" is decided by the stubbed SQL (the real status = pending filter that drops failed-held positions never runs); the sell is mocked and its dex argument accepted as any object.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/integration/api/health.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-012"
+    ],
+    "quality_label": {
+      "claims": "GET /health returns 200 ok with version, chain status, position count and uptime when the chain answers, 503 degraded when it does not, and the Telegram status from the getter.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/riskManager"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real route; the position and exposure figures are mocked constants (noted under AUD-TESTI-012 but the claims here are status/shape only)."
+    }
+  },
+  {
+    "path": "test/integration/api/positions.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-012"
+    ],
+    "quality_label": {
+      "claims": "GET /api/positions returns open positions with live prices, the stale flag on quote failure, unrealised P&L and dexName for multi-dex BSC.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/api/helpers/positions (buildPositionsWithLivePrices)"
+      ],
+      "mocked_mechanism_detail": "The helper that computes every claimed field is mocked; the route is a pass-through.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/integration/api/risk.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-012"
+    ],
+    "quality_label": {
+      "claims": "GET /api/risk/exposure, /pnl and /limits return exposure by chain, cumulative P&L points over a range, and limit utilisation read from env.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/riskManager (getPortfolioExposure)",
+        "src/utils/db (getPnL, getPnLChartData, limit statements)"
+      ],
+      "mocked_mechanism_detail": "All figures come from mocked statements fed decimal-ETH rows.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Replaces and restores process.env wholesale (sound)."
+    }
+  },
+  {
+    "path": "test/integration/api/trades.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-012"
+    ],
+    "quality_label": {
+      "claims": "GET /api/trades filters, paginates, defaults to 7 days and returns the D-27 columns; /export produces CSV of all matching trades.",
+      "mocks_mechanism": "yes",
+      "mocked_dependencies": [
+        "src/utils/db (getPnL)"
+      ],
+      "mocked_mechanism_detail": "getPnL is mocked with decimal rows.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/integration/api/wsPush.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-015",
+      "AUD-TESTI-016"
+    ],
+    "quality_label": {
+      "claims": "The API server broadcast interval calls buildPositionsWithLivePrices every 5 s and broadcasts positions_update when clients are connected, skips when none are, and chain_status_change can be broadcast.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/api/helpers/positions",
+        "src/api/ws/broadcaster",
+        "src/api/ws/handler",
+        "src/api/middleware/auth",
+        "src/api/routes/auth",
+        "src/api/routes/trades",
+        "src/api/routes/risk",
+        "src/api/routes/controls",
+        "src/utils/db",
+        "src/riskManager",
+        "src/exitEngine",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "The upgrade handler and auth middleware are mocked out (the AUD-API-008 crash path is not exercised); the last case calls the broadcast mock itself.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "calls buildPositionsWithLivePrices on broadcast interval",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "broadcasts positions data via WebSocket",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "skips broadcast when no WebSocket clients connected",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "broadcast is called with chain_status_change type on mock server",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "the test calls the mock and asserts the call"
+        }
+      ],
+      "notes": "Real startApiServer on 127.0.0.1:0 with fake timers. src/utils/notifier loads unmocked through routes/antiRug but no tested path sends an alert."
+    }
+  },
+  {
+    "path": "test/integration/exitMonitor.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-010"
+    ],
+    "quality_label": {
+      "claims": "The per-token sell lock blocks a second sell and releases; exit triggers (trailing stop, stop-loss, no premature sell, null price, volatility and urgency multipliers, tier selection, partial amount) are correct; connection failures do not crash or corrupt exit state.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/utils/db",
+        "src/config",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/utils/exitManager (in the exit-trigger describes)"
+      ],
+      "mocked_mechanism_detail": "The trigger cases never run pollExitStrategy; the thresholds are recomputed in the test.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "Sell lock mutex (exitManager) cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "trailing stop fires at correct threshold: HWM=300, trigger=270, price=265",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "the poll loop decision and the executeFullSell call"
+        },
+        {
+          "name": "stop-loss fires at correct threshold: entry=100, stopLossPrice=70, price=65",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "same"
+        },
+        {
+          "name": "no premature sell for stable prices above stop-loss and below trailing activation",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "same"
+        },
+        {
+          "name": "queryPrice returning null does not trigger a sell",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "asserts null === null"
+        },
+        {
+          "name": "VolatilityTracker / urgency / getUnfilledTiers / calculatePartialSellAmount cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "queryPrice returns null on ECONNRESET error (does not crash)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "an ECONNRESET; the provider is {} so any error returns null"
+        },
+        {
+          "name": "stale price data recovery: null cycles followed by valid price",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "in-test loop only"
+        },
+        {
+          "name": "multiple consecutive connection failures do not corrupt exit state",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "no failure is simulated"
+        },
+        {
+          "name": "Phase 1 harm-prevention: FIX-01 sell-lock cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/integration/honeypotDeploy.eth.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011"
+    ],
+    "quality_label": {
+      "claims": "The ETH HoneypotChecker has bytecode at the resolved address and the address matches the Ignition deployment artifact.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Live mainnet read: new JsonRpcProvider(process.env.ETH_RPC_URL).getCode; skipped when ETH_RPC_URL is unset (CI). Imports CHAIN_TEMPLATES from src/chainRegistry, which loads src/config. After the rails ETH_RPC_URL is a 127.0.0.1:1 sentinel, so the skip no longer applies (22-29 / 22-15 own the post-rail behaviour)."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+        "findings": [
+          "AUD-TESTQ-003"
+        ],
+        "note": "The live bytecode test moved to the fork project by ruling ESC-RAILS-01; imports it no longer needed removed; the rest unchanged. Reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/honeypotDispatch.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "D-AGGREGATION: a gating probe (50% or 100%) that reverts makes the verdict unsafe; a 1% probe revert is advisory; probe results are reported in size order.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "provider.call (returns ABI-encoded RoundtripResult / BuyFailed reverts)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The real checkerContract aggregation and decoding run; the error object is a plain { data, message } rather than an ethers CALL_EXCEPTION, which the decoder reads the same way."
+    }
+  },
+  {
+    "path": "test/integration/honeypotUnknownFailsClosed.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "quality_label": {
+      "claims": "RPC timeout with no data, a call that does not revert, malformed revert data and a V3 QuoteFailed revert all give verdict unsafe (never safe).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "provider.call"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real checkerContract on scripted call outcomes; assertions are precise verdicts."
+    }
+  },
+  {
+    "path": "test/integration/killswitchCheckpoints.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-009",
+      "AUD-TESTI-011",
+      "AUD-TESTI-016"
+    ],
+    "quality_label": {
+      "claims": "Kill-switch checkpoints in the V2 and V3 buy handlers: CP1 returns before the bundle is built, CP2 discards a built bundle before submit, CP3 only logs after submit (trade still recorded and monitored), with feeTier on V3.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/utils/tokenSafety",
+        "src/utils/honeypot",
+        "src/utils/honeypot/bytecodeScan",
+        "src/utils/honeypot/sanitize",
+        "src/utils/blocklist",
+        "src/utils/notifier",
+        "src/utils/db",
+        "src/utils/provider",
+        "src/utils/txManager",
+        "src/utils/exitManager",
+        "src/exitEngine",
+        "src/anti-rug/lpBaseline",
+        "src/anti-rug/detector",
+        "src/anti-rug/allowlist",
+        "src/api/ws/broadcaster",
+        "src/riskManager",
+        "ethers Contract"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "killswitch CP1 (V2 path)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "killswitch CP2 (V2 path)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "killswitch CP3 (V2 path)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "killswitch V2 happy path (no pause)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "paused=1 → pino info { op: killswitch.cp1, feeTier } + sendTxWithRetry NEVER called",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "that CP1 was reached"
+        },
+        {
+          "name": "paused flips between CP1 and CP2 on V3 path → pino info { op: killswitch.cp2, feeTier } + V3 quoteExactInputSingle WAS called",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "CP2 reached; quoter call"
+        },
+        {
+          "name": "paused=1 ONLY at V3 CP3 (post-submit) → pino info { op: killswitch.cp3, feeTier } + insertTrade STILL called",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "every assertion is conditional"
+        },
+        {
+          "name": "paused=0 throughout → no killswitch.* log fires on V3 path",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "that the V3 buy was sent"
+        }
+      ],
+      "notes": "src/config is not mocked: importing src/bot loads CONFIG from the real .env before the rails (AUD-TESTI-011). The CP2 case depends on the exact number of getPauseState reads."
+    }
+  },
+  {
+    "path": "test/integration/mevStrategies.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-002",
+      "AUD-TESTI-003"
+    ],
+    "quality_label": {
+      "claims": "Flashbots: sendBundle at currentBlock+1 with the re-fetched nonce, the real tx hash returned, a missing hash rejected; bloXroute: bsc_private_tx call and the reconciled locally-signed hash; passthrough: direct send, a wait timeout reconciled without resubmit, a thrown broadcast not resubmitted.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "ethers FetchRequest",
+        "@flashbots/ethers-provider-bundle",
+        "axios",
+        "test/helpers/mockProvider (status-1 receipts)"
+      ],
+      "mocked_mechanism_detail": "Receipts always status 1 (mockProvider); the passthrough wait timeout is a rejection ethers 6.16.0 cannot produce for tx.wait(3).",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "FlashbotsMevStrategy cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "status-0, replaced or never-included bundles"
+        },
+        {
+          "name": "BloxrouteMevStrategy: sendTransaction sends bsc_private_tx JSON-RPC call via axios",
+          "mocks_mechanism": "partial",
+          "hollow": "no",
+          "missing_observable": "reconciliation against a non-status-1 receipt"
+        },
+        {
+          "name": "BloxrouteMevStrategy: returns a real on-chain tx hash — no synthetic-hash bug on BSC path (regression)",
+          "mocks_mechanism": "partial",
+          "hollow": "no",
+          "missing_observable": "same"
+        },
+        {
+          "name": "PassthroughMevStrategy: sendTransaction calls wallet.sendTransaction directly",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "PassthroughMevStrategy: reconciles a wait-timeout to a landed tx and returns the real hash (no resubmit)",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the real outcome: wait(3) pending forever (AUD-TX-002)"
+        },
+        {
+          "name": "PassthroughMevStrategy: a broadcast that throws (no tx created) propagates without resubmitting the same nonce",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "Relay URLs are strings only; FetchRequest and axios are mocked, so nothing leaves the machine. Saves and restores BLOXROUTE_AUTH_HEADER."
+    }
+  },
+  {
+    "path": "test/integration/midRunWalletCheck.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-015"
+    ],
+    "quality_label": {
+      "claims": "startMultiChainBot schedules the mid-run wallet check at MID_RUN_CHECK_INTERVAL_SEC (default 300 s, override 60 s); an undercut sets pause with paused_by preflight, broadcasts, alerts *BOT PAUSED* and logs fatal; an already-paused state is not re-paused.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/preflight (checkWalletBalance)",
+        "src/chainRegistry (partial)",
+        "src/utils/db",
+        "src/anti-rug/detector",
+        "src/anti-rug/allowlist",
+        "src/api/server",
+        "src/utils/notifier",
+        "src/telegramListener",
+        "src/api/ws/broadcaster",
+        "src/utils/provider",
+        "src/utils/txManager"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Wiring test with fake timers; the balance verdict is injected (the balance math is not the claim). src/config loads unmocked through src/bot and the chainRegistry importActual (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/integration/pauseCli.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-014",
+      "AUD-TESTI-015"
+    ],
+    "quality_label": {
+      "claims": "npm run pause / resume: login then POST /api/controls/{pause,resume} with the cookie forwarded writes or clears the pause row and broadcasts; a missing DASHBOARD_API_KEY exits 1; the scripts never log the key and default to the DASHBOARD_HOST/PORT bind.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db (pause statements)",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "The CLI HTTP flow is re-implemented in the test; scripts/pause.ts is spawned once (missing-key path) and otherwise grepped.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "Test 1/2/3/5: in-process login + pause/resume flow",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "scripts/pause.ts and resume.ts never run on this path"
+        },
+        {
+          "name": "Test 4: missing DASHBOARD_API_KEY → CLI FATAL exit 1",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "T-20-05 and 20-09 static grep cases",
+          "mocks_mechanism": "no",
+          "hollow": "yes",
+          "missing_observable": "runtime behaviour of the scripts"
+        }
+      ],
+      "notes": "Test 4 spawns with { ...process.env } (real .env before the rails; the child also runs dotenv.config()); it exits before any network call. Server on 127.0.0.1:0."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be57bff04153a2745cf5979ca1f49e4f8de6a51d",
+        "findings": [
+          "AUD-TESTQ-010"
+        ],
+        "note": "Direct spawn with a parent-env copy replaced by spawnRailedChild with envOverrides. Assertions unchanged. Reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/pauseFlow.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-001",
+      "AUD-TESTI-011",
+      "AUD-TESTI-014",
+      "AUD-TESTI-015"
+    ],
+    "quality_label": {
+      "claims": "pause_state persists across restart and clears with its audit columns; the pause/resume/GET routes write, clear and read through the statements and broadcast; reasons are sanitised; a bot restarted paused keeps listeners, dashboard and exit monitors but CP1 blocks new buys.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/db",
+        "src/api/ws/broadcaster",
+        "src/utils/exitManager",
+        "src/exitEngine",
+        "src/utils/logger",
+        "Test 9: src/preflight, src/chainRegistry (partial), src/anti-rug/*, src/api/server, src/utils/notifier, src/telegramListener, src/utils/provider, src/utils/txManager, src/utils/tokenSafety, src/utils/honeypot, src/riskManager, ethers Contract"
+      ],
+      "mocked_mechanism_detail": "Tests 1-4 run their own SQL on a hand-built v6 replica; Test 9 seeds pause through a mocked getPauseState.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "cases": [
+        {
+          "name": "Tests 1-4: pause_state persistence + restart-survival on a temp file DB",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the production statements and migration (db.ts:685-687, migrateSchema)"
+        },
+        {
+          "name": "Tests 5-8: endpoint exercise (real routes, mocked statements)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "D-PAUSED-RESTART positive observable",
+          "mocks_mechanism": "partial",
+          "hollow": "yes",
+          "missing_observable": "listeners attached and exit monitors running are claimed but not asserted"
+        }
+      ],
+      "notes": "Tests 1-4 use an os.tmpdir() file DB (not data/). Test 9 imports src/bot without mocking src/config (AUD-TESTI-011). afterEach deletes DB_PATH (AUD-TESTI-015)."
+    }
+  },
+  {
+    "path": "test/integration/preflightCli.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011",
+      "AUD-TESTI-014"
+    ],
+    "quality_label": {
+      "claims": "npm run preflight exits 0 or 1 (never 2) against the current .env, exits 1 with FAIL lines for an unreachable RPC, reports the honeypot-checker check, never starts the bot, and scripts/preflight.ts does not import bot.ts.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "yes",
+      "notes": "Every runtime case spawns npx ts-node scripts/preflight.ts with { ...process.env }: before the rails the child loaded the real .env, built wallets from the real key, opened and migrated data/bot.db (src/preflight.ts:49 -> src/utils/db) and called the mainnet RPCs (Tests 1 and 4 with no override). Test 1 passes on both 0 and 1, so it asserts only \"no crash\". Test 3 accepts any FAIL line. Wall-clock bound: 60 s spawn timeout."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "fec8ee811f62d40ebe5b99bbb876c7ff3ed634f7",
+        "findings": [
+          "AUD-TESTQ-006",
+          "AUD-TESTQ-007",
+          "AUD-TESTQ-008",
+          "AUD-TESTQ-009",
+          "AUD-TESTQ-018"
+        ],
+        "note": "Children moved to spawnRailedChild on sentinels; wrong override key corrected to ETH_WS_URL; describe timeout raised. Reviewed: the test previously named 'pass' now runs a failing preflight on sentinels (AUD-TESTQ-009)."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/preflightInvocation.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011"
+    ],
+    "quality_label": {
+      "claims": "startMultiChainBot calls preflight exactly once between buildChainRegistry and the first createChainContext, creates no chain context when preflight exits, and proceeds when it resolves.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/preflight",
+        "src/chainRegistry (partial)",
+        "src/utils/db",
+        "src/anti-rug/detector",
+        "src/anti-rug/allowlist",
+        "src/api/server",
+        "src/utils/notifier",
+        "src/telegramListener",
+        "src/api/ws/broadcaster",
+        "src/utils/provider",
+        "src/utils/txManager",
+        "process.exit (throws)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Sound ordering test via a call-order witness. src/config loads unmocked (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/integration/txManager.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-002",
+      "AUD-TESTI-015"
+    ],
+    "quality_label": {
+      "claims": "sendTxWithRetry dispatches to the chain MEV strategy with maxRetries and gasMultiplier and propagates errors; createMevStrategy picks the right class; Flashbots resubmits at the re-fetched latest nonce, targets currentBlock+1, does not resubmit after a relay rejection or a simulated revert; healthCheck reflects the auth key.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "ethers FetchRequest",
+        "src/utils/db",
+        "src/utils/logger",
+        "src/config",
+        "@flashbots/ethers-provider-bundle",
+        "axios",
+        "src/utils/mevStrategies/* (first describe)",
+        "test/helpers/mockProvider"
+      ],
+      "mocked_mechanism_detail": "The first describe replaces every strategy with a mock (dispatch wiring only); the Flashbots cases use the real strategy with a scripted bundle library and status-1 receipts.",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "sendTxWithRetry (multi-chain path) cases",
+          "mocks_mechanism": "yes",
+          "hollow": "no",
+          "missing_observable": "the strategy itself (wiring-only by design)"
+        },
+        {
+          "name": "createMevStrategy dispatch cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        },
+        {
+          "name": "a genuine resubmit reuses the re-fetched \"latest\" nonce, NEVER base+attempt (no double-spend)",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "status-0 or replaced receipts (AUD-TESTI-002)"
+        },
+        {
+          "name": "includes correct targetBlockNumber / relay rejection / simulated revert / healthCheck cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": ""
+        }
+      ],
+      "notes": "Reads and restores FLASHBOTS_AUTH_KEY; sets and deletes the MEV_CONFIRM_* keys (AUD-TESTI-015)."
+    }
+  },
+  {
+    "path": "test/integration/v2HoneypotIntegration.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011"
+    ],
+    "quality_label": {
+      "claims": "handleNewPairForChain dispatches simulateHoneypotRoundtrip on every V2 candidate; unsafe sends a *SKIP* alert and no buy; safe plus a clean bank buys; isMutableTokenForChain = true blocks the buy.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers Contract",
+        "src/utils/honeypot",
+        "src/utils/honeypot/bytecodeScan",
+        "src/utils/tokenSafety",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/riskManager",
+        "src/exitEngine",
+        "src/utils/db",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Gate-wiring test: the verdicts are injected by design (the honeypot mechanism itself is covered by honeypotDispatch / honeypotUnknownFailsClosed and the fork tests). src/config loads unmocked through src/bot (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/integration/v3HoneypotIntegration.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011"
+    ],
+    "quality_label": {
+      "claims": "handleNewV3PoolForChain dispatches simulateHoneypotRoundtrip with the runtime feeTier; unsafe skips with an alert, safe buys, isMutableTokenForChain = true blocks.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers Contract",
+        "src/utils/honeypot",
+        "src/utils/honeypot/bytecodeScan",
+        "src/utils/tokenSafety",
+        "src/utils/notifier",
+        "src/utils/txManager",
+        "src/riskManager",
+        "src/exitEngine",
+        "src/utils/db",
+        "src/utils/logger"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Gate-wiring test; src/config loads unmocked through src/bot (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/integration/v3LiquidityWait.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-011"
+    ],
+    "quality_label": {
+      "claims": "waitForLiquidity resolves false and logs \"Mint timeout (30s), dropping opportunity\" when no Mint arrives within 30 s, after subscribing to Mint.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "ethers Contract",
+        "src/utils/logger",
+        "src/utils/db"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "yes",
+      "notes": "Real waitForLiquidity with fake timers. src/config and src/utils/notifier load unmocked through src/bot; the tested path sends no alert (AUD-TESTI-011)."
+    }
+  },
+  {
+    "path": "test/integration/wsReconnect.test.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-TESTI-002",
+      "AUD-TESTI-013"
+    ],
+    "quality_label": {
+      "claims": "The WS provider cache returns, reuses, destroys and recreates providers; the DEX reconnect backs off 1 s to 60 s and resets; HTTP polling is the fallback; disconnect errors are caught without crashing.",
+      "mocks_mechanism": "partial",
+      "mocked_dependencies": [
+        "src/utils/logger",
+        "src/config",
+        "ethers (ethers.WebSocketProvider / JsonRpcProvider / Wallet class mocks)",
+        "test/helpers/mockProvider"
+      ],
+      "mocked_mechanism_detail": "Backoff, fallback and disconnect cases never import bot.ts; they compute or catch in the test.",
+      "hollow_assertions": "yes",
+      "can_reach_real_state": "no",
+      "cases": [
+        {
+          "name": "WebSocket provider cache lifecycle cases",
+          "mocks_mechanism": "no",
+          "hollow": "no",
+          "missing_observable": "the provider has no websocket, so the missing error listener cannot surface"
+        },
+        {
+          "name": "WebSocket reconnect exponential backoff cases",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "bot.ts reconnect loop never runs"
+        },
+        {
+          "name": "wsProvider null condition triggers HTTP polling path",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "asserts on local objects"
+        },
+        {
+          "name": "RPC disconnect behavior cases",
+          "mocks_mechanism": "yes",
+          "hollow": "yes",
+          "missing_observable": "errors are thrown and caught by the test itself"
+        }
+      ],
+      "notes": ""
+    }
+  },
+  {
+    "path": "test/.env.test",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed in full. Sentinel values only: RPC and WS URLs on 127.0.0.1:1, a TEST-SENTINEL Telegram token, small-integer private keys that are not Hardhat #0. Key set enforced equal to .env.example by envExampleSync.test.ts."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/aliased-vi.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only (aliased vi import), reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-aliased.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-bare.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-relative.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/non-literal.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only (non-literal specifier), reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid-dir/index.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid-target.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/helpers/forkRpcUrl.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed in full. The one reader of ETH_FORK_RPC_URL; no fallback; error names the variable. No runtime imports."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/helpers/hardhatChildEnv.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed in full. Env built from sentinels, OS essentials and the two shell keys; parent env never spread; NODE_OPTIONS set last, so nothing can remove the preload."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/honeypotDeploy.eth.fork.test.ts",
+    "audited_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+    "findings": [
+      "AUD-TESTQ-003",
+      "AUD-TESTQ-034"
+    ],
+    "quality_label": {
+      "claims": "The ETH HoneypotChecker has real bytecode on mainnet (not 0x, longer than 100 characters).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Moved by ruling ESC-RAILS-01; never executed in its new file (UFV-05). Rehearsal against a loopback fake proves wiring only."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+        "findings": [
+          "AUD-TESTQ-003",
+          "AUD-TESTQ-034"
+        ],
+        "note": "Reviewed: The ETH HoneypotChecker has real bytecode on mainnet (not 0x, longer than 100 characters)."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/rails/forkRails.fork.test.ts",
+    "audited_sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+    "findings": [
+      "AUD-TESTQ-030",
+      "AUD-TESTQ-031",
+      "AUD-TESTQ-032"
+    ],
+    "quality_label": {
+      "claims": "Under fork mode the rails are installed, sentinels hold except the shell keys, and a Telegram send is a recorded refusal.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/api/ws/broadcaster"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Rehearsed only (UFV-01 to UFV-03), never under the real fork project; owner Phase 25."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+        "findings": [
+          "AUD-TESTQ-030",
+          "AUD-TESTQ-031",
+          "AUD-TESTQ-032"
+        ],
+        "note": "Reviewed: Under fork mode the rails are installed, sentinels hold except the shell keys, and a Telegram send is a recorded refusal."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/backupState.test.ts",
+    "audited_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+    "findings": "none",
+    "quality_label": {
+      "claims": "backup-state.ts --self-check exits 0.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Runs the script self-check on temp fixtures only, through a railed child."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+        "findings": "none",
+        "note": "Reviewed: backup-state.ts --self-check exits 0."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/dbGuards.test.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real better-sqlite3 in railed children (no VITEST) on temp files."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": "none",
+        "note": "Reviewed: Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/dbInit.test.ts",
+    "audited_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+    "findings": "none",
+    "quality_label": {
+      "claims": "db:init creates the database atomically and refuses every unsafe target, with the exact-path confirmation.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ts-node child and real SQLite on temp files."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+        "findings": "none",
+        "note": "Reviewed: db:init creates the database atomically and refuses every unsafe target, with the exact-path confirmation."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/directEntryGuard.test.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A direct start refuses before any later import runs (marker file), a non-direct import is not refused, and canonical comparison holds.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ts-node child processes."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Reviewed: A direct start refuses before any later import runs (marker file), a non-direct import is not refused, and canonical comparison holds."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/dbGuardChild.ts",
+    "audited_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+        "findings": "none",
+        "note": "Child entry for dbGuards.test.ts; reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryFixtureGuard.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryLateFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryStarterFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/importMarker.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Marker module for the direct-entry tests, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/lockHolder.ts",
+    "audited_sha": "569f08c2afa47decd0131958fcc5384ed915ac30",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "569f08c2afa47decd0131958fcc5384ed915ac30",
+        "findings": "none",
+        "note": "Real lock holder process for processLock.test.ts, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/processLock.test.ts",
+    "audited_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real holder processes in temp folders."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+        "findings": "none",
+        "note": "Reviewed: A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/rails/notifierRefusalIntegration.test.ts",
+    "audited_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Under the integration project a Telegram send is a recorded refusal and the broadcast runs.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/api/ws/broadcaster",
+        "axios.post (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The refusal is real."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+        "findings": "none",
+        "note": "Reviewed: Under the integration project a Telegram send is a recorded refusal and the broadcast runs."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/rails/railsIntegration.test.ts",
+    "audited_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real rails."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+        "findings": "none",
+        "note": "Reviewed: The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/core.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": [
+      "AUD-TESTQ-004"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": [
+          "AUD-TESTQ-004"
+        ],
+        "note": "Reviewed in full against the 20 classes and rail correctness. Fail closed: a failed install is sticky and thrown. Pipe test mirrors Node (!!options.path) so an http agent's path: null is not a pipe. DNS results are re-checked after lookup, so a hostname cannot resolve past the deny. Env scrub deletes every app key before the sentinels load; the fork shell keys are captured once and only in fork-first mode; values are not put on the global state object. The data block and DB tripwire use canonical forms including win32 short names, stream names and trailing dots; ATTACH and VACUUM INTO are checked, a non-literal target is refused. Recorded residuals are honest: a native addon, worker_threads, a module that captured fs before install, and a pre-existing link whose spelled path holds neither 'data' nor '.env'. One gap registered: process.loadEnvFile (AUD-TESTQ-004). Vitest main process is not railed by design; AUD-REAUDIT-001 is the one place that bit."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/ledgerRun.ts",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed in full. Writes only under the temp ledger folder, never reads the real env file, and decides no enforcement. Its second-opinion loopback check is independent of core.cjs. triggeringTestFiles is informational (stack frames are capped at 8)."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/preload.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed. One install call in full mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/childProbe.cjs",
+    "audited_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+        "findings": "none",
+        "note": "Reviewed. Runs only as a railed child; proves rail state and denials."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/dotenvProbe.ts",
+    "audited_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "Reviewed. Runs only as a railed child; counts .env read attempts at the dotenv sites."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/duplicateLoadProbe.cjs",
+    "audited_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "findings": "none",
+        "note": "Reviewed. Computes an alias path and requires it to prove the singleton guard; runs only as a railed child, and its one allowance in spawnSites is limited to a plain require."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/moduleScopeDb.cjs",
+    "audited_sha": "03f7f1277eaf8b9a8b642256be8d16f2f77108a3",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "03f7f1277eaf8b9a8b642256be8d16f2f77108a3",
+        "findings": "none",
+        "note": "Reviewed. Railed child that sets DB_PATH to the data path and proves the module-scope import is blocked."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/notifierProdPathProbe.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed. Railed child with a fake env proving the production notifier path still posts without VITEST."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/tsProbe.ts",
+    "audited_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+        "findings": "none",
+        "note": "Reviewed. Railed ts-node child proving the preload reaches a ts-node process."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/selfcheck.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed. Plain Node proof of every rail against a fake root; run by hand, not by Vitest. Its only unrailed child hashes and deletes the temp fake root with a minimal env; the code passed to it is a literal in this file and the argument is the fixture or the fake root."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/setup-fork.cjs",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed. One install call in fork mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/setup.cjs",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed. One install call in full mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/spawnRailedChild.ts",
+    "audited_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+    "findings": [
+      "AUD-TESTQ-005",
+      "AUD-REAUDIT-004"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": [
+          "AUD-TESTQ-005",
+          "AUD-REAUDIT-004"
+        ],
+        "note": "Reviewed in full. Every limit runs before spawning (command, env-file, require, path, envOverrides, homeOverride, nodeOptions, inheritedEnv, ledgerRunId); the child env is built from scratch and NODE_OPTIONS is set last. killProcessTree validates a positive integer. Open items registered: the path limit does not resolve links (AUD-TESTQ-005); railsEntry can select fork mode for a child (AUD-REAUDIT-004)."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/vitest.fork-rehearsal.config.ts",
+    "audited_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+    "findings": [
+      "AUD-REAUDIT-001"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+        "findings": [
+          "AUD-REAUDIT-001"
+        ],
+        "note": "extends: true added by a08d650 after AUD-REAUDIT-001. Project now inherits envDir: false from the root. Reviewed."
+      }
+    ]
+  }
+]

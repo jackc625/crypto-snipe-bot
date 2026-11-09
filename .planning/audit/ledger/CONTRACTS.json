@@ -1,0 +1,79 @@
+[
+  {
+    "path": ".github/workflows/test.yml",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-CONTRACTS-002",
+      "AUD-CONTRACTS-003",
+      "AUD-ROOT-001",
+      "AUD-ROOT-003",
+      "AUD-CONTRACTS-006"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a1ae6932ba35dae93a470d6a0644a9e8ea9fde75",
+        "findings": [
+          "AUD-CONTRACTS-005"
+        ],
+        "note": "One hunk: adds the vi.mock specifier gate. No secrets added. Reviewed. The missing job timeout predates Phase 22 (AUD-CONTRACTS-005)."
+      },
+      {
+        "from_sha": "a1ae6932ba35dae93a470d6a0644a9e8ea9fde75",
+        "to_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "findings": [
+          "AUD-CONTRACTS-006"
+        ],
+        "note": "One hunk: adds npm ci --prefix dashboard before the dashboard type check. No secrets added. Reviewed."
+      }
+    ]
+  },
+  {
+    "path": "contracts/FakeToken.sol",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "note": "ledger only; Solidity logic review is Phase 30 (the mismatched deploy call to its constructor is a script defect, AUD-SCRIPTS-001)"
+  },
+  {
+    "path": "contracts/honeypot/HoneypotChecker.sol",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none",
+    "note": "ledger only; Solidity logic review is Phase 30"
+  },
+  {
+    "path": "hardhat.config.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-CONTRACTS-001",
+      "AUD-CONTRACTS-004",
+      "AUD-TESTI-011",
+      "AUD-TESTI-017"
+    ]
+  },
+  {
+    "path": "ignition/modules/HoneypotChecker.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": "none"
+  },
+  {
+    "path": "scripts/audit-honeypot-checker.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-SCRIPTS-005"
+    ]
+  },
+  {
+    "path": "scripts/check-mythril-report.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-CONTRACTS-003"
+    ]
+  },
+  {
+    "path": "scripts/deploy-honeypot-checker.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-CONTRACTS-004"
+    ]
+  }
+]

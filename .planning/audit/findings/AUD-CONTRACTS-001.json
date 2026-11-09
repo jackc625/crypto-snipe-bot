@@ -1,0 +1,132 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "boundary",
+    "credential-exposure",
+    "mitigation-planned-22-11"
+  ],
+  "related": [
+    "AUD-CONTRACTS-004",
+    "AUD-TESTI-017",
+    "AUD-RAIL-002",
+    "AUD-ROOT-008"
+  ],
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "id": "AUD-CONTRACTS-001",
+  "title": "Hardhat config boundaries: every Hardhat process loads the real .env (hardhat.config.ts:9), real-network signing accounts (sepolia, mainnet, bsc, base, arbitrum) exist whenever an RPC URL and DEPLOY_PRIVATE_KEY are set, and the default in-process network forks mainnet through ALCHEMY_URL; no test, fork or CI path reaches a real-network signer, but at the base every Hardhat child of the fork harness held the deploy key and RPC keys in memory",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "hardhat.config.ts",
+    "scripts/deploy-honeypot-checker.ts",
+    ".github/workflows/test.yml",
+    "test/fork/setup.ts",
+    "README.md"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:7-9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "import dotenv; dotenv.config() at module load: any Hardhat command (compile, node, test, run, ignition, verify) reads <repo>/.env into its process"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:51-59@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sepolia network with accounts [DEPLOY_PRIVATE_KEY] when SEPOLIA_RPC_URL and DEPLOY_PRIVATE_KEY are set"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:60-68@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mainnet network, url ETH_RPC_URL, accounts [DEPLOY_PRIVATE_KEY], chainId 1, whenever both are set"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:69-95@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bsc (56), base (8453), arbitrum (42161) the same way"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:96-101@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "hardhat network forking url ETH_FORK_RPC_URL || ALCHEMY_URL, enabled when either is set: with the shipped .env any Hardhat command without --network forks mainnet through the operator RPC key (reads only; it signs with Hardhat built-in accounts)"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:33-38@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment says the sepolia entry \"continues to use PRIVATE_KEY\"; the code uses DEPLOY_PRIVATE_KEY (README.md:114 repeats the comment)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e \"--network\" -e \"hardhat run\" -e \"ignition deploy\" -e \"hardhat node\" -e \"HARDHAT_NETWORK\" 23a64617dca167976adc4645fed0e2c69e384820 -- (all tracked files except package-lock.json, *.md and .planning)",
+      "note": "the only --network use is scripts/deploy-honeypot-checker.ts:93 (operator CLI, network from a fixed map); there is no defaultNetwork in hardhat.config.ts, so every other Hardhat command uses the in-process hardhat network"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/setup.ts:14-16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "fork harness at the base: execSync(\"npx hardhat compile --quiet\") and spawn(\"npx\", [\"hardhat\", \"node\", \"--fork\", rpcUrl, \"--port\", \"8545\"]): no --network, so no real-network signer; both children inherit the parent env and load .env through hardhat.config.ts:9, and the fork URL with its key is on the node command line"
+    },
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:94-95@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CI runs npx hardhat compile only, without a .env (the network entries evaluate to nothing)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"scripts/(deploy-honeypot|deliberate-buy|recover-sell|addLiquidity|deploySepolia)\" 23a64617dca167976adc4645fed0e2c69e384820 -- test (comment lines filtered)",
+      "note": "no test spawns or imports a deploy or signing script"
+    }
+  ],
+  "sibling_sites_checked": "All Hardhat entry points at the base: hardhat.config.ts, ignition/modules/HoneypotChecker.ts (no parameters, deploys HoneypotChecker with no constructor args), scripts/deploy-honeypot-checker.ts (the only --network caller), test/fork/setup.ts (compile + node, TESTI slice), .github/workflows/test.yml hardhat-compile job, package.json scripts (no hardhat script). Commands that would sign on a real network: npx hardhat ignition deploy ignition/modules/HoneypotChecker.ts --network <sepolia|mainnet|bsc|base|arbitrum> (what deploy-honeypot-checker.ts runs), npx hardhat run <script> --network <name>, npx hardhat console --network <name>; all need an operator to type the network name, and Ignition asks for confirmation on a live network. No test, fork or CI path passes --network, so there is no rail-class path (no immediate stop). Mitigation for the fork harness: plan 22-11 launches every Hardhat child with buildHardhatChildEnv (sentinel env, OS essentials, the shell-only fork keys, NODE_OPTIONS --require test/rails/setup-fork.cjs), which blocks the child read of .env at hardhat.config.ts:9; its first real Hardhat launch is obligation UFV-04 (owner Phase 25); 22-29 re-audits it. Operator-run Hardhat commands outside the harness still load .env (OD-22, Phase 30).",
+  "status": "confirmed",
+  "severity_rationale": "S2 EXPOSURE: a trust boundary, not a live loss. The deploy key and every RPC key are resident in each Hardhat process at the base (including the fork harness children, which ran unattended under Vitest), and the fork URL key was visible on a command line. No path signs on a real network without an operator typing --network, so not S1.",
+  "external_od_refs": [
+    {
+      "id": "OD-22",
+      "owner_phase": "30"
+    }
+  ],
+  "recommendation": "Phase 30 (OD-22): keep DEPLOY_PRIVATE_KEY out of .env (Hardhat keystore or configVariable), remove the real-network entries from the default config (or gate them behind an explicit deploy-only config file), stop the default network from forking implicitly (fork only when ETH_FORK_RPC_URL is set, no ALCHEMY_URL fallback), and fix the sepolia comment and README. Phase 25 confirms the 22-11 sanitized child env on the first real fork run (UFV-04).",
+  "sub_claims": [
+    {
+      "claim": "No test, fork or CI path can sign with DEPLOY_PRIVATE_KEY on a real network at the base",
+      "evidence": [
+        "git grep --network at the base (only scripts/deploy-honeypot-checker.ts:93)",
+        "test/fork/setup.ts:14-16@23a64617dca167976adc4645fed0e2c69e384820",
+        ".github/workflows/test.yml:94-95@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "At the base the fork harness Hardhat children loaded the real .env (deploy key and RPC keys in memory)",
+      "evidence": [
+        "hardhat.config.ts:7-9@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/fork/setup.ts:14-16@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed (mitigated by plan 22-11, first real launch UFV-04, Phase 25)"
+    },
+    {
+      "claim": "The sepolia comment and README say PRIVATE_KEY, the code uses DEPLOY_PRIVATE_KEY",
+      "evidence": [
+        "hardhat.config.ts:33-38@23a64617dca167976adc4645fed0e2c69e384820",
+        "hardhat.config.ts:51-59@23a64617dca167976adc4645fed0e2c69e384820",
+        "README.md:114@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

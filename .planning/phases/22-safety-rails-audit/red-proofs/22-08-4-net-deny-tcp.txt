@@ -1,0 +1,72 @@
+RED proof 22-08-4 — net-deny-tcp
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:24:56.807Z at HEAD 9d19cd9dc1e84a0aa32a4565a1421c41c12cbab8.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..62b908b 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -991,7 +991,7 @@ function makeConnectWrapper(orig) {
+             port = a0;
+             host = typeof args[1] === 'string' ? args[1] : undefined;
+         }
+-        if (pipe || !st) return Reflect.apply(orig, this, args);
++        if (true || pipe || !st) return Reflect.apply(orig, this, args); // RED 22-08-4: connect wrapper passes through
+         const h = host === undefined || host === null || host === '' ? 'localhost' : String(host);
+         const cls = classifyHost(h);
+         if (hostAllowed(cls, st.mode)) {
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/netDeny.test.ts -t "192.0.2.1"
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/netDeny.test.ts (18 tests | 10 failed | 8 skipped) 30117ms
+       × http.get to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3012ms
+       × https.get to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3007ms
+       × fetch http to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3012ms
+       × fetch https to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3014ms
+       × net.connect to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3013ms
+       × net.createConnection to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3011ms
+       × tls.connect to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3013ms
+       × axios to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3010ms
+       × ws wss://192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3011ms
+       × ethers JsonRpcProvider to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s 3011ms
+  ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > http.get to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > https.get to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > fetch http to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > fetch https to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > net.connect to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > net.createConnection to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > tls.connect to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > ws wss://192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > ethers JsonRpcProvider to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+  AssertionError: expected 'timeout after 3000ms' to be 'denied' // Object.is equality
+  Expected: "denied"
+  Received: "timeout after 3000ms"
+      101|         it(`${label} fails with E_RAIL_NET_DENIED within 3 s`, async (…
+   FAIL   unit  test/unit/rails/netDeny.test.ts > non-loopback TCP / TLS deny to 192.0.2.1 (AC-15) > axios to 192.0.2.1 fails with E_RAIL_NET_DENIED within 3 s
+  AssertionError: expected 'timeout after 3000ms' to be 'denied' // Object.is equality
+  Expected: "denied"
+  Received: "timeout after 3000ms"
+      101|         it(`${label} fails with E_RAIL_NET_DENIED within 3 s`, async (…
+   Test Files  1 failed (1)
+        Tests  10 failed | 8 skipped (18)
+     Duration  30.70s (transform 28ms, setup 58ms, import 300ms, tests 30.12s, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042422-21944-566138 | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042422-21944-566138\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  10 passed | 8 skipped (18)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042455-2648-882ed3 | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042455-2648-882ed3\summary.json

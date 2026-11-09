@@ -1,0 +1,77 @@
+# Phase 22 secret-scan config, PASS 1 (betterleaks v1.10.0; D-17 as amended).
+#
+# = the built-in default ruleset (useDefault) + two rules the default lacks
+#   (RESEARCH.md Pitfall 8): a keyword-anchored EVM private key and a gramjs
+#   Telegram StringSession.
+#
+# known-public.toml (PASS 2) is THIS FILE BYTE-FOR-BYTE followed by one
+# appended [[allowlists]] block. Hits found by pass 1 but not by pass 2 are, by
+# construction, known-public Hardhat #0 hits; every other hit is non-public.
+# fixture-check.ts refuses to run if that prefix relationship is broken.
+#
+# Rules for editing this file:
+#   - No top-level `filter` or `prefilter` here. A global filter in this file
+#     REPLACES the default config's global filter (config.go extend(): "Current
+#     config's global Prefilter/Filter wins"), which would silently change the
+#     default ruleset's false-positive handling.
+#   - No bare 64-hex rule: it floods on tx hashes (Pitfall 8).
+#   - Any change here changes this file's SHA-256, so FIXTURES.json must be
+#     regenerated before a scan with it is accepted.
+
+[extend]
+useDefault = true
+
+# A 64-hex value (optional 0x) right after a key-ish keyword and an
+# assignment-like operator, e.g. PRIVATE_KEY=0x..., privateKey: '0x...',
+# new Wallet('0x...'), signer = "...". The keyword is required, so a tx hash
+# with no keyword nearby does not match. entropy = 3.5 skips low-entropy
+# values such as the 63-zeros-and-a-1 test sentinel (a random 64-hex value
+# scores about 3.8 to 4.0). The operator/terminator shape mirrors the default
+# ruleset's own keyword rules.
+[[rules]]
+id = "evm-private-key"
+description = "EVM (secp256k1) private key as 64 hex characters next to a key-like keyword"
+regex = '''(?i)(?:private[_. -]?key|signer|wallet|mnemonic|pk|secret)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,|\()[\x60'"\s=]{0,5}(?:0x)?([0-9a-f]{64})(?:[^0-9a-z]|$)'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["private", "signer", "wallet", "mnemonic", "pk", "secret"]
+confidence = "high"
+
+# A gramjs StringSession (base64, typically several hundred characters) after
+# TELEGRAM_SESSION or StringSession and an assignment-like operator.
+[[rules]]
+id = "telegram-string-session"
+description = "Telegram (gramjs) StringSession login session, 100+ base64 characters"
+regex = '''(?i)(?:telegram_session|stringsession)(?:[ \t\w.-]{0,20})[\s'"]{0,3}(?:=|>|:{1,3}=|\|\||:|=>|\?=|,|\()[\x60'"\s=]{0,5}([a-z0-9+/_-]{100,}={0,2})'''
+secretGroup = 1
+keywords = ["telegram_session", "stringsession"]
+confidence = "high"
+
+# ---- PASS 2 addition (known-public.toml only) -------------------------------
+# One global allowlist whose only regex matches exactly the Hardhat account #0
+# private key (public: printed by every `hardhat node`; tracked in this repo as
+# FORK_ONLY_TEST_KEY in test/fork/helpers/realMainnetGate.ts). It targets the
+# matched SECRET only (regexTarget = "secret"), never the match or the line, so
+# a different secret on the same line is still reported (fixture case c).
+# Every 16th hex character is wrapped in a one-character class, so this file
+# holds no contiguous 64-hex run and cannot itself become a scanner hit.
+[[allowlists]]
+description = "known-public: Hardhat account #0 private key"
+regexTarget = "secret"
+regexes = ['''(?i)^(?:0x)?ac0974bec39a17e[3]6ba4a6b4d238ff9[4]4bacb478cbed5ef[c]ae784d7bf4f2ff8[0]$''']
+
+# ---- PASS 3 addition (public-address.toml only) -----------------------------
+# Operator ruling "classify-addresses" on ESC-SECRET-01 (22-02 Task 3): a hit
+# whose flagged SECRET (the rule capture group, not the match or the line) is
+# EXACTLY 0x followed by 40 hex characters, an EVM address, is classified
+# "public-address". The regex is anchored at both ends, so a 64-hex key, an
+# address followed by more characters, or an address inside a longer token is
+# NOT matched and stays non-public (fixture cases j, k, l, n). Classification
+# only: pass 1 still reports every such hit and the scan JSON lists it under
+# the public-address label; nothing is dropped. This file is
+# known-public.toml byte-for-byte plus this one block; fixture-check.ts
+# refuses to run if that relationship or this block changes.
+[[allowlists]]
+description = "public-address: the flagged secret is exactly 0x + 40 hex characters (an EVM address)"
+regexTarget = "secret"
+regexes = ['''^0x[0-9a-fA-F]{40}$''']

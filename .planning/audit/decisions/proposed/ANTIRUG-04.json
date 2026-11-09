@@ -1,0 +1,37 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "ANTIRUG-04",
+  "title": "Circuit-breaker trip across a restart",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: a restart clears the trip and its history",
+      "behavior_impact": "none",
+      "risk": "A misfiring detector gets `threshold` more emergency sells after every restart, and the operator is not told at boot that a chain had tripped (AUD-ANTIRUG-010)."
+    },
+    {
+      "id": "persist-trip",
+      "name": "Persist the trip and the trigger events; restore them at boot; only the dashboard reset clears them",
+      "behavior_impact": "A tripped chain stays halted across restarts until acknowledged.",
+      "risk": "A trip caused by the dispatch counting (AUD-ANTIRUG-003) keeps anti-rug off after a restart until the operator acts."
+    },
+    {
+      "id": "persist-and-alert",
+      "name": "persist-trip, plus a Telegram alert at boot for every chain that starts tripped",
+      "behavior_impact": "As persist-trip, and the operator is told at once.",
+      "risk": "Same as persist-trip."
+    }
+  ],
+  "recommendation": "persist-and-alert, together with ANTIRUG-01 so that a trip means several real triggers.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract).",
+  "behavior_impact": "Decides whether a breaker trip survives a restart.",
+  "findings": [
+    "AUD-ANTIRUG-010"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-50"
+}

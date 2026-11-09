@@ -1,0 +1,67 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": "OD-70",
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-003",
+  "title": "recover-sell-ladys.ts sells the whole LADYS balance on the public mempool with a minimum of 90% of a spot quote that ignores the token transfer tax, a 10-minute deadline and no fee ceiling, so a sandwich bot can take up to about 10% and a tax above 10% makes the sell revert after paying gas",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C04",
+    "C05",
+    "C16"
+  ],
+  "files": [
+    "scripts/recover-sell-ladys.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:62-64@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "minOut = getAmountsOut(full balance) x 90 / 100: the floor is relative to the spot quote at that moment"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:76-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deadline now + 600 s; swapExactTokensForETHSupportingFeeOnTransferTokens sent to the public mempool (header :6-7 says so on purpose)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:24-27@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getAmountsOut is the router pure-reserve quote: it does not deduct a fee-on-transfer token tax, while the swap itself pays it"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:42-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "plain ethers Wallet; no maxFeePerGas or maxPriorityFeePerGas is set anywhere, so the fee is whatever ethers derives from getFeeData at send time"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "router, WETH and LADYS addresses hard-coded: a one-off for one token"
+    }
+  ],
+  "sibling_sites_checked": "The other script sell path is the bot exit engine (EXIT slice; private sells accept any output, AUD-EXIT-001). The deliberate buy public leg computes its own minOut in src/bot.ts (TH-BUY-03) and is the BUY slice. addLiquidity.ts uses zero minimums but cannot load (AUD-SCRIPTS-001). No other script swaps.",
+  "status": "confirmed",
+  "severity_rationale": "S2: a bounded capital effect (at most the 10% band, plus gas on a revert) under a common condition (public-mempool swaps of a sizeable position are routinely sandwiched). Not S1 because the loss is capped by the floor and the script is a one-off the operator runs by hand while watching it.",
+  "related": [
+    "AUD-SCRIPTS-002",
+    "AUD-EXIT-001"
+  ],
+  "tags": [
+    "capital",
+    "signing-script"
+  ],
+  "recommendation": "Decide on card SCRIPTS-03 whether this one-off script is deleted or kept as a general recovery tool. If kept (Phase 29, HYG-03): hold the process lock (card SCRIPTS-01), send through the private route the bot uses for sells, quote with a tax-aware amount (simulate the sell or read the measured sell tax) and set minOut from that, shorten the deadline, and cap the fee."
+}

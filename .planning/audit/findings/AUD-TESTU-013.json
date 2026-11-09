@@ -1,0 +1,59 @@
+{
+  "id": "AUD-TESTU-013",
+  "title": "Hygiene: a conditional no-op assertion that turns a case hollow if a test helper is renamed, and two file headers that still say every case is a skipped placeholder",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "test/unit/anti-rug/detectorEvaluator.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/detectorEvaluator.test.ts:1273-1289@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 10d: if _getPendingV3BurnForTesting is not a function the case ends in expect(true).toBe(true)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:334@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the helper is exported at the base SHA, so the real branch runs today"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliation.test.ts:15-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"every test below is it.skip\" with placeholder bodies; all cases are enabled at the base SHA"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts:10-14@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: \"Every test is it.skip\"; all cases are enabled"
+    }
+  ],
+  "sibling_sites_checked": "git grep \"expect(true)\" and \"it.skip|test.skip|it.todo|describe.skip|.only(\" over test/unit at the base SHA: the only live expect(true) is detectorEvaluator.test.ts:1288; no skipped or focused case exists.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: no case is hollow today; the risk is silent decay and misleading documentation.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: replace the conditional with an unconditional use of the helper (fail if it is missing) and correct the two headers.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 10d: Multiple V3 Burns for same pool within grace window → LAST-WINS (latest burn held)"
+  ]
+}

@@ -1,0 +1,448 @@
+{
+  "rows": [
+    {
+      "hardcoded": false,
+      "env_key": "DELIBERATE_BUY_SLIPPAGE_PCT",
+      "flags": [],
+      "recommendation": null,
+      "od_ref": null,
+      "overlap": "same knob as TH-BUY-03 (src side, the authoritative row); listed here because the operator sets it for scripts/deliberate-buy.ts",
+      "id": "TH-SCRIPTS-01",
+      "name": "Deliberate buy slippage percent (operator-script view)",
+      "current_value": "default 5 (fallback CONFIG.slippagePercent || 5)",
+      "definition_sites": [
+        "src/bot.ts:529@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:703@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:279",
+        "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:338-342@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "computePublicMinOut: minOut = expected x round(100 - clamp(s, 0, 99)) / 100 for the private leg (:529) and the public leg (:703)",
+      "units": "percent",
+      "representation": "float, rounded to an integer percent, then bigint math",
+      "effective_unset": "5",
+      "effective_empty": "'' -> 5",
+      "effective_non_numeric": "'abc' -> 5; '0' or negative -> 5 (0% cannot be configured); '150' -> clamped to 99",
+      "rationale": "one slippage helper for both legs (src/bot.ts:524-526)",
+      "also_defined_in": [
+        "TH-BUY-03"
+      ]
+    },
+    {
+      "hardcoded": false,
+      "env_key": "DELIBERATE_BUY_PRIVATE_ATTEMPTS",
+      "flags": [
+        "no-upper-bound"
+      ],
+      "recommendation": "As TH-BUY-06: reject non-integers and cap at a documented maximum.",
+      "od_ref": null,
+      "overlap": "same knob as TH-BUY-06; the whole private leg holds the script process nonce lock (src/bot.ts:558)",
+      "id": "TH-SCRIPTS-02",
+      "name": "Deliberate buy private attempt budget (operator-script view)",
+      "current_value": "default 2",
+      "definition_sites": [
+        "src/bot.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:278",
+        "scripts/deliberate-buy.ts:13-15@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:332-336@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:577@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "number of private submissions before the no-double-buy guard and the public fallback",
+      "units": "count",
+      "representation": "integer (parseInt)",
+      "effective_unset": "2",
+      "effective_empty": "'' -> 2",
+      "effective_non_numeric": "'abc' -> 2; '0' -> 2; '5x' -> 5 (numeric prefix accepted); no upper bound",
+      "rationale": "default 2 private submissions (src/bot.ts:554)",
+      "also_defined_in": [
+        "TH-BUY-06"
+      ]
+    },
+    {
+      "hardcoded": false,
+      "env_key": "DELIBERATE_BUY_GAS_BUFFER",
+      "flags": [],
+      "recommendation": null,
+      "od_ref": null,
+      "overlap": "same knob as TH-DB-21 (part of TH-DB-19)",
+      "id": "TH-SCRIPTS-03",
+      "name": "Deliberate buy public gas buffer (operator-script view)",
+      "current_value": "2.0",
+      "definition_sites": [
+        "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/config.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:280",
+        "src/preflight.ts:300-305@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:423-431@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:370-435@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:160@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:274-285@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/preflight.ts:314-330@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "multiplier on base fee for the public-fallback gas reserve in the entry affordability floor checked before the deliberate buy",
+      "units": "multiplier",
+      "representation": "float (Number.parseFloat), finite > 0 else 2.0",
+      "effective_unset": "2.0",
+      "effective_empty": "2.0",
+      "effective_non_numeric": "2.0 (default)",
+      "rationale": "D-BUY-AFFORDABILITY-EXTEND",
+      "also_defined_in": [
+        "TH-DB-21",
+        "TH-DB-19"
+      ]
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "abort-depends-on-ctrl-c"
+      ],
+      "recommendation": "Decide on card SCRIPTS-02 (typed confirmation instead of, or in addition to, a timed window).",
+      "od_ref": "OD-69",
+      "overlap": "precedes the private leg; independent of the bot timers",
+      "id": "TH-SCRIPTS-04",
+      "name": "Deliberate buy abort window before signing",
+      "current_value": "5000",
+      "definition_sites": [
+        "scripts/deliberate-buy.ts:137@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/deliberate-buy.ts:124@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "sleep(5000) after the banner; the only way to stop is Ctrl+C during the sleep",
+      "units": "milliseconds",
+      "representation": "integer literal",
+      "effective_unset": "5000 (hard-coded)",
+      "effective_empty": "n/a (hard-coded)",
+      "effective_non_numeric": "n/a (hard-coded)",
+      "rationale": "HIGH-STAKES OPS PROTOCOL banner and abort window (deliberate-buy.ts:19-22)"
+    },
+    {
+      "hardcoded": false,
+      "env_key": null,
+      "flags": [
+        "no-upper-bound",
+        "bypasses-risk-gate"
+      ],
+      "recommendation": "Decide on card SCRIPTS-02 whether the risk gate (or an explicit typed override) applies to a deliberate buy.",
+      "od_ref": "OD-69",
+      "overlap": "bypasses the risk gate caps (TH-DB-03 MAX_POSITION_SIZE, exposure, open positions) that apply to snipes",
+      "id": "TH-SCRIPTS-05",
+      "name": "Deliberate buy amount (operator argument)",
+      "current_value": "any value > 0 typed on the command line",
+      "definition_sites": [
+        "scripts/deliberate-buy.ts:79-86@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "amountInWei <= 0n refused; no maximum; passed to the affordability gate only",
+      "units": "native currency (ETH on eth)",
+      "representation": "parseEther of argv[4] (bigint wei)",
+      "effective_unset": "refused (usage error)",
+      "effective_empty": "refused (usage error)",
+      "effective_non_numeric": "refused (parseEther throws -> usage error)",
+      "rationale": "explicit operator-chosen size (D-DELIBERATE-EXPLICIT-ONLY)"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "public-mempool",
+        "quote-ignores-transfer-tax"
+      ],
+      "recommendation": "Card SCRIPTS-03: delete the one-off, or set minOut from a tax-aware simulated sell and send privately.",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-06",
+      "name": "LADYS recovery sell minimum output",
+      "current_value": "90% of the spot quote",
+      "definition_sites": [
+        "scripts/recover-sell-ladys.ts:64@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "minOut = getAmountsOut(balance)[1] x 90 / 100",
+      "units": "percent of quote",
+      "representation": "bigint literal 90n / 100n",
+      "effective_unset": "90% (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "\"10% slippage floor\" (:13, :64)"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "long-public-deadline"
+      ],
+      "recommendation": "Card SCRIPTS-03: shorten if the script is kept.",
+      "od_ref": "OD-70",
+      "overlap": "the script waits for the receipt with no timeout (:82)",
+      "id": "TH-SCRIPTS-07",
+      "name": "LADYS recovery sell deadline",
+      "current_value": "600",
+      "definition_sites": [
+        "scripts/recover-sell-ladys.ts:76@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "deadline = now + 600 s passed to the router",
+      "units": "seconds",
+      "representation": "integer literal",
+      "effective_unset": "600 (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none stated"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "no-ceiling"
+      ],
+      "recommendation": "Card SCRIPTS-03: if kept, reuse the bot fee caps.",
+      "od_ref": "OD-70",
+      "overlap": "the bot caps its own fees (TX slice: MEV_MAX_PRIORITY_FEE_GWEI family)",
+      "id": "TH-SCRIPTS-08",
+      "name": "LADYS recovery sell fee ceiling",
+      "current_value": "none (ethers getFeeData default at send time)",
+      "definition_sites": [
+        "scripts/recover-sell-ladys.ts:42-43@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/recover-sell-ladys.ts:78-80@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "no maxFeePerGas / maxPriorityFeePerGas override; ethers populate fills them",
+      "units": "wei per gas",
+      "representation": "absent",
+      "effective_unset": "uncapped",
+      "effective_empty": "uncapped",
+      "effective_non_numeric": "uncapped",
+      "rationale": "none stated"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "latent-script-cannot-load",
+        "wraps-whole-balance"
+      ],
+      "recommendation": "Card SCRIPTS-03 (delete the script).",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-09",
+      "name": "addLiquidity gas reserve left unwrapped",
+      "current_value": "0.005 ETH",
+      "definition_sites": [
+        "scripts/addLiquidity.ts:28-30@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "wethAmount = balance - 0.005 ETH (or 0 when below)",
+      "units": "native currency",
+      "representation": "parseEther literal (bigint)",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "\"leave ~0.005 ETH for gas\" (:28)"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "latent-script-cannot-load",
+        "zero-minimum"
+      ],
+      "recommendation": "Card SCRIPTS-03 (delete the script).",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-10",
+      "name": "addLiquidity liquidity minimums",
+      "current_value": "0 and 0",
+      "definition_sites": [
+        "scripts/addLiquidity.ts:63-64@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "amountAMin = 0, amountBMin = 0 passed to router.addLiquidity",
+      "units": "token units",
+      "representation": "integer literals",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none stated"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "latent-script-cannot-load"
+      ],
+      "recommendation": "Card SCRIPTS-03 (delete the script).",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-11",
+      "name": "addLiquidity gas limit",
+      "current_value": "300000",
+      "definition_sites": [
+        "scripts/addLiquidity.ts:67@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "fixed gasLimit for router.addLiquidity",
+      "units": "gas",
+      "representation": "integer literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none stated"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "latent-script-cannot-load"
+      ],
+      "recommendation": "Card SCRIPTS-03 (delete the script).",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-12",
+      "name": "addLiquidity deadline",
+      "current_value": "600",
+      "definition_sites": [
+        "scripts/addLiquidity.ts:32@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "deadline = now + 10 min",
+      "units": "seconds",
+      "representation": "integer arithmetic 60 * 10",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "\"10 minutes\" (:32)"
+    },
+    {
+      "hardcoded": true,
+      "env_key": null,
+      "flags": [
+        "hardcoded",
+        "latent-script-cannot-load"
+      ],
+      "recommendation": "Card SCRIPTS-03 (delete the script).",
+      "od_ref": "OD-70",
+      "overlap": "n/a (not a timer or interval)",
+      "id": "TH-SCRIPTS-13",
+      "name": "addLiquidity token amount minted and paired",
+      "current_value": "1000 tokens (1000 x 10^18)",
+      "definition_sites": [
+        "scripts/addLiquidity.ts:25@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/addLiquidity.ts:35@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/addLiquidity.ts:58-61@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "comparison": "mint, approve and pair this amount against the whole wrapped balance (sets the pool price)",
+      "units": "token units (18 decimals)",
+      "representation": "parseUnits literal",
+      "effective_unset": "n/a (hard-coded)",
+      "effective_empty": "n/a",
+      "effective_non_numeric": "n/a",
+      "rationale": "none stated"
+    }
+  ],
+  "discovery": {
+    "env_reads": [
+      {
+        "key": "DELIBERATE_BUY_SLIPPAGE_PCT",
+        "sites": [
+          "src/bot.ts:529@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-SCRIPTS-01"
+      },
+      {
+        "key": "DELIBERATE_BUY_PRIVATE_ATTEMPTS",
+        "sites": [
+          "src/bot.ts:557@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-SCRIPTS-02"
+      },
+      {
+        "key": "DELIBERATE_BUY_GAS_BUFFER",
+        "sites": [
+          "src/preflight.ts:153@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "row_id": "TH-SCRIPTS-03"
+      },
+      {
+        "key": "PRIVATE_KEY",
+        "sites": [
+          "scripts/deliberate-buy.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/recover-sell-ladys.ts:37@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/addLiquidity.ts:18@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/deploySepoliaTest.ts:16@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "a key, not a number"
+      },
+      {
+        "key": "ETH_RPC_URL / ALCHEMY_URL / CAPTURE_ARCHIVE_RPC_URL / ETH_FORK_RPC_URL",
+        "sites": [
+          "scripts/recover-sell-ladys.ts:36@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/capture-launch.ts:194-197@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/addLiquidity.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/deploySepoliaTest.ts:15@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "endpoints, not money or timing numbers (network targeting is recorded in AUD-SCRIPTS-001)"
+      },
+      {
+        "key": "DASHBOARD_URL / DASHBOARD_HOST / DASHBOARD_PORT / DASHBOARD_API_KEY",
+        "sites": [
+          "scripts/pause.ts:50-52@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/pause.ts:73@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/resume.ts:42-44@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/resume.ts:48@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "address and credential, not money or timing (AUD-SCRIPTS-008)"
+      },
+      {
+        "key": "TELEGRAM_API_ID / TELEGRAM_API_HASH",
+        "sites": [
+          "scripts/telegram-login.ts:28-29@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "credentials, not money or timing"
+      }
+    ],
+    "constants": [
+      {
+        "name": "capture-launch MAX_GETLOGS_RANGE 10, MAX_LOOKAHEAD_CHUNKS 5, --window default 10",
+        "sites": [
+          "scripts/capture-launch.ts:214@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/capture-launch.ts:218@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/capture-launch.ts:160@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "fixture capture scan sizes; no money or trading timing (behaviour noted in AUD-SCRIPTS-009)"
+      },
+      {
+        "name": "telegram-login connectionRetries 5",
+        "sites": [
+          "scripts/telegram-login.ts:40@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "interactive login retries; no money or trading timing"
+      },
+      {
+        "name": "deploySepoliaTest FakeToken argument parseEther(\"1000000\")",
+        "sites": [
+          "scripts/deploySepoliaTest.ts:32@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "test-token constructor argument that does not even match the constructor (AUD-SCRIPTS-001); no money effect"
+      },
+      {
+        "name": "chainId 1 checks",
+        "sites": [
+          "scripts/recover-sell-ladys.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
+          "scripts/capture-launch.ts:366@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "network identity checks, not thresholds"
+      },
+      {
+        "name": "deliberate buy deadlines (private now + 60 s, public now + 600 s)",
+        "sites": [
+          "src/bot.ts:544@23a64617dca167976adc4645fed0e2c69e384820",
+          "src/bot.ts:731@23a64617dca167976adc4645fed0e2c69e384820"
+        ],
+        "excluded_reason": "defined in src/bot.ts, inventoried as TH-BUY-05"
+      }
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-008",
+  "title": "preflightCli Test 3 moved to spawnRailedChild; a wrong override key corrected to ETH_WS_URL",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "As for Test 2.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-test-edits.json#2"
+  ],
+  "files": [
+    "test/integration/preflightCli.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#2",
+      "note": "Child now started through spawnRailedChild with envOverrides. Override key ETH_WS_RPC_URL corrected to ETH_WS_URL. Assertions unchanged. Reason: D-03, and the same wrong key as Test 2."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/integration/preflightCli.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}

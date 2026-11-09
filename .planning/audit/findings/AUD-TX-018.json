@@ -1,0 +1,53 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-016",
+    "AUD-TX-002"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-55",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-018",
+  "title": "Fee escalation does not guarantee a valid replacement bid: retries can repeat the same bid or miss the node replacement bump",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:500-516@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "desired fee is max(market rate, step x (attempt + 1)), not tied to the previous bid"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 500,516p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced against a node."
+    }
+  ],
+  "sibling_sites_checked": "flashbots.ts:210, bloxroute.ts:115, passthrough.ts:104 build the fee from that value. Floor size is AUD-TX-016.",
+  "status": "candidate",
+  "severity_rationale": "S2: a retry can be refused, which delays the private route. Sells still have the public fallback.",
+  "recommendation": "Make each retry at least the node replacement bump above the previous submitted fee, within the ceiling; decide in card TX-02. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-07"
+  ]
+}

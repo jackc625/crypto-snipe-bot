@@ -1,0 +1,102 @@
+{
+  "id": "AUD-TESTI-021",
+  "title": "Fork tests report a pass when they did not run: every guard and skip path (gate false, node unreachable, artifact missing, fixture unpinned, archive RPC unset, hardhat_reset failed) is console.warn + return inside the test, and the real-mainnet honeypot and V3 rug fixtures are unpinned skeletons, two of them consumed by no test, so the \"real fixture\" half of the honeypot and rug strategy has never executed",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/honeypotMultiAmount.fork.test.ts",
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "test/fork/fixtures/honeypots/eth-max-wallet.json",
+    "test/fork/fixtures/honeypots/eth-sell-revert.json",
+    "test/fork/fixtures/honeypots/eth-v3-honeypot.json",
+    "test/fork/fixtures/honeypots/README.md",
+    "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:253-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 real-fixture case returns early when the fixture is missing or forkBlockNumber is null"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/honeypots/eth-v3-honeypot.json:4-9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tokenAddress null, forkBlockNumber null"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/honeypots/eth-max-wallet.json:9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "forkBlockNumber null (eth-sell-revert.json:9 the same)"
+    },
+    {
+      "type": "command",
+      "ref": "grep -rn \"eth-max-wallet\\|eth-sell-revert\" test (TESTI snapshot)",
+      "note": "no test reads the two V2 honeypot fixtures; only their README mentions them"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/honeypots/README.md:1-11@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "claims the fixtures are consumed by honeypotChecker.fork.test.ts and asserted against expectedVerdict and expectedRevertContains"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json:5-16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 rug skeleton: token, pool, blocks and destinations all null; referenced by no test"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:187-199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isHardhatFork returns false when the node is unreachable (\"skip gracefully\")"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:749-800@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HORSE replay returns early on gate false, missing fixture, unset fork RPC or a failed hardhat_reset"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/captureRehearsal.fork.test.ts:316-324@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "returns early on gate false or a missing HoneypotChecker artifact (deliberateBuyReplay.fork.test.ts:242-249, exitStatePersistence.fork.test.ts:281-285 / :406-414 / :580-584 and realLaunchReplay.fork.test.ts:470-485 the same)"
+    }
+  ],
+  "sibling_sites_checked": "Every `return` inside an it() in the 23 fork files (grep console.warn( ... return): 23 early-return sites across nine files; none uses it.skip / ctx.skip(), so Vitest records them as passed. Fixture pin status checked for all eight JSON fixtures: the three realLaunches and eth-v2-horse are pinned (HORSE resolves its token at run time); the three honeypot fixtures and eth-v3-CANDIDATE are not.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the honeypot gate and the anti-rug detector are capital controls; a fork run that executed nothing (or only the contrived halves) reports green, and the real-mainnet honeypot and V3-rug evidence the READMEs describe does not exist.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-023",
+    "AUD-TESTI-022",
+    "AUD-TESTI-020"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25: turn every guard and missing-precondition branch into ctx.skip() with the reason (or a hard failure when the precondition is mandatory, such as the compiled artifact), make the fork run fail when any test skipped unexpectedly, and pin or delete the unpinned fixtures (and correct the honeypots README).",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "V3 honeypot fixture: forkBlockNumber resolved → verdict === unsafe; null → skip",
+    "HORSE V2 rug fixture: forkBlockNumber resolved → multi-signal unsafe; missing addresses → skipped per Wave-1 follow-up",
+    "every fork case with a chainGuardOk=false early return"
+  ],
+  "escaped_regression": "Delete the honeypot artifact build step (or leave ETH_FORK_RPC_URL unset with ALCHEMY_URL pointing at an unreachable host after setup): captureRehearsal, exitStatePersistence Test 2 and realLaunchReplay return early and pass, so a fork run that proved nothing reports green."
+}

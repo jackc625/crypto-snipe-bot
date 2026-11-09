@@ -1,0 +1,57 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-017"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-42",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-EXIT-025",
+  "title": "Completed partial-sell tiers are stored as array indices, so changing PARTIAL_SELL_TARGETS while positions are open can repeat a sale",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:288-294@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "restored indices have no record of the tier list they were made against"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1568-1575@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "tier completion stored by index"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 288,294p and 1566,1576p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read; the tier list is parsed fresh from configuration."
+    }
+  ],
+  "sibling_sites_checked": "exitEngine.ts:243 (completion check by current index) and :291 (restore). Crash-window re-sale is AUD-EXIT-017.",
+  "status": "confirmed",
+  "severity_rationale": "S2: needs an operator to change the tier list while positions are open. The over-sale is bounded by the position.",
+  "recommendation": "Store each completed tier by its target and size, or a hash of the tier list; decide in card EXIT-08. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-EXIT-15"
+  ]
+}

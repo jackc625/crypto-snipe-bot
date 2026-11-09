@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-009",
+  "title": "preflightCli Test 4 no longer observes a real all-pass run; 'passResult' is now also a failing preflight on sentinels",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S3: the variable name and the test claim promise a passing run that the rails make impossible; the assertion that matters (no bot-startup markers) still holds.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "input_refs": [
+    "rails-test-edits.json#3"
+  ],
+  "files": [
+    "test/integration/preflightCli.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#3",
+      "note": "Both children now started through spawnRailedChild; second run's override key corrected to ETH_WS_URL. Assertions unchanged. The first run is named passResult but runs on sentinels, where every RPC is refused, so it is now also a failing preflight: the test no longer observes a real all-pass run. Reason: D-03. The old pass case depended on the operator's real .env and network, which no test may reach."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/integration/preflightCli.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}

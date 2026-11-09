@@ -1,4 +1,6 @@
 import { logger } from "./logger";
+import { EPOCH } from '../guards/epoch';
+import { registerSingleton } from '../guards/singleton';
 
 const log = logger.child({ module: 'exitManager' });
 
@@ -11,6 +13,7 @@ const log = logger.child({ module: 'exitManager' });
 // Multi-chain: keys are "chain:tokenAddress" composites to prevent
 // cross-chain collisions. Legacy single-arg overloads preserved.
 
+registerSingleton('exitManager', __filename, EPOCH);
 const sellingTokens = new Map<string, boolean>();
 
 export function tryAcquireSellLock(tokenAddress: string): boolean;

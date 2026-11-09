@@ -95,6 +95,8 @@ import { sendCtxAlert } from '../utils/notifier';
 import { broadcast } from '../api/ws/broadcaster';
 import { removeWsProvider } from '../utils/provider';
 import { upsertChainState, getChainState, setAntirugDryRunStarted } from '../utils/db';
+import { EPOCH } from '../guards/epoch';
+import { registerSingleton } from '../guards/singleton';
 
 const log = logger.child({ module: 'antiRug:detector' });
 
@@ -189,6 +191,7 @@ interface ChainAntiRugState {
 // Module-level state
 // ---------------------------------------------------------------------------
 
+registerSingleton('antiRugDetector', __filename, EPOCH);
 const positionRegistry = new Map<
     string,
     Map<string, RegisteredPosition[]>

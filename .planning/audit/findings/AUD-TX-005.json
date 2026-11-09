@@ -1,0 +1,77 @@
+{
+  "id": "AUD-TX-005",
+  "title": "RC-18 no single-instance process lock: a second bot process on the same wallet has its own nonce authority, so both processes can fetch the same latest nonce and sign competing buys or sells",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C07",
+    "C15"
+  ],
+  "files": [
+    "src/utils/nonceAuthority.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git grep -niE \"Symbol\\.for|registerSingleton|processLock|lockfile|locking_mode|single[- ]instance|LockFileEx|O_EXCL\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no output: nothing at the base SHA stops a second process from starting on the same wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:41-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the lock is in-process memory only; two processes have two Maps"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:476-478@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each attempt reads getTransactionCount(latest) as its nonce; two processes read the same value"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:598-603@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a process whose nonce was taken by the other process sees landed-not-ours and throws; for a snipe that is the fail-clean path, while the other process may have bought the same token too"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2359-2361@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bot.ts self-starts under require.main === module; nothing checks for another running instance"
+    }
+  ],
+  "sibling_sites_checked": "In-process signing all goes through withNonceLock (AUD-TX-001 sibling list). Out-of-process signers (scripts/deliberate-buy.ts, scripts/recover-sell-ladys.ts) are a separate known gap owned by Phase 29 (HYG-03) and the SCRIPTS slice. The second-key case (two bots with different wallets sharing data/bot.db) is a 22-CONTEXT deferred idea for the DB slice. A duplicate module in one process is AUD-TX-004.",
+  "status": "fixed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-18"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. Plausible condition: on Windows npx swallows Ctrl+C, so an operator who thinks the bot stopped can start a second one (STATE.md operating note: stop the bot by force-killing the PID). Two processes then snipe the same token twice (double spend), race each other's nonces (one buy or sell replaced), and both run exits for the same positions. Mitigation: the process-lock rail of plan 22-13 (D-06, D-07: src/main.ts takes an OS-released SQLite exclusive lock before importing anything stateful). Status stays confirmed until 22-29 verifies the rail.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-004"
+  ],
+  "tags": [
+    "capital",
+    "mitigation-planned-22-13"
+  ],
+  "escalation_ref": "ESC-TX-01",
+  "od_ref": null,
+  "recommendation": "Mitigated by the planned rail 22-13 (single-instance process lock keyed by the wallet address, acquired in src/main.ts before bot.ts loads); 22-29 re-audits it. Out-of-process scripts honoring the lock is Phase 29 (HYG-03).",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "fixed_by": [
+    "569f08c",
+    "3786e2e",
+    "961d269",
+    "5378478"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 24, 25, 26 (22-13-1-lock-pin.txt, 22-13-2-lock-refusal.txt, 22-13-3-direct-entry-first-import.txt)",
+  "status_note": "The re-audit reviewed src/utils/processLock.ts, src/main.ts and src/guards/directEntry.ts in full. A second bot process on the same wallet is refused at boot. Out-of-process signing scripts honoring the lock stays with Phase 29 (HYG-03), and the lock folder follows the OS user (AUD-TX-026)."
+}

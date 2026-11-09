@@ -1,0 +1,42 @@
+{
+  "id": "TX-01",
+  "title": "What a signing op may wait for while it holds the wallet nonce lock: wait() and RPC timeouts, and what happens on a timeout, a replacement or a reorg",
+  "area": "TX",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: wait() with no timeout under the lock, ethers 300 s idle timeouts on RPC and relay calls, wait errors not classified, inclusion final at one confirmation",
+      "behavior_impact": "none",
+      "risk": "A tx that is never mined freezes every later buy and exit of the wallet for the life of the process (AUD-TX-002, including every Base/Arbitrum private submit); one hung RPC call holds the lock for minutes (AUD-TX-008)."
+    },
+    {
+      "id": "bounded-wait-reconcile",
+      "name": "Bounded wait under the lock, then reconcile receipt + nonce and keep the lock until the nonce is settled or replaced",
+      "behavior_impact": "No wait is unbounded; a stuck tx is replaced (same nonce, higher fee) or cancelled with an alert, so the queue moves again.",
+      "risk": "Replacing a stuck sell or buy costs extra gas and needs the replacement fee rules per chain; a wrong timeout value can replace a tx that would have mined."
+    },
+    {
+      "id": "bounded-wait-release",
+      "name": "Bounded wait, then release the lock and reconcile the pending tx in the background",
+      "behavior_impact": "Other ops proceed at once after the timeout.",
+      "risk": "The next op signs while the earlier tx is still pending: with the \"pending\" vs \"latest\" nonce sources mixed in the code, two txs can contend for one nonce, the collision the lock exists to prevent."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "bounded-wait-reconcile, with RPC_TIMEOUT_MS wired to every provider and relay call, wait() errors classified (replacement receipt used), and a per-chain confirmation depth before teardown. Decide with OD-17: this card sets how long one op may hold the nonce lock, OD-17 sets who gets the lock next.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether one stuck or slow transaction can block every later trade of the wallet.",
+  "findings": [
+    "AUD-TX-002",
+    "AUD-TX-008",
+    "AUD-TX-011",
+    "AUD-TX-012",
+    "AUD-TX-020"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "related_od": "OD-17",
+  "assigned_id": "OD-54"
+}

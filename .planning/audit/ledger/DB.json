@@ -1,0 +1,160 @@
+[
+  {
+    "path": "src/chainRegistry.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-008",
+      "AUD-DB-011",
+      "AUD-DB-014",
+      "AUD-DB-016",
+      "AUD-DB-017",
+      "AUD-DB-020"
+    ]
+  },
+  {
+    "path": "src/config.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-005",
+      "AUD-DB-008",
+      "AUD-DB-011",
+      "AUD-DB-014",
+      "AUD-DB-016"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "One hunk: dotenv.config() now runs only when VITEST is unset (SAFE-02 src layer, D-01). Setup-layer block is independent. Under a real start with VITEST set, src/main.ts refuses first (see AUD-BUY-034). No config parsing changed."
+      }
+    ]
+  },
+  {
+    "path": "src/preflight.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-006",
+      "AUD-DB-010",
+      "AUD-DB-011",
+      "AUD-DB-016",
+      "AUD-DB-017",
+      "AUD-DB-020"
+    ]
+  },
+  {
+    "path": "src/riskManager.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-001",
+      "AUD-DB-002",
+      "AUD-DB-003",
+      "AUD-DB-013",
+      "AUD-DB-014",
+      "AUD-BUY-010"
+    ]
+  },
+  {
+    "path": "src/utils/db.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-002",
+      "AUD-DB-003",
+      "AUD-DB-004",
+      "AUD-DB-006",
+      "AUD-DB-007",
+      "AUD-DB-012",
+      "AUD-DB-013",
+      "AUD-DB-015",
+      "AUD-DB-019",
+      "AUD-BUY-002",
+      "AUD-RAIL-002",
+      "AUD-FORENSIC-001",
+      "AUD-DB-021",
+      "AUD-DB-022"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+        "findings": "none",
+        "note": "Hunks reviewed: imports, repo-root anchored path resolution, src-layer tripwire under Vitest (RC-19), openGuardedDb in place of new Database (RC-25), verbatim migrateSchema removal plus migrateSchema(db) at the original point (D-24, re-verified byte-identical on HEAD in judgment-reviews.json), and a getDbFilePath accessor used by tests only. Relative DB_PATH is now anchored to the repo root rather than the cwd (planned, AC-25); the unconditional user_version write and normalizeLegacyMainnetRows at import are unchanged, so RC-25 is closed only for the newer-schema half (see AUD-DB-006). Pragmas run only after openGuardedDb returns."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/logger.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-005",
+      "AUD-DB-008",
+      "AUD-DB-009"
+    ]
+  },
+  {
+    "path": "src/utils/notifier.ts",
+    "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "findings": [
+      "AUD-DB-009",
+      "AUD-DB-018",
+      "AUD-BUY-022",
+      "AUD-EXIT-021"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "Reviewed. dotenv gated on VITEST; refuseUnderVitest runs first inside both existing try blocks, so the existing catch logs it, callers never see a throw, and the dashboard broadcast still runs. Ledger global is optional-chained, so outside a railed process nothing is touched; the message never carries the token."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/dbPath.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": [
+      "AUD-DB-023",
+      "AUD-DB-024"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": [
+          "AUD-DB-023",
+          "AUD-DB-024"
+        ],
+        "note": "Reviewed in full. resolveDbPath anchors to the repo root and gives a per-worker temp file under Vitest (E10). openGuardedDb probes, refuses, then opens with fileMustExist, re-reads dev+ino and user_version through the write handle. Windows path forms normalised. The temp-copy fallback was judged in judgment-reviews.json (question b): a direct read-only open of a live WAL file when the copy failed is acceptable because -wal and -shm exist, it adds no write beyond what SQLite's reader does to -shm, and the write open follows anyway with the identity and version re-checks. A :memory: DB_PATH outside Vitest fails closed at the statSync re-check rather than running on a volatile DB, which is the safe direction. Two defects fixed in 5378478 are registered: AUD-DB-023 (probe cleanup failure) and AUD-DB-024 (linked data folder)."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/dbSchema.ts",
+    "audited_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+        "findings": "none",
+        "note": "Moved verbatim from db.ts (D-24, operator-accepted). Body hash equals the audit-base body on HEAD; only the signature line differs, plus the CURRENT_SCHEMA_VERSION export (still 7). Migration idempotence and transaction wrapping unchanged from the base; the base-audited issues stay on their base findings."
+      }
+    ]
+  },
+  {
+    "path": "src/utils/repoRoot.ts",
+    "audited_sha": "791e811c87b6ce15d29c8708c79d2709b23b6789",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "791e811c87b6ce15d29c8708c79d2709b23b6789",
+        "findings": "none",
+        "note": "Reviewed in full. Walks up to the nearest package.json named crypto-snipe-bot from the calling file; uses no git and no __dirname depth, and returns a native real path. A throw on no match fails closed."
+      }
+    ]
+  }
+]

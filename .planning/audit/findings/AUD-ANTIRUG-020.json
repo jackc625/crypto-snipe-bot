@@ -1,0 +1,50 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-012"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-49",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-020",
+  "title": "Repeated V3 Burns restart the grace window with no limit from the first Burn",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:2106-2125@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "timeout is the newest Burn block plus the grace; the prior watcher is removed"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 2106,2125p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced. Funds withdrawn from a V3 position still need a Collect, and a Collect triggers evaluation."
+    }
+  ],
+  "sibling_sites_checked": "Same pendingV3Burn state as AUD-ANTIRUG-012.",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: an attacker gains delay only, since the Collect that releases funds is evaluated.",
+  "recommendation": "Measure the timeout from the first pending Burn; decide in card ANTIRUG-03. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-11"
+  ]
+}

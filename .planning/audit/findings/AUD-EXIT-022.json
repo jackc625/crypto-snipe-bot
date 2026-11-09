@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-016"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-46",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-EXIT-022",
+  "title": "The dust floor is a fixed 1000 raw token units, so for a token with very few decimals a small whole position counts as dust",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C03",
+    "C14"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:615-622@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "absoluteFloor is 1000n whatever the decimals"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1143-1153@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a balance at or under the threshold after a failed exit is torn down as a genuine close"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 612,623p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Number recorded at TH-EXIT-10."
+    }
+  ],
+  "sibling_sites_checked": "computeDustThreshold is the single source of the dust limit (exitEngine.ts:615). The unbounded basis-points setting is AUD-EXIT-016.",
+  "status": "confirmed",
+  "severity_rationale": "S3: needs a token with 0 to a few decimals and a holding below 1000 raw units, which is rare at normal sizes. It would remove protection from a real position if it happened.",
+  "recommendation": "Scale the absolute floor by token decimals, or use only the relative threshold. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-EXIT-05"
+  ]
+}

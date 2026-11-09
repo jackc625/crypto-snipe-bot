@@ -1,0 +1,213 @@
+{
+  "description": "Test edits made to accommodate the Phase 22 rails. No test was deleted, skipped or todo'd (NAC-04). 22-29 registers each entry as a test-quality finding.",
+  "registered_by_plan": "22-11",
+  "entries": [
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild on the sentinel test env. Title and comment changed from 'against current .env' to 'against the sentinel test env'. Assertions unchanged (status not null, 0 or 1, never 2).",
+      "reason": "The test depended on the operator's real .env, network and DB: it spawned preflight with the parent environment, so the child reloaded real configuration. RESEARCH Pitfall 7, D-03.",
+      "register_as": "test-quality",
+      "title_before": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against current .env",
+      "title_after": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 2: subprocess emits structured FAIL log lines when ENABLED_CHAINS includes a chain with an unreachable RPC",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild with envOverrides. Override key ETH_WS_RPC_URL corrected to ETH_WS_URL. Assertions unchanged.",
+      "reason": "D-03: no child env from the parent. ETH_WS_RPC_URL is a key the code never reads (src/chainRegistry.ts:211 reads ETH_WS_URL) and it is not a test/.env.test key, so spawnRailedChild refuses it. The old override was silently a no-op.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 3: subprocess prints honeypot-checker FAIL when getCode returns 0x",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild with envOverrides. Override key ETH_WS_RPC_URL corrected to ETH_WS_URL. Assertions unchanged.",
+      "reason": "D-03, and the same wrong key as Test 2.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 4: subprocess does NOT print startMultiChainBot or bot-startup markers (OPS-LIVE-10 hard requirement)",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Both children now started through spawnRailedChild; second run's override key corrected to ETH_WS_URL. Assertions unchanged. The first run is named passResult but runs on sentinels, where every RPC is refused, so it is now also a failing preflight: the test no longer observes a real all-pass run.",
+      "reason": "D-03. The old pass case depended on the operator's real .env and network, which no test may reach.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "Test 4: missing DASHBOARD_API_KEY → CLI FATAL exit 1 with stderr containing DASHBOARD_API_KEY not set",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "Parent-env copy and direct spawn replaced by spawnRailedChild with envOverrides {DASHBOARD_API_KEY: ''}. The comment explaining the old env-copy trick was replaced. Assertions unchanged (exit 1, output matches DASHBOARD_API_KEY not set).",
+      "reason": "D-03: the child was built from a copy of the parent environment.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/exitStatePersistence.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/deliberateBuyReplay.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/realLaunchReplay.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/captureRehearsal.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/honeypotChecker.fork.test.ts",
+      "test": "the hardhat_reset jsonRpcUrl in the V3 fixture replay",
+      "it_count_before": 4,
+      "it_count_after": 4,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the inline jsonRpcUrl now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/antiRugDetector.fork.test.ts",
+      "test": "HORSE replay skip guard, its warning text and its hardhat_reset jsonRpcUrl",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: hasArchiveRpc is hasForkRpcUrl(), the warning names only ETH_FORK_RPC_URL, jsonRpcUrl is resolveForkRpcUrl(). The skip guard keeps its existing behaviour (NAC-04).",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/unit/bot/buyNonceLock.test.ts",
+      "test": "Phase 21.2 / WR-01 — the buy submit routes through the REAL withNonceLock (observable serialization), all three cases (module-level vi.mock of src/utils/logger)",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "The logger mock gained top-level info, warn, debug, error and fatal vi.fn()s beside the existing child(). No assertion, import, or mocked mechanism changed. withNonceLock stays real.",
+      "reason": "Found by plan 22-12's run of the 37 reset/doMock files; not caused by the duplicate-load guard (same TypeError with registerSingleton neutralised). The mock exposed only logger.child, and src/utils/dbSchema.ts migrateSchema calls logger.info when it creates a fresh database. Under the rails DB_PATH is an empty per-worker temp file, so the migration now runs; before the rails this test opened the live data/bot.db at schema version 7, so that branch never ran (AUD-TESTU-001).",
+      "register_as": "test-quality",
+      "added_by_plan": "22-12"
+    },
+    {
+      "file": "test/unit/configEnvVar.test.ts",
+      "test": "custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct",
+      "line": 146,
+      "specifier": "../../src/db",
+      "resolves_to": "../../src/utils/db",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "vi.doMock specifier corrected from '../../src/db' to '../../src/utils/db'. Only that string changed; the factory and the assertion are untouched.",
+      "reason": "src/db.ts has never existed; the database module is src/utils/db.ts. Found by the SAFE-06 gate (22-14). The mock was a silent no-op, so exitEngine loaded the real database module. The test passes with the corrected specifier too, so it did not depend on the no-op.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-14"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "npm run preflight CLI (OPS-LIVE-10), whole describe block; Test 4 is the one that timed out",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "describe() gained the option { timeout: 150_000 } and a two-line comment. No assertion, title, import or mock changed.",
+      "reason": "Found by 22-15 first full run. Test 4 starts the real CLI twice (21.9 s total under the full parallel run) on the integration project default 15 s test timeout, so it timed out with no assertion failing. Single-child Tests 1-3 took 11.1-13.3 s of the same 15 s. Each child already has its own 60 s kill limit in spawnRailedChild; the new per-test limit is two of those plus margin.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-15"
+    },
+    {
+      "kind": "moved",
+      "file": "test/integration/honeypotDeploy.eth.test.ts",
+      "moved_to": "test/fork/honeypotDeploy.eth.fork.test.ts",
+      "title": "HONEY-03: HoneypotChecker deployed on ETH > has bytecode at deployedAddress (not 0x)",
+      "test": "has bytecode at deployedAddress (not 0x)",
+      "it_count_before": 2,
+      "it_count_after": 1,
+      "moved_to_it_count_before": 0,
+      "moved_to_it_count_after": 1,
+      "total_it_count_before": 2,
+      "total_it_count_after": 2,
+      "operator_ruling": "ESC-RAILS-01",
+      "change": "The one test moved to the fork project by operator ruling; both assertions are word for word. Integration file: JsonRpcProvider import and provider creation removed, because nothing left in the file used them. beforeAll, its ETH_RPC_URL guard, the address resolution and the second test are unchanged. Fork file: the URL comes from resolveForkRpcUrl, not ETH_RPC_URL, and an unset URL is an error rather than a skip, matching the other fork files. The address comes from buildChainRegistry().get('eth').honeypotChecker.deployedAddress, which applies the same precedence the old file wrote by hand (ETH_HONEYPOT_CHECKER_ADDRESS, then the template default), because test/unit/rails/forkShellOnly.test.ts forbids a fork test reading a key the rails replace.",
+      "reason": "A live mainnet check cannot pass in the integration project, which the rails keep off the real RPC: ETH_RPC_URL is the sentinel http://127.0.0.1:1, so the call was refused. Skip, delete and a canned-bytecode fake were all forbidden. See rails-discoveries.json#2 and ESC-RAILS-01. The per-file count is 2 to 1 and the fork file 0 to 1; the plan's must-be-equal rule holds on the total, by the operator's ruling.",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "obligation": "UFV-05",
+      "register_as": "test-quality",
+      "found_in_plan": "22-15"
+    },
+    {
+      "file": "test/unit/bot/noDoubleBuyReconcile.test.ts",
+      "test": "Phase 21.3 — no-double-buy guard (STOP-THE-LINE-05-C) [REAL-PATH], whole describe block; REAL-PATH first test is the one that timed out",
+      "it_count_before": 15,
+      "it_count_after": 15,
+      "change": "describe() gained the option { timeout: 30_000 } and a two-line comment. No assertion, title, import or mock changed.",
+      "reason": "Found by the 22-15 final run (vpu-20261109T045056-10640-6a8b4a). The first test in the file pays for the first dynamic import of src/bot, which took 4648 ms in the earlier full run and 5015 ms in this one against the unit default limit of 5000 ms (the file's other tests take 50-100 ms), so it timed out with no assertion failing. The new backupState test adds a 48 s compile to the parallel load and tipped it over.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-15"
+    },
+    {
+      "file": "test/unit/rails/dbTripwireSetup.test.ts",
+      "test": "beforeAll, afterAll and the real-root cases that read the real data/ folder or open a database in it",
+      "it_count_before": 11,
+      "it_count_after": 11,
+      "change": "A realDataFacts() helper records the real folder state, with absent as a valid state, and replaces statFacts on the real folder. A expectRealDbOpenRefused() helper replaces four direct assertions: with the folder present it asserts RAIL_DB_TRIPWIRE as before; with it missing it asserts the library refusal and asks isProtectedDbPath. No test was removed, skipped or renamed.",
+      "reason": "Found by GitHub Actions run 42627936916 (PR #2, commit 776858c), step npm run test:unit. data/ is gitignored, so a fresh checkout has no such folder: beforeAll crashed with ENOENT and all 11 tests in the file were skipped on CI.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI"
+    },
+    {
+      "file": "test/unit/rails/dbTripwireSrc.test.ts",
+      "test": "afterAll",
+      "it_count_before": 8,
+      "it_count_after": 8,
+      "change": "The afterAll check compares fs.existsSync on the real data/ folder with its value when the file loaded, instead of requiring true. No test was changed.",
+      "reason": "Found by GitHub Actions run 42627936916 (PR #2, commit 776858c), step npm run test:unit. The check failed on a fresh checkout, where data/ does not exist.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI"
+    },
+    {
+      "file": "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+      "test": "Phase 21.3 — landed deliberate buy ARMS monitoring (STOP-THE-LINE-06) [REAL-PATH], first test",
+      "change": "A beforeAll hook imports src/bot once under its own 30 s limit. The per-test 5 s limit is kept. No assertion, title or mock changed.",
+      "it_count_before": 6,
+      "it_count_after": 6,
+      "reason": "Found by a clean-clone replay of the CI steps on Windows at 776858c. The first test pays for the first dynamic import of src/bot and took 6295 ms against the unit default limit of 5000 ms. The other tests in the file take 61-90 ms.",
+      "register_as": "test-quality",
+      "found_in": "PR #2 CI replay"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "id": "OD-33",
+  "title": "Factory event processing and chain reorgs",
+  "area": "BUY",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: act on events at the head",
+      "behavior_impact": "none",
+      "risk": "Events from reorged blocks trigger buys that fail; events re-included below lastBlock are missed."
+    },
+    {
+      "id": "head-plus-rescan",
+      "name": "Keep acting at the head and rescan the last few blocks each poll, deduplicated by pair",
+      "behavior_impact": "Same speed; re-included events are caught.",
+      "risk": "Dedup must be exact or a pair is dispatched twice (see OD-28)."
+    },
+    {
+      "id": "wait-confirmations",
+      "name": "Act only after N confirmations",
+      "behavior_impact": "No reorg exposure.",
+      "risk": "Slower than other snipers by N blocks, which defeats the purpose of sniping."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "head-plus-rescan.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). The linked finding is S3.",
+  "behavior_impact": "Decides how quickly the bot reacts to new pairs versus reorg safety.",
+  "findings": [
+    "AUD-BUY-019"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 (or Phase 24 if Phase 23 shows impact)",
+  "proposed_from": "BUY-08"
+}

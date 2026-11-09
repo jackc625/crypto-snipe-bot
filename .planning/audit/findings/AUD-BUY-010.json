@@ -1,0 +1,80 @@
+{
+  "id": "AUD-BUY-010",
+  "title": "Risk limits (cooldown, max open positions, total exposure) are checked long before the snipe is recorded, so concurrent handlers for different tokens all pass and overspend the caps",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C15"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/riskManager.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 canSnipe at the start of the handler"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 canSnipe (after up to 30 s waiting for liquidity)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 recordSnipe only after the buy returned"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 recordSnipe only after the buy returned"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "max open positions read from the DB (rows exist only after insertTrade)"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "cooldown read from an in-memory map updated only by recordSnipe"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "exposure read from pending buy rows only"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:139-152@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Risk approval reserves no capacity for an in-flight buy"
+    }
+  ],
+  "sibling_sites_checked": "Both handler call sites of canSnipe and recordSnipe checked; the deliberate path calls recordSnipe (bot.ts:772) without canSnipe (operator-run, by design). riskManager.ts belongs to the DB slice (22-21); read for the state each gate uses, not edited. NaN fail-open of the risk env values is recorded on threshold TH-BUY-27. Same-token double buys are AUD-BUY-004.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1: a burst of new pairs within a few seconds (normal at busy times) lets every handler pass canSnipe before the first one inserts its row or calls recordSnipe, so the bot can commit several snipe amounts beyond MAX_OPEN_POSITIONS / MAX_TOTAL_EXPOSURE and inside the cooldown. Plausible condition, bounded by the number of concurrent handlers.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-004"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-02",
+  "od_ref": "OD-28",
+  "recommendation": "Reserve the risk budget synchronously when a handler passes canSnipe (count, exposure and cooldown) and release it on a fail-clean, or serialize the buy pipeline per chain. Card BUY-03. Phase 24; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

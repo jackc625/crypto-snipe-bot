@@ -1,0 +1,154 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": "ESC-SCRIPTS-01",
+  "od_ref": "OD-68",
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-002",
+  "title": "Section C SC-12 / D4: the operator scripts that sign with the bot wallet (deliberate-buy, recover-sell-ladys, and behind broken imports addLiquidity and deploySepoliaTest) run as separate processes outside the bot nonce lock and never read the pause switch, so with the bot running on the same wallet both can sign with the same nonce or sell the same tokens",
+  "severity": "S1",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C07",
+    "C14",
+    "C15"
+  ],
+  "files": [
+    "scripts/deliberate-buy.ts",
+    "scripts/recover-sell-ladys.ts",
+    "scripts/addLiquidity.ts",
+    "scripts/deploySepoliaTest.ts",
+    "src/bot.ts",
+    "src/utils/nonceAuthority.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git grep -n \"getPauseState\\|pause_state\\|withNonceLock\\|processLock\\|canSnipe\" 23a64617dca167976adc4645fed0e2c69e384820 -- scripts",
+      "note": "no output: no script at the base reads the pause flag, takes a process lock or calls the risk gate itself"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:41-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the nonce lock is a module-level Map inside one process; a script process has its own empty Map, so it never waits for the bot and the bot never waits for it"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:39-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports executeDeliberateBuy from src/bot and loads .env: the script runs the bot buy code in its own process"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:110@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "createChainContext(chain): the same wallet (PRIVATE_KEY) the bot uses"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing entry: executeDeliberateBuy(ctx, token, amount, dex)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site (via the script): the private buy leg runs under withNonceLock of the script process only"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:746-747@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site (via the script): the public fallback swapExactETHForTokensSupportingFeeOnTransferTokens, again under the script process lock only"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:485-497@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeDeliberateBuy starts with the affordability gate only; it never calls getPauseState (the pause checks are in the snipe handlers at :1035, :1067, :1118, :1352, :1402, :1442)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:36-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "builds its own ethers Wallet from PRIVATE_KEY on ETH_RPC_URL || ALCHEMY_URL"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:70@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: token.approve(router, balance)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/recover-sell-ladys.ts:78-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: swapExactTokensForETHSupportingFeeOnTransferTokens of the FULL token balance on the public mempool"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 65,72p node_modules/ethers/lib.commonjs/providers/abstract-signer.js (ethers 6.16.0, the installed version)",
+      "note": "populateTransaction takes nonce = getNonce(\"pending\") when none is given, so the script reads the node pending count while the bot strategies read \"latest\" and keep their own in-process counter; the two can pick the same nonce"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:35@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing sites behind the broken imports (AUD-SCRIPTS-001): :35 mint, :43 deposit, :48 approve, :53 approve, :58 addLiquidity"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing sites behind the broken imports (AUD-SCRIPTS-001): ContractFactory.deploy at :22, :32, :42, :52 and createPair at :61"
+    }
+  ],
+  "sibling_sites_checked": "Every script at the base (10 SCRIPTS files) plus the three contracts-tooling scripts. Signing scripts that use the bot wallet: deliberate-buy.ts (through src/bot.ts :558 and :746-747), recover-sell-ladys.ts (:70, :78), addLiquidity.ts (:35, :43, :48, :53, :58) and deploySepoliaTest.ts (:22, :32, :42, :52, :61); the last two cannot load today (AUD-SCRIPTS-001). deploy-honeypot-checker.ts signs through Hardhat Ignition with DEPLOY_PRIVATE_KEY, a different wallet unless the keys are equal in another spelling (AUD-CONTRACTS-004). Read-only or non-signing: capture-launch.ts (archive reads only, never uses PRIVATE_KEY), preflight.ts (builds wallets, signs nothing), pause.ts and resume.ts (HTTP to the dashboard), telegram-login.ts, check-empty-files.sh, audit-honeypot-checker.ts, check-mythril-report.ts. In-process signing in src/ is AUD-TX-001..-005 territory; a second bot process is AUD-TX-005 (closed by rail 22-13, which does not cover scripts because scripts never call src/main.ts). The deliberate-buy protection gap after the script exits is AUD-BUY-001 (S0, card BUY-01).",
+  "status": "confirmed",
+  "severity_rationale": "S1. Plausible condition: the operator runs one of these scripts while the bot is running on the same wallet, which nothing warns about (the deliberate buy banner and the recovery script print nothing about the bot). Then (a) two processes pick nonces independently, so one transaction replaces or blocks the other: a bot exit sell can be pushed out by a script transaction, or fail with a nonce error and leave the position held; (b) recover-sell-ladys sells the full balance while the bot exit engine may be selling the same position, so one sell wastes gas or both race; (c) a deliberate buy proceeds while the bot is paused. Not S0 because it needs the operator to start a script during a run. The bot is OFF for all of v7.0, so nothing can happen now. Fix owned by Phase 29 (HYG-03); nothing changes in Phase 22 (NAC-13).",
+  "related": [
+    "AUD-TX-005",
+    "AUD-BUY-001",
+    "AUD-SCRIPTS-001",
+    "AUD-SCRIPTS-003",
+    "AUD-SCRIPTS-004"
+  ],
+  "tags": [
+    "capital",
+    "section-c:SC-12",
+    "signing-script",
+    "d-stop-the-line",
+    "premise-challenge:D-06"
+  ],
+  "recommendation": "Phase 29 (HYG-03), decided on card SCRIPTS-01. Recommendation: every script that signs with the bot wallet calls acquireProcessLock(defaultLockDir(), <wallet address derived from the key>) from src/utils/processLock.ts (plan 22-13) before it builds any transaction, holds the lock until the process exits (the operating system releases it if the script crashes), and reads the pause state while it holds the lock (refusing a buy when paused; a sell follows the same pause rule the bot applies to its own exits). It must NOT use tryAcquireThenRelease as a guard: that query takes the lock and lets it go again before the script signs, so the bot can start and take the lock in the gap between the check and the signing (a check-then-act race), which gives false assurance. This challenges the premise of D-06 in 22-CONTEXT.md (\"The query API for Phase 29 scripts is try-acquire-then-release\"); per D-STOP-THE-LINE it is put back to the operator at the 22-25 Task 3 checkpoint, not filed and deferred. Holding the lock means a running bot makes the script refuse, and the bot refuses to start while a script signs. Interaction to decide together with card BUY-01: if BUY-01 chooses handing a deliberate buy to the running bot, the buy must then be performed by the bot process itself (for example through a dashboard command), because a separate signing script would be refused while the bot holds the lock.",
+  "traces": [
+    {
+      "scenario": "recover-sell-ladys.ts run while the bot is running and its exit engine holds a position in the same token",
+      "steps": [
+        "the script reads balanceOf for the wallet (:54) and quotes the full balance (:62)",
+        "approve (:70) with nonce N from the node pending count",
+        "the bot exit engine signs its sell under its own lock with its own counter, also N or N+1",
+        "the script swap (:78) and the bot sell race for nonce and for the same tokens"
+      ],
+      "outcome": "one transaction is replaced or rejected (nonce too low), or the second sell reverts on an empty balance; the bot may then mark the exit failed and keep a position that was already sold, or the script sell may be the one dropped"
+    },
+    {
+      "scenario": "scripts/deliberate-buy.ts run while the bot is running (or paused) on the same wallet",
+      "steps": [
+        "the script process builds the same wallet (:110)",
+        "executeDeliberateBuy runs the private leg under the script process lock (src/bot.ts:558)",
+        "the running bot snipes or sells under its own lock at the same time",
+        "no pause check anywhere on this path (src/bot.ts:485-497)"
+      ],
+      "outcome": "two nonce authorities for one wallet: a buy and a sell can collide; a buy is sent although the operator paused the bot"
+    },
+    {
+      "scenario": "Phase 29 implements the D-06 wording: the script calls tryAcquireThenRelease, sees the lock free, then signs",
+      "steps": [
+        "script: tryAcquireThenRelease returns {held: false} and has already released the lock",
+        "operator (or a supervisor) starts the bot; src/main.ts acquires the lock and starts exits",
+        "script signs its transaction"
+      ],
+      "outcome": "the same collision as above, with the script having reported that the bot was not running (check-then-act window); holding acquireProcessLock for the whole run closes it"
+    }
+  ]
+}

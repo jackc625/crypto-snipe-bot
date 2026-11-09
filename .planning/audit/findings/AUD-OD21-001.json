@@ -1,0 +1,65 @@
+{
+  "id": "AUD-OD21-001",
+  "title": "Tracked ignition/deployments files have no line-ending attribute, so under core.autocrlf=true a re-checkout writes CRLF working copies that no longer match the backup manifest (and switching to a branch without them deletes them)",
+  "kind": "finding",
+  "area": "contracts",
+  "slice": "OD21",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "ignition/deployments/chain-1/journal.jsonl",
+    "ignition/deployments/chain-11155111/journal.jsonl",
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+    "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+    "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+    "ignition/deployments/chain-1/deployed_addresses.json",
+    "ignition/deployments/chain-11155111/deployed_addresses.json",
+    ".gitattributes"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git check-attr -a ignition/deployments/chain-1/journal.jsonl",
+      "note": "run 2026-11-06 after the OD-21 commit 93f81898e21927679117f2401491a0e9ddb8f634: prints nothing (no attribute set, so no -text); git check-attr text eol on both journal.jsonl files, an artifacts/*.json and a build-info/*.json prints 'text: unspecified' and 'eol: unspecified' for each; there is no .git/info/attributes file"
+    },
+    {
+      "type": "command",
+      "ref": "git config --show-origin --get-all core.autocrlf",
+      "note": "true from both file:C:/Program Files/Git/etc/gitconfig and file:C:/Users/jackc/.gitconfig; with text unspecified, git auto-detects these JSON/JSONL files as text and converts LF to CRLF on checkout"
+    },
+    {
+      "type": "command",
+      "ref": "git add -f ignition/deployments (22-07 Task 1)",
+      "note": "git printed 'in the working copy of <path>, LF will be replaced by CRLF the next time Git touches it' for each of the 6 newly added files; git ls-files --eol shows i/lf w/lf for all 10 and every committed blob's sha256 equals the backup manifest (.planning/baselines/od21-record.json), so the blobs are correct and only a future working-tree checkout is affected"
+    },
+    {
+      "type": "code",
+      "ref": ".gitattributes:1-2@eff3635126771b3241eae7127e39f59ed97f96fe",
+      "note": "the root .gitattributes holds only '.planning/intel/** text eol=lf'; nothing covers ignition/deployments/** (the .planning/audit/.gitattributes LF pin from 22-04 is scoped to .planning/audit/)"
+    },
+    {
+      "type": "command",
+      "ref": "git ls-tree -r --name-only main -- ignition/deployments",
+      "note": "main tracks only the 4 build-info/*.json and deployed_addresses.json files; the 6 files added by OD-21 exist only on phase-22-safety-rails-audit until it merges, so checking out main removes them from the working tree"
+    }
+  ],
+  "sibling_sites_checked": "Both chain folders (ignition/deployments/chain-1/ and ignition/deployments/chain-11155111/) and every file kind in them: journal.jsonl, artifacts/*.json and *.dbg.json, build-info/*.json and deployed_addresses.json. All 10 have text and eol unspecified and are pure LF on disk (0 CR bytes, re-hashed against the manifest before and after the OD-21 commit). The 4 build-info/ and deployed_addresses.json files were already tracked before Phase 22 with the same exposure, so the hazard predates OD-21 for them and OD-21 widens it to the journals and artifacts. Other attribute sources checked: the root .gitattributes (only .planning/intel/**), .planning/audit/.gitattributes (scoped to its own folder), and .git/info/attributes (absent). No ignition/.gitattributes exists.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 ops friction, capital none: the committed blobs are byte-identical to the verified backup and the working copies are LF today, so nothing is wrong yet. A future re-checkout (branch switch, git checkout -- path, git restore) would write CRLF copies whose bytes differ from the manifest, and Hardhat Ignition would then read rewritten journals; switching to main before the merge deletes the 6 newly tracked files from the working tree. Both effects are recoverable from git or the verified backup, the STATE.md operating note tells the operator how to avoid and undo them, and 22-29's IGN_AC07 check stops the phase on any missing or changed file. No Hardhat command runs in Phase 22.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Add 'ignition/deployments/** -text' to the root .gitattributes in Phase 25 together with the rest of the line-ending work (out of Phase 22 scope per 22-SPEC.md Boundaries), then re-verify every working-tree file against the backup manifest. Until then the operator may choose to add the same rule to the untracked, machine-local .git/info/attributes (an operator action, not done in Phase 22). Stay on the phase branch until it merges into main; if the files go missing or change, restore with git checkout phase-22-safety-rails-audit -- ignition/deployments or by byte copy from C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06. Nothing is fixed in Phase 22 (NAC-13).",
+  "reported_by": ["claude (22-07 executor)", "claude (22 phase researcher, Ignition specifics)"],
+  "found_date": "2026-11-06",
+  "audited_sha": "eff3635126771b3241eae7127e39f59ed97f96fe"
+}

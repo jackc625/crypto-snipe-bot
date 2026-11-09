@@ -1,0 +1,31 @@
+{
+  "id": "ESC-REAUDIT-01",
+  "date": "2026-11-09",
+  "tier": "immediate",
+  "tags": [
+    "rail",
+    "re-audit",
+    "22-29-task-1"
+  ],
+  "items": [
+    "AUD-REAUDIT-001"
+  ],
+  "resolved_items": [],
+  "summary": "The 22-29 re-audit found a rail defect in the fork rehearsal Vitest config: its project had no extends, so its root-level envDir: false never reached the project and Vite was free to read the repo .env files in the unrailed Vitest main process during fork rehearsal runs (11 runs predate the fix). The first draft of the finding wrongly said vitest.config.ts had the same fault; the code shows all three of its projects have had extends: true since d5f65b1, and a real Vitest run against a fake .env confirms the main config never read it. Corrected scope: the fork rehearsal runs only, not npm test or the real fork project. Nobody observed the real .env being opened; the conclusion rests on the code path and fake-file runs. Only VITE_-prefixed values could have left the main process and no code reads them, so no worker result changed.",
+  "presented_at": "2026-11-09 session: the 22-29 Task 1 immediate-tier blocking checkpoint, relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Fix now",
+  "operator_response_recorded_at": "2026-11-09T06:19:35.000Z",
+  "operator_response_channel": "typed by the operator at the 22-29 Task 1 immediate-tier blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-29 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-29 Task 1 immediate-tier blocking checkpoint.",
+  "ruling": "fix-now",
+  "ruling_option_text": "fix-now: add extends: true to the one config and a test proven to fail first against a fake env file, correct the finding, re-run the suite evidence",
+  "ruling_note": "Recorded by the 22-29 continuation executor. The options as presented were: fix-now (add extends: true to the one config and a test proven to fail first against a fake env file, correct the finding, re-run the suite evidence); record-and-route (change nothing, record the requirement as not met for rehearsals, fix in a later phase); stop. The operator saw the corrected, narrower scope (the rehearsal config only, not the main test run). Context attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator recommended fix-now, and it made the fix outside this plan (commits a08d650 and db68184) because this plan may only change .planning/.",
+  "phase_continued": true,
+  "resolution": {
+    "status": "closed",
+    "outcome": "fixed",
+    "closed_at": "2026-11-09T06:19:35.000Z",
+    "closed_by": "22-29 continuation executor, per the operator ruling",
+    "statement": "Per the operator ruling \"Fix now\", commit a08d650 added extends: true to the rehearsal project and test/unit/rails/vitestEnvFile.test.ts, proven failing first against a fake env file (red-proofs/22-review-2-rehearsal-env-file.txt, INDEX row 30); db68184 re-recorded the suite evidence and baselines on the fixed code; the post-fix fork rehearsal run vpu-20261109T055907-6892-d9a439 passed 6 of 6. AUD-REAUDIT-001 was corrected before it was committed and is the resolving finding."
+  }
+}

@@ -1,3 +1,5 @@
+// SAFE-04 / D-07: must stay the FIRST statement; a direct start refuses here, before any stateful import runs (start via src/main.ts).
+import './guards/directEntry';
 import { ethers, Contract, WebSocketProvider, EventLog } from "ethers";
 import { CONFIG } from "./config";
 import { getGasOptions } from "./utils/gasManager";
@@ -2357,5 +2359,6 @@ function initMultiChainShutdownHandler(
 // ---------------------------------------------------------------------------
 
 if (require.main === module) {
-    startMultiChainBot();
+    process.stderr.write('Refusing to start: start the bot via src/main.ts (npx ts-node src/main.ts or npm start), which takes the single-instance process lock first (SAFE-04).\n');
+    process.exit(1);
 }

@@ -1,0 +1,38 @@
+{
+  "id": "OD-60",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Retire the one-time .bot-state.json import that runs on every database load",
+  "capital": false,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep the import on every load",
+      "behavior_impact": "none",
+      "risk": "A stale .bot-state.json next to an empty database is imported as open buys and renamed (AUD-DB-019)."
+    },
+    {
+      "id": "remove",
+      "name": "Delete migrateJsonState",
+      "behavior_impact": "Legacy JSON state is never imported again.",
+      "risk": "An operator with a pre-Phase-4 state file loses the automatic import (none is expected; the repo-root .bak shows it already ran)."
+    },
+    {
+      "id": "db-init-flag",
+      "name": "Move it into npm run db:init behind an explicit flag",
+      "behavior_impact": "Import only when asked.",
+      "risk": "Keeps legacy code alive."
+    }
+  ],
+  "recommendation": "remove: the import already ran (the .bak file exists) and the code path only adds risk.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); no capital effect.",
+  "behavior_impact": "Decides whether loading the database can import an old JSON state file.",
+  "findings": [
+    "AUD-DB-019",
+    "AUD-DB-022"
+  ],
+  "needed_by": "Phase 29 discussion (S2-S4 fixes)",
+  "proposed_from": "DB-03"
+}

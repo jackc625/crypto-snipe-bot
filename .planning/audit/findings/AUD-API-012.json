@@ -1,0 +1,59 @@
+{
+  "id": "AUD-API-012",
+  "title": "RC-21 sibling: the dashboard position broadcast is a setInterval(async) every 5 s with no in-flight guard, and each cycle quotes every open position on the shared RPC with no timeout, so slow RPC stacks overlapping cycles while a dashboard tab is open",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "src/api/server.ts",
+    "src/api/helpers/positions.ts",
+    "src/api/routes/positions.ts",
+    "dashboard/src/hooks/useWebSocket.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/server.ts:186-205@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "setInterval(async () => { if (getClientCount() === 0) return; await buildPositionsWithLivePrices(contexts); ... }, 5000): no running flag"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/helpers/positions.ts:59-135@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Promise.all over every open position, each calling queryPrice (the exit engine quote, no timeout; AUD-EXIT-005)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/positions.ts:25-28@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "GET /api/positions runs the same live quote for every position per request"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:62-76@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every WebSocket (re)connect calls GET /api/positions again"
+    }
+  ],
+  "sibling_sites_checked": "All timers in src/api: server.ts:186 (this finding; cleared in close() at :218), auth.ts:22 (session cleanup, unref, synchronous, correct). The per-position exit poll with the same pattern is AUD-EXIT-005 (RC-21, EXIT slice, card EXIT-04). The dashboard Chain Controls page opens an extra socket per visit (DASH slice).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: only while a dashboard client is connected; the quotes are display-only, but they share the HTTP provider and its rate limit with the exit monitors, so a slow RPC doubles the quote load and lets cycles pile up. Lower than the S2 of the exit-path entry AUD-EXIT-005 because no exit decision depends on these cycles.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-005"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Self-rescheduling setTimeout (skip while a cycle runs), withTimeout on each quote, and reuse the exit monitor's latest quote instead of quoting again. Same fix pattern as card EXIT-04. Phase 29.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

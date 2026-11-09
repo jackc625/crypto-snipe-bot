@@ -1,0 +1,47 @@
+{
+  "id": "AUD-TESTQ-005",
+  "title": "spawnRailedChild's path limit does not resolve links",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: the check is a pre-spawn convenience; the child rails are the enforcement.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#11"
+  ],
+  "files": [
+    "test/rails/spawnRailedChild.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#11 (IN-02)",
+      "note": "recorded by the code review"
+    },
+    {
+      "type": "code",
+      "ref": "test/rails/spawnRailedChild.ts:151@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "realpath only on existing directories; a symlink file in an argument is resolved lexically"
+    }
+  ],
+  "sibling_sites_checked": "The child still gets the preload, so the data and .env blocks fire in the child at the setup layer regardless of how the path is spelled.",
+  "recommendation": "Leave unless the rail rewrite happens."
+}

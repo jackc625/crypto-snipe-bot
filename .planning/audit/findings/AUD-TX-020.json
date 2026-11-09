@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-012"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-54",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-020",
+  "title": "A Flashbots native confirmation is treated as success without reading the transaction receipt status",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C09"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:569-573@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "returns the hash at once when nativeConfirmed"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:374@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "nativeConfirmed is waitResponse === 0"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 566,574p and grep revertingTxHashes in the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read; the strategy simulates first and sets no revertingTxHashes, so relays should drop a reverting bundle. Not reproduced."
+    }
+  ],
+  "sibling_sites_checked": "Other inclusion decisions (reconciliation.ts:373-378, :405-407; passthrough.ts) do read a receipt.",
+  "status": "candidate",
+  "severity_rationale": "S3 candidate: relay rules should make a status-0 inclusion impossible, so a receipt check is defence in depth.",
+  "recommendation": "Read the receipt status before reporting a native confirmation as success; decide in card TX-01. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-08"
+  ]
+}

@@ -1,0 +1,561 @@
+[
+  {
+    "id": "TH-ANTIRUG-01",
+    "name": "LP removal percent that trips signal 1",
+    "env_key": "<PREFIX>_ANTIRUG_LP_REMOVAL_PCT (ETH, BSC, BASE, ARB)",
+    "hardcoded": false,
+    "current_value": "50 on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:225@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:289@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:346@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:403@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:726-745@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1598-1603@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1692-1696@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:84@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "lpRemovedPct > lpRemovalPct (strict). V2: lpRemovedPct = (10000 - currentSupply*10000/baselineSupply)/100 against the LP totalSupply at buy time; V3: the same on pool.liquidity() (active liquidity at the current tick)",
+    "units": "percent of the LP baseline taken at buy time",
+    "representation": "Number() of the env string; the measured value is integer basis points (bigint) divided by 100, so steps of 0.01 %",
+    "effective_unset": "50",
+    "effective_empty": "0 (?? keeps the empty string, Number(\"\") is 0 and passes the 0..100 check): any LP decrease trips signal 1",
+    "effective_non_numeric": "fatal exit at boot (NaN)",
+    "rationale": "none in code beyond the config.ts:84 description",
+    "overlap": "AND-ed with signals 2 and 3 (TH-ANTIRUG-11, TH-ANTIRUG-12); on V3 signals 2 and 3 are effectively always tripped (AUD-ANTIRUG-006), so this is the only working V3 gate",
+    "flags": [
+      "empty-string-zero",
+      "no-rationale",
+      "sole-v3-gate"
+    ],
+    "recommendation": "Treat an empty value as unset, reject 0, and document why 50 % (card ANTIRUG-07; V3 semantics card ANTIRUG-03).",
+    "od_ref": "OD-53"
+  },
+  {
+    "id": "TH-ANTIRUG-02",
+    "name": "Confirm-after-N-blocks delay before an anti-rug exit",
+    "env_key": "<PREFIX>_ANTIRUG_CONFIRM_BLOCKS",
+    "hardcoded": false,
+    "current_value": "1 on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:226@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:290@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:347@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:404@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:746-765@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1831-1849@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:85@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "confirmBlocks === 0 dispatches at once; otherwise the gate fires at the first polled block >= getBlockNumber()-at-scheduling + confirmBlocks and re-reads live state",
+    "units": "blocks, counted from when the log is processed, not from the log block",
+    "representation": "Number() with an integer and >= 0 check",
+    "effective_unset": "1",
+    "effective_empty": "0 (no confirmation, synchronous dispatch inside the evaluator and inside a backfill)",
+    "effective_non_numeric": "fatal exit at boot",
+    "rationale": "config.ts:85: higher values for reorg-volatile chains",
+    "overlap": "the ethers block poll (4 s, subscriber-polling.js:45) adds up to one poll of delay; with 0 the exit runs inside backfill and registration (AUD-ANTIRUG-005)",
+    "flags": [
+      "empty-string-zero",
+      "same-blocks-different-time"
+    ],
+    "recommendation": "Treat empty as unset; count from the log block; state the intended delay in seconds per chain, since 1 block is 12 s on ETH and about 0.25 s on Arbitrum (cards ANTIRUG-07, ANTIRUG-01).",
+    "od_ref": "OD-53"
+  },
+  {
+    "id": "TH-ANTIRUG-03",
+    "name": "Circuit-breaker trip count",
+    "env_key": "<PREFIX>_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+    "hardcoded": false,
+    "current_value": "3 on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:291@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:348@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:405@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:766-785@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/circuitBreaker.ts:108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/circuitBreaker.ts:127@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/circuitBreaker.ts:121@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "recent.length >= threshold trips (once per trip); the ring buffer keeps the last threshold events",
+    "units": "triggerAntiRugExit calls per chain within the window (each log dispatch counts, refusals included), not rugs or positions",
+    "representation": "Number() with an integer and >= 1 check",
+    "effective_unset": "3",
+    "effective_empty": "fatal exit at boot (0 < 1)",
+    "effective_non_numeric": "fatal exit at boot",
+    "rationale": "exitTrigger.ts:32-35: defence against rapid-fire false positives",
+    "overlap": "multiplied by duplicate dispatch sources (AUD-ANTIRUG-001, -005, -007); the increment comes after the exit, so the threshold-th exit is already sent",
+    "flags": [
+      "counts-dispatches-not-rugs",
+      "in-memory-only"
+    ],
+    "recommendation": "Count per position or rug event, not per log (card ANTIRUG-01), and persist the trip (card ANTIRUG-04).",
+    "od_ref": "OD-47"
+  },
+  {
+    "id": "TH-ANTIRUG-04",
+    "name": "Circuit-breaker rolling window",
+    "env_key": "<PREFIX>_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+    "hardcoded": false,
+    "current_value": "1 h on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:228@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:292@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:349@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:406@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:786-805@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/circuitBreaker.ts:107@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/circuitBreaker.ts:113@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "a trigger counts while now - t < windowHours * 3600 * 1000",
+    "units": "hours (integer); milliseconds internally; wall clock of the running process",
+    "representation": "Number() with an integer and >= 1 check",
+    "effective_unset": "1",
+    "effective_empty": "fatal exit at boot",
+    "effective_non_numeric": "fatal exit at boot (a fraction such as 0.5 is also rejected)",
+    "rationale": "none in code",
+    "overlap": "history and trip are lost on restart (AUD-ANTIRUG-010)",
+    "flags": [
+      "in-memory-only",
+      "integer-hours-only"
+    ],
+    "recommendation": "Persist the history and trip state (card ANTIRUG-04); allow minutes if a shorter window is wanted.",
+    "od_ref": "OD-50"
+  },
+  {
+    "id": "TH-ANTIRUG-05",
+    "name": "Anti-rug gas multiplier on the emergency sell",
+    "env_key": "<PREFIX>_ANTIRUG_GAS_MULTIPLIER",
+    "hardcoded": false,
+    "current_value": "2.0 on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:229@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:293@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:350@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:407@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:806-824@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:862@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/types.ts:61@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:806-822@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "multiplies the fee fields of the private anti-rug sell only (passed to submitPrivateSell; applyGasMultiplier in the MEV strategies)",
+    "units": "multiplier on fee per gas",
+    "representation": "Number() float, >= 1.0, no upper bound; applied to bigint fees through applyGasMultiplier (TX slice)",
+    "effective_unset": "2.0",
+    "effective_empty": "fatal exit at boot (0 < 1)",
+    "effective_non_numeric": "fatal exit at boot",
+    "rationale": "chainRegistry.ts:848-861 comment: higher urgency of front-running a rug pull",
+    "overlap": "same number as TH-EXIT-20 (EXIT inventory); the sell-leg priority-fee ceiling is TH-EXIT-23",
+    "flags": [
+      "no-upper-bound",
+      "float-on-fee"
+    ],
+    "recommendation": "Add an upper bound and fail loud above it (card ANTIRUG-07); confirm the TX-slice multiplication is exact bigint math.",
+    "od_ref": "OD-53",
+    "also_defined_in": [
+      "TH-EXIT-20"
+    ]
+  },
+  {
+    "id": "TH-ANTIRUG-06",
+    "name": "Backfill getLogs block range per call",
+    "env_key": "<PREFIX>_ANTIRUG_BACKFILL_CAP_BLOCKS",
+    "hardcoded": false,
+    "current_value": "ETH 10, BSC 500, Base 500, Arbitrum 500 (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:230@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:294@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:351@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:825-839@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1441-1458@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:89@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "chunks of cap blocks: chunkEnd = min(chunkStart + cap - 1, toBlock), one getLogs per chunk, serial",
+    "units": "blocks per eth_getLogs call",
+    "representation": "Number() with an integer check in [1, 100000]",
+    "effective_unset": "per chain as above",
+    "effective_empty": "fatal exit at boot (0 < 1)",
+    "effective_non_numeric": "fatal exit at boot",
+    "rationale": "ETH 10: Alchemy free-tier cap (chainRegistry.ts:223-224 comment); others 500: conservative public RPC",
+    "overlap": "with TH-ANTIRUG-07, ETH needs up to 720 serial calls for a full window, run inside registration (AUD-ANTIRUG-005)",
+    "flags": [
+      "serial-calls-on-registration-path"
+    ],
+    "recommendation": "Keep the per-provider cap but run the backfill off the buy path (AUD-ANTIRUG-005, card ANTIRUG-02). The differing ETH default has a stated reason.",
+    "od_ref": "OD-48"
+  },
+  {
+    "id": "TH-ANTIRUG-07",
+    "name": "Maximum backfill window before GAP DETECTED",
+    "env_key": "<PREFIX>_ANTIRUG_MAX_BACKFILL_BLOCKS",
+    "hardcoded": false,
+    "current_value": "7200 on all four chains (unset)",
+    "definition_sites": [
+      "src/chainRegistry.ts:231@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:295@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:352@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:409@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:840-861@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1048-1085@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:90@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "gapBlocks > maxBackfillBlocks skips the whole replay and advances last_seen_block; gap is measured from the last (re)subscription, not from the outage start",
+    "units": "blocks",
+    "representation": "Number() with an integer check, >= backfill cap",
+    "effective_unset": "7200",
+    "effective_empty": "fatal exit at boot (0 < cap)",
+    "effective_non_numeric": "fatal exit at boot",
+    "rationale": "config.ts:90: about 1 day (true at 12 s blocks only)",
+    "overlap": "about 24 h on ETH, 4 h on Base, 30 min on Arbitrum at typical block times (not in the repo); combined with last_seen_block advancing only on subscription, most reconnects skip the replay (AUD-ANTIRUG-005)",
+    "flags": [
+      "same-blocks-different-time",
+      "window-measured-from-last-subscription"
+    ],
+    "recommendation": "Express the window in time per chain and measure the gap from the last seen live block (card ANTIRUG-02).",
+    "od_ref": "OD-48"
+  },
+  {
+    "id": "TH-ANTIRUG-08",
+    "name": "Anti-rug live-execute switch",
+    "env_key": "<PREFIX>_ANTIRUG_LIVE_EXECUTE",
+    "hardcoded": false,
+    "current_value": "false on all four chains (unset, dry-run)",
+    "definition_sites": [
+      "src/chainRegistry.ts:721-724@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:174@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:179-216@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:628-697@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:83@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "strict string equality with \"true\"; false logs, alerts and broadcasts would-have-sold and returns before the breaker and the sell",
+    "units": "boolean, read once at boot",
+    "representation": "string compare",
+    "effective_unset": "false",
+    "effective_empty": "false",
+    "effective_non_numeric": "false for anything but exactly \"true\" (TRUE, 1, yes are false)",
+    "rationale": "types.ts:121-123 and config.ts:83: live only after the 7-day dry run with 0 false positives",
+    "overlap": "gated at boot by the 7-day floor TH-ANTIRUG-10; dry-run never exercises the breaker",
+    "flags": [],
+    "recommendation": "No change to the switch itself; the gate that guards it is TH-ANTIRUG-10 (OD-19, Phase 32).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-09",
+    "name": "Anti-rug locker allowlist overlays",
+    "env_key": "<PREFIX>_ANTIRUG_ALLOWLIST_EXTRA (deprecated, both pool types), <PREFIX>_ANTIRUG_ALLOWLIST_EXTRA_V2, <PREFIX>_ANTIRUG_ALLOWLIST_EXTRA_V3",
+    "hardcoded": false,
+    "current_value": "empty (hardcoded lockers only: chainRegistry.ts:449-579)",
+    "definition_sites": [
+      "src/chainRegistry.ts:881-932@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:449-579@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/allowlist.ts:72-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1605-1611@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1698-1704@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:91-93@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "case-insensitive equality of the log destination (V2 Burn/Transfer to, V3 Burn/Collect owner) with any entry; a hit short-circuits to allowlisted (no exit)",
+    "units": "addresses (not a number; listed because a hit decides whether an emergency sell happens)",
+    "representation": "comma-separated, each passed through ethers.getAddress",
+    "effective_unset": "hardcoded list only",
+    "effective_empty": "hardcoded list only",
+    "effective_non_numeric": "an invalid address or checksum is a fatal exit at boot; an address with no code is a fatal exit at verify (allowlist.ts:135-148)",
+    "rationale": "chainRegistry.ts:417-446 (D-V3-ALLOWLIST)",
+    "overlap": "on V3 the owner field is the position manager for NFT positions, so lockers cannot match (AUD-ANTIRUG-006)",
+    "flags": [
+      "v3-owner-semantics"
+    ],
+    "recommendation": "Decide what a lock means on V3 (card ANTIRUG-03).",
+    "od_ref": "OD-49"
+  },
+  {
+    "id": "TH-ANTIRUG-10",
+    "name": "Dry-run floor before live execute is allowed",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "7 days (604800 s)",
+    "definition_sites": [
+      "src/preflight.ts:127@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:669@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:584-585@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/db.ts:702-707@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "now - antirug_dry_run_started >= SEVEN_DAYS_SEC at boot when LIVE_EXECUTE is \"true\"; no stamp fails",
+    "units": "seconds of wall clock since the first startChainAntiRugListener ever on this DB",
+    "representation": "integer seconds",
+    "effective_unset": "not configurable",
+    "effective_empty": "not configurable",
+    "effective_non_numeric": "not configurable",
+    "rationale": "config.ts:83 and types.ts:121-123 (7-day dry run with 0 false positives)",
+    "overlap": "guards TH-ANTIRUG-08; card OD-19 is owned by Phase 32",
+    "flags": [
+      "wall-clock-not-observation"
+    ],
+    "recommendation": "Measure monitored time and evaluated events, reset on detector changes (OD-19, Phase 32; AUD-ANTIRUG-009).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-11",
+    "name": "V2 signal 3: reserve floor",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "50 % of either baseline reserve",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:1618-1631@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "reserve0Pct < 50 || reserve1Pct < 50 against the reserves at buy time",
+    "units": "percent of each baseline reserve",
+    "representation": "integer basis points, then Number / 100",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:1476-1480 header (sell-feasibility signal)",
+    "overlap": "a 4x price move in either direction halves one reserve on a constant-product pool, so this trips on price movement alone; it is redundant with TH-ANTIRUG-01 rather than an independent check",
+    "flags": [
+      "hardcoded",
+      "trips-on-4x-price-move"
+    ],
+    "recommendation": "Replace with a sell-impact quote for the held amount (card ANTIRUG-03).",
+    "od_ref": "OD-49"
+  },
+  {
+    "id": "TH-ANTIRUG-12",
+    "name": "V3 signal 3: quote ratio floor",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "50 % of quotedOut / probeAmount",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:1750-1764@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1765-1788@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "quotedOut (WETH base units) * 10000 / probeAmount (token base units) < 5000 trips; a QuoterV2 revert also trips",
+    "units": "mixed: WETH per token in base units (a price, not a slippage)",
+    "representation": "integer basis points, then Number / 100",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:1754-1757 comment (meant as > 50 % slippage)",
+    "overlap": "always tripped for tokens worth less than 0.5 WETH each (AUD-ANTIRUG-006)",
+    "flags": [
+      "hardcoded",
+      "unit-mismatch"
+    ],
+    "recommendation": "Compare like units (card ANTIRUG-03).",
+    "od_ref": "OD-49"
+  },
+  {
+    "id": "TH-ANTIRUG-13",
+    "name": "V3 Burn-without-Collect grace window",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "5 blocks",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:213@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:2108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:2124@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "the held Burn is evaluated at the first block >= burnBlock + 5 unless a Collect arrives first",
+    "units": "blocks",
+    "representation": "integer constant",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:203-212 (planner discretion; may move to config)",
+    "overlap": "the pending entry is keyed by pool, not position (AUD-ANTIRUG-012)",
+    "flags": [
+      "same-blocks-different-time",
+      "hardcoded"
+    ],
+    "recommendation": "State it in time per chain and key it per position (AUD-ANTIRUG-012).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-14",
+    "name": "WebSocket heartbeat interval",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "30000 ms; a missed pong terminates on the next tick (up to about 60 s to detect a dead socket)",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:106@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:782-807@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "isAlive false at a tick terminates the socket; otherwise ping and broadcast connected",
+    "units": "milliseconds",
+    "representation": "integer constant",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:105 (ANTIRUG-12, ws README)",
+    "overlap": "detects a dead socket, not a missing subscription (AUD-ANTIRUG-008)",
+    "flags": [
+      "detects-socket-not-subscription"
+    ],
+    "recommendation": "Also require a recent log or block on the subscription for health (AUD-ANTIRUG-008).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-15",
+    "name": "Anti-rug WebSocket reconnect backoff",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "1000 ms doubling to a 60000 ms cap",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:112@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:878@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:886-887@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "sleep, then rebuild; the loop ends after a provider is constructed",
+    "units": "milliseconds",
+    "representation": "integer constants",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:109-111 (matches bot.ts precedent)",
+    "overlap": "same shape as the DEX loops (TH-BUY-11); a failed connect crashes before the second attempt (AUD-ANTIRUG-002)",
+    "flags": [
+      "crash-on-failed-connect",
+      "no-shutdown-check"
+    ],
+    "recommendation": "Single owner with an error listener and a shutdown check (OD-11).",
+    "od_ref": "OD-11"
+  },
+  {
+    "id": "TH-ANTIRUG-16",
+    "name": "Disconnect alert threshold and reconnect-failure alert count",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "60000 ms; 3 consecutive failures",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:119@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:126@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:889-914@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:959-980@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "disconnected duration > 60 s, once per window; consecutiveFailures >= 3, once per window",
+    "units": "milliseconds; count",
+    "representation": "integer constants",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:114-126 (D-VIS-WS-HEALTH)",
+    "overlap": "effectively unreachable: construction never throws and a failed connect crashes first (AUD-ANTIRUG-002, -008)",
+    "flags": [
+      "unreachable"
+    ],
+    "recommendation": "Make the alerts reachable with the OD-11 reconnect rework (AUD-ANTIRUG-008).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-17",
+    "name": "Anti-rug HTTP polling interval (no WS URL)",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "2000 ms",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:133@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/detector.ts:1261-1317@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "setInterval(async) every 2 s; one new interval per arm",
+    "units": "milliseconds",
+    "representation": "integer constant",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "detector.ts:128-132 (matches the bot.ts poller)",
+    "overlap": "stacked pollers and no in-flight guard (AUD-ANTIRUG-007); TH-BUY-10 is the factory poller",
+    "flags": [
+      "stacked-pollers",
+      "no-in-flight-guard"
+    ],
+    "recommendation": "One guarded poller per chain (AUD-ANTIRUG-007).",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-18",
+    "name": "Anti-rug exit wall-clock budget",
+    "env_key": "WATCHDOG_BUDGET_MS",
+    "hardcoded": false,
+    "current_value": "60000 ms (unset)",
+    "definition_sites": [
+      "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2182@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:238"
+    ],
+    "comparison": "withTimeout(executeFullSell, budget): overrun frees the caller, counts as a failed exit and alerts; the sell keeps running",
+    "units": "milliseconds",
+    "representation": "Number.parseInt(raw, 10), > 0 and finite",
+    "effective_unset": "60000",
+    "effective_empty": "60000",
+    "effective_non_numeric": "60000 for \"abc\"; but a numeric prefix is accepted: \"60s\" gives 60 ms, \"1e5\" gives 1 ms",
+    "rationale": "exitTrigger.ts:67-76: must exceed one 45 s confirm window plus margin",
+    "overlap": "same env and default as TH-EXIT-21 and TH-BUY-14 (worker watchdog); can be exceeded while waiting behind the nonce lock (AUD-EXIT-014)",
+    "flags": [
+      "parseInt-prefix"
+    ],
+    "recommendation": "Parse strictly and fail loud (card ANTIRUG-07); size it from the anti-rug attempt budget and confirm window (card EXIT-11).",
+    "od_ref": "OD-53",
+    "also_defined_in": [
+      "TH-BUY-14",
+      "TH-EXIT-21"
+    ]
+  },
+  {
+    "id": "TH-ANTIRUG-19",
+    "name": "Default V3 fee tier for the anti-rug sell simulation",
+    "env_key": null,
+    "hardcoded": true,
+    "current_value": "3000 (0.30 %)",
+    "definition_sites": [
+      "src/anti-rug/detector.ts:1747@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/raceTelemetry.ts:220@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "position.feeTier ?? baseline.v3FeeTier ?? 3000",
+    "units": "hundredths of a basis point (Uniswap fee units)",
+    "representation": "integer constant",
+    "effective_unset": "n/a",
+    "effective_empty": "n/a",
+    "effective_non_numeric": "n/a",
+    "rationale": "none in code",
+    "overlap": "a wrong tier quotes another pool or reverts, which trips signal 3 (fail-closed); TH-BUY-21 is the honeypot-probe default",
+    "flags": [
+      "silent-default"
+    ],
+    "recommendation": "Fail the evaluation (verdict unknown with an alert) instead of guessing a fee tier.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-ANTIRUG-20",
+    "name": "Anti-rug private attempt budget and public-fallback slippage",
+    "env_key": "MEV_SELL_ANTIRUG_SLIPPAGE_PCT (slippage); the attempt budget is hard-coded",
+    "hardcoded": false,
+    "current_value": "1 private attempt; fallback slippage max(15, 10, routine slippage) %",
+    "definition_sites": [
+      "src/exitEngine.ts:453-455@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:469-476@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:194@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:471-475@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:522@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:252"
+    ],
+    "comparison": "reason anti-rug gets 1 private attempt before the public fallback; the fallback minOut uses the widened slippage",
+    "units": "attempts; percent",
+    "representation": "integer constant; parseFloat with a > 0 check",
+    "effective_unset": "1; 15",
+    "effective_empty": "1; 15",
+    "effective_non_numeric": "1; 15",
+    "rationale": "exitEngine.ts:447-466 (a rug is happening now; a sandwiched sell beats a stranded position)",
+    "overlap": "EXIT rows TH-EXIT-12 and TH-EXIT-14 own these numbers; listed here so the anti-rug emergency sell parameters are complete in one place",
+    "flags": [],
+    "recommendation": "Covered by the EXIT inventory (card OD-14 decides the private-sell floor).",
+    "od_ref": "OD-14",
+    "also_defined_in": [
+      "TH-EXIT-14"
+    ]
+  }
+]

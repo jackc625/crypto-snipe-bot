@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-017",
+  "title": "buyNonceLock test: the logger mock gained top-level methods",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "Mechanism under test stays real; found because rails make migrateSchema run on a fresh temp DB.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-test-edits.json#11"
+  ],
+  "files": [
+    "test/unit/bot/buyNonceLock.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#11",
+      "note": "The logger mock gained top-level info, warn, debug, error and fatal vi.fn()s beside the existing child(). No assertion, import, or mocked mechanism changed. withNonceLock stays real. Reason: Found by plan 22-12's run of the 37 reset/doMock files; not caused by the duplicate-load guard (same TypeError with registerSingleton neutralised). The mock exposed only logger.child, and src/utils/dbSchema.ts migrateSchema calls logger.info when it creates a fresh database. Under the rails DB_PATH is an empty per-worker temp file, so the migration now runs; before the rails this test opened the live data/bot.db at schema version 7, so that branch never ran (AUD-TESTU-001)."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/unit/bot/buyNonceLock.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}

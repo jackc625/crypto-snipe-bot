@@ -1,0 +1,148 @@
+{
+  "slice": "EXIT",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-EXIT-003"
+      ],
+      "search": "grep -nE \"Number\\(|BigInt\\(|parseFloat|parseInt|toFixed\" over the EXIT snapshot (slice-files.ts --snapshot EXIT, 4 files); read queryPrice :315-345 (Number(amountOut)), calculatePartialSellAmount :251-257, computePublicMinOut :483-497 (BigInt(Math.round)), computeDustThreshold :615-622, deserializeExitState BigInt(original_token_amount) :300, priceMultiple :1714"
+    },
+    "C02": {
+      "result": [
+        "AUD-EXIT-016"
+      ],
+      "search": "grep -nE \"\\|\\||\\?\\?\" over the EXIT snapshot; read every env/CONFIG fallback: CONFIG.slippagePercent || 5 (:470; hard-coded 5 in config.ts:282), txHash || null (:1077, :1554), row?.exit_failure_count ?? 0 (:707), config.ts:290-303 parseFloat(env || default) for the trailing trio and stop-loss"
+    },
+    "C03": {
+      "result": [
+        "AUD-EXIT-002",
+        "AUD-EXIT-003",
+        "AUD-EXIT-015",
+        "AUD-EXIT-022"
+      ],
+      "search": "grep -nE \"decimals|parseEther|parseUnits|formatUnits\" over the EXIT snapshot (no decimals() read anywhere); traced the probe amount from parseEther(buyAmountNative) :1866/:1962 into queryPrice amountIn :328/:337 and every source of buyAmountNative (bot.ts:422, :1483, :1948, :1955; exitEngine.ts:731) | 22-27 merge: AUD-EXIT-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C04": {
+      "result": [
+        "AUD-EXIT-001",
+        "AUD-EXIT-006",
+        "AUD-EXIT-011",
+        "AUD-EXIT-026"
+      ],
+      "search": "grep -nE \"amountOutMin|amountOutMinimum|minOut|slippage|swapExact|exactInput\" over the EXIT snapshot; read buildV2SellTx :351-372, buildV3SellTx :378-407, executePublicFallbackSell :508-564, fallbackSlippagePct :464-476, computePublicMinOut :483-497 | 22-27 merge: AUD-EXIT-026 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C05": {
+      "result": [
+        "AUD-EXIT-011"
+      ],
+      "search": "grep -nE \"deadline\" over the EXIT snapshot; read the private builders (now+60 s computed per builder call, :362, :399) and the public fallback (now+600 s computed after the approve wait, :551) against the quote time (:520)"
+    },
+    "C06": {
+      "result": [
+        "AUD-EXIT-004",
+        "AUD-EXIT-024"
+      ],
+      "search": "grep -nE \"approve|allowance\" over the EXIT snapshot; read ensureApproval :409-424 and its four callers (:871, :874, :1509, :1512) and the public-fallback approve :540-547; fee population checked in ethers@6.16.0 abstract-signer.js:98-132 | 22-27 merge: AUD-EXIT-024 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C07": {
+      "result": [
+        "AUD-EXIT-009",
+        "AUD-EXIT-014"
+      ],
+      "search": "grep -nE \"withNonceLock|nonce\" over the EXIT snapshot; read every lock site (:543, :552, :788, :871, :874, :1509, :1512, :1531) and nonceAuthority.ts:60-73 (base SHA, cross-read); checked what each op awaits while holding the lock"
+    },
+    "C08": {
+      "result": [
+        "AUD-EXIT-020"
+      ],
+      "search": "grep -niE \"reorg|confirm|wait\\(\" over the EXIT snapshot; read the teardown decisions (:841-846, :984-992, :1099-1105, :1143-1157) for confirmation depth; ethers@6.16.0 provider.js:1044 (confirms default 1)"
+    },
+    "C09": {
+      "result": [
+        "AUD-EXIT-006",
+        "AUD-EXIT-009",
+        "AUD-EXIT-010"
+      ],
+      "search": "grep -nE \"\\.wait\\(|status|receipt|CALL_EXCEPTION|TRANSACTION_REPLACED\" over the EXIT snapshot; read the three wait() sites (:422, :545, :556), decodeReceipt use (:1058-1070, :1545-1547), the catch :1112-1167; ethers@6.16.0 provider.js:1112-1143 (replacement and status-0 throws)"
+    },
+    "C10": {
+      "result": "checked, none",
+      "search": "grep -niE \"websocket|wsProvider|WebSocket|reconnect|backfill\" over the EXIT snapshot: no hits; the exit engine quotes and sells over ctx.httpProvider and ctx.wallet only (:324, :335, :942, :1059); anti-rug WS handling belongs to the ANTIRUG slice"
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "grep -nE \"void |\\.catch\\(|catch \\(|async \\(\\)\" over the EXIT snapshot; read every detached promise: void this.drain() (:1350, :1416; drain has try/finally and per-item try/catch), dispatchPartialSell .catch (:1649-1654), the two setInterval(async) bodies (try/catch around everything, :1907-1941, :2008-2041), awaits inside the executeFullSell catch (:1164-1166, contained by the caller)"
+    },
+    "C12": {
+      "result": [
+        "AUD-EXIT-002",
+        "AUD-EXIT-005",
+        "AUD-EXIT-007",
+        "AUD-EXIT-009",
+        "AUD-EXIT-018",
+        "AUD-EXIT-019",
+        "AUD-EXIT-021",
+        "AUD-EXIT-023"
+      ],
+      "search": "grep -nE \"setInterval|setTimeout|clearInterval|clearTimeout|unref|timeout\" over the EXIT snapshot; read both poll intervals (:1906, :2007), registerExitMonitor / clearAllTimersForToken / hasExitMonitorTimer (exitManager.ts:161-212), the watchdog timer (exitWatchdog.ts:54-58, :84-87), withTimeout (withTimeout.ts:40-55), every early return after a caller cleared timers (:829, :878, :1036), awaited alerts with no timeout (notifier.ts:75-87) | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C13": {
+      "result": [
+        "AUD-EXIT-015",
+        "AUD-EXIT-017"
+      ],
+      "search": "grep -nE \"insertTrade|upsertExitState|markExitFailedHeld|updateTradeStatus|deleteExitState|getExitState\" over the EXIT snapshot; read each write and its position relative to awaits (:667-675, :700, :1073-1111, :1163, :1550-1575, :1646, :1829, :1891, :2001); db.ts:320-327, :505-547, :597-604 cross-read at the base SHA"
+    },
+    "C14": {
+      "result": [
+        "AUD-EXIT-007",
+        "AUD-EXIT-008",
+        "AUD-EXIT-013",
+        "AUD-EXIT-014",
+        "AUD-EXIT-017",
+        "AUD-EXIT-018",
+        "AUD-EXIT-022",
+        "AUD-EXIT-023",
+        "AUD-EXIT-025"
+      ],
+      "search": "read every path through executeFullSell (:809-1171) and executePartialSell (:1473-1592) for repeated or dropped exits: sell lock, position queue (ExitWorker.enqueue :1322-1353), routine pause (:824-830), every return false, the teardown helpers; callers exitTrigger.ts:240-270 and controls.ts:84-112/:160-185 cross-read at the base SHA | 22-27 merge: AUD-EXIT-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-EXIT-025 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C15": {
+      "result": [
+        "AUD-EXIT-005",
+        "AUD-EXIT-008",
+        "AUD-EXIT-011",
+        "AUD-EXIT-012",
+        "AUD-EXIT-014",
+        "AUD-EXIT-023"
+      ],
+      "search": "grep -nE \"tryAcquireSellLock|releaseSellLock|tryEnqueuePosition|releasePositionQueue|isRoutinePaused|balanceOf\" over the EXIT snapshot; read check-then-act sequences: balance read -> approve -> sell (:839-909), allowance check outside the lock (:541-542), quote -> approve wait -> swap (:520-555), the legacy overload key spaces (exitManager.ts:16-34) | 22-27 merge: AUD-EXIT-023 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C16": {
+      "result": [
+        "AUD-EXIT-004"
+      ],
+      "search": "grep -nE \"gasMultiplier|gasLimit|maxFee|priority|buildReconcileConfig\" over the EXIT snapshot; read which sends get the sell ceiling (only the private escalation, :909 and :940) and which use ethers default fees (approvals :421/:544, public swap :553); ethers@6.16.0 abstract-provider.js:619-625"
+    },
+    "C17": {
+      "result": "checked, none",
+      "search": "grep -niE \"privateKey|PRIVATE_KEY|mnemonic|signer|wallet\\.\" over the EXIT snapshot: only ctx.wallet.address and ctx.wallet as the Contract runner; no key material is read, logged or passed in the slice"
+    },
+    "C18": {
+      "result": [
+        "AUD-EXIT-016"
+      ],
+      "search": "grep -nE \"process\\.env\" over the EXIT snapshot (MEV_SELL_FALLBACK_ATTEMPTS :455, MEV_SELL_ANTIRUG_SLIPPAGE_PCT :472, EXIT_ROUTINE_MAX_FAILURES :601, EXIT_DUST_THRESHOLD_BPS :616, process.env to buildReconcileConfig :940) plus every CONFIG exit field (config.ts:290-308); each parse traced for unset, empty, non-numeric and out-of-range values (thresholds/EXIT.json)"
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "grep -niE \"req\\.|res\\.|express|router\\.|auth|cors\" over the EXIT snapshot: no HTTP surface in the slice; the dashboard sell routes that call executeFullSell (controls.ts) belong to the API slice and were cross-read only for how they call the engine (AUD-EXIT-008, AUD-EXIT-013)"
+    },
+    "C20": {
+      "result": "checked, none",
+      "search": "grep -nE \"sendCtxAlert|telegram|Markdown\" over the EXIT snapshot; read every alert body: they interpolate the reason, the token address, numbers and errMsg only; no symbol, name or Telegram input reaches the slice, and no Telegram input drives an exit"
+    }
+  }
+}

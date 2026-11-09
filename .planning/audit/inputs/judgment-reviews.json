@@ -1,0 +1,430 @@
+{
+  "generated_by": "22-29 executor",
+  "generated_at": "2026-11-09T06:25:36.270Z",
+  "audit_base_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "head_sha": "a6ed94b5e431ee204505783e55fccb35fa067ed5",
+  "nac05": {
+    "verdict": "No env var or flag disables a rail. Setup-layer rails decide on no env var at all. The src-layer VITEST gates turn the src rails on when set; unsetting VITEST cannot remove the setup layer, and src/main.ts refuses a real start with VITEST set.",
+    "entries": [
+      {
+        "name": "VITEST",
+        "where": "src/config.ts, src/utils/notifier.ts, src/utils/db.ts, src/main.ts, scripts/pause.ts, scripts/preflight.ts, scripts/resume.ts, scripts/db-init.ts",
+        "role": "selects the src-layer rail (D-01)",
+        "can_disable_a_rail": false,
+        "why": "Set: the src rails are active (no .env load, Telegram refused, temp DB, tripwire on). Unset inside a test: the setup layer still installs in every worker and railed child and decides on no env var (selfcheck.cjs and dbTripwireSetup prove it with VITEST deleted). Unset in production is the normal path. Set on a real start: src/main.ts refuses before the lock (AUD-BUY-034, fixed)."
+      },
+      {
+        "name": "CSB_RAIL_RUN_ID",
+        "where": "test/rails/core.cjs, test/rails/ledgerRun.ts, test/rails/spawnRailedChild.ts, scripts/verify-prod-untouched.ts",
+        "role": "ledger folder name",
+        "can_disable_a_rail": false,
+        "why": "Chooses a ledger location only, validated by RUN_ID_RE, captured once at first install. No rail reads it. An invalid value fails the install closed."
+      },
+      {
+        "name": "CSB_RAIL_PROJECT",
+        "where": "test/rails/core.cjs, vitest.config.ts project env",
+        "role": "ledger project label",
+        "can_disable_a_rail": false,
+        "why": "Copied into ledger entries only. No rail reads it."
+      },
+      {
+        "name": "ETH_FORK_RPC_URL",
+        "where": "test/rails/core.cjs FORK_SHELL_KEYS, test/fork/helpers/forkRpcUrl.ts",
+        "role": "value carried through fork mode",
+        "can_disable_a_rail": false,
+        "why": "Decides no enforcement: one of two values re-applied from the first shell capture in fork mode only. Absent means deleted, so the fork resolver errors. Full mode scrubs it."
+      },
+      {
+        "name": "ALLOW_REAL_MAINNET",
+        "where": "test/rails/core.cjs FORK_SHELL_KEYS, test/fork/helpers/realMainnetGate",
+        "role": "value carried through fork mode",
+        "can_disable_a_rail": false,
+        "why": "Decides no enforcement in the rails. Absent means empty (gate closed). A protected-root .env cannot set it (childRails case iv)."
+      },
+      {
+        "name": "CSB_RAIL_* other, OS essentials, PATH",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "child environment",
+        "can_disable_a_rail": false,
+        "why": "inheritedEnv refuses these names. PATH is forced with the Node 22 folder first. NODE_OPTIONS is set last, so nothing can remove the preload."
+      },
+      {
+        "name": "spawnRailedChild option inheritedEnv",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "plant literal app-key values in a child",
+        "can_disable_a_rail": false,
+        "why": "Refuses NODE_OPTIONS, PATH, VITEST, VITEST_*, CSB_RAIL_*, NODE_* and OS essentials. Values are test literals, never read from process.env; the child rails then scrub or keep them as a worker would."
+      },
+      {
+        "name": "spawnRailedChild option envOverrides",
+        "where": "test/rails/spawnRailedChild.ts, test/rails/core.cjs applyChildOverrides",
+        "role": "override test sentinels",
+        "can_disable_a_rail": false,
+        "why": "Limited to test/.env.test app keys, re-validated in the child after the rails entry."
+      },
+      {
+        "name": "spawnRailedChild option homeOverride",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "fake HOME for lock tests",
+        "can_disable_a_rail": false,
+        "why": "Refused unless absolute and under os.tmpdir()."
+      },
+      {
+        "name": "spawnRailedChild option nodeOptions",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "harmless Node flags",
+        "can_disable_a_rail": false,
+        "why": "Allow-list: --expose-gc, --preserve-symlinks, --preserve-symlinks-main, --no-warnings, --max-old-space-size, --stack-size. The rails preload is applied last and cannot be removed."
+      },
+      {
+        "name": "spawnRailedChild option ledgerRunId",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "ledger folder for one case",
+        "can_disable_a_rail": false,
+        "why": "Pattern ^case-[a-z0-9-]+$; location only. dotenvSrcSkip test proves it does not affect enforcement."
+      },
+      {
+        "name": "spawnRailedChild option withVitestEnv",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "run a child without VITEST",
+        "can_disable_a_rail": false,
+        "why": "Turns off only the src layer in that child, which is how the setup layer is proven to stand alone. The rails preload still runs."
+      },
+      {
+        "name": "spawnRailedChild option railsEntry",
+        "where": "test/rails/spawnRailedChild.ts",
+        "role": "choose preload (full) or setup-fork rails",
+        "can_disable_a_rail": "relaxes one rail for a test-code caller only",
+        "why": "Not an env var or flag, so not a bypass under NAC-05, but it does select fork mode for that child, where the general non-loopback deny is off. Used only by the two rail proof files. Registered as AUD-REAUDIT-004."
+      },
+      {
+        "name": "raceHookForTests parameter",
+        "where": "src/utils/dbPath.ts openGuardedDb",
+        "role": "swap the file between probe and open in a test",
+        "can_disable_a_rail": false,
+        "why": "A function parameter only production code never passes; no env var or flag can set it; it runs before the identity and version re-checks, so it cannot weaken them."
+      }
+    ]
+  },
+  "nac06": {
+    "hunk_count": 28,
+    "hunks": [
+      {
+        "file": "src/anti-rug/detector.ts",
+        "hunk": "@@ -97,0 +98,2 @@",
+        "added_lines": 2,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/anti-rug/detector.ts",
+        "hunk": "@@ -191,0 +194 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/bot.ts",
+        "hunk": "@@ -0,0 +1,2 @@",
+        "added_lines": 2,
+        "removed_lines": 0,
+        "classification": "direct-entry guard",
+        "note": "first-import guard / refusal for direct starts (D-07)."
+      },
+      {
+        "file": "src/bot.ts",
+        "hunk": "@@ -2360 +2362,2 @@",
+        "added_lines": 2,
+        "removed_lines": 1,
+        "classification": "direct-entry guard",
+        "note": "first-import guard / refusal for direct starts (D-07)."
+      },
+      {
+        "file": "src/config.ts",
+        "hunk": "@@ -4 +4,2 @@",
+        "added_lines": 2,
+        "removed_lines": 1,
+        "classification": "guard",
+        "note": "VITEST-gated dotenv or Telegram refusal (SAFE-02 src layer)."
+      },
+      {
+        "file": "src/exitEngine.ts",
+        "hunk": "@@ -22,0 +23,2 @@",
+        "added_lines": 2,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/exitEngine.ts",
+        "hunk": "@@ -1420,0 +1423 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/guards/directEntry.ts",
+        "hunk": "@@ -0,0 +1,49 @@",
+        "added_lines": 49,
+        "removed_lines": 0,
+        "classification": "direct-entry guard",
+        "note": "first-import guard module."
+      },
+      {
+        "file": "src/guards/epoch.ts",
+        "hunk": "@@ -0,0 +1,12 @@",
+        "added_lines": 12,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "duplicate-load registry (RC-17)."
+      },
+      {
+        "file": "src/guards/singleton.ts",
+        "hunk": "@@ -0,0 +1,74 @@",
+        "added_lines": 74,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "duplicate-load registry (RC-17)."
+      },
+      {
+        "file": "src/main.ts",
+        "hunk": "@@ -0,0 +1,101 @@",
+        "added_lines": 101,
+        "removed_lines": 0,
+        "classification": "lock entry",
+        "note": "lock-first entry; VITEST refusal and private env read are part of it (WR-01, WR-03)."
+      },
+      {
+        "file": "src/utils/db.ts",
+        "hunk": "@@ -8,7 +8,18 @@",
+        "added_lines": 18,
+        "removed_lines": 7,
+        "classification": "guard",
+        "note": "repo-root anchored path resolution, src-layer tripwire and the guarded open."
+      },
+      {
+        "file": "src/utils/db.ts",
+        "hunk": "@@ -17 +28,3 @@",
+        "added_lines": 3,
+        "removed_lines": 1,
+        "classification": "guard",
+        "note": "repo-root anchored path resolution, src-layer tripwire and the guarded open."
+      },
+      {
+        "file": "src/utils/db.ts",
+        "hunk": "@@ -27,128 +40 @@",
+        "added_lines": 1,
+        "removed_lines": 128,
+        "classification": "verbatim schema move (operator-accepted, D-24)",
+        "note": "the removed body and the migrateSchema(db) call; byte-identity re-verified on HEAD."
+      },
+      {
+        "file": "src/utils/db.ts",
+        "hunk": "@@ -156,80 +42 @@",
+        "added_lines": 1,
+        "removed_lines": 80,
+        "classification": "verbatim schema move (operator-accepted, D-24)",
+        "note": "the removed body and the migrateSchema(db) call; byte-identity re-verified on HEAD."
+      },
+      {
+        "file": "src/utils/db.ts",
+        "hunk": "@@ -717,0 +525,5 @@",
+        "added_lines": 5,
+        "removed_lines": 0,
+        "classification": "path anchoring",
+        "note": "a read-only accessor for the resolved DB path; used only by tests."
+      },
+      {
+        "file": "src/utils/dbPath.ts",
+        "hunk": "@@ -0,0 +1,285 @@",
+        "added_lines": 285,
+        "removed_lines": 0,
+        "classification": "guard",
+        "note": "DB path resolution, probe and guarded open (SAFE-05, RC-25, SAFE-02 src layer)."
+      },
+      {
+        "file": "src/utils/dbSchema.ts",
+        "hunk": "@@ -0,0 +1,217 @@",
+        "added_lines": 217,
+        "removed_lines": 0,
+        "classification": "verbatim schema move (operator-accepted, D-24)",
+        "note": "moved body, re-verified byte-identical on HEAD (nac06.d24_schema_move)."
+      },
+      {
+        "file": "src/utils/exitManager.ts",
+        "hunk": "@@ -1,0 +2,2 @@",
+        "added_lines": 2,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/utils/exitManager.ts",
+        "hunk": "@@ -13,0 +16 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/utils/nonceAuthority.ts",
+        "hunk": "@@ -39,0 +40,2 @@",
+        "added_lines": 2,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/utils/nonceAuthority.ts",
+        "hunk": "@@ -42,0 +45 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "registry call",
+        "note": "imports and registerSingleton only."
+      },
+      {
+        "file": "src/utils/notifier.ts",
+        "hunk": "@@ -6 +6,2 @@",
+        "added_lines": 2,
+        "removed_lines": 1,
+        "classification": "guard",
+        "note": "VITEST-gated dotenv or Telegram refusal (SAFE-02 src layer)."
+      },
+      {
+        "file": "src/utils/notifier.ts",
+        "hunk": "@@ -32,0 +34,21 @@",
+        "added_lines": 21,
+        "removed_lines": 0,
+        "classification": "guard",
+        "note": "VITEST-gated dotenv or Telegram refusal (SAFE-02 src layer)."
+      },
+      {
+        "file": "src/utils/notifier.ts",
+        "hunk": "@@ -43,0 +66 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "guard",
+        "note": "VITEST-gated dotenv or Telegram refusal (SAFE-02 src layer)."
+      },
+      {
+        "file": "src/utils/notifier.ts",
+        "hunk": "@@ -79,0 +103 @@",
+        "added_lines": 1,
+        "removed_lines": 0,
+        "classification": "guard",
+        "note": "VITEST-gated dotenv or Telegram refusal (SAFE-02 src layer)."
+      },
+      {
+        "file": "src/utils/processLock.ts",
+        "hunk": "@@ -0,0 +1,217 @@",
+        "added_lines": 217,
+        "removed_lines": 0,
+        "classification": "lock entry",
+        "note": "SQLite exclusive single-instance lock."
+      },
+      {
+        "file": "src/utils/repoRoot.ts",
+        "hunk": "@@ -0,0 +1,34 @@",
+        "added_lines": 34,
+        "removed_lines": 0,
+        "classification": "path anchoring",
+        "note": "repo-root finder for the DB path."
+      }
+    ],
+    "other_count": 0,
+    "d24_schema_move": {
+      "decision": "D-24",
+      "base_body_sha256": "f85abb67043d53401b59b71d86155fe0a58e4d1afc637db0fae93766196e0c17",
+      "head_body_sha256": "f85abb67043d53401b59b71d86155fe0a58e4d1afc637db0fae93766196e0c17",
+      "identical": true,
+      "bytes": 10639,
+      "current_schema_version": 7,
+      "call_site_unchanged": true,
+      "call_line_base": 235,
+      "call_line_head": 42,
+      "schema_sql_changed": false,
+      "note": "Re-run on HEAD as blob-level extraction, not taken from the 22-09 record: the text between the opening line of migrateSchema and its closing brace, in the audit-base blob of src/utils/db.ts and the HEAD blob of src/utils/dbSchema.ts, are byte-equal (no CRLF in either blob). Only the signature line differs: function migrateSchema(): void to export function migrateSchema(db: Database.Database): void, as D-24 allows. CURRENT_SCHEMA_VERSION is still 7, exported from dbSchema.ts. db.ts still calls migrateSchema(db) directly after the same three pragmas, before the JSON state migration and the prepared statements."
+    },
+    "census_comparison": {
+      "base_total_tx_signing": 23,
+      "head_total_tx_signing": 23,
+      "head_snapshot": "git archive of HEAD with the same method as 22-26",
+      "difference": "none"
+    }
+  },
+  "nac13": {
+    "verdict": "Every commit touching src/ maps to RC-17, RC-18, RC-19, RC-25 or a non-capital rail fix. No other capital candidate was fixed in Phase 22.",
+    "commits": [
+      {
+        "sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "subject": "fix(phase-22): close four code review findings in the boot path and DB guards",
+        "maps_to": "non-capital rail fixes (WR-01..WR-05)",
+        "summary": "VITEST refusal and private env read in src/main.ts; probe cleanup and tripwire through a linked folder in src/utils/dbPath.ts; documentation of the lock location"
+      },
+      {
+        "sha": "961d2690c259a9d55189888f66b6edd5964f4ddc",
+        "subject": "fix(22-13): retry a busy lock attempt so a simultaneous start has exactly one winner",
+        "maps_to": "RC-18",
+        "summary": "busy retry so a simultaneous start has one winner"
+      },
+      {
+        "sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "subject": "feat(22-13): lock-first src/main.ts entry and first-import direct-entry guard for bot.ts",
+        "maps_to": "RC-18",
+        "summary": "lock-first src/main.ts and the direct-entry guard"
+      },
+      {
+        "sha": "569f08c2afa47decd0131958fcc5384ed915ac30",
+        "subject": "feat(22-13): SQLite exclusive single-instance process lock with real-holder proofs",
+        "maps_to": "RC-18",
+        "summary": "SQLite single-instance lock"
+      },
+      {
+        "sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+        "subject": "feat(22-12): register the sell lock, ExitWorker and anti-rug registry; casing flag in every tsconfig",
+        "maps_to": "RC-17",
+        "summary": "exitManager, exitEngine and anti-rug registered; tsconfig casing flag"
+      },
+      {
+        "sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "subject": "feat(22-12): epoch and singleton registry; guard the nonce authority against a second load",
+        "maps_to": "RC-17",
+        "summary": "epoch and singleton registry; nonceAuthority registered"
+      },
+      {
+        "sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "subject": "feat(22-10): skip the .env file under Vitest at the five reachable dotenv sites",
+        "maps_to": "RC-19",
+        "summary": "dotenv gated on VITEST at the five reachable sites"
+      },
+      {
+        "sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+        "subject": "feat(22-10): refuse Telegram sends under Vitest through the notifier's catch path",
+        "maps_to": "RC-19",
+        "summary": "Telegram refusal under Vitest (src layer)"
+      },
+      {
+        "sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+        "subject": "feat(22-09): guard the DB open with a no-touch version probe and write-boundary checks",
+        "maps_to": "RC-25",
+        "summary": "guarded DB open: read-only version probe and write-boundary checks; migrateSchema moved under D-24"
+      },
+      {
+        "sha": "791e811c87b6ce15d29c8708c79d2709b23b6789",
+        "subject": "feat(22-09): anchor DB_PATH to the repo root and add the src-layer Vitest tripwire",
+        "maps_to": "RC-25 / SAFE-05",
+        "summary": "repo-root DB path anchoring and the Vitest src tripwire"
+      }
+    ],
+    "note": "Five orchestrator commits between plans carry no plan number: f695363 (spawn gate test fix), 6ba177d (docs), 5378478 (listed above), fce2ac3 and c3472c6 (docs), a08d650 and db68184 (fork rehearsal config and evidence). Only 5378478 touches src/, and the rest are test or docs commits outside this NAC-13 list."
+  },
+  "census_diff_explanation": "None needed: total_tx_signing is 23 at audit_base_sha and 23 at HEAD, locked 10, unlocked 13, unknown 0 at both. The census ran with census/manual-inventory-head.json, a line-shifted copy of the base manual inventory, because Phase 22 added two import lines above the signing sites in src/bot.ts and src/exitEngine.ts and the manual inventory is keyed by file:line:api. Without the shift the tool reports N=24 only because one auditor exclusion no longer matches its old line; that is the keying, not a new signing site. No signing site was added, moved in meaning or lost.",
+  "judgment_notes": {
+    "vitest_main_process_covering_argument": "Question (a). The Vitest main process is deliberately not railed. It holds, with its limits stated. What covers it is not the ledger, which only ever sees workers and railed children, but: no env-file loader in its import closure (test/unit/rails/forkShellOnly.test.ts scans both configs and the closure); Vite env loading off through envDir: false reaching every project through extends: true, proven against a fake .env for vitest.config.ts and, since a08d650, for the rehearsal config; the data folder compared by hash, size, mtime and listing before and after every run, which sees writes but not reads; and --net-watch sampling that includes the Vitest main process (vitest_main_observed true, 103 of 106 samples in ac19-run.json) and that can miss a very short connection, as the evidence_basis string in ac19-run.json itself says. So a verdict of untouched and a clean ledger do not prove the main process never opened .env; the argument is that nothing in its code path can, after the fix. AUD-REAUDIT-001 was the one place where that was false, and it was only for the rehearsal config. Note that the earlier checkpoint answer was re-derived here from the corrected facts rather than copied.",
+    "db_probe_direct_read_fallback": "Question (b). src/utils/dbPath.ts falls back to a direct read-only SQLite open when the temp copy fails with both -wal and -shm present. Acceptable for a live file: the direct open adds no write beyond what a SQLite reader does to -shm, it is only reached when both companions exist, and the read-write open that follows in openGuardedDb goes further anyway, then re-checks identity and user_version through the write handle before the caller can write. If -wal or -shm is missing it fails closed rather than create them beside the file. Under Vitest it cannot reach the live folder: the src tripwire and the setup-layer rails block it first. The single-instance lock also means no second bot process can be mid-write at boot; only preflight, pause and resume can run alongside a live bot, and a probe there is the case the temp copy exists for.",
+    "spawn_site_allowlists": "Question (c), assessed as rail options under NAC-05. ALLOWED_FILES: test/rails/spawnRailedChild.ts is the railed spawner; test/fork/setup.ts starts Hardhat with buildHardhatChildEnv, and hardhatChildEnv.test.ts's own AST check pins every child launch there; test/rails/selfcheck.cjs runs one unrailed child with its own literal code against a temp fake root only. COMPUTED_REQUIRE_FILES: test/rails/probes/duplicateLoadProbe.cjs only, limited to a plain require of a computed path; it runs only as a railed child. SAFE_EXEC_RECEIVERS: db, mockDb, fileDb, mem, w, attachRe, vacRe, entryRe are database or RegExp objects as used today; a receiver of those names could only hold a child_process object if a banned-module load had already got past the gate, and process.getBuiltinModule is the one route I found that the gate does not see (AUD-REAUDIT-003). No entry grants a route around the rails to a test that the rail itself would otherwise have stopped."
+  }
+}

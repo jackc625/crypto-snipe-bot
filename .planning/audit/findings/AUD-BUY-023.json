@@ -1,0 +1,44 @@
+{
+  "id": "AUD-BUY-023",
+  "title": "Section C SC-16: the shutdown cleanup uses an inline require('./utils/db')",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2344-2345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const { closeDb } = require('./utils/db'); closeDb();"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the same module is already imported at the top"
+    }
+  ],
+  "sibling_sites_checked": "No other require( call in the slice (grep).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: db is already imported at bot.ts:52; the inline require works but bypasses the import graph and typing.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "section-c:SC-16"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Import closeDb at the top with the other db imports. Phase 29.",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

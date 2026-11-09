@@ -1,0 +1,80 @@
+{
+  "id": "AUD-TESTI-007",
+  "title": "The dashboard force-sell and emergency-sell tests stub the position SQL by substring, pin the routine exit reason as correct and accept any dex object, so the registered S1s on those controls (still-held failed positions skipped, routine-paused sells refused, first-dex routing) all pass green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "test/integration/api/controls.test.ts",
+    "src/api/routes/controls.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/api/controls.test.ts:15-27@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "db.prepare is a stub that routes on \"WHERE id = ?\" / \"WHERE status = ?\" and returns whatever rows the case injects"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:51-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real statements filter status = ? (pending) AND action = ?, which excludes still-held failed exits (AUD-API-001, ESC-PRE-04)"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/controls.test.ts:127-135@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell asserts executeFullSell(ctx, expect.any(Object), token, fee_tier, \"urgency-market-sell\", 42, ...)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:96-104@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "force-sell sends the routine reason urgency-market-sell (AUD-EXIT-008: refused while routine retries are paused)"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/controls.ts:36-39@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dex chosen as the first dex of the pool type (AUD-EXIT-013); the test accepts any object"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/controls.test.ts:146-154@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "executeFullSell false is asserted to mean 409 \"Sell already in progress\"; false also means V3 private not landed, unknown dex or routine pause (AUD-EXIT-007)"
+    }
+  ],
+  "sibling_sites_checked": "All nine cases of controls.test.ts; pauseFlow Tests 5-8 and pauseCli Tests 1-3/5 (pause/resume routes, db mocked); chains.test.ts (AUD-TESTI-008). No integration or fork test sells a failed-held position from the dashboard.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the emergency controls are the operator escape hatch; the stubbed SQL and pinned reason hide AUD-API-001 (already escalated as ESC-PRE-04), AUD-EXIT-008, AUD-EXIT-013 and AUD-EXIT-007.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-API-001",
+    "AUD-EXIT-008",
+    "AUD-EXIT-013",
+    "AUD-EXIT-007"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28 (after the Phase 24 fixes): run the routes against a temp DB seeded with a pending position, a failed-held position (exit_status exit_failed_held) and a position on the second dex of its type, with executeFullSell real on a scripted provider, and assert all three are sold through the right dex with an emergency (non-routine) reason.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "triggers sell for a pending trade",
+    "returns 409 when sell lock held",
+    "sells all open positions",
+    "tracks errors when some sells fail"
+  ],
+  "escaped_regression": "Today: emergency-sell with a still-held failed position in the wallet sells nothing for it (AUD-API-001) and reports success for the rest; the suite stays green because the stub returns only the rows the case injects."
+}

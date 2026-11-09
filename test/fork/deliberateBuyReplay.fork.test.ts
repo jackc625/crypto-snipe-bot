@@ -85,9 +85,10 @@ process.env.DAILY_LOSS_PCT = '99';
 process.env.MAX_TOTAL_EXPOSURE = '1000';
 
 import { requireRealMainnetGate, FORK_ONLY_TEST_KEY } from './helpers/realMainnetGate';
+import { resolveForkRpcUrl } from './helpers/forkRpcUrl';
 
 const PROVIDER_URL = 'http://127.0.0.1:8545';
-const FORK_RPC = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL;
+const FORK_RPC = resolveForkRpcUrl();
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 
 // Reuse the proven LADYS V2 fixture from Plan 21-03's realLaunches replay: an

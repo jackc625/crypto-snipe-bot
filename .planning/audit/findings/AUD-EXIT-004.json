@@ -1,0 +1,93 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-009",
+    "AUD-EXIT-014"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-37",
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-15"
+  ],
+  "research_suggested_severity": "S2",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-004",
+  "title": "Sell approvals go to the public mempool with ethers default fees, outside the sell fee ceiling, and are exact-amount so most exits first need a public approve",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C06",
+    "C16"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:409-424@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ensureApproval: allowance check, then token.approve(spender, amount) and approveTx.wait(); the doc comment says \"Approval does not need MEV protection -- sent directly\""
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:871@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 full exit: approval for exactly the current balance before the private sell"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:874@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 full exit: same"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1509@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 partial: approval for exactly the partial amount"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1512@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 partial: same"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:541-546@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public fallback: approval for exactly heldBalance"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-signer.js:98-132",
+      "note": "a Contract call through the Wallet populates fees from provider.getFeeData() when none are given; no ceiling is applied"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:619-625",
+      "note": "getFeeData: maxFeePerGas = baseFee*2 + priority fee (node suggestion, or 1 gwei)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:940@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the sell fee ceiling (buildReconcileConfig ... \"sell\", MEV_SELL_MAX_PRIORITY_FEE_GWEI) applies only inside the private escalation, not to approvals or the public fallback swap"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:553-555@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Direct approvals and public fallback bypass transaction fee ceilings"
+    }
+  ],
+  "sibling_sites_checked": "All five approve sites in the slice (:421 via :871/:874/:1509/:1512, and :544). The public fallback swap (:553-555) is also sent with ethers default fees and no ceiling or anti-rug gas multiplier (the multiplier at :862 is passed only to the private leg, :909). Because each approve is exactly the amount sold, a completed sell leaves allowance 0 and the next exit approves again. The buy-side dead simulateSell approve is AUD-BUY-007.",
+  "status": "confirmed",
+  "severity_rationale": "S2, equal to the research suggestion. Proven: approvals are public, uncapped and per-exit. The capital effect is indirect and bounded: a public approve signals an imminent sell (another holder can sell first), costs gas outside the ceiling, and adds a mined public tx before every first exit, including anti-rug exits, whose private sell cannot start until the approve is mined (the wait has no timeout, AUD-EXIT-009).",
+  "recommendation": "Decide on card EXIT-03: approve at buy time (bounded or max allowance to the one router used), or bundle the approve with the private sell, and apply the sell fee ceiling to approvals and the public fallback. Phase 24."
+}

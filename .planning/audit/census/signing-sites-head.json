@@ -1,0 +1,1768 @@
+{
+  "generated_by": ".planning/audit/tools/signing-census.ts",
+  "audited_sha": "a6ed94b5e431ee204505783e55fccb35fa067ed5",
+  "method": {
+    "summary": "TypeScript 5.8.3 type-checker census over a git archive snapshot of src/ and scripts/ at audited_sha (tsconfig.json root files plus scripts/**/*.ts; node_modules = per-entry junctions, type information only, nothing executed). Every CallExpression is classified by the TYPE of its receiver; contract runners and ABIs are traced to their constructions; lock status follows reference chains through the TypeScript language service (findReferences), cycle-safe, and requires every hop to be awaited or returned.",
+    "tx_signing": "sendTransaction/signTransaction on a Signer type; ContractFactory.deploy; state-changing contract method calls and .send on a Signer-runner Contract; Flashbots signBundle/sendBundle/sendRawBundle/sendPrivateTransaction; in-program rawSendBundle/sendRawBundle; unresolved receivers (type_unresolved, lock unknown)",
+    "message_signing": "signMessage/signTypedData on a Signer (no nonce; never a D-NONCE-AUTHORITY-ALL violation)",
+    "excluded": "view/pure ABI fragments, .staticCall/.estimateGas/.populateTransaction, getDeployTransaction (census), and auditor exclusions with evidence (manual inventory)",
+    "lock": "locked lexical = the site function is the op of withNonceLock; locked transitive = every reference chain ends in such an op with every hop awaited/returned; unlocked = a chain reaches module top level, an event/route callback or an exported function with no in-program caller; unknown = unresolved type, unfollowable callback/value use, un-awaited hop, no reference",
+    "in_process_only": "the lock is per process; a script is a separate process with its own lock (AUD-SCRIPTS-002)",
+    "program": {
+      "root_files": 90,
+      "src_files": 71,
+      "script_files": 19,
+      "files_with_ts_errors": 3,
+      "unresolved_modules": [
+        "scripts/addLiquidity.ts: ../artifacts/contracts/FakeToken.sol/FakeToken.json",
+        "scripts/addLiquidity.ts: ../artifacts/contracts/UniswapV2Factory.sol/UniswapV2Factory.json",
+        "scripts/addLiquidity.ts: ../artifacts/contracts/UniswapV2Router02.sol/UniswapV2Router02.json",
+        "scripts/addLiquidity.ts: ../artifacts/contracts/interfaces/IWETH.sol/IWETH.json",
+        "scripts/capture-baselines.ts: ../test/rails/spawnRailedChild",
+        "scripts/deploySepoliaTest.ts: ../artifacts/contracts/FakeToken.sol/FakeToken.json",
+        "scripts/deploySepoliaTest.ts: ../artifacts/contracts/UniswapV2Factory.sol/UniswapV2Factory.json",
+        "scripts/deploySepoliaTest.ts: ../artifacts/contracts/UniswapV2Router02.sol/UniswapV2Router02.json",
+        "scripts/deploySepoliaTest.ts: ../artifacts/contracts/interfaces/IWETH.sol/IWETH.json"
+      ]
+    }
+  },
+  "total_tx_signing": 23,
+  "total_message_signing": 1,
+  "total_excluded": 26,
+  "by_file": {
+    "scripts/addLiquidity.ts": {
+      "tx_signing": 5,
+      "message_signing": 0,
+      "excluded": 1
+    },
+    "scripts/deploySepoliaTest.ts": {
+      "tx_signing": 5,
+      "message_signing": 0,
+      "excluded": 0
+    },
+    "scripts/recover-sell-ladys.ts": {
+      "tx_signing": 2,
+      "message_signing": 0,
+      "excluded": 5
+    },
+    "src/bot.ts": {
+      "tx_signing": 2,
+      "message_signing": 0,
+      "excluded": 8
+    },
+    "src/exitEngine.ts": {
+      "tx_signing": 3,
+      "message_signing": 0,
+      "excluded": 10
+    },
+    "src/utils/mevStrategies/bloxroute.ts": {
+      "tx_signing": 1,
+      "message_signing": 0,
+      "excluded": 0
+    },
+    "src/utils/mevStrategies/flashbots.ts": {
+      "tx_signing": 3,
+      "message_signing": 1,
+      "excluded": 0
+    },
+    "src/utils/mevStrategies/passthrough.ts": {
+      "tx_signing": 1,
+      "message_signing": 0,
+      "excluded": 0
+    },
+    "src/utils/tokenSafety.ts": {
+      "tx_signing": 1,
+      "message_signing": 0,
+      "excluded": 2
+    }
+  },
+  "by_lock_status": {
+    "all": {
+      "locked": 10,
+      "unlocked": 13,
+      "unknown": 0
+    },
+    "src": {
+      "locked": 10,
+      "unlocked": 1,
+      "unknown": 0
+    },
+    "scripts": {
+      "locked": 0,
+      "unlocked": 12,
+      "unknown": 0
+    }
+  },
+  "sites": [
+    {
+      "id": "SIG-001",
+      "file": "scripts/addLiquidity.ts",
+      "line": 35,
+      "column": 11,
+      "ref": "scripts/addLiquidity.ts:35@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.mint",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:35 token.mint(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "FakeToken.mint through a Wallet-runner Contract (:21); the ABI comes from an untracked artifacts/ JSON import, so the census cannot read it; mint is a state-changing external function (contracts/FakeToken.sol:9@23a64617dca167976adc4645fed0e2c69e384820). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:21"
+      ]
+    },
+    {
+      "id": "SIG-002",
+      "file": "scripts/addLiquidity.ts",
+      "line": 43,
+      "column": 29,
+      "ref": "scripts/addLiquidity.ts:43@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.deposit",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:43 weth.deposit(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "WETH deposit (payable, sends value) through a Wallet-runner Contract (:22); ABI from an untracked artifact import. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:22"
+      ]
+    },
+    {
+      "id": "SIG-003",
+      "file": "scripts/addLiquidity.ts",
+      "line": 48,
+      "column": 29,
+      "ref": "scripts/addLiquidity.ts:48@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:48 token.approve(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "token approve through a Wallet-runner Contract (:21); ERC-20 approve is state-changing. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:21"
+      ]
+    },
+    {
+      "id": "SIG-004",
+      "file": "scripts/addLiquidity.ts",
+      "line": 53,
+      "column": 33,
+      "ref": "scripts/addLiquidity.ts:53@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:53 weth.approve(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "WETH approve through a Wallet-runner Contract (:22). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:22"
+      ]
+    },
+    {
+      "id": "SIG-005",
+      "file": "scripts/addLiquidity.ts",
+      "line": 58,
+      "column": 22,
+      "ref": "scripts/addLiquidity.ts:58@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.addLiquidity",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:58 router.addLiquidity(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "router addLiquidity through a Wallet-runner Contract (:23), gasLimit 300000. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:23"
+      ]
+    },
+    {
+      "id": "SIG-006",
+      "file": "scripts/addLiquidity.ts",
+      "line": 73,
+      "column": 31,
+      "ref": "scripts/addLiquidity.ts:73@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.getPair",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "getPair is a view function (the Uniswap V2 factory public mapping getter): an eth_call, no transaction, no nonce (evidence: src/utils/abis.ts:8@23a64617dca167976adc4645fed0e2c69e384820 declares \"function getPair(address tokenA, address tokenB) external view returns (address pair)\")",
+      "excluded_by": "auditor",
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/addLiquidity.ts:73 factory.getPair(...) in main",
+          "scripts/addLiquidity.ts:83 main(...) in module top level",
+          "scripts/addLiquidity.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "factory getPair through a Wallet-runner Contract (:19); a read, excluded by the auditor (the census could not read the artifact ABI).",
+      "origins": [
+        "signer @ scripts/addLiquidity.ts:19"
+      ]
+    },
+    {
+      "id": "SIG-007",
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 22,
+      "column": 24,
+      "ref": "scripts/deploySepoliaTest.ts:22@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "receiver_type": "ContractFactory<any[], BaseContract>",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/deploySepoliaTest.ts:22 WETHFactory.deploy(...) in main",
+          "scripts/deploySepoliaTest.ts:94 main(...) in module top level",
+          "scripts/deploySepoliaTest.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "deployment",
+      "site_awaited": true,
+      "review_note": "WETH deployment, ContractFactory runner = deployer Wallet (:16, :21). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "id": "SIG-008",
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 32,
+      "column": 25,
+      "ref": "scripts/deploySepoliaTest.ts:32@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "receiver_type": "ContractFactory<any[], BaseContract>",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/deploySepoliaTest.ts:32 FakeTokenFactory.deploy(...) in main",
+          "scripts/deploySepoliaTest.ts:94 main(...) in module top level",
+          "scripts/deploySepoliaTest.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "deployment",
+      "site_awaited": true,
+      "review_note": "FakeToken deployment (runner deployer Wallet, :27-31). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "id": "SIG-009",
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 42,
+      "column": 27,
+      "ref": "scripts/deploySepoliaTest.ts:42@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "receiver_type": "ContractFactory<any[], BaseContract>",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/deploySepoliaTest.ts:42 FactoryFactory.deploy(...) in main",
+          "scripts/deploySepoliaTest.ts:94 main(...) in module top level",
+          "scripts/deploySepoliaTest.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "deployment",
+      "site_awaited": true,
+      "review_note": "UniswapV2Factory deployment (runner deployer Wallet, :37-41). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "id": "SIG-010",
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 52,
+      "column": 26,
+      "ref": "scripts/deploySepoliaTest.ts:52@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "ContractFactory.deploy",
+      "kind": "tx-signing",
+      "receiver_type": "ContractFactory<any[], BaseContract>",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/deploySepoliaTest.ts:52 RouterFactory.deploy(...) in main",
+          "scripts/deploySepoliaTest.ts:94 main(...) in module top level",
+          "scripts/deploySepoliaTest.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "deployment",
+      "site_awaited": true,
+      "review_note": "UniswapV2Router02 deployment (runner deployer Wallet, :47-51). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01)."
+    },
+    {
+      "id": "SIG-011",
+      "file": "scripts/deploySepoliaTest.ts",
+      "line": 61,
+      "column": 22,
+      "ref": "scripts/deploySepoliaTest.ts:61@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.createPair",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/deploySepoliaTest.ts:61 factoryContract.createPair(...) in main",
+          "scripts/deploySepoliaTest.ts:94 main(...) in module top level",
+          "scripts/deploySepoliaTest.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "factory createPair through a Wallet-runner Contract (:60); state-changing: the script reads the PairCreated event from its receipt (:62-75). ABI from an untracked artifact import. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/deploySepoliaTest.ts:60"
+      ]
+    },
+    {
+      "id": "SIG-012",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 53,
+      "column": 23,
+      "ref": "scripts/recover-sell-ladys.ts:53@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.decimals",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment decimals: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:44"
+      ]
+    },
+    {
+      "id": "SIG-013",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 54,
+      "column": 31,
+      "ref": "scripts/recover-sell-ladys.ts:54@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:44"
+      ]
+    },
+    {
+      "id": "SIG-014",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 62,
+      "column": 37,
+      "ref": "scripts/recover-sell-ladys.ts:62@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.getAmountsOut",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment getAmountsOut: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:45"
+      ]
+    },
+    {
+      "id": "SIG-015",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 67,
+      "column": 37,
+      "ref": "scripts/recover-sell-ladys.ts:67@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.allowance",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment allowance: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:44"
+      ]
+    },
+    {
+      "id": "SIG-016",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 70,
+      "column": 27,
+      "ref": "scripts/recover-sell-ladys.ts:70@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/recover-sell-ladys.ts:70 token.approve(...) in main",
+          "scripts/recover-sell-ladys.ts:93 main(...) in module top level",
+          "scripts/recover-sell-ladys.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "LADYS approve through a Wallet-runner Contract (:44); the inline ERC20_ABI (:31) declares approve state-changing. unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:44"
+      ]
+    },
+    {
+      "id": "SIG-017",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 78,
+      "column": 23,
+      "ref": "scripts/recover-sell-ladys.ts:78@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "scripts/recover-sell-ladys.ts:78 router.swapExactTokensForETHSupportingFeeOnTransferTokens(...) in main",
+          "scripts/recover-sell-ladys.ts:93 main(...) in module top level",
+          "scripts/recover-sell-ladys.ts: module top level (entry)"
+        ]
+      ],
+      "reason": "module top level",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "public-mempool LADYS sell through a Wallet-runner router (:45, ABI :26). unlocked: the call runs in the script main(), invoked at module top level; the script is its own process with its own nonce lock, so the bot lock can never cover it (AUD-SCRIPTS-002; signer exclusion decided in Phase 29, ESC-SCRIPTS-01).",
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:45"
+      ]
+    },
+    {
+      "id": "SIG-018",
+      "file": "scripts/recover-sell-ladys.ts",
+      "line": 86,
+      "column": 36,
+      "ref": "scripts/recover-sell-ladys.ts:86@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "main",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ scripts/recover-sell-ladys.ts:44"
+      ]
+    },
+    {
+      "id": "SIG-019",
+      "file": "src/bot.ts",
+      "line": 225,
+      "column": 36,
+      "ref": "src/bot.ts:225@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "maybeApproveForChain",
+      "api": "contract.allowance",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "allowance is a view function in every ERC-20 ABI in the program, and maybeApproveForChain is not exported and has no reference anywhere in src/ or scripts/, so this line never runs (evidence: src/utils/abis.ts:32@23a64617dca167976adc4645fed0e2c69e384820 declares \"function allowance(address owner, address spender) view returns (uint256)\"; git grep -n -F \"maybeApproveForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts returns only the declaration src/bot.ts:222)",
+      "excluded_by": "auditor",
+      "lock_status": "unknown",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "src/bot.ts:225 tokenContract.allowance(...) in maybeApproveForChain",
+          "src/bot.ts:224 maybeApproveForChain"
+        ]
+      ],
+      "reason": "runner unresolved (src/bot.ts:224 parameter tokenContract with no traceable call site); no in-program reference (dead code, or invoked dynamically)",
+      "type_unresolved": false,
+      "runner": "unresolved",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "allowance read inside maybeApproveForChain; the census cannot trace the tokenContract parameter because the function has no caller. A read, excluded by the auditor.",
+      "origins": [
+        "unresolved @ src/bot.ts:224 parameter tokenContract with no traceable call site"
+      ]
+    },
+    {
+      "id": "SIG-020",
+      "file": "src/bot.ts",
+      "line": 228,
+      "column": 19,
+      "ref": "src/bot.ts:228@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "<arrow passed to withNonceLock>",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "lexical",
+      "chains": [
+        [
+          "src/bot.ts:228 tokenContract.approve(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:227 withNonceLock(ctx.wallet.address, ...) in maybeApproveForChain"
+        ]
+      ],
+      "reason": "runner unresolved (src/bot.ts:224 parameter tokenContract with no traceable call site)",
+      "type_unresolved": false,
+      "runner": "unresolved",
+      "mutability": "unresolved",
+      "site_awaited": true,
+      "review_note": "locked (lexical): the approve is the op body of withNonceLock(ctx.wallet.address, ...) at :225. The enclosing maybeApproveForChain has no caller (dead code, recorded in AUD-BUY-007), so the census cannot trace the runner; counted because it is an approve.",
+      "origins": [
+        "unresolved @ src/bot.ts:224 parameter tokenContract with no traceable call site"
+      ]
+    },
+    {
+      "id": "SIG-021",
+      "file": "src/bot.ts",
+      "line": 532,
+      "column": 41,
+      "ref": "src/bot.ts:532@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeDeliberateBuy",
+      "api": "contract.getAmountsOut",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment getAmountsOut: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:503"
+      ]
+    },
+    {
+      "id": "SIG-022",
+      "file": "src/bot.ts",
+      "line": 715,
+      "column": 44,
+      "ref": "src/bot.ts:715@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeDeliberateBuy",
+      "api": "contract.getAmountsOut",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment getAmountsOut: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:503"
+      ]
+    },
+    {
+      "id": "SIG-023",
+      "file": "src/bot.ts",
+      "line": 749,
+      "column": 27,
+      "ref": "src/bot.ts:749@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "<arrow passed to withNonceLock>",
+      "api": "contract.swapExactETHForTokensSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "lexical",
+      "chains": [
+        [
+          "src/bot.ts:749 router.swapExactETHForTokensSupportingFeeOnTransferTokens(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:748 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "payable",
+      "site_awaited": true,
+      "review_note": "locked (lexical): the deliberate public-mempool buy is the op body of withNonceLock(ctx.wallet.address, ...) at :746; router = Wallet-runner Contract (:501). executeDeliberateBuy is reached from scripts/deliberate-buy.ts, a separate process whose own lock does not serialize with the bot process (AUD-SCRIPTS-002).",
+      "origins": [
+        "signer @ src/bot.ts:503"
+      ]
+    },
+    {
+      "id": "SIG-024",
+      "file": "src/bot.ts",
+      "line": 833,
+      "column": 47,
+      "ref": "src/bot.ts:833@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "recordAndArmDeliberateBuy",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:832"
+      ]
+    },
+    {
+      "id": "SIG-025",
+      "file": "src/bot.ts",
+      "line": 1053,
+      "column": 34,
+      "ref": "src/bot.ts:1053@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "handleNewPairForChain",
+      "api": "contract.getAmountsOut",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment getAmountsOut: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:1048"
+      ]
+    },
+    {
+      "id": "SIG-026",
+      "file": "src/bot.ts",
+      "line": 1161,
+      "column": 51,
+      "ref": "src/bot.ts:1161@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "handleNewPairForChain",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:1160"
+      ]
+    },
+    {
+      "id": "SIG-027",
+      "file": "src/bot.ts",
+      "line": 1481,
+      "column": 51,
+      "ref": "src/bot.ts:1481@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "handleNewV3PoolForChain",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:1480"
+      ]
+    },
+    {
+      "id": "SIG-028",
+      "file": "src/bot.ts",
+      "line": 1936,
+      "column": 9,
+      "ref": "src/bot.ts:1936@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "resumeMultiChainMonitoring",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": false,
+      "review_note": null,
+      "origins": [
+        "signer @ src/bot.ts:1935"
+      ]
+    },
+    {
+      "id": "SIG-029",
+      "file": "src/exitEngine.ts",
+      "line": 421,
+      "column": 44,
+      "ref": "src/exitEngine.ts:421@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "ensureApproval",
+      "api": "contract.allowance",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment allowance: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:873 argument 0",
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:876 argument 0",
+        "signer @ src/exitEngine.ts:1492 -> src/exitEngine.ts:1512 argument 0",
+        "signer @ src/exitEngine.ts:1492 -> src/exitEngine.ts:1515 argument 0"
+      ]
+    },
+    {
+      "id": "SIG-030",
+      "file": "src/exitEngine.ts",
+      "line": 423,
+      "column": 33,
+      "ref": "src/exitEngine.ts:423@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "ensureApproval",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/exitEngine.ts:423 token.approve(...) in ensureApproval",
+          "src/exitEngine.ts:873 ensureApproval(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:873 withNonceLock(ctx.wallet.address, ...) in executeFullSell"
+        ],
+        [
+          "src/exitEngine.ts:423 token.approve(...) in ensureApproval",
+          "src/exitEngine.ts:876 ensureApproval(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:876 withNonceLock(ctx.wallet.address, ...) in executeFullSell"
+        ],
+        [
+          "src/exitEngine.ts:423 token.approve(...) in ensureApproval",
+          "src/exitEngine.ts:1512 ensureApproval(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1512 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/exitEngine.ts:423 token.approve(...) in ensureApproval",
+          "src/exitEngine.ts:1515 ensureApproval(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1515 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "locked (transitive): ensureApproval (:413) is called only at :871, :874, :1509 and :1512, each as the awaited op body of withNonceLock(ctx.wallet.address, ...); token = Wallet-runner Contract (:838, :1489). Read by hand: git grep \"ensureApproval(\" shows no other caller.",
+      "origins": [
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:873 argument 0",
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:876 argument 0",
+        "signer @ src/exitEngine.ts:1492 -> src/exitEngine.ts:1512 argument 0",
+        "signer @ src/exitEngine.ts:1492 -> src/exitEngine.ts:1515 argument 0"
+      ]
+    },
+    {
+      "id": "SIG-031",
+      "file": "src/exitEngine.ts",
+      "line": 522,
+      "column": 37,
+      "ref": "src/exitEngine.ts:522@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executePublicFallbackSell",
+      "api": "contract.getAmountsOut",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment getAmountsOut: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:518"
+      ]
+    },
+    {
+      "id": "SIG-032",
+      "file": "src/exitEngine.ts",
+      "line": 543,
+      "column": 44,
+      "ref": "src/exitEngine.ts:543@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executePublicFallbackSell",
+      "api": "contract.allowance",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment allowance: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:1023 argument 2"
+      ]
+    },
+    {
+      "id": "SIG-033",
+      "file": "src/exitEngine.ts",
+      "line": 546,
+      "column": 37,
+      "ref": "src/exitEngine.ts:546@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "<arrow passed to withNonceLock>",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "lexical",
+      "chains": [
+        [
+          "src/exitEngine.ts:546 token.approve(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:545 withNonceLock(ctx.wallet.address, ...) in executePublicFallbackSell"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "locked (lexical): op body of withNonceLock(ctx.wallet.address, ...) at :543 (public-fallback sell approve); token is the Wallet-runner Contract passed in from :838 via :1021.",
+      "origins": [
+        "signer @ src/exitEngine.ts:840 -> src/exitEngine.ts:1023 argument 2"
+      ]
+    },
+    {
+      "id": "SIG-034",
+      "file": "src/exitEngine.ts",
+      "line": 555,
+      "column": 27,
+      "ref": "src/exitEngine.ts:555@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "<arrow passed to withNonceLock>",
+      "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "lexical",
+      "chains": [
+        [
+          "src/exitEngine.ts:555 router.swapExactTokensForETHSupportingFeeOnTransferTokens(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:554 withNonceLock(ctx.wallet.address, ...) in executePublicFallbackSell"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "locked (lexical): the public-fallback sell is the op body of withNonceLock(ctx.wallet.address, ...) at :552; router = Wallet-runner Contract (:516). The never-settling wait inside this lock is AUD-TX-002.",
+      "origins": [
+        "signer @ src/exitEngine.ts:518"
+      ]
+    },
+    {
+      "id": "SIG-035",
+      "file": "src/exitEngine.ts",
+      "line": 841,
+      "column": 39,
+      "ref": "src/exitEngine.ts:841@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeFullSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840"
+      ]
+    },
+    {
+      "id": "SIG-036",
+      "file": "src/exitEngine.ts",
+      "line": 987,
+      "column": 47,
+      "ref": "src/exitEngine.ts:987@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeFullSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840"
+      ]
+    },
+    {
+      "id": "SIG-037",
+      "file": "src/exitEngine.ts",
+      "line": 1004,
+      "column": 44,
+      "ref": "src/exitEngine.ts:1004@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeFullSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840"
+      ]
+    },
+    {
+      "id": "SIG-038",
+      "file": "src/exitEngine.ts",
+      "line": 1101,
+      "column": 47,
+      "ref": "src/exitEngine.ts:1101@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeFullSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:840"
+      ]
+    },
+    {
+      "id": "SIG-039",
+      "file": "src/exitEngine.ts",
+      "line": 1132,
+      "column": 33,
+      "ref": "src/exitEngine.ts:1132@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executeFullSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:1131"
+      ]
+    },
+    {
+      "id": "SIG-040",
+      "file": "src/exitEngine.ts",
+      "line": 1493,
+      "column": 39,
+      "ref": "src/exitEngine.ts:1493@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "executePartialSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:1492"
+      ]
+    },
+    {
+      "id": "SIG-041",
+      "file": "src/exitEngine.ts",
+      "line": 1991,
+      "column": 39,
+      "ref": "src/exitEngine.ts:1991@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "resumeExitMonitor",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/exitEngine.ts:1990"
+      ]
+    },
+    {
+      "id": "SIG-042",
+      "file": "src/utils/mevStrategies/bloxroute.ts",
+      "line": 128,
+      "column": 30,
+      "ref": "src/utils/mevStrategies/bloxroute.ts:128@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "submit",
+      "api": "signer.signTransaction",
+      "kind": "tx-signing",
+      "receiver_type": "Wallet",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/utils/mevStrategies/bloxroute.ts:128 wallet.signTransaction(...) in submit",
+          "src/utils/mevStrategies/bloxroute.ts:197 submitWithReconciliation(...) in BloxrouteMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:199 sendTxWithRetry(...) in escalatePrivateSell",
+          "src/exitEngine.ts:790 escalatePrivateSell(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:790 withNonceLock(ctx.wallet.address, ...) in submitPrivateSell"
+        ],
+        [
+          "src/utils/mevStrategies/bloxroute.ts:128 wallet.signTransaction(...) in submit",
+          "src/utils/mevStrategies/bloxroute.ts:197 submitWithReconciliation(...) in BloxrouteMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:304 sendTxWithRetry(...) in escalatePrivateBuy",
+          "src/bot.ts:560 escalatePrivateBuy(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:560 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ],
+        [
+          "src/utils/mevStrategies/bloxroute.ts:128 wallet.signTransaction(...) in submit",
+          "src/utils/mevStrategies/bloxroute.ts:197 submitWithReconciliation(...) in BloxrouteMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/exitEngine.ts:1534 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1534 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/utils/mevStrategies/bloxroute.ts:128 wallet.signTransaction(...) in submit",
+          "src/utils/mevStrategies/bloxroute.ts:197 submitWithReconciliation(...) in BloxrouteMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/bot.ts:269 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:269 withNonceLock(ctx.wallet.address, ...) in submitBuyTx"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": null,
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "locked (transitive): runs in the submit closure that submitWithReconciliation awaits directly (reconciliation.ts:557); BloxrouteMevStrategy.sendTransaction is reached only through strategy.sendTransaction in sendTxWithRetry (txManager.ts:114), whose callers are the withNonceLock ops at bot.ts:267, bot.ts:558 (via escalatePrivateBuy, txManager.ts:304), exitEngine.ts:788 (via escalatePrivateSell, txManager.ts:199) and exitEngine.ts:1531. The signed bytes go to the bloXroute relay over HTTP."
+    },
+    {
+      "id": "SIG-043",
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 102,
+      "column": 47,
+      "ref": "src/utils/mevStrategies/flashbots.ts:102@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "rawSendBundle",
+      "api": "signer.signMessage",
+      "kind": "message-signing",
+      "receiver_type": "Wallet",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": null,
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "message-signing: the X-Flashbots-Signature relay auth header, signed by authSigner = new Wallet(this.authKey) (:151); no transaction, no nonce; never a D-NONCE-AUTHORITY-ALL violation."
+    },
+    {
+      "id": "SIG-044",
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 232,
+      "column": 30,
+      "ref": "src/utils/mevStrategies/flashbots.ts:232@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "submit",
+      "api": "flashbots.signBundle",
+      "kind": "tx-signing",
+      "receiver_type": "FlashbotsBundleProvider",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/utils/mevStrategies/flashbots.ts:232 flashbotsProvider.signBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:199 sendTxWithRetry(...) in escalatePrivateSell",
+          "src/exitEngine.ts:790 escalatePrivateSell(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:790 withNonceLock(ctx.wallet.address, ...) in submitPrivateSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:232 flashbotsProvider.signBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:304 sendTxWithRetry(...) in escalatePrivateBuy",
+          "src/bot.ts:560 escalatePrivateBuy(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:560 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:232 flashbotsProvider.signBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/exitEngine.ts:1534 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1534 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:232 flashbotsProvider.signBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/bot.ts:269 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:269 withNonceLock(ctx.wallet.address, ...) in submitBuyTx"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "bundle",
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "locked (transitive): signs the bot-wallet tx once per attempt inside the submit closure awaited by submitWithReconciliation; same four lock entries as bloxroute.ts:128 (bot.ts:267, bot.ts:558, exitEngine.ts:788, exitEngine.ts:1531)."
+    },
+    {
+      "id": "SIG-045",
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 263,
+      "column": 28,
+      "ref": "src/utils/mevStrategies/flashbots.ts:263@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "submit",
+      "api": "flashbots.sendBundle",
+      "kind": "tx-signing",
+      "receiver_type": "FlashbotsBundleProvider",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/utils/mevStrategies/flashbots.ts:263 flashbotsProvider.sendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:199 sendTxWithRetry(...) in escalatePrivateSell",
+          "src/exitEngine.ts:790 escalatePrivateSell(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:790 withNonceLock(ctx.wallet.address, ...) in submitPrivateSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:263 flashbotsProvider.sendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:304 sendTxWithRetry(...) in escalatePrivateBuy",
+          "src/bot.ts:560 escalatePrivateBuy(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:560 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:263 flashbotsProvider.sendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/exitEngine.ts:1534 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1534 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:263 flashbotsProvider.sendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/bot.ts:269 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:269 withNonceLock(ctx.wallet.address, ...) in submitBuyTx"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "bundle",
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "locked (transitive): the library sendBundle receives {signer: wallet, transaction} and signs again inside the library; same submit closure and lock entries as :232."
+    },
+    {
+      "id": "SIG-046",
+      "file": "src/utils/mevStrategies/flashbots.ts",
+      "line": 305,
+      "column": 27,
+      "ref": "src/utils/mevStrategies/flashbots.ts:305@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "submit",
+      "api": "rawSendBundle",
+      "kind": "tx-signing",
+      "receiver_type": "function",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/utils/mevStrategies/flashbots.ts:305 rawSendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:199 sendTxWithRetry(...) in escalatePrivateSell",
+          "src/exitEngine.ts:790 escalatePrivateSell(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:790 withNonceLock(ctx.wallet.address, ...) in submitPrivateSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:305 rawSendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:304 sendTxWithRetry(...) in escalatePrivateBuy",
+          "src/bot.ts:560 escalatePrivateBuy(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:560 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:305 rawSendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/exitEngine.ts:1534 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1534 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/utils/mevStrategies/flashbots.ts:305 rawSendBundle(...) in submit",
+          "src/utils/mevStrategies/flashbots.ts:380 submitWithReconciliation(...) in FlashbotsMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/bot.ts:269 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:269 withNonceLock(ctx.wallet.address, ...) in submitBuyTx"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "relay",
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "locked (transitive): the multi-builder eth_sendBundle fanout of the bytes signed at :232 (the relay auth signature inside it is the message-signing site :102); same submit closure and lock entries as :232."
+    },
+    {
+      "id": "SIG-047",
+      "file": "src/utils/mevStrategies/passthrough.ts",
+      "line": 130,
+      "column": 24,
+      "ref": "src/utils/mevStrategies/passthrough.ts:130@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "submit",
+      "api": "signer.sendTransaction",
+      "kind": "tx-signing",
+      "receiver_type": "Wallet",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "locked",
+      "lock_evidence": "transitive",
+      "chains": [
+        [
+          "src/utils/mevStrategies/passthrough.ts:130 wallet.sendTransaction(...) in submit",
+          "src/utils/mevStrategies/passthrough.ts:155 submitWithReconciliation(...) in PassthroughMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:199 sendTxWithRetry(...) in escalatePrivateSell",
+          "src/exitEngine.ts:790 escalatePrivateSell(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:790 withNonceLock(ctx.wallet.address, ...) in submitPrivateSell"
+        ],
+        [
+          "src/utils/mevStrategies/passthrough.ts:130 wallet.sendTransaction(...) in submit",
+          "src/utils/mevStrategies/passthrough.ts:155 submitWithReconciliation(...) in PassthroughMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/utils/txManager.ts:304 sendTxWithRetry(...) in escalatePrivateBuy",
+          "src/bot.ts:560 escalatePrivateBuy(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:560 withNonceLock(ctx.wallet.address, ...) in executeDeliberateBuy"
+        ],
+        [
+          "src/utils/mevStrategies/passthrough.ts:130 wallet.sendTransaction(...) in submit",
+          "src/utils/mevStrategies/passthrough.ts:155 submitWithReconciliation(...) in PassthroughMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/exitEngine.ts:1534 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/exitEngine.ts:1534 withNonceLock(ctx.wallet.address, ...) in executePartialSell"
+        ],
+        [
+          "src/utils/mevStrategies/passthrough.ts:130 wallet.sendTransaction(...) in submit",
+          "src/utils/mevStrategies/passthrough.ts:155 submitWithReconciliation(...) in PassthroughMevStrategy.sendTransaction",
+          "src/utils/mevStrategies/reconciliation.ts:454 submitWithReconciliation invokes parameter submit directly and awaits it (src/utils/mevStrategies/reconciliation.ts:557)",
+          "src/utils/txManager.ts:114 strategy.sendTransaction(...) in sendTxWithRetry",
+          "src/bot.ts:269 sendTxWithRetry(...) in <arrow passed to withNonceLock>",
+          "src/bot.ts:269 withNonceLock(ctx.wallet.address, ...) in submitBuyTx"
+        ]
+      ],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": null,
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": "locked (transitive): wallet.sendTransaction in the passthrough submit closure awaited by submitWithReconciliation (passthrough.ts:155 -> reconciliation.ts:557); same four lock entries. The tx.wait(3) inside the lock is AUD-TX-002."
+    },
+    {
+      "id": "SIG-048",
+      "file": "src/utils/tokenSafety.ts",
+      "line": 276,
+      "column": 31,
+      "ref": "src/utils/tokenSafety.ts:276@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "simulateSell",
+      "api": "contract.balanceOf",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "view/pure ABI fragment balanceOf: a read-only eth_call through the contract runner; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "view",
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/utils/tokenSafety.ts:274"
+      ]
+    },
+    {
+      "id": "SIG-049",
+      "file": "src/utils/tokenSafety.ts",
+      "line": 277,
+      "column": 15,
+      "ref": "src/utils/tokenSafety.ts:277@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "simulateSell",
+      "api": "contract.approve",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": false,
+      "excluded_reason": null,
+      "excluded_by": null,
+      "lock_status": "unlocked",
+      "lock_evidence": null,
+      "chains": [
+        [
+          "src/utils/tokenSafety.ts:277 erc20.approve(...) in simulateSell",
+          "src/utils/tokenSafety.ts:269 simulateSell is exported with no in-program caller (entry: an importer can call it outside any lock)"
+        ]
+      ],
+      "reason": "exported entry with no in-program caller",
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": "nonpayable",
+      "site_awaited": true,
+      "review_note": "UNLOCKED: simulateSell builds a Wallet-runner ERC-20 Contract (:274) and sends a real approve of the whole balance to CONFIG.routerAddress with no withNonceLock. simulateSell is exported and imported by src/bot.ts:17 but never called anywhere in src/ or scripts/ (git grep \"simulateSell(\" returns only the declaration); tests only mock it. Unreachable today, one call away from live. Same defect as AUD-BUY-007; registered as AUD-CENSUS-002 (duplicate) and escalated at ESC-CENSUS-01.",
+      "origins": [
+        "signer @ src/utils/tokenSafety.ts:274"
+      ]
+    },
+    {
+      "id": "SIG-050",
+      "file": "src/utils/tokenSafety.ts",
+      "line": 286,
+      "column": 15,
+      "ref": "src/utils/tokenSafety.ts:286@a6ed94b5e431ee204505783e55fccb35fa067ed5",
+      "enclosing": "simulateSell",
+      "api": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens.staticCall",
+      "kind": "tx-signing",
+      "receiver_type": "Contract",
+      "excluded": true,
+      "excluded_reason": "staticCall: a read-only eth_call simulation; no transaction, no nonce",
+      "excluded_by": "census",
+      "lock_status": null,
+      "lock_evidence": null,
+      "chains": [],
+      "reason": null,
+      "type_unresolved": false,
+      "runner": "signer",
+      "mutability": null,
+      "site_awaited": true,
+      "review_note": null,
+      "origins": [
+        "signer @ src/utils/tokenSafety.ts:279"
+      ]
+    }
+  ],
+  "delegations": [
+    {
+      "file": "src/utils/txManager.ts",
+      "line": 114,
+      "call": "strategy.sendTransaction",
+      "receiver_type": "MevStrategy",
+      "note": "receiver is not a Signer: a wrapper whose implementations hold the counted signing calls"
+    }
+  ],
+  "lock_calls": [
+    {
+      "file": "src/bot.ts",
+      "line": 227,
+      "key": "ctx.wallet.address",
+      "enclosing": "maybeApproveForChain"
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 269,
+      "key": "ctx.wallet.address",
+      "enclosing": "submitBuyTx"
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 560,
+      "key": "ctx.wallet.address",
+      "enclosing": "executeDeliberateBuy"
+    },
+    {
+      "file": "src/bot.ts",
+      "line": 748,
+      "key": "ctx.wallet.address",
+      "enclosing": "executeDeliberateBuy"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 545,
+      "key": "ctx.wallet.address",
+      "enclosing": "executePublicFallbackSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 554,
+      "key": "ctx.wallet.address",
+      "enclosing": "executePublicFallbackSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 790,
+      "key": "ctx.wallet.address",
+      "enclosing": "submitPrivateSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 873,
+      "key": "ctx.wallet.address",
+      "enclosing": "executeFullSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 876,
+      "key": "ctx.wallet.address",
+      "enclosing": "executeFullSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 1512,
+      "key": "ctx.wallet.address",
+      "enclosing": "executePartialSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 1515,
+      "key": "ctx.wallet.address",
+      "enclosing": "executePartialSell"
+    },
+    {
+      "file": "src/exitEngine.ts",
+      "line": 1534,
+      "key": "ctx.wallet.address",
+      "enclosing": "executePartialSell"
+    }
+  ],
+  "reconciliation": {
+    "manual_inventory": ".planning/audit/census/manual-inventory-head.json",
+    "manual_tx_signing": 23,
+    "census_tx_signing": 23,
+    "missing_from_census": [],
+    "missing_from_manual": []
+  }
+}

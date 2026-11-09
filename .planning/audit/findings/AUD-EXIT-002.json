@@ -1,0 +1,78 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-003"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-EXIT-01",
+  "od_ref": "OD-35",
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-07"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-002",
+  "title": "Exit monitor silently never starts when the first price quote fails, so the position has no stop-loss, trailing stop or 30-minute exit until a restart",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C03",
+    "C12"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1866-1873@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor: entryPrice = await queryPrice(...); if null -> ctx.log.error(\"Cannot query initial price, exit monitor not started\") and return; no interval, no exit_state row, no retry, no Telegram alert"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:315-345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice returns null on any error (RPC error, revert, unsupported dex/feeTier combination), so one transient RPC failure right after the buy is enough"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1890-1891@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the exit_state row is written only after the quote succeeds, so the failed start leaves nothing persisted for the position"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1978-1984@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sibling: resumeExitMonitor with no exit_state row (exactly the state a failed start leaves) queries the price once more and returns the same way on null (\"Cannot query price for resume, skipping\")"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:421-422@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "armPositionMonitoring awaits startExitMonitor, which resolves normally on this path, so the caller cannot tell the monitor was not armed; anti-rug registration then still runs (:430-439)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1482-1483@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 snipe path: same call, same silent return"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1870-1873@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): One initial quote failure leaves a purchased position without monitoring"
+    }
+  ],
+  "sibling_sites_checked": "All three monitor entry points: startExitMonitor (:1857-1946, returns on null at :1870-1873), resumeExitMonitor no-row branch (:1978-1984, same), resumeExitMonitor with a row (:1968-1977, no quote needed, starts). Callers at the base SHA: bot.ts:422 (armPositionMonitoring, V2 snipe and deliberate buy), bot.ts:1483 (V3 snipe), bot.ts:1948/:1955 (restart resume), exitEngine.ts:731 (re-arm after a failed exit; has a row, so it starts). The parseEther(buyAmountNative) at :1866 throws instead of returning for an invalid amount, which rejects armPositionMonitoring before the anti-rug registration (BUY slice, AUD-BUY-002 family).",
+  "status": "confirmed",
+  "severity_rationale": "S1, equal to the research suggestion. Proven by the code: on a null first quote the function returns with no timer, no persisted state, no alert and no retry. The plausible condition is a single RPC error or quoter revert in the seconds after a buy (busy launch block). Anti-rug registration still runs, so the position is not fully unprotected, and a restart re-tries once; that bounds it below S0. Until then there is no stop-loss, trailing stop, partial take-profit or 30-minute urgency exit.",
+  "recommendation": "Never return without an armed monitor: retry the first quote with backoff, or persist exit_state with an unknown entry price and keep the interval armed so it baselines on the first good quote; alert the operator on any start failure. Decide the policy on card EXIT-01 (Phase 24)."
+}

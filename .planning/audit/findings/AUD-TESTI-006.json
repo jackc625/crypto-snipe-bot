@@ -1,0 +1,90 @@
+{
+  "id": "AUD-TESTI-006",
+  "title": "The anti-rug restart-resume tests mock the resume SQL, give every chain a single dex per pool type and never assert which dex a position is re-registered with, so the registered S1 (positions re-registered on the first dex of their type, not the dex bought on) passes green; five of the ten cases are source-text greps",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10",
+    "C13"
+  ],
+  "files": [
+    "test/integration/anti-rug/botWiring.test.ts",
+    "src/bot.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:112-141@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeAntiRugTrades / getResumeExitMonitorTrades are mocks whose rows the test injects"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:263-313@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildChainCtx gives each chain one V2 and one V3 dex"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:430-467@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 27 rows have no dex_name and the assertion reads only the trade id argument (:464)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2096-2098@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resume picks ctx.chain.dexes.find(d => d.dexType === trade.pool_type), the first dex of that type (AUD-ANTIRUG-011)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:612-621@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeAntiRugTrades does not select dex_name"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:469-485@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 28 comment: \"the ordering invariant is enforced by implementation — we test it via Test 27\"; Test 27 asserts no order"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:519-559@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 31 \"excluded by INNER JOIN\" regex-matches the SQL text in db.ts (:551-558) instead of running it"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/anti-rug/botWiring.test.ts:339-427@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Tests 22-26 assert substrings and index order in src/bot.ts source text"
+    }
+  ],
+  "sibling_sites_checked": "Resume paths in the TESTI slice: botWiring (anti-rug resume), preflightInvocation / midRunWalletCheck / pauseFlow (resume statements mocked to return []), test/fork/exitStatePersistence.fork.test.ts (exit-monitor resume on a fork, Task 2). The unit sibling for the exit-monitor resume is AUD-TESTU-005.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: mocked SQL plus a single-dex fixture on the restart-resume path hide the registered S1s AUD-ANTIRUG-011 and AUD-EXIT-013 (wrong dex after restart).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-011",
+    "AUD-EXIT-013",
+    "AUD-TESTU-005"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: seed a temp DB (from the real migration, see AUD-TESTI-001) with a buy on the second V2 dex of a chain, run resumeAntiRugMonitoring and resumeMultiChainMonitoring against it, and assert the dex passed to registerAntiRugPosition / resumeExitMonitor is the stored dex_name (RED today). Replace the source-text greps with behavioural assertions.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 27: queries trades JOIN lp_baseline and re-registers each row via registerAntiRugPosition",
+    "Test 28: calls verifyAllowlistAtStartup once per chain BEFORE the re-register loop",
+    "Test 31: pre-Phase-19 trades (no lp_baseline) are excluded by INNER JOIN",
+    "Tests 22-26 (source-text wiring guards)"
+  ],
+  "escaped_regression": "Today: after a restart a position bought on sushiswap-v2 (ETH) or biswap-v2 (BSC) is re-registered for anti-rug with the first V2 dex of the chain (AUD-ANTIRUG-011) and Test 27 stays green because the fixture has one V2 dex and the dex argument is not asserted."
+}

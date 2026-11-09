@@ -1,0 +1,51 @@
+RED proof 22-08-3 — db-tripwire-setup
+Plan 22-08 (SAFE-02, AC-18 setup layer). Recorded 2026-11-07T04:24:02.869Z at HEAD e3dad09b46e5124f673800924512dcafa6dd495a.
+Neutralised file: test/rails/core.cjs (working tree only; never committed)
+M = C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json (backup MANIFEST, NAC-03)
+
+== Neutralising diff (git diff) ==
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..b906ec9 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -923,8 +923,9 @@ function wrapAddon(addon) {
+         if (!new.target) return Reflect.apply(orig, this, args);
+         // Native signature (lib/database.js:69): (filename, filenameGiven, anonymous, ...).
+         // The `anonymous` flag is not trusted: both names are checked unless '' / ':memory:'.
+-        checkDbFilenameOrThrow(args[0], 'open');
+-        checkDbFilenameOrThrow(args[1], 'open');
++        // RED 22-08-3: addon Database wrapper passes through
++        // checkDbFilenameOrThrow(args[0], 'open');
++        // checkDbFilenameOrThrow(args[1], 'open');
+         return Reflect.construct(orig, args, new.target === wrapped ? orig : new.target);
+     };
+     wrapped.prototype = proto;
+
+== RED command (only the one named test file) ==
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest "$M" -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/dbTripwireSetup.test.ts
+
+== RED result: wrapped command exit 1 (Vitest failed, as required) ==
+Failing output excerpt (ANSI stripped):
+   ❯  unit  test/unit/rails/dbTripwireSetup.test.ts (11 tests | 11 skipped) 22ms
+  ⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+   FAIL   unit  test/unit/rails/dbTripwireSetup.test.ts [ test/unit/rails/dbTripwireSetup.test.ts ]
+  AssertionError: expected 'NO-THROW' to be 'RAIL_DB_TRIPWIRE' // Object.is equality
+  Expected: "RAIL_DB_TRIPWIRE"
+  Received: "NO-THROW"
+   Test Files  1 failed (1)
+        Tests  11 skipped (11)
+     Duration  401ms (transform 63ms, setup 59ms, import 89ms, tests 22ms, environment 0ms)
+  verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+== Wrapper verdict (RED run) ==
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042358-8860-1f699d | child exit 1 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042358-8860-1f699d\summary.json
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git status --porcelain test/rails/core.cjs => (empty)
+sha256 before neutralising 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91 == after restore 61d73137360ceb3907b1a5e37627f765487803fcb9efff4d984d77d2b3835d91
+
+== GREEN rerun (same command, rail restored) ==
+  Test Files  1 passed (1)
+  Tests  11 passed (11)
+verify-prod-untouched: verdict: untouched | run vpu-20261107T042401-15560-3132ea | child exit 0 | manifest: equal | ledger: not required | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261107T042401-15560-3132ea\summary.json

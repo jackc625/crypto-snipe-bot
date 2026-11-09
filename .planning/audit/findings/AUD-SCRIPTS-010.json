@@ -1,0 +1,49 @@
+{
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-SCRIPTS-010",
+  "title": "check-empty-files.sh checks the size of the working-tree file instead of the staged content, silently passes when run from a subfolder, and is not installed as a hook",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "scripts/check-empty-files.sh"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/check-empty-files.sh:33@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "staged paths come from git diff --cached --name-only (repo-root relative)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/check-empty-files.sh:46-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "[ -f \"$f\" ] and wc -c on the working-tree file, resolved from the current folder: a staged empty blob with a non-empty working copy passes, and from a subfolder every path is skipped"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/check-empty-files.sh:9-20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "install is a manual per-clone step; nothing in the repo installs or runs it (no npm script, no CI step)"
+    }
+  ],
+  "sibling_sites_checked": "package.json scripts (:7-18) and .github/workflows/test.yml: neither runs it. The tracked 0-byte file at the base is reports/.gitkeep (allow-listed); .DS_Store is 6148 bytes (AUD-ROOT-005).",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: a guard that does not guard; no capital path.",
+  "related": [
+    "AUD-ROOT-005"
+  ],
+  "tags": [],
+  "recommendation": "Phase 25 (cleanup) or Phase 31 (CI gates): check the staged blob size (git cat-file -s :<path>), cd to the repo root first, and run it as a CI step if it is kept."
+}

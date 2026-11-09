@@ -102,7 +102,7 @@ After any `.env` change to anti-rug variables (or any other env var):
 grep ANTIRUG .env
 
 # 3. Start the bot
-npx ts-node src/bot.ts
+npx ts-node src/main.ts
 
 # 4. Watch the startup logs for the per-chain allowlist verification block
 #    Look for log lines with op='antirug.allowlist-verified' for each enabled
@@ -135,7 +135,7 @@ allowlist block on each bot start before pressing enter on subsequent operations
 
 ## 3. Per-chain verification protocol — dry-run mode
 
-After `npx ts-node src/bot.ts` finishes startup with
+After `npx ts-node src/main.ts` finishes startup with
 `<CHAIN>_ANTIRUG_LIVE_EXECUTE=false` (the default), confirm dry-run is active
 before assuming the bot is operating safely.
 
@@ -223,7 +223,7 @@ grep ETH_ANTIRUG_LIVE_EXECUTE .env
 # Expected output: ETH_ANTIRUG_LIVE_EXECUTE=true
 
 # 4. Restart the bot
-npx ts-node src/bot.ts
+npx ts-node src/main.ts
 
 # 5. Verify live mode is active
 #    Dashboard: the "Anti-Rug" column on each ETH position now shows the
@@ -346,7 +346,7 @@ identified a serious bug and want to take the chain offline while you fix it):
 # 2. Edit .env — remove the chain from ENABLED_CHAINS
 #    Before: ENABLED_CHAINS=eth,bsc,base,arb
 #    After:  ENABLED_CHAINS=bsc,base,arb
-# 3. Restart: npx ts-node src/bot.ts
+# 3. Restart: npx ts-node src/main.ts
 #    The removed chain is not initialized at all. Anti-rug + factory listeners
 #    + exit monitors all skip this chain. Open positions on the chain are NOT
 #    sold automatically — you must close them manually via the dashboard
@@ -488,7 +488,7 @@ disposition at Phase 19 ship time.
 | Locker | Chain | Status at Phase 19 ship | Verification Steps |
 |--------|-------|-------------------------|--------------------|
 | TeamFinance V3 NFT vault | ETH | **Resolved** — same proxy as V2 (`0xe2fe530c047f2d85298b07d9333c05737f1435fb`) per TrustSwap blog "Uniswap V3 is now supported by Team Finance"; the Gnosis-admined proxy was upgraded to handle V3 NFTs without changing the user-facing address. | Re-verify: open https://app.team.finance/ → locate a locked V3 position on ETH → record the locker contract → cross-verify on Etherscan token-tag. |
-| TeamFinance V3 NFT vault | BSC | **Operator-accepted-gap** (not in `ENABLED_CHAINS` at ship) | Pre-enable: repeat the procedure above on the BSC TeamFinance app surface + BscScan. Re-run `npx ts-node src/bot.ts` and confirm the merged BSC V3 allowlist contains a TeamFinance V3 entry. |
+| TeamFinance V3 NFT vault | BSC | **Operator-accepted-gap** (not in `ENABLED_CHAINS` at ship) | Pre-enable: repeat the procedure above on the BSC TeamFinance app surface + BscScan. Re-run `npx ts-node src/main.ts` and confirm the merged BSC V3 allowlist contains a TeamFinance V3 entry. |
 | TeamFinance V3 NFT vault | Base | **Operator-accepted-gap** (not in `ENABLED_CHAINS` at ship) | Pre-enable: repeat the procedure above on the Base TeamFinance app surface + BaseScan. |
 | TeamFinance V3 NFT vault | Arbitrum | **Operator-accepted-gap** (not in `ENABLED_CHAINS` at ship) | Pre-enable: repeat the procedure above on the Arbitrum TeamFinance app surface + ArbiScan. |
 | PinkLock V3 | ETH | **Resolved** — verified non-existent. Etherscan ABI inspection (2026-05-23) of `0x71b5759d73262fbb223956913ecf4ecc51057641` (PinkLock02) shows pure ERC20 LP-token locker semantics; zero V3/NFT signatures. PinkSale docs (`https://docs.pinksale.finance/pinklock`) only reference V3 on BSC. No allowlist entry required. | Re-verify only if PinkSale publishes ETH V3 support. |

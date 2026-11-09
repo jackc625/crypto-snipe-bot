@@ -1,0 +1,65 @@
+{
+  "id": "AUD-TESTI-025",
+  "title": "Fork cases that run no bot code: snipeLifecycle.test.ts (\"Snipe Lifecycle on Forked Mainnet (TEST-05)\") swaps through the Uniswap router by hand, and the three \"handler-export sanity\" cases assert only typeof === \"function\"",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C14"
+  ],
+  "files": [
+    "test/fork/snipeLifecycle.test.ts",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/snipeLifecycle.test.ts:31-177@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deploys FakeToken, creates a pair, adds liquidity, swaps in and out through the router with amountOutMin 0; no src module is imported"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:7-9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "calls snipeLifecycle.test.ts \"the antithesis\" (manual swaps, never touches the handler)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/captureRehearsal.fork.test.ts:565-574@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "handler-export sanity: expect(typeof bot.handleNewPairForChain).toBe(\"function\") (deliberateBuyReplay.fork.test.ts:349-358, realLaunchReplay.fork.test.ts:573-580 the same)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/snipeLifecycle.test.ts:53-176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the seven cases share state and must run in order"
+    }
+  ],
+  "sibling_sites_checked": "All 23 fork files for cases that import no src code or assert only on test-local values: snipeLifecycle (all seven), the three export-sanity cases, realMainnetGate.fork.test.ts FORK_ONLY_TEST_KEY constant case.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: misleading coverage claims; the real handler is exercised by the replay files, so nothing is hidden that those do not also leave out.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-020"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: delete snipeLifecycle.test.ts or rename it as a fork-harness smoke test; drop the typeof cases.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Snipe Lifecycle on Forked Mainnet (TEST-05) cases",
+    "drives the REAL handler (not a manual swap) — handler-export sanity"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "OD-17",
+  "title": "Nonce-lock head-of-line policy (priority lane or abortable escalation) and re-entrancy detection (throw vs deadlock)",
+  "area": "TX",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: one strict first-come queue per wallet, held for a whole escalation; a nested acquire is not detected",
+      "behavior_impact": "none",
+      "risk": "An anti-rug exit can wait about 4 minutes behind a snipe that does not land, gives up after 60 s and then runs late at whatever price is left (AUD-TX-003); any future nested acquire freezes every buy and exit of the wallet with no error (AUD-TX-001)."
+    },
+    {
+      "id": "priority-lane-and-throw",
+      "name": "Priority lane for emergency exits plus holder tracking that throws on a nested acquire",
+      "behavior_impact": "Anti-rug (and operator emergency) sells are served before queued routine ops and the running escalation yields at its next attempt boundary; a nested acquire fails loudly instead of hanging.",
+      "risk": "The yielding escalation must re-read the nonce and reconcile its last attempt before continuing (an emergency sell consumes a nonce in between); more code on the most sensitive path."
+    },
+    {
+      "id": "abortable-escalation",
+      "name": "Abortable buy escalation (stop between attempts when an emergency exit is waiting) plus throw on nested acquire",
+      "behavior_impact": "A snipe stops escalating as soon as an exit needs the wallet; the exit then takes the lock.",
+      "risk": "The aborted snipe can still land from its last sent bundle, so it must be reconciled before the exit signs; snipes are given up more often."
+    },
+    {
+      "id": "lock-per-attempt",
+      "name": "Take the lock per attempt instead of per escalation (other ops interleave between attempts)",
+      "behavior_impact": "No op holds the wallet for more than one attempt plus its confirm window.",
+      "risk": "Every attempt boundary becomes a nonce-advanced reconcile point; a still-pending earlier attempt can collide with an interleaved op, which the current design avoids by holding the lock."
+    },
+    {
+      "id": "reentrant-lock",
+      "name": "Make the lock re-entrant for the holding async context (re-entrancy part only)",
+      "behavior_impact": "A nested acquire by the holder runs immediately instead of deadlocking.",
+      "risk": "Hides design errors and lets a nested op sign while the outer op still assumes it owns the nonce; does nothing for head-of-line blocking."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Research recommendation (research SUMMARY OD-17): priority-lane-and-throw, i.e. enforce lock ownership with AsyncLocalStorage (throw on nested acquire) and give anti-rug exits a priority lane; bound the total hold of one escalation, and cancel or reconcile an exit that its caller abandoned.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides how long a buy can make an emergency exit wait, and whether a nested lock call fails loudly or hangs forever.",
+  "findings": [
+    "AUD-TX-001",
+    "AUD-TX-002",
+    "AUD-TX-003"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion before Wave A (capital fixes, after the Phase 23 real-path proof)"
+}

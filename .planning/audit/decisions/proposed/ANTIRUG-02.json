@@ -1,0 +1,38 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "ANTIRUG-02",
+  "title": "What a backfill does with an unsafe verdict, and how its window is measured",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: backfilled unsafe verdicts schedule live exits (contrary to the D-BACKFILL comments); the window starts at the last subscription",
+      "behavior_impact": "none",
+      "risk": "Most reconnects after a long session skip the outage replay (GAP DETECTED); every registration replays already-handled logs (AUD-ANTIRUG-005)."
+    },
+    {
+      "id": "log-only",
+      "name": "Match the documented rule: backfill never exits, it alerts per still-held position with the stale evidence",
+      "behavior_impact": "A rug missed during an outage produces an alert, not a sell.",
+      "risk": "The operator has to sell by hand while the pool drains further."
+    },
+    {
+      "id": "exit-if-held",
+      "name": "Keep exiting on backfilled verdicts for still-held positions, but only after a fresh live re-read, and measure the window from the last live block",
+      "behavior_impact": "Outage windows are replayed fully; still-held rugged positions get an exit attempt.",
+      "risk": "An exit on old evidence can sell a pool that recovered (rare after a real LP pull)."
+    }
+  ],
+  "recommendation": "exit-if-held, with last_seen_block advanced from the live stream, after a Phase 23 test that drops the socket during a rug.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a rug that happened during a WebSocket outage is sold, alerted, or missed.",
+  "findings": [
+    "AUD-ANTIRUG-005",
+    "AUD-ANTIRUG-018"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-48"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "ESC-CENSUS-01",
+  "date": "2026-11-07",
+  "tier": "area-batch",
+  "tags": [
+    "d-nonce-authority-all",
+    "census"
+  ],
+  "items": [
+    "AUD-CENSUS-002"
+  ],
+  "resolved_items": [
+    "AUD-BUY-007"
+  ],
+  "summary": "Signing-site census (22-26 Task 2, AC-36, D-16 area-batch tier for S1): of 11 transaction-signing sites in src/, 10 are proven to run inside the wallet nonce lock and 1 is not: src/utils/tokenSafety.ts:277, the real approve inside simulateSell, which has no caller at the base (imported by src/bot.ts:17, never called; tests mock it). It is the same defect AUD-BUY-007 recorded at S2; the census rule grades it S1, so the operator is asked how to grade it. No unknown site. The 12 script sites run in their own processes and are already acknowledged in ESC-SCRIPTS-01 (Phase 29); they are not re-escalated. Nothing is changed in Phase 22.",
+  "presented_at": "2026-11-07 session: the 22-26 Task 2 blocking checkpoint (checkpoint:decision, area-batch), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "keep s1",
+  "operator_response_recorded_at": "2026-11-07T21:42:30Z",
+  "operator_response_channel": "typed by the operator in reply to the 22-26 Task 2 blocking checkpoint (checkpoint:decision, area-batch); relayed verbatim by the execute-phase orchestrator to the 22-26 continuation executor, which recorded it at operator_response_recorded_at. The orchestrator mapped the reply to the checkpoint option keep-s1; the mapping is the orchestrator's, the words are the operator's",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-26 Task 2 blocking checkpoint.",
+  "ruling": "keep-s1, in the operator's words \"keep s1\": AUD-CENSUS-002 (src/utils/tokenSafety.ts:277, the real approve inside simulateSell, outside withNonceLock, no caller at the base) stays S1 under the census rule; the finding is not changed; no decimal phase is inserted; Phase 22 continues. At consolidation (22-28) the canonical AUD-BUY-007 carries the higher severity of the merged set (S1) and this escalation.",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: \"keep s1\" selects the keep-s1 option (keep the S1 grade the census rule gives, rather than the S2 that AUD-BUY-007 recorded for the same defect). Context, attributed to the execute-phase orchestrator and NOT to the operator (shown to the operator with the checkpoint): the orchestrator recommended keep-s1 because the fix is deleting a dead function (near-zero cost) and S1 makes sure it is actually removed in Phase 24 rather than lingering; a function named simulateSell that really signs is a re-wiring trap. The bot is OFF for all of v7.0; nothing is changed in Phase 22 (NAC-13).",
+  "phase_continued": true,
+  "resolution": {
+    "status": "ruled",
+    "outcome": "keep-s1",
+    "ruled_at": "2026-11-07T21:42:30Z",
+    "recorded_by": "22-26 continuation executor, per the operator ruling",
+    "statement": "Per the operator ruling \"keep s1\", AUD-CENSUS-002 stays S1 (capital STRAND, status confirmed, duplicate_of AUD-BUY-007, escalation_ref ESC-CENSUS-01) and is not edited. The defect stays open: it is fixed by deleting simulateSell and its import at src/bot.ts:17 (Phase 24 if it touches tokenSafety.ts first, else Phase 29). Phase 23 cannot assert that every src signing site is locked while the site exists. AUD-BUY-007 is not edited in 22-26.",
+    "consolidation_note": "For 22-28 (PROTOCOL section 5 merge rules): AUD-BUY-007 is the canonical entry and AUD-CENSUS-002 its duplicate. The canonical must carry severity S1 (the highest of the merged set, per this ruling) with a severity_rationale naming AUD-CENSUS-002 and ESC-CENSUS-01; the union of evidence (adds the census site SIG-049 command), classes (C06, C07, already equal), sibling sites and reported_by (adds \"claude (22-26 executor)\"); and escalation_ref ESC-CENSUS-01 (the duplicate may keep its escalation_ref only if it equals the canonical one). capital_impact is reconciled at consolidation (AUD-BUY-007 EXPOSURE, AUD-CENSUS-002 STRAND).",
+    "evidence": {
+      "finding": ".planning/audit/findings/AUD-CENSUS-002.json",
+      "census": ".planning/audit/census/signing-sites.json (site SIG-049, lock_status unlocked)",
+      "orchestrator_check": "independent check by the execute-phase orchestrator at the audit base 23a64617dca167976adc4645fed0e2c69e384820: simulateSell is imported at src/bot.ts:17 and otherwise only mentioned in comments (src/bot.ts:918, :1259; src/utils/tokenSafety.ts:521-522); erc20.approve(CONFIG.routerAddress, balance) at src/utils/tokenSafety.ts:277 is inside it"
+    }
+  }
+}

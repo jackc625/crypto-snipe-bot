@@ -1,0 +1,81 @@
+# RED proof 22-12-1-singleton-guard (AC-18 / AC-20: the duplicate-load guard)
+Date: 2026-11-09T03:35:34.389Z
+File neutralised (working tree only, never committed): src/guards/singleton.ts
+sha256 before and after restore: 50530c6aefcafa9b5fe5761fed205054a58ba6238a249a9b282abeb7964f92d2
+
+## What this proves
+
+With registerSingleton returning immediately, a casing alias, a junction alias and a require.cache reload of each real guarded module all load a second copy. Only the guard stops them.
+
+## Diff applied
+
+diff --git a/src/guards/singleton.ts b/src/guards/singleton.ts
+index 4f54ae6..b26af22 100644
+--- a/src/guards/singleton.ts
++++ b/src/guards/singleton.ts
+@@ -64,6 +64,7 @@ function duplicateError(name: string, canonicalPath: string, firstIdentity: stri
+  * @param epoch        the `EPOCH` object from src/guards/epoch.ts, as this module imported it
+  */
+ export function registerSingleton(name: string, rawIdentity: string, epoch: object): void {
++    return; // RED 22-12-1
+     const registry = getRegistry();
+     const canonicalPath = fs.realpathSync.native(rawIdentity);
+     const existing = registry.get(canonicalPath);
+
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/guards/singleton.test.ts
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  16 failed | 13 passed (29)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T033453-11080-b9c3bc | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T033453-11080-b9c3bc\summary.json
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > a casing alias in the same module graph is refused with the alias named
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > a casing alias in the same module graph is refused with the alias named
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > a casing alias in the same module graph is refused with the alias named
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > a casing alias in the same module graph is refused with the alias named
+AssertionError: expected true to be false // Object.is equality
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > plain Node: a casing alias is refused and names the alias
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > plain Node: a directory junction or symlink alias under --preserve-symlinks is refused and names the alias
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > plain Node: a directory junction or symlink alias under --preserve-symlinks is refused and names the alias
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > plain Node: a directory junction or symlink alias under --preserve-symlinks is refused and names the alias
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > plain Node: a directory junction or symlink alias under --preserve-symlinks is refused and names the alias
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to match /^THREW SINGLETON_DUPLICATE /
+"LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'nonceAuthority' > plain Node: delete require.cache and reload is refused
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > plain Node: a casing alias is refused and names the alias
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitManager' > plain Node: delete require.cache and reload is refused
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > plain Node: a casing alias is refused and names the alias
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'exitEngine' > plain Node: delete require.cache and reload is refused
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > plain Node: a casing alias is refused and names the alias
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+ FAIL   unit  test/unit/guards/singleton.test.ts > duplicate-load guard: 'antiRugDetector' > plain Node: delete require.cache and reload is refused
+AssertionError: probe line: "LOADED_TWICE"; exit 0; stderr: : expected 'LOADED_TWICE' to be 'THREW SINGLETON_DUPLICATE C:\Users\ja…' // Object.is equality
+Received: "LOADED_TWICE"
+
+## Restore
+
+git -c core.autocrlf=false checkout -- src/guards/singleton.ts
+sha256 after restore: 50530c6aefcafa9b5fe5761fed205054a58ba6238a249a9b282abeb7964f92d2 (equal)
+git status --porcelain src/guards/singleton.ts: empty
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  29 passed (29)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T033511-21240-eaa853 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T033511-21240-eaa853\summary.json

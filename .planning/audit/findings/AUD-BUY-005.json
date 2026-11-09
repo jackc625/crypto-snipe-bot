@@ -1,0 +1,124 @@
+{
+  "id": "AUD-BUY-005",
+  "title": "No unhandledRejection handler and many un-awaited async calls: one escaped rejection exits the process and takes every exit monitor and anti-rug subscription down with it",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C11",
+    "C12",
+    "C18"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1542@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 WS listener calls handleNewV3PoolForChain without await or .catch"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1583@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 WS listener calls handleNewPairForChain without await or .catch"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1644@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 HTTP poll dispatch, un-awaited"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1669@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 HTTP poll dispatch, un-awaited"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1531@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startHttpPollingListener is called without await; its first awaited getBlockNumber (:1632 / :1656) rejects on an RPC error"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2360@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startMultiChainBot() is called without await or .catch"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1740-1749@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "async MEV health setInterval with no try/catch"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1774-1794@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "async wallet-balance setInterval with no try/catch (checkWalletBalance, getPauseState, setPauseState, forceWalCheckpoint can throw)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1552-1576@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "async handleWsCloseV3 registered as a raw socket close listener; a rejection is not handled"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1593-1618@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "async handleWsClose, same"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1083@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "example throw point outside any try in the V2 handler"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1188-1190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the catch body itself can throw (updateTradeStatus.run inside catch), escaping the handler"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -e unhandledRejection -e uncaughtException 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "no matches: there is no process-level handler anywhere in src/ or scripts/"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node -e \"setInterval(()=>{},1000); Promise.reject(new Error('probe'))\"; echo exit=$?",
+      "note": "exit=1 under v22.16.0: an unhandled rejection terminates the process even with a live interval timer (Node default --unhandled-rejections=throw)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:185@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "concrete trigger found during the threshold inventory: parseEther(<envPrefix>_MIN_LIQUIDITY) runs before the try in checkMinLiquidity (:190) and before the V3 honeypot gate; a non-numeric value (not validated at load, chainRegistry.ts:665) rejects the un-awaited V3 handler on the first pool and exits the process (TH-BUY-08)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1539-1543@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Listener callbacks discard rejecting handler promises"
+    }
+  ],
+  "sibling_sites_checked": "Every async call site in bot.ts was read: listener callbacks (:1542, :1583), poll dispatches (:1644, :1669), the un-awaited poll starter (:1531), the entry point (:2360), the four setInterval callbacks (:1636, :1660, :1740, :1774; the two poll loops have try/catch around their bodies, the two health/balance loops do not), the two close handlers, resumeMultiChainMonitoring (.then/.catch present, :1934-1959, contained) and the shutdown disconnect (.catch present, :2323). telegramListener.ts:121 contains with .catch (correct). The exit engine poll loop has its own try/catch (exitEngine.ts:1906-1942, EXIT slice).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-05"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1, equal to the research suggestion. Node 22.16.0 exits with code 1 on an unhandled rejection even while timers are live (command evidence below). Exit monitors and anti-rug are in-process timers and subscriptions, so every open position is unprotected from the crash until someone restarts the bot. Plausible condition: any throw on one of the un-awaited paths listed.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-002",
+    "AUD-BUY-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-02",
+  "od_ref": "OD-6",
+  "recommendation": "Decide the policy on card OD-6 (per-handler containment, a global handler, or both, and whether a global handler shuts down or continues). Phase 24; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "TX-02",
+  "title": "Private-submit fee model: which ceiling caps buys and sells, what base fee the affordability math uses, and per-chain escalation steps",
+  "area": "TX",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: one 25 gwei ceiling (MEV_BUY_MAX_PRIORITY_FEE_GWEI) for both legs, MEV_MAX_PRIORITY_FEE_GWEI and MEV_SELL_MAX_PRIORITY_FEE_GWEI without effect, base fee taken as 2 x latest, 1 gwei step on every chain",
+      "behavior_impact": "none",
+      "risk": "Priority fees up to five times the documented cap; operator changes to the sell ceiling do nothing; thin-wallet private sells are refused and go public (AUD-TX-007, AUD-TX-010, AUD-TX-016)."
+    },
+    {
+      "id": "leg-aware-real-base",
+      "name": "Pass the leg to the strategies (sell ceiling and no second-sell reserve on sells), use the real latest base fee for affordability, per-chain step and floor",
+      "behavior_impact": "Fees and refusals match the documented knobs; thin wallets keep the private sell path longer.",
+      "risk": "A lower real-base reserve leaves less headroom if the base fee jumps between buy and sell; needs the buffer re-derived and tested per chain."
+    },
+    {
+      "id": "single-hard-cap",
+      "name": "Make MEV_MAX_PRIORITY_FEE_GWEI a hard cap over both legs, keep everything else as today",
+      "behavior_impact": "The documented 5 gwei cap becomes true; private bids are lower.",
+      "risk": "Lower private inclusion odds at busy times (the reason the 25 gwei buy ceiling was added in 21.3)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "leg-aware-real-base, and delete or redefine MEV_MAX_PRIORITY_FEE_GWEI so every documented knob does what it says; correct the two alert texts.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). The findings here are S2/S3 (bounded overspend and indirect exposure), so the default can stand until Phase 24 decides.",
+  "behavior_impact": "Decides how much the bot may tip per private submit and when a thin wallet must sell publicly.",
+  "findings": [
+    "AUD-TX-007",
+    "AUD-TX-010",
+    "AUD-TX-016",
+    "AUD-TX-018",
+    "AUD-TX-019",
+    "AUD-TX-021"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-55"
+}

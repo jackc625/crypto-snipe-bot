@@ -1,0 +1,30 @@
+{
+  "id": "ESC-BUY-02",
+  "date": "2026-11-06",
+  "tier": "area-batch",
+  "tags": [
+    "capital"
+  ],
+  "items": [
+    "AUD-BUY-002",
+    "AUD-BUY-003",
+    "AUD-BUY-004",
+    "AUD-BUY-005",
+    "AUD-BUY-006",
+    "AUD-BUY-008",
+    "AUD-BUY-010",
+    "AUD-BUY-011"
+  ],
+  "resolved_items": [],
+  "summary": "BUY area S1 batch (22-17 Task 3, D-16 area-batch tier), presented together once the BUY slice audit, thresholds and cards were complete. Eight S1 entries, each a way money could be lost, stuck, overspent or exposed under a realistic condition: AUD-BUY-002 (RC-01, STRAND) a buy that landed or can still land can be left with no trades row, a row flipped to failed, or no exit and anti-rug monitoring, because one broad catch treats every error after submission as a clean zero-spend failure (src/bot.ts:1087-1191 V2 with the catch at :1177-1191, and :1379-1516 V3; card BUY-02); AUD-BUY-003 (RC-02, LOSS) when the price quote fails the snipe is still sent with amountOutMin = 0, so any slippage or sandwich is accepted (src/bot.ts:1048-1056 V2 and :1362-1377 V3; card OD-15); AUD-BUY-004 (RC-04, OVERSPEND) the already-sniped check runs once, many awaits before the row is written and never again inside the nonce lock, so two concurrent handlers for one token both buy (src/bot.ts:881-885 V2 and :1210-1214 V3; card BUY-03); AUD-BUY-005 (RC-05, STRAND) there is no unhandledRejection handler and many async calls are not awaited, so one escaped rejection exits the process and stops every exit monitor and anti-rug subscription (src/bot.ts:1542, :1583, :1644, :1669, :2360; card OD-6); AUD-BUY-006 (RC-09, EXPOSURE) the Telegram allowlist allows everyone unless BOTH the sender and channel lists are set, and sender OR channel is enough, so an unlisted source can trigger buys (src/telegramListener.ts:53-58, :77-83; card OD-16); AUD-BUY-008 (RC-20, OVERSPEND, candidate) on DEX WebSocket reconnect the replaced providers are not destroyed, one reconnect loop per DEX races on ctx.wsProvider, there is no backfill or heartbeat, and a dashboard restart stacks a second close handler that later doubles every event (src/bot.ts:1549-1576 V3 and :1590-1618 V2; card OD-11); AUD-BUY-010 (independent, OVERSPEND) cooldown, max open positions and total exposure are checked long before the snipe is recorded, so concurrent handlers for different tokens all pass and overspend the caps (src/bot.ts:909 V2 and :1248 V3; card BUY-03); AUD-BUY-011 (independent, EXPOSURE) the dashboard \"stop chain\" does not stop buying: HTTP-polling chains keep polling and buying, Telegram alpha drops still route to stopped chains, and \"start\" adds a second poller (src/api/routes/chains.ts:121-145; card BUY-04). Already escalated and not re-counted here: AUD-BUY-001 (S0, ESC-BUY-01) and AUD-BUY-025 (S1, rediscovery of RC-10, linked through ESC-PRE-02 resolved_items). The bot is OFF for all of v7.0, so none of these can cause a loss now. Nothing is changed in Phase 22 (NAC-13): each item is proven with a real-path test in Phase 23 and fixed in Phase 24. The operator was asked to acknowledge and say whether any item needs its own urgent decimal phase before Phase 24, or to stop the phase.",
+  "presented_at": "2026-11-06 session (after commit 5f2fe23 at 2026-11-07T05:14:40Z UTC): the 22-17 Task 3 area-batch blocking checkpoint (checkpoint:decision, gate blocking-human), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Acknowledge continue",
+  "operator_response_recorded_at": "2026-11-07T05:35:05Z",
+  "operator_response_channel": "typed by the operator at the 22-17 Task 3 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-17 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply). Presented at presented_at through the 22-17 Task 3 blocking checkpoint (gate blocking-human).",
+  "ruling": "none",
+  "ruling_option_text": "acknowledge-continue: Acknowledge and continue (default plan). The audit keeps going; all items wait for Phase 23 proof and Phase 24 fixes with the bot off.",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: the operator chose the acknowledge-continue option for all eight S1 entries. No severity was changed (AUD-BUY-002 stays S1; the operator did not ask for S0), no decimal phase is inserted, and Phase 22 continues. Context, attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator recommended acknowledge-continue to the operator, and added that whatever its final rating, AUD-BUY-002 should be first in line in Phase 23. As S1 capital findings, none of these can rest on a keep-current default; each blocks the live re-entry gate until it is fixed.",
+  "date_note": "date is the session the items were found, matching ESC-BUY-01. AUD-BUY-011 carries found_date 2026-11-07 because it was written after midnight in the same 22-17 audit session.",
+  "phase_continued": true
+}

@@ -1,0 +1,6 @@
+{
+  "audit_base_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "recorded_at": "2026-11-07T01:49:43Z",
+  "source": ".planning/baselines/backup-record.json phase_start_sha (equal to .planning/baselines/phase-start.json phase_start_sha), recorded by 22-01 before any Phase 22 change",
+  "rule": "every slice reads files at this SHA via slice-files.ts --snapshot (or git show <sha>:<path>), never the working tree"
+}

@@ -1,7 +1,8 @@
 // src/config.ts
 import * as dotenv from "dotenv";
 import { logger } from './utils/logger';
-dotenv.config();
+// SAFE-02 / D-01 (src layer): skip the .env file under Vitest. The setup layer blocks the read independently.
+if (!process.env.VITEST) dotenv.config();
 
 // --- Startup Environment Validation ---
 interface EnvVarSpec {

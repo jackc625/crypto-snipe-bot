@@ -1,0 +1,128 @@
+{
+  "slice": "DB",
+  "area": "src",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-DB-002",
+        "AUD-DB-013"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for BigInt(|Number(|parseInt|parseFloat|parseEther|formatEther|CAST(.* AS REAL)|toFixed: the risk SQL subtracts native-decimal amount_in from wei amount_out/gas_cost (AUD-DB-002, reproduced on the real SQL in memory) and its formulas mix cost and proceeds and currencies (AUD-DB-013); riskManager compares floats (parseFloat of decimal strings) where the stored amounts are wei; preflight floors are bigint (parseEther, applyGasMultiplier), correct"
+    },
+    "C02": {
+      "result": [
+        "AUD-DB-001"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for \\|\\| and \\?\\?: riskManager.ts:28-32 and chainRegistry.ts:663-669/:695-696 use || (an explicit '' becomes the default, fine; a 0 cannot be expressed for MAX_POSITION_SIZE only via '0', handled); the anti-rug overlays (chainRegistry.ts:727-848) use ?? so '' reaches Number('') = 0 (LP_REMOVAL_PCT and CONFIRM_BLOCKS accept 0; recorded in AUD-DB-001 sub_claims and TH-ANTIRUG-01/-02); preflight.ts:837-838 Number(x) || default turns '0' into the default (log-only); preflight.ts:186 avoids the || bug explicitly (CR-01)"
+    },
+    "C03": {
+      "result": [
+        "AUD-DB-002"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for decimals|parseUnits|formatUnits|1e18|wei: no token-decimals math in the slice; the native-unit vs wei mismatch in stored amounts is AUD-DB-002 (also listed under C01)"
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for slippage|minOut|amountOutMin: only the legacy CONFIG constants slippage 0.1 / slippagePercent 5 / slippageTolerance 0.1 (config.ts:281-285); the live consumer is bot.ts (BUY slice, TH-BUY-02); no minOut logic in the slice"
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for deadline|Date.now|setTimeout|86400|unixepoch: riskManager rolling 24 h window (riskManager.ts:94) and cooldown (:124-127), preflight 7-day floor (:127, :666-669), Telegram alert race 5000 ms (:991-993), stale thresholds (:837-838); no transaction deadline is built in the slice; timing values are in thresholds/DB.json"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for approve|allowance|EXIT_GATE_APPROVAL: only the reserved approval gas EXIT_GATE_APPROVAL_GAS_LIMIT 60000n (preflight.ts:160) in the affordability floor; no approval is sent from the slice"
+    },
+    "C07": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for nonce|withNonceLock|getTransactionCount|sendTransaction|signTransaction: none in the slice; chainRegistry.ts:1067 builds the Wallet each chain context uses, nonce handling is the TX slice"
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for reorg|confirmations|removed|blockNumber: chain_state last_seen_block upsert (db.ts:662-670) stores the anti-rug backfill cursor without a block hash (backfill/reorg semantics are the ANTIRUG slice); preflight block-age check only; no reorg logic in the slice"
+    },
+    "C09": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for receipt|status === 1|wait(: none; receipt decoding is receiptDecoder.ts (TX slice); the slice stores what it is given (AUD-DB-002 covers the units of what is stored)"
+    },
+    "C10": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for WebSocket|getWsProvider|reconnect|backfill: chainRegistry.ts:1066 creates the WS provider via provider.ts (TX); chain_state cursor storage only (db.ts:662-670); reconnect logic is ANTIRUG/BUY"
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for async|await|.then(|.catch(|process.on|Promise.race: notifier senders catch their axios errors (notifier.ts:49-51, :85-87); preflight() races Telegram with a 5 s timeout and allSettled (:986-1003); preflightDryRun catches the stale scan; no floating promise in the slice (crash-ending rejections elsewhere are AUD-BUY-005)"
+    },
+    "C12": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for setInterval|setTimeout|clearInterval|unref: only the preflight Telegram race timer (preflight.ts:991-993, not cleared but the process exits right after); riskManager keeps an unbounded-by-chain Map of 4 keys at most (riskManager.ts:40)"
+    },
+    "C13": {
+      "result": [
+        "AUD-DB-004",
+        "AUD-DB-006",
+        "AUD-DB-012",
+        "AUD-DB-015",
+        "AUD-DB-003",
+        "AUD-DB-019",
+        "AUD-DB-007",
+        "AUD-DB-021",
+        "AUD-DB-022",
+        "AUD-FORENSIC-001"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for transaction(|db.exec|pragma|synchronous|journal_mode|user_version|INSERT|UPDATE|DELETE|prepare( (emphasis): synchronous=NORMAL under WAL and no buy intent row (AUD-DB-004, RC-14), unconditional user_version write and writes on every import (AUD-DB-006, RC-25), migrations 1-5 outside transactions (AUD-DB-012), no wallet scoping or DB lock (AUD-DB-015), risk queries keyed on trades.status instead of the exit lifecycle (AUD-DB-003), cwd-relative state (AUD-DB-007, AUD-DB-019); markExitFailedHeld + updateTradeStatus as two statements without a transaction live in exitEngine.ts (EXIT slice); buy row then exit_state then lp_baseline in bot.ts is SC-06 (BUY slice) | 22-27 merge: AUD-DB-021 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-27 merge: AUD-DB-022 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA. | 22-28 consolidation: AUD-FORENSIC-001 (findings-only slice, area src, class C13) folded in"
+    },
+    "C14": {
+      "result": [
+        "AUD-DB-003",
+        "AUD-DB-004"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for status = 'pending'|exit_failed_held|deleteExitState|markExitFailedHeld|getResume: restart-resume reads pending buys plus exit_failed_held (db.ts:597-620), correct; risk queries ignore exit_failed_held (AUD-DB-003); a buy that landed during shutdown has no row to resume (AUD-DB-004); updateTradeStatus updates every pending row of a token+chain (AUD-BUY-002, BUY slice)"
+    },
+    "C15": {
+      "result": [
+        "AUD-DB-015"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for check-then-act on shared state: canSnipe reads counts long before the row is written (AUD-BUY-010, BUY slice, linked); getTradeIdForPendingToken newest-row pick (SC-06, BUY); two processes on one database with different wallets mark each other's rows failed (AUD-DB-015); same-wallet second process is AUD-TX-005 (22-13 lock)"
+    },
+    "C16": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for gas|maxFeePerGas|multiplier|maxGasLimit|GAS_BUFFER: preflight entry floor prices buy gas at maxGasLimit x maxFeePerGas and the public exit at (maxGasLimit + 60000) x baseFee x 2.0 in bigint (preflight.ts:274-285, :408-435), base fee derived as maxFee - priority (RC-22, TX slice TH-TX-09); per-chain gas templates (chainRegistry.ts:204, :273, :330, :387) recorded in thresholds; no ceiling defect found in the slice beyond those owned elsewhere"
+    },
+    "C17": {
+      "result": [
+        "AUD-DB-008",
+        "AUD-DB-009",
+        "AUD-DB-010"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for PRIVATE_KEY|walletPrivateKey|TOKEN|AUTH|HEADER|SESSION|HASH|err: (emphasis): raw key on exported CONFIG and no logger redaction (AUD-DB-008, SC-13), Telegram bot token logged via axios err.config.url (AUD-DB-009, reproduced), RPC URL with key sent to Telegram from preflight reasons (AUD-DB-010, reproduced); FLASHBOTS_AUTH_KEY / BLOXROUTE_AUTH_HEADER copied into mevConfig (chainRegistry.ts:979-985) and logged nowhere in the slice; DASHBOARD_API_KEY placeholder/length rule (preflight.ts:792-817) never echoes the key"
+    },
+    "C18": {
+      "result": [
+        "AUD-DB-001",
+        "AUD-DB-005",
+        "AUD-DB-007",
+        "AUD-DB-011",
+        "AUD-DB-014",
+        "AUD-DB-016",
+        "AUD-DB-017",
+        "AUD-DB-019",
+        "AUD-DB-020"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for process.env (every static and template read, listed in thresholds/DB.json discovery) (emphasis): NaN fail-open risk parsers classified per site (AUD-DB-001, RC-06), LOG_LEVEL never applied (AUD-DB-005, RC-23), cwd-relative DB_PATH incl. the shipped template value (AUD-DB-007, SC-21), ALCHEMY_URL / ETH_RPC_URL contradiction and duplicate config (AUD-DB-011, SC-14), max capital documented but not enforced (AUD-DB-014), validateEnvVars presence-only and out of sync (AUD-DB-016), preflight acceptance gaps (AUD-DB-017), cwd-relative JSON import (AUD-DB-019) | 22-27 merge: AUD-DB-020 reported by codex (independent second opinion), confirmed by re-reading the cited lines at the base SHA."
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for DASHBOARD_|cors|origin|apiKey: only the DASHBOARD_API_KEY placeholder/empty/length rule (preflight.ts:782-817) and its registration (config.ts:27-29); auth and CORS live in src/api (API slice)"
+    },
+    "C20": {
+      "result": [
+        "AUD-DB-009",
+        "AUD-DB-010",
+        "AUD-DB-018"
+      ],
+      "search": "grep over the DB snapshot (slice-files.ts --snapshot DB at 23a6461 (7 files)) for telegram|sendMessage|parse_mode|Markdown|broadcast: token in the request URL logged on failure (AUD-DB-009), credential-bearing reasons sent to the chat (AUD-DB-010), broadcast skipped when Telegram is unset (AUD-DB-018); unescaped symbols in Markdown are AUD-BUY-022 and the missing request timeout AUD-EXIT-021 (both linked in the ledger notifier row); inbound Telegram trust is the BUY slice listener"
+    }
+  }
+}

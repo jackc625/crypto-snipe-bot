@@ -1,0 +1,65 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-016",
+  "title": "validateEnvVars checks presence only, and its list does not match the code: 18 keys the code reads are not registered (the per-chain MIN_LIQUIDITY, tax and honeypot-checker keys, DASHBOARD_HOST/PORT), MIN_LIQUIDITY is also missing from .env.example, and some registered keys are read nowhere",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/config.ts",
+    "src/chainRegistry.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/config.ts:231-244@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "validateEnvVars: only spec.required && !process.env[name]; no type, range or format check for any key"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:13-229@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the registered list (95 names, 8 required)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:663-696@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reads <PREFIX>_MIN_LIQUIDITY, _HONEYPOT_CHECKER_ADDRESS, _MAX_BUY_TAX_BPS, _MAX_SELL_TAX_BPS for four prefixes, none registered"
+    },
+    {
+      "type": "command",
+      "ref": "node diff script in the scratch folder over git show <sha>:.env.example, the snapshot config.ts and git grep -ho \"process.env.[A-Z_0-9]*\" <sha> -- src (template keys expanded for ETH/BSC/BASE/ARB)",
+      "note": "read by code but not registered: ETH/BSC/BASE/ARB_MIN_LIQUIDITY, _HONEYPOT_CHECKER_ADDRESS, _MAX_BUY_TAX_BPS, _MAX_SELL_TAX_BPS, DASHBOARD_HOST, DASHBOARD_PORT; read by code but not in .env.example: the four _MIN_LIQUIDITY keys; registered and in .env.example but read nowhere: MEV_MAX_PRIORITY_FEE_GWEI, RPC_TIMEOUT_MS, MEV_BUY/SELL_COINBASE_BRIBE_ENABLED (AUD-TX-010, TH-TX-05/-20/-26)"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:742-760@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "TELEGRAM_API_ID/HASH/SESSION are optional here (rule applies only if API_ID is set) but required: true in config.ts:20-22"
+    }
+  ],
+  "sibling_sites_checked": "Diff computed over all of src at the base SHA; regex-only hits that are not reads (preflight.ts:63 comment process.env.X, :715 comment MEV_STRATEGY, NODE_ENV) were removed, and MEV_CONFIRM_* / MEV_*_GWEI keys read through a passed env object in reconciliation.ts (TX slice) were checked by hand and are read. FLASHBOTS_AUTH_KEY / BLOXROUTE_AUTH_HEADER are required:false here and enforced per chain at chainRegistry.ts:948-955.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the canonical env list and the template do not describe what the bot reads (D-ENV-EXAMPLE drift); the money-relevant consequence (non-numeric values accepted) is RC-06 / AUD-DB-001 and is graded there.",
+  "related": [
+    "AUD-DB-001",
+    "AUD-DB-011",
+    "AUD-TX-010"
+  ],
+  "tags": [],
+  "od_ref": "OD-63",
+  "recommendation": "Generate the env list from one typed schema that the parsers use (key, type, range, default, required-when), add a sync test against .env.example (22-05 already syncs test/.env.test with .env.example), and drop or wire the dead keys. Card DB-06. Phase 27/29."
+}

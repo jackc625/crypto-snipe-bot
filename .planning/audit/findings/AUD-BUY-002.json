@@ -1,0 +1,317 @@
+{
+  "id": "AUD-BUY-002",
+  "title": "A buy that has landed, or can still land, can end up with no trades row, a trades row flipped to failed, or no exit and anti-rug monitoring, because one catch treats every error after submission as a clean zero-spend failure",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C09",
+    "C11",
+    "C13",
+    "C14",
+    "C16"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/db.ts",
+    "src/exitEngine.ts",
+    "src/utils/notifier.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1087-1191@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2: one try wraps submitBuyTx AND all post-submit bookkeeping (pause read, recordSnipe, insertTrade, alert, balanceOf, trade-id lookup, armPositionMonitoring)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177-1191@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 catch: emitSnipeFailClean, then updateTradeStatus.run(failed, token, chain), then alert \"TX failed\" — runs for ANY throw in the try, including after the buy mined"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:360-386@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emitSnipeFailClean logs \"Snipe FAILED CLEAN ... zero ETH spent, no trades row\" unconditionally (:384)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1379-1516@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 twin: same single try/catch shape; V3 arms monitoring inline at :1481-1507 (not through the shared helper)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1083-1085@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 affordability gate sits OUTSIDE the try: a throw escapes the handler (links RC-05)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1417-1419@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 affordability gate sits INSIDE the try: a throw reaches the catch, which runs updateTradeStatus(failed) for the token"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:325-327@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "updateTradeStatus = UPDATE trades SET status=? WHERE token=? AND chain=? AND status=pending — it matches ANY pending row of that token, including a concurrent handler's live position (RC-04)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "multi-block fanout: after the bundle is already sent for block tb, a relay error for a later target block throws out of the submit closure"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:476-497@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitWithReconciliation: on an advanced nonce it reconciles only the PREVIOUS attempt's hash"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "per-attempt reconcile uses only the latest attempt's signed hash; an earlier attempt (same nonce, different fee, different hash) that mines reads as landed-not-ours and the helper throws"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:592-597@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mined-but-reverted throws (gas spent, no tokens)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:606-614@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ceiling-hit throw: for the passthrough strategy an already-broadcast public tx can still be pending in the mempool and mine after this throw"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:130@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "passthrough wallet.sendTransaction: if an earlier attempt mined first, the next attempt's send can fail (nonce too low) and throw"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1118@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "post-mine: synchronous SQLite read (getPauseState) inside the try"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1125-1146@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "post-mine: recordSnipe then insertTrade.run — a SQLite error here leaves the mined buy with no row"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1147@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "post-mine: awaited Telegram alert; sendCtxAlert awaits axios.post with no timeout (src/utils/notifier.ts:80), so a hung Telegram call delays balanceOf and arming"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1158-1159@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "post-mine: balanceOf on a single RPC call — a throw goes to the catch, which flips the just-inserted row to failed"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getResumeExitMonitorTrades: resumes only status=pending buys or exit_failed_held rows — a row flipped to failed with no exit_state is never resumed"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:615-621@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a stale balanceOf of 0 is not rejected: computeDustThreshold(0) falls back to the 1000-wei absolute floor"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1736@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "partial-sell amount is computed from state.originalTokenAmount, so a 0 recorded at buy time makes partial sells size 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1162-1176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "trade-id lookup miss only logs \"Could not find trade ID\"; the row stays pending with no monitor until the next boot"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1869-1873@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor returns silently when the entry price query returns null: no exit monitor, row stays pending (links RC-07)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1891@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor: upsertExitState.run can throw; it propagates out of armPositionMonitoring before anti-rug is attempted, reaching the snipe catch, which flips the row to failed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:431-451@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug baseline/register failure is caught and logged only; with no lp_baseline row the position is excluded from anti-rug resume forever (INNER JOIN, see resumeAntiRugMonitoring :2032-2051)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177-1190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Post-buy setup errors mark successfully acquired positions failed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1100-1112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Buy submission precedes any recoverable trade record"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1934-1938@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restart abandons pending buys without reconciling settlement"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:555-559@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Submission exceptions bypass reconciliation after a possible broadcast"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:558-559@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Earlier replacement hashes are discarded before their outcome is known"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:605-613@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): A reconciliation timeout abandons transactions that can still execute"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:179-190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "22-28 (from sweep/TX.json C07): relay transport failure defers to reconciliation"
+    }
+  ],
+  "sibling_sites_checked": "V2 handleNewPairForChain (bot.ts:1087-1191) and V3 handleNewV3PoolForChain (bot.ts:1379-1516) both checked: same single try/catch, same catch body; V3 arms monitoring inline (:1481-1507), V2 via armPositionMonitoring (:413-452). The deliberate path (executeDeliberateBuy, :485-761) records and arms outside any catch (its own defect is AUD-BUY-001). Every submit strategy reachable from submitBuyTx was traced for \"throws after a broadcast\": flashbots fanout (flashbots.ts:303-309), shared reconcile loop (reconciliation.ts:476-497, :576-628), passthrough send (passthrough.ts:130); bloxroute.ts was traced by the TX slice (sweep/TX.json cell C07): a relay transport failure defers to reconciliation (bloxroute.ts:179-190), and after a not-landed attempt the next attempt re-signs the same nonce and only the latest hash is reconciled (reconciliation.ts:476-497, :576-603), so an earlier accepted attempt that mines reads as landed-not-ours, the same mechanism as sub_claim 3. Recorded at 22-28. Both resume queries were read (db.ts:597-604 and the lp_baseline INNER JOIN used at bot.ts:2043). The pause read, recordSnipe, insertTrade, alert, balanceOf, trade-id lookup and both arming helpers were each checked as separate throw points.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-01"
+  ],
+  "research_suggested_severity": "S0",
+  "severity_rationale": "Graded S1, one step below the research suggestion (S0/S1, the higher end taken as the suggestion). Rubric reason: every traced failure point needs a non-default condition (a single RPC or SQLite error after inclusion, a stale load-balanced node, a multi-block inclusion timing, a revert, or a concurrent same-token handler); none fires on the ordinary success path, so it is \"plausible condition\" (S1), not \"no unusual condition\" (S0). Within S1 it is the worst kind: in the post-mine and monitoring-setup traces the held position is never re-armed, not even by a restart (the resume queries need status pending or exit_failed_held, db.ts:597-604, and anti-rug resume needs an lp_baseline row), and the operator is told \"zero ETH spent\". The broad catch (bot.ts:1177-1191, V3 :1508-1516) and its \"fail-clean\" comments (bot.ts:345-358, :1178-1187) were traced, not taken at their word.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-001",
+    "AUD-BUY-004",
+    "AUD-BUY-005",
+    "AUD-BUY-020",
+    "AUD-EXIT-002"
+  ],
+  "tags": [
+    "capital",
+    "cross-class"
+  ],
+  "escalation_ref": "ESC-BUY-02",
+  "od_ref": "OD-27",
+  "recommendation": "Phase 24 (after a Phase 23 real-path proof of at least the balanceOf-throw and earlier-attempt-landed traces): separate \"did money leave the wallet\" from \"did bookkeeping succeed\". Once a submit may have broadcast, never run the zero-spend branch: reconcile against chain truth (token balance delta plus nonce, like the deliberate guard at bot.ts:617-662), record the row, and arm monitoring with retries; on any post-landing failure alert loudly that a position is held and unprotected. The direction (intent row before broadcast vs reconcile-on-throw, retry policy) is a behaviour decision on card BUY-02. Nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "traces": [
+    {
+      "scenario": "Failure point 1, before submission: the affordability gate (or a call just before submit) throws",
+      "steps": [
+        "V2: enforceEntryExitAffordability (bot.ts:1083) is outside the try; if it (or sendCtxAlert/broadcast inside it) throws, the rejection leaves handleNewPairForChain, which no caller awaits (bot.ts:1583, :1644) -> unhandled rejection (AUD-BUY-005)",
+        "V3: the same gate (bot.ts:1417) is inside the try; a throw runs the catch: emitSnipeFailClean + updateTradeStatus.run(failed, token, chain) (bot.ts:1513-1515)",
+        "updateTradeStatus matches every pending row of that token on that chain (db.ts:325-327); if a concurrent same-token handler (V2 pair and V3 pool for one token, AUD-BUY-004) has already landed and inserted its pending row, that live row is flipped to failed"
+      ],
+      "outcome": "This handler spent nothing and holds nothing. trades: no row of its own, but a concurrent handler's live row can become failed. exit_state: untouched. The other handler's tokens ARE held; its in-process monitor keeps running, but after any restart the failed row is not resumed (db.ts:597-604), so the position is then stranded with no exit monitor or anti-rug."
+    },
+    {
+      "scenario": "Failure point 2, after submission but before (or without) a confirmed mine: the strategy throws although a broadcast tx can still land",
+      "steps": [
+        "Flashbots: the bundle is sent for block tb, then a relay error for target block tb+i throws (flashbots.ts:303-309); the bundle already sent for tb can still be included",
+        "Multi-attempt: attempt k and attempt k+1 share a nonce but differ in fee and hash; reconcile checks only the latest hash (reconciliation.ts:476-497, :576-603); if attempt k mines (multi-block targeting keeps it eligible), the latest hash has no receipt while the nonce advanced -> landed-not-ours -> throw",
+        "Passthrough: if an earlier attempt mines first, the next sendTransaction can fail with nonce-too-low and throw (passthrough.ts:130)",
+        "Reverted: the tx mined with status 0 -> throw (reconciliation.ts:592-597); gas was spent",
+        "Ceiling-hit: the helper throws after the last not-landed reconcile (reconciliation.ts:606-614) while a passthrough public tx can still be pending and mine later",
+        "Every one of these throws reaches the snipe catch (bot.ts:1177-1191 / :1508-1516): no insertTrade, updateTradeStatus finds no own row (or flips a concurrent one), and the operator is told \"zero ETH spent, no trades row\" (bot.ts:384)"
+      ],
+      "outcome": "Tokens: held whenever an earlier attempt or the already-sent bundle landed, or the pending public tx mines later (not held for a revert, but gas is lost). trades: no row. exit_state: none. No exit monitor, no anti-rug, never resumed at restart (no row to resume), and isTokenSniped (any row) stays false, so dedup is broken and the same token can be bought again on a later event."
+    },
+    {
+      "scenario": "Failure point 3, after mining, while persisting the trade row",
+      "steps": [
+        "submitBuyTx returned the real hash, so the buy is mined (bot.ts:1100-1112)",
+        "getPauseState.get (bot.ts:1118), recordSnipe (:1125) or insertTrade.run (:1127) throws (for example SQLITE_BUSY or disk full): catch -> no row written",
+        "or the insert succeeds, the awaited alert at :1147 hangs (no axios timeout, notifier.ts:80) and delays everything after it",
+        "or balanceOf (bot.ts:1159) throws on one RPC error: catch -> updateTradeStatus flips the just-inserted row to failed, alert \"TX failed\""
+      ],
+      "outcome": "Tokens: held. trades: either no row, or a row with status failed. exit_state: none. No exit monitor and no anti-rug; the failed row is not in getResumeExitMonitorTrades (db.ts:597-604) and has no lp_baseline, so not even a restart re-arms it. The operator is told the buy failed and cost nothing."
+    },
+    {
+      "scenario": "Failure point 3b, after mining: the balance read succeeds but is stale (lagging node behind a load-balanced RPC)",
+      "steps": [
+        "balanceOf at bot.ts:1159 returns 0 because the node serving the call has not seen the inclusion block",
+        "nothing rejects 0: armPositionMonitoring/startExitMonitor are called with originalTokenAmount = 0",
+        "computeDustThreshold(0) uses only the 1000-wei absolute floor (exitEngine.ts:615-621); partial-sell sizes are computed from 0 (exitEngine.ts:1736)"
+      ],
+      "outcome": "Tokens: held. trades: pending (correct). exit_state: written with original amount 0. The exit monitor runs, but partial-sell tiers sell 0 tokens and the stored denominator is wrong for the life of the position."
+    },
+    {
+      "scenario": "Failure point 4, while setting up monitoring",
+      "steps": [
+        "trade-id lookup misses (bot.ts:1162-1176): logs only, no monitor; row stays pending",
+        "startExitMonitor: queryPrice returns null -> returns without arming (exitEngine.ts:1869-1873); anti-rug is still attempted (bot.ts:431-451)",
+        "startExitMonitor: upsertExitState.run throws (exitEngine.ts:1891) -> propagates out of armPositionMonitoring before anti-rug -> snipe catch flips the row to failed",
+        "snapshotLpBaseline / registerAntiRugPosition throws -> caught and logged only (bot.ts:441-451); no lp_baseline row",
+        "V3 twin arms inline (bot.ts:1481-1507) with the same shape"
+      ],
+      "outcome": "Tokens: held in every branch. Lookup miss or null price: trades pending, exit_state none, unmonitored for exit until the next boot (resume re-arms it). upsertExitState throw: trades failed, exit_state none, no exit monitor and no anti-rug, never resumed. Anti-rug failure: exit monitor runs but anti-rug is absent now and after every restart (no lp_baseline row for the INNER JOIN)."
+    }
+  ],
+  "sub_claims": [
+    {
+      "claim": "A single balanceOf RPC error after a mined buy flips the trade row to failed and the position is never re-armed, even after restart",
+      "evidence": [
+        "src/bot.ts:1158-1159@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1189@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "A SQLite error in the post-mine bookkeeping leaves a mined buy with no row, no monitor and broken dedup",
+      "evidence": [
+        "src/bot.ts:1118-1146@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1177-1191@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "An earlier same-nonce attempt that mines is reported as landed-not-ours and the snipe path records nothing",
+      "evidence": [
+        "src/utils/mevStrategies/reconciliation.ts:476-497@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "A Flashbots fanout error after the first send throws while the sent bundle can still land",
+      "evidence": [
+        "src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "The V3 catch can flip a concurrent same-token handler's live pending row to failed",
+      "evidence": [
+        "src/bot.ts:1417-1419@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1514@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/db.ts:325-327@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "A stale balanceOf of 0 is accepted as the original token amount",
+      "evidence": [
+        "src/bot.ts:1159@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:615-621@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/exitEngine.ts:1736@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ]
+}

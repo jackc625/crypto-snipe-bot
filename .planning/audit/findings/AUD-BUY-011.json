@@ -1,0 +1,89 @@
+{
+  "id": "AUD-BUY-011",
+  "title": "Dashboard \"stop chain\" does not stop buying: HTTP-polling chains keep polling and buying, Telegram alpha drops still route to stopped chains, and \"start\" adds a second poller",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C10",
+    "C12"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/telegramListener.ts",
+    "src/api/routes/chains.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:121-145@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "stop route: adds the chain to stoppedChains and calls ctx.wsProvider.removeAllListeners() only when a WS provider exists"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n stoppedChains 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "only src/api/routes/chains.ts and src/api/server.ts reference stoppedChains: no buy handler and no Telegram routing consults it"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1529-1533@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "chains without a WS URL use startHttpPollingListener"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1636-1651@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V2 poller is a setInterval whose handle is discarded: nothing can clear it, so stop has no effect on it"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1660-1676@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V3 poller, same"
+    },
+    {
+      "type": "code",
+      "ref": "src/telegramListener.ts:103-124@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Telegram routing sends an address to every context whose chain has code there, stopped or not"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:158-176@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "start route calls onRestart"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1836-1845@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onRestart calls startDexListener again; for an HTTP chain that starts a second poller, so every event is dispatched twice (feeds AUD-BUY-004)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1835-1839@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Chain restart accumulates listeners and uncancellable polling intervals"
+    }
+  ],
+  "sibling_sites_checked": "Every buy entry point checked for a stop check: V2 WS listener, V3 WS listener, both HTTP pollers, Telegram -> alphaDrop -> both handlers, onRestart. None checks stoppedChains. The pause flag is checked at CP1/CP2 in both handlers (bot.ts:1034-1040, :1066-1072, :1351-1357, :1401-1407). The API slice owns chains.ts; it is read, not edited.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1: the operator control that reads \"stopped\" leaves capital being committed on a chain configured without a WebSocket URL, and for every Telegram-routed token on any chain. Plausible condition (operator uses stop; HTTP fallback or Telegram enabled). The global pause (CP1/CP2 checks in both handlers) is unaffected and does stop new buys, which keeps this at S1.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-004",
+    "AUD-BUY-006",
+    "AUD-BUY-008"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-02",
+  "od_ref": "OD-29",
+  "recommendation": "Make \"stopped\" a state every buy entry point honours (handlers, pollers and Telegram routing), keep the poller handle so stop clears it and start cannot duplicate it, or remove the per-chain stop/start in favour of the global pause. Card BUY-04. Until fixed, use the global pause, not per-chain stop, to halt buying. Phase 24; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,86 @@
+{
+  "id": "AUD-BUY-008",
+  "title": "DEX WebSocket reconnect: replaced providers are not destroyed, one reconnect loop per DEX races on ctx.wsProvider, no backfill, no heartbeat, and dashboard restart stacks a second close handler that later doubles every event",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C10",
+    "C12"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/provider.ts",
+    "src/api/routes/chains.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1549-1576@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 reconnect: removeWsProvider, then a while(true) loop creating new WebSocketProvider (:1561), assigning ctx.wsProvider (:1562), re-subscribing, adding a close handler on the new socket (:1568)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1590-1618@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 reconnect: same shape"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:46-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "removeWsProvider destroys only the provider cached in the map; providers created at bot.ts:1561/:1603 are never put in the map, so after the first reconnect nothing destroys the replaced provider"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1576@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one close handler is added per DEX on the same raw socket: N DEXes on a chain = N independent reconnect loops, last writer wins ctx.wsProvider"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1557@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "while(true) has no shutdown check"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1836-1845@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onRestart calls startDexListener again for every DEX, which adds another close handler on the still-open socket"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/chains.ts:140-142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dashboard stop removes provider listeners but not the raw-socket close handlers"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1561-1569@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): DEX reconnects never backfill events missed during disconnection"
+    }
+  ],
+  "sibling_sites_checked": "V2 and V3 reconnect loops both checked (identical shape). provider.ts getWsProvider/removeWsProvider read. onRestart (:1808-1852) and the dashboard stop/start routes (chains.ts:121-190) read for listener stacking. No PairCreated/PoolCreated backfill exists anywhere in bot.ts (searched queryFilter: only the HTTP pollers use it). No ping/heartbeat in the DEX listener path. The anti-rug detector has its own reconnect (detector.ts ~918-926, ANTIRUG slice, RC-13); not edited here.",
+  "status": "candidate",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-20"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "Graded S1, above the research suggestion (S2, \"S1 if it breaks anti-rug's consumer\"). Reason: besides the S2 robustness defects (leaks, missed events, silent half-open socket), the code shows a path to a double buy: after a dashboard stop/start the raw socket carries two close handlers for one DEX; the next disconnect runs two reconnect loops, each subscribing the same listener on its own new provider, so every PairCreated reaches two concurrent handlers, which AUD-BUY-004 lets both buy. Status candidate until a Phase 23 run shows the duplicate dispatch. The anti-rug interaction (shared ctx.wsProvider) is RC-13, owned by the ANTIRUG slice.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-004",
+    "AUD-BUY-011",
+    "AUD-ANTIRUG-001"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": "ESC-BUY-02",
+  "od_ref": "OD-11",
+  "recommendation": "Fix together with RC-13 under card OD-11 (one per-chain WebSocket owner that notifies subscribers, destroys what it replaces, backfills the gap, detects half-open sockets and stops on shutdown); make listener registration idempotent so restart cannot stack handlers. Phase 24; nothing is changed in Phase 22.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

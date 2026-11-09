@@ -1,0 +1,22 @@
+{
+  "id": "ESC-BUY-01",
+  "date": "2026-11-06",
+  "tier": "immediate",
+  "tags": [
+    "capital",
+    "d-stop-the-line"
+  ],
+  "items": [
+    "AUD-BUY-001"
+  ],
+  "resolved_items": [],
+  "summary": "S0 finding from the BUY slice audit (22-17 Task 1), presented at once because it is S0 (D-16 immediate tier). After scripts/deliberate-buy.ts lands a buy, the exit monitor and anti-rug protection are armed inside the script's own process (src/bot.ts recordAndArmDeliberateBuy -> armPositionMonitoring -> startExitMonitor / registerAntiRugPosition), and the script then calls process.exit(0) (scripts/deliberate-buy.ts:150), which kills them. The main bot reloads open positions only when it boots (src/bot.ts:1797, :1805), so the bought position has no exit and no rug protection until the main bot is next started, and nothing tells the operator to start it. The bot is OFF for all of v7.0, so there is no live exposure now. Proposed fix directions are on card BUY-01 (hand the position to the running bot; refuse while the bot runs and tell the operator loudly to start it; or keep the script alive until the position closes). Nothing is changed in Phase 22.",
+  "presented_at": "2026-11-06 session: the 22-17 Task 1 immediate-tier (S0) blocking checkpoint returned right after commit 93c001e, relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Acknowledge continue",
+  "operator_response_recorded_at": "2026-11-07T05:08:29Z",
+  "operator_response_channel": "typed by the operator at the 22-17 Task 1 blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-17 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply). Presented at presented_at through the 22-17 Task 1 blocking checkpoint (gate blocking-human).",
+  "ruling": "acknowledge-continue: the finding is acknowledged, its severity stays S0 (the operator did not re-rate it), no decimal phase is inserted, and Phase 22 continues",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: the operator chose the acknowledge-continue option and did not say \"rate it S1\". The orchestrator's recommendation shown to the operator was acknowledge-continue keeping S0, with the interim rule \"if you ever do a manual buy, start the main bot immediately afterwards\", and the note that the bot is OFF for all of v7.0 and Phase 24 fixes this before the live re-entry round trip. The interim rule is carried on card BUY-01. As an S0 capital finding it cannot rest on a keep-current default and blocks the re-entry gate until fixed.",
+  "phase_continued": true
+}

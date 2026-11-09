@@ -1,0 +1,121 @@
+SEND-LIST for plan 22-27 (D-14 independent second opinion)
+==========================================================
+
+Status: PREPARED ONLY. Nothing has been sent. No codex or agy request has been made.
+
+WARNING: once sent, this content cannot be recalled. It reaches OpenAI (via codex) and/or
+Google (via agy) and stays under their data-handling terms. The content cannot be recalled once sent.
+
+Base commit (audit_base_sha): 23a64617dca167976adc4645fed0e2c69e384820
+Export folder (outside the repository): C:/Users/jackc/AppData/Local/Temp/gsd-22-27-export-azpUe7
+  slices/<SLICE>/  one folder per slice; each assistant run uses exactly one of these as its working folder
+  combined/        the same 49 files in one folder; used only to cross-check, never sent
+Built with: slice-files.ts --snapshot BUY,EXIT,ANTIRUG,TX,DB (combined) and --snapshot <SLICE> per slice,
+  i.e. git archive of the literal slice entries at the base commit; the tool checked that the extracted
+  list equals the enumerated slice list and that every blob id matches the tree.
+Checks done on the export: 49 files = 19 + 4 + 8 + 11 + 7 (count_at_base); every per-slice list equals
+  files_at_base; per-slice union equals combined/ byte for byte; every path is under src/; no dotfile,
+  no symlink, no git folder.
+Secret scan of slices/ (betterleaks 1.10.0, exe 16600f87ef27..., three passes,
+  scanned 761671 bytes each): 0 hits, 0 non-public. RESULT CLEAN.
+
+NOT included (never sent): environment files, the database folder, backups, the planning folder,
+  the git folder, node_modules, tests, scripts, contracts, dashboard, and any audit finding,
+  research candidate, escalation, decision or summary. The assistants receive no prior findings.
+
+Files (format: FILE <slice> <sha256> <bytes> <path inside slices/<slice>/>)
+-------------------------------------------------------------------------
+# BUY: 19 files, 200464 bytes
+FILE BUY 4536a557f12eeac501226ed90669946f04dc972fe2f953d4a175db5e1a3358a2 3323 src/alphaDrop.ts
+FILE BUY cf5d48b80c02526bc165dc41426924a73239a5b3d71f20f7fe4847ca6e2d1656 122697 src/bot.ts
+FILE BUY 5a64e3a2d06413d86316c6f2a85f8755e44e65e3b233e79f3c976c6709434366 5641 src/telegramListener.ts
+FILE BUY 58affe8226d9cd0bd65243bfe0d60f0bfdc37220553395d42af88950f879137c 4464 src/utils/abis.ts
+FILE BUY 70033f088a57f6d3b6846c6abc978c8a87b6c4430d7f9e22c31511eea4386881 234 src/utils/blocklist.ts
+FILE BUY fe1049e3a84128d80e6944d382573bef62aa1d82f52bb4180031c982cac2fcda 1076 src/utils/honeypot/abi.ts
+FILE BUY 9a95cb02f1fd3ba38056c8b515ac0de8304ab89f8cac917b11545f38da0f1428 4603 src/utils/honeypot/bytecodeScan.ts
+FILE BUY 13139b89cb6dc59c30a9b5eb93dee2a0be49031baea8b974262530ee84f02fa6 18069 src/utils/honeypot/checkerContract.ts
+FILE BUY 170cfcb3fdfeb203b43dd7679bb540d108996f8c94b6d2c30de84d1904f19ffb 3940 src/utils/honeypot/index.ts
+FILE BUY e25e17081bb6f47d584cc75df09be866274e6b8c46f4fe21871d4bcba97b24a5 2968 src/utils/honeypot/sanitize.ts
+FILE BUY 66a5ab5598a8cb11dbbf7153ee2fc1149cf6f2408dadcf61371f4c4e56695c60 984 src/utils/honeypot/simulator.ts
+FILE BUY 77868601721ad00f6638ff1a58f575413dc8b1d62f8f29e3b948cce9e646fb26 2585 src/utils/honeypot/types.ts
+FILE BUY 913049ed36b891222e3b172eeeaa13c0b162755ca7701caf8d45c9c4ec24e87f 748 src/utils/pairDiscovery.ts
+FILE BUY 4b1191e217691d7c8dd0523e824cbd2507947177bda6cdd0e4ddc860f45b3306 3002 src/utils/safetyProviders/goplus.ts
+FILE BUY 887ba0bf71d9b23bee5e183e5c7e1d5db372e3ac133ab67648aff7803ef8562c 1263 src/utils/safetyProviders/honeypotIs.ts
+FILE BUY dea872e31a21449389ca72563b36cb3576bf6e589b618ed7f92e483b5cbd8d46 1600 src/utils/safetyProviders/mudra.ts
+FILE BUY f20c1eb20c948f78aae1fc8b91decb9b8c6685f60183f53af14b9f6c8ceab3bc 851 src/utils/safetyProviders/types.ts
+FILE BUY 5e5a990ec7aa1f6eb3db995b9557cfc2500a61a8702c79be85cb8aa44b5259a5 2107 src/utils/safetyProviders/unicrypt.ts
+FILE BUY 3c0ce1f85a60f0370f65af0b93e609d8b19caa7ede0c58d7c0793fa667bdea74 20309 src/utils/tokenSafety.ts
+# EXIT: 4 files, 118828 bytes
+FILE EXIT c0e438d42436f8d7fc23c5cca4286bd765f2cbb7df2f021f1dd2c97fcb8a6424 100595 src/exitEngine.ts
+FILE EXIT abdc1e394bb1758768cdef657be2b601dec9a5f60cbdec691d3a8684d3f276a9 10886 src/utils/exitManager.ts
+FILE EXIT 23cbb495ec7f0f56fc08917894dec7710b8fbcd7310e79af6ee650918a4b3cb8 4812 src/utils/exitWatchdog.ts
+FILE EXIT 118c9051f3c182003e2cf3e46fa5f908ead64d719fd5fbd98e0ffa2e4b4b9870 2535 src/utils/withTimeout.ts
+# ANTIRUG: 8 files, 159046 bytes
+FILE ANTIRUG ae3e5cc22924272b07debb7a6dafd8bc8176552f5fd12061e9be4fb7d694b379 7168 src/anti-rug/allowlist.ts
+FILE ANTIRUG 42b9fa00bc383385da42b3449ee3cb5f4657acef00743a5db12514c71e0df680 9787 src/anti-rug/circuitBreaker.ts
+FILE ANTIRUG e7ee97e8ebec6c02e2a355ac15f0dbed2a2c6d1266673ecedc9e169833ce1a11 91472 src/anti-rug/detector.ts
+FILE ANTIRUG 0c68fb0d98400ea7868eeae348f3c11e73716f9244e515bd5cca51129d1b0bf7 5374 src/anti-rug/events.ts
+FILE ANTIRUG d520f0d2d07a1588ae65968735c752976879ca4a022f3461eb311ce77fa6a939 14373 src/anti-rug/exitTrigger.ts
+FILE ANTIRUG 5819cee1d0d5479dfa437a2e6fae50f0c64b37c6fb0a5be17d95cb7ce455169d 9853 src/anti-rug/lpBaseline.ts
+FILE ANTIRUG d0cbec0e8dfa08f79d33140b2b1e8b109395b9420e97f653e5e6c839311e3d7c 11474 src/anti-rug/raceTelemetry.ts
+FILE ANTIRUG e8b9d726329f7485100ef71a505f9552ca21c63b9bdd819f31dbf08d47ab4c34 9545 src/anti-rug/types.ts
+# TX: 11 files, 108806 bytes
+FILE TX 16b505cd614aaaf6c6547b6d6c36e3def88a508a765c2421f585cf8865232dd0 1485 src/utils/gasManager.ts
+FILE TX 1a95fac52f26e541154ea7553fa73469f4b8398c2ff43e5be6e7c66273f33866 9822 src/utils/mevStrategies/bloxroute.ts
+FILE TX f2c8da2301bd36baa4fc6249e649ed6f29b030ddd678d76e9c383c604bb1567c 20150 src/utils/mevStrategies/flashbots.ts
+FILE TX 91f6cb718fbbd3ecae5b313b145236888c82f2550830c2ef2c121ffeacb022f4 7972 src/utils/mevStrategies/passthrough.ts
+FILE TX e20d44cdc69720799657b0192e980745e856857c266bae60ee5210c200af8f67 35691 src/utils/mevStrategies/reconciliation.ts
+FILE TX 3985db33b7e57647bd50c19622f1985d379505bd55a64a18126a47e637b4588f 2712 src/utils/mevStrategies/types.ts
+FILE TX e95158a8049e862bdf20ff67398f6f13d99a00628bc3dea692b5418a995b9548 4785 src/utils/nonceAuthority.ts
+FILE TX 7f614f800dc86112c836c3b0652e46dc056256c307061b93d9ef23e3eb0835ca 2243 src/utils/provider.ts
+FILE TX dabc04a9a79a19603631dea2fa855e6233d429b026ff39c042c15a4843a5c156 5071 src/utils/receiptDecoder.ts
+FILE TX b154b8a62f9b697f1ef2822743c6fe051c372561174ff6e366c427c9092491f6 640 src/utils/retry.ts
+FILE TX 3aaa4b4638fef5dcc4779c2b68d6055737d1ba5c9cc25bdc691dc199c21df505 18235 src/utils/txManager.ts
+# DB: 7 files, 174527 bytes
+FILE DB 8f4a59e157bb729e3486cad7997e7b74684fb08cb9fc3af09b87554e5634ca6c 48874 src/chainRegistry.ts
+FILE DB 52ab30acb0759572229d737720e1cc6538933e1d9a12d5a3722c027388d37ff5 31203 src/config.ts
+FILE DB 2ed5185009d810637e96293077406410856274574af4e7811fcf77222655b11a 46507 src/preflight.ts
+FILE DB 68e41d2635bf44762ffb403ce729799921e754205593d8f7486c60f3372c090f 7426 src/riskManager.ts
+FILE DB b439f90d7b0e73ffdec90497f6a56a90c6341e8b25db1b94fc1660790a8f72ed 36210 src/utils/db.ts
+FILE DB 4053adab0e7b9ff63f1152f7b31a6c2ab028d3960f8e4879844b5c67af72df9e 321 src/utils/logger.ts
+FILE DB b59e9165340731f796df7c2038eb9a5ed15a8f31d78ca88d449a8f80b1efeb81 3986 src/utils/notifier.ts
+
+TOTAL 49 files, 761671 bytes
+
+Also sent with every run (instructions, no repository code):
+  PROMPT 717a55b5a747a6a78941316f2930a7f75282d250860d3a0b93d62dd2e6e1a93f 6080 PROMPT.md (this folder): role, the 20 bug classes, severity and capital
+    definitions, evidence rules, and the statement that no prior findings are provided
+  SCHEMA d95226c44a9cc1c0193493730c296d2005618b47a0a4ab9a8fefa6faf5ad5151 2420 finding.schema.json (this folder): the required answer shape
+
+Destinations (each only if the operator approves it at the Task 2 decision)
+--------------------------------------------------------------------------
+DEST openai: service OpenAI, CLI codex (codex-cli 0.163.0), model gpt-6.1-sol, reasoning effort xhigh
+DEST google: service Google (Gemini), CLI agy (agy 1.5.2), model gemini-4-argon-high, effort: CLI default
+  (no agy effort is configured in review.effort)
+Runs: 5 per approved assistant, one per slice (BUY, EXIT, ANTIRUG, TX, DB), each with its working folder
+  set to slices/<SLICE>/ of the export, never the repository. All 49 files reach each approved service.
+The content cannot be recalled once sent.
+
+Planned commands (flag spelling confirmed with each --help; only isolation may be added, never removed)
+-----------------------------------------------------------------------------------------------
+codex exec -C <export>/slices/<SLICE> --sandbox read-only --skip-git-repo-check --ephemeral
+  -m gpt-6.1-sol -c model_reasoning_effort="xhigh" --output-schema <schema copy outside the export>
+  -o <raw output file in a temp folder outside the export and the repository> "<PROMPT.md text>"
+  plus, to keep codex from using tools outside its sandbox: --disable plugins --disable apps
+  --disable browser_use --disable computer_use -c mcp_servers.base44.enabled=false
+  -c mcp_servers.node_repl.enabled=false (checked locally: with these flags codex mcp list shows every
+  MCP server disabled; without them node_repl, cua_repl and a base44 web connector are enabled).
+agy --print "<PROMPT.md text>" --model gemini-4-argon-high --output-format json --sandbox
+  --json-schema <schema copy outside the export>, with the process working folder = <export>/slices/<SLICE>
+  (agy mcp list: no MCP servers; agy plugin list: no plugins).
+
+Read confinement (checked BEFORE any code is sent; the probe sends no repository code)
+-------------------------------------------------------------------------------------
+Each approved assistant is first run, with the same flags, in an EMPTY folder and asked to list what it
+can see and to print a harmless canary file placed next to that folder (random token made at run time,
+never printed) and the repository package.json. Pass = its output contains neither the token nor the
+package name. A failed probe stops that assistant before any code is sent and goes back to the operator
+(options: run it in a container that can see only the export, leave it out, or send nothing).
+Known in advance: the codex documentation for 0.163.0 states that its legacy read-only mode on Windows
+allows reading the whole file system (it blocks writes, not reads). The plain codex probe is therefore
+expected to FAIL; codex is then not sent anything until the operator chooses how to proceed.

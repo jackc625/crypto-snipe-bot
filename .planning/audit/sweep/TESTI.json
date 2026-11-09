@@ -1,0 +1,155 @@
+{
+  "slice": "TESTI",
+  "area": "test",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": [
+        "AUD-TESTI-012"
+      ],
+      "search": "grep Number(, BigInt(, parseEther, formatEther, toBe on bigints, decimal amount fixtures over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Integration money paths compare bigints exactly (mevStrategies, txManager, killswitch, honeypotDispatch probe sizes); the dashboard risk/trades/positions tests feed decimal-ETH rows where production sell rows are wei (AUD-TESTI-012). Fork: fork assertions use bigint balances (BigInt(amount_out) > 0n) and formatEther only for logs; no Number coercion of wei."
+    },
+    "C02": {
+      "result": "checked, none",
+      "search": "grep \"|| \", \"??\" in fixtures, mock defaults and assertions over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). No test pins a wrong || default for 0/0n/\"\" (the env-driven defaults are TESTU scope). Fork: the replays set their exit and risk keys explicitly, so src defaults are not exercised either way (the unread STOP_LOSS_PERCENT key is C03/C18, AUD-TESTI-019)."
+    },
+    "C03": {
+      "result": [
+        "AUD-TESTI-010",
+        "AUD-TESTI-012",
+        "AUD-TESTI-019"
+      ],
+      "search": "grep decimals, getAmountsOut, snipeAmount, probe, entryPrice, priceMultiple, STOP_LOSS over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). exitMonitor recomputes price thresholds in the test (AUD-TESTI-010); every integration token fixture is 18 decimals with a fixed quote; dashboard price/P&L figures are mocked (AUD-TESTI-012). Fork: realLaunchReplay's stop threshold comes from the operator .env because it sets an unread key, and its exit path is unasserted (AUD-TESTI-019); the probe-price S1s AUD-EXIT-003/-015 are not caught (AUD-TESTI-020 map)."
+    },
+    "C04": {
+      "result": [
+        "AUD-TESTI-020"
+      ],
+      "search": "grep minOut, amountOutMin, slippage, slippagePercent over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). No integration test asserts a buy or sell minOut, so the snipe-buy and private-sell minOut S1s (AUD-BUY-003, AUD-EXIT-001) are claimed by no test. Fork: the fork replays and snipeLifecycle swap with real routers but assert no minOut floor; recorded in the AUD-TESTI-020 coverage map."
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "grep deadline, Date.now, block.timestamp, deadline arguments over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Deadlines are not asserted anywhere in the integration suite; mocks encode calldata as constants. Fork: fork swaps pass Date.now()-based or block.timestamp+300 deadlines on the local node; no test-quality defect specific to deadlines."
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep approve, allowance, MaxUint256 over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). No integration test exercises approvals (exitEngine mocked or pure functions only). Fork: the fork exit paths approve through the real exitEngine; checked, no approval-specific test defect."
+    },
+    "C07": {
+      "result": [
+        "AUD-TESTI-002",
+        "AUD-TESTI-003",
+        "AUD-TESTI-020"
+      ],
+      "search": "grep nonce, getTransactionCount, withNonceLock, resubmit over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). mockProvider fixes getTransactionCount at 42 and cannot express a replacement (AUD-TESTI-002); the passthrough timeout case fakes a rejection ethers cannot produce, hiding the never-settling wait in the nonce lock (AUD-TESTI-003). The txManager nonce-reuse case is sound for what it claims. Fork: fork tests sign with Hardhat #0/#1 on the local node with one operation at a time; the nonce-lock S1s AUD-TX-001..005 are not caught (AUD-TESTI-020)."
+    },
+    "C08": {
+      "result": [
+        "AUD-TESTI-002"
+      ],
+      "search": "grep reorg, removed, confirmations, orphan over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). No integration test or helper models a reorg or a dropped tx (AUD-TESTI-002 sub-claim with ethers 6.16.0 provider.js:1179-1192). Fork: a Hardhat fork does not reorg; no fork test models one."
+    },
+    "C09": {
+      "result": [
+        "AUD-TESTI-002",
+        "AUD-TESTI-003",
+        "AUD-TESTI-023"
+      ],
+      "search": "grep status: 1, status: 0, CALL_EXCEPTION, receipt, wait(, revert decoding over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Every mock receipt is status 1 and wait() never throws CALL_EXCEPTION (AUD-TESTI-002, -003); receipt.fixtures has no status field and receiptDecoder does not read one. Fork: fork receipts are real; the honeypot fork cases accept a no-pool revert as a detected honeypot (AUD-TESTI-023)."
+    },
+    "C10": {
+      "result": [
+        "AUD-TESTI-004",
+        "AUD-TESTI-006",
+        "AUD-TESTI-008",
+        "AUD-TESTI-013",
+        "AUD-TESTI-020",
+        "AUD-TESTI-022"
+      ],
+      "search": "grep WebSocketProvider, reconnect, backfill, removeAllListeners, close handler, heartbeat over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Anti-rug reconnect failure modelled as a constructor throw and backfill exits proven with a fake evaluator (AUD-TESTI-004); resume re-registers with an unasserted dex (AUD-TESTI-006); stop-chain requires removeAllListeners (AUD-TESTI-008); DEX reconnect cases are in-test arithmetic (AUD-TESTI-013). Fork: antiRugDetector.fork mocks the chain reads and synthesises logs (AUD-TESTI-022); no fork test reconnects; reconnect S1s not caught (AUD-TESTI-020)."
+    },
+    "C11": {
+      "result": [
+        "AUD-TESTI-004",
+        "AUD-TESTI-013",
+        "AUD-TESTI-020"
+      ],
+      "search": "grep unhandledRejection, uncaughtException, on('error', try/catch in test bodies, process.exit spies over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). No integration test lets a rejection escape or installs an error event; the WS failure that crashes the process is modelled away (AUD-TESTI-004, AUD-TESTI-013). Fork: no fork test checks process survival; AUD-BUY-005 / AUD-TX-009 not caught (AUD-TESTI-020)."
+    },
+    "C12": {
+      "result": "checked, none",
+      "search": "grep setInterval, setTimeout, useFakeTimers, clearAllTimers, registerExitMonitor, afterEach cleanup over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Fake timers are restored in afterEach (midRunWalletCheck, preflightInvocation, wsReconnectBackfill, wsPush, v3LiquidityWait); exitMonitor registers real 60 s intervals and clears them in the same case; wsPush closes the server. No leaked timer that changes a result. Fork: the fork replays clear their monitor timers and interval mining before returning; teardown kills the Hardhat tree on Windows with taskkill /T."
+    },
+    "C13": {
+      "result": [
+        "AUD-TESTI-001",
+        "AUD-TESTI-006",
+        "AUD-TESTI-007",
+        "AUD-TESTI-011",
+        "AUD-TESTI-012",
+        "AUD-TESTI-020",
+        "AUD-TESTI-026"
+      ],
+      "search": "grep CREATE TABLE, user_version, db.prepare, createTestDb, DB_PATH, new Database over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). RC-28 helper schema at v4 and the pauseFlow v6 replica (AUD-TESTI-001); resume and control SQL stubbed (AUD-TESTI-006/-007); the preflightCli child opened the live DB before the rails (AUD-TESTI-011); display figures from mocked statements (AUD-TESTI-012). Fork: the four replays set a temp DB_PATH before importing src and exitStatePersistence runs the real SQL (sound), but its resume loop is re-implemented (AUD-TESTI-026); risk SQL after real wei sell rows is never asserted (AUD-TESTI-020)."
+    },
+    "C14": {
+      "result": [
+        "AUD-TESTI-004",
+        "AUD-TESTI-005",
+        "AUD-TESTI-007",
+        "AUD-TESTI-010",
+        "AUD-TESTI-019",
+        "AUD-TESTI-020",
+        "AUD-TESTI-022",
+        "AUD-TESTI-025",
+        "AUD-TESTI-026",
+        "AUD-TESTI-027"
+      ],
+      "search": "grep executeFullSell, tryAcquireSellLock, exit_failed_held, triggerAntiRugExit, sell/partial_sell rows over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Anti-rug exit mocked to succeed, duplicate dispatch unobserved (AUD-TESTI-004/-005); dashboard sells skip failed-held positions unobserved (AUD-TESTI-007); exit triggers hollow (AUD-TESTI-010). The exitMonitor sell-lock cases are real and sound. Fork: captureRehearsal proves a real stop-loss sell with decoded amount_out (sound); realLaunchReplay leaves the exit path unasserted (AUD-TESTI-019); the fork anti-rug exit is mocked (AUD-TESTI-022); the failed-held resume pins first-dex behaviour (AUD-TESTI-026); deliberate-buy arming is proven only in-process (AUD-TESTI-027); snipeLifecycle runs no bot code (AUD-TESTI-025); coverage map AUD-TESTI-020."
+    },
+    "C15": {
+      "result": [
+        "AUD-TESTI-005",
+        "AUD-TESTI-009",
+        "AUD-TESTI-020"
+      ],
+      "search": "grep concurrent, race, Promise.all, pause between checkpoints, isTokenSniped over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). V3 kill-switch checkpoint cases are conditional (AUD-TESTI-009); anti-rug duplicate dispatch for one rug unobserved (AUD-TESTI-005). Fork: no fork test runs two handlers concurrently, so the double-buy and risk-limit races (AUD-BUY-004/-010) are not caught (AUD-TESTI-020)."
+    },
+    "C16": {
+      "result": "checked, none",
+      "search": "grep maxFeePerGas, maxPriorityFeePerGas, gasMultiplier, gasPrice ceiling, MEV_*_MAX_* over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). txManager asserts the gasMultiplier argument is passed through; mockProvider fee data is a fixed 30/1 gwei; no integration test claims a fee ceiling, so none pins a wrong one. Fork: fork tests use Hardhat auto-gas and claim no ceiling."
+    },
+    "C17": {
+      "result": [
+        "AUD-TESTI-011",
+        "AUD-TESTI-017",
+        "AUD-TESTI-018",
+        "AUD-TESTI-024"
+      ],
+      "search": "grep PRIVATE_KEY, DEPLOY_PRIVATE_KEY, Wallet(, privateKey, 0xac0974, mnemonic, walletPrivateKey, 0x + 64 hex over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Before the rails the preflightCli child built wallets from the real PRIVATE_KEY and eight files loaded CONFIG.walletPrivateKey (AUD-TESTI-011); integration fixtures use synthetic keys. Fork: Hardhat #0/#1 keys in six fork files are known-public (AUD-TESTI-018, not escalated); the Hardhat child and the four replays read the real .env but no fork path signs with the real key (AUD-TESTI-017 trace); the chainId tripwire cannot fire for its stated threat (AUD-TESTI-024)."
+    },
+    "C18": {
+      "result": [
+        "AUD-TESTI-011",
+        "AUD-TESTI-014",
+        "AUD-TESTI-015",
+        "AUD-TESTI-016",
+        "AUD-TESTI-017",
+        "AUD-TESTI-019",
+        "AUD-TESTI-021",
+        "AUD-TESTI-024"
+      ],
+      "search": "grep process.env, delete process.env, dotenv, skipIf(!process.env, ETH_FORK_RPC_URL, ALCHEMY_URL, STOP_LOSS, console.warn + return over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Real .env reach before the rails (AUD-TESTI-011); env overwrite/delete without restore (AUD-TESTI-015); CLI claims vs runs (AUD-TESTI-014); orphaned fixtures (AUD-TESTI-016). Fork: fork harness non-hermetic: ALCHEMY_URL fallback, Hardhat child reads .env, npm test runs the fork project (AUD-TESTI-017); STOP_LOSS_PERCENT read nowhere in src (AUD-TESTI-019); skipped preconditions report green and real fixtures are unpinned (AUD-TESTI-021); tripwire coverage (AUD-TESTI-024)."
+    },
+    "C19": {
+      "result": [
+        "AUD-TESTI-014"
+      ],
+      "search": "grep authMiddleware, cookie, DASHBOARD_API_KEY, cors, handleUpgrade, Host header over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). auth.test runs the real login and middleware (sound); wsPush mocks the upgrade handler and auth, so the AUD-API-008 crash path is unexercised (noted on its row and in the coverage map); pauseCli re-implements the CLI auth flow (AUD-TESTI-014). Fork: no fork test touches the API."
+    },
+    "C20": {
+      "result": "checked, none",
+      "search": "grep telegram, TELEGRAM_, allowlist sender/channel, sendTelegramAlert over the 39 test/integration, test/helpers and test/fixtures files of the slice-files.ts --snapshot TESTI tree at 23a6461 (each read in full; the src files they drive read from a git archive of 23a6461); and over the 23 test/fork files of the same snapshot plus hardhat.config.ts and vitest.config.ts at 23a6461 (each read in full; nothing executed). Telegram is mocked in every integration file whose tested path alerts; v3LiquidityWait and wsPush load the real notifier but call no send path; no Telegram trust claim in the slice. Fork: the replays load the real notifier (alerts would reach the operator chat before the rails, AUD-TESTI-011) but make no Telegram trust claim; antiRugDetector mocks it."
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "id": "AUD-BUY-012",
+  "title": "Dead checkHoneypot passes the wallet private key as the swap recipient address; ethers would put the value into an error message that the function logs",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "src/utils/tokenSafety.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:37-44@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "router.swapExactETHForTokens.staticCall(0, path, CONFIG.walletPrivateKey, deadline, {value}) — the key is passed where the recipient address belongs"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:46-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the error message is logged: log.warn({ error: fallbackMessage })"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:271@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CONFIG.walletPrivateKey is the PRIVATE_KEY env value"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/address/checks.js:103-109",
+      "note": "resolveAddress: a string that is not 0x+40 hex goes to resolver.resolveName (ENS)"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/address/checks.js:61",
+      "note": "checkAddress: an unresolved string raises UNCONFIGURED_NAME with info {value: target}"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/utils/errors.js:100-124",
+      "note": "makeError appends every info key as key=value to the message"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"checkHoneypot(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the definition at tokenSafety.ts:19: no caller"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:38-48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Legacy honeypot fallback can write the wallet private key to logs"
+    }
+  ],
+  "sibling_sites_checked": "All key references in the slice: only tokenSafety.ts:41. Signers elsewhere in the slice come from ctx.wallet (getWallet, src/utils/provider.ts:59, DB/infra slice). The other legacy single-chain helpers are dead too (AUD-BUY-026). Test files only mock checkHoneypot (vi.fn), they do not call it.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2, latent: the function has no caller at the base, so no key has been exposed by it. If it were ever called and the honeypot API failed, the fallback staticCall resolves the recipient argument: a 64-hex string is not an address, so ethers tries ENS, the name does not resolve, and ethers raises UNCONFIGURED_NAME with value=<the key> in the message, which line 47-48 logs at warn level. Not escalated: no secret value was found or exposed (PROTOCOL immediate tier covers a found non-public secret), and nothing was printed during this audit.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-007",
+    "AUD-BUY-026"
+  ],
+  "tags": [
+    "key-handling",
+    "latent",
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Delete checkHoneypot (no caller, so no behaviour change), and add a static check that CONFIG.walletPrivateKey is referenced only where the Wallet is constructed. Phase 29 hygiene, or earlier if Phase 24 touches tokenSafety.ts.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

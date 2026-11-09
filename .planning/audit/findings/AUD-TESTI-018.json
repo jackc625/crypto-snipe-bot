@@ -1,0 +1,77 @@
+{
+  "id": "AUD-TESTI-018",
+  "title": "Known-public key record: the Hardhat default account #0 private key (six fork files) and account #1 (honeypotMultiAmount) are committed as fork-only signers; they are public test keys, not a leak, and are recorded without escalation",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C17"
+  ],
+  "files": [
+    "test/fork/helpers/realMainnetGate.ts",
+    "test/fork/realMainnetGate.fork.test.ts",
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fork/snipeLifecycle.test.ts",
+    "test/fork/honeypotMultiAmount.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/helpers/realMainnetGate.ts:125-126@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "FORK_ONLY_TEST_KEY = Hardhat account #0 (shared by captureRehearsal, deliberateBuyReplay, exitStatePersistence, realLaunchReplay)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realMainnetGate.fork.test.ts:84-89@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "asserts the constant equals the Hardhat #0 key"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:41-42@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Hardhat #0 literal"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:207-209@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Hardhat #0 literal"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/snipeLifecycle.test.ts:11-12@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Hardhat #0 literal"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotMultiAmount.fork.test.ts:49-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Hardhat default account #1 literal"
+    },
+    {
+      "type": "command",
+      "ref": "grep -rnoE \"0x[0-9a-fA-F]{64}\" over the TESTI snapshot (excluding fork fixtures, which hold tx hashes)",
+      "note": "the only 32-byte hex literals in the slice are these two Hardhat keys and two synthetic receipt.fixtures values (0xabcdef...7890, 0xdeadbeef...); no other key-shaped value"
+    }
+  ],
+  "sibling_sites_checked": "Every file of the slice grepped for key-shaped literals and key words (PRIVATE_KEY, privateKey, Wallet(, mnemonic, 0x + 64 hex): integration files use \"0x\" + \"1\"x64 (wsReconnect:38) and \"0x\" + \"1\"x64 auth keys (txManager, mevStrategies), synthetic; api.fixtures MOCK_API_KEY is synthetic; no fixture or README holds a credential value (realLaunches/README.md:45-49 describes which env var holds the operator's archive key without its value).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 record: Hardhat #0 and #1 are published development keys (PROTOCOL section 4 and D-17: known-public, never escalated).",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "secret"
+  ],
+  "secret_class": "known-public",
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "None required for safety. Phase 28 may centralise the two keys in the realMainnetGate helper so scanners have one known-public location to allow-list.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,80 @@
+{
+  "id": "AUD-BUY-007",
+  "title": "Dead tokenSafety.simulateSell sends a real approve of the whole balance to the legacy router, outside the nonce lock; it is still imported, and maybeApproveForChain is also dead",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C06",
+    "C07"
+  ],
+  "files": [
+    "src/utils/tokenSafety.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:269-299@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell: erc20 connected to the Wallet signer; approve(CONFIG.routerAddress, balance) at :277 is a real transaction, only the swap is .staticCall"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "simulateSell is still imported into bot.ts"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:222-229@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "maybeApproveForChain: defined, never called"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"simulateSell(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the definition at tokenSafety.ts:269; no caller"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -F \"maybeApproveForChain(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only the definition at bot.ts:222; no caller"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:274-277@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Legacy sell simulation signs an approval outside the nonce authority"
+    },
+    {
+      "type": "command",
+      "ref": "PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH node node_modules/ts-node/dist/bin.js .planning/audit/tools/signing-census.ts --root <git archive 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts tsconfig.json tsconfig.bot.json package.json, node_modules = per-entry junctions> --sha 23a64617dca167976adc4645fed0e2c69e384820 --out .planning/audit/census/signing-sites.json --manual .planning/audit/census/manual-inventory.json",
+      "note": "census site SIG-049: kind tx-signing, api contract.approve, runner signer (traced to :274), mutability nonpayable (ERC20_ABI src/utils/abis.ts:31), lock_status unlocked: \"simulateSell is exported with no in-program caller (entry: an importer can call it outside any lock)\""
+    }
+  ],
+  "sibling_sites_checked": "All approve( sites in the slice: bot.ts:226 (dead maybeApproveForChain, inside the nonce lock), tokenSafety.ts:277 (dead simulateSell, outside the lock); abis.ts:31 is the ABI fragment. Exit-side approvals belong to the EXIT slice. The other legacy single-chain helpers imported at bot.ts:4-18 are recorded in AUD-BUY-026; the key-handling defect in checkHoneypot is AUD-BUY-012. Merged at 22-28 with AUD-CENSUS-002, the census S1 for the same site (tokenSafety.ts:277); no other unlocked signing site exists in src per the census.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-16"
+  ],
+  "research_suggested_severity": "S2",
+  "severity_rationale": "S1 on merge with AUD-CENSUS-002 (22-26 census), by the operator ruling recorded in ESC-CENSUS-01 (\"keep s1\"): every src transaction-signing site not proven to run under the nonce lock is graded S1 or above, and this approve can take the same nonce as a live buy or sell, so a dropped sell would leave a position held (STRAND). Mitigating fact kept on the record: the site has no caller at the base (imported, never called; tests mock it), which is why this entry was S2 before the merge. Only the census S1 is carried; the code is the same as before.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-012",
+    "AUD-BUY-026"
+  ],
+  "tags": [
+    "dead-code"
+  ],
+  "escalation_ref": "ESC-CENSUS-01",
+  "od_ref": null,
+  "recommendation": "Delete simulateSell, its import at bot.ts:17 and maybeApproveForChain (no caller, so no behaviour change). Phase 29 hygiene unless Phase 24 touches the file first.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex",
+    "claude (22-26 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

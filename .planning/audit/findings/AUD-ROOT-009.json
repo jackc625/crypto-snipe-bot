@@ -1,0 +1,45 @@
+{
+  "id": "AUD-ROOT-009",
+  "title": "A failed test collection is recorded as 0 tests and passes the NAC-04 check in capture-baselines --phase before",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: reachable only in a mode that has finished.",
+  "area": "scripts",
+  "slice": "ROOT",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#8"
+  ],
+  "files": [
+    "scripts/capture-baselines.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/capture-baselines.ts:791@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the comparison treats a collection error as a count of 0"
+    },
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#8 routing",
+      "note": "the false pass exists only in --phase before, which is complete; --phase after loads committed counts"
+    }
+  ],
+  "sibling_sites_checked": "The after mode loads the committed pre-rail counts, so a failed collection fails NAC-04 there.",
+  "recommendation": "Fix if the tool is reused for another baseline: a collection error should fail the check."
+}

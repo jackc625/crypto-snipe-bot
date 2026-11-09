@@ -1,0 +1,90 @@
+{
+  "id": "AUD-RAIL-002",
+  "title": "Tests load the real .env and open and migrate the live DB at import (RC-19)",
+  "kind": "finding",
+  "area": "test",
+  "slice": "RAIL",
+  "severity": "S1",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C13",
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "vitest.config.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "vitest.config.ts:2-4@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dotenv config() at config load: every test process gets the real .env (PRIVATE_KEY, Telegram and RPC credentials)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'bot.db'): with the real .env and the repo as cwd, a test resolves the live DB"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "new Database(DB_PATH) at import time (creates the file if absent)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:20-24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "journal_mode = WAL and synchronous = NORMAL pragmas written at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "user_version = CURRENT_SCHEMA_VERSION (7) written unconditionally by migrateSchema()"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:235@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "migrateSchema() runs at import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:316@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "normalizeLegacyMainnetRows() runs at import (writes rows), after the .bot-state.json migration at :238-285"
+    }
+  ],
+  "sibling_sites_checked": "dotenv sites in src at the base SHA (git grep dotenv): src/config.ts:4 and src/utils/notifier.ts:6, both import-time. Import-time writes in src/utils/db.ts after the open: pragmas :20-24, migrateSchema() :235 (user_version :232), the cwd .bot-state.json migration :238-285 (reads and renames a file in the cwd), normalizeLegacyMainnetRows() :316. The candidate's named test files test/unit/db.test.ts and test/unit/bot/twoStageSigint.test.ts are two of the three duration-0 entries in the 2026-11-06 11:21 Vitest cache (AUD-RAIL-001). The test-file side (which of the unit/integration files import src/utils/db unmocked) is for the TESTU/TESTI audit (22-23, 22-24) to enumerate.",
+  "status": "candidate",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-19"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "",
+  "duplicate_of": null,
+  "related": [
+    "AUD-RAIL-001"
+  ],
+  "tags": [
+    "rail"
+  ],
+  "escalation_ref": "ESC-PRE-03",
+  "od_ref": null,
+  "recommendation": "The SAFE-02 rails mitigate it (22-05, 22-07..22-10): remove config() from vitest.config.ts, scrub and replace the env with test/.env.test sentinels, block reads of the real .env, the DB tripwire for any path inside <repo>/data/ under Vitest, and a per-worker temp DB when DB_PATH is unset. Each rail layer gets its own RED proof (D-01). Phase 23 triages the candidate on a real-path harness. It stays a candidate here, never NOT-A-BUG (NAC-10).",
+  "reported_by": [
+    "claude (22-04 executor)",
+    "research summary candidate #19"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "fixed_by": [
+    "6a254a1",
+    "31b7854",
+    "791e811",
+    "1d1991d",
+    "03412cf",
+    "be3c572",
+    "a08d650"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-18, 30",
+  "status_note": "Stays candidate, as its recommendation and NAC-10 say. The rails block every reach the entry lists; Phase 23 triages the candidate on a real-path harness."
+}

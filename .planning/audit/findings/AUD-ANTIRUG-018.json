@@ -1,0 +1,58 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-007",
+    "AUD-ANTIRUG-005"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-48",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-018",
+  "title": "HTTP anti-rug polling requests the whole outstanding range unchunked, so a gap larger than the provider log-range limit fails every poll from then on",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1279-1291@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getLogs from lastBlock + 1 to current, no chunking"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1300@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lastBlock advances only after success"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 1279,1300p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. A failed poll leaves lastBlock unchanged, so the range only grows. Not reproduced against a provider."
+    }
+  ],
+  "sibling_sites_checked": "Backfill uses a chunked helper (getLogsForBackfill) and TH-ANTIRUG-06 holds that cap. The HTTP poller does not use it.",
+  "status": "confirmed",
+  "severity_rationale": "S2: only chains running without a WebSocket URL, after an outage larger than the provider range limit. Same grade as the related HTTP poller defect AUD-ANTIRUG-007. Protection then stays off until restart.",
+  "recommendation": "Use the chunked helper in the poller; decide the outage handling in card ANTIRUG-02. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-04"
+  ]
+}

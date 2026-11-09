@@ -31,7 +31,7 @@
 //   (e) anti-rug baseline failure (snapshotLpBaseline throws) -> exit monitor
 //       STILL armed + op:'antirug.baseline-snapshot-failed' log
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 // -----------------------------------------------------------------------------
 // External-boundary mocks ONLY (mirror noDoubleBuyReconcile.test.ts) + spies on
@@ -225,6 +225,14 @@ const SAVED_ENV: Record<string, string | undefined> = {
     MEV_CONFIRM_POLL_MS: process.env.MEV_CONFIRM_POLL_MS,
     DELIBERATE_BUY_PRIVATE_ATTEMPTS: process.env.DELIBERATE_BUY_PRIVATE_ATTEMPTS,
 };
+
+// The first import of src/bot compiles the whole bot graph, about 5 s under a full parallel run,
+// which used up the first test's 5 s limit. Paying for it here keeps that limit on every test, so
+// a real hang in the money path still fails fast. Each test still re-imports src/bot after
+// vi.resetModules(), so this adds no shared state.
+beforeAll(async () => {
+    await import('../../../src/bot');
+}, 30_000);
 
 afterEach(() => {
     for (const [k, v] of Object.entries(SAVED_ENV)) {

@@ -1,0 +1,91 @@
+{
+  "id": "AUD-TESTU-017",
+  "title": "The risk-limit tests never run the production risk SQL on production-shaped rows: db.test.ts runs re-typed copies of the exposure and daily-loss queries with sell amounts stored as decimal ETH, and riskManager.test.ts mocks the statements, so the registered unit-mismatch and failed-held exclusion defects pass green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C01",
+    "C03",
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "test/unit/db.test.ts",
+    "test/unit/riskManager.test.ts",
+    "src/utils/db.ts",
+    "src/riskManager.ts",
+    "src/utils/receiptDecoder.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/db.test.ts:206-260@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "GET_TOTAL_EXPOSURE_SQL and GET_DAILY_LOSS_SQL are re-typed inside the test (\"SQL for getTotalExposure ...\")"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db.test.ts:358-427@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the exposure and daily-loss cases insert sell rows with amount_out \"0.03\" / \"0.02\" and gas_cost \"0.0005\" (decimal ETH) and run the copies"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:425-459@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real getTotalExposure / getDailyRealizedLoss subtract CAST(amount_out) from CAST(amount_in); never executed by a unit test"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "production sell rows get amountOut = the WETH wad as a wei bigint string, not decimal ETH (AUD-DB-002)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/riskManager.test.ts:14-26@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getOpenPositionCount, getTotalExposure and getDailyRealizedLoss are vi.fn statements"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/riskManager.test.ts:78-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the daily-loss and exposure cases feed total_loss -0.15 and total 9.96 (decimal) straight into canSnipe"
+    },
+    {
+      "type": "code",
+      "ref": "src/riskManager.ts:95-99@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "canSnipe compares the statement result to the decimal threshold"
+    }
+  ],
+  "sibling_sites_checked": "Every unit test of risk, P&L and exposure: db.test.ts (copies of getPnL, getTotalExposure, getDeployedCapitalByChain, getDailyRealizedLoss, getPnLChartData at :170-282), riskManager.test.ts (statements mocked, getPortfolioExposure fed decimal deployed values), positionsHelper.test.ts (getPnL mocked). bot/* tests mock riskManager entirely. No unit test inserts a row the way bot.ts (decimal amount_in) and exitEngine.ts (wei amount_out from receiptDecoder) do and then runs the real statement.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the tests claim the daily-loss breaker and exposure cap work (risk limits are capital controls) while the registered S1s AUD-DB-002 (unit mismatch) and AUD-DB-003 (failed-held positions excluded from status=pending) pass green; the fixtures encode the wrong-unit assumption.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-002",
+    "AUD-DB-003",
+    "AUD-TESTI-001"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28 (after the AUD-DB-002 fix in Phase 24): seed a temp DB through the real write paths (insertTrade as bot.ts and exitEngine.ts call it, with a decoded wei amountOut) and run the real db.ts statements and canSnipe on it; delete the SQL copies.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "getTotalExposure subtracts partial sell proceeds (D-04)",
+    "getDeployedCapitalByChain subtracts partial sell proceeds (D-04)",
+    "getDailyRealizedLoss includes partial_sell events (D-05)",
+    "getDailyRealizedLoss: partial sell profit offsets later loss (D-05)",
+    "riskManager.test.ts: returns {allowed:false, reason:\"daily_loss_limit\"} when daily loss exceeded",
+    "riskManager.test.ts: returns {allowed:false, reason:\"exposure_cap\"} when total exposure exceeded"
+  ],
+  "escaped_regression": "Today's code already escapes (AUD-DB-002): a sell row stores the WETH wad in wei, so the daily loss computed by db.ts:441-459 is a huge positive number and the breaker never fires, while every case stays green. A concrete change that also stays green: edit getDailyRealizedLoss at src/utils/db.ts:441-459 in any way (for example drop the \"< 0\" filter); the copy in db.test.ts:238 is what runs."
+}

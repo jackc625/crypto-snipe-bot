@@ -1,0 +1,55 @@
+{
+  "id": "AUD-TESTQ-035",
+  "title": "Every test/fork file changed in Phase 22 has not executed under the real fork project",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality",
+    "unrun-verification"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S2 by the plan: an unrun change can hide a fork-mode break.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S2",
+  "owner_phase": "25",
+  "files": [
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/helpers/forkRpcUrl.ts",
+    "test/fork/helpers/hardhatChildEnv.ts",
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/honeypotDeploy.eth.fork.test.ts",
+    "test/fork/rails/forkRails.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "test/fork/setup.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git diff --name-only 23a64617dca167976adc4645fed0e2c69e384820..HEAD -- test/fork",
+      "note": "11 files: test/fork/antiRugDetector.fork.test.ts, test/fork/captureRehearsal.fork.test.ts, test/fork/deliberateBuyReplay.fork.test.ts, test/fork/exitStatePersistence.fork.test.ts, test/fork/helpers/forkRpcUrl.ts, test/fork/helpers/hardhatChildEnv.ts, test/fork/honeypotChecker.fork.test.ts, test/fork/honeypotDeploy.eth.fork.test.ts, test/fork/rails/forkRails.fork.test.ts, test/fork/realLaunchReplay.fork.test.ts, test/fork/setup.ts"
+    }
+  ],
+  "sibling_sites_checked": "The fork project needs Hardhat, which Phase 22 may not start (AC-08). The rail assertions among these files are UFV-01 to UFV-05; the others are mechanical edits recorded in AUD-TESTQ-011 to AUD-TESTQ-016.",
+  "escaped_regression": "A fork test broken by these edits (a missing import, a wrong argument order, a resolver that throws under the real project) would stay green until Phase 25 first runs the fork suite.",
+  "recommendation": "Run the whole fork suite at the first npm run test:fork of v7.0, owner Phase 25, and record the pass or fail of each file.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
+}

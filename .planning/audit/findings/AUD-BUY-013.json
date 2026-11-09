@@ -1,0 +1,80 @@
+{
+  "id": "AUD-BUY-013",
+  "title": "Two token-screening gates can never fire: the anti-bot selector scan matches \"0x\"-prefixed selectors that cannot occur inside bytecode, and the blocklist is always empty",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "EXPOSURE",
+  "classes": [],
+  "files": [
+    "src/utils/tokenSafety.ts",
+    "src/utils/blocklist.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:331-340@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isBlacklistedTokenForChain: bytecode.includes(\"0xdd62ed3e\") etc. The bytecode string has a single \"0x\" at its start, so the test is false for every real token (true only on an RPC error)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:332@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "0xdd62ed3e is allowance(address,address), which every ERC20 has; simply stripping the prefix would make the gate block every token"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:56-61@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "legacy twin isBlacklistedToken: same defect (dead)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/blocklist.ts:5-8@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "BLOCKLIST tokens/pairs are empty Sets; nothing in src adds to them"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:889-899@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 blocklist checks against the empty sets"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:433-451@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "isKnownBadTokenForChain: only \"no code\" or the empty blocklist; the creator check is skipped"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1023@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "alert prints \"Blacklist Function\" from the no-op gate"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:332-335@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S2): Blacklist selector scanning includes an impossible interior 0x prefix"
+    }
+  ],
+  "sibling_sites_checked": "Both blacklist scanners (tokenSafety.ts:56-61 legacy, :331-340 chain) and every BLOCKLIST use (bot.ts:889, :895, :1218; tokenSafety.ts:204, :441) checked; git grep found no code that adds to BLOCKLIST. The bytecode scan is AUD-BUY-014.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: two gates in the buy path are no-ops, so the alert line \"Blacklist Function: No\" is printed for every token and the \"known bad token\" gate only rejects addresses with no code. The bytecode mutability scan (honeypot/bytecodeScan.ts) independently covers setBlacklist-style selectors, which bounds the effect.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-009",
+    "AUD-BUY-014"
+  ],
+  "tags": [
+    "safety-gate"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-30",
+  "recommendation": "Either make each gate test what it is named for (strip the prefix, drop the allowance selector, give the blocklist a data source) or remove it and stop printing its result. Fixing it would block more tokens, so it is a behaviour change on card BUY-05. Phase 24 or 29 per the card.",
+  "reported_by": [
+    "claude (22-17 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

@@ -1,0 +1,108 @@
+{
+  "id": "AUD-DASH-002",
+  "title": "An anti-rug circuit-breaker trip, the per-chain anti-rug socket health and a backfill gap are shown only if the browser was connected at the moment they were pushed; nothing loads them on page open or reconnect, so after a reload the \"ANTI-RUG HALTED\" banner (the only way to the reset dialog) is missing and the monitor tile still says monitoring is active",
+  "kind": "finding",
+  "area": "dashboard",
+  "slice": "DASH",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "dashboard/src/hooks/useWebSocket.ts",
+    "dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx",
+    "dashboard/src/components/anti-rug/CircuitBreakerResetModal.tsx",
+    "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx",
+    "dashboard/src/components/anti-rug/WsHealthIndicator.tsx",
+    "dashboard/src/components/anti-rug/GapDetectedBanner.tsx",
+    "dashboard/src/pages/Overview.tsx",
+    "src/api/routes/antiRug.ts",
+    "src/anti-rug/circuitBreaker.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:54-56@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "antiRugEvents, chainWsHealth and circuitBreakerTrips start empty"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:62-96@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "refreshFromRest (run on every connect and reconnect) loads positions, chains and pause state only"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/hooks/useWebSocket.ts:214-249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "chain_ws_health_change, cb_tripped and cb_reset are the only writers of those maps"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:126-152@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the trip is broadcast once per trip window (trippedChains guard) as cb_tripped"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/antiRug.ts:50-96@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the API offers POST reset and GET /events/:chain only; there is no route that reports whether a chain is tripped"
+    },
+    {
+      "type": "command",
+      "ref": "grep -rn \"fetch(\" <snapshot>/dashboard/src (slice-files.ts --snapshot API,DASH at 23a6461)",
+      "note": "no dashboard code calls /api/anti-rug/events or any anti-rug read route"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx:34-36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the banner renders nothing when circuitBreakerTrips is empty"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/CircuitBreakerBanner.tsx:52-66@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "banner text \"New positions will open without anti-rug coverage until you ... reset the breaker\" and the chip that is the only way to open the reset dialog"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:140-143@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "onResetClick from the banner is the only setter of resetModalTarget"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx:48-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the per-chain health dot is drawn only when a chain_ws_health_change has arrived in this tab"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/components/anti-rug/AntiRugMonitorTile.tsx:74-80@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "empty state: \"Anti-rug monitoring is active on <CHAIN>\" whatever the real state"
+    },
+    {
+      "type": "code",
+      "ref": "dashboard/src/pages/Overview.tsx:51-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "gap-detected banners come from pushed antirug_event entries only"
+    }
+  ],
+  "sibling_sites_checked": "Every piece of anti-rug state the dashboard shows and where it comes from: circuit-breaker trips (push only, no read route), per-chain anti-rug socket health (push only; ChainStatusCard shows the chain's own wsConnected from /api/chains, which is the provider object, not the anti-rug subscription), backfill-gap banners (push only), anti-rug events (push only, AUD-DASH-003), per-position anti-rug state (push only and then overwritten, AUD-DASH-001). Pause state is the one push-driven value that IS re-loaded on connect (useWebSocket.ts:72, :82-92), which shows the intended pattern. The trip is also announced once on Telegram (circuitBreaker.ts:154-158). A CB trip survives in memory only until restart (card ANTIRUG-04, ANTIRUG slice).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 STRAND (indirect): while a breaker is tripped, new positions open without anti-rug protection (as the banner itself says); after any page load, reload or dashboard socket drop that spans the trip, the dashboard shows no banner, offers no way to reach the reset dialog, and the monitor tile states monitoring is active, so the operator is told the opposite of the truth. Not S1: the trip itself is the protection-off condition and is produced elsewhere; a Telegram alert is sent once; no funds move because of the display.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DASH-001",
+    "AUD-DASH-003",
+    "AUD-API-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Add a read route for each chain's anti-rug status (tripped flag with its trigger list, subscription health, last gap) and load it in refreshFromRest on every connect, the way pause state already is; make the monitor tile's text depend on that status. Real-path test: trip the breaker, open a fresh dashboard session and assert the banner and reset path appear. Pure bug fix; nothing changed in Phase 22.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

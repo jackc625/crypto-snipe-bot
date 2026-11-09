@@ -1,0 +1,74 @@
+{
+  "id": "AUD-TESTI-016",
+  "title": "Hygiene: orphaned or self-referential test data (test/fixtures/chainConfig.ts and the two Mythril sample reports are imported by nothing, three integration tests cite chainConfig.ts as the chain template source, the Flashbots bundle factories are only smoke-tested, and one wsPush case asserts that a mock it just called was called)",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "test/fixtures/chainConfig.ts",
+    "test/fixtures/mythril/sample-clean.json",
+    "test/fixtures/mythril/sample-high.json",
+    "test/fixtures/txManager.fixtures.ts",
+    "test/integration/api/wsPush.test.ts",
+    "test/integration/killswitchCheckpoints.test.ts",
+    "test/fork/teardown.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "git grep -n -e fixtures/chainConfig -e sample-clean -e sample-high 23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no import of chainConfig.ts anywhere; the Mythril samples are referenced by no test or script (scripts/check-mythril-report.ts has no test)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fixtures/chainConfig.ts:1-5@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: inline Phase 4 types that \"mirror the planned ChainConfig\""
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/killswitchCheckpoints.test.ts:253@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment cites \"chainRegistry.ts:204 / test/fixtures/chainConfig.ts:62\" as the ETH gas template (also v2HoneypotIntegration.test.ts:233, v3HoneypotIntegration.test.ts:245)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fixtures/txManager.fixtures.ts:24-52@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "createMockBundleResponse / createMockFlashbotsProvider: referenced only by test/unit/helpers.smoke.test.ts typeof checks"
+    },
+    {
+      "type": "code",
+      "ref": "test/integration/api/wsPush.test.ts:235-247@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "chain_status_change case calls the mocked broadcast and asserts it was called"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/teardown.ts:1-3@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: teardown is handled by setup.ts; the file \"exists for documentation purposes\" and exports nothing (vitest.config.ts:36 names only setup.ts)"
+    }
+  ],
+  "sibling_sites_checked": "Every file under test/fixtures and test/helpers checked for an importer at the base SHA (git grep on each export name): api.fixtures, exitEngine.fixtures, receipt.fixtures, tokenSafety.fixtures, mockProvider and testDb are used; chainConfig.ts and the Mythril samples are not; the two Solidity fixtures are compiled by hardhat.config.ts and used by the fork tests.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4: dead or tautological test material; misleading but harmless.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-002"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28/29: delete chainConfig.ts (point the comments at chainRegistry.ts) or make it the single fixture source; either add a unit test for scripts/check-mythril-report.ts that uses the two samples or delete them; delete the tautological wsPush case.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

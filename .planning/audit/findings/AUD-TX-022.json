@@ -1,0 +1,49 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-022",
+  "title": "Strategies assert transaction amounts are bigint without converting them",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C01"
+  ],
+  "files": [
+    "src/utils/mevStrategies/passthrough.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:57-62@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "as bigint casts on gasLimit and value"
+    },
+    {
+      "type": "command",
+      "ref": "grep gasLimit and value across exitEngine.ts and bot.ts in the base snapshot (22-27 merge)",
+      "note": "Claude verification: latent; every in-repo builder passes bigint or omits the field."
+    }
+  ],
+  "sibling_sites_checked": "bloxroute.ts:84, :91 and flashbots.ts:161, :166 have the same casts.",
+  "status": "candidate",
+  "severity_rationale": "S4: no current caller reaches the failing case.",
+  "recommendation": "Convert with BigInt() at the strategy boundary. No behaviour change for current callers. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-01"
+  ]
+}

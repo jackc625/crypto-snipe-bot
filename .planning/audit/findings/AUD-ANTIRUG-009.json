@@ -1,0 +1,80 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-006",
+    "AUD-ANTIRUG-003"
+  ],
+  "tags": [
+    "section-c:SC-11"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "research-candidate",
+  "id": "AUD-ANTIRUG-009",
+  "title": "The 7-day anti-rug dry-run floor measures calendar time since the first listener start: time with the bot off counts, no observed pool event is required, and the stamp never resets",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/utils/db.ts",
+    "src/preflight.ts",
+    "src/config.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:579-585@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the stamp is written on every startChainAntiRugListener call, with or without positions and before any event"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:702-707@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "INSERT ... ON CONFLICT ... COALESCE keeps the first stamp forever"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:628-697@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the gate is only now minus stamp >= SEVEN_DAYS_SEC (:127)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1710@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "preflight runs at boot and is fatal on failure, so the gate is checked only at boot"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:179-216@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "in dry-run the breaker is never reached, so the dry run does not exercise it"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "documented rule: flip to true ONLY after a 7-day dry run with 0 confirmed false positives; the false-positive review is not in code"
+    }
+  ],
+  "sibling_sites_checked": "Every reader and writer of antirug_dry_run_started (db.ts:186-188 column, :702-709 statements; detector.ts:585; preflight.ts:640-655). Every LIVE_EXECUTE read: chainRegistry.ts:721-724 (strict \"true\"), exitTrigger.ts:174 (from the registry), preflight.ts:629-630 (from env, same strictness). No dashboard or Telegram path flips it at runtime.",
+  "status": "confirmed",
+  "severity_rationale": "S2. Going live on a chain whose detector never saw a pool event during the \"dry run\" (for example the bot ran for one minute a week ago) turns on emergency sells with minOut 0 and a 2x gas bid against an unvalidated detector; the loss is bounded per position and needs the operator to flip the switch. Section-C item SC-11 (L1).",
+  "external_od_refs": [
+    {
+      "id": "OD-19",
+      "owner_phase": "32"
+    }
+  ],
+  "recommendation": "Decide in Phase 32 (card OD-19, owned there; no local card) what the floor measures: monitored time with the bot running and positions registered, a minimum count of evaluated events with zero false positives, and a reset when the detector code or its thresholds change. Until then treat the stamp as a lower bound only."
+}

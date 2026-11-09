@@ -1,0 +1,55 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "related": [
+    "AUD-DB-004",
+    "AUD-BUY-002"
+  ],
+  "tags": [
+    "external-only",
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-18",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-14"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "external",
+  "id": "AUD-DB-021",
+  "title": "SQLite runs WAL with synchronous=NORMAL, so a just-written position record can be lost on power loss or OS crash",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "journal_mode WAL and synchronous NORMAL"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 19,23p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Not reproduced. A process crash alone does not lose committed data; only power loss or OS failure does."
+    }
+  ],
+  "sibling_sites_checked": "All critical writes (db.ts:320-323, :540-545, :631-652) use the same database handle and setting.",
+  "status": "confirmed",
+  "severity_rationale": "S2: a power cut or OS crash in the small window after a buy is recorded, on a machine with no battery guarantee. The effect is a lost row for a real position. Linked at 22-28 to RC-14, whose text names synchronous=NORMAL under WAL; the RC is otherwise carried by AUD-DB-004. S2 is below the S1 suggestion because a loss here needs a host-level crash within the OS write-back window after a buy (a process crash cannot lose WAL commits).",
+  "recommendation": "Decide whether critical writes need FULL durability in card OD-18, which holds the synchronous=FULL options (the proposed durability card was linked to it at 22-28). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-DB-08"
+  ]
+}

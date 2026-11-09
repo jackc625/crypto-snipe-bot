@@ -1,0 +1,39 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-47",
+  "title": "Anti-rug trigger dedupe, retry and circuit-breaker counting",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: every matching log dispatch is its own exit attempt and its own breaker count; a refused or failed escape is not retried",
+      "behavior_impact": "none",
+      "risk": "One rug can trip the chain breaker and suppress every later anti-rug exit on the chain (AUD-ANTIRUG-003); a refused or failed escape is lost (AUD-ANTIRUG-004)."
+    },
+    {
+      "id": "dedupe-and-retry",
+      "name": "One in-flight anti-rug dispatch per position; an unsafe verdict stays pending and is retried each block until a successful exit or a genuine close",
+      "behavior_impact": "Duplicate logs no longer start duplicate attempts; a failed escape is retried.",
+      "risk": "A retry loop on a position that cannot be sold (honeypot, no route) burns gas each block unless bounded."
+    },
+    {
+      "id": "dedupe-retry-count-per-position",
+      "name": "dedupe-and-retry, and count the breaker once per position (or per rug event) instead of per dispatch",
+      "behavior_impact": "The breaker trips on several positions misfiring, not on one rug.",
+      "risk": "A detector misfiring repeatedly on one position is no longer caught by the breaker; needs its own bound."
+    }
+  ],
+  "recommendation": "dedupe-retry-count-per-position with a bounded retry, decided after the Phase 23 fork replay counts the logs of a complete removal.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides how many exit attempts and breaker counts one rug produces.",
+  "findings": [
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-004",
+    "AUD-ANTIRUG-021"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "ANTIRUG-01"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "AUD-API-011",
+  "title": "Section C SC-15: health.ts reads package.json through a __dirname-relative path at import, so any change of the output layout (compiled dist/, the Phase 27 restructure) makes the import throw and the whole bot fails to start",
+  "kind": "finding",
+  "area": "src",
+  "slice": "API",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/api/routes/health.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/api/routes/health.ts:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const pkg = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf-8')) at module load"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:110@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "bot.ts imports startApiServer at the top, so the health module loads with the bot"
+    }
+  ],
+  "sibling_sites_checked": "grep over the API snapshot for __dirname, readFileSync and process.cwd(): health.ts:15 (this finding); server.ts:165 serves dashboard/dist from process.cwd() (cwd-relative: started from another folder the SPA answers 404 'Dashboard not built', fail-soft, recorded here as hygiene); no other file reads.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S4 hygiene: the failure is loud and at boot (the bot does not start), never a silent wrong state; it matters for the Phase 26/27 restructure.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Read the version once through a resolver that walks up to the package.json named crypto-snipe-bot (as rail 22-09 does for the DB path), or inject it at build time; resolve the dashboard dist path from the repo root, not cwd. Phase 27.",
+  "reported_by": [
+    "claude (22-22 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

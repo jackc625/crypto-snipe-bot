@@ -1,0 +1,57 @@
+{
+  "id": "AUD-TESTU-010",
+  "title": "The anti-rug dry-run timestamp test runs its own copy of the COALESCE SQL in an in-memory DB instead of the statement in db.ts, so a change to the real statement is invisible (the copy already cites stale line numbers)",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "test/unit/anti-rug/dryRunTimestamp.test.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/dryRunTimestamp.test.ts:72-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"same SQL as src/utils/db.ts:565-572\": the statement is re-typed in the test; at the base SHA it lives at db.ts:702-707"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/anti-rug/dryRunTimestamp.test.ts:95-103@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "src/utils/db is replaced by the in-test copies"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:702-707@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real setAntirugDryRunStarted statement"
+    }
+  ],
+  "sibling_sites_checked": "Other mirror-SQL tests: the db/*Migration.test.ts files are checked in Task 2 (RC-28 sibling). preflight/antiRugLiveGate.test.ts reads the value through a mocked getAntirugDryRunStarted (Task 2).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: the mechanism is mocked, but the plausible escaped change (losing COALESCE) makes each restart reset the 7-day dry-run floor, which delays live anti-rug execution (conservative direction); no capital effect.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: run the test against the real db.ts statement on a temp DB (the rails give each worker a temp DB) instead of a copy.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "Test 2: re-calling startChainAntiRugListener for the same chain does NOT overwrite the original ts (COALESCE-idempotent)",
+    "Test 4: with fake timers — first call records T0; after advancing 1 day, re-call leaves stored ts at T0"
+  ],
+  "escaped_regression": "Drop the COALESCE at src/utils/db.ts:706 (antirug_dry_run_started = excluded.antirug_dry_run_started): every case stays green because the test runs its own statement."
+}

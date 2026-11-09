@@ -1,0 +1,60 @@
+{
+  "_meta": {
+    "updated_at": "2026-11-06T18:51:04.488Z",
+    "version": 2
+  },
+  "entries": {
+    "overview": {
+      "pattern": "Single-process multi-chain event-driven trading bot with embedded API/dashboard",
+      "description": "src/bot.ts startMultiChainBot builds per-chain contexts (src/chainRegistry.ts), listens for new DEX V2 pairs / V3 pools and Telegram alpha calls, runs safety checks, buys, then manages exits and anti-rug monitoring; Express API + WebSocket (src/api/server.ts) serves the React dashboard (dashboard/)."
+    },
+    "data-flow": {
+      "flow": "DEX factory events / Telegram (src/telegramListener.ts -> src/alphaDrop.ts) -> handleNewPairForChain (src/bot.ts) -> tokenSafety + honeypot simulation -> riskManager.canSnipe -> txManager/MEV strategy buy -> db.insertTrade -> exitEngine + anti-rug detector -> sell",
+      "description": "State persisted in SQLite (src/utils/db.ts); alerts via src/utils/notifier.ts and WS broadcast."
+    },
+    "component:ChainRegistry": {
+      "path": "src/chainRegistry.ts",
+      "responsibility": "Per-chain context (providers, DEX V2/V3 allowlists, config)"
+    },
+    "component:SafetyPipeline": {
+      "path": "src/utils/tokenSafety.ts, src/utils/honeypot/, src/utils/safetyProviders/, contracts/honeypot/HoneypotChecker.sol",
+      "responsibility": "Honeypot/roundtrip simulation, external providers (GoPlus, honeypot.is, Mudra, Unicrypt), blocklist, LP lock and limits checks"
+    },
+    "component:RiskManager": {
+      "path": "src/riskManager.ts",
+      "responsibility": "Exposure, position count, daily loss gating (canSnipe)"
+    },
+    "component:MevSubmission": {
+      "path": "src/utils/txManager.ts, src/utils/mevStrategies/",
+      "responsibility": "Private submission (Flashbots, bloXroute) with inclusion reconciliation and public fallback; nonce serialization in src/utils/nonceAuthority.ts"
+    },
+    "component:ExitEngine": {
+      "path": "src/exitEngine.ts, src/utils/exitManager.ts, src/utils/exitWatchdog.ts",
+      "responsibility": "Stop-loss, take-profit tiers, trailing, timed sells; per-token sell locks; serialized exit state"
+    },
+    "component:AntiRug": {
+      "path": "src/anti-rug/",
+      "responsibility": "LP burn/removal detection, LP baseline, exit trigger, per-chain circuit breaker, race telemetry"
+    },
+    "component:API": {
+      "path": "src/api/",
+      "responsibility": "Express 5 routes with session auth middleware, helmet, WS broadcaster; serves dashboard/dist SPA"
+    },
+    "component:Preflight": {
+      "path": "src/preflight.ts, scripts/preflight.ts",
+      "responsibility": "Read-only cold-start checks: RPC chainId/block age, balances, gas affordability, MEV health, checker bytecode"
+    },
+    "security": {
+      "auth": "Session cookies via src/api/middleware/auth.ts protect /api/*",
+      "keys": "Wallet from env via src/utils/provider.ts getWallet"
+    },
+    "testing": {
+      "framework": "Vitest unit/integration/fork projects (vitest.config.ts); Hardhat for contracts (hardhat.config.ts)"
+    },
+    "conventions": {
+      "naming": "camelCase modules, _resetXForTesting test hooks",
+      "file-organization": "src/ top-level domain modules, src/utils/ infrastructure, src/anti-rug/ and src/api/ subsystems",
+      "imports": "relative TS imports, CommonJS output via tsc"
+    }
+  }
+}

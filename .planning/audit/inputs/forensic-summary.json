@@ -1,0 +1,309 @@
+{
+  "attribution_counts": {
+    "attributed-test-write": 0,
+    "literal-match-uncorroborated": 0,
+    "production-constant-literal": 0,
+    "public-historical-literal": 3
+  },
+  "diff_counts": {
+    "chain_state": {
+      "added": 0,
+      "changed": 0,
+      "removed": 0
+    },
+    "exit_state": {
+      "added": 0,
+      "changed": 0,
+      "removed": 0
+    },
+    "lp_baseline": {
+      "added": 0,
+      "changed": 0,
+      "removed": 0
+    },
+    "pause_state": {
+      "added": 0,
+      "changed": 0,
+      "removed": 0
+    },
+    "trades": {
+      "added": 0,
+      "changed": 0,
+      "removed": 0
+    }
+  },
+  "e_equals_source": {
+    "run1": true,
+    "run2": true
+  },
+  "e_unchanged": {
+    "run1": true,
+    "run2": true
+  },
+  "extraction_limits": [
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fork/captureRehearsal.fork.test.ts",
+    "test/fork/deliberateBuyReplay.fork.test.ts",
+    "test/fork/exitStatePersistence.fork.test.ts",
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/honeypotMultiAmount.fork.test.ts",
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "test/fork/snipeLifecycle.test.ts",
+    "test/integration/anti-rug/multiSignalEnd2End.test.ts",
+    "test/integration/mevStrategies.test.ts",
+    "test/unit/anti-rug/detectorEvaluator.test.ts",
+    "test/unit/anti-rug/types.test.ts",
+    "test/unit/chainRegistry/antiRugConfig.test.ts",
+    "test/unit/exitEngine/noDoubleSellReconcile.test.ts",
+    "test/unit/mevStrategies/flashbotsMultiBuilder.test.ts",
+    "test/unit/mevStrategies/gasMultiplier.test.ts",
+    "test/unit/mevStrategies/inclusionReconciliation.test.ts"
+  ],
+  "images": {
+    "A_merged_2025": {
+      "chain_state": [
+        {
+          "antirug_dry_run_started": "1779754507",
+          "chain": "eth",
+          "last_seen_block": "25203473",
+          "last_updated_ts": "1780087218"
+        }
+      ],
+      "change_counter": 1068,
+      "counts": {
+        "chain_state": 1,
+        "exit_state": 0,
+        "lp_baseline": 1,
+        "pause_state": 1,
+        "trades": 2
+      },
+      "header_bytes_18_19_original": [
+        2,
+        2
+      ],
+      "header_patched": true,
+      "integrity": "ok",
+      "pause_state": [
+        {
+          "id": "1",
+          "paused": "0",
+          "paused_at": null,
+          "paused_by": null,
+          "reason": null
+        }
+      ],
+      "sqlite_sequence": [
+        {
+          "name": "trades",
+          "seq": "3"
+        }
+      ],
+      "user_version": 7
+    },
+    "B_checkpoint_1733": {
+      "chain_state": [
+        {
+          "antirug_dry_run_started": "1779754507",
+          "chain": "eth",
+          "last_seen_block": "25203473",
+          "last_updated_ts": "1780087218"
+        }
+      ],
+      "change_counter": 1028,
+      "counts": {
+        "chain_state": 1,
+        "exit_state": 0,
+        "lp_baseline": 1,
+        "pause_state": 1,
+        "trades": 2
+      },
+      "header_bytes_18_19_original": [
+        2,
+        2
+      ],
+      "header_patched": true,
+      "integrity": "ok",
+      "pause_state": [
+        {
+          "id": "1",
+          "paused": "0",
+          "paused_at": null,
+          "paused_by": null,
+          "reason": null
+        }
+      ],
+      "sqlite_sequence": [
+        {
+          "name": "trades",
+          "seq": "3"
+        }
+      ],
+      "user_version": 7
+    }
+  },
+  "integrity_failed": false,
+  "interpretation": [
+    "No row in trades, exit_state, pause_state, chain_state or lp_baseline was added, changed or removed between the 17:33 checkpoint image and the 20:25 merged image, and the commit-by-commit WAL replay shows no row that existed only in between (1 distinct row state across all 40 commit points).",
+    "The 40 WAL frames are all current-generation, each a single-page commit of page 1 (the database header) that only increments the file change counter (1029..1068); user_version stays 7. Reproduced on a temp DB: a process that opens the DB the way src/utils/db.ts does at import (journal_mode, synchronous, busy_timeout, user_version = 7) and exits without close() adds exactly one page-1 commit. So the live DB was opened 40 separate times between 17:33:56 and 20:25:58 local time on 2026-05-29; the bytes cannot say which program made the opens. The window is consistent with test runs during the Phase 21 close-out commits (18:13 to 20:28).",
+    "The three literal matches are the LADYS token (trades 2 and 3) and the LADYS pair (lp_baseline 2), both public-historical (captured in test/fork/fixtures/realLaunches/eth-v2-tp.json). Their tx hashes match no test literal. The rows are consistent with the Phase 21 live capture round trip (buy 16:40:17, sell 17:11:03 local, before the checkpoint); not verified on-chain (no network in Phase 22). They are not attributed to tests.",
+    "sqlite_sequence for trades is 3 in both images while only ids 2 and 3 exist: a trade with id 1 was created and deleted at some time before the 17:33 checkpoint. Its content is not recoverable (no residual hex strings remain in either file; secure_delete is off in this SQLite build, but a page rewrite can overwrite freed bytes). Its origin is unknown.",
+    "Extraction limits: 17 test files generate addresses or hashes at runtime, so a row they wrote could not be matched by literal. In this window no row changed at all, so the limit hides nothing here; it matters only for rows already present before 17:33."
+  ],
+  "kind": "forensic-summary",
+  "note": "Metadata-only summary of the read-only forensic report (D-12 two-image method + STL-3 header patch, plus WAL commit replay). Trade rows that are not literal matches stay only in the external report.",
+  "plan": "22-06",
+  "report_path": "C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run1/report.json",
+  "report_sha256": "10b77e6db930534c53e4edf6a8edda28c812c87c0e9565344dd2b016178cec42",
+  "residual_hex_strings": 0,
+  "run2_report_path": "C:/Users/jackc/crypto-snipe-bot-backups/forensics-2026-11-06/run2/report.json",
+  "run2_report_sha256": "10b77e6db930534c53e4edf6a8edda28c812c87c0e9565344dd2b016178cec42",
+  "runs_byte_identical": true,
+  "source": {
+    "files": {
+      "data/bot.db": {
+        "present": true,
+        "sha256": "961aa8222c62fd12ee45aec5cf082ab1d76df138c8748b5c1b8d22c49f361c0c",
+        "size": 57344
+      },
+      "data/bot.db-shm": {
+        "present": true,
+        "sha256": "2200a440727514ae2893386b094d64a6e2c5b1dbaa10a8b87067dbe09289ca70",
+        "size": 32768
+      },
+      "data/bot.db-wal": {
+        "present": true,
+        "sha256": "70b57264ef591190515fbe9dd4427f9f606a419af6ddab83b65ee1d3449bea36",
+        "size": 164832
+      }
+    },
+    "folder": "C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06"
+  },
+  "source_unchanged": {
+    "run1": true,
+    "run2": true
+  },
+  "state_changes": {
+    "chain_state_changed": false,
+    "exit_state_changed": false,
+    "lp_baseline_changed": false,
+    "pause_state_changed": false,
+    "trades_changed": false,
+    "transient_rows_found": false,
+    "user_version_changed": false
+  },
+  "test_literal_matches": [
+    {
+      "attribution": "public-historical-literal",
+      "corroboration": [],
+      "image": "A+B",
+      "in_diff": "unchanged",
+      "key": "2",
+      "linked_rows": [],
+      "literal": "0xcbe856765eeec3fdc505ddebf9dc612da995e593",
+      "literal_provenance": "public-historical",
+      "matched_column": "pair_or_pool_address",
+      "table": "lp_baseline",
+      "test_paths": [
+        "test/fork/fixtures/realLaunches/README.md",
+        "test/fork/fixtures/realLaunches/eth-v2-tp.json"
+      ]
+    },
+    {
+      "attribution": "public-historical-literal",
+      "corroboration": [],
+      "image": "A+B",
+      "in_diff": "unchanged",
+      "key": "2",
+      "linked_rows": [
+        {
+          "key": "2",
+          "table": "lp_baseline"
+        }
+      ],
+      "literal": "0x12970e6868f88f6557b76120662c1b3e50a646bf",
+      "literal_provenance": "public-historical",
+      "matched_column": "token",
+      "table": "trades",
+      "test_paths": [
+        "test/fork/fixtures/realLaunches/README.md",
+        "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+        "test/unit/bot/deliberateBuyAffordability.test.ts",
+        "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+        "test/unit/bot/noDoubleBuyReconcile.test.ts",
+        "test/unit/exitEngine/antiRugBounded.test.ts",
+        "test/unit/exitEngine/exitInclusionLadder.test.ts",
+        "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+        "test/unit/exitEngine/noDoubleSellReconcile.test.ts"
+      ]
+    },
+    {
+      "attribution": "public-historical-literal",
+      "corroboration": [],
+      "image": "A+B",
+      "in_diff": "unchanged",
+      "key": "3",
+      "linked_rows": [],
+      "literal": "0x12970e6868f88f6557b76120662c1b3e50a646bf",
+      "literal_provenance": "public-historical",
+      "matched_column": "token",
+      "table": "trades",
+      "test_paths": [
+        "test/fork/fixtures/realLaunches/README.md",
+        "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+        "test/unit/bot/deliberateBuyAffordability.test.ts",
+        "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+        "test/unit/bot/noDoubleBuyReconcile.test.ts",
+        "test/unit/exitEngine/antiRugBounded.test.ts",
+        "test/unit/exitEngine/exitInclusionLadder.test.ts",
+        "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+        "test/unit/exitEngine/noDoubleSellReconcile.test.ts"
+      ]
+    }
+  ],
+  "test_literals": {
+    "by_provenance": {
+      "production-constant": 39,
+      "public-historical": 12,
+      "synthetic": 99
+    },
+    "literal_count": 150,
+    "match_columns": [
+      "pair_or_pool_address",
+      "token",
+      "tx_hash"
+    ],
+    "sha": "23a64617dca167976adc4645fed0e2c69e384820",
+    "src_file_count": 63,
+    "test_file_count": 146,
+    "window_lines": 30
+  },
+  "tool": {
+    "commit": "2561d5e",
+    "node": "v22.16.0",
+    "node_abi": "127",
+    "path": "scripts/forensic-db.ts",
+    "script_git_blob_sha": "16c503f60491b9273978f995b90fe018ec5eb541",
+    "script_sha256": "6fb1d1b3a3c702dc926c3bc52cba138df111768e074eb953e76163a1d66e6d69"
+  },
+  "unknown_origin_diff_rows": [],
+  "wal": {
+    "bytes": 164832,
+    "change_counter_first_last": [
+      1029,
+      1068
+    ],
+    "checkpoint_sequence": 0,
+    "commit_frames": 40,
+    "distinct_row_states": 1,
+    "frame_count": 40,
+    "frames_salt_matching": 40,
+    "header_only_commits": 40,
+    "page_size": 4096,
+    "pages_touched": [
+      1
+    ],
+    "replay_method": "per commit frame k: throwaway copy = E main bytes + first k WAL frames; SQLite recovery, serialize, header patch, read-only in-memory open",
+    "trailing_bytes": 0,
+    "transient_rows": 0
+  }
+}

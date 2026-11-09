@@ -1,0 +1,51 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-011"
+  ],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-43",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-EXIT-026",
+  "title": "The protected minimum rounds to a whole percent, so a fractional slippage setting is not applied exactly",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C04"
+  ],
+  "files": [
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:492-496@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Math.round(100 - slippage), then bigint maths"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 490,498p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. Routine slippage is hard-coded 5; only a fractional MEV_SELL_ANTIRUG_SLIPPAGE_PCT reaches it."
+    }
+  ],
+  "sibling_sites_checked": "The buy side rounds the same way (TH-BUY-03).",
+  "status": "confirmed",
+  "severity_rationale": "S4: at most half a percent either way, reachable only with a fractional anti-rug slippage setting.",
+  "recommendation": "Use basis points. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-EXIT-17"
+  ]
+}

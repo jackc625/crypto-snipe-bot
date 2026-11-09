@@ -1,0 +1,50 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-031",
+  "title": "Anti-bot limit and burn ratios are computed with Number() on raw uint256 values before the threshold comparison",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C01"
+  ],
+  "files": [
+    "src/utils/tokenSafety.ts",
+    "src/utils/safetyProviders/unicrypt.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/tokenSafety.ts:499-503@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Number(limit) / Number(totalSupply), compared with 0.01"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 496,504p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: rounding exists; the effect is on the order of 1e-16 of the ratio, immaterial to a 1 percent boundary."
+    }
+  ],
+  "sibling_sites_checked": "tokenSafety.ts:249 and :93 (legacy, dead) and unicrypt.ts:41 use the same pattern. Threshold row TH-BUY-24.",
+  "status": "confirmed",
+  "severity_rationale": "S4: hygiene. Integer maths would be exact, but the difference cannot change a real decision.",
+  "recommendation": "Use integer cross-multiplication when this code is next touched. No behaviour change in practice. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-23"
+  ]
+}

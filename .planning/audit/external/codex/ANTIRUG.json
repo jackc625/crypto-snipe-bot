@@ -1,0 +1,432 @@
+{
+  "slice": "ANTIRUG",
+  "assistant": "codex",
+  "model": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "cli_version": "codex-cli 0.163.0",
+  "raw_sha256": "1563d9a5c50b5427f88c2a4ea563fd479a2dca3b47429bd3c916f1c96520a805",
+  "files_reviewed": [
+    "src/anti-rug/allowlist.ts",
+    "src/anti-rug/circuitBreaker.ts",
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/events.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/anti-rug/lpBaseline.ts",
+    "src/anti-rug/raceTelemetry.ts",
+    "src/anti-rug/types.ts"
+  ],
+  "findings": [
+    {
+      "ext_id": "codex-ANTIRUG-01",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1754,
+      "line_end": 1764,
+      "class_ids": [
+        "C03"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "V3 slippage compares raw amounts of different assets",
+      "explanation": "The ratio divides WETH output by token input and treats 1:1 as the expected exchange rate (src/anti-rug/detector.ts:1761). Neither token decimals nor the token's expected WETH price is represented. Cheap 18-decimal tokens therefore appear to have extreme slippage even in healthy pools, while tokens with fewer decimals can fail this signal despite a severe price collapse. This can cause unwanted liquidations or suppress genuine anti-rug exits.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-02",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1155,
+      "line_end": 1159,
+      "class_ids": [
+        "C10"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Backfill invokes an evaluator that dispatches live exits",
+      "explanation": "Backfill calls the production evaluator before merely inspecting its returned verdict (src/anti-rug/detector.ts:1155). That evaluator already schedules or executes exits at lines 1976 and 2063, and replayed V3 Burns install live grace watchers. Consequently, restart/reconnect replay can liquidate positions from historical events despite the explicit telemetry-only backfill policy; logging 'too-late' afterward does not prevent the sell.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:1976 V2 evaluation schedules an exit before returning its verdict",
+        "src/anti-rug/detector.ts:2063 V3 evaluation schedules an exit before returning its verdict",
+        "src/anti-rug/detector.ts:2256 Replayed V3 Burns install live grace watchers"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-03",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 647,
+      "line_end": 655,
+      "class_ids": [
+        "C10"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Healthy websocket operation never advances the persisted cursor",
+      "explanation": "The websocket dispatcher only evaluates logs; neither it nor dispatchEvent updates last_seen_block (src/anti-rug/detector.ts:652, 1341–1396). The cursor advances during backfill or HTTP polling instead. After a long healthy websocket session, even a brief disconnect can therefore appear to exceed maxBackfillBlocks, causing lines 1048–1084 to discard the actual outage window and miss protective events.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-04",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1279,
+      "line_end": 1291,
+      "class_ids": [
+        "C10"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "HTTP polling can become permanently stuck beyond the RPC log-range cap",
+      "explanation": "HTTP polling requests the entire outstanding block range directly, bypassing the chunked getLogsForBackfill helper (src/anti-rug/detector.ts:1279). If startup or an outage leaves a range exceeding the provider's cap, every request can fail. The catch preserves lastBlock, so subsequent requests have an equally large or larger range and monitoring cannot recover.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-05",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 587,
+      "line_end": 600,
+      "class_ids": [
+        "C12",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Every HTTP-mode registration starts another polling interval",
+      "explanation": "Each registration refreshes the listener at src/anti-rug/detector.ts:447, and HTTP mode unconditionally starts another poller at line 599. startHttpPollingAntiRug creates an interval at line 1261 without storing its handle or checking for an existing poller. Multiple positions therefore produce duplicate event processing and circuit-breaker counts, potentially halting protection after one incident.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:309 Test reset clears heartbeat intervals but cannot clear the untracked HTTP intervals"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-06",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1261,
+      "line_end": 1264,
+      "class_ids": [
+        "C14",
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Async HTTP polling cycles overlap and replay the same events",
+      "explanation": "setInterval starts another async cycle every two seconds without an in-flight guard (src/anti-rug/detector.ts:1261). lastBlock advances only after all awaited dispatches finish at line 1300. Slow RPC calls or an immediate exit lasting several seconds therefore let concurrent cycles fetch and dispatch the same range, duplicating exit attempts and breaker counts. Out-of-order completion can also move the cursor backward.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-07",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1967,
+      "line_end": 1982,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Multiple logs from one withdrawal create independent exit triggers",
+      "explanation": "Every unsafe log schedules an exit without a per-trade pending or incident guard (src/anti-rug/detector.ts:1976). A standard router-driven V2 withdrawal emits LP Transfer logs and a Burn log, all of which can observe the same final depleted state. Each can enter triggerAntiRugExit and increment the breaker, including failed duplicate attempts (src/anti-rug/exitTrigger.ts:312–319). Thus one withdrawal can exhaust the default three-trigger breaker even if executeFullSell independently prevents duplicate swaps.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:2063 V3 events also schedule gates without deduplication",
+        "src/anti-rug/detector.ts:1909 Each confirmation request installs a separate block listener"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-08",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 221,
+      "line_end": 232,
+      "class_ids": [
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Concurrent exits bypass the circuit-breaker threshold",
+      "explanation": "The breaker is checked before the asynchronous sell, but its count is incremented only after the sell and notifications complete (src/anti-rug/exitTrigger.ts:221, 265, 316). Any burst of concurrent triggers can all pass the check while the count is below threshold. The configured limit therefore does not bound how many exits are admitted during a false-positive burst.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-09",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2106,
+      "line_end": 2119,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "V3 pending Burns collide across trades and chains",
+      "explanation": "Pending Burns use only the pool address as a global key (src/anti-rug/detector.ts:247, 2106). Dispatching one Burn to multiple registered trades repeatedly cancels the preceding trade's watcher, leaving only the last trade's baseline evaluated. If that baseline is safe while an earlier trade's is unsafe, the required exit is lost. Identical pool addresses on different chains also overwrite each other's state and attempt listener removal through the wrong provider.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:2179 Collect handling uses the same chain-independent pool key"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-10",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2179,
+      "line_end": 2190,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "An unrelated Collect cancels the pending V3 Burn",
+      "explanation": "Any Collect from the pool consumes the pending Burn without matching owner, tick range, or grace-window bounds (src/anti-rug/detector.ts:2179–2190). Evaluation then uses the Collect owner's identity at line 2203. If an unrelated allowlisted LP collects fees during a malicious owner's pending Burn, that Collect is suppressed as allowlisted and the malicious Burn's watcher has already been removed, losing the protective evaluation.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-11",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2117,
+      "line_end": 2124,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Repeated V3 Burns can postpone evaluation indefinitely",
+      "explanation": "Every Burn cancels the previous watcher and resets the timeout to the newest event's block plus five (src/anti-rug/detector.ts:2108, 2117–2124). There is no maximum delay measured from the first pending removal. On standard V3 pools, an existing LP can emit zero-amount Burns; repeating these before each timeout, without Collect, can indefinitely prevent evaluation of an earlier material liquidity removal.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-12",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 471,
+      "line_end": 487,
+      "class_ids": [
+        "C12",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Unregistering a trade leaves its delayed exits active",
+      "explanation": "Unregistration removes only the registry entry (src/anti-rug/detector.ts:474); it does not cancel confirmation listeners or pending Burn watchers. Their closures retain the old trade and can later call triggerAntiRugExit after it has closed. On re-entry into the same token, the stale call unconditionally clears that token's current timers (src/anti-rug/exitTrigger.ts:240). Whether it also sells the new balance depends on closed-trade validation in the unavailable executeFullSell implementation.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:1909 Confirmation listener is not tracked for trade cleanup",
+        "src/anti-rug/detector.ts:2167 Burn watcher is not removed on unregistration",
+        "src/anti-rug/detector.ts:317 Test reset clears pending entries without detaching their block listeners",
+        "src/anti-rug/detector.ts:326 Pending-Burn test reset also leaves listeners installed"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-13",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1871,
+      "line_end": 1881,
+      "class_ids": [
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "A transient confirmation RPC error permanently consumes the trigger",
+      "explanation": "The confirmation listener is removed at src/anti-rug/detector.ts:1850 before re-evaluation. If an RPC call then fails, the catch returns without retrying or restoring the listener (lines 1871–1881). A known unsafe event can therefore produce no anti-rug exit after a temporary outage, even once RPC service recovers, unless another qualifying event arrives.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:2138 Grace timeout deletes pending state before evaluation can fail",
+        "src/anti-rug/detector.ts:1991 Initial V2 evaluation errors become unknown without a retry",
+        "src/anti-rug/detector.ts:2078 Initial V3 evaluation errors become unknown without a retry"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-14",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 270,
+      "line_end": 286,
+      "class_ids": [
+        "C12",
+        "C14"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Watchdog timeout does not restore the exit timers it cleared",
+      "explanation": "All token timers are cleared before execution at src/anti-rug/exitTrigger.ts:240. On timeout, the catch only records failure and alerts; it never re-arms monitoring or schedules a retry. The underlying sell is explicitly not cancelled, so if it remains hung its own failure cleanup cannot restore polling either. Without an independent recovery mechanism outside these files, a held position can have no routine exit timer and receive no retry when there are no further pool events.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-15",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 904,
+      "line_end": 907,
+      "class_ids": [
+        "C10",
+        "C11"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Notification failures can terminate websocket recovery",
+      "explanation": "The disconnection alert is awaited outside the reconnect try/catch (src/anti-rug/detector.ts:904); the consecutive-failure alert is awaited inside a catch without another handler at line 974. If the unavailable sendCtxAlert implementation propagates a notification error, handleWsClose rejects and stops reconnecting. Its caller discards the promise at line 711, also allowing an unhandled rejection and possible process termination.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:974 Reconnect-failure notification can escape the retry loop",
+        "src/anti-rug/detector.ts:711 Reconnect promise is discarded without a rejection handler"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-16",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 655,
+      "line_end": 657,
+      "class_ids": [
+        "C10",
+        "C11"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Ethers subscription promises are discarded",
+      "explanation": "Ethers v6 on/off methods return promises, but the websocket subscription is neither awaited nor caught (src/anti-rug/detector.ts:655). The function can report a connected monitor before subscription setup completes, and a setup rejection bypasses its caller's awaited error handling. During provider failure or destruction this can leave positions unsubscribed or terminate Node through an unhandled rejection.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:644 Websocket unsubscribe promise discarded",
+        "src/anti-rug/detector.ts:1850 Confirmation unsubscribe promise discarded",
+        "src/anti-rug/detector.ts:1909 Confirmation subscribe promise discarded",
+        "src/anti-rug/detector.ts:2119 Replaced Burn unsubscribe promise discarded",
+        "src/anti-rug/detector.ts:2133 Obsolete Burn unsubscribe promise discarded",
+        "src/anti-rug/detector.ts:2138 Expired Burn unsubscribe promise discarded",
+        "src/anti-rug/detector.ts:2167 Burn subscribe promise discarded",
+        "src/anti-rug/detector.ts:2189 Collected Burn unsubscribe promise discarded"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-17",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 1845,
+      "line_end": 1857,
+      "class_ids": [
+        "C08"
+      ],
+      "severity": "S1",
+      "capital_impact": "LOSS",
+      "title": "Confirmation delay never verifies that the triggering event survived a reorg",
+      "explanation": "The gate waits for a head number and re-reads current pool state, but never checks the original event's block hash or canonical inclusion (src/anti-rug/detector.ts:1845–1857). Dispatch also does not reject removed websocket logs. An orphaned event's destination can therefore authorize a later sell if current liquidity signals remain tripped, even when the canonical withdrawal had an allowlisted destination. HTTP polling additionally advances past replacement blocks without a reorg overlap.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:1341 Dispatch does not inspect logEvent.removed",
+        "src/anti-rug/detector.ts:1300 HTTP cursor advances to the unfinalized head without rewind handling",
+        "src/anti-rug/lpBaseline.ts:120 Latest-state baseline is persisted without finality or canonical-block verification",
+        "src/anti-rug/lpBaseline.ts:141 V3 baseline has the same unconfirmed-state persistence"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-18",
+      "file": "src/anti-rug/circuitBreaker.ts",
+      "line_start": 73,
+      "line_end": 83,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Restarting the process clears a manual-reset-only breaker",
+      "explanation": "Trigger history and tripped state exist only in module-level Maps and a Set (src/anti-rug/circuitBreaker.ts:73–83), with no persistence or recovery here. A process restart therefore clears a tripped breaker and allows src/anti-rug/exitTrigger.ts:221 to pass again. Unless startup code outside these files restores the state, an automatic restart bypasses the promised operator-reset requirement.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-19",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 2251,
+      "line_end": 2253,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "LP Transfer handling defeats the V2 withdrawal allowlist",
+      "explanation": "Every LP Transfer is evaluated like a Burn, using its own recipient for the allowlist check (src/anti-rug/detector.ts:2251, 1527–1531). During a normal router withdrawal, LP tokens transfer into the pair and are burned to the zero address, while underlying tokens go to the Burn recipient. Those Transfer evaluations observe the final depleted reserves but check the pair or zero address instead of the allowlisted withdrawal recipient. Unless those unrelated addresses are also allowlisted, a permitted withdrawal can still force an exit.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:1527 LP Transfer recipient is used as the liquidity-withdrawal destination"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-20",
+      "file": "src/anti-rug/detector.ts",
+      "line_start": 710,
+      "line_end": 712,
+      "class_ids": [
+        "C12"
+      ],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "Listener refresh accumulates raw websocket handlers",
+      "explanation": "Every registration refresh adds another raw close listener (src/anti-rug/detector.ts:710). setupHeartbeat also adds new pong and close listeners each time, while clearing only the interval. The old handlers are never removed, so a long-running wallet accumulates listeners, warnings, memory use, and repeated close-handler work as it opens positions.",
+      "sibling_sites": [
+        "src/anti-rug/detector.ts:771 Pong handler added on every refresh",
+        "src/anti-rug/detector.ts:809 Heartbeat close handler added on every refresh"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-21",
+      "file": "src/anti-rug/lpBaseline.ts",
+      "line_start": 110,
+      "line_end": 119,
+      "class_ids": [
+        "C15"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Baseline reads are not pinned to their recorded snapshot block",
+      "explanation": "The snapshot records a block number, then performs independent latest-state contract calls without that blockTag (src/anti-rug/lpBaseline.ts:110–119). A block arriving between calls can produce reserves and total supply from different states and a snapshot_block matching neither. Such a baseline can suppress or falsely trip the multi-signal threshold; the V3 snapshot has the same consistency problem.",
+      "sibling_sites": [
+        "src/anti-rug/lpBaseline.ts:137 V3 liquidity and tick are read without the recorded blockTag",
+        "src/anti-rug/detector.ts:1576 V2 live reserve and supply reads are also unpinned",
+        "src/anti-rug/detector.ts:1685 V3 liquidity is read separately from the later sell quote at line 1750"
+      ]
+    },
+    {
+      "ext_id": "codex-ANTIRUG-22",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 101,
+      "line_end": 107,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "Flashbots simulation is sent through the ordinary chain RPC provider",
+      "explanation": "eth_callBundle is sent through ctx.httpProvider rather than a Flashbots relay transport (src/anti-rug/raceTelemetry.ts:101). With an ordinary EVM RPC endpoint, the method is unsupported and every attempted simulation becomes 'loss'. This only works if provider construction outside these files specially routes and authenticates relay requests; no such transport is supplied here, so the advertised dry-run measurement is configuration-dependent and can silently be unusable.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-23",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 114,
+      "line_end": 120,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "A positive miner payment is incorrectly reported as a race win",
+      "explanation": "The simulated bundle contains only the sell transaction and uses latest state (src/anti-rug/raceTelemetry.ts:103–105). There is no competing removal transaction or ordering comparison. Nevertheless, any positive coinbaseDiff is labeled 'win' at line 120. A successful fee-paying simulation therefore appears to prove a frontrun victory that was never tested, misleading the dry-run review used before live execution.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-24",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 189,
+      "line_end": 203,
+      "class_ids": [
+        "C03"
+      ],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "V2 recovery telemetry fabricates a WETH amount from reserve1",
+      "explanation": "The V2 calculation ignores position.amount and never resolves token direction; tokenIsR0 is always false and unused (src/anti-rug/raceTelemetry.ts:189–195). It reports one percent of reserve1 as recovered WETH at line 202, even when reserve1 is the other token. Zero or dust positions can be labeled recoverable, and non-WETH raw units can be reported as WETH, corrupting the operator's recovery metrics.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-25",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 207,
+      "line_end": 218,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "V3 post-hoc telemetry can quote a different DEX pool",
+      "explanation": "The function chooses the first configured V3 DEX and ignores baseline.pairOrPoolAddress when selecting the quoter (src/anti-rug/raceTelemetry.ts:207–218). With multiple V3 DEXes, the token pair and fee can resolve to another factory's pool or no pool at all. The reported recovery or drained verdict can therefore describe a different market from the position under review.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-26",
+      "file": "src/anti-rug/raceTelemetry.ts",
+      "line_start": 229,
+      "line_end": 242,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "Every V3 historical quote error is classified as a drained pool",
+      "explanation": "The inner catch converts every staticCall failure into 'too-late-already-drained' (src/anti-rug/raceTelemetry.ts:239–242). Rate limits, missing archive state, transport errors, or querying postRemovalBlock + 2 before it exists are therefore counted as economic failures rather than inconclusive measurements. This corrupts dry-run outcome distributions even when liquidity remains available.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-ANTIRUG-27",
+      "file": "src/anti-rug/exitTrigger.ts",
+      "line_start": 172,
+      "line_end": 174,
+      "class_ids": [],
+      "severity": "S3",
+      "capital_impact": "none",
+      "title": "Circuit-breaker events identify the destination as the pool",
+      "explanation": "pairAddress is assigned evaluation.signals.destination, which is the withdrawal recipient or V3 owner, not the emitting pair/pool (src/anti-rug/exitTrigger.ts:173). It is subsequently stored as TriggerEvent.pair at line 318. The breaker review therefore presents the wrong contract identity to operators investigating or acknowledging a halt.",
+      "sibling_sites": []
+    }
+  ]
+}

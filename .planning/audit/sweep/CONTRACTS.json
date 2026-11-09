@@ -1,0 +1,97 @@
+{
+  "slice": "CONTRACTS",
+  "area": "contracts",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "cells": {
+    "C01": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for BigInt|Number(|parseInt|formatEther: no money arithmetic in the tooling; audit-honeypot-checker.ts:34 code length and :90 formatEther are display only; check-mythril-report.ts counts issues"
+    },
+    "C02": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for \"||\" and \"??\": hardhat.config.ts:98-99 ETH_FORK_RPC_URL || ALCHEMY_URL || \"\" (recorded as a boundary in AUD-CONTRACTS-001, not a 0/\"\" confusion), :104 ETHERSCAN_API_KEY ?? \"\"; check-mythril-report.ts:71, :76-78 ?? defaults for display"
+    },
+    "C03": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for decimals: not applicable to the tooling (no token amounts); token decimals inside HoneypotChecker.sol are Phase 30"
+    },
+    "C04": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for minOut|amountOutMin|slippage: not applicable to the tooling (no swaps); the swap calls inside HoneypotChecker.sol are Solidity logic, Phase 30"
+    },
+    "C05": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for deadline|timeout: test.yml job timeouts (:86, :101, :134) and mythril --execution-timeout 300 (:163) are CI limits, not transaction deadlines; contract deadlines are Phase 30"
+    },
+    "C06": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for approve|forceApprove: only inside HoneypotChecker.sol (SafeERC20.forceApprove import at :5-9), Solidity logic, Phase 30; no tooling script approves"
+    },
+    "C07": {
+      "result": [
+        "AUD-CONTRACTS-004"
+      ],
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for nonce|getTransactionCount|accounts: Ignition manages the deploy nonce; the deploy wallet is separate from the bot wallet only if the raw-string key check holds (AUD-CONTRACTS-004); audit-honeypot-checker.ts:88 reads a nonce for display"
+    },
+    "C08": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for reorg|confirmations: Ignition waits for its own confirmations and keeps a journal; no tooling persists block-based state of its own"
+    },
+    "C09": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for status|isError|receipt: audit-honeypot-checker.ts:61, :81 print Etherscan isError flags; deploy-honeypot-checker.ts:193-196 checks the child exit status; Ignition checks receipts"
+    },
+    "C10": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for WebSocket|wss|reconnect: no WebSocket in the tooling"
+    },
+    "C11": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for .catch|process.exit|spawnSync: audit-honeypot-checker.ts:124-127 and the deploy wrapper handle failures with exit codes; check-mythril-report.ts is synchronous"
+    },
+    "C12": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for setTimeout|setInterval: none in the tooling"
+    },
+    "C13": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for sqlite|db.|writeFileSync: no SQLite in the tooling; the Ignition journal is written by Ignition (its line-ending hazard is AUD-OD21-001, area contracts, unclassed)"
+    },
+    "C14": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for sell|exit: not applicable to the tooling"
+    },
+    "C15": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for check-then-act around a signed send: the deploy wrapper checks env then spawns Ignition, which re-reads its own config; no read-then-sign race in the tooling"
+    },
+    "C16": {
+      "result": [
+        "AUD-CONTRACTS-004"
+      ],
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for gasPrice|maxFeePerGas|ignition: hardhat.config.ts:48-106 sets no ignition fee limits and no per-network gasPrice (AUD-CONTRACTS-004)"
+    },
+    "C17": {
+      "result": [
+        "AUD-CONTRACTS-001",
+        "AUD-CONTRACTS-004",
+        "AUD-SCRIPTS-005"
+      ],
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for PRIVATE_KEY|DEPLOY_PRIVATE_KEY|API_KEY|dotenv|accounts|env: hardhat.config.ts:9 loads .env and :51-95 build DEPLOY_PRIVATE_KEY accounts (AUD-CONTRACTS-001); deploy wrapper key check and env pass-through (AUD-CONTRACTS-004); audit-honeypot-checker.ts crash prints the raw error (AUD-SCRIPTS-005); Etherscan key in the HTTPS query string at :46, :74 is not printed | 22-28 fold of sweep/contrib-SECRET.json: betterleaks 1.10.0 git mode over the full history (fixture-check.ts --git-scan, log-opts \"--full-history --all --reflog --diff-filter=tuxdb --diff-merges=first-parent\", 1053 commits), three passes: default ruleset + evm-private-key + telegram-string-session, then the Hardhat #0 and exact-address allowlists: no hit of any classification under contracts/ in any commit"
+    },
+    "C18": {
+      "result": [
+        "AUD-CONTRACTS-001"
+      ],
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for process.env|chainId|forking: networks appear only when both env values are set and pin chainId (hardhat.config.ts:51-95); the default network forks through ALCHEMY_URL (AUD-CONTRACTS-001); audit-honeypot-checker.ts requires ETH_RPC_URL (:18-24); CI runs without a .env"
+    },
+    "C19": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for permissions|token|auth: no HTTP API in the tooling; the missing workflow permissions block is recorded in AUD-CONTRACTS-002 (unclassed CI hygiene)"
+    },
+    "C20": {
+      "result": "checked, none",
+      "search": "grep and full read of the CONTRACTS snapshot (slice-files.ts --snapshot CONTRACTS at 23a6461, 8 files; .sol files ledger only, Solidity logic is Phase 30) for telegram: none in the tooling"
+    }
+  }
+}

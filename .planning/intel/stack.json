@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "updated_at": "2026-11-06T18:51:03.300Z",
+    "version": 2
+  },
+  "languages": [
+    "TypeScript",
+    "Solidity",
+    "JavaScript"
+  ],
+  "frameworks": [
+    "ethers v6",
+    "Express 5",
+    "Hardhat",
+    "React (dashboard/)",
+    "Vite (dashboard/)",
+    "Tailwind CSS (dashboard/)"
+  ],
+  "tools": [
+    "Vitest",
+    "ESLint (eslint.config.mjs)",
+    "TypeChain",
+    "solidity-coverage",
+    "hardhat-gas-reporter",
+    "pino",
+    "ts-node",
+    "better-sqlite3"
+  ],
+  "build_system": "npm scripts (tsc; dashboard via vite)",
+  "test_framework": "Vitest (projects: unit, integration, fork; vitest.config.ts)",
+  "package_manager": "npm",
+  "content_formats": [
+    "Solidity contracts (contracts/FakeToken.sol, contracts/honeypot/HoneypotChecker.sol)",
+    "SQLite database (src/utils/db.ts)",
+    "dotenv environment config (src/config.ts)",
+    "Markdown planning docs (.planning/)"
+  ]
+}

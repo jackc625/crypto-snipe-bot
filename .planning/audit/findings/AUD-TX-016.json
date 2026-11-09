@@ -1,0 +1,60 @@
+{
+  "id": "AUD-TX-016",
+  "title": "The private-fee escalation floor is 1 gwei per attempt on every chain, tuned for Ethereum, so on Base and BSC the bot tips many times the going rate on every private submit",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "OVERSPEND",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/bloxroute.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:76-77@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "priorityFeeStepGwei default 1 (MEV_PRIORITY_FEE_STEP_GWEI), one global value"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:502-514@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "desired priority = max(step x (attempt+1), chain priority): the first attempt already bids at least 1 gwei"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:104-105@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Base/Arbitrum: maxPriorityFeePerGas = that fee"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:115@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "BSC: gasPrice = gasPrice + that fee"
+    }
+  ],
+  "sibling_sites_checked": "All three strategies share the helper. On Arbitrum the priority fee is not paid (the sequencer charges the base fee), so only the affordability reserve is affected there; on Base and BSC it is paid. The anti-rug gas multiplier raises only the chain priority floor and stays clamped (TH-ANTIRUG-05 owns that number).",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 OVERSPEND, bounded: amounts are small in absolute terms (about 150k gas x 1 gwei = 0.00015 ETH per Base submit; about 10x the BSC gas price at 0.1 gwei) and capped by the affordability clamp, but it is paid on every private submit and is not what the operator configured per chain.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-010"
+  ],
+  "tags": [
+    "fees"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-55",
+  "recommendation": "Phase 24 with card TX-02: make the escalation step and floor per chain (or relative to the observed priority fee) when the fee-ceiling wiring is redone.",
+  "reported_by": [
+    "claude (22-20 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

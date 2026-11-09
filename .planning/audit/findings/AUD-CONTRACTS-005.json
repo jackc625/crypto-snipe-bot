@@ -1,0 +1,40 @@
+{
+  "id": "AUD-CONTRACTS-005",
+  "title": "The CI test job has no timeout",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: predates Phase 22, ops only.",
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#9"
+  ],
+  "files": [
+    ".github/workflows/test.yml"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": ".github/workflows/test.yml:18@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the job has no timeout-minutes; this predates Phase 22"
+    }
+  ],
+  "sibling_sites_checked": "test.yml is the only workflow with a test job.",
+  "recommendation": "Set a timeout-minutes in the CI work (routed by the code review)."
+}

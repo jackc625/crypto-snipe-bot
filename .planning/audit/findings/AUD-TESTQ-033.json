@@ -1,0 +1,48 @@
+{
+  "id": "AUD-TESTQ-033",
+  "title": "UFV-04 (AC-17 / SPEC R4 fork child env): this fork assertion has not run under the real fork project",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality",
+    "unrun-verification"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-08",
+  "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S2 by the plan: an unexecuted rail assertion can hide a fork-mode leak. Capital none: no fork test runs against live funds and the bot is off.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S2",
+  "owner_phase": "25",
+  "input_refs": [
+    "unrun-fork-verifications.json#3"
+  ],
+  "files": [
+    "test/fork/setup.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "unrun-fork-verifications.json#3",
+      "note": "Assertion: the first real npm run test:fork starts Hardhat with the sanitized env from buildHardhatChildEnv, the fork works, and the Hardhat child's ledger records a blocked .env read (the child env carries no CSB_RAIL_RUN_ID, so its ledger is under <tmp>/crypto-snipe-bot-rail-ledger/no-run) Why not run: starting Hardhat is out of Phase 22 scope (AC-08) Rehearsal: none (Hardhat cannot be rehearsed without starting it) Result: not rehearsed"
+    }
+  ],
+  "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: test/unit/rails/hardhatChildEnv.test.ts (the pure env, a railed child on the same setup-fork preload, and an AST check of every child launch in test/fork/setup.ts)",
+  "escaped_regression": "A Hardhat child that still reads the real .env (through a code path AST and unit tests do not cover) would be invisible, because Hardhat has never been started under this environment.",
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion.",
+  "related_inputs": [
+    "inputs/fork-acceptance.json"
+  ]
+}

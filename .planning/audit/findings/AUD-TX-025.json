@@ -1,0 +1,49 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-TX-025",
+  "title": "The reconcile loop sleeps the whole poll interval and can run past its confirmation window",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C18"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:398-400@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sleep(pollMs) not limited by the time left"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 398,400p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read. TH-TX-01 and TH-TX-02 hold the numbers."
+    }
+  ],
+  "sibling_sites_checked": "reconciliation.ts:679 parses the interval as any positive integer.",
+  "status": "confirmed",
+  "severity_rationale": "S4: needs a poll interval set far from its default.",
+  "recommendation": "Sleep for the smaller of the interval and the time left, and validate the relationship at load. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-TX-17"
+  ]
+}

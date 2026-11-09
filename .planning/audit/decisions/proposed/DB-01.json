@@ -1,0 +1,43 @@
+{
+  "id": "DB-01",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "Risk accounting basis: units of stored amounts, which positions count as open, how partial sells and gas count, and whether per-chain max capital is a cap",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current accounting",
+      "behavior_impact": "none",
+      "risk": "The daily-loss breaker misses ordinary losses and the exposure cap turns off after a partial sell (AUD-DB-002); stuck positions free their slots (AUD-DB-003); partial sells are double-charged and currencies are mixed (AUD-DB-013); per-chain max capital is not a cap (AUD-DB-014)."
+    },
+    {
+      "id": "wei-and-lifecycle",
+      "name": "Store every amount in wei, count open positions by exit lifecycle (incl. exit_failed_held), compute loss per position on cost basis, keep totals per currency; max capital stays a loss base (renamed)",
+      "behavior_impact": "The breaker and the caps start to bind as documented; more snipes are refused after losses or while positions are stuck.",
+      "risk": "A data migration of existing buy rows (decimal to wei); the dashboard P&L changes."
+    },
+    {
+      "id": "wei-lifecycle-and-chain-cap",
+      "name": "As wei-and-lifecycle, plus enforce deployed-per-chain <= <PREFIX>_MAX_CAPITAL in canSnipe",
+      "behavior_impact": "Adds a per-chain deployment cap that matches the .env.example wording.",
+      "risk": "One more limit that can refuse snipes; needs per-chain cost basis."
+    }
+  ],
+  "recommendation": "wei-and-lifecycle as the minimum, because without it the configured limits do not measure what they claim; add the per-chain cap only if the operator wants that limit.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides what the daily-loss breaker, the exposure cap and the open-position limit actually count.",
+  "findings": [
+    "AUD-DB-002",
+    "AUD-DB-003",
+    "AUD-DB-013",
+    "AUD-DB-014",
+    "AUD-API-016",
+    "AUD-API-017"
+  ],
+  "needed_by": "Phase 24 discussion before Wave A (capital fixes, after the Phase 23 real-path proof)",
+  "related_od": "OD-25",
+  "assigned_id": "OD-58"
+}

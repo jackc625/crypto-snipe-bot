@@ -1,0 +1,4 @@
+# Audit register: keep LF in every checkout (core.autocrlf=true on the operator machine).
+# render.ts output is compared byte-for-byte (cmp) against the committed files, and
+# tools/betterleaks/*.toml are pinned by SHA-256, so a CRLF checkout must never happen.
+* text=auto eol=lf

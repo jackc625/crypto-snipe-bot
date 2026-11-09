@@ -1,0 +1,91 @@
+{
+  "id": "AUD-TESTI-019",
+  "title": "realLaunchReplay sets STOP_LOSS_PERCENT, which src never reads (src reads STOP_LOSS_PCT), so its \"30% stop-loss\" exit comes from the operator's .env or the default 25, and every replay accepts any sell row, so the per-fixture exit path (partial-sell, trailing-stop, stop-loss) is never asserted",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C03",
+    "C14",
+    "C18"
+  ],
+  "files": [
+    "test/fork/realLaunchReplay.fork.test.ts",
+    "src/config.ts",
+    "test/fork/fixtures/realLaunches/eth-v2-tp.json",
+    "test/fork/fixtures/realLaunches/eth-v2-partial.json",
+    "test/fork/fixtures/realLaunches/eth-v3-trailing.json"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:75@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "process.env.STOP_LOSS_PERCENT = '30'"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:291@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the stop-loss is parseFloat(process.env.STOP_LOSS_PCT || '25'); src reads STOP_LOSS_PCT only (config.ts:67 declares it)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n STOP_LOSS 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts .env.example test",
+      "note": "STOP_LOSS_PERCENT appears only in realLaunchReplay.fork.test.ts:75 and :384; captureRehearsal, deliberateBuyReplay and exitStatePersistence set STOP_LOSS_PCT (the read name)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:381-384@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dumpV3Pool doc: \"STOP_LOSS_PERCENT=30 -> fixedStopPrice = entryPrice * 0.70\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:450-462@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "waitForSellRow accepts any sell or partial_sell row with amount_out"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:517-519@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 assertion: at least one such row; the fixture's expectedExitPath (partial-sell for LADYS, trailing-stop for BOBO) is not checked"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realLaunchReplay.fork.test.ts:563-565@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 assertion: the same; expectedExitPath stop-loss (PEPE) is not checked"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/realLaunches/eth-v2-partial.json:20@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "expectedExitPath \"trailing-stop\" (read into the test title only, :470)"
+    }
+  ],
+  "sibling_sites_checked": "Every env key set by a fork file (grep process.env.X = over test/fork) against the keys src reads (git grep process.env over src): STOP_LOSS_PERCENT is the only key set that src never reads. PARTIAL_SELL_TARGETS, TRAILING_STOP_PCT, MAX_POSITION_SIZE, MAX_OPEN_POSITIONS, SNIPE_COOLDOWN_MS, DAILY_LOSS_PCT, MAX_TOTAL_EXPOSURE and DB_PATH are read by src. captureRehearsal asserts the stop-loss reason explicitly (:464-478); realLaunchReplay is the only replay that leaves the exit path unasserted.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the replays are the closest real-path exit proof; with the exit path unasserted a regression that breaks the partial-tier or trailing branch (the money-taking exits) passes as long as any other exit eventually sells, and the stop threshold silently depends on the operator's .env.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-017",
+    "AUD-TESTI-020"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25 (first fork execution): set STOP_LOSS_PCT (the read name), assert the exit reason per fixture (partial_sell row for the partial-sell fixture, reason trailing-stop / stop-loss for the others, as captureRehearsal does), and fail the test when the reason differs.",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "eth-v2-tp (v2, partial-sell) drives the REAL handler",
+    "eth-v2-partial (v2, trailing-stop) drives the REAL handler",
+    "eth-v3-trailing (v3, stop-loss) drives the REAL handler"
+  ],
+  "escaped_regression": "Break the 2x partial-sell tier in pollExitStrategy (for example skip getUnfilledTiers): the LADYS replay still passes because the trailing stop or the 30-minute urgency exit later writes a sell row, so a release that never takes profit at 2x ships green."
+}

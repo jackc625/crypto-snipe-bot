@@ -1,0 +1,108 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-001",
+    "AUD-EXIT-003"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-49",
+  "reported_by": [
+    "claude (22-19 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-006",
+  "title": "On V3 pools signal 3 compares raw WETH out with raw tokens in (a price, not slippage), and signal 2 checks lockers against the pool event owner field, so V3 detection reduces to \"active liquidity fell by half when a Burn or Collect arrived\"",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C03",
+    "C04"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/anti-rug/allowlist.ts",
+    "src/chainRegistry.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1735-1742@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "probeAmount is the wallet token balance (token base units)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1750-1764@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "quotedRatioBps = quotedOut * 10000 / probeAmount, where quotedOut is WETH base units; signal 3 trips when the ratio is below 50 %"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1533-1546@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 Burn and Collect destination = topics[1], the owner field"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1698-1704@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "owner checked against allowlistV3 through isAddressAllowlisted (allowlist.ts:72-83)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:515-579@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V3 allowlists hold locker contracts (UNCX V3 Locker, TeamFinance proxy); the comment at :523-527 says the locker holds NonfungiblePositionManager NFTs"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1685-1696@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signal 1 on V3 uses pool.liquidity(), the active liquidity at the current tick"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/fixtures/rugs/eth-v3-CANDIDATE.json:24@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V3 rug fixture is not block-pinned (\"Block-pin pending\"), so V3 detection has never been replayed against a real rug"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1754-1764@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): V3 slippage compares raw amounts of different assets"
+    }
+  ],
+  "sibling_sites_checked": "V2 path read for the same faults: signal 3 there compares each reserve with its own baseline (detector.ts:1618-1631, same units), so no unit mismatch; but either reserve under 50 % also trips on a 4x price move in either direction (constant product), which makes it redundant with signal 1 rather than wrong. V2 signal 2 uses the Burn or Transfer to field (:1521-1532); a lock is an LP Transfer to the locker, which does not reduce totalSupply, so signal 1 does not trip on it anyway. raceTelemetry.ts:206-243 has a V3 quote too but is dead code (AUD-ANTIRUG-014).",
+  "status": "candidate",
+  "severity_rationale": "S2. Effect: false-positive emergency exits on V3 (sold at any price with the anti-rug gas bid, upside lost) and a three-signal safety argument that does not hold on V3. Bounded by the position; live mode only. Candidate because sub-claims 2 and 3 rest on Uniswap V3 event semantics and liquidity behaviour that are not in the repo; sub-claim 1 is a code fact.",
+  "sub_claims": [
+    {
+      "claim": "(1) Unit mismatch: for an 18-decimal token worth less than 0.5 WETH per whole token, the ratio is below 50 % with no slippage at all, so signal 3 is always tripped and carries no information about sell feasibility.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1750-1764@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) For liquidity managed through the NonfungiblePositionManager (the lockers hold such NFTs, chainRegistry.ts:523-527), the pool emits Burn and Collect with owner = the position manager, not the locker, so the V3 allowlist cannot match those events and signal 2 always trips; locking itself is an NFT transfer that emits no pool log.",
+      "evidence": [
+        "src/chainRegistry.ts:523-527@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1533-1546@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "(3) Active liquidity also falls when the price leaves a concentrated range. A later fee Collect then meets signal 1, and with signals 2 and 3 always tripped the bot fires an emergency exit with minOut 0 (AUD-EXIT-001) and the anti-rug gas multiplier on a pool that was not rugged.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1685-1696@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:2054-2071@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    }
+  ],
+  "recommendation": "Make signal 3 a real sell-impact check in one unit (the quote for the held amount compared with its value at the pool price), and decide what locked means on V3 (follow NFT transfers to lockers, or drop signal 2 on V3 and document it). Card ANTIRUG-03. Phase 24, with a fork replay of a real V3 rug and of a concentrated-range pool that is not a rug."
+}

@@ -1,0 +1,40 @@
+{
+  "id": "AUD-ROOT-011",
+  "title": "The net-watch early-exit check in verify-prod-untouched cannot fire",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: a redundant check, the deadline covers it.",
+  "area": "scripts",
+  "slice": "ROOT",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#13"
+  ],
+  "files": [
+    "scripts/verify-prod-untouched.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/verify-prod-untouched.ts:518@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "a synchronous loop never lets the child exit code update, so the early check cannot run; the 60 s deadline still applies"
+    }
+  ],
+  "sibling_sites_checked": "The sampler has an independent 60 s deadline, so a dead sampler still fails the run.",
+  "recommendation": "Poll with an async wait, or drop the dead branch."
+}

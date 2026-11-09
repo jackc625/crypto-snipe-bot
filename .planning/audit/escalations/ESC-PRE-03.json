@@ -1,0 +1,13 @@
+{
+  "id": "ESC-PRE-03",
+  "date": "2026-11-06",
+  "tier": "pre-phase",
+  "items": ["AUD-RAIL-002"],
+  "resolved_items": ["AUD-TESTU-001", "AUD-TESTI-011"],
+  "summary": "Research candidate RC-19, a rail finding. Tests load the real .env (vitest.config.ts:2-4). They then open and migrate the live DB at import: src/utils/db.ts:9 falls back to cwd/data/bot.db, :17 opens it, :232 writes user_version 7 unconditionally, :235 runs migrateSchema(). Any test file that imports src/utils/db unmocked can write kill-switch, dedup and resume state in data/bot.db. The planned SAFE-02 rails (22-05, 22-07..22-10) mitigate it. Nothing else is fixed in Phase 22 (NAC-13).",
+  "presented_at": "2026-11-06 SPEC interview (22-SPEC.md Background, 'Tests already reach the live DB')",
+  "operator_response": null,
+  "acknowledgement_evidence": "22-SPEC.md Background: escalated to the operator during the 2026-11-06 SPEC interview",
+  "ruling": "none",
+  "phase_continued": true
+}

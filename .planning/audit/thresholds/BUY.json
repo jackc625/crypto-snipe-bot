@@ -1,0 +1,840 @@
+[
+  {
+    "id": "TH-BUY-01",
+    "name": "Per-chain snipe amount",
+    "current_value": "template defaults 0.01, 0.05, 0.005, 0.005 native (the four CHAIN_TEMPLATES entries), env overrides",
+    "definition_sites": [
+      "src/chainRegistry.ts:663@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:207@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:276@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:333@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:390@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1044@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1359@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1138@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1462@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1173@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1483@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:297@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:387@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:378@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:201@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:15",
+      ".env.example:21",
+      ".env.example:27",
+      ".env.example:33",
+      "src/preflight.ts:408@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:280@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:1962@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:731@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:422@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:860-862@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1948@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1955@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "no comparison at the definition; used as the buy value (parseEther) and as a float in canSnipe (riskManager.ts:76: amount > maxPositionSize, total + amount > maxTotalExposure)",
+    "units": "native coin (ETH/BNB), decimal string",
+    "representation": "string; parseEther -> bigint wei for the buy and the honeypot probes; parseFloat -> float in the risk checks",
+    "effective_unset": "template default for the chain",
+    "effective_empty": "'' is falsy, so || gives the template default",
+    "effective_non_numeric": "passed through unvalidated at load; preflight's wallet floor calls parseEther(snipeAmount) at boot (preflight.ts:201), so boot fails (whether as a FATAL check or a crash is for the DB slice); if it got past boot, the honeypot wrapper turns the parseEther error into verdict unknown and every snipe is skipped (fail closed), while canSnipe's parseFloat gives NaN and its size/exposure comparisons are false (would pass). '0' is accepted (no positive check)",
+    "rationale": "none stated in code beyond per-chain defaults",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "<envPrefix>_SNIPE_AMOUNT (per-chain envPrefix from CHAIN_TEMPLATES)",
+    "hardcoded": false,
+    "flags": [
+      "float-money",
+      "no-rationale"
+    ],
+    "recommendation": "Validate at registry load as a positive decimal with at most 18 decimals and fail loud (as the tax bps are at chainRegistry.ts:701-714); compare risk limits in wei (bigint), not parseFloat. Validation belongs to the DB slice (chainRegistry.ts); recorded here because the buy path consumes it.",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-06",
+      "TH-EXIT-24"
+    ]
+  },
+  {
+    "id": "TH-BUY-02",
+    "name": "Snipe buy slippage percent (V2 and V3)",
+    "current_value": "5 (hard-coded CONFIG.slippagePercent)",
+    "definition_sites": [
+      "src/config.ts:282@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1050@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1053@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1373@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1374@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:470-471@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:522-523@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "minOut = expectedOut - expectedOut * BigInt(slippage) / 100n; the router reverts if the output is below minOut",
+    "units": "percent (integer)",
+    "representation": "number converted with BigInt(); BigInt throws RangeError on a fractional value",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a (constant). If the constant were 0, `|| 5` would silently make it 5; a fractional constant would throw into the catch and leave minOut = 0 (fail open, AUD-BUY-003)",
+    "rationale": "none stated",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "nan-fail-open",
+      "no-rationale"
+    ],
+    "recommendation": "Hold slippage as integer basis points (bigint math) so no value can throw into the fail-open catch, and decide the quote-failure behaviour on OD-15.",
+    "od_ref": "OD-15",
+    "also_defined_in": [
+      "TH-EXIT-13"
+    ]
+  },
+  {
+    "id": "TH-BUY-03",
+    "name": "Deliberate buy slippage percent",
+    "current_value": "default 5 (fallback CONFIG.slippagePercent || 5)",
+    "definition_sites": [
+      "src/bot.ts:529@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:703@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:338-342@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/exitEngine.ts:483-497@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:279",
+      "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "computePublicMinOut: keepPct = round(100 - min(max(0, s), 99)), minOut = expected * keepPct / 100",
+    "units": "percent",
+    "representation": "float, rounded to an integer percent, then bigint math",
+    "effective_unset": "5",
+    "effective_empty": "'' -> 5 (parsePositiveNumberDefault)",
+    "effective_non_numeric": "'abc' -> 5; '0' and negatives -> 5 (n > 0 required, so 0% cannot be configured); '150' -> clamped to 99 (keeps 1%); '2.4' -> rounds to 2",
+    "rationale": "comment: one single-source slippage helper so the private and public legs agree (bot.ts:524-526); clamp rationale at exitEngine.ts:484-491",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "DELIBERATE_BUY_SLIPPAGE_PCT",
+    "hardcoded": false,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-SCRIPTS-01"
+    ]
+  },
+  {
+    "id": "TH-BUY-04",
+    "name": "Snipe buy deadline",
+    "current_value": "now + 60 s",
+    "definition_sites": [
+      "src/bot.ts:1043@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1382@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1435@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/txManager.ts:113@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "router deadline check: the swap reverts when block.timestamp > deadline",
+    "units": "seconds (unix time)",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated",
+    "overlap": "yes: computed once before the quote, pause checks and affordability gate, and the tx is built once (txManager.ts:113), so escalation attempts that run past 60 s carry an expired deadline (AUD-BUY-018)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "overlap",
+      "no-rationale"
+    ],
+    "recommendation": "Rebuild the deadline per attempt or size it to the whole escalation budget (card BUY-07).",
+    "od_ref": "OD-32"
+  },
+  {
+    "id": "TH-BUY-05",
+    "name": "Deliberate buy deadlines (private leg and public leg)",
+    "current_value": "private now + 60 s; public now + 600 s",
+    "definition_sites": [
+      "src/bot.ts:544@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:547@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:731@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:748@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "router deadline check (block.timestamp > deadline reverts)",
+    "units": "seconds (unix time)",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated for either value",
+    "overlap": "the private leg runs DELIBERATE_BUY_PRIVATE_ATTEMPTS attempts against one 60 s deadline",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "differing-defaults",
+      "no-rationale"
+    ],
+    "recommendation": "Derive the private deadline from the attempt budget and document why the public leg uses ten times as long (card BUY-07).",
+    "od_ref": "OD-32"
+  },
+  {
+    "id": "TH-BUY-06",
+    "name": "Deliberate buy private attempt budget",
+    "current_value": "default 2",
+    "definition_sites": [
+      "src/bot.ts:557@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:332-336@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:558@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:577@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:278",
+      "scripts/deliberate-buy.ts:13-15@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "number of private submissions passed to escalatePrivateBuy and buildReconcileConfig",
+    "units": "count",
+    "representation": "integer (parseInt)",
+    "effective_unset": "2",
+    "effective_empty": "'' -> 2",
+    "effective_non_numeric": "'abc' -> 2; '0' -> 2 (n > 0 required); '2.9' -> 2; '5x' -> 5 (parseInt accepts a numeric prefix); no upper bound",
+    "rationale": "comment: default 2 private submissions (bot.ts:554)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "DELIBERATE_BUY_PRIVATE_ATTEMPTS",
+    "hardcoded": false,
+    "flags": [
+      "no-upper-bound"
+    ],
+    "recommendation": "Reject non-integers and cap at a documented maximum, because the whole private leg holds the wallet nonce lock (bot.ts:558).",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-SCRIPTS-02"
+    ]
+  },
+  {
+    "id": "TH-BUY-07",
+    "name": "V3 wait for first liquidity (Mint)",
+    "current_value": "30000 ms",
+    "definition_sites": [
+      "src/bot.ts:164-168@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1225@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1228@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "no Mint within 30 s -> resolve(false) -> opportunity dropped",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "design decision D-01 named in the comment (bot.ts:161)",
+    "overlap": "the V3 handler holds the token for up to 30 s after its dedup and before its risk check, widening the double-buy and risk-gate windows (AUD-BUY-004, AUD-BUY-010); for alpha drops (block 0) it is the only liquidity path (AUD-BUY-017)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "overlap"
+    ],
+    "recommendation": "Claim the token before waiting (card BUY-03) and handle alpha drops without waiting for a new Mint (card BUY-06).",
+    "od_ref": "OD-28"
+  },
+  {
+    "id": "TH-BUY-08",
+    "name": "V3 minimum liquidity threshold",
+    "current_value": "template defaults 0.5, 1.0, 0.1, 0.1 native; reference probe 0.001 native (hard-coded)",
+    "definition_sites": [
+      "src/chainRegistry.ts:665@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:209@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:278@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:335@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:392@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:185@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:188@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:201-208@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1233@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "passes if quoteExactInputSingle(amountIn = threshold) does not revert; the quoted output is not compared with anything (AUD-BUY-015)",
+    "units": "native coin",
+    "representation": "string -> parseEther bigint",
+    "effective_unset": "template default",
+    "effective_empty": "'' -> template default (||)",
+    "effective_non_numeric": "'abc' is not validated at load; parseEther at bot.ts:185 runs BEFORE the try (:190), so the first V3 pool makes handleNewV3PoolForChain reject, and that handler is not awaited (bot.ts:1542, :1669): an unhandled rejection that exits the process (AUD-BUY-005)",
+    "rationale": "comment: research recommendation, \"if the pool can convert 0.001 native to tokens it has meaningful liquidity\" (bot.ts:186-187); no rationale for the defaults",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "<envPrefix>_MIN_LIQUIDITY",
+    "hardcoded": false,
+    "flags": [
+      "differing-defaults",
+      "nan-crash"
+    ],
+    "recommendation": "Validate at registry load (fail loud), parse inside the try, measure depth directly, and use the same threshold semantics for V2 (TH-BUY-09) and V3 (card BUY-05).",
+    "od_ref": "OD-30"
+  },
+  {
+    "id": "TH-BUY-09",
+    "name": "V2 minimum liquidity",
+    "current_value": "1 native (1e18 wei), every chain",
+    "definition_sites": [
+      "src/utils/tokenSafety.ts:417-421@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:180-181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:978@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "wethReserve < 1e18 -> reject (exactly 1 passes)",
+    "units": "native coin wei",
+    "representation": "bigint",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "comment \"Require at least 1 ETH in liquidity\" (tokenSafety.ts:180, legacy twin); the same 1 is applied to BNB and the L2s, and <envPrefix>_MIN_LIQUIDITY is ignored on V2",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "differing-defaults",
+      "no-rationale"
+    ],
+    "recommendation": "Use the per-chain <envPrefix>_MIN_LIQUIDITY for V2 as well, so V2 and V3 share one threshold (card BUY-05).",
+    "od_ref": "OD-30"
+  },
+  {
+    "id": "TH-BUY-10",
+    "name": "HTTP-polling interval (V2 and V3 factory events)",
+    "current_value": "2000 ms",
+    "definition_sites": [
+      "src/bot.ts:1651@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1676@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1647@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1672@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "setInterval period",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "comment \"poll every 2 seconds\", no reason given",
+    "overlap": "yes: the async callback has no in-flight guard and lastBlock is advanced only after the dispatch loop, so a cycle slower than 2 s overlaps the next, which queries the same range and dispatches the same events again (AUD-BUY-004); the handle is discarded, so stop cannot clear it (AUD-BUY-011)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "overlap",
+      "no-rationale"
+    ],
+    "recommendation": "Use a self-scheduling timer or an in-flight flag, advance lastBlock before dispatch, keep the handle so stop can clear it (cards BUY-03, BUY-04).",
+    "od_ref": "OD-28"
+  },
+  {
+    "id": "TH-BUY-11",
+    "name": "DEX WebSocket reconnect backoff",
+    "current_value": "start 1000 ms, doubles per failure, max 60000 ms, unlimited attempts, reset to 1000 on success",
+    "definition_sites": [
+      "src/bot.ts:1549-1550@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1558-1559@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1565@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1590-1591@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1599-1600@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1607@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "delay = min(delay * 2, 60000) after each attempt",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "D-11 named in the comment (bot.ts:1520, :1589)",
+    "overlap": "yes: one loop per DEX on the same socket, plus a stacked loop per dashboard restart, run concurrently and race on ctx.wsProvider (AUD-BUY-008)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "overlap"
+    ],
+    "recommendation": "One per-chain owner with one backoff loop (card OD-11).",
+    "od_ref": "OD-11"
+  },
+  {
+    "id": "TH-BUY-12",
+    "name": "MEV health re-check interval",
+    "current_value": "300000 ms (5 min)",
+    "definition_sites": [
+      "src/bot.ts:1740-1749@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "setInterval period; an unhealthy result only alerts (it does not gate buys)",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "D-07 named in the comment (bot.ts:1739)",
+    "overlap": "only if one cycle takes over 5 min (no guard); the callback has no try/catch (AUD-BUY-005)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-13",
+    "name": "Mid-run wallet balance check interval",
+    "current_value": "default 300 s",
+    "definition_sites": [
+      "src/bot.ts:1764-1773@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1774-1794@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "reject (fatal exit) when non-finite or < 10; otherwise seconds * 1000 is the setInterval period; an undercut pauses buying",
+    "units": "seconds",
+    "representation": "number (Number())",
+    "effective_unset": "300 (?? default)",
+    "effective_empty": "'' -> Number('') = 0 -> < 10 -> fatal process.exit(1)",
+    "effective_non_numeric": "'abc' -> NaN -> fatal process.exit(1); '1e9' is accepted: 1e12 ms exceeds the 2^31-1 ms timer limit, which Node replaces with 1 ms, so the balance check then runs about every millisecond",
+    "rationale": "WR-07 comment (bot.ts:1760-1763): reject non-finite or < 10 s",
+    "overlap": "yes: async callback with no in-flight guard; with a short interval, checks overlap",
+    "env_key": "MID_RUN_CHECK_INTERVAL_SEC",
+    "hardcoded": false,
+    "flags": [
+      "no-upper-bound",
+      "overlap"
+    ],
+    "recommendation": "Add an upper bound (for example 86400 s) and an in-flight guard.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-14",
+    "name": "Exit-worker watchdog budget",
+    "current_value": "default 60000 ms",
+    "definition_sites": [
+      "src/bot.ts:2177-2183@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:77-81@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:263-296@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:181@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2177-2182@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/anti-rug/exitTrigger.ts:265-269@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/exitWatchdog.ts:45-58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:238"
+    ],
+    "comparison": "per-submit wall-clock race budget (exit worker)",
+    "units": "milliseconds",
+    "representation": "integer (parseInt)",
+    "effective_unset": "60000",
+    "effective_empty": "'' -> 60000",
+    "effective_non_numeric": "'abc', '0', negatives -> 60000; '30s' -> 30; '9e9' -> 9 (parseInt stops at 'e'); a value above 2^31-1 is replaced by Node with 1 ms; no lower bound although the comment says it must exceed one 45 s confirm window",
+    "rationale": "comment: default 60000 ms, must exceed one 45 s confirm window plus margin (bot.ts:2172-2176)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "WATCHDOG_BUDGET_MS",
+    "hardcoded": false,
+    "flags": [
+      "no-upper-bound",
+      "no-lower-bound"
+    ],
+    "recommendation": "Enforce the documented minimum (above the confirm window) and a maximum below the timer limit. The watchdog semantics belong to the EXIT slice.",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-ANTIRUG-18",
+      "TH-EXIT-21"
+    ]
+  },
+  {
+    "id": "TH-BUY-15",
+    "name": "Two-stage SIGINT grace",
+    "current_value": "default 8000 ms",
+    "definition_sites": [
+      "src/bot.ts:2305-2307@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:2270-2274@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:182@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:239"
+    ],
+    "comparison": "force-exit timer after the first signal",
+    "units": "milliseconds",
+    "representation": "integer (parseInt)",
+    "effective_unset": "8000",
+    "effective_empty": "'' -> 8000",
+    "effective_non_numeric": "'abc', '0', negatives -> 8000; '5x' -> 5; above 2^31-1 Node uses 1 ms (forced exit almost at once)",
+    "rationale": "RESEARCH A4 named in the comment (bot.ts:2302-2304)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "SIGINT_GRACE_MS",
+    "hardcoded": false,
+    "flags": [
+      "no-upper-bound"
+    ],
+    "recommendation": "Cap below the timer limit.",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-14"
+    ]
+  },
+  {
+    "id": "TH-BUY-16",
+    "name": "Snipe attempt count reported in the fail-clean alert",
+    "current_value": "4 (hard-coded), equal to the txManager default 3 retries + 1",
+    "definition_sites": [
+      "src/bot.ts:369@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/txManager.ts:107-108@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/flashbots.ts:145@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/passthrough.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/bloxroute.ts:76@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:177@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/mevStrategies/reconciliation.ts:476@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "none (telemetry only; the real budget is retries ?? 3 in txManager)",
+    "units": "count",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "comment: the documented snipe submission budget (bot.ts:367-368)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "duplicated-constant"
+    ],
+    "recommendation": "Report the attempt count from the same source sendTxWithRetry uses, so the alert cannot drift from the real budget.",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-TX-13"
+    ]
+  },
+  {
+    "id": "TH-BUY-17",
+    "name": "Telegram intake cooldown",
+    "current_value": "5000 ms, global across all addresses",
+    "definition_sites": [
+      "src/telegramListener.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/telegramListener.ts:95-98@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "now - lastProcessed < 5000 -> skip this address (it is not recorded, so it is lost)",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated beyond \"5 seconds\"",
+    "overlap": "n/a (a timestamp gate, not a timer)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "no-rationale"
+    ],
+    "recommendation": "Per-address rate limit and record only after routing succeeded (card BUY-06).",
+    "od_ref": "OD-31"
+  },
+  {
+    "id": "TH-BUY-18",
+    "name": "Honeypot roundtrip probe amounts",
+    "current_value": "1%, 50% and 100% of the snipe amount; 50% and 100% gate, 1% is advisory",
+    "definition_sites": [
+      "src/utils/honeypot/checkerContract.ts:298@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:388@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:197@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "any gating probe !ok -> unsafe",
+    "units": "native coin wei",
+    "representation": "bigint (snipeWei / 100n, / 2n)",
+    "effective_unset": "follows TH-BUY-01",
+    "effective_empty": "follows TH-BUY-01",
+    "effective_non_numeric": "parseEther throws inside the outer try -> verdict unknown/unsafe -> skip (fail closed)",
+    "rationale": "D-AGGREGATION (checkerContract.ts:14, :28-33)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-19",
+    "name": "Maximum buy and sell tax",
+    "current_value": "default 1000 bps (10%) on every chain",
+    "definition_sites": [
+      "src/chainRegistry.ts:695-714@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:213-214@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:282-283@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:339-340@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:396-397@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:227@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:240@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "max gating-probe tax > limit -> unsafe (exactly the limit passes)",
+    "units": "basis points",
+    "representation": "integer (parseInt)",
+    "effective_unset": "1000",
+    "effective_empty": "'' -> 1000 (||)",
+    "effective_non_numeric": "'abc' -> NaN -> fatal process.exit(1) at load (chainRegistry.ts:701-714); '12abc' -> 12 (parseInt accepts a numeric prefix); '999.9' -> 999",
+    "rationale": "D-TAX-THRESHOLDS (chainRegistry.ts:691-693)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "<envPrefix>_MAX_BUY_TAX_BPS, <envPrefix>_MAX_SELL_TAX_BPS",
+    "hardcoded": false,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-20",
+    "name": "Honeypot checker success status",
+    "current_value": "0x07",
+    "definition_sites": [
+      "src/utils/honeypot/checkerContract.ts:137@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "status === 0x07 -> probe ok; anything else -> unsafe",
+    "units": "status code from the checker contract",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "contract interface (checkerContract.ts:23)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-21",
+    "name": "Default V3 fee tier for the honeypot probe",
+    "current_value": "3000 (0.3%)",
+    "definition_sites": [
+      "src/utils/honeypot/index.ts:69@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/honeypot/checkerContract.ts:375@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "used only when a caller omits the fee tier; both production callers pass the pool fee (bot.ts:1262)",
+    "units": "Uniswap fee units (hundredths of a basis point)",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "iter-2 Blocker #1 (honeypot/index.ts:16-22)",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [],
+    "recommendation": null,
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-22",
+    "name": "Alpha-drop V3 fee tiers",
+    "current_value": "[500, 3000, 10000]; the first tier with a pool wins",
+    "definition_sites": [
+      "src/alphaDrop.ts:43@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "first non-zero getPool result is used",
+    "units": "Uniswap fee units",
+    "representation": "number array",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "comment \"common fee tiers\" only; the 100 tier is missing and depth is not compared",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "no-rationale"
+    ],
+    "recommendation": "Choose the pool by depth and include the 100 tier (card BUY-06).",
+    "od_ref": "OD-31"
+  },
+  {
+    "id": "TH-BUY-23",
+    "name": "LP burned share treated as locked",
+    "current_value": "> 0.9 (90%)",
+    "definition_sites": [
+      "src/utils/safetyProviders/unicrypt.ts:41-43@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:93-95@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "Number(burned) / Number(total) > 0.9 -> locked",
+    "units": "ratio",
+    "representation": "float from Number(bigint)",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "float-money",
+      "no-rationale"
+    ],
+    "recommendation": "Compare in bigint (burned * 10n > total * 9n) and document the 90% choice.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-24",
+    "name": "Max wallet / max tx anti-bot ratio",
+    "current_value": "< 0.01 (1% of supply)",
+    "definition_sites": [
+      "src/utils/tokenSafety.ts:496-505@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:246-255@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "Number(limit) / Number(totalSupply) < 0.01 -> block (a limit of 0 also blocks)",
+    "units": "ratio",
+    "representation": "float from Number(bigint)",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "float-money",
+      "no-rationale"
+    ],
+    "recommendation": "Compare in bigint (limit * 100n < totalSupply) and document the 1% choice.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-25",
+    "name": "Token metadata bounds",
+    "current_value": "decimals 6..18; symbol length 2..10; name length >= 2",
+    "definition_sites": [
+      "src/utils/tokenSafety.ts:356-359@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:122-125@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "decimals < 6 or > 18 -> reject; symbol length < 2 or > 10 -> reject; name length < 2 -> reject",
+    "units": "decimals / characters",
+    "representation": "bigint decimals compared with numbers (exact); string lengths",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "no-rationale"
+    ],
+    "recommendation": "Document why these bounds decide whether to buy.",
+    "od_ref": null
+  },
+  {
+    "id": "TH-BUY-26",
+    "name": "External safety-provider timeouts and retries",
+    "current_value": "GoPlus 10000 ms, honeypot.is 10000 ms, Mudra 10000 ms, Unicrypt none; Telegram alert post none; retry() 3 retries with 1000/2000/4000 ms waits",
+    "definition_sites": [
+      "src/utils/safetyProviders/goplus.ts:35@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/safetyProviders/honeypotIs.ts:21@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/safetyProviders/mudra.ts:17@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/safetyProviders/unicrypt.ts:18-20@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/tokenSafety.ts:65-67@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/notifier.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/utils/retry.ts:5-23@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "axios timeout per request",
+    "units": "milliseconds",
+    "representation": "number",
+    "effective_unset": "n/a: hard-coded, not read from the environment",
+    "effective_empty": "n/a: hard-coded, not read from the environment",
+    "effective_non_numeric": "n/a: hard-coded, not read from the environment",
+    "rationale": "none stated",
+    "overlap": "the safety bank awaits all checks in parallel, so the handler waits for the slowest: about 47 s worst case for a 10 s-timeout provider (4 tries plus 7 s of waits), unbounded for Unicrypt and for every awaited Telegram alert",
+    "env_key": null,
+    "hardcoded": true,
+    "flags": [
+      "differing-defaults",
+      "no-rationale"
+    ],
+    "recommendation": "One bounded timeout for every external call on the buy path, Telegram alerts included (card BUY-05).",
+    "od_ref": "OD-30"
+  },
+  {
+    "id": "TH-BUY-27",
+    "name": "Snipe cooldown and the other risk limits read by canSnipe",
+    "current_value": "SNIPE_COOLDOWN_MS default 30000 ms; MAX_OPEN_POSITIONS 10; MAX_TOTAL_EXPOSURE 10.0; DAILY_LOSS_PCT 10; MAX_POSITION_SIZE unset",
+    "definition_sites": [
+      "src/riskManager.ts:31@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:28-32@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:124-135@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:111-120@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:139-148@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1125@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1449@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/risk.ts:82@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:90@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:30@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:94-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:59@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:61",
+      "src/api/routes/risk.ts:80@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:28@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:185-197@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:57@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:58",
+      "src/preflight.ts:178-234@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/preflight.ts:200-203@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:198",
+      "src/api/routes/risk.ts:81@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/api/routes/chains.ts:89@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:29@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:58@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:59",
+      "src/riskManager.ts:159-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:60@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:62"
+    ],
+    "comparison": "Date.now() - last < cooldown -> refuse; count >= max -> refuse; total + amount > cap -> refuse",
+    "units": "milliseconds / count / native coin",
+    "representation": "parseInt / parseFloat",
+    "effective_unset": "the defaults above",
+    "effective_empty": "'' -> default (|| in the parse)",
+    "effective_non_numeric": "'abc' -> NaN: Date.now() - last < NaN is false, so the cooldown never blocks; count >= NaN and total + amount > NaN are false too, so a malformed MAX_OPEN_POSITIONS or MAX_TOTAL_EXPOSURE silently disables that limit (fail open)",
+    "rationale": "none stated in riskManager.ts beyond defaults",
+    "overlap": "yes: the cooldown timestamp is set by recordSnipe only after a buy landed, so concurrent handlers all pass (AUD-BUY-010)",
+    "env_key": "SNIPE_COOLDOWN_MS (also MAX_OPEN_POSITIONS, MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT, MAX_POSITION_SIZE)",
+    "hardcoded": false,
+    "flags": [
+      "nan-fail-open",
+      "overlap",
+      "differing-defaults"
+    ],
+    "recommendation": "Validate the risk env values at load (fail loud as the tax bps do) and reserve the cooldown and budget at canSnipe time (card BUY-03). riskManager.ts belongs to the DB slice (22-21); recorded here because the buy path consumes it.",
+    "od_ref": "OD-28",
+    "also_defined_in": [
+      "TH-API-06",
+      "TH-DB-04",
+      "TH-API-04",
+      "TH-DB-01",
+      "TH-DB-18",
+      "TH-API-05",
+      "TH-DB-02",
+      "TH-DB-05"
+    ]
+  },
+  {
+    "id": "TH-BUY-28",
+    "name": "Per-chain max capital (daily-loss base)",
+    "current_value": "template defaults 1.0, 5.0, 0.5, 0.5 native",
+    "definition_sites": [
+      "src/chainRegistry.ts:664@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:208@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:277@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:334@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/chainRegistry.ts:391@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:94-99@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:909@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/bot.ts:1248@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/riskManager.ts:96-97@23a64617dca167976adc4645fed0e2c69e384820",
+      "src/config.ts:44-51@23a64617dca167976adc4645fed0e2c69e384820",
+      ".env.example:16",
+      ".env.example:22",
+      ".env.example:28",
+      ".env.example:34",
+      "src/api/routes/chains.ts:84@23a64617dca167976adc4645fed0e2c69e384820"
+    ],
+    "comparison": "daily realized loss <= -(maxCapital * DAILY_LOSS_PCT / 100) -> refuse",
+    "units": "native coin",
+    "representation": "string -> parseFloat",
+    "effective_unset": "template default",
+    "effective_empty": "'' -> template default (||)",
+    "effective_non_numeric": "'abc' -> NaN -> the loss threshold is NaN and the comparison is false, so the daily-loss limit never blocks (fail open)",
+    "rationale": "none stated",
+    "overlap": "n/a (not a timer or interval)",
+    "env_key": "<envPrefix>_MAX_CAPITAL",
+    "hardcoded": false,
+    "flags": [
+      "nan-fail-open",
+      "float-money"
+    ],
+    "recommendation": "Validate at registry load and compare in wei. Owned by the DB slice (chainRegistry.ts, riskManager.ts); recorded here because the buy path consumes it.",
+    "od_ref": null,
+    "also_defined_in": [
+      "TH-DB-07"
+    ]
+  }
+]

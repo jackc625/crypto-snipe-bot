@@ -1,0 +1,43 @@
+{
+  "id": "DB-02",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "One database per wallet: record the wallet on every trade, or lock the database file, or refuse a database owned by another wallet",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour (no wallet on rows, no file lock)",
+      "behavior_impact": "none",
+      "risk": "Two bots with different wallets on one file mark each other's positions failed on restart and share every risk total (AUD-DB-015)."
+    },
+    {
+      "id": "owner-check",
+      "name": "Store the owning wallet address in the database and refuse to start with a different wallet",
+      "behavior_impact": "A second wallet cannot use the file at all.",
+      "risk": "Small schema addition; the operator must create a separate database for a second wallet."
+    },
+    {
+      "id": "wallet-column",
+      "name": "Add a wallet column to trades and scope every query by the running wallet",
+      "behavior_impact": "Several wallets can share one file safely.",
+      "risk": "Touches every query on the money path; a larger migration."
+    },
+    {
+      "id": "path-lock",
+      "name": "A second process lock keyed by the canonical DB path (beside the 22-13 wallet lock)",
+      "behavior_impact": "Only one bot process of any wallet can use the file.",
+      "risk": "Scripts that open the DB while the bot runs (preflight, pause, resume) must use the try-acquire query or read-only opens."
+    }
+  ],
+  "recommendation": "owner-check: the bot is single-wallet by design, so refusing a foreign wallet is the smallest safe change.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S2, the setup is not used today.",
+  "behavior_impact": "Decides whether a database can be shared across wallets.",
+  "findings": [
+    "AUD-DB-015"
+  ],
+  "needed_by": "Phase 24 discussion (with the 22-13 lock re-audit in 22-29)",
+  "assigned_id": "OD-59"
+}

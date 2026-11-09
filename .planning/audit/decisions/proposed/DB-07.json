@@ -1,0 +1,37 @@
+{
+  "id": "DB-07",
+  "area": "DB",
+  "status": "open",
+  "decided": null,
+  "keep_current_option_id": "keep-current",
+  "title": "SQLite durability for position and exit records",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep WAL with synchronous=NORMAL",
+      "behavior_impact": "none",
+      "risk": "A power loss or OS crash can lose the latest committed rows, including a record of a real position (AUD-DB-021)."
+    },
+    {
+      "id": "synchronous-full",
+      "name": "Use synchronous=FULL",
+      "behavior_impact": "Every commit is flushed to disk, so acknowledged writes survive a power loss.",
+      "risk": "Each write is slower. Measure against the buy and exit paths."
+    },
+    {
+      "id": "checkpoint-critical",
+      "name": "Keep NORMAL and force a flush after critical writes only",
+      "behavior_impact": "Only buys and exit-state writes pay the cost.",
+      "risk": "Any critical write that misses the flush stays exposed."
+    }
+  ],
+  "recommendation": "synchronous-full, subject to measuring write latency.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S2.",
+  "behavior_impact": "Decides whether recorded positions survive a power cut.",
+  "findings": [
+    "AUD-DB-021"
+  ],
+  "needed_by": "Phase 29 discussion (S2-S4 fixes)",
+  "linked_od": "OD-18"
+}

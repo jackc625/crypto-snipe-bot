@@ -1,0 +1,87 @@
+{
+  "id": "AUD-TESTI-024",
+  "title": "The D-GATE-BOTH-LAYERS chainId tripwire: the global layer covers every fork-project file but only checks the node globalSetup just spawned (a local fork always reports 31337, so it cannot fire for the misconfiguration it names), the per-test layer uses the shared helper in four files, three files carry their own inline copies of the predicate, snipeLifecycle has none, and a tripped gate makes the test pass",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "test/fork/setup.ts",
+    "test/fork/helpers/realMainnetGate.ts",
+    "test/fork/realMainnetGate.fork.test.ts",
+    "test/fork/antiRugDetector.fork.test.ts",
+    "test/fork/honeypotChecker.fork.test.ts",
+    "test/fork/honeypotMultiAmount.fork.test.ts",
+    "test/fork/snipeLifecycle.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/fork/setup.ts:38-61@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "global layer: requireRealMainnetGate on http://127.0.0.1:8545, the node spawned at :16; the comment says it guards \"a misconfigured ETH_FORK_RPC_URL/ALCHEMY_URL pointing at a real-mainnet node\""
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:96-101@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the hardhat network has no chainId override, so the local fork reports 31337 whatever it forks"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/helpers/realMainnetGate.ts:128-145@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the shared predicate, documented as \"Copied verbatim ... so there is a single source of truth\""
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/antiRugDetector.fork.test.ts:187-199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "inline copy (also maps an unreachable node to false)"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotChecker.fork.test.ts:57-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "inline copy"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotMultiAmount.fork.test.ts:83-85@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "inline copy"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/snipeLifecycle.test.ts:40-51@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no per-test gate before signing"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/realMainnetGate.fork.test.ts:20-26@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the helper is tested with provider stubs only"
+    }
+  ],
+  "sibling_sites_checked": "Per fork file: captureRehearsal (:161), deliberateBuyReplay (:130), exitStatePersistence (:125) and realLaunchReplay (:153) call the shared requireRealMainnetGate; antiRugDetector, honeypotChecker and honeypotMultiAmount use inline copies; snipeLifecycle has none; realMainnetGate.fork.test.ts tests the helper; setup.ts is the global layer. The real protection against a real-mainnet transaction is structural (every provider is the local node and every signer a Hardhat key, see the AUD-TESTI-017 trace), not the tripwire.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: no capital path (no fork test can reach real mainnet or the real key), but the tripwire is described as the protection while it cannot fire, its \"single source of truth\" claim is false, and a tripped gate reports a pass (AUD-TESTI-021).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-017",
+    "AUD-TESTI-021",
+    "AUD-TESTI-018"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 25: replace the inline copies with the shared helper, add the gate to snipeLifecycle, make a tripped gate fail the run instead of returning, and re-document the global layer as a guard against an unexpected node on 127.0.0.1:8545 (or check the fork source with eth_chainId on the fork URL before spawning).",
+  "reported_by": [
+    "claude (22-24 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

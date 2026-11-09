@@ -1,0 +1,139 @@
+[
+  {
+    "file": "test/unit/rails/spawnSites.test.ts",
+    "line": 169,
+    "description": "The spawn-site gate fails at HEAD, red since 22-12 (ac4cd88): 6 offences, 5 'require with a non-literal specifier' in test/rails/probes/duplicateLoadProbe.cjs (lines 80, 102, 108, 133, 143) and 1 'call to exec()' in test/unit/guards/singleton.test.ts:66. 22-12's verification did not run this gate. Read in code, none is a spawn: the probe requires real project modules by computed path inside a railed child, and the exec call is a RegExp named RESULT_LINE that the receiver allow-list does not include. No child process and no production state is reached (22-13 wrapped runs: verdict untouched, nonLoopbackAllowed 0, telegramAllowed 0), so this is not a rail-class reach. The gate stays red until 22-15, whose first full-suite run will hit it. Likely fix: rename the receiver or add it to SAFE_EXEC_RECEIVERS, and add duplicateLoadProbe.cjs to ALLOWED_FILES with its reason. 22-13 does not fix it (Discovery rule); no 22-13 file is among the offences.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-13",
+    "resolution": "Fixed by the execute-phase orchestrator at the wave 9 boundary, commit f695363: test/rails/probes/duplicateLoadProbe.cjs is allowed a plain require of a computed path through COMPUTED_REQUIRE_FILES (all other gate checks still apply to it), and singleton.test.ts uses String.match instead of RegExp.exec. RED before the fix: the 6 offences. GREEN after: spawnSites and singleton tests, 34 passed, wrapped verdict untouched."
+  },
+  {
+    "file": "test/unit/configEnvVar.test.ts",
+    "line": 146,
+    "description": "vi.doMock('../../src/db', ...) named a module that does not exist (the database module is src/utils/db.ts), so the mock was a silent no-op from the day the test was written (13-01, e0a0f0b). What the test actually exercised: the real src/utils/db module loaded and opened a real SQLite file when exitEngine was imported; its one assertion, buildExitConfig().stopLossPct === 18, reads CONFIG only and never touches the database, so the env -> CONFIG -> exitConfig claim was and is genuinely proven. Measured under the rails: with the broken specifier one run added 3 files to the per-worker temp test-DB folder (one DB plus its -wal and -shm); with the corrected specifier it added 0, and the same 10 tests pass both ways. No test passed only because of the no-op. The other 583 mock calls in the suite resolve. Historical note: before the 22-05 / 22-08 rails, this test opened whatever DB_PATH resolved to, with no src-layer tripwire; today resolveDbPath and assertNotProdDbUnderVitest keep it away from data/.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-14",
+    "resolution": "Specifier corrected with the smallest edit in the 22-14 Task 1 commit; recorded in rails-test-edits.json with register_as test-quality. 22-29 registers this as a test-quality finding."
+  },
+  {
+    "file": "test/integration/honeypotDeploy.eth.test.ts",
+    "line": 35,
+    "description": "The first full railed run shows this test is a live mainnet check sitting in the default integration suite: 'has bytecode at deployedAddress (not 0x)' calls provider.getCode() against process.env.ETH_RPC_URL and asserts the HoneypotChecker contract really has code on-chain. Under the rails ETH_RPC_URL is the sentinel http://127.0.0.1:1, so the call fails with ECONNREFUSED (fully wrapped runs vpu-20261109T042734-6628-578d1f and vpu-20261109T043212-18400-1f9f93; verdict untouched, net-watch 0 non-loopback). The test's guard is it.skipIf(!process.env.ETH_RPC_URL), which skipped it in CI but is false under a sentinel value, so the rails turned it from skipped into red. Before the rails this test made a real mainnet call whenever the operator's real .env set ETH_RPC_URL (AUD-TESTI-011). No bot code is at fault and no capital path is involved: preflight's checkHoneypotCheckerCode still does this getCode check against the real RPC at boot, src/preflight.ts:590,924. It cannot go green under the rails without a forbidden edit: a skip or sentinel-aware skip violates NAC-04 and the 0-skipped rule, deleting it violates P4, moving it out of the file breaks the same-file title identity rule, and a fake loopback RPC returning canned bytecode would mock the very thing it claims to check.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-15",
+    "resolution": "Operator ruling ESC-RAILS-01 (reply: b): the one test moved to the fork project in commit d66d8d0 (test/fork/honeypotDeploy.eth.fork.test.ts), assertions word for word. It has not run in its new file; the real run is obligation UFV-05, owner Phase 25. 22-29 registers this as a test-quality finding."
+  },
+  {
+    "file": "src/main.ts",
+    "line": 62,
+    "description": "A non-empty VITEST in the bot environment or .env switched a real start to test behaviour: db.ts resolved a temporary database (no open positions, unpaused) and every Telegram alert was refused, while the bot kept trading. Low likelihood, silent, affects funds.",
+    "defect_type": "production",
+    "severity_estimate": "S2",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-01",
+    "resolution": "commit 5378478: src/main.ts refuses to start when VITEST is set; RED-proven"
+  },
+  {
+    "file": "src/utils/processLock.ts",
+    "line": 77,
+    "description": "The lock folder follows the OS user and HOME/USERPROFILE, so two bots on one wallet under different users or a changed HOME each get their own lock.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-02",
+    "routing": "Documented in src/utils/processLock.ts (5378478). Needs a second bot under another OS user or a changed HOME. Registered by 22-29; a machine-wide lock location is a design choice for Phase 24."
+  },
+  {
+    "file": "src/main.ts",
+    "line": 62,
+    "description": "Loading .env before require(./bot) made LOG_LEVEL from .env take effect on the live bot, which it did not before; an invalid value would stop the boot. Undeclared boot behaviour change.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-03",
+    "resolution": "commit 5378478: src/main.ts reads .env into a private object, so process.env and boot order are unchanged; RED-proven"
+  },
+  {
+    "file": "src/utils/dbPath.ts",
+    "line": 189,
+    "description": "An exception from the unguarded temp-copy cleanup in the DB version probe replaced a successful result, turning a good database check into a boot failure.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-04",
+    "resolution": "commit 5378478: cleanup failure no longer fails the probe; RED-proven"
+  },
+  {
+    "file": "src/utils/dbPath.ts",
+    "line": 97,
+    "description": "The src-layer Vitest DB tripwire built the protected folder without resolving <repo>/data, so a data folder that is a junction or symlink was not protected at this layer. The setup-layer rail still caught it.",
+    "defect_type": "production",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-05",
+    "resolution": "commit 5378478: tripwire also compares the resolved data folder; RED-proven"
+  },
+  {
+    "file": "scripts/capture-baselines.ts",
+    "line": 791,
+    "description": "A failed test collection is recorded as 0 tests and passes the NAC-04 check in --phase before mode.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-06",
+    "routing": "The false pass exists only in --phase before, which is complete; --phase after loads committed counts, so a failed collection fails NAC-04. Registered by 22-29."
+  },
+  {
+    "file": ".github/workflows/test.yml",
+    "line": 9,
+    "description": "The CI test job has no timeout.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "WR-07",
+    "routing": "CI job timeout predates Phase 22. Registered by 22-29 for the CI work."
+  },
+  {
+    "file": "test/rails/core.cjs",
+    "line": 0,
+    "description": "process.loadEnvFile() is not covered by the .env rail.",
+    "defect_type": "test",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-01",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "test/rails/spawnRailedChild.ts",
+    "line": 0,
+    "description": "The spawn path limit does not resolve links.",
+    "defect_type": "test",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-02",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "scripts/capture-baselines.ts",
+    "line": 0,
+    "description": "capture-baselines --out with no value writes to the committed baseline folder.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-03",
+    "routing": "Info. Registered by 22-29."
+  },
+  {
+    "file": "scripts/verify-prod-untouched.ts",
+    "line": 0,
+    "description": "The net-watch early-exit check cannot fire.",
+    "defect_type": "tooling",
+    "severity_estimate": "S4",
+    "found_in_plan": "22-code-review",
+    "review_id": "IN-04",
+    "routing": "Info. Registered by 22-29."
+  }
+]

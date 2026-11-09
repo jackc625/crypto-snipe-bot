@@ -1,0 +1,122 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": "ESC-DB-01",
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-004",
+  "title": "RC-14 a buy that lands has no database row until its whole submission returns (minutes on a private bundle), and stopping the bot in that window (Ctrl+C runs the cleanup that closes the DB and exits at once) or any crash leaves a held token the bot does not know about; synchronous=NORMAL can also roll back the last commits on a power loss",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1100-1111@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 snipe: await submitBuyTx(...) covers every private attempt and its confirm window; the signed bundle can be included while this await is still pending"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1125-1145@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "only after it returns: recordSnipe, then insertTrade.run (the first and only durable record of the buy)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1431-1466@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 snipe: same order"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2251-2286@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "first SIGINT/SIGTERM: arm the grace timer, then run cleanup() synchronously"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2309-2349@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "cleanup closes the API, timers and providers, calls closeDb() and process.exit(0); an awaiting buy never reaches insertTrade"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2198-2202@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the comment says abandoned in-flight submits are safe because restart-resume finds them; for a buy there is no row to resume"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "journal_mode = WAL, synchronous = NORMAL"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:718-740@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "forceWalCheckpoint is applied only to pause/resume; its comment says a commit can be lost on SIGKILL, which is not how WAL+NORMAL behaves (process death keeps committed frames; power loss or an OS crash can roll them back)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -niE \"intent|reconcile.*wallet|unknown.*balance|orphan\" 23a64617dca167976adc4645fed0e2c69e384820 -- src/bot.ts src/utils/db.ts",
+      "note": "no write-ahead buy intent row and no boot-time check of wallet token balances against trades rows exists at the base SHA"
+    }
+  ],
+  "sibling_sites_checked": "All three buy row writes (bot.ts:773 deliberate, :1127 V2, :1451 V3) are written after the awaited submit. The catch-path loss of a landed buy is AUD-BUY-002 (RC-01, error path) and is not repeated here; this entry is the process-death path. Process-ending conditions already registered elsewhere that can hit inside the window: AUD-BUY-005 (unhandled rejection exits), AUD-TX-009 (bundle-wait crash), AUD-ANTIRUG-002 (WS reconnect crash). The restart scan (db.ts:597-620, bot.ts:1904-1960) reads only rows that exist. exit_state and lp_baseline are written after the trade row by armPositionMonitoring (BUY slice, SC-06).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-14"
+  ],
+  "research_suggested_severity": "S1",
+  "severity_rationale": "S1 STRAND, equal to the research suggestion, strengthened by the shutdown path: stopping the bot is a routine operator action (the operating notes say to force-kill the process), and the first signal closes the database and exits immediately, so a buy in its multi-minute submission window is lost to the bot even on a clean stop. The token then sits in the wallet with no exit monitor, no anti-rug watch and no dedup record. Not S0 because it needs a stop or crash inside the window. The synchronous=NORMAL part is power-loss only and is recorded as a sub-claim, not proven here.",
+  "related": [
+    "AUD-BUY-002",
+    "AUD-BUY-005",
+    "AUD-TX-009",
+    "AUD-ANTIRUG-002"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "od_ref": "OD-18",
+  "recommendation": "Write a buy intent row (token, chain, nonce, signed hash(es)) before the first submission and reconcile it at boot against the chain (schema 7 to 8); make the first shutdown signal wait for in-flight buys up to the grace period instead of closing the DB at once; decide synchronous=FULL. Card OD-18. Phase 24; nothing is changed in Phase 22.",
+  "sub_claims": [
+    {
+      "claim": "No durable record of a buy exists between the first signed submission and the end of submitBuyTx",
+      "evidence": [
+        "src/bot.ts:1100-1145@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1431-1466@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "The first shutdown signal closes the DB and exits without waiting for an in-flight buy",
+      "evidence": [
+        "src/bot.ts:2251-2286@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:2309-2349@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "synchronous=NORMAL under WAL can roll back the last committed rows after a power loss or OS crash (SQLite documented behaviour; process death alone does not lose them)",
+      "evidence": [
+        "src/utils/db.ts:20-22@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "candidate"
+    },
+    {
+      "claim": "No boot reconciliation compares wallet token holdings with trades rows",
+      "evidence": [
+        "src/bot.ts:1892-1960@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ]
+}

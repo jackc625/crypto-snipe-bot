@@ -1,0 +1,53 @@
+{
+  "sealed_sha": "1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+  "sealed_at": "2026-11-09T09:29:42-05:00",
+  "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "scan": {
+    "range": "23a64617dca167976adc4645fed0e2c69e384820..1d1dd171235fa8a4a7841b65f5f7afdd6ffef020",
+    "non_public": 0,
+    "known_public": 0,
+    "public_address": 0,
+    "phase_scan_sha256": "64ba4ae008ea37075b61f74d77889bfeb2cb244f29df692fce9bc4436f0cc40f"
+  },
+  "final_check": "pass",
+  "render_sha256": {
+    "findings": "afd6e3d7691f4d906d3c9a0b5983e5ab89b3a0bdc31050675f0d14685bc2921c",
+    "decisions": "90946c7db693f877c90e7384d44c4de68b710bdb6b7b8e8fb65fbb0eeefc4e8a"
+  },
+  "exempt_paths": [
+    ".planning/audit/SEAL.json",
+    ".planning/audit/inputs/phase-scan.json",
+    ".planning/phases/22-safety-rails-audit/*-SUMMARY.md",
+    ".planning/phases/22-safety-rails-audit/*-VERIFICATION.md",
+    ".planning/STATE.md",
+    ".planning/ROADMAP.md",
+    ".planning/REQUIREMENTS.md",
+    ".planning/state.json",
+    ".planning/phases/22-safety-rails-audit/*-REVIEW*.md",
+    ".planning/phases/22-safety-rails-audit/*-UAT.md",
+    ".planning/phases/22-safety-rails-audit/*-SECURITY.md",
+    ".planning/phases/22-safety-rails-audit/*-VALIDATION.md",
+    ".planning/phases/22-safety-rails-audit/22-ORCHESTRATOR-NOTES.md",
+    ".planning/phases/22-safety-rails-audit/.continue-here.md"
+  ],
+  "exempt_paths_note": "`*` matches any run of characters except `/`, whole path; proven by seal-verify.ts --self-test. Exempt paths may change but are still scanned for secrets by seal-verify.ts --scan. The *-VALIDATION.md entry was added after the seal by the execute-phase orchestrator: validate-phase writes only that bookkeeping file unless the operator chooses to add tests, and any new test file would still invalidate this seal.",
+  "rule": "any later change outside exempt_paths invalidates this seal; run seal-verify.ts --scan",
+  "previous_seals": [
+    {
+      "sealed_sha": "93d90297b58a8b333519873112473156fe45d6bf",
+      "sealed_at": "2026-11-09T01:45:40-05:00",
+      "scan": {
+        "range": "23a64617dca167976adc4645fed0e2c69e384820..93d90297b58a8b333519873112473156fe45d6bf",
+        "non_public": 0,
+        "known_public": 0,
+        "public_address": 0,
+        "phase_scan_sha256": "8b1d70b400de01d67c2fb242592b831280b0eede7cc83c0108e9009ecd494f49"
+      },
+      "render_sha256": {
+        "findings": "8808dca93e4c1f60cebe47b3d8f25ec6ee274b825e326a60b333c4cd48f3338a",
+        "decisions": "90946c7db693f877c90e7384d44c4de68b710bdb6b7b8e8fb65fbb0eeefc4e8a"
+      },
+      "superseded_because": "PR #2 CI failed on a fresh checkout. The fixes in ea193b8 changed three test files and the CI workflow, none of them exempt, so the phase was re-sealed with the same steps: re-audit of the changed files, check.ts --stage final, end-of-phase checks, and the phase-wide secret scan. No path was added to exempt_paths."
+    }
+  ]
+}

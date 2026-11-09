@@ -1,0 +1,104 @@
+{
+  "id": "AUD-BUY-001",
+  "title": "A landed deliberate buy is armed for exit and anti-rug only inside the short-lived operator script, which exits at once; the position runs unprotected until the main bot next boots",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S0",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12",
+    "C14"
+  ],
+  "files": [
+    "src/bot.ts",
+    "scripts/deliberate-buy.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:565@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "private-landed branch of executeDeliberateBuy: await recordAndArmDeliberateBuy(...) then return the hash"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:594@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "late-land (reconciled included) branch: same record-and-arm call, then return"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:759-760@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public-fallback branch: same record-and-arm call, then return txHash"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:820-863@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "recordAndArmDeliberateBuy: writes the trades row, reads balanceOf, resolves the trade id and pair, then calls armPositionMonitoring in the CURRENT process"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:413-452@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "armPositionMonitoring: await startExitMonitor (:422), then snapshotLpBaseline + registerAntiRugPosition (:432, :440). Both arm in-process timers and listeners."
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1906@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startExitMonitor arms a setInterval poll loop in the calling process"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1945@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "registerExitMonitor stores the interval in the in-memory timerRegistry (src/utils/exitManager.ts:104), which dies with the process"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:142@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the operator script is the only caller of executeDeliberateBuy (D-DELIBERATE-EXPLICIT-ONLY)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deliberate-buy.ts:150@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "on a landed buy the script calls process.exit(0) right after printing the result, which kills the just-armed exit poll timer and the anti-rug WebSocket subscription"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1797@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the main bot re-reads open trades from the DB only once, at boot (resumeMultiChainMonitoring); a running main bot never picks up a trade row another process wrote later"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1805@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "anti-rug resume also runs only once, at boot (resumeAntiRugMonitoring)"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n \"getResumeExitMonitorTrades\\|getResumeAntiRugTrades\\|resumeMultiChainMonitoring\\|resumeExitMonitor(\" 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "the only consumers of the resume queries are the two boot-time functions in src/bot.ts; src/exitEngine.ts:731 re-arms only a position the same process already monitors; no src/api route re-arms monitoring. Nothing re-scans the trades table while the bot runs."
+    }
+  ],
+  "sibling_sites_checked": "All three landed branches of executeDeliberateBuy (src/bot.ts:565 private-landed, :594 late-land, :759 public fallback) route through recordAndArmDeliberateBuy and so share the defect. The snipe paths (handleNewPairForChain :1173, handleNewV3PoolForChain :1483-1492) run inside the long-lived main bot process and are not affected by this mechanism. Callers of executeDeliberateBuy at the base: only scripts/deliberate-buy.ts:142 (git grep). Re-arm paths in a running bot: none that read new trade rows (the resume queries are read only at boot, src/bot.ts:1797 and :1805; exitEngine.ts:731 re-arms a position already tracked in-process; src/api routes call none of startExitMonitor/resumeExitMonitor/registerAntiRugPosition). The script also signs from a second process on the same wallet while the main bot may run, so the in-process nonce lock is not shared (that hazard is RC-18 and the out-of-process-signer scope deferred to Phase 29 HYG-03; recorded here only as context, not as this finding). The script's closing text (scripts/deliberate-buy.ts:157-162 region) tells the operator nothing about restarting the main bot.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S0 under the rubric: on the ordinary success path of an operator-run money path (every landed deliberate buy, no unusual condition), the position is held with no exit monitor and no anti-rug protection from the moment the script exits until the main bot is next started. If the main bot was already running, it does not pick the position up until it is restarted. The length of the unprotected window depends only on what the operator does next, and nothing in the code prompts a restart. The bot is OFF throughout Phase 22, so there is no live exposure now. Grading between S0 and S1 is a judgment (S1 if one treats 'the operator restarts the bot afterwards' as the expected procedure); it is escalated at the immediate tier so the operator can rule. Operator ruling (ESC-BUY-01, recorded 2026-11-07): acknowledge-continue; the severity stays S0, no decimal phase, Phase 22 continues; interim rule: after any landed deliberate buy, start (or restart) the main bot immediately.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-005",
+    "AUD-BUY-002",
+    "AUD-BUY-025"
+  ],
+  "tags": [
+    "capital",
+    "d-stop-the-line"
+  ],
+  "escalation_ref": "ESC-BUY-01",
+  "od_ref": "OD-26",
+  "recommendation": "Phase 24 (capital fix, after a Phase 23 real-path proof): make the protection of a deliberately bought position not depend on the short-lived script process. Options to decide on the card: (a) the script hands the new position to the running main bot (for example the main bot re-scans pending buys without a monitor on a timer, or an explicit IPC/DB-flag handoff), (b) the script refuses to run unless the main bot is stopped and then tells the operator, loudly, to start the main bot at once (and the main bot's boot resume already covers the row), (c) the script stays alive and keeps monitoring until the position is closed. Until fixed, after any landed deliberate buy the operator must start or restart the main bot immediately. Nothing is changed in Phase 22 (NAC-13).",
+  "reported_by": [
+    "claude (22-17 executor)"
+  ],
+  "found_date": "2026-11-06",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

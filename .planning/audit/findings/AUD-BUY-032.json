@@ -1,0 +1,55 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-009"
+  ],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-30",
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-BUY-032",
+  "title": "Unused honeypot adapters read a partial API response as safe",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/utils/safetyProviders/goplus.ts",
+    "src/utils/safetyProviders/honeypotIs.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/goplus.ts:53-54@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "an empty object passes because undefined is not equal to 1"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/safetyProviders/honeypotIs.ts:25-30@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "missing fields read as not a honeypot"
+    },
+    {
+      "type": "command",
+      "ref": "grep of checkHoneypotForChain over the base snapshot (22-27 merge)",
+      "note": "Claude verification: dead on the live path; isHoneypot is hard-coded false (AUD-BUY-009)."
+    }
+  ],
+  "sibling_sites_checked": "Both adapters behind checkHoneypotForChain (tokenSafety.ts:309-314), which has no live caller. Legacy tokenSafety.ts:31 has the same shape.",
+  "status": "confirmed",
+  "severity_rationale": "S4: not reachable from the running bot today. It would matter only if these adapters were wired in, which card BUY-05 decides.",
+  "recommendation": "If the adapters are ever used, treat a missing verdict as unknown and block. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-BUY-25"
+  ]
+}

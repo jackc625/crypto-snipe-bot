@@ -1,0 +1,94 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-BUY-025",
+    "AUD-TX-001",
+    "AUD-TX-002",
+    "AUD-EXIT-004"
+  ],
+  "tags": [
+    "capital",
+    "rediscovery"
+  ],
+  "escalation_ref": "ESC-PRE-02",
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-18 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [
+    "RC-10"
+  ],
+  "research_suggested_severity": "S1",
+  "origin": "research-candidate",
+  "id": "AUD-EXIT-009",
+  "title": "RC-10 sibling sites in the exit engine: wait() with no timeout runs inside the wallet nonce lock at six exit sites, and a never-settling wait also pins the per-token sell lock",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C07",
+    "C09",
+    "C12"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/utils/exitWatchdog.ts",
+    "src/utils/withTimeout.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:543-546@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public-fallback approve: withNonceLock(... await approveTx.wait()) (named in ESC-PRE-02 as :545)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:552-562@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "public-fallback swap: withNonceLock(... await stx.wait()) (named in ESC-PRE-02 as :556)"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:419-423@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ensureApproval: await approveTx.wait() with no timeout; it runs inside withNonceLock at four more sites not named in ESC-PRE-02: :871 (V3 full), :874 (V2 full), :1509 (V3 partial), :1512 (V2 partial)"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider.js:1045",
+      "note": "wait() timeout defaults to 0; the timer is only armed when timeout > 0 (:1172-1178), so it waits forever for a tx that is never mined"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/nonceAuthority.ts:60-73@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withNonceLock chains each op after the prior settles, so a never-settling op blocks every later signing op for the wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:1168-1170@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "releaseSellLock runs only in executeFullSell finally; a wait that never settles never reaches it, so the per-token sell lock stays held and every later exit of that token (anti-rug and dashboard included) returns \"Another exit already handling\" (:832-835)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitWatchdog.ts:59-82@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the worker watchdog frees the drain loop after the budget but does not settle the inner op, so both locks stay held"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/withTimeout.ts:50-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "withTimeout (used by the anti-rug exit, exitTrigger.ts:265-269) likewise frees only the caller"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/exitWatchdog.ts:60-63@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Watchdog expiry leaves the underlying sell lock held"
+    }
+  ],
+  "sibling_sites_checked": "Every wait( in the slice: :422 (ensureApproval, reached under the lock from :871, :874, :1509, :1512), :545, :556. No other .wait( in exitManager.ts, exitWatchdog.ts or withTimeout.ts. This entry belongs to the never-settling-operation mechanism of RC-10 (a wait with no timeout inside withNonceLock), not to the nested-lock re-entrancy mechanism; the TX slice (22-20) owns RC-10 and defines both sub-findings, so related carries the rc:RC-10 placeholder until 22-28 replaces it with the TX never-settling sub-finding id. The BUY-slice rediscovery of the same mechanism is AUD-BUY-025 (bot.ts:750).",
+  "status": "confirmed",
+  "severity_rationale": "S1, equal to the research suggestion and to ESC-PRE-02. Registered from the EXIT slice because the sites are in this slice. It is a rediscovery, so it links the existing pre-phase record and is not escalated again. New relative to ESC-PRE-02: four further sites through ensureApproval (:871, :874, :1509, :1512), and the sell-lock pinning, which blocks even the direct anti-rug exit of that token.",
+  "recommendation": "Covered by the RC-10 fix planned for Phase 24 in the TX slice (bounded wait, or no wait inside the lock, plus releasing the sell lock when an exit is abandoned); apply it to all six exit sites."
+}

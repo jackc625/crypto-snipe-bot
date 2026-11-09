@@ -1,0 +1,244 @@
+{
+  "id": "AUD-SCRIPTS-001",
+  "title": "RC-27 the two legacy scripts addLiquidity.ts and deploySepoliaTest.ts import compiled artifacts of Solidity sources that no longer exist, so neither can load; behind the broken imports both sign with the bot wallet key on the ALCHEMY_URL network (documented as Ethereum mainnet), and addLiquidity would wrap almost the whole wallet balance into a pool with zero minimums",
+  "kind": "finding",
+  "area": "scripts",
+  "slice": "SCRIPTS",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C04",
+    "C09",
+    "C16",
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "scripts/addLiquidity.ts",
+    "scripts/deploySepoliaTest.ts",
+    "contracts/FakeToken.sol",
+    ".env.example",
+    "src/config.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:3-6@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "imports artifacts/contracts/FakeToken.sol, interfaces/IWETH.sol, UniswapV2Router02.sol and UniswapV2Factory.sol JSON"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:5-8@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same four artifact imports (FakeToken, UniswapV2Factory, UniswapV2Router02, IWETH)"
+    },
+    {
+      "type": "command",
+      "ref": "git ls-tree -r --name-only 23a64617dca167976adc4645fed0e2c69e384820 | grep -iE \"UniswapV2|IWETH|FakeToken|contracts/\"",
+      "note": "only contracts/FakeToken.sol, contracts/honeypot/HoneypotChecker.sol and two test fixtures are tracked; no UniswapV2Router02.sol, UniswapV2Factory.sol or interfaces/IWETH.sol source exists at the base, so a compile cannot produce those artifacts"
+    },
+    {
+      "type": "command",
+      "ref": "node -e \"require('./artifacts/contracts/interfaces/IWETH.sol/IWETH.json')\" (and the Router02 / Factory JSON) in the main checkout, plus ls of the untracked artifacts/contracts folders",
+      "note": "MODULE_NOT_FOUND for IWETH.json, UniswapV2Router02.json and UniswapV2Factory.json; the stale local folders interfaces/IWETH.sol, UniswapV2Router02.sol and UniswapV2Factory.sol exist but are empty (dated 2026-03-22), so on this machine both scripts fail at module resolution before main() runs and nothing is signed"
+    },
+    {
+      "type": "command",
+      "ref": "git log --oneline --diff-filter=D -- contracts/UniswapV2Router02.sol contracts/interfaces/IWETH.sol contracts/UniswapV2Factory.sol src/addresses.json",
+      "note": "f230881 (fix(05-04): add legacy ETH V2 addresses to CONFIG, remove empty addresses.json) and c529428 (remove 8 empty placeholder files and ignition/) removed what the scripts read"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:14-18@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "reads src/addresses.json (absent at the base) before anything else, then builds the wallet from PRIVATE_KEY (the bot wallet) on ALCHEMY_URL"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:15-16@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "deployer = new Wallet(PRIVATE_KEY) on ALCHEMY_URL; no SEPOLIA_RPC_URL, no chainId check despite the Sepolia name"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:54@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ALCHEMY_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY marked [REQUIRED]: the documented value is Ethereum mainnet"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:104-107@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "D-DEPLOY-KEY: the bot wallet (PRIVATE_KEY) intentionally has no deploy authority on any production chain; deploySepoliaTest.ts deploys four contracts with it"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:22@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: WETH ContractFactory.deploy()"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:32@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: FakeToken deploy(parseEther(\"1000000\")), one uint argument"
+    },
+    {
+      "type": "code",
+      "ref": "contracts/FakeToken.sol:7@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "constructor(string name, string symbol): the deploy argument list does not match the only FakeToken source (the local artifact constructor inputs are also [\"string\",\"string\"])"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:42@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: UniswapV2Factory deploy"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:52-55@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: UniswapV2Router02 deploy"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:61@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: factory.createPair"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploySepoliaTest.ts:74-89@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pair address falls back to the string \"UNKNOWN\" when the PairCreated log is not parsed, and that value is written to src/addresses.json; the file is written only after all five transactions, so a failure part-way leaves deployed contracts recorded nowhere but the console"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:25-32@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "wethAmount = whole native balance minus a fixed 0.005 ETH buffer; deadline now + 10 min"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:35@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: token.mint, sent before the balance check at :39 and never awaited for a receipt"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:43@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: weth.deposit({value: wethAmount})"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:48@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: token.approve(router, tokenAmount)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:53@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: weth.approve(router, wethAmount)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:58-68@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "signing site: router.addLiquidity with amountAMin = 0 and amountBMin = 0 and a fixed gasLimit 300000"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:70@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "logs receipt.transactionHash, which ethers v6 receipts do not have (the field is hash), so the printed TX is undefined"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/addLiquidity.ts:73-76@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "side effect: getPair reads addresses.tokenAddress from the JSON file while the liquidity used CONFIG.tokenAddress, then fs.writeFileSync rewrites src/addresses.json after the liquidity transaction; a failure between the addLiquidity receipt and the write leaves the file without pairAddress"
+    },
+    {
+      "type": "code",
+      "ref": "src/config.ts:276-278@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "CONFIG has factoryAddress, routerAddress and wethAddress but no tokenAddress, so addLiquidity.ts:21 and :59 would use undefined"
+    },
+    {
+      "type": "code",
+      "ref": "tsconfig.json:15@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "include is src/**/* and hardhat.config.ts only; no tsconfig includes scripts/, so CI (test.yml:46-51) never type-checks these files and the broken imports were never reported (AUD-ROOT-003)"
+    }
+  ],
+  "sibling_sites_checked": "Every file under scripts/ at the base (slice-files.ts --snapshot SCRIPTS, 10 files) and the three contracts-tooling scripts were searched for artifacts/ and .sol imports: only addLiquidity.ts and deploySepoliaTest.ts import compiled artifacts; deploy-honeypot-checker.ts goes through Hardhat Ignition (ignition/modules/HoneypotChecker.ts, contract present). The other two scripts that write files are capture-launch.ts (test fixtures, AUD-SCRIPTS-009) and no other script writes src/. Nothing under src/ or test/ reads src/addresses.json at the base (git grep addresses.json finds only these two scripts and the ignition deployed_addresses.json files). The five addLiquidity and five deploySepoliaTest signing sites above are also listed in the signer finding AUD-SCRIPTS-002 for the 22-26 signing-site census.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [
+    "RC-27"
+  ],
+  "research_suggested_severity": "S4",
+  "severity_rationale": "S3, one step above the research suggestion S4. Not S2 or higher because neither script can run at the base or on this machine: the artifact JSON files do not exist (MODULE_NOT_FOUND), so module resolution fails before main() and no transaction can be signed. Above S4 because the files are misleading rather than merely dead: README.md calls them \"Sepolia bootstrap helpers\" while both target ALCHEMY_URL (documented as mainnet) with the bot wallet key, against D-DEPLOY-KEY; anyone who \"fixes\" the imports would get a script that deploys contracts from the trading wallet on mainnet (deploySepoliaTest) or wraps nearly the whole balance into a liquidity pool with zero minimums (addLiquidity). Never NOT-A-BUG (NAC-10).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-SCRIPTS-002",
+    "AUD-ROOT-003",
+    "AUD-ROOT-008"
+  ],
+  "tags": [
+    "rc-27",
+    "signing-script",
+    "side-effects-traced"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-70",
+  "recommendation": "Phase 29 (HYG-03: broken scripts are removed or fixed): decide on card SCRIPTS-03. The recommendation is to delete both scripts (nothing reads src/addresses.json any more and the contracts they deploy are not in the repo). If the operator wants a Sepolia rehearsal tool instead, rebuild it from scratch: read SEPOLIA_RPC_URL, refuse unless the chainId is 11155111, sign with a testnet-only key (never PRIVATE_KEY), match the FakeToken constructor, use non-zero liquidity minimums and write any output file atomically and only after every transaction succeeded.",
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "sub_claims": [
+    {
+      "claim": "Both scripts fail at module resolution at the base and on this machine, before any signing",
+      "evidence": "git ls-tree at the base (no source for the three artifacts) and node require of the three artifact JSON paths in the main checkout (MODULE_NOT_FOUND; the local folders are empty)",
+      "status": "confirmed"
+    },
+    {
+      "claim": "deploySepoliaTest.ts targets ALCHEMY_URL (documented mainnet) with the bot wallet key and checks no chainId",
+      "evidence": [
+        "scripts/deploySepoliaTest.ts:15-16@23a64617dca167976adc4645fed0e2c69e384820",
+        ".env.example:54@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "FakeToken deploy arguments do not match the only FakeToken constructor",
+      "evidence": [
+        "scripts/deploySepoliaTest.ts:32@23a64617dca167976adc4645fed0e2c69e384820",
+        "contracts/FakeToken.sol:7@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "addLiquidity.ts would wrap the whole balance minus 0.005 ETH and add liquidity with zero minimums",
+      "evidence": [
+        "scripts/addLiquidity.ts:25-32@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/addLiquidity.ts:58-68@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed (latent: unreachable while the imports are broken)"
+    },
+    {
+      "claim": "Partial runs leave a stale or missing src/addresses.json",
+      "evidence": [
+        "scripts/addLiquidity.ts:73-76@23a64617dca167976adc4645fed0e2c69e384820",
+        "scripts/deploySepoliaTest.ts:74-89@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed (latent)"
+    }
+  ],
+  "traces": [
+    {
+      "scenario": "addLiquidity.ts made runnable again (artifacts restored, addresses.json recreated) and run with the shipped .env",
+      "steps": [
+        "dotenv loads PRIVATE_KEY (bot wallet) and ALCHEMY_URL (mainnet per .env.example:54)",
+        "mint 1000 FakeToken (:35, not awaited)",
+        "if the balance is above 0.005 ETH, wrap balance - 0.005 ETH into WETH (:43)",
+        "approve both amounts (:48, :53)",
+        "addLiquidity with both minimums 0 and gasLimit 300000 (:58-68); a revert still burns gas",
+        "rewrite src/addresses.json with the pair address (:76)"
+      ],
+      "outcome": "nearly the whole trading balance sits in a pool of a mintable test token; a failure after :69 and before :76 leaves the addresses file without pairAddress"
+    },
+    {
+      "scenario": "deploySepoliaTest.ts made runnable again and run with the shipped .env",
+      "steps": [
+        "wallet = PRIVATE_KEY on ALCHEMY_URL (:15-16)",
+        "five signed transactions: four deployments (:22, :32, :42, :52) and createPair (:61)",
+        "addresses written once at the end (:83-89), pair possibly \"UNKNOWN\""
+      ],
+      "outcome": "mainnet gas spent from the trading wallet for test contracts; a failure part-way leaves deployed contracts recorded only in the console output"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "dead-code"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-015",
+  "title": "clearLpBaseline has no production caller although its comments say the full-close teardown calls it, so lp_baseline rows are never deleted",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "src/anti-rug/lpBaseline.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/lpBaseline.ts:16-19@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: cleanup hook for the exitEngine full-close flow"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/lpBaseline.ts:227-242@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "clearLpBaseline"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n clearLpBaseline 23a64617dca167976adc4645fed0e2c69e384820 -- src",
+      "note": "only lpBaseline.ts itself"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:667-675@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "teardownGenuineClose calls unsubscribeAntiRug, not clearLpBaseline"
+    }
+  ],
+  "sibling_sites_checked": "Every lp_baseline statement (db.ts:631-656) and caller: upsertLpBaseline (lpBaseline.ts:120, :141), getLpBaseline (:205), deleteLpBaseline (:240, no caller). The resume query filters by trade status (db.ts:612-621), so stale rows are not re-registered.",
+  "status": "confirmed",
+  "severity_rationale": "S4 hygiene: rows accumulate and the documentation is wrong; no behaviour depends on the deletion today.",
+  "recommendation": "Call it from the genuine-close teardown or delete it and fix the comments. Phase 29."
+}

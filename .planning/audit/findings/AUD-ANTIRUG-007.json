@@ -1,0 +1,82 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-005",
+    "AUD-ANTIRUG-003",
+    "AUD-BUY-011"
+  ],
+  "tags": [],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-19 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-007",
+  "title": "Without a WebSocket URL every anti-rug (re)arm starts another HTTP poller that is never stopped, and each poller is a setInterval(async) with no in-flight guard, so every rug log is dispatched once per poller and slow ticks can repeat a block range",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12",
+    "C14",
+    "C10"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:587-601@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "with no ctx.wsProvider, every startChainAntiRugListener call runs startHttpPollingAntiRug"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1261-1317@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "setInterval(async) with its own closure lastBlock; the handle is not stored and never cleared"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:447@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "every registration re-arms"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2120-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resume arms once per position and once more per chain"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1263-1300@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lastBlock advances only after every dispatch of the tick has been awaited; a tick longer than 2 s overlaps the next, which reads the same lastBlock"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1242-1249@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "healthState connected is set once at start, before any poll succeeds; poll errors only log (:1307-1316)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:587-600@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Every HTTP-mode registration starts another polling interval"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1261-1264@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Async HTTP polling cycles overlap and replay the same events"
+    }
+  ],
+  "sibling_sites_checked": "Every setInterval in the slice: detector.ts:782 (heartbeat, cleared on close and replaced on re-arm) and :1261 (this poller, never cleared). RC-21 owns the setInterval(async) overlap pattern; the exit-engine sites are AUD-EXIT-005 and the bot.ts factory pollers are AUD-BUY-011 (start adds a second poller); this is the anti-rug site named in RC-21 (detector.ts:1261).",
+  "status": "confirmed",
+  "severity_rationale": "S2. With N registrations on a chain without a WS URL, each rug log is evaluated N times and N confirm gates fire. The sell lock keeps the sells serialized, so there is no double sell, but each extra dispatch is a circuit-breaker count (AUD-ANTIRUG-003 carries the S1 consequence) and RPC load grows with every buy until rate limits make every poll fail. Linked to the RC-21 entry AUD-EXIT-005.",
+  "recommendation": "One poller per chain (store the handle, start it once, stop it on shutdown), an in-flight guard per tick, and a health state that reflects the last successful poll. No behaviour decision needed; Phase 24 together with the ANTIRUG-01 dedupe, because the breaker count depends on it."
+}

@@ -26,7 +26,8 @@ import * as dotenv from 'dotenv';
 import axios from 'axios';
 import { logger } from '../src/utils/logger';
 
-dotenv.config();
+// SAFE-02 / D-01 (src layer): skip the .env file under Vitest. The setup layer blocks the read independently.
+if (!process.env.VITEST) dotenv.config();
 
 const log = logger.child({ module: 'resume-cli' });
 

@@ -1,0 +1,22 @@
+{
+  "id": "ESC-BUY-04",
+  "date": "2026-11-09",
+  "tier": "area-batch",
+  "tags": [
+    "capital",
+    "22-28-regrade"
+  ],
+  "items": [
+    "AUD-BUY-015"
+  ],
+  "resolved_items": [],
+  "summary": "Raised to S1 by the 22-28 re-grade of codex S1 findings against the code at the audit base. The V3 minimum-liquidity gate treats a quote that did not revert as proof the pool is deep enough; a thin V3 pool does not make the quote revert, so the gate passes any pool with some liquidity. The configured minimum (0.5 ETH on Ethereum, 1 BNB on BSC, 0.1 on Base and Arbitrum) is therefore not enforced on V3, and the bot can buy a pool thinner than the operator asked for; the other gates measure tax and honeypots, not depth.",
+  "presented_at": "2026-11-09 session: the 22-28 Task 1 S1 batch blocking checkpoint, relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Acknowledge continue",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-28 Task 1 area-batch blocking checkpoint.",
+  "ruling": "none",
+  "phase_continued": true,
+  "operator_response_recorded_at": "2026-11-09T02:54:30.347Z",
+  "operator_response_channel": "typed by the operator at the 22-28 Task 1 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-28 continuation executor, which recorded it at operator_response_recorded_at",
+  "ruling_note": "Recorded by the 22-28 continuation executor: the reply is an acknowledgement for AUD-BUY-015, so no ruling is recorded, the severity stays S1, no decimal phase is inserted and Phase 22 continues. Context attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator's own recommendation at this checkpoint was acknowledge-continue."
+}

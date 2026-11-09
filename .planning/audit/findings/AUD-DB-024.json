@@ -1,0 +1,49 @@
+{
+  "id": "AUD-DB-024",
+  "title": "The src-layer Vitest DB tripwire built the protected folder without resolving <repo>/data, so a data folder that is a junction or symlink was not protected at this layer",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [
+    "C15"
+  ],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S3, equal to the estimate: the setup-layer rail still caught it; one layer of two was weaker than stated.",
+  "area": "src",
+  "slice": "DB",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#7"
+  ],
+  "files": [
+    "src/utils/dbPath.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/dbPath.ts:99@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the fix: both the repo-root-joined and the resolved data folder are compared"
+    },
+    {
+      "type": "command",
+      "ref": "red-proofs/22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+      "note": "RED-proven in test/unit/rails/dbTripwireSrc.test.ts"
+    }
+  ],
+  "sibling_sites_checked": "The setup layer (test/rails/core.cjs) already compared the canonical data folder, so the path was still blocked in tests.",
+  "fixed_by": "5378478",
+  "red_proof": "22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+  "recommendation": "Done (5378478)."
+}

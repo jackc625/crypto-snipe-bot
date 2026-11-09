@@ -9,21 +9,21 @@
 
 ### Safety Rails (SAFE)
 
-- [ ] **SAFE-01**: Ignition deployment state (`ignition/deployments/`, incl. gitignored `journal.jsonl` + per-future artifacts) and `data/` (`bot.db` + `-wal` + `-shm` together, or checkpoint + `db.backup()`) are backed up outside the repo with a verified hash manifest before any `npm install`, Hardhat invocation, sweep, or relocation; `ignition/deployments/` is then tracked in git (OD-21).
-- [ ] **SAFE-02**: Test runs cannot read the real `.env`, open `data/bot.db`, reach the network, or send Telegram alerts — enforced by a dummy test env, a prod-DB tripwire that throws under Vitest, an outbound-network deny, and a notifier that refuses to send under Vitest; each rail is proven by a test that fails if the rail is removed.
-- [ ] **SAFE-03**: Lock/registry singletons (`withNonceLock`, sell lock, ExitWorker, anti-rug registry) throw on duplicate load in one process (e.g. `Symbol.for` guard catching Windows path-casing aliases), and `forceConsistentCasingInFileNames` is enabled in every tsconfig.
-- [ ] **SAFE-04**: A second bot process for the same wallet refuses to start (single-instance process lock acquired at boot).
-- [ ] **SAFE-05**: The bot refuses to boot against a DB whose `user_version` is newer than the code supports, and refuses to silently create a fresh DB in production (absolute `DB_PATH` resolution, refuse-to-create).
-- [ ] **SAFE-06**: CI fails if any `vi.mock` path in the suite does not resolve to an existing module (a moved file cannot turn a mock into a silent no-op).
-- [ ] **SAFE-07**: Before/after baselines are captured and committed: `npm ls`, `npm audit`, ESLint counts by rule and file, per-project test counts, coverage file list, `data/bot.db` checksum.
+- [x] **SAFE-01**: Ignition deployment state (`ignition/deployments/`, incl. gitignored `journal.jsonl` + per-future artifacts) and `data/` (`bot.db` + `-wal` + `-shm` together, or checkpoint + `db.backup()`) are backed up outside the repo with a verified hash manifest before any `npm install`, Hardhat invocation, sweep, or relocation; `ignition/deployments/` is then tracked in git (OD-21).
+- [x] **SAFE-02**: Test runs cannot read the real `.env`, open `data/bot.db`, reach the network, or send Telegram alerts — enforced by a dummy test env, a prod-DB tripwire that throws under Vitest, an outbound-network deny, and a notifier that refuses to send under Vitest; each rail is proven by a test that fails if the rail is removed.
+- [x] **SAFE-03**: Lock/registry singletons (`withNonceLock`, sell lock, ExitWorker, anti-rug registry) throw on duplicate load in one process (e.g. `Symbol.for` guard catching Windows path-casing aliases), and `forceConsistentCasingInFileNames` is enabled in every tsconfig.
+- [x] **SAFE-04**: A second bot process for the same wallet refuses to start (single-instance process lock acquired at boot).
+- [x] **SAFE-05**: The bot refuses to boot against a DB whose `user_version` is newer than the code supports, and refuses to silently create a fresh DB in production (absolute `DB_PATH` resolution, refuse-to-create).
+- [x] **SAFE-06**: CI fails if any `vi.mock` path in the suite does not resolve to an existing module (a moved file cannot turn a mock into a silent no-op).
+- [x] **SAFE-07**: Before/after baselines are captured and committed: `npm ls`, `npm audit`, ESLint counts by rule and file, per-project test counts, coverage file list, `data/bot.db` checksum.
 
 ### Audit (AUDIT)
 
-- [ ] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
+- [x] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
 - [ ] **AUDIT-02**: All 28 research-surfaced candidates (SUMMARY.md §Audit Candidates) are triaged to confirmed (RED real-path test or fork script) or NOT-A-BUG (with evidence).
-- [ ] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
-- [ ] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
-- [ ] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
+- [x] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
+- [x] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
+- [x] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
 - [ ] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
 - [ ] **AUDIT-07**: Every confirmed S2–S4 finding in the register is fixed with a RED-then-GREEN test (real-path for money-path code) or closed by an explicit operator won't-fix decision before the re-entry gate — none deferred automatically (covers e.g. base-fee derivation, DEX-listener backfill/heartbeat, stale buy deadline, fee-on-transfer sell variant, reorg handling, `.wait()` error classification, non-transactional state changes, symbol/name injection, key/log redaction, when confirmed below S1).
 
@@ -57,6 +57,7 @@ Each requirement is satisfied by one of: (a) confirmed with a RED real-path test
 - [ ] **CAP-15**: Token approvals respect the fee ceiling and are submitted privately, so sell intent does not leak to the public mempool (or an operator decision records why not).
 - [ ] **CAP-16**: The dead `tokenSafety.simulateSell` path (which sends a real `approve`) and related dead approve paths (`maybeApproveForChain`) are removed.
 - [ ] **CAP-17**: Every other S0/S1 finding confirmed by the audit is fixed with a RED-then-GREEN real-path test or explicitly escalated to the operator — none is deferred automatically.
+- [ ] **CAP-18**: A second bot process for the same wallet is refused whichever OS user or `HOME`/`USERPROFILE` value it starts with: the single-instance lock moves to a location that depends on neither (AUD-TX-026, review WR-02), or an operator decision records why the per-user lock stays. The `src/utils/processLock.ts` header comment, which still says no environment variable can relocate the lock, is corrected in the same change.
 
 ### Pre-Move Cleanup (CLEAN)
 
@@ -194,18 +195,18 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SAFE-01 | Phase 22 | Pending |
-| SAFE-02 | Phase 22 | Pending |
-| SAFE-03 | Phase 22 | Pending |
-| SAFE-04 | Phase 22 | Pending |
-| SAFE-05 | Phase 22 | Pending |
-| SAFE-06 | Phase 22 | Pending |
-| SAFE-07 | Phase 22 | Pending |
-| AUDIT-01 | Phase 22 | Pending |
+| SAFE-01 | Phase 22 | Complete |
+| SAFE-02 | Phase 22 | Complete |
+| SAFE-03 | Phase 22 | Complete |
+| SAFE-04 | Phase 22 | Complete |
+| SAFE-05 | Phase 22 | Complete |
+| SAFE-06 | Phase 22 | Complete |
+| SAFE-07 | Phase 22 | Complete |
+| AUDIT-01 | Phase 22 | Complete |
 | AUDIT-02 | Phase 23 | Pending |
-| AUDIT-03 | Phase 22 | Pending |
-| AUDIT-04 | Phase 22 | Pending |
-| AUDIT-05 | Phase 22 | Pending |
+| AUDIT-03 | Phase 22 | Complete |
+| AUDIT-04 | Phase 22 | Complete |
+| AUDIT-05 | Phase 22 | Complete |
 | AUDIT-06 | Phase 23 | Pending |
 | AUDIT-07 | Phase 29 | Pending |
 | CHAR-01 | Phase 23 | Pending |
@@ -231,6 +232,7 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | CAP-15 | Phase 24 | Pending |
 | CAP-16 | Phase 24 | Pending |
 | CAP-17 | Phase 24 | Pending |
+| CAP-18 | Phase 24 | Pending |
 | CLEAN-01 | Phase 25 | Pending |
 | CLEAN-02 | Phase 25 | Pending |
 | CLEAN-03 | Phase 25 | Pending |
@@ -296,12 +298,13 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | LIVE-03 | Phase 32 | Pending |
 
 **Coverage:**
-- v1 requirements: 100 total
-- Mapped to phases: 100
+- v1 requirements: 101 total
+- Mapped to phases: 101
 - Unmapped: 0 ✓
 
 **Mapping notes:**
 - AUDIT-07 was added on 2026-11-06 at operator request. It closes the gap where confirmed S2–S4 findings had no owning requirement (CAP-17 covers only S0/S1).
+- CAP-18 was added on 2026-11-09 at operator request during Phase 22 UAT. AUD-TX-026 is S3, so without a named requirement CAP-17 would not have carried it into Phase 24.
 - SAFE-07 (Phase 22): before-baselines are captured in Phase 22. The same capture script produces the after-baselines at milestone close.
 - CI-04 (Phase 26) sits with the toolchain rather than the blocking-gates phase, so the Node 26 matrix builds a green history before the OD-13 runtime decision. TOOL-08 (lefthook, Phase 28) lands once lint reaches zero.
 

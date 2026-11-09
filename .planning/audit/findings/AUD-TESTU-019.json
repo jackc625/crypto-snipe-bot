@@ -1,0 +1,86 @@
+{
+  "id": "AUD-TESTU-019",
+  "title": "The schema-migration tests run a replica of migrateSchema written inside each test, and their \"production module\" cases only check exports and columns on whatever DB the module bound (before the rails: the already-migrated live DB), so a broken migration step in db.ts stays green",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTU",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C13"
+  ],
+  "files": [
+    "test/unit/db/exitFailedHeldMigration.test.ts",
+    "test/unit/db/lpBaselineMigration.test.ts",
+    "test/unit/db/pauseStateMigration.test.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/db/exitFailedHeldMigration.test.ts:39-60@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"replicate the production migration steps against an in-memory DB\": applyV1Migration .. applyV7Migration are written in the test"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db/exitFailedHeldMigration.test.ts:254-277@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "production cases: import src/utils/db and assert user_version 7 and two column names on the module's own DB"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db/exitFailedHeldMigration.test.ts:394-419@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 5 prepares its own copy of the markExitFailedHeld SQL (\"markExitFailedHeld production SQL\")"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db/lpBaselineMigration.test.ts:113-118@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "\"Production migrateSchema() replica ... mirrors the structure of src/utils/db.ts:29-123\" (migrateSchema ends at :232 at the base SHA)"
+    },
+    {
+      "type": "code",
+      "ref": "test/unit/db/pauseStateMigration.test.ts:335-345@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Test 6 prepares its own setPauseState SQL"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:29-232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the real migrateSchema, run only at module import"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:194@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the v6 to v7 step that the exit_failed_held persistence depends on"
+    }
+  ],
+  "sibling_sites_checked": "All three db/*Migration.test.ts files follow the same replica + \"production module integration\" pattern; anti-rug/dryRunTimestamp.test.ts copies one statement (AUD-TESTU-010); db.test.ts copies the risk SQL (AUD-TESTU-017). No unit test opens a fresh temp DB through the real module and checks the upgrade path from an older version.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2: the migrations carry state the exit engine relies on (exit_failed_held, pause_state, lp_baseline); a broken upgrade step loses failed-held persistence (an S1 stranded-position class) while the replicas stay green. The production cases add live-DB reach before the rails (AUD-TESTU-001).",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-001",
+    "AUD-TESTU-001",
+    "AUD-TESTU-010",
+    "AUD-TESTU-018"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 28: run the real migration (dbSchema.ts after the 22-09 move) against temp DBs seeded at v4, v5 and v6, then assert the schema and run the real prepared statements; delete the replicas.",
+  "reported_by": [
+    "claude (22-23 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "affected_cases": [
+    "exitFailedHeldMigration: Test 1 (version bump) .. Test 5 (statement round-trip)",
+    "exitFailedHeldMigration: production user_version pragma reports 7 after module load",
+    "lpBaselineMigration: Tests 1-10 (replica migration)",
+    "pauseStateMigration: Tests 1-10 (replica migration and own statements)"
+  ],
+  "escaped_regression": "Delete the ALTER TABLE exit_state ADD COLUMN exit_status guard from the version < 7 step at src/utils/db.ts:194: a fresh or v6 DB never gets the column (markExitFailedHeld then throws on every still-held failed exit), while the replica tests stay green and the production cases stay green on any DB that already had the column (the live DB before the rails)."
+}

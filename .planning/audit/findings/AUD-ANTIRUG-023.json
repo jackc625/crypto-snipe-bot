@@ -1,0 +1,52 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "codex"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "external",
+  "id": "AUD-ANTIRUG-023",
+  "title": "Circuit-breaker trigger events record the withdrawal destination in the pair field",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [],
+  "files": [
+    "src/anti-rug/exitTrigger.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:173@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "pairAddress = signals.destination"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/exitTrigger.ts:318@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "stored as the event pair"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 170,176p of the base snapshot (22-27 merge)",
+      "note": "Claude verification: lines re-read."
+    }
+  ],
+  "sibling_sites_checked": "Only site building the trigger event.",
+  "status": "confirmed",
+  "severity_rationale": "S4: a mislabelled field in a review record.",
+  "recommendation": "Record the pair address. No behaviour change. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "external_sources": [
+    "codex-ANTIRUG-27"
+  ]
+}

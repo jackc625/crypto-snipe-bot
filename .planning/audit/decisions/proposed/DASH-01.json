@@ -1,0 +1,37 @@
+{
+  "id": "DASH-01",
+  "title": "What evidence must exist before a chain's anti-rug is switched from dry-run to live selling, given the dashboard review panel shows only one browser session?",
+  "area": "DASH",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current: the dashboard panel and its advice (\"after 7 days with zero false positives, flip ..._ANTIRUG_LIVE_EXECUTE=true\") stay as they are",
+      "behavior_impact": "none",
+      "risk": "The panel cannot show detections from when the tab was closed or disconnected and two of its charts are fixed zeros, so an operator following its advice can arm live market sells after an unobserved false positive; healthy positions can then be sold by mistake (AUD-DASH-003)."
+    },
+    {
+      "id": "persisted-evidence",
+      "name": "Record every dry-run detection on the server (with its signals and the later outcome) and have the panel load that record; remove the placeholder charts until they are wired",
+      "behavior_impact": "The dashboard shows the full dry-run history for the review window, whoever was watching; no change to selling.",
+      "risk": "New storage and a new read route; the record must survive restarts to cover 7 days."
+    },
+    {
+      "id": "report-gate",
+      "name": "Gate the switch on a written review produced from the bot logs (a read-only report script), and change the panel text so it no longer tells the operator when to flip",
+      "behavior_impact": "The live switch is decided from a complete log-based report; the panel becomes an informal live view.",
+      "risk": "Relies on logs being kept for the whole window; the panel still shows only one session."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Decide before any chain's anti-rug live-execute switch is turned on, together with the anti-rug cards (ANTIRUG-01 trigger counting, ANTIRUG-07 setting validation); the keep-current option leaves the operator's only on-screen evidence incomplete.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); live execute stays off by default meanwhile.",
+  "behavior_impact": "Decides what record the operator uses to arm anti-rug live selling and what the dashboard panel claims.",
+  "findings": [
+    "AUD-DASH-003"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 capital discussion (AUDIT-05), before any ANTIRUG_LIVE_EXECUTE switch is turned on",
+  "assigned_id": "OD-67"
+}

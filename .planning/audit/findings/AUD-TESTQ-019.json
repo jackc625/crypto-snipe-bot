@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-019",
+  "title": "noDoubleBuyReconcile describe block given a 30 s per-test timeout",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "The first test pays for a cold import of src/bot under load; no assertion changed.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-test-edits.json#15"
+  ],
+  "files": [
+    "test/unit/bot/noDoubleBuyReconcile.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#15",
+      "note": "describe() gained the option { timeout: 30_000 } and a two-line comment. No assertion, title, import or mock changed. Reason: Found by the 22-15 final run (vpu-20261109T045056-10640-6a8b4a). The first test in the file pays for the first dynamic import of src/bot, which took 4648 ms in the earlier full run and 5015 ms in this one against the unit default limit of 5000 ms (the file's other tests take 50-100 ms), so it timed out with no assertion failing. The new backupState test adds a 48 s compile to the parallel load and tipped it over."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/unit/bot/noDoubleBuyReconcile.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}

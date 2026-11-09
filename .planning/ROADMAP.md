@@ -105,7 +105,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 - **D-ALERTS**: structured pino (dotted `op` fields) plus Telegram on every ceiling-hit, fallback, fail-clean, and escalation, each with a remediation pointer.
 - **High-stakes-ops protocol** (Phases 30 and 32): testnet rehearsal first, step-by-step verification, and address checks at every step.
 
-- [ ] **Phase 22: Safety Rails & Audit** - Back up Ignition state and the live DB first, wall tests off from production, then a read-only audit with findings register and decision cards
+- [x] **Phase 22: Safety Rails & Audit** - Back up Ignition state and the live DB first, wall tests off from production, then a read-only audit with findings register and decision cards (completed 2026-11-09)
 - [ ] **Phase 23: Test Safety Net (Harness, Triage, Characterization)** - Real-path harness, all 28 candidates proven RED or NOT-A-BUG, golden-master trace and commit-taxonomy check
 - [ ] **Phase 24: Capital-Safety Fixes** - Every confirmed S0/S1 fixed on the current layout with RED→GREEN real-path proof: nonce/containment, buy path, exit/anti-rug
 - [ ] **Phase 25: Behavior-Neutral Cleanup & Dependencies** - Line endings and Prettier, dead code and cycles out, contracts package on Hardhat 2, all runtime deps at latest with 0 prod vulns
@@ -141,7 +141,69 @@ Config granularity `fine` applies to plan sizing, not phase count.
 **Conventions**: D-STOP-THE-LINE (any candidate that reads as S0/S1, or a rail finding such as evidence that tests already mutated the live DB, is re-surfaced to the operator at once and never filed-and-deferred); D-NONCE-AUTHORITY-ALL (the singleton guards and the process lock keep one nonce authority per wallet; the sweep includes a census of every signing call site, scripts included).
 **Operator decisions**: OD-21 during Wave 1, after the backup verifies. This phase produces the cards for OD-6, OD-9, OD-10, OD-11, OD-14 to OD-18, OD-25, and any new ones.
 **Research flag**: Yes for the audit wave (per-area deep reading; ethers v6 `getFeeData` base-fee derivation and `wait()` error semantics such as `TRANSACTION_REPLACED`/`repriced`). The rail mechanics are already specified.
-**Plans**: TBD
+**Plans**: 29/29 plans complete in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
+
+Plans:
+**Wave 1**
+- [x] 22-01-PLAN.md — SAFE-01 local backup: backup-state.ts with fixture self-check, verified dated backup + archive, phase-start SHA
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 22-02-PLAN.md — betterleaks v1.10.0 provenance (operator check), D-22 exact-value checker, secret scan of the backup
+- [x] 22-04-PLAN.md — audit register tooling (PROTOCOL, slices, check/render) and the D-23 pre-phase records, OD-21 card
+- [x] 22-05-PLAN.md — SAFE-02 setup-layer rails (one CommonJS module), sentinel env with fork-mode shell keys, vitest wiring, npm test re-scope (no Vitest run)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 22-03-PLAN.md — operator exact-value check, Google Drive/USB decision (one-way), download-back verify → SAFE-01 VALID
+- [x] 22-06-PLAN.md — forensic two-image report on a backup copy of the live DB; register and escalate test-origin rows
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 22-07-PLAN.md — OD-21: commit ignition/deployments, blob hashes equal the manifest, scoped ignore rules
+- [x] 22-08-PLAN.md — first railed Vitest run: verify-prod-untouched wrapper, spawnRailedChild, setup-layer rail tests + RED proofs
+- [x] 22-17-PLAN.md — audit BUY/detection slice (RC-01/02/04/05/09/16/20/24, OD-6/15/16)
+- [x] 22-18-PLAN.md — audit EXIT slice (RC-03/07/08/15/21, OD-14)
+- [x] 22-19-PLAN.md — audit ANTIRUG slice (RC-13, OD-9)
+- [x] 22-20-PLAN.md — audit nonce/MEV/tx slice (RC-10/11/17/18/22/26, OD-17)
+- [x] 22-21-PLAN.md — audit DB/risk/config slice (RC-06/14/23/25, OD-10/18/25)
+- [x] 22-22-PLAN.md — audit dashboard API and dashboard (RC-12, OD-11)
+- [x] 22-23-PLAN.md — audit test/unit with per-file quality labels (D-20)
+- [x] 22-24-PLAN.md — audit integration/fork tests, helpers, fixtures (RC-28)
+- [x] 22-25-PLAN.md — audit scripts, contracts tooling and root configs (RC-27, out-of-process signers)
+- [x] 22-26-PLAN.md — full-history secret scan and signing-site census (N)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 22-09-PLAN.md — SAFE-05 DB guards: repo-root anchoring, VITEST src tripwire, read-only version probe, refuse-to-create, npm run db:init
+- [x] 22-27-PLAN.md — codex/agy code-only second opinion on the money slices (operator one-way decision) + union merge
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 22-10-PLAN.md — notifier refusal via the catch path (D-04 amended) and VITEST-gated dotenv sites, with RED proofs
+- [x] 22-28-PLAN.md — consolidation: RC map, duplicates, 20x5 matrix, thresholds, OD-26+ numbering, rendered register
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 22-11-PLAN.md — spawn sites onto spawnRailedChild, AST spawn gate, shell-only fork RPC resolver in globalSetup and every fork worker
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [x] 22-12-PLAN.md — SAFE-03 duplicate-load guards (epoch registry) on the four singletons + casing flag in every tsconfig
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [x] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 22-14-PLAN.md — SAFE-06 vi.mock specifier gate (TS AST) + CI step
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 22-15-PLAN.md — full railed npm test green with recorded edits; AC-19 proof; RED-proof index
+
+**Wave 12** *(blocked on Wave 11 completion)*
+- [x] 22-16-PLAN.md — SAFE-07 capture-baselines.ts (isolated pre-rail export) and committed before-baselines
+
+**Wave 13** *(blocked on Wave 12 completion)*
+- [x] 22-29-PLAN.md — re-audit of rail diffs, new-file ledger, phase-end NAC and Ignition checks, fork obligations, final check and render
+
+**Cross-cutting constraints:** <!-- gsd:generated -->
+- D-21: Node 22.16.0 for every command
+- AC-33 / NAC-13: commits change nothing outside .planning/ and fix nothing
+- D-16: immediate-tier items stop at once; S1 entries are presented together at the area checkpoint; AC-33 / NAC-13: nothing outside .planning/ changes and nothing is fixed
+- P9 anti-anchoring: evidence only from code at audit_base_sha or command output
 
 ### Phase 23: Test Safety Net (Harness, Triage, Characterization)
 **Goal**: A real-path test harness exists, and every research candidate has been proven (RED) or disproven (NOT-A-BUG) on it. Current trading behavior, known bugs included and tagged, is then locked by a golden-master decision trace. From then on, every mechanical commit is provably behavior-neutral, and every behavior change can be traced to a decision. The phase is test-only: no change to `src/` behavior.
@@ -170,7 +232,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 - Anti-rug protection survives a dashboard stop and WebSocket reconnects.
 - No confirmed S0/S1 finding remains open before any move begins.
 **Depends on**: Phase 23; operator rulings batched in this phase's discussion
-**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-06, CAP-07, CAP-08, CAP-09, CAP-10, CAP-11, CAP-12, CAP-13, CAP-14, CAP-15, CAP-16, CAP-17
+**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-06, CAP-07, CAP-08, CAP-09, CAP-10, CAP-11, CAP-12, CAP-13, CAP-14, CAP-15, CAP-16, CAP-17, CAP-18
 **Success Criteria** (what must be TRUE):
   1. Every CAP item closes with proof. Either a real-path test written RED before the fix goes GREEN after it, and a separate reviewer re-runs that proof independently (gsd-verifier alone is not sufficient), or the item closes as NOT-A-BUG with evidence. Decision-trace changes appear only in `behavior:` commits that cite finding and OD IDs. The signing-site census still reports `>= N` sites, all under `withNonceLock`.
   2. Monitoring cannot be silently stopped, on the real lock:
@@ -192,8 +254,9 @@ Config granularity `fine` applies to plan sizing, not phase count.
      - Approvals are fee-capped and private through `withNonceLock`.
      - Dashboard stop-chain and WS reconnects leave anti-rug armed for every held position, under a single per-chain owner with no leaked providers (OD-11).
   5. The register shows zero confirmed S0/S1 findings outside `fixed`/`verified` or an explicit operator escalation, and none was deferred automatically.
+  6. A second bot process on the same wallet is refused whichever OS user or `HOME`/`USERPROFILE` value it starts with, or an operator decision records why the per-user lock stays (CAP-18, AUD-TX-026).
 **Waves** (each wave closes with independent RED→GREEN re-runs, the full suite, and the census before the next starts):
-  - Wave A: nonce authority and failure containment (CAP-05, CAP-10, CAP-11).
+  - Wave A: nonce authority and failure containment (CAP-05, CAP-10, CAP-11, CAP-18).
   - Wave B: buy path (CAP-01, CAP-02, CAP-04, CAP-06, CAP-09, CAP-14, CAP-16).
   - Wave C: exit and anti-rug (CAP-03, CAP-07, CAP-08, CAP-12, CAP-13, CAP-15).
   - Wave D: CAP-17 sweep of every other confirmed S0/S1.
@@ -222,6 +285,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
      - `npm ls ethers` shows a single ethers.
      - `npm ci` succeeds without `--legacy-peer-deps` on Windows and Linux.
   5. better-sqlite3 13 opens a copy of the production DB, never the live file, with migrations, WAL, and the persisted kill-switch state intact.
+  6. A real `npm run test:fork`, wrapped by `scripts/verify-prod-untouched.ts`, confirms by name the five checks Phase 22 could only rehearse (UFV-01..UFV-05, AUD-TESTQ-030..035, listed in `.planning/audit/inputs/unrun-fork-verifications.json`): the fork rails pass, the Hardhat child receives only the sanitized env, no Telegram send occurs, and the real HoneypotChecker bytecode is found on mainnet.
 **Waves** (each gated by a zero decision-trace diff):
   - Wave 1: `.gitattributes` + renormalize.
   - Wave 2: the Prettier commit.
@@ -467,7 +531,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Safety Rails & Audit | 0/TBD | Not started | - |
+| 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
 | 23. Test Safety Net (Harness, Triage, Characterization) | 0/TBD | Not started | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |

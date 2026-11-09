@@ -1,0 +1,81 @@
+{
+  "kind": "finding",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (22-25 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "tags": [
+    "credential-exposure",
+    "side-effects-traced"
+  ],
+  "related": [
+    "AUD-CONTRACTS-001",
+    "AUD-OD21-001",
+    "AUD-SCRIPTS-005"
+  ],
+  "area": "contracts",
+  "slice": "CONTRACTS",
+  "id": "AUD-CONTRACTS-004",
+  "title": "The HoneypotChecker deploy wrapper compares DEPLOY_PRIVATE_KEY and PRIVATE_KEY as raw strings, passes the whole environment (bot key included) to the Hardhat child, and the config sets no fee ceiling for Ignition deploys",
+  "severity": "S3",
+  "capital_impact": "EXPOSURE",
+  "classes": [
+    "C07",
+    "C16",
+    "C17"
+  ],
+  "files": [
+    "scripts/deploy-honeypot-checker.ts",
+    "hardhat.config.ts",
+    "ignition/modules/HoneypotChecker.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/deploy-honeypot-checker.ts:164-171@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "refuses only when DEPLOY_PRIVATE_KEY === PRIVATE_KEY as strings: the same key with or without 0x, or in other letter case, passes, and Ignition then deploys from the bot wallet (its nonce shared with a running bot)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploy-honeypot-checker.ts:180-191@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "spawnSync npx hardhat ignition deploy ... --network <network> with env {...process.env} and shell: true: every secret in the parent env reaches the Hardhat child, which also loads .env itself (hardhat.config.ts:9)"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploy-honeypot-checker.ts:151-156@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "DEPLOY_PRIVATE_KEY must be present (in .env or the shell); the log asks the operator to rotate it out of .env after the deploy"
+    },
+    {
+      "type": "code",
+      "ref": "hardhat.config.ts:48-106@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "no ignition block (maxFeePerGasLimit / maxPriorityFeePerGas) and no per-network gasPrice: a deploy during a fee spike pays whatever the network asks"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/deploy-honeypot-checker.ts:198-204@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "side effect: Ignition writes ignition/deployments/chain-<id>/ (journal.jsonl, artifacts, build-info, deployed_addresses.json); the operator pastes the address into .env by hand; a deploy interrupted part-way leaves a journal the next run resumes"
+    },
+    {
+      "type": "code",
+      "ref": "ignition/modules/HoneypotChecker.ts:8-11@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "module has no parameters and no follow-up calls: nothing else to configure"
+    }
+  ],
+  "sibling_sites_checked": "The other deploy-time scripts: audit-honeypot-checker.ts (read-only; Etherscan key in the query string over HTTPS, not printed; crash output is AUD-SCRIPTS-005) and deploySepoliaTest.ts (bot key, cannot load, AUD-SCRIPTS-001). The Ignition journal files are tracked since OD-21 (commit 93f8189); their line-ending hazard is AUD-OD21-001. The keystore question is card OD-22 (Phase 30).",
+  "status": "confirmed",
+  "severity_rationale": "S3: an operator-run, interactive deploy (Ignition asks for confirmation on a live network); the weak key check matters only if the operator reuses the bot key in another spelling, and the missing fee cap only during a spike, each a bounded gas or capability-split effect.",
+  "external_od_refs": [
+    {
+      "id": "OD-22",
+      "owner_phase": "30"
+    }
+  ],
+  "recommendation": "Phase 30 (with OD-22): compare the derived addresses (computeAddress of both keys), pass the Hardhat child only what it needs, and set ignition.maxFeePerGasLimit and maxPriorityFeePerGas in the deploy config."
+}

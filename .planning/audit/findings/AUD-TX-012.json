@@ -1,0 +1,66 @@
+{
+  "id": "AUD-TX-012",
+  "title": "Section C E5: inclusion is decided at one confirmation with no reorg handling; a reorged-out buy or sell stays recorded as included and its hash is never re-checked",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C08"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/utils/mevStrategies/flashbots.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:371-375@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the first receipt with status 1 returns included at once (no confirmation depth)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:569-573@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a native confirm returns the hash at once"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:317-329@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "Flashbots native confirm = the bundle hash is in block targetBlock right after that block arrives (library BundleIncluded, 0 extra confirmations)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:140@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "only the passthrough native confirm waits for 3 confirmations (and with no timeout, AUD-TX-002)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:371-375@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Reconciliation accepts a first-block receipt without confirmations"
+    }
+  ],
+  "sibling_sites_checked": "Every inclusion decision in the slice (reconciliation.ts:373-378, :405-407, :569-573; flashbots.ts:319; passthrough.ts:141). Consumers outside the slice: exit teardown on one balance read (AUD-EXIT-020), factory events at chain head (AUD-BUY-019).",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3: post-merge Ethereum and the L2 sequencers reorg rarely and shallowly, so the condition is uncommon; when it hits, a reorged-out sell is treated as done (position untracked while still held, AUD-EXIT-020) or a reorged-out buy is recorded with a hash that never mined. Section C candidate (no RC), origin research-candidate with an empty rc list.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-020",
+    "AUD-BUY-019"
+  ],
+  "tags": [
+    "section-c"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-54",
+  "recommendation": "Phase 29 unless Phase 24 decides otherwise on card TX-01: record the inclusion block hash and re-check it after N blocks (or require N confirmations before teardown), with N per chain.",
+  "reported_by": [
+    "claude (22-20 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}

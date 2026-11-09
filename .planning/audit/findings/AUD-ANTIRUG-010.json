@@ -1,0 +1,103 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-002",
+    "AUD-BUY-005"
+  ],
+  "tags": [
+    "capital"
+  ],
+  "escalation_ref": null,
+  "od_ref": "OD-50",
+  "reported_by": [
+    "claude (22-19 executor)",
+    "codex"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-010",
+  "title": "Circuit-breaker state lives only in module memory: a restart silently clears a trip and its acknowledgement trail, so the protection against a misfiring detector is lost on every restart",
+  "severity": "S2",
+  "capital_impact": "LOSS",
+  "classes": [
+    "C13",
+    "C14"
+  ],
+  "files": [
+    "src/anti-rug/circuitBreaker.ts",
+    "src/anti-rug/exitTrigger.ts",
+    "src/api/routes/antiRug.ts",
+    "src/utils/db.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:72-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "triggerHistory, trippedChains and recentTriggerEvents are in-memory Map/Set; the module has no DB read or write"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:5-7@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "header: exits stay disabled \"until the operator resets the breaker through the dashboard (Plan 19-06) or CLI\""
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:183-203@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a real reset logs resetByOperatorTs and broadcasts cb_reset; a restart produces neither"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:30-36@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the ring buffer exists so the reset modal shows exactly the events that tripped the breaker"
+    },
+    {
+      "type": "code",
+      "ref": "src/api/routes/antiRug.ts:59-67@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the reset route refuses unless tripped; :88 serves the ring buffer"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:107-127@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "evaluation filters in-memory timestamps; after a restart the history is empty"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:691-696@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "contrast: the dry-run start stamp is persisted precisely so that a restart does not reset it"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n resetCircuitBreaker 23a64617dca167976adc4645fed0e2c69e384820 -- src scripts",
+      "note": "only api/routes/antiRug.ts calls it; the CLI reset named in the header does not exist"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/circuitBreaker.ts:73-83@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "codex (22-27 independent second opinion, graded S1): Restarting the process clears a manual-reset-only breaker"
+    }
+  ],
+  "sibling_sites_checked": "All module-local anti-rug state: circuitBreaker.ts:73-83 and detector.ts:192 (positionRegistry), :197 (chainState), :247 (pendingV3Burn). The registry and pending maps are rebuilt at boot by resumeAntiRugMonitoring (bot.ts:1989-2145); the breaker is not. A duplicate module load would split all of these maps (RC-17, owned by the TX slice, noted here only). _resetRegistryForTesting (detector.ts:301) and _resetForTesting (circuitBreaker.ts:228) have no production caller (git grep at the base).",
+  "status": "confirmed",
+  "severity_rationale": "S2. The breaker exists to stop a misfiring detector from selling one position after another (exitTrigger.ts:32-35). After a restart the same code and config run with an empty history, so up to `threshold` more emergency sells at minOut 0 can go out before it trips again. Bounded per position; live mode only. The opposite effect (a restart re-enables anti-rug after a trip caused by AUD-ANTIRUG-003) is today the only reset besides the dashboard.",
+  "traces": [
+    {
+      "scenario": "Restart after the circuit breaker tripped (is the reset intended, or a lost protection?)",
+      "steps": [
+        "Live mode. The threshold-th incrementCircuitBreaker on a chain (circuitBreaker.ts:110-128) adds the chain to trippedChains, logs fatal, broadcasts cb_tripped and sends [ANTI-RUG HALTED] (:130-161).",
+        "Every later trigger on that chain returns at exitTrigger.ts:221-232 with a log.fatal only.",
+        "The bot exits: an operator restart, a SIGINT, or a crash such as AUD-ANTIRUG-002 or AUD-BUY-005. Nothing in circuitBreaker.ts is written to disk.",
+        "Boot: module load creates empty maps (circuitBreaker.ts:73-83). resumeAntiRugMonitoring re-registers positions and arms the listeners (bot.ts:2074-2144). isCircuitBreakerTripped returns false for every chain (:171-173); getRecentTriggers returns [] (:215-218), so the dashboard has no halted state and the reset modal has nothing to acknowledge. Nothing at boot reports that a chain had tripped.",
+        "The next trigger on that chain sends a live exit. The breaker trips again only after `threshold` new triggers, and the threshold-th exit has already been sent by then (increment after the exit, exitTrigger.ts:312-319)."
+      ],
+      "outcome": "Judgment: the restart reset loses a protection the design relies on; it is not an intended reset. Evidence: the header promises the trip lasts \"until the operator resets\" it (circuitBreaker.ts:5-7); the acknowledgement trail is built for that reset (ring buffer :30-36, reset log and broadcast :183-203, reset route and modal data antiRug.ts:59-67, :88); and the codebase persists gate state it means to survive restarts (db.ts:691-696). A restart is not an acknowledgement: it can follow a crash, and nothing tells the operator after boot that a chain had tripped."
+    }
+  ],
+  "recommendation": "Persist the trip (chain_state or its own table), restore it at boot, require the dashboard reset to clear it, and alert at boot when a chain starts tripped; either build the CLI reset the header promises or remove the claim. Card ANTIRUG-04. Phase 24."
+}

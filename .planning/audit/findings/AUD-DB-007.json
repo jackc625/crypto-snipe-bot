@@ -1,0 +1,73 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "DB",
+  "duplicate_of": null,
+  "escalation_ref": "ESC-DB-01",
+  "reported_by": [
+    "claude (22-21 executor)"
+  ],
+  "found_date": "2026-11-07",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "id": "AUD-DB-007",
+  "title": "Section C SC-21: the database path resolves against the current working directory (unset DB_PATH and the shipped DB_PATH=./data/bot.db alike), and db.ts creates the folder and an empty database when none is there, so starting from another directory boots on a fresh database: kill-switch off, open positions not resumed, dedup and loss history empty",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C18",
+    "C13"
+  ],
+  "files": [
+    "src/utils/db.ts",
+    ".env.example"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:9@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'bot.db'): both the default and any relative value depend on the cwd"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:12-17@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "mkdirSync(dbDir, { recursive: true }) then new Database(DB_PATH): a missing file is created silently"
+    },
+    {
+      "type": "code",
+      "ref": ".env.example:92@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the template ships DB_PATH=./data/bot.db (relative), so a copied .env keeps the cwd dependence"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:171-190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a fresh database gets pause_state seeded with paused = 0 (kill-switch off)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the restart scan reads only rows in the database it opened; an empty one resumes nothing"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:341-347@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dedup (isTokenSniped) reads the same database"
+    }
+  ],
+  "sibling_sites_checked": "Other cwd-relative state in the slice: migrateJsonState reads cwd/.bot-state.json (db.ts:242, AUD-DB-019). Any process importing db.ts from another cwd creates its own data/bot.db there (preflight, pause, resume scripts, the dashboard via bot.ts). The 22-09 rail anchors DB_PATH to the repo root (nearest package.json named crypto-snipe-bot) and refuses to create a database outside Vitest except through npm run db:init (D-08); 22-29 re-audits that diff.",
+  "status": "confirmed",
+  "origin": "research-candidate",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S1 STRAND: a plausible operator slip (starting the bot from a subfolder, an IDE run configuration or a scheduled task with another working directory) gives a bot that is unpaused even if the operator had paused it, monitors none of the positions the wallet holds (no exits, no anti-rug), may re-buy tokens it already holds and starts with an empty daily-loss history, all without an error. Mitigated by the 22-09 rail; status stays confirmed until 22-29 verifies it.",
+  "related": [
+    "AUD-DB-019",
+    "AUD-DB-006"
+  ],
+  "tags": [
+    "capital",
+    "section-c:SC-21",
+    "mitigation-planned-22-09"
+  ],
+  "od_ref": null,
+  "recommendation": "Mitigated by the planned 22-09 rail (repo-root anchoring of DB_PATH, refuse-to-create outside Vitest, explicit npm run db:init). 22-29 re-audits the db.ts diff; also change the .env.example line to an absolute path or remove it (D-ENV-EXAMPLE)."
+}
