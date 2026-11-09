@@ -55,7 +55,7 @@
     {
       "type": "command",
       "ref": "git grep -n -E \"refundETH|unwrapWETH9|sweepToken\" 23a64617dca167976adc4645fed0e2c69e384820 -- src contracts",
-      "note": "No output: nothing in the bot calls the router refund, so unspent ETH is never recovered"
+      "note": "One line of output, and it is a comment: contracts/honeypot/HoneypotChecker.sol:383 mentions unwrapWETH9 in a comment. That is the only hit; no code in src/ or contracts/ calls the router refund, so unspent ETH is never recovered"
     },
     {
       "type": "code",

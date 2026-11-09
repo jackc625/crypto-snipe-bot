@@ -12,8 +12,11 @@
   "resolved_items": [],
   "summary": "New S1 found by the 22-28 re-grade. A V3 snipe sends the whole amount as ETH and never asks the router for the unused part back. If the pool can only fill part of the buy, the unused ETH stays in the Uniswap router, where anyone can take it. Candidate: the router and pool are standard Uniswap contracts not in this repository, so a Phase 23 fork test must prove it on a real thin pool. The per-trade loss is capped at the snipe amount.",
   "presented_at": "2026-11-09 session: the 22-28 Task 1 S1 batch blocking checkpoint, relayed to the operator by the execute-phase orchestrator",
-  "operator_response": null,
-  "acknowledgement_evidence": "Presented in the 22-28 Task 1 S1 batch checkpoint on 2026-11-09. The operator reply is not yet recorded: a continuation executor records it verbatim in operator_response when it is relayed.",
+  "operator_response": "Acknowledge continue",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-28 Task 1 area-batch blocking checkpoint.",
   "ruling": "none",
-  "phase_continued": true
+  "phase_continued": true,
+  "operator_response_recorded_at": "2026-11-09T02:54:30.347Z",
+  "operator_response_channel": "typed by the operator at the 22-28 Task 1 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-28 continuation executor, which recorded it at operator_response_recorded_at",
+  "ruling_note": "Recorded by the 22-28 continuation executor: the reply is an acknowledgement for AUD-BUY-033, so no ruling is recorded, the severity stays S1, no decimal phase is inserted and Phase 22 continues. Context attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator's own recommendation at this checkpoint was acknowledge-continue."
 }
