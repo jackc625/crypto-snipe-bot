@@ -141,7 +141,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 **Conventions**: D-STOP-THE-LINE (any candidate that reads as S0/S1, or a rail finding such as evidence that tests already mutated the live DB, is re-surfaced to the operator at once and never filed-and-deferred); D-NONCE-AUTHORITY-ALL (the singleton guards and the process lock keep one nonce authority per wallet; the sweep includes a census of every signing call site, scripts included).
 **Operator decisions**: OD-21 during Wave 1, after the backup verifies. This phase produces the cards for OD-6, OD-9, OD-10, OD-11, OD-14 to OD-18, OD-25, and any new ones.
 **Research flag**: Yes for the audit wave (per-area deep reading; ethers v6 `getFeeData` base-fee derivation and `wait()` error semantics such as `TRANSACTION_REPLACED`/`repriced`). The rail mechanics are already specified.
-**Plans**: 24/29 plans executed in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
+**Plans**: 25/29 plans executed in 13 execution waves (rails plans run one per wave; audit plans run in parallel with them)
 
 Plans:
 **Wave 1**
@@ -185,7 +185,7 @@ Plans:
 - [x] 22-12-PLAN.md — SAFE-03 duplicate-load guards (epoch registry) on the four singletons + casing flag in every tsconfig
 
 **Wave 9** *(blocked on Wave 8 completion)*
-- [ ] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
+- [x] 22-13-PLAN.md — SAFE-04 process lock (pinned SQLite exclusive lock), src/main.ts entry, bot.ts refusal, start-command docs
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [ ] 22-14-PLAN.md — SAFE-06 vi.mock specifier gate (TS AST) + CI step
@@ -529,7 +529,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Safety Rails & Audit | 24/29 | In Progress | - |
+| 22. Safety Rails & Audit | 25/29 | In Progress | - |
 | 23. Test Safety Net (Harness, Triage, Characterization) | 0/TBD | Not started | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |

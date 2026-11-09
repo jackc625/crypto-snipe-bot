@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-12-PLAN.md
-last_updated: "2026-11-09T03:38:09.575Z"
+stopped_at: Completed 22-13-PLAN.md
+last_updated: "2026-11-09T04:02:02.248Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 0cd3fdaccf2f44d521599183f680544495fe8797
+state_head: 1f4e34cb092aad1e64253956033504801f535c68
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 24
+  completed_plans: 25
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 14 of 29
+Plan: 15 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -102,11 +102,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P28 | 10 min | 2 tasks | 224 files |
 | Phase 22 P11 | 14min | 3 tasks | 23 files |
 | Phase 22 P12 | 11min | 3 tasks | 16 files |
+| Phase 22 P13 | 17min | 3 tasks | 24 files |
 
 ## Session
 
-**Last session:** 2026-11-09T03:38:09.481Z
-**Stopped at:** Completed 22-12-PLAN.md
+**Last session:** 2026-11-09T04:02:02.110Z
+**Stopped at:** Completed 22-13-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -185,3 +186,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-12: duplicate-load guard on nonceAuthority, exitManager, exitEngine and anti-rug/detector (registerSingleton, epoch sentinel); the rail for AUD-TX-004/RC-17, whose register status stays with 22-29's re-audit
 - [Phase 22]: 22-12: the junction probe maps the aliased module's own imports to the real folder, so an alias proof names the module under test; the junction into src/ is removed with unlinkSync and a non-recursive rmdirSync, never a recursive delete
 - [Phase 22]: 22-12: test/unit/bot/buyNonceLock.test.ts needed a logger-mock edit unrelated to the guard (fresh rails DB now runs migrateSchema logger.info; before the rails it opened the live DB at version 7); 22-15 may meet the same pattern in other child-only logger mocks
+- [Phase 22]: 22-13: SQLite gives zero winners when processes collide in its lock upgrade with timeout 0 (measured); timeout stays 0 per D-06 and the whole attempt retries for one second, so a real holder still refuses and a collision has exactly one winner
+- [Phase 22]: 22-13: src/main.ts accepts PRIVATE_KEY with or without 0x exactly as new ethers.Wallet does, so the lock key is the signing wallet; MAIN_NO_WALLET uses fixed text because ethers errors can quote the key
+- [Phase 22]: 22-13: rail for AUD-TX-005 (RC-18) is in place, register status stays with 22-29; the scripts-while-held proof does not settle card SCRIPTS-01
+- [Phase 22]: 22-13 for 22-15: test/unit/rails/spawnSites.test.ts is red at HEAD from 22-12 files (6 offences, none spawns), recorded S3 in rails-discoveries.json; the first full-suite run will hit it

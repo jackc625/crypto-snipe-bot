@@ -1,0 +1,10 @@
+[
+  {
+    "file": "test/unit/rails/spawnSites.test.ts",
+    "line": 169,
+    "description": "The spawn-site gate fails at HEAD, red since 22-12 (ac4cd88): 6 offences, 5 'require with a non-literal specifier' in test/rails/probes/duplicateLoadProbe.cjs (lines 80, 102, 108, 133, 143) and 1 'call to exec()' in test/unit/guards/singleton.test.ts:66. 22-12's verification did not run this gate. Read in code, none is a spawn: the probe requires real project modules by computed path inside a railed child, and the exec call is a RegExp named RESULT_LINE that the receiver allow-list does not include. No child process and no production state is reached (22-13 wrapped runs: verdict untouched, nonLoopbackAllowed 0, telegramAllowed 0), so this is not a rail-class reach. The gate stays red until 22-15, whose first full-suite run will hit it. Likely fix: rename the receiver or add it to SAFE_EXEC_RECEIVERS, and add duplicateLoadProbe.cjs to ALLOWED_FILES with its reason. 22-13 does not fix it (Discovery rule); no 22-13 file is among the offences.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-13"
+  }
+]
