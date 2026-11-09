@@ -1,0 +1,30 @@
+{
+  "end": {
+    "node_modules": {
+      "file_count": 36443,
+      "sha256": "b0ac6a52e515c82707b97e7f40ea60421a72923a525ea0197ee3a12e405729c5"
+    },
+    "package_json_sha256": "25f8de6d9eea0b299b26b167d61faccbf79c799e31c4d57197538a7c2021b3c5",
+    "package_lock_json_sha256": "115e3ec6237693f5132bbfb2e6d3f8327f7162fc15d768444cf3fc6089f10a7e"
+  },
+  "nac03_db_unchanged": true,
+  "nac08": {
+    "node_modules_unchanged": true,
+    "package_json_unchanged": true,
+    "package_lock_json_unchanged": true
+  },
+  "node_modules_excluded": [
+    ".vite",
+    ".vite-temp",
+    ".cache"
+  ],
+  "node_modules_excluded_reason": "Vitest and Vite write these caches during `vitest list`; they are not part of the installed dependency tree, so including them would make the NAC-08 hash change on every run (RESEARCH STL-2).",
+  "start": {
+    "node_modules": {
+      "file_count": 36443,
+      "sha256": "b0ac6a52e515c82707b97e7f40ea60421a72923a525ea0197ee3a12e405729c5"
+    },
+    "package_json_sha256": "25f8de6d9eea0b299b26b167d61faccbf79c799e31c4d57197538a7c2021b3c5",
+    "package_lock_json_sha256": "115e3ec6237693f5132bbfb2e6d3f8327f7162fc15d768444cf3fc6089f10a7e"
+  }
+}

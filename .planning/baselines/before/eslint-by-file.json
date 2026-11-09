@@ -1,0 +1,355 @@
+{
+  "phase_start": {
+    "files": {
+      "src/alphaDrop.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/anti-rug/detector.ts": {
+        "errors": 34,
+        "warnings": 7
+      },
+      "src/anti-rug/lpBaseline.ts": {
+        "errors": 17,
+        "warnings": 0
+      },
+      "src/anti-rug/raceTelemetry.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/helpers/positions.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/middleware/errorHandler.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/api/routes/antiRug.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/routes/chains.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/routes/controls.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/api/routes/health.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/api/routes/risk.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/api/routes/trades.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/server.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/api/ws/handler.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/bot.ts": {
+        "errors": 91,
+        "warnings": 10
+      },
+      "src/exitEngine.ts": {
+        "errors": 34,
+        "warnings": 0
+      },
+      "src/preflight.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/telegramListener.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/db.ts": {
+        "errors": 4,
+        "warnings": 2
+      },
+      "src/utils/exitManager.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/honeypot/checkerContract.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/utils/honeypot/sanitize.ts": {
+        "errors": 0,
+        "warnings": 1
+      },
+      "src/utils/honeypot/simulator.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/bloxroute.ts": {
+        "errors": 10,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/flashbots.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/passthrough.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/reconciliation.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/notifier.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/utils/pairDiscovery.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/utils/provider.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/receiptDecoder.ts": {
+        "errors": 12,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/goplus.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/honeypotIs.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/mudra.ts": {
+        "errors": 10,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/types.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/unicrypt.ts": {
+        "errors": 13,
+        "warnings": 0
+      },
+      "src/utils/tokenSafety.ts": {
+        "errors": 58,
+        "warnings": 2
+      },
+      "src/utils/txManager.ts": {
+        "errors": 2,
+        "warnings": 0
+      }
+    },
+    "total": {
+      "errors": 350,
+      "warnings": 22
+    }
+  },
+  "phase_start_matches_state_md": true,
+  "phase_start_vs_state_md": "phase_start equals the STATE.md milestone-start baseline (npx eslint src: 350 errors / 22 warnings).",
+  "post_rails": {
+    "files": {
+      "src/alphaDrop.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/anti-rug/detector.ts": {
+        "errors": 34,
+        "warnings": 7
+      },
+      "src/anti-rug/lpBaseline.ts": {
+        "errors": 17,
+        "warnings": 0
+      },
+      "src/anti-rug/raceTelemetry.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/helpers/positions.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/middleware/errorHandler.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/api/routes/antiRug.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/routes/chains.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/routes/controls.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/api/routes/health.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/api/routes/risk.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/api/routes/trades.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/api/server.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/api/ws/handler.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/bot.ts": {
+        "errors": 90,
+        "warnings": 10
+      },
+      "src/exitEngine.ts": {
+        "errors": 34,
+        "warnings": 0
+      },
+      "src/main.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/preflight.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/telegramListener.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/db.ts": {
+        "errors": 4,
+        "warnings": 2
+      },
+      "src/utils/exitManager.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/honeypot/checkerContract.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/utils/honeypot/sanitize.ts": {
+        "errors": 0,
+        "warnings": 1
+      },
+      "src/utils/honeypot/simulator.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/bloxroute.ts": {
+        "errors": 10,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/flashbots.ts": {
+        "errors": 4,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/passthrough.ts": {
+        "errors": 3,
+        "warnings": 0
+      },
+      "src/utils/mevStrategies/reconciliation.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/notifier.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/utils/pairDiscovery.ts": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "src/utils/provider.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/receiptDecoder.ts": {
+        "errors": 12,
+        "warnings": 0
+      },
+      "src/utils/repoRoot.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/goplus.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/honeypotIs.ts": {
+        "errors": 5,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/mudra.ts": {
+        "errors": 10,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/types.ts": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "src/utils/safetyProviders/unicrypt.ts": {
+        "errors": 13,
+        "warnings": 0
+      },
+      "src/utils/tokenSafety.ts": {
+        "errors": 58,
+        "warnings": 2
+      },
+      "src/utils/txManager.ts": {
+        "errors": 2,
+        "warnings": 0
+      }
+    },
+    "total": {
+      "errors": 351,
+      "warnings": 22
+    }
+  },
+  "post_rails_delta_by_file": {
+    "src/bot.ts": {
+      "errors": -1,
+      "warnings": 0
+    },
+    "src/main.ts": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "src/utils/repoRoot.ts": {
+      "errors": 1,
+      "warnings": 0
+    }
+  },
+  "post_rails_delta_note": "The delta is the lint effect of the rails' new or changed src/ files.",
+  "post_rails_delta_vs_phase_start": {
+    "errors": 1,
+    "warnings": 0
+  },
+  "state_md_baseline": {
+    "errors": 350,
+    "warnings": 22
+  }
+}

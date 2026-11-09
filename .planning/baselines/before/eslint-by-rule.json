@@ -1,0 +1,165 @@
+{
+  "phase_start": {
+    "fatal": [],
+    "rules": {
+      "(parse-error)": {
+        "errors": 0,
+        "warnings": 2
+      },
+      "@typescript-eslint/no-explicit-any": {
+        "errors": 14,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-floating-promises": {
+        "errors": 26,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-misused-promises": {
+        "errors": 16,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-require-imports": {
+        "errors": 1,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unnecessary-type-assertion": {
+        "errors": 15,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-argument": {
+        "errors": 0,
+        "warnings": 20
+      },
+      "@typescript-eslint/no-unsafe-assignment": {
+        "errors": 102,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-call": {
+        "errors": 33,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-enum-comparison": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-member-access": {
+        "errors": 78,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-return": {
+        "errors": 7,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unused-vars": {
+        "errors": 34,
+        "warnings": 0
+      },
+      "@typescript-eslint/require-await": {
+        "errors": 19,
+        "warnings": 0
+      },
+      "@typescript-eslint/restrict-template-expressions": {
+        "errors": 3,
+        "warnings": 0
+      }
+    },
+    "total": {
+      "errors": 350,
+      "warnings": 22
+    }
+  },
+  "phase_start_matches_state_md": true,
+  "phase_start_vs_state_md": "phase_start equals the STATE.md milestone-start baseline (npx eslint src: 350 errors / 22 warnings).",
+  "post_rails": {
+    "fatal": [],
+    "rules": {
+      "(parse-error)": {
+        "errors": 0,
+        "warnings": 2
+      },
+      "@typescript-eslint/no-explicit-any": {
+        "errors": 14,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-floating-promises": {
+        "errors": 25,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-misused-promises": {
+        "errors": 16,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-require-imports": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unnecessary-type-assertion": {
+        "errors": 15,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-argument": {
+        "errors": 0,
+        "warnings": 20
+      },
+      "@typescript-eslint/no-unsafe-assignment": {
+        "errors": 102,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-call": {
+        "errors": 33,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-enum-comparison": {
+        "errors": 2,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-member-access": {
+        "errors": 79,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unsafe-return": {
+        "errors": 7,
+        "warnings": 0
+      },
+      "@typescript-eslint/no-unused-vars": {
+        "errors": 34,
+        "warnings": 0
+      },
+      "@typescript-eslint/require-await": {
+        "errors": 19,
+        "warnings": 0
+      },
+      "@typescript-eslint/restrict-template-expressions": {
+        "errors": 3,
+        "warnings": 0
+      }
+    },
+    "total": {
+      "errors": 351,
+      "warnings": 22
+    }
+  },
+  "post_rails_delta_by_rule": {
+    "@typescript-eslint/no-floating-promises": {
+      "errors": -1,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-require-imports": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-unsafe-member-access": {
+      "errors": 1,
+      "warnings": 0
+    }
+  },
+  "post_rails_delta_note": "The delta is the lint effect of the rails' new or changed src/ files.",
+  "post_rails_delta_vs_phase_start": {
+    "errors": 1,
+    "warnings": 0
+  },
+  "state_md_baseline": {
+    "errors": 350,
+    "warnings": 22
+  }
+}
