@@ -1,0 +1,43 @@
+# RED proof 22-10-4-dotenv-pause (AC-18, src notifier + dotenv layers)
+Date: 2026-11-09T02:19:44Z
+File neutralised (working tree only, never committed): scripts/pause.ts
+What was neutralised: the VITEST gate at the scripts/pause.ts dotenv site is removed; the setup layer still blocks the read, so the real .env is never read
+sha256 before and after restore: 9b9d92c30186db23cd4b50cbaef8baf903e70a0cf9d79a536872b53c0838796c
+
+## Diff applied
+
+diff --git a/scripts/pause.ts b/scripts/pause.ts
+index 006ff8e..451c309 100644
+--- a/scripts/pause.ts
++++ b/scripts/pause.ts
+@@ -30,7 +30,7 @@ import axios from 'axios';
+ import { logger } from '../src/utils/logger';
+ 
+ // SAFE-02 / D-01 (src layer): skip the .env file under Vitest. The setup layer blocks the read independently.
+-if (!process.env.VITEST) dotenv.config();
++dotenv.config();
+ 
+ const log = logger.child({ module: 'pause-cli' });
+ 
+
+## Command (wrapped, ran ONLY this test file, filtered to one rail)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/dotenvSrcSkip.test.ts -t "pause"
+
+## RED result: exit 1
+
+ FAIL   unit  test/unit/rails/dotenvSrcSkip.test.ts > dotenv gate at the reachable sites (SAFE-02 src layer, D-01) > (c) pause with VITEST set: reaches its key check with zero .env read attempts
+AssertionError: expected 1 to be +0 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed | 10 skipped (12)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T021929-9088-a10530 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T021929-9088-a10530\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- scripts/pause.ts (sha256 equal; git status --porcelain src scripts empty)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 10 skipped (12)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T021938-17108-8a970d | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T021938-17108-8a970d\summary.json
