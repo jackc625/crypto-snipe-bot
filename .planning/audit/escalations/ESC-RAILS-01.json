@@ -1,0 +1,23 @@
+{
+  "id": "ESC-RAILS-01",
+  "date": "2026-11-09",
+  "tier": "immediate",
+  "tags": [
+    "rails-discovery",
+    "22-15-task-1"
+  ],
+  "items": [
+    "input:rails-discoveries.json#2"
+  ],
+  "resolved_items": [],
+  "summary": "The first full railed run of the test suite had one red test: test/integration/honeypotDeploy.eth.test.ts, 'has bytecode at deployedAddress (not 0x)'. It is a live mainnet check sitting in the default integration suite: it asks an RPC whether the HoneypotChecker contract really has code on chain. Under the safety rails ETH_RPC_URL is a fake local address, so the call is refused and the test fails. No bot code is at fault and no capital path is involved. It could not go green under the rails without a forbidden edit (skip, delete, or a fake RPC returning canned bytecode). Three options were presented: (a) keep the test failing and register an escalated finding; (b) move this one test to the fork project, inside plan 22-15, keeping the real bytecode check against forked mainnet, with a tracked obligation for Phase 25 because the moved test will not actually run until then; (c) stop Phase 22. The operator chose (b).",
+  "presented_at": "2026-11-09 session: the 22-15 Task 1 blocking checkpoint, relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "b",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-15 Task 1 blocking checkpoint.",
+  "ruling": "move-test-to-fork-project-inside-22-15",
+  "ruling_option_text": "Move this one test to the fork project, inside this plan",
+  "phase_continued": true,
+  "operator_response_recorded_at": "2026-11-09T04:41:54.000Z",
+  "operator_response_channel": "typed by the operator at the 22-15 Task 1 blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-15 continuation executor, which recorded it at operator_response_recorded_at",
+  "ruling_note": "Recorded by the 22-15 continuation executor. A bare 'b' means nothing on its own, so the options as presented were: (a) keep the test failing and register an escalated finding; (b) 'Move this one test to the fork project, inside this plan', keeping the real bytecode check against forked mainnet, with a tracked obligation for Phase 25 because the moved test will not actually run until then; (c) stop Phase 22. The operator chose (b). The test moves to the fork project, its obligation is UFV-05 in inputs/unrun-fork-verifications.json with owner Phase 25, no decimal phase is inserted and Phase 22 continues. Context attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator's own recommendation at this checkpoint was (b)."
+}
