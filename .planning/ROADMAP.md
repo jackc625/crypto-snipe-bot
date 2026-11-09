@@ -232,7 +232,7 @@ Plans:
 - Anti-rug protection survives a dashboard stop and WebSocket reconnects.
 - No confirmed S0/S1 finding remains open before any move begins.
 **Depends on**: Phase 23; operator rulings batched in this phase's discussion
-**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-06, CAP-07, CAP-08, CAP-09, CAP-10, CAP-11, CAP-12, CAP-13, CAP-14, CAP-15, CAP-16, CAP-17
+**Requirements**: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-06, CAP-07, CAP-08, CAP-09, CAP-10, CAP-11, CAP-12, CAP-13, CAP-14, CAP-15, CAP-16, CAP-17, CAP-18
 **Success Criteria** (what must be TRUE):
   1. Every CAP item closes with proof. Either a real-path test written RED before the fix goes GREEN after it, and a separate reviewer re-runs that proof independently (gsd-verifier alone is not sufficient), or the item closes as NOT-A-BUG with evidence. Decision-trace changes appear only in `behavior:` commits that cite finding and OD IDs. The signing-site census still reports `>= N` sites, all under `withNonceLock`.
   2. Monitoring cannot be silently stopped, on the real lock:
@@ -254,8 +254,9 @@ Plans:
      - Approvals are fee-capped and private through `withNonceLock`.
      - Dashboard stop-chain and WS reconnects leave anti-rug armed for every held position, under a single per-chain owner with no leaked providers (OD-11).
   5. The register shows zero confirmed S0/S1 findings outside `fixed`/`verified` or an explicit operator escalation, and none was deferred automatically.
+  6. A second bot process on the same wallet is refused whichever OS user or `HOME`/`USERPROFILE` value it starts with, or an operator decision records why the per-user lock stays (CAP-18, AUD-TX-026).
 **Waves** (each wave closes with independent RED→GREEN re-runs, the full suite, and the census before the next starts):
-  - Wave A: nonce authority and failure containment (CAP-05, CAP-10, CAP-11).
+  - Wave A: nonce authority and failure containment (CAP-05, CAP-10, CAP-11, CAP-18).
   - Wave B: buy path (CAP-01, CAP-02, CAP-04, CAP-06, CAP-09, CAP-14, CAP-16).
   - Wave C: exit and anti-rug (CAP-03, CAP-07, CAP-08, CAP-12, CAP-13, CAP-15).
   - Wave D: CAP-17 sweep of every other confirmed S0/S1.

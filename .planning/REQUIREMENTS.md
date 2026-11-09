@@ -57,6 +57,7 @@ Each requirement is satisfied by one of: (a) confirmed with a RED real-path test
 - [ ] **CAP-15**: Token approvals respect the fee ceiling and are submitted privately, so sell intent does not leak to the public mempool (or an operator decision records why not).
 - [ ] **CAP-16**: The dead `tokenSafety.simulateSell` path (which sends a real `approve`) and related dead approve paths (`maybeApproveForChain`) are removed.
 - [ ] **CAP-17**: Every other S0/S1 finding confirmed by the audit is fixed with a RED-then-GREEN real-path test or explicitly escalated to the operator — none is deferred automatically.
+- [ ] **CAP-18**: A second bot process for the same wallet is refused whichever OS user or `HOME`/`USERPROFILE` value it starts with: the single-instance lock moves to a location that depends on neither (AUD-TX-026, review WR-02), or an operator decision records why the per-user lock stays. The `src/utils/processLock.ts` header comment, which still says no environment variable can relocate the lock, is corrected in the same change.
 
 ### Pre-Move Cleanup (CLEAN)
 
@@ -231,6 +232,7 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | CAP-15 | Phase 24 | Pending |
 | CAP-16 | Phase 24 | Pending |
 | CAP-17 | Phase 24 | Pending |
+| CAP-18 | Phase 24 | Pending |
 | CLEAN-01 | Phase 25 | Pending |
 | CLEAN-02 | Phase 25 | Pending |
 | CLEAN-03 | Phase 25 | Pending |
@@ -296,12 +298,13 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | LIVE-03 | Phase 32 | Pending |
 
 **Coverage:**
-- v1 requirements: 100 total
-- Mapped to phases: 100
+- v1 requirements: 101 total
+- Mapped to phases: 101
 - Unmapped: 0 ✓
 
 **Mapping notes:**
 - AUDIT-07 was added on 2026-11-06 at operator request. It closes the gap where confirmed S2–S4 findings had no owning requirement (CAP-17 covers only S0/S1).
+- CAP-18 was added on 2026-11-09 at operator request during Phase 22 UAT. AUD-TX-026 is S3, so without a named requirement CAP-17 would not have carried it into Phase 24.
 - SAFE-07 (Phase 22): before-baselines are captured in Phase 22. The same capture script produces the after-baselines at milestone close.
 - CI-04 (Phase 26) sits with the toolchain rather than the blocking-gates phase, so the Node 26 matrix builds a green history before the OD-13 runtime decision. TOOL-08 (lefthook, Phase 28) lands once lint reaches zero.
 

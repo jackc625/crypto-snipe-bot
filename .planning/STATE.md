@@ -33,7 +33,7 @@ Phase: 22 (Safety Rails & Audit) — EXECUTING
 Plan: 29 of 29
 Status: All plans complete and sealed; verification human_needed, run /gsd-verify-work 22 to close
 Last activity: 2026-11-09 — Plan 22-29 complete (phase sealed on 93d9029)
-Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
+Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
 
