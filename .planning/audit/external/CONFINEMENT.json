@@ -161,8 +161,8 @@
         "command_executions_in_decoy_run": 0
       },
       "4_unapproved_needs": "none. No broader mount, other install source, or weaker container was used.",
-      "5_send_checks": "export file list and SHA-256s re-checked against SEND-LIST.txt immediately before each slice; recorded per run",
-      "6_after": "recorded after the sends"
+      "5_send_checks": "File list, sizes and SHA-256s re-verified against SEND-LIST.txt immediately before each slice (timestamps in MERGE.json runs). Per-slice runs, raw answers outside repo and export first, SHA-256s recorded before normalisation. No quota or rate-limit event.",
+      "6_after": "After all five runs: no gsd2227 container remains; no volume was created (--rm, tmpfs and binds only; the image declares no VOLUME); live data/ equals the backup MANIFEST by raw-byte SHA-256 via scripts/verify-prod-untouched.ts (verdict untouched, manifest equal, run vpu-20261109T012557-18064-4a4fa4), never through SQLite. Login file unchanged in every run (AUTH_CHANGED=no)."
     },
     "no_tools_mode": {
       "why": "codex 0.163.0 inner Linux sandbox (bubblewrap) cannot start inside this container: user namespaces are blocked, every command failed with \"No permissions to create a new namespace\". That first in-container probe (2026-11-09T00:12:50Z) was void, not a pass, because no read could have worked. Making it work would need turning that sandbox off or loosening the container, neither approved.",

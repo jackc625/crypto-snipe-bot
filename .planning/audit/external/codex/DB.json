@@ -1,0 +1,246 @@
+{
+  "slice": "DB",
+  "assistant": "codex",
+  "model": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "cli_version": "codex-cli 0.163.0",
+  "raw_sha256": "b1ca41f031f371bb20510baf9f2feef91c164ac11b5273b161a16671a6e69e42",
+  "files_reviewed": [
+    "src/chainRegistry.ts",
+    "src/config.ts",
+    "src/preflight.ts",
+    "src/riskManager.ts",
+    "src/utils/db.ts",
+    "src/utils/logger.ts",
+    "src/utils/notifier.ts"
+  ],
+  "findings": [
+    {
+      "ext_id": "codex-DB-01",
+      "file": "src/riskManager.ts",
+      "line_start": 28,
+      "line_end": 32,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Malformed numeric settings silently disable risk limits",
+      "explanation": "The parsers at src/riskManager.ts:28-32 accept malformed values as NaN without rejecting them. For example, MAX_TOTAL_EXPOSURE=bad makes the comparison at src/riskManager.ts:140 always false. Invalid MAX_POSITION_SIZE, DAILY_LOSS_PCT and SNIPE_COOLDOWN_MS similarly disable their checks. The supplied preflight validates MAX_OPEN_POSITIONS but does not reject these other malformed settings.",
+      "sibling_sites": [
+        "src/riskManager.ts:96 unchecked maxCapitalNative can make the daily-loss threshold NaN",
+        "src/chainRegistry.ts:664 per-chain MAX_CAPITAL is forwarded without numeric validation",
+        "src/config.ts:300-302 trailing percentages can also become NaN"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-02",
+      "file": "src/utils/db.ts",
+      "line_start": 420,
+      "line_end": 421,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Still-held failed exits disappear from risk accounting",
+      "explanation": "The position count at src/utils/db.ts:420-421 and exposure query at src/utils/db.ts:425-438 include only pending buys. However, the restart queries explicitly recognize exit_failed_held positions regardless of trades.status at src/utils/db.ts:597-620. If the omitted exit writer stores trades.status='failed' alongside that marker, as described at src/utils/db.ts:569-580, the bot continues holding and monitoring the position while its risk gates stop counting its position and capital. Further entries can therefore exceed both limits.",
+      "sibling_sites": [
+        "src/utils/db.ts:437 total exposure excludes failed-held buys",
+        "src/riskManager.ts:61 per-chain exposure excludes failed-held buys"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-03",
+      "file": "src/riskManager.ts",
+      "line_start": 139,
+      "line_end": 152,
+      "class_ids": [
+        "C15"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Risk approval reserves no capacity for an in-flight buy",
+      "explanation": "canSnipe reads committed exposure and returns approval without reserving capital or a position slot at src/riskManager.ts:139-152. Cooldown is recorded separately after success at src/riskManager.ts:159-160. If the omitted orchestrator permits overlapping attempts without a global lock or reservation, multiple attempts can pass against the same remaining capacity before either purchase is recorded. Per-chain serialization alone would not protect the global limits.",
+      "sibling_sites": [
+        "src/riskManager.ts:111-112 open-position check uses an unreserved snapshot",
+        "src/riskManager.ts:124-125 cooldown is checked without reserving the next attempt",
+        "src/preflight.ts:386-389 affordability checks read an unreserved wallet balance",
+        "src/utils/db.ts:341-344 token deduplication is a separate read from insertion"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-04",
+      "file": "src/chainRegistry.ts",
+      "line_start": 669,
+      "line_end": 669,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "A negative gas buffer defeats both wallet funding floors",
+      "explanation": "The gas-buffer override at src/chainRegistry.ts:669 has no non-negative validation. ethers.parseEther accepts signed values, so a setting such as ETH_GAS_BUFFER=-0.1 subtracts capital from both the startup floor at src/preflight.ts:200-202 and the entry floor at src/preflight.ts:433-435. A thin wallet can consequently pass both checks, execute a buy, and lack funds for approval or sale.",
+      "sibling_sites": [
+        "src/preflight.ts:201-202 signed gas buffer lowers the wallet floor",
+        "src/preflight.ts:433-435 signed cushion lowers the entry-exit affordability floor"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-05",
+      "file": "src/preflight.ts",
+      "line_start": 289,
+      "line_end": 294,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Gas buffer multipliers below one underfund the promised exit",
+      "explanation": "parseExitGateBuffer accepts every finite positive value at src/preflight.ts:289-294, including 0.1. The reserve calculation at src/preflight.ts:282-284 then prices exit gas at only that fraction of the derived fee. On legacy BSC, that fee is the current gas price itself. When the fixed cushion does not cover the deficit, an approved buy can leave insufficient native currency for its exit. The deliberate-buy buffer has the same defect for public fallback gas.",
+      "sibling_sites": [
+        "src/preflight.ts:300-304 deliberate-buy gas buffer also accepts multipliers below one"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-06",
+      "file": "src/config.ts",
+      "line_start": 300,
+      "line_end": 302,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Exit settings can export unusable stop percentages",
+      "explanation": "Malformed TRAILING_STOP_PCT, TRAILING_MIN_PCT or TRAILING_MAX_PCT values become NaN at src/config.ts:300-302. STOP_LOSS_PCT also accepts Infinity or values above 100 at src/config.ts:291-292. The exit engine is omitted; if it consumes these exports without further validation, NaN poisons threshold arithmetic and an above-100 fixed stop produces a negative trigger price, silently disabling the corresponding loss protection.",
+      "sibling_sites": [
+        "src/config.ts:291-292 fixed stop-loss validation rejects NaN but permits invalid ranges and Infinity",
+        "src/riskManager.ts:28-32 risk settings use similarly unchecked numeric parsing"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-07",
+      "file": "src/utils/db.ts",
+      "line_start": 100,
+      "line_end": 102,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Interrupted schema migrations can prevent every subsequent restart",
+      "explanation": "The v3 copy, drop and rename operations at src/utils/db.ts:100-102 run without an enclosing transaction, while user_version is updated only at src/utils/db.ts:232. A crash after dropping trades but before renaming trades_new leaves the database without its trades table and with the old version. Restart repeats the migration and fails on the existing intermediate table. The v2 ALTER sequence has a similar duplicate-column failure window. Existing holdings then cannot resume monitoring until the database is repaired.",
+      "sibling_sites": [
+        "src/utils/db.ts:58-59 v2 column additions are neither atomic nor guarded",
+        "src/utils/db.ts:232 schema version is committed separately from earlier migration steps"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-08",
+      "file": "src/utils/db.ts",
+      "line_start": 20,
+      "line_end": 22,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Acknowledged position writes are not durable across host failure",
+      "explanation": "WAL synchronous=NORMAL at src/utils/db.ts:20-22 does not fsync every committed transaction. A host crash or power loss can therefore discard recently acknowledged buy records or protection state while the corresponding on-chain purchase remains final. The restart scans at src/utils/db.ts:597-620 cannot restore a position whose records disappeared. This capital effect depends on the omitted write callers not explicitly forcing durability after each critical write; exporting forceWalCheckpoint does not apply it automatically.",
+      "sibling_sites": [
+        "src/utils/db.ts:320-323 buy records use the same durability policy",
+        "src/utils/db.ts:540-545 failed-held exit markers use the same durability policy",
+        "src/utils/db.ts:631-652 anti-rug baselines use the same durability policy"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-09",
+      "file": "src/utils/db.ts",
+      "line_start": 282,
+      "line_end": 285,
+      "class_ids": [
+        "C13"
+      ],
+      "severity": "S1",
+      "capital_impact": "STRAND",
+      "title": "Failed legacy-state migration continues with an empty position database",
+      "explanation": "Migration is attempted only when trades is empty at src/utils/db.ts:245-247, but JSON parsing or import failures are swallowed at src/utils/db.ts:282-285. If the legacy file describes still-held positions, startup continues without importing them. The supplied resume queries see no holdings, while risk accounting and token deduplication also see an empty database, leaving existing funds unmonitored and permitting additional purchases.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-DB-10",
+      "file": "src/utils/db.ts",
+      "line_start": 259,
+      "line_end": 260,
+      "class_ids": [],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Imported live buys count as zero deployed capital",
+      "explanation": "The legacy import at src/utils/db.ts:259-260 creates pending buy rows without amount_in. In getTotalExposure, CAST(NULL AS REAL) remains NULL and is ignored by SUM, which is then defaulted to zero at src/utils/db.ts:425-438. Consequently, imported positions that are still held contribute no deployed capital to canSnipe. Unless omitted code reconstructs their costs and blocks entries until that finishes, additional buys can bypass the exposure cap.",
+      "sibling_sites": [
+        "src/utils/db.ts:427 total exposure ignores NULL buy costs",
+        "src/riskManager.ts:51 per-chain exposure likewise ignores NULL buy costs",
+        "src/utils/db.ts:444 daily-loss arithmetic also loses rows with NULL buy costs"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-11",
+      "file": "src/utils/notifier.ts",
+      "line_start": 49,
+      "line_end": 50,
+      "class_ids": [
+        "C17"
+      ],
+      "severity": "S1",
+      "capital_impact": "EXPOSURE",
+      "title": "Telegram request failures disclose the bot token in logs",
+      "explanation": "The request URL embeds TELEGRAM_BOT_TOKEN at src/utils/notifier.ts:10. Axios errors retain request configuration, including that URL, and src/utils/notifier.ts:50 passes the complete error to pino. The logger at src/utils/logger.ts:6-9 configures no redaction. An ordinary Telegram request failure can therefore persist the bot credential in logs and expose control of the bot's Telegram identity to log readers.",
+      "sibling_sites": [
+        "src/utils/notifier.ts:85-86 context-alert failures log the same credential-bearing Axios error"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-12",
+      "file": "src/utils/db.ts",
+      "line_start": 443,
+      "line_end": 449,
+      "class_ids": [],
+      "severity": "S2",
+      "capital_impact": "none",
+      "title": "Daily loss subtracts the entire buy cost for every partial sale",
+      "explanation": "Each sell or partial_sell joined at src/utils/db.ts:443-449 subtracts the full original buy cost and buy gas again. For example, a buy costing 1 followed by two equal-half sales returning 0.6 each is profitable by 0.2 before fees, but this query reports losses totaling 0.8. The comparison at src/riskManager.ts:99 can consequently trip the daily-loss circuit breaker on profitable positions.",
+      "sibling_sites": []
+    },
+    {
+      "ext_id": "codex-DB-13",
+      "file": "src/chainRegistry.ts",
+      "line_start": 675,
+      "line_end": 676,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S2",
+      "capital_impact": "EXPOSURE",
+      "title": "Infinity passes configuration checks and disables RPC freshness protection",
+      "explanation": "BLOCK_AGE_TOLERANCE_SEC=Infinity, or an overflowing value such as 1e309, passes src/chainRegistry.ts:675-676 because it is neither NaN nor non-positive. The freshness comparison at src/preflight.ts:528 then accepts an arbitrarily stale block tip. The anti-rug gas multiplier validator has the same non-finite-value acceptance pattern, allowing unusable fee configuration into ChainConfig.",
+      "sibling_sites": [
+        "src/chainRegistry.ts:809-813 anti-rug gas multiplier also accepts positive Infinity"
+      ]
+    },
+    {
+      "ext_id": "codex-DB-14",
+      "file": "src/config.ts",
+      "line_start": 16,
+      "line_end": 16,
+      "class_ids": [
+        "C18"
+      ],
+      "severity": "S2",
+      "capital_impact": "STRAND",
+      "title": "RPC validation contradicts the supported per-chain URL configuration",
+      "explanation": "src/config.ts:16 requires ALCHEMY_URL unconditionally, so a valid ETH_RPC_URL-only or non-ETH configuration exits during module loading. Conversely, with ENABLED_CHAINS=eth and only ALCHEMY_URL, the registry explicitly supports that fallback at src/chainRegistry.ts:934-938, but src/preflight.ts:769-778 rejects the missing ETH_RPC_URL. These contradictory checks prevent supported configurations from starting and, on restart, prevent existing positions from restoring their monitors.",
+      "sibling_sites": [
+        "src/preflight.ts:771 cross-variable validation requires ETH_RPC_URL despite the supported ALCHEMY_URL fallback"
+      ]
+    }
+  ]
+}
