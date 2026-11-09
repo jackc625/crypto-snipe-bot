@@ -143,7 +143,7 @@ describe('STOP_LOSS_PCT integration with exitEngine', () => {
             releaseSellLock: vi.fn(),
             registerExitMonitor: vi.fn(),
         }));
-        vi.doMock('../../src/db', () => ({
+        vi.doMock('../../src/utils/db', () => ({
             insertExitState: { run: vi.fn() },
             getExitState: { get: vi.fn() },
             updateExitState: { run: vi.fn() },

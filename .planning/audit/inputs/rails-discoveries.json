@@ -7,5 +7,14 @@
     "severity_estimate": "S3",
     "found_in_plan": "22-13",
     "resolution": "Fixed by the execute-phase orchestrator at the wave 9 boundary, commit f695363: test/rails/probes/duplicateLoadProbe.cjs is allowed a plain require of a computed path through COMPUTED_REQUIRE_FILES (all other gate checks still apply to it), and singleton.test.ts uses String.match instead of RegExp.exec. RED before the fix: the 6 offences. GREEN after: spawnSites and singleton tests, 34 passed, wrapped verdict untouched."
+  },
+  {
+    "file": "test/unit/configEnvVar.test.ts",
+    "line": 146,
+    "description": "vi.doMock('../../src/db', ...) named a module that does not exist (the database module is src/utils/db.ts), so the mock was a silent no-op from the day the test was written (13-01, e0a0f0b). What the test actually exercised: the real src/utils/db module loaded and opened a real SQLite file when exitEngine was imported; its one assertion, buildExitConfig().stopLossPct === 18, reads CONFIG only and never touches the database, so the env -> CONFIG -> exitConfig claim was and is genuinely proven. Measured under the rails: with the broken specifier one run added 3 files to the per-worker temp test-DB folder (one DB plus its -wal and -shm); with the corrected specifier it added 0, and the same 10 tests pass both ways. No test passed only because of the no-op. The other 583 mock calls in the suite resolve. Historical note: before the 22-05 / 22-08 rails, this test opened whatever DB_PATH resolved to, with no src-layer tripwire; today resolveDbPath and assertNotProdDbUnderVitest keep it away from data/.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-14",
+    "resolution": "Specifier corrected with the smallest edit in the 22-14 Task 1 commit; recorded in rails-test-edits.json with register_as test-quality. 22-29 registers this as a test-quality finding."
   }
 ]

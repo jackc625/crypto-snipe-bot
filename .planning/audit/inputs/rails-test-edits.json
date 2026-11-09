@@ -122,6 +122,19 @@
       "reason": "Found by plan 22-12's run of the 37 reset/doMock files; not caused by the duplicate-load guard (same TypeError with registerSingleton neutralised). The mock exposed only logger.child, and src/utils/dbSchema.ts migrateSchema calls logger.info when it creates a fresh database. Under the rails DB_PATH is an empty per-worker temp file, so the migration now runs; before the rails this test opened the live data/bot.db at schema version 7, so that branch never ran (AUD-TESTU-001).",
       "register_as": "test-quality",
       "added_by_plan": "22-12"
+    },
+    {
+      "file": "test/unit/configEnvVar.test.ts",
+      "test": "custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct",
+      "line": 146,
+      "specifier": "../../src/db",
+      "resolves_to": "../../src/utils/db",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "vi.doMock specifier corrected from '../../src/db' to '../../src/utils/db'. Only that string changed; the factory and the assertion are untouched.",
+      "reason": "src/db.ts has never existed; the database module is src/utils/db.ts. Found by the SAFE-06 gate (22-14). The mock was a silent no-op, so exitEngine loaded the real database module. The test passes with the corrected specifier too, so it did not depend on the no-op.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-14"
     }
   ]
 }
