@@ -104,7 +104,18 @@
       "can_reach_real_state": "no",
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Signs nothing itself (Hardhat #0 constant declared). Every src dependency that could reach state is mocked. A tripped gate, missing fixture or failed hardhat_reset returns green (AUD-TESTI-021)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-016",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Fork RPC read routed through resolveForkRpcUrl and the fallback removed. Skip guard keeps its behaviour (NAC-04). Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/captureRehearsal.fork.test.ts",
@@ -125,7 +136,18 @@
       "can_reach_real_state": "yes",
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path: real handler, real exit engine, real receiptDecoder, isolated temp DB (DB_PATH set before any src import). Before the rails src/config and src/utils/notifier load the real .env (Telegram alerts would post to the operator chat) and the safety bank calls live Unicrypt/GoPlus/honeypot.is (AUD-TESTI-011/-017). Signs with Hardhat #0 on the local node only. The second case is a typeof check (AUD-TESTI-025)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-014",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/deliberateBuyReplay.fork.test.ts",
@@ -147,7 +169,18 @@
       "can_reach_real_state": "yes",
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real path in-process; cannot observe that the production caller (scripts/deliberate-buy.ts) exits after the buy (AUD-TESTI-027 / AUD-BUY-001). Real .env loaded through src/config and the notifier before the rails (AUD-TESTI-011). Temp DB. The second case is a typeof check."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-012",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/exitStatePersistence.fork.test.ts",
@@ -188,7 +221,18 @@
       ],
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real SQL on an isolated temp DB (the strongest DB-real fork test). Real .env through src/config and the notifier before the rails (AUD-TESTI-011)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-011",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/fixtures/honeypots/README.md",
@@ -330,7 +374,18 @@
       ],
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real contracts and real checker on the fork; imports only the ABI and checkerContract (no config, DB or notifier). Hardhat #0 signer. Inline copy of the chainId predicate (AUD-TESTI-024)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-015",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Inline jsonRpcUrl routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/honeypotMultiAmount.fork.test.ts",
@@ -386,7 +441,18 @@
       "can_reach_real_state": "yes",
       "execution": "not executed in Phase 22; first execution owner Phase 25",
       "notes": "Hardhat node on 127.0.0.1:8545 spawned by globalSetup (test/fork/setup.ts), forking the operator fork RPC (ETH_FORK_RPC_URL, falling back to ALCHEMY_URL). Real handlers and exit engine on an isolated temp DB. Sets STOP_LOSS_PERCENT, which src never reads (AUD-TESTI-019); accepts any sell row, so the named exit path is unasserted; the risk caps it does not set come from the operator .env (its own comment, :36-39). Real .env through src/config and the notifier before the rails (AUD-TESTI-011). Uses the shared gate helper (:153)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "findings": [
+          "AUD-TESTQ-013",
+          "AUD-TESTQ-035"
+        ],
+        "note": "FORK_RPC routed through resolveForkRpcUrl, fallback removed. Never executed in Phase 22 (Hardhat forbidden); owned by Phase 25."
+      }
+    ]
   },
   {
     "path": "test/fork/realMainnetGate.fork.test.ts",
@@ -415,6 +481,17 @@
       "AUD-TESTI-011",
       "AUD-TESTI-017",
       "AUD-TESTI-024"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": [
+          "AUD-TESTQ-033",
+          "AUD-TESTQ-035"
+        ],
+        "note": "Reviewed in full. rpcUrl now comes from resolveForkRpcUrl with no fallback; compile and the Hardhat node both get buildHardhatChildEnv. Main-process globalSetup stays unrailed by design. Never executed in Phase 22 (UFV-04, owner Phase 25)."
+      }
     ]
   },
   {
@@ -985,7 +1062,17 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "yes",
       "notes": "Live mainnet read: new JsonRpcProvider(process.env.ETH_RPC_URL).getCode; skipped when ETH_RPC_URL is unset (CI). Imports CHAIN_TEMPLATES from src/chainRegistry, which loads src/config. After the rails ETH_RPC_URL is a 127.0.0.1:1 sentinel, so the skip no longer applies (22-29 / 22-15 own the post-rail behaviour)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+        "findings": [
+          "AUD-TESTQ-003"
+        ],
+        "note": "The live bytecode test moved to the fork project by ruling ESC-RAILS-01; imports it no longer needed removed; the rest unchanged. Reviewed."
+      }
+    ]
   },
   {
     "path": "test/integration/honeypotDispatch.test.ts",
@@ -1239,7 +1326,17 @@
         }
       ],
       "notes": "Test 4 spawns with { ...process.env } (real .env before the rails; the child also runs dotenv.config()); it exits before any network call. Server on 127.0.0.1:0."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be57bff04153a2745cf5979ca1f49e4f8de6a51d",
+        "findings": [
+          "AUD-TESTQ-010"
+        ],
+        "note": "Direct spawn with a parent-env copy replaced by spawnRailedChild with envOverrides. Assertions unchanged. Reviewed."
+      }
+    ]
   },
   {
     "path": "test/integration/pauseFlow.test.ts",
@@ -1302,7 +1399,21 @@
       "hollow_assertions": "yes",
       "can_reach_real_state": "yes",
       "notes": "Every runtime case spawns npx ts-node scripts/preflight.ts with { ...process.env }: before the rails the child loaded the real .env, built wallets from the real key, opened and migrated data/bot.db (src/preflight.ts:49 -> src/utils/db) and called the mainnet RPCs (Tests 1 and 4 with no override). Test 1 passes on both 0 and 1, so it asserts only \"no crash\". Test 3 accepts any FAIL line. Wall-clock bound: 60 s spawn timeout."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "fec8ee811f62d40ebe5b99bbb876c7ff3ed634f7",
+        "findings": [
+          "AUD-TESTQ-006",
+          "AUD-TESTQ-007",
+          "AUD-TESTQ-008",
+          "AUD-TESTQ-009",
+          "AUD-TESTQ-018"
+        ],
+        "note": "Children moved to spawnRailedChild on sentinels; wrong override key corrected to ETH_WS_URL; describe timeout raised. Reviewed: the test previously named 'pass' now runs a failing preflight on sentinels (AUD-TESTQ-009)."
+      }
+    ]
   },
   {
     "path": "test/integration/preflightInvocation.test.ts",
@@ -1506,5 +1617,668 @@
       ],
       "notes": ""
     }
+  },
+  {
+    "path": "test/.env.test",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed in full. Sentinel values only: RPC and WS URLs on 127.0.0.1:1, a TEST-SENTINEL Telegram token, small-integer private keys that are not Hardhat #0. Key set enforced equal to .env.example by envExampleSync.test.ts."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/aliased-vi.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only (aliased vi import), reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-aliased.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-bare.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/broken-relative.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Deliberately broken scanner fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/non-literal.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only (non-literal specifier), reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid-dir/index.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid-target.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fixtures/viMockGate/valid.fixture.ts",
+    "audited_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "findings": "none",
+        "note": "Scanner fixture only, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/helpers/forkRpcUrl.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed in full. The one reader of ETH_FORK_RPC_URL; no fallback; error names the variable. No runtime imports."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/helpers/hardhatChildEnv.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed in full. Env built from sentinels, OS essentials and the two shell keys; parent env never spread; NODE_OPTIONS set last, so nothing can remove the preload."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/honeypotDeploy.eth.fork.test.ts",
+    "audited_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+    "findings": [
+      "AUD-TESTQ-003",
+      "AUD-TESTQ-034"
+    ],
+    "quality_label": {
+      "claims": "The ETH HoneypotChecker has real bytecode on mainnet (not 0x, longer than 100 characters).",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Moved by ruling ESC-RAILS-01; never executed in its new file (UFV-05). Rehearsal against a loopback fake proves wiring only."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+        "findings": [
+          "AUD-TESTQ-003",
+          "AUD-TESTQ-034"
+        ],
+        "note": "Reviewed: The ETH HoneypotChecker has real bytecode on mainnet (not 0x, longer than 100 characters)."
+      }
+    ]
+  },
+  {
+    "path": "test/fork/rails/forkRails.fork.test.ts",
+    "audited_sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+    "findings": [
+      "AUD-TESTQ-030",
+      "AUD-TESTQ-031",
+      "AUD-TESTQ-032"
+    ],
+    "quality_label": {
+      "claims": "Under fork mode the rails are installed, sentinels hold except the shell keys, and a Telegram send is a recorded refusal.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/api/ws/broadcaster"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Rehearsed only (UFV-01 to UFV-03), never under the real fork project; owner Phase 25."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "03412cf96af460239bd9e94f47528a4ae5ff0fc5",
+        "findings": [
+          "AUD-TESTQ-030",
+          "AUD-TESTQ-031",
+          "AUD-TESTQ-032"
+        ],
+        "note": "Reviewed: Under fork mode the rails are installed, sentinels hold except the shell keys, and a Telegram send is a recorded refusal."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/backupState.test.ts",
+    "audited_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+    "findings": "none",
+    "quality_label": {
+      "claims": "backup-state.ts --self-check exits 0.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Runs the script self-check on temp fixtures only, through a railed child."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+        "findings": "none",
+        "note": "Reviewed: backup-state.ts --self-check exits 0."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/dbGuards.test.ts",
+    "audited_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real better-sqlite3 in railed children (no VITEST) on temp files."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "findings": "none",
+        "note": "Reviewed: Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/dbInit.test.ts",
+    "audited_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+    "findings": "none",
+    "quality_label": {
+      "claims": "db:init creates the database atomically and refuses every unsafe target, with the exact-path confirmation.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ts-node child and real SQLite on temp files."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "fe4649ecde03140e4385a6e25d82bb88670aa239",
+        "findings": "none",
+        "note": "Reviewed: db:init creates the database atomically and refuses every unsafe target, with the exact-path confirmation."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/directEntryGuard.test.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A direct start refuses before any later import runs (marker file), a non-direct import is not refused, and canonical comparison holds.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real ts-node child processes."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Reviewed: A direct start refuses before any later import runs (marker file), a non-direct import is not refused, and canonical comparison holds."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/dbGuardChild.ts",
+    "audited_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "1d1991d26c4d906c2fc2a7a48dbb93457b69e04e",
+        "findings": "none",
+        "note": "Child entry for dbGuards.test.ts; reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryFixtureGuard.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryLateFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/directEntryStarterFixture.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Direct-entry fixture, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/importMarker.ts",
+    "audited_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "3786e2e2cad5dd97d635509654f00cb229134e64",
+        "findings": "none",
+        "note": "Marker module for the direct-entry tests, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/fixtures/lockHolder.ts",
+    "audited_sha": "569f08c2afa47decd0131958fcc5384ed915ac30",
+    "findings": "none",
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "569f08c2afa47decd0131958fcc5384ed915ac30",
+        "findings": "none",
+        "note": "Real lock holder process for processLock.test.ts, reviewed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/processLock.test.ts",
+    "audited_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+    "findings": "none",
+    "quality_label": {
+      "claims": "A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real holder processes in temp folders."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+        "findings": "none",
+        "note": "Reviewed: A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/rails/notifierRefusalIntegration.test.ts",
+    "audited_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+    "findings": "none",
+    "quality_label": {
+      "claims": "Under the integration project a Telegram send is a recorded refusal and the broadcast runs.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [
+        "src/api/ws/broadcaster",
+        "axios.post (spied)"
+      ],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "The refusal is real."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+        "findings": "none",
+        "note": "Reviewed: Under the integration project a Telegram send is a recorded refusal and the broadcast runs."
+      }
+    ]
+  },
+  {
+    "path": "test/integration/rails/railsIntegration.test.ts",
+    "audited_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+    "findings": "none",
+    "quality_label": {
+      "claims": "The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed.",
+      "mocks_mechanism": "no",
+      "mocked_dependencies": [],
+      "mocked_mechanism_detail": "",
+      "hollow_assertions": "no",
+      "can_reach_real_state": "no",
+      "notes": "Real rails."
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+        "findings": "none",
+        "note": "Reviewed: The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/core.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": [
+      "AUD-TESTQ-004"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": [
+          "AUD-TESTQ-004"
+        ],
+        "note": "Reviewed in full against the 20 classes and rail correctness. Fail closed: a failed install is sticky and thrown. Pipe test mirrors Node (!!options.path) so an http agent's path: null is not a pipe. DNS results are re-checked after lookup, so a hostname cannot resolve past the deny. Env scrub deletes every app key before the sentinels load; the fork shell keys are captured once and only in fork-first mode; values are not put on the global state object. The data block and DB tripwire use canonical forms including win32 short names, stream names and trailing dots; ATTACH and VACUUM INTO are checked, a non-literal target is refused. Recorded residuals are honest: a native addon, worker_threads, a module that captured fs before install, and a pre-existing link whose spelled path holds neither 'data' nor '.env'. One gap registered: process.loadEnvFile (AUD-TESTQ-004). Vitest main process is not railed by design; AUD-REAUDIT-001 is the one place that bit."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/ledgerRun.ts",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed in full. Writes only under the temp ledger folder, never reads the real env file, and decides no enforcement. Its second-opinion loopback check is independent of core.cjs. triggeringTestFiles is informational (stack frames are capped at 8)."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/preload.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed. One install call in full mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/childProbe.cjs",
+    "audited_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+        "findings": "none",
+        "note": "Reviewed. Runs only as a railed child; proves rail state and denials."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/dotenvProbe.ts",
+    "audited_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": "none",
+        "note": "Reviewed. Runs only as a railed child; counts .env read attempts at the dotenv sites."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/duplicateLoadProbe.cjs",
+    "audited_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ac4cd888c2b2f587e98226925fb2275c858c45d7",
+        "findings": "none",
+        "note": "Reviewed. Computes an alias path and requires it to prove the singleton guard; runs only as a railed child, and its one allowance in spawnSites is limited to a plain require."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/moduleScopeDb.cjs",
+    "audited_sha": "03f7f1277eaf8b9a8b642256be8d16f2f77108a3",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "03f7f1277eaf8b9a8b642256be8d16f2f77108a3",
+        "findings": "none",
+        "note": "Reviewed. Railed child that sets DB_PATH to the data path and proves the module-scope import is blocked."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/notifierProdPathProbe.ts",
+    "audited_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "findings": "none",
+        "note": "Reviewed. Railed child with a fake env proving the production notifier path still posts without VITEST."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/probes/tsProbe.ts",
+    "audited_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "49a31abdc25231be4596cde35f4687eb96e0a1b8",
+        "findings": "none",
+        "note": "Reviewed. Railed ts-node child proving the preload reaches a ts-node process."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/selfcheck.cjs",
+    "audited_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Reviewed. Plain Node proof of every rail against a fake root; run by hand, not by Vitest. Its only unrailed child hashes and deletes the temp fake root with a minimal env; the code passed to it is a literal in this file and the argument is the fixture or the fake root."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/setup-fork.cjs",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed. One install call in fork mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/setup.cjs",
+    "audited_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed. One install call in full mode; no env reads."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/spawnRailedChild.ts",
+    "audited_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+    "findings": [
+      "AUD-TESTQ-005",
+      "AUD-REAUDIT-004"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "findings": [
+          "AUD-TESTQ-005",
+          "AUD-REAUDIT-004"
+        ],
+        "note": "Reviewed in full. Every limit runs before spawning (command, env-file, require, path, envOverrides, homeOverride, nodeOptions, inheritedEnv, ledgerRunId); the child env is built from scratch and NODE_OPTIONS is set last. killProcessTree validates a positive integer. Open items registered: the path limit does not resolve links (AUD-TESTQ-005); railsEntry can select fork mode for a child (AUD-REAUDIT-004)."
+      }
+    ]
+  },
+  {
+    "path": "test/rails/vitest.fork-rehearsal.config.ts",
+    "audited_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+    "findings": [
+      "AUD-REAUDIT-001"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+        "findings": [
+          "AUD-REAUDIT-001"
+        ],
+        "note": "extends: true added by a08d650 after AUD-REAUDIT-001. Project now inherits envDir: false from the root. Reviewed."
+      }
+    ]
   }
 ]
