@@ -272,7 +272,7 @@ Open items carried forward: the five fork obligations and the changed `test/fork
 
 ## Self-Check: PASSED
 
-Checked before this file was written: every created file above exists, and all 17 commit hashes are ancestors of HEAD.
+Checked after this file was committed: the 11 created records named above exist, all 17 plan commit hashes are ancestors of HEAD, and `seal-verify.ts --scan` still prints `SEAL VALID`.
 
 ---
 *Phase: 22-safety-rails-audit*
