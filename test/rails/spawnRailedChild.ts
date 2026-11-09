@@ -39,6 +39,10 @@
 //                         below. Its values are only the literals the test passes (it is never
 //                         filled from process.env); the child's own rails then scrub or
 //                         preserve them exactly as a worker's rails would.
+//   [limit: ledgerRunId]  must match ^case-[a-z0-9-]+$. It replaces the parent's CSB_RAIL_RUN_ID
+//                         so one case's ledger can be read in isolation even through npx, whose
+//                         wrapper process has a different pid. It only chooses a ledger folder
+//                         and decides no enforcement.
 //
 // Child env, in order: every key of test/.env.test; then inheritedEnv; then only these OS
 // essentials copied from process.env: SystemRoot, ComSpec, PATHEXT, APPDATA, LOCALAPPDATA,
@@ -77,6 +81,7 @@ export interface SpawnRailedOptions {
     timeoutMs?: number;
     inheritedEnv?: Record<string, string>;
     input?: string;
+    ledgerRunId?: string;
 }
 
 const IS_WIN = process.platform === 'win32';
@@ -85,6 +90,7 @@ const OS_ESSENTIAL_KEYS = Object.freeze(['SystemRoot', 'ComSpec', 'PATHEXT', 'AP
 const ALLOWED_NODE_OPTIONS = Object.freeze(['--expose-gc', '--preserve-symlinks', '--preserve-symlinks-main', '--no-warnings']);
 const ALLOWED_NODE_OPTION_RES = Object.freeze([/^--max-old-space-size=\d+$/, /^--stack-size=\d+$/]);
 const ALLOWED_REQUIRES = Object.freeze(['ts-node/register', 'ts-node/register/transpile-only']);
+const LEDGER_RUN_ID_RE = /^case-[a-z0-9-]+$/;
 
 function findRepoRoot(start: string): string {
     let dir = start;
@@ -309,6 +315,11 @@ export function checkSpawnLimits(cmd: string, args: string[], opts: SpawnRailedO
         refuse('railsEntry', `${JSON.stringify(o.railsEntry)} is not 'preload' or 'setup-fork'`);
     }
     if (o.timeoutMs !== undefined && (!Number.isInteger(o.timeoutMs) || o.timeoutMs <= 0)) refuse('timeoutMs', 'timeoutMs must be a positive integer');
+
+    // [limit: ledgerRunId]
+    if (o.ledgerRunId !== undefined && (typeof o.ledgerRunId !== 'string' || !LEDGER_RUN_ID_RE.test(o.ledgerRunId))) {
+        refuse('ledgerRunId', `${JSON.stringify(o.ledgerRunId)} does not match ${LEDGER_RUN_ID_RE}`);
+    }
 }
 
 function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan {
@@ -337,7 +348,7 @@ function buildPlan(cmd: string, args: string[], opts: SpawnRailedOptions): Plan 
         env.HOME = o.homeOverride;
         env.USERPROFILE = o.homeOverride;
     }
-    const runId = process.env.CSB_RAIL_RUN_ID;
+    const runId = o.ledgerRunId !== undefined ? o.ledgerRunId : process.env.CSB_RAIL_RUN_ID;
     if (typeof runId === 'string' && runId !== '') env.CSB_RAIL_RUN_ID = runId;
     if (o.withVitestEnv !== false) env.VITEST = 'true';
 

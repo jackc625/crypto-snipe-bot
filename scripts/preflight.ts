@@ -23,7 +23,8 @@ import { preflightDryRun, type PreflightResult, type PreflightRegistry } from '.
 import { logger } from '../src/utils/logger';
 import { getProvider, getWallet } from '../src/utils/provider';
 
-dotenv.config();
+// SAFE-02 / D-01 (src layer): skip the .env file under Vitest. The setup layer blocks the read independently.
+if (!process.env.VITEST) dotenv.config();
 
 const log = logger.child({ module: 'preflight-cli' });
 
