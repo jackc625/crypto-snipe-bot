@@ -1,17 +1,17 @@
 {
-  "run_id": "vpu-20261109T054111-22024-02ecc1",
+  "run_id": "vpu-20261109T055941-14196-47d53c",
   "command": [
     "npm",
     "test",
     "--",
     "--reporter=json",
-    "--outputFile=C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run.json"
+    "--outputFile=C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run2.json"
   ],
   "exit_code": 0,
   "child_status": 0,
   "verdict": "untouched",
-  "started_at": "2026-11-09T05:41:13.840Z",
-  "finished_at": "2026-11-09T05:43:01.823Z",
+  "started_at": "2026-11-09T05:59:42.555Z",
+  "finished_at": "2026-11-09T06:01:15.305Z",
   "node_version": "v22.16.0",
   "npm_version": "11.17.0",
   "before": {
@@ -52,27 +52,27 @@
   "manifest_match": true,
   "data_listing_unchanged": true,
   "ledger": {
-    "summary_path": "C:/Users/jackc/AppData/Local/Temp/crypto-snipe-bot-rail-ledger/vpu-20261109T054111-22024-02ecc1/summary.json",
-    "summary_sha256": "269e2414c20726fb313fcf85c4c762e9bfcaa385f787ef84dc650718f52e4baf",
+    "summary_path": "C:/Users/jackc/AppData/Local/Temp/crypto-snipe-bot-rail-ledger/vpu-20261109T055941-14196-47d53c/summary.json",
+    "summary_sha256": "b178bba73f0aca384928f26f78235db20f2f712d2d90f1d6c4ad404c51e698ef",
     "projects": [
       "integration",
       "unit"
     ],
     "workers_by_project_counts": {
-      "integration": 34,
-      "none": 207,
-      "unit": 99
+      "integration": 33,
+      "none": 224,
+      "unit": 100
     },
     "countsByKind": {
-      "worker-start": 357,
+      "worker-start": 366,
       "net-allow": 90,
-      "env-read-blocked": 12,
       "env-override": 61,
-      "net-deny": 16,
       "db-tripwire": 21,
       "data-access-blocked": 24,
-      "notifier-refused": 6,
+      "env-read-blocked": 12,
       "fork-shell-key": 18,
+      "net-deny": 16,
+      "notifier-refused": 6,
       "dns-deny": 2,
       "udp-deny": 2
     },
@@ -83,25 +83,25 @@
   "net_watch": {
     "ok": true,
     "problems": [],
-    "samples": 109,
+    "samples": 106,
     "sample_errors": 0,
-    "max_descendants": 66,
+    "max_descendants": 64,
     "non_loopback_observed": [],
     "loopback_connections_seen": 2,
     "vitest_main_observed": true,
-    "vitest_main_samples": 107,
+    "vitest_main_samples": 103,
     "descendant_names_at_peak": {
-      "cmd.exe": 16,
+      "cmd.exe": 14,
       "node.exe": 33,
       "conhost.exe": 16,
       "git.exe": 1
     }
   },
   "report": {
-    "path": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run.json",
-    "sha256": "59dd38156486265b9c5b1f7b1f70fa8834e4b32f36196039dd11d719e936ecae",
+    "path": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run2.json",
+    "sha256": "08fd283815586faf59d64f4bd9679c712ad4044bd7220a366a5b1e0ae86ca818",
     "totals": {
-      "numPassedTests": 1198,
+      "numPassedTests": 1200,
       "numFailedTests": 0,
       "numPendingTests": 0,
       "numTodoTests": 0

@@ -33,6 +33,7 @@ Each row is one rail or guard, the file that records it going RED, what was swit
 | 27 | `vi.mock` gate fails on broken specifiers | `22-14-1-vi-mock-gate-fixtures.txt` | Nothing switched off: the gate runs on its seeded broken fixtures | `scripts/check-vi-mock-paths.ts` (exits 1, names all four violations) |
 | 28 | The `vi.mock` gate's own test | `22-14-2-vi-mock-gate-mutation.txt` | `scripts/check-vi-mock-paths.ts`: checker disabled | `test/unit/viMockGate.test.ts` |
 | 29 | Code-review fixes before the seal: VITEST refusal at the entry point, private .env read, probe cleanup, tripwire through a linked data folder | `22-review-1-boot-and-db-guards.txt` | `src/main.ts`, `src/utils/dbPath.ts`: the four fixes not yet applied (tests written first) | `test/unit/mainEntry.test.ts`, `test/unit/rails/dbTripwireSrc.test.ts`, `test/integration/dbGuards.test.ts` |
+| 30 | The Vitest configs read no env file of their root | `22-review-2-rehearsal-env-file.txt` | `test/rails/vitest.fork-rehearsal.config.ts`: `extends: true` not yet on its project | `test/unit/rails/vitestEnvFile.test.ts` |
 
 ## Other files in this folder
 
