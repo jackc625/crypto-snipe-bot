@@ -9,7 +9,9 @@
       "it_count_after": 5,
       "change": "Child now started through spawnRailedChild on the sentinel test env. Title and comment changed from 'against current .env' to 'against the sentinel test env'. Assertions unchanged (status not null, 0 or 1, never 2).",
       "reason": "The test depended on the operator's real .env, network and DB: it spawned preflight with the parent environment, so the child reloaded real configuration. RESEARCH Pitfall 7, D-03.",
-      "register_as": "test-quality"
+      "register_as": "test-quality",
+      "title_before": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against current .env",
+      "title_after": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env"
     },
     {
       "file": "test/integration/preflightCli.test.ts",
@@ -135,6 +137,16 @@
       "reason": "src/db.ts has never existed; the database module is src/utils/db.ts. Found by the SAFE-06 gate (22-14). The mock was a silent no-op, so exitEngine loaded the real database module. The test passes with the corrected specifier too, so it did not depend on the no-op.",
       "register_as": "test-quality",
       "found_in_plan": "22-14"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "npm run preflight CLI (OPS-LIVE-10), whole describe block; Test 4 is the one that timed out",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "describe() gained the option { timeout: 150_000 } and a two-line comment. No assertion, title, import or mock changed.",
+      "reason": "Found by 22-15 first full run. Test 4 starts the real CLI twice (21.9 s total under the full parallel run) on the integration project default 15 s test timeout, so it timed out with no assertion failing. Single-child Tests 1-3 took 11.1-13.3 s of the same 15 s. Each child already has its own 60 s kill limit in spawnRailedChild; the new per-test limit is two of those plus margin.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-15"
     }
   ]
 }

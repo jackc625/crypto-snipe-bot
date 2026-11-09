@@ -16,5 +16,14 @@
     "severity_estimate": "S3",
     "found_in_plan": "22-14",
     "resolution": "Specifier corrected with the smallest edit in the 22-14 Task 1 commit; recorded in rails-test-edits.json with register_as test-quality. 22-29 registers this as a test-quality finding."
+  },
+  {
+    "file": "test/integration/honeypotDeploy.eth.test.ts",
+    "line": 35,
+    "description": "The first full railed run shows this test is a live mainnet check sitting in the default integration suite: 'has bytecode at deployedAddress (not 0x)' calls provider.getCode() against process.env.ETH_RPC_URL and asserts the HoneypotChecker contract really has code on-chain. Under the rails ETH_RPC_URL is the sentinel http://127.0.0.1:1, so the call fails with ECONNREFUSED (fully wrapped runs vpu-20261109T042734-6628-578d1f and vpu-20261109T043212-18400-1f9f93; verdict untouched, net-watch 0 non-loopback). The test's guard is it.skipIf(!process.env.ETH_RPC_URL), which skipped it in CI but is false under a sentinel value, so the rails turned it from skipped into red. Before the rails this test made a real mainnet call whenever the operator's real .env set ETH_RPC_URL (AUD-TESTI-011). No bot code is at fault and no capital path is involved: preflight's checkHoneypotCheckerCode still does this getCode check against the real RPC at boot, src/preflight.ts:590,924. It cannot go green under the rails without a forbidden edit: a skip or sentinel-aware skip violates NAC-04 and the 0-skipped rule, deleting it violates P4, moving it out of the file breaks the same-file title identity rule, and a fake loopback RPC returning canned bytecode would mock the very thing it claims to check.",
+    "defect_type": "test",
+    "severity_estimate": "S3",
+    "found_in_plan": "22-15",
+    "resolution": null
   }
 ]

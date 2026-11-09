@@ -32,7 +32,9 @@ function runPreflight(extraEnv: Record<string, string> = {}): CliResult {
     return spawnRailedChild('npx', ['ts-node', 'scripts/preflight.ts'], { envOverrides: extraEnv });
 }
 
-describe('npm run preflight CLI (OPS-LIVE-10)', () => {
+// Each subprocess test starts the real CLI (11-13 s under the full parallel run, 60 s kill limit per
+// child); Test 4 starts two, so this file cannot live on the project's 15 s default test timeout.
+describe('npm run preflight CLI (OPS-LIVE-10)', { timeout: 150_000 }, () => {
     it('Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env', () => {
         // Run preflight subprocess against the committed sentinel test env
         // (test/.env.test, every RPC on 127.0.0.1:1). This test used to read the
