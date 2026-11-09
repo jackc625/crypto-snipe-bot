@@ -168,6 +168,16 @@
       "obligation": "UFV-05",
       "register_as": "test-quality",
       "found_in_plan": "22-15"
+    },
+    {
+      "file": "test/unit/bot/noDoubleBuyReconcile.test.ts",
+      "test": "Phase 21.3 — no-double-buy guard (STOP-THE-LINE-05-C) [REAL-PATH], whole describe block; REAL-PATH first test is the one that timed out",
+      "it_count_before": 15,
+      "it_count_after": 15,
+      "change": "describe() gained the option { timeout: 30_000 } and a two-line comment. No assertion, title, import or mock changed.",
+      "reason": "Found by the 22-15 final run (vpu-20261109T045056-10640-6a8b4a). The first test in the file pays for the first dynamic import of src/bot, which took 4648 ms in the earlier full run and 5015 ms in this one against the unit default limit of 5000 ms (the file's other tests take 50-100 ms), so it timed out with no assertion failing. The new backupState test adds a 48 s compile to the parallel load and tipped it over.",
+      "register_as": "test-quality",
+      "found_in_plan": "22-15"
     }
   ]
 }
