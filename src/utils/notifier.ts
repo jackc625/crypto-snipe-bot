@@ -31,6 +31,27 @@ function inferCategory(message: string): 'trade' | 'risk' | 'system' | 'error' {
 }
 
 // ---------------------------------------------------------------------------
+// Test-isolation rail (SAFE-02 src layer, D-01; D-04 amended 2026-11-06)
+// ---------------------------------------------------------------------------
+
+/**
+ * Under Vitest a Telegram send is refused before axios.post. It is called first inside the
+ * existing try blocks, so the existing catch logs it, the caller never sees a throw and the
+ * dashboard broadcast still runs. A no-op outside Vitest. The rail ledger global exists only
+ * in railed test processes; the message never carries the bot token.
+ */
+function refuseUnderVitest(): void {
+    if (!process.env.VITEST) return;
+    const ledger = (globalThis as Record<symbol, unknown>)[Symbol.for('crypto-snipe-bot.railLedger')] as
+        | { append(entry: { kind: string; target: string }): void }
+        | undefined;
+    ledger?.append({ kind: 'notifier-refused', target: 'telegram' });
+    throw Object.assign(new Error('RAIL_NOTIFIER_REFUSED: Telegram send refused under Vitest (SAFE-02 src layer)'), {
+        code: 'RAIL_NOTIFIER_REFUSED',
+    });
+}
+
+// ---------------------------------------------------------------------------
 // Telegram + WebSocket broadcast alert functions
 // ---------------------------------------------------------------------------
 
@@ -41,6 +62,7 @@ export async function sendTelegramAlert(message: string) {
     }
 
     try {
+        refuseUnderVitest();
         await axios.post(TELEGRAM_API, {
             chat_id: process.env.TELEGRAM_CHAT_ID,
             text: message,
@@ -77,6 +99,7 @@ export async function sendCtxAlert(ctx: ChainContext, message: string) {
         log.warn('Telegram alert skipped: missing chat ID or bot token');
     } else {
         try {
+            refuseUnderVitest();
             await axios.post(TELEGRAM_API, {
                 chat_id: process.env.TELEGRAM_CHAT_ID,
                 text: `${ctx.chain.displayName} ${message}`,

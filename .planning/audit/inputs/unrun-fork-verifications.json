@@ -31,6 +31,21 @@
       "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project, with the operator's real fork URL in the shell",
       "registered": "2026-11-06",
       "registered_by_plan": "22-08"
+    },
+    {
+      "id": "UFV-03",
+      "ac": "AC-16",
+      "test_file": "test/fork/rails/forkRails.fork.test.ts",
+      "assertion": "fork project rails (SPEC R4) > a Telegram send through the notifier is a recorded refusal, not a network call, and the broadcast runs (AC-16)",
+      "why_unrun": "npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts), and Phase 22 runs no Hardhat command (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/notifierRefusal.test.ts and test/integration/rails/notifierRefusalIntegration.test.ts plus the src-layer refusal in src/utils/notifier.ts (refuseUnderVitest)",
+      "rehearsed_by": "test/rails/vitest.fork-rehearsal.config.ts run wrapped with ETH_FORK_RPC_URL=http://127.0.0.1:9/rehearsal-marker (a dead loopback marker; nothing connected to it); axios.post spied and never called; ledger notifier-refused 2",
+      "rehearsal_result": "pass",
+      "rehearsal_run_id": "vpu-20261109T021405-22636-8bff56",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project",
+      "registered": "2026-11-08",
+      "registered_by_plan": "22-10"
     }
   ]
 }

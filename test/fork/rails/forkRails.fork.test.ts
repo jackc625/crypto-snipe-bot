@@ -7,16 +7,28 @@
 // ETH_FORK_RPC_URL compares booleans, so a failure message cannot echo the operator's URL.
 //
 // Phase 22 runs this file only in the Hardhat-free rehearsal (test/rails/vitest.fork-rehearsal.config.ts).
-// The real fork-project run is the dated obligation UFV-01 / UFV-02 in
+// The real fork-project run is the dated obligation UFV-01 / UFV-02 / UFV-03 in
 // .planning/audit/inputs/unrun-fork-verifications.json (owner: Phase 25).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
 import * as dotenv from 'dotenv';
 import Database from 'better-sqlite3';
+import axios from 'axios';
+
+const recordedBroadcasts = vi.hoisted(() => [] as Array<{ type: string; data: Record<string, unknown> }>);
+
+vi.mock('../../../src/api/ws/broadcaster', () => ({
+    broadcast: (type: string, data: Record<string, unknown>) => {
+        recordedBroadcasts.push({ type, data });
+    },
+}));
+
+import { sendCtxAlert, sendTelegramAlert } from '../../../src/utils/notifier';
+import type { ChainContext } from '../../../src/chainRegistry';
 
 const req = createRequire(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,6 +43,7 @@ const core = req('../../rails/core.cjs') as {
     };
     addProtectedRoot(dir: string): string;
     classifyHost(host: string, mode?: string): string;
+    readLedger(): Array<{ kind: string; target: unknown }>;
     FORK_SHELL_KEYS: readonly string[];
 };
 
@@ -97,5 +110,26 @@ describe('fork project rails (SPEC R4)', () => {
         const notSentinel = nonEmpty && v !== sentinels.ETH_FORK_RPC_URL;
         expect({ present, nonEmpty, notSentinel }).toEqual({ present: true, nonEmpty: true, notSentinel: true });
         expect(core.railsStatus().forkShellKeys.ETH_FORK_RPC_URL).toBe('preserved');
+    });
+
+    it('a Telegram send through the notifier is a recorded refusal, not a network call, and the broadcast runs (AC-16)', async () => {
+        // Spied and resolved: no request can leave even without the refusal (this file makes
+        // no network connection), and the general network deny is off in fork mode.
+        const postSpy = vi.spyOn(axios, 'post').mockResolvedValue({});
+        const refusals = () => core.readLedger().filter((e) => e.kind === 'notifier-refused').length;
+        const ctx = { chain: { displayName: '[ETH]', name: 'eth' } } as unknown as ChainContext;
+        recordedBroadcasts.length = 0;
+        const before = refusals();
+        try {
+            await expect(sendTelegramAlert('x')).resolves.toBeUndefined();
+            await expect(sendCtxAlert(ctx, 'y')).resolves.toBeUndefined();
+
+            expect(postSpy.mock.calls.length).toBe(0);
+            expect(refusals()).toBe(before + 2);
+            expect(recordedBroadcasts.map((b) => b.data.message)).toEqual(['x', 'y']);
+            expect(recordedBroadcasts[1].data.chain).toBe('eth');
+        } finally {
+            postSpy.mockRestore();
+        }
     });
 });
