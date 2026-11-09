@@ -1,0 +1,44 @@
+# RED proof 22-11-2-fork-rpc-source (AC-18, fork RPC source, spawn gate and Hardhat child env)
+Date: 2026-11-09T03:16:32Z
+File neutralised (working tree only, never committed): test/fork/helpers/forkRpcUrl.ts
+What was neutralised: the old fallback to another variable is reinstated inside resolveForkRpcUrl
+sha256 before and after restore: 7d424260dcc2f03d60180e5cdf4d2d7e8d0475b6f1b2e5e4d1bfc4d7a111d280 / 7d424260dcc2f03d60180e5cdf4d2d7e8d0475b6f1b2e5e4d1bfc4d7a111d280
+
+## Diff applied
+
+diff --git a/test/fork/helpers/forkRpcUrl.ts b/test/fork/helpers/forkRpcUrl.ts
+index 028d0f2..d8fc2ae 100644
+--- a/test/fork/helpers/forkRpcUrl.ts
++++ b/test/fork/helpers/forkRpcUrl.ts
+@@ -16,7 +16,7 @@
+ 
+ /** The fork RPC URL from the shell, or a clear error naming ETH_FORK_RPC_URL. */
+ export function resolveForkRpcUrl(env: NodeJS.ProcessEnv = process.env): string {
+-    const url = env.ETH_FORK_RPC_URL;
++    const url = env.ETH_FORK_RPC_URL || env.ALCHEMY_URL;
+     if (typeof url === 'string' && url !== '') return url;
+     throw new Error(
+         'ETH_FORK_RPC_URL is required for fork tests and is read from the shell only (never from .env). ' +
+
+## Command (wrapped, ran ONLY this test file)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/forkRpcSource.test.ts
+
+## RED result: exit 1
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   unit  test/unit/rails/forkRpcSource.test.ts > resolveForkRpcUrl (AC-17) > has no fallback: another variable does not satisfy it
+AssertionError: expected [Function] to throw an error
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031626-13572-8592bd | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031626-13572-8592bd\summary.json
+
+## Restore
+
+git -c core.autocrlf=false checkout -- test/fork/helpers/forkRpcUrl.ts (sha256 equal: yes; git status --porcelain test empty: yes)
+
+## GREEN rerun after restore: exit 0
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T031630-7980-b78ef5 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T031630-7980-b78ef5\summary.json
