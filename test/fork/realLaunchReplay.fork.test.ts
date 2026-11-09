@@ -83,9 +83,10 @@ process.env.DAILY_LOSS_PCT = '99';
 process.env.MAX_TOTAL_EXPOSURE = '1000';
 
 import { requireRealMainnetGate, FORK_ONLY_TEST_KEY } from './helpers/realMainnetGate';
+import { resolveForkRpcUrl } from './helpers/forkRpcUrl';
 
 const PROVIDER_URL = 'http://127.0.0.1:8545';
-const FORK_RPC = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL;
+const FORK_RPC = resolveForkRpcUrl();
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 const UNISWAP_V2_ROUTER = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
 // Uniswap V3 SwapRouter (the ORIGINAL '0xE592...' router whose exactInputSingle

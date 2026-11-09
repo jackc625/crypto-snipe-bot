@@ -46,6 +46,72 @@
       "change": "Parent-env copy and direct spawn replaced by spawnRailedChild with envOverrides {DASHBOARD_API_KEY: ''}. The comment explaining the old env-copy trick was replaced. Assertions unchanged (exit 1, output matches DASHBOARD_API_KEY not set).",
       "reason": "D-03: the child was built from a copy of the parent environment.",
       "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/exitStatePersistence.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/deliberateBuyReplay.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/realLaunchReplay.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/captureRehearsal.fork.test.ts",
+      "test": "module-scope FORK_RPC constant (used by the file's hardhat_reset)",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/honeypotChecker.fork.test.ts",
+      "test": "the hardhat_reset jsonRpcUrl in the V3 fixture replay",
+      "it_count_before": 4,
+      "it_count_after": 4,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the inline jsonRpcUrl now calls resolveForkRpcUrl().",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/fork/antiRugDetector.fork.test.ts",
+      "test": "HORSE replay skip guard, its warning text and its hardhat_reset jsonRpcUrl",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: hasArchiveRpc is hasForkRpcUrl(), the warning names only ETH_FORK_RPC_URL, jsonRpcUrl is resolveForkRpcUrl(). The skip guard keeps its existing behaviour (NAC-04).",
+      "reason": "AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env).",
+      "never_executed_in_phase_22": true,
+      "first_execution_owner_phase": 25,
+      "register_as": "test-quality"
     }
   ]
 }

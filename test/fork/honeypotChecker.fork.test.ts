@@ -29,6 +29,7 @@ import { ethers, Interface } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { HONEYPOT_CHECKER_ABI } from '../../src/utils/honeypot/abi';
+import { resolveForkRpcUrl } from './helpers/forkRpcUrl';
 
 // Real Uniswap V2 + V3 mainnet addresses (available on the fork)
 const UNISWAP_V2_FACTORY = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f';
@@ -272,7 +273,7 @@ describe('Phase 18 plan 18-09 Task 3 — HoneypotChecker fork tests (V2 + V3)', 
             await provider.send('hardhat_reset', [
                 {
                     forking: {
-                        jsonRpcUrl: process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL,
+                        jsonRpcUrl: resolveForkRpcUrl(),
                         blockNumber: fixture.forkBlockNumber,
                     },
                 },

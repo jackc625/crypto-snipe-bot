@@ -49,6 +49,7 @@ import {
 import { ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveForkRpcUrl, hasForkRpcUrl } from './helpers/forkRpcUrl';
 
 // ---------------------------------------------------------------------------
 // Module-level state + mocks
@@ -768,11 +769,10 @@ describe('Phase 19 plan 19-07 — Anti-rug detector fork tests', () => {
             // runs against an archive RPC, the test resolves them; otherwise
             // it skips gracefully (matches Phase 18 D-FIXTURE null-block-pin
             // precedent).
-            const hasArchiveRpc =
-                !!process.env.ETH_FORK_RPC_URL || !!process.env.ALCHEMY_URL;
+            const hasArchiveRpc = hasForkRpcUrl();
             if (!hasArchiveRpc) {
                 console.warn(
-                    'ETH_FORK_RPC_URL / ALCHEMY_URL not set — skipping HORSE replay (operator runs locally per Wave-1 follow-up)',
+                    'ETH_FORK_RPC_URL not set in the shell — skipping HORSE replay (operator runs locally per Wave-1 follow-up)',
                 );
                 return;
             }
@@ -785,9 +785,7 @@ describe('Phase 19 plan 19-07 — Anti-rug detector fork tests', () => {
                 await provider.send('hardhat_reset', [
                     {
                         forking: {
-                            jsonRpcUrl:
-                                process.env.ETH_FORK_RPC_URL ||
-                                process.env.ALCHEMY_URL,
+                            jsonRpcUrl: resolveForkRpcUrl(),
                             blockNumber: fixture.forkBlockNumber,
                         },
                     },
