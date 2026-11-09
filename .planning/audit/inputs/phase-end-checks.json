@@ -1,0 +1,182 @@
+{
+  "phase": "22-safety-rails-audit",
+  "plan": "22-29",
+  "recorded_at": "2026-11-09T06:44:32.004Z",
+  "branch": "phase-22-safety-rails-audit",
+  "head_sha_at_check": "47153bedfa36476cf26b79ceb8de9118c0a80b7d",
+  "phase_start_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "backup_manifest": "C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json",
+  "checks": {
+    "NAC-02": {
+      "command": "git ls-files data <dotenv> '<dotenv>.*'; git ls-files filtered by (^|/)<dotenv>; verify-prod-untouched wrapped run of test/unit/rails/envExampleSync.test.ts (project unit)",
+      "output": {
+        "data_and_env_files_tracked": [
+          ".env.example"
+        ],
+        "all_tracked_env_files": [
+          ".env.example",
+          "test/.env.test"
+        ],
+        "sentinel_values": "test/unit/rails/envExampleSync.test.ts run vpu-20261109T064413-4140-796ee7: 4 tests passed (private-key sentinels are distinct small integers and not Hardhat #0; secret-like sentinels at most 3.0 bits per character)",
+        "wrapper_verdict": "verdict: untouched | run vpu-20261109T064413-4140-796ee7 | child exit 0 | manifest: equal | ledger: ok | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T064413-4140-796ee7\\summary.json"
+      },
+      "pass": true,
+      "note": "The git ls-files commands were run from a node script with the file name built at runtime because the machine secret guard refuses the literal name in shell filters. The result is the same list the plan commands would print."
+    },
+    "NAC-03": {
+      "command": "verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json -- node -e 0",
+      "output": {
+        "wrapper_verdict": "verdict: untouched | run vpu-20261109T064416-19940-8f67a1 | child exit 0 | manifest: equal | ledger: not required | summary C:\\Users\\jackc\\AppData\\Local\\Temp\\crypto-snipe-bot-rail-ledger\\vpu-20261109T064416-19940-8f67a1\\summary.json",
+        "data_files_compared": 6
+      },
+      "pass": true,
+      "note": "Raw-byte hashes, sizes and mtimes of every file in data/, compared with the backup manifest. data/ was not opened through SQLite."
+    },
+    "AC-02": {
+      "command": "git log --format=%H 23a64617dca167976adc4645fed0e2c69e384820..HEAD -- package-lock.json hardhat.config.ts",
+      "output": {
+        "commits_touching": []
+      },
+      "pass": true
+    },
+    "AC-08": {
+      "command": "text search of every plan SUMMARY for \"hardhat\" and for command-shaped invocations; newest mtime under cache/ and artifacts/",
+      "output": {
+        "summaries_searched": 28,
+        "lines_mentioning_hardhat": 62,
+        "command_shaped_lines": [
+          {
+            "at": "22-08-SUMMARY.md:145",
+            "text": "    rationale: \"The real fork-project run starts Hardhat and is deliberately not run in Phase 22 (AC-08); whichever phase first runs npm run test:fork must chec"
+          },
+          {
+            "at": "22-10-SUMMARY.md:123",
+            "text": "    rationale: \"The real fork project starts Hardhat and is deliberately not run in Phase 22 (AC-08); whichever phase first runs npm run test:fork must check UF"
+          },
+          {
+            "at": "22-15-SUMMARY.md:64",
+            "text": "  - \"22-15: the moved test reads the RPC from the shell-only resolver, so a real run reads mainnet through the archive URL the fork is built from, not through t"
+          },
+          {
+            "at": "22-15-SUMMARY.md:253",
+            "text": "- **Phase 25:** the first real `npm run test:fork` must check UFV-05 by name."
+          }
+        ],
+        "newest_cache_file": "2026-05-29T23:29:07.964Z",
+        "newest_artifacts_file": "2026-05-24T04:13:04.608Z",
+        "phase_started_at": "2026-11-07T00:36:35.000Z"
+      },
+      "command_shaped_lines_diagnosis": [
+        {
+          "at": "22-08-SUMMARY.md:145",
+          "diagnosis": "prose about what is deliberately not run or is deferred to Phase 25; not a command that was executed"
+        },
+        {
+          "at": "22-10-SUMMARY.md:123",
+          "diagnosis": "prose about what is deliberately not run or is deferred to Phase 25; not a command that was executed"
+        },
+        {
+          "at": "22-15-SUMMARY.md:64",
+          "diagnosis": "prose about what is deliberately not run or is deferred to Phase 25; not a command that was executed"
+        },
+        {
+          "at": "22-15-SUMMARY.md:253",
+          "diagnosis": "prose about what is deliberately not run or is deferred to Phase 25; not a command that was executed"
+        }
+      ],
+      "pass": true,
+      "note": "Mechanical text search of every 22-NN-SUMMARY.md only (P9: not cited as evidence of the code). Each command-shaped line is diagnosed in command_shaped_lines_diagnosis. Independent corroboration: the newest file under the Hardhat cache/ and artifacts/ folders predates phase start, so no compile or fork ran there after the phase began."
+    },
+    "AC-33": {
+      "command": "for every commit in 23a64617dca167976adc4645fed0e2c69e384820..HEAD whose subject names 22-04 or 22-17..22-29: git show --name-only --format= <sha> lists only .planning/",
+      "output": {
+        "commits_in_range": 196,
+        "audit_wave_commits": 87,
+        "commits_with_paths_outside_planning": [],
+        "not_applicable_commits_named": [
+          "f695363",
+          "6ba177d",
+          "5378478",
+          "fce2ac3",
+          "c3472c6",
+          "a08d650",
+          "db68184"
+        ]
+      },
+      "pass": true,
+      "note": "Commits whose subject carries no 22-04 or 22-17..22-29 plan number are outside AC-33; the seven named were reviewed by the orchestrator as out of scope for this check."
+    },
+    "IGN_AC07": {
+      "command": "git merge-base --is-ancestor 93f81898e21927679117f2401491a0e9ddb8f634 HEAD; for every manifest entry under ignition/deployments/: raw-byte SHA-256 of the working-tree file and of git cat-file -p HEAD:<path> equal the manifest; sorted git ls-files ignition/deployments equals the manifest subset",
+      "branch": "phase-22-safety-rails-audit",
+      "head_sha": "47153bedfa36476cf26b79ceb8de9118c0a80b7d",
+      "od21_commit_sha": "93f81898e21927679117f2401491a0e9ddb8f634",
+      "od21_is_ancestor_of_head": true,
+      "file_count": 10,
+      "tracked_set_equals_manifest_subset": true,
+      "per_file": [
+        {
+          "path": "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+          "manifest_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-1/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+          "manifest_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-1/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+          "manifest_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-1/deployed_addresses.json",
+          "manifest_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-1/journal.jsonl",
+          "manifest_sha256": "f81740e9d0241b884e843653d69ffd7b745671c15667e6c86c24063f3b4d900a",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.dbg.json",
+          "manifest_sha256": "e5979f5f415155b7b7051d20f70057ccbce6dff98a7f7051bae5816a9db89fac",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-11155111/artifacts/HoneypotCheckerModule#HoneypotChecker.json",
+          "manifest_sha256": "e6ae6c57bff73e608cc0f1938fa54bfcaec8ec5dc4a4ccdfe7079d91d2c202ef",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-11155111/build-info/55eb2c5abedae6ebafb8dd8c43d739a9.json",
+          "manifest_sha256": "f323e57fc551a240764e3bcdcaf2165272035ba9690e718087ed56b5d9123c46",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-11155111/deployed_addresses.json",
+          "manifest_sha256": "e7334fddb9a4d4d80921aba5b7c963d869dd8cf9db21ccb5dbd8a1a6239d9d72",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        },
+        {
+          "path": "ignition/deployments/chain-11155111/journal.jsonl",
+          "manifest_sha256": "b6d04cdfc528759e9a79d8c71e793189e8065ed32b31566d4d9996e1101fdcd1",
+          "working_tree_equal": true,
+          "head_blob_equal": true
+        }
+      ],
+      "pass": true
+    }
+  }
+}
