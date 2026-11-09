@@ -285,6 +285,7 @@ Plans:
      - `npm ls ethers` shows a single ethers.
      - `npm ci` succeeds without `--legacy-peer-deps` on Windows and Linux.
   5. better-sqlite3 13 opens a copy of the production DB, never the live file, with migrations, WAL, and the persisted kill-switch state intact.
+  6. A real `npm run test:fork`, wrapped by `scripts/verify-prod-untouched.ts`, confirms by name the five checks Phase 22 could only rehearse (UFV-01..UFV-05, AUD-TESTQ-030..035, listed in `.planning/audit/inputs/unrun-fork-verifications.json`): the fork rails pass, the Hardhat child receives only the sanitized env, no Telegram send occurs, and the real HoneypotChecker bytecode is found on mainnet.
 **Waves** (each gated by a zero decision-trace diff):
   - Wave 1: `.gitattributes` + renormalize.
   - Wave 2: the Prettier commit.
