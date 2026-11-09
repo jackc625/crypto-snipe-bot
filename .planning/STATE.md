@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-11-PLAN.md
-last_updated: "2026-11-09T03:23:09.687Z"
+stopped_at: Completed 22-12-PLAN.md
+last_updated: "2026-11-09T03:38:09.575Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 361bd1bcc4e10e9cf82d463f319c37a45f7bafca
+state_head: 0cd3fdaccf2f44d521599183f680544495fe8797
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 23
+  completed_plans: 24
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 13 of 29
+Plan: 14 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -101,11 +101,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P10 | 11min | 3 tasks | 18 files |
 | Phase 22 P28 | 10 min | 2 tasks | 224 files |
 | Phase 22 P11 | 14min | 3 tasks | 23 files |
+| Phase 22 P12 | 11min | 3 tasks | 16 files |
 
 ## Session
 
-**Last session:** 2026-11-09T03:23:09.591Z
-**Stopped at:** Completed 22-11-PLAN.md
+**Last session:** 2026-11-09T03:38:09.481Z
+**Stopped at:** Completed 22-12-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -181,3 +182,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-11: .exec member calls are accepted only on a RegExp literal or eight named receivers (about 55 better-sqlite3/RegExp calls under test/); an unknown receiver still fails the gate
 - [Phase 22]: 22-11: UFV-04 keeps owner_phase as the number 25 like UFV-01..03; the string rule at check.ts:304 is for external_od_refs on findings only
 - [Phase 22]: 22-11: Hardhat children get buildHardhatChildEnv (sentinels, OS essentials, two shell keys, setup-fork preload); first real launch is UFV-04, owner Phase 25; the six edited fork files have never executed
+- [Phase 22]: 22-12: duplicate-load guard on nonceAuthority, exitManager, exitEngine and anti-rug/detector (registerSingleton, epoch sentinel); the rail for AUD-TX-004/RC-17, whose register status stays with 22-29's re-audit
+- [Phase 22]: 22-12: the junction probe maps the aliased module's own imports to the real folder, so an alias proof names the module under test; the junction into src/ is removed with unlinkSync and a non-recursive rmdirSync, never a recursive delete
+- [Phase 22]: 22-12: test/unit/bot/buyNonceLock.test.ts needed a logger-mock edit unrelated to the guard (fresh rails DB now runs migrateSchema logger.info; before the rails it opened the live DB at version 7); 22-15 may meet the same pattern in other child-only logger mocks
