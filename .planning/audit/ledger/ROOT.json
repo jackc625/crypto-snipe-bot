@@ -20,6 +20,14 @@
       "AUD-SCRIPTS-001",
       "AUD-SCRIPTS-005",
       "AUD-SCRIPTS-008"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "6a254a123cc90e945939e2e2dd0b33f7ac6c826e",
+        "findings": "none",
+        "note": "Two lines: ALLOW_REAL_MAINNET comment clarified and ETH_FORK_RPC_URL added. Reviewed; both documented as shell-only."
+      }
     ]
   },
   {
@@ -34,6 +42,14 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-ROOT-005"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ce3851efbf001e1b9995e3e3013d7a12d24c386a",
+        "findings": "none",
+        "note": "Negations for test/.env.test (one path) and ignition/deployments artifacts (OD-21). Reviewed; no secret-bearing path un-ignored."
+      }
     ]
   },
   {
@@ -82,6 +98,14 @@
     "findings": [
       "AUD-ROOT-008",
       "AUD-ROOT-007"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "9f47d5b1578833fc63d419d852c7cad89b31a719",
+        "findings": "none",
+        "note": "Start command references updated to src/main.ts. Reviewed."
+      }
     ]
   },
   {
@@ -94,7 +118,15 @@
   {
     "path": "ignition/.gitignore",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-    "findings": "none"
+    "findings": "none",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "ce3851efbf001e1b9995e3e3013d7a12d24c386a",
+        "findings": "none",
+        "note": "Journal ignore rule removed for OD-21. Reviewed."
+      }
+    ]
   },
   {
     "path": "package-lock.json",
@@ -113,6 +145,14 @@
       "AUD-ROOT-007",
       "AUD-SCRIPTS-007",
       "AUD-TESTI-017"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "e095ab5385a66355f0c2263fdb0a9a0ca25cd940",
+        "findings": "none",
+        "note": "Scripts only: start via src/main.ts, npm test scoped to unit and integration, db:init, backup:state, baselines:capture, check:vi-mock. No dependency changed. Reviewed."
+      }
     ]
   },
   {
@@ -127,6 +167,14 @@
       "AUD-ROOT-003",
       "AUD-TESTU-008",
       "AUD-TX-004"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b3617f672f26f63e5c4a02ea52d3e152b1c448ae",
+        "findings": "none",
+        "note": "One line: forceConsistentCasingInFileNames true (RC-17). Reviewed."
+      }
     ]
   },
   {
@@ -149,6 +197,14 @@
       "AUD-TESTI-017",
       "AUD-TESTU-001",
       "AUD-TESTU-008"
+    ],
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "findings": "none",
+        "note": "Reviewed. dotenv removed, envDir: false at the root, setup entries added per project, each project already had extends: true since d5f65b1. Not affected by AUD-REAUDIT-001; that finding's evidence shows why."
+      }
     ]
   }
 ]
