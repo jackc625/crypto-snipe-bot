@@ -1,21 +1,23 @@
 import { spawn, execSync, ChildProcess } from 'child_process';
 import { ethers } from 'ethers';
 import { requireRealMainnetGate } from './helpers/realMainnetGate';
+import { resolveForkRpcUrl } from './helpers/forkRpcUrl';
+import { buildHardhatChildEnv } from './helpers/hardhatChildEnv';
+
+export { resolveForkRpcUrl } from './helpers/forkRpcUrl';
 
 let hardhatProcess: ChildProcess;
 
 export async function setup() {
-    const rpcUrl = process.env.ETH_FORK_RPC_URL || process.env.ALCHEMY_URL;
-    if (!rpcUrl) {
-        throw new Error('ETH_FORK_RPC_URL or ALCHEMY_URL env var required for fork tests');
-    }
+    const rpcUrl = resolveForkRpcUrl();
 
     // Compile contracts so artifacts exist for deployment
-    execSync('npx hardhat compile --quiet', { stdio: 'pipe' });
+    execSync('npx hardhat compile --quiet', { stdio: 'pipe', env: buildHardhatChildEnv(process.env) });
 
     hardhatProcess = spawn('npx', ['hardhat', 'node', '--fork', rpcUrl, '--port', '8545'], {
         stdio: 'pipe',
         shell: true,
+        env: buildHardhatChildEnv(process.env),
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -42,7 +44,7 @@ export async function setup() {
     // transacting on real mainnet against the funded prod wallet.
     //
     // The local `hardhat node --fork` reports chainId 31337, so this NEVER fires
-    // in CI — it guards against a misconfigured ETH_FORK_RPC_URL/ALCHEMY_URL
+    // in CI — it guards against a misconfigured ETH_FORK_RPC_URL
     // pointing at a real-mainnet node. We reuse requireRealMainnetGate() rather
     // than re-implementing the predicate, so there is a single source of truth.
     const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');

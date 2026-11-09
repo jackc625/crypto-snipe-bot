@@ -27,10 +27,9 @@ function loaded(): boolean {
     return hit;
 }
 
-function load(id: string): unknown {
+function load(id: string, importer: () => unknown): unknown {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        return require(id);
+        return importer();
     } catch (err) {
         process.stderr.write(`notifierProdPathProbe: import of ${id} failed: ${String((err as Error).message)}\n`);
         process.exit(4);
@@ -45,9 +44,9 @@ async function main(): Promise<void> {
     }
 
     // test/rails/probes/ is three levels below the repo root.
-    load('../../../src/config');
+    load('../../../src/config', () => require('../../../src/config'));
     const configLoadedEnv = loaded();
-    const notifier = load('../../../src/utils/notifier') as {
+    const notifier = load('../../../src/utils/notifier', () => require('../../../src/utils/notifier')) as {
         sendTelegramAlert(m: string): Promise<void>;
         sendCtxAlert(c: unknown, m: string): Promise<void>;
     };

@@ -46,6 +46,19 @@
       "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this assertion by name under the real fork project",
       "registered": "2026-11-08",
       "registered_by_plan": "22-10"
+    },
+    {
+      "id": "UFV-04",
+      "ac": "AC-17 / SPEC R4 fork child env",
+      "test_file": "test/fork/setup.ts",
+      "assertion": "the first real npm run test:fork starts Hardhat with the sanitized env from buildHardhatChildEnv, the fork works, and the Hardhat child's ledger records a blocked .env read (the child env carries no CSB_RAIL_RUN_ID, so its ledger is under <tmp>/crypto-snipe-bot-rail-ledger/no-run)",
+      "why_unrun": "starting Hardhat is out of Phase 22 scope (AC-08)",
+      "proven_meanwhile_by": "test/unit/rails/hardhatChildEnv.test.ts (the pure env, a railed child on the same setup-fork preload, and an AST check of every child launch in test/fork/setup.ts)",
+      "rehearsed_by": "none (Hardhat cannot be rehearsed without starting it)",
+      "owner_phase": 25,
+      "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this by name, with the operator's real fork URL in the shell",
+      "registered": "2026-11-08",
+      "registered_by_plan": "22-11"
     }
   ]
 }

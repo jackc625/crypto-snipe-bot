@@ -22,7 +22,7 @@ const CORE_PATH = req.resolve('../../rails/core.cjs');
 // native require cache, so this file talks to the SAME module instance (22-05 open risk a).
 const coreLoadedBySetup = Boolean(req.cache[CORE_PATH]);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const core = req(CORE_PATH) as {
+const core = req('../../rails/core.cjs') as {
     railsStatus(): Record<string, unknown> & { installed: boolean; mode: string; repoRoot: string; protectedRoots: string[]; installCount: number };
     addProtectedRoot(dir: string): string;
     installRails(o: { mode: 'full' | 'fork' }): unknown;
