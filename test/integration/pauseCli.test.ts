@@ -24,14 +24,12 @@
 //     never appear inside a log call).
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import axios from 'axios';
+import { spawnRailedChild } from '../rails/spawnRailedChild';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
-const isWindows = process.platform === 'win32';
-const npxCmd = isWindows ? 'npx.cmd' : 'npx';
 
 // Hoisted module-scope spies. vitest.config.ts has mockReset:true which wipes
 // vi.fn() impls between tests — Plan 20-04 cascade-fix precedent.
@@ -263,36 +261,17 @@ describe('npm run pause CLI subprocess invariants (OPS-LIVE-11)', () => {
     it(
         'Test 4: missing DASHBOARD_API_KEY → CLI FATAL exit 1 with stderr containing DASHBOARD_API_KEY not set',
         () => {
-            // Need to clear DASHBOARD_API_KEY in the child env AND prevent the
-            // child's dotenv.config() from re-injecting it from the .env file.
-            // We achieve this by setting a custom DOTENV_CONFIG_PATH to a
-            // nonexistent file, but dotenv silently ignores missing files. The
-            // most reliable approach: copy the actual env, then forcibly delete
-            // the key. dotenv.config() in the child WILL re-inject from .env if
-            // the file exists, but we can override the in-process env value
-            // AFTER dotenv runs by reading the script directly... actually the
-            // simplest reliable approach is to use { override: false } default
-            // dotenv behavior plus a custom DOTENV_CONFIG_PATH.
-
-            // dotenv default behavior: if process.env.DASHBOARD_API_KEY is
-            // already set (even to empty string), dotenv.config() does NOT
-            // override it unless { override: true }. So setting the child env
-            // var to empty string PLUS the script's check is `if (!apiKey)`
-            // (which catches '' as falsy) → exits 1.
-            const childEnv = { ...process.env };
-            // Force-blank the key so the in-process apiKey lookup gets empty.
-            childEnv.DASHBOARD_API_KEY = '';
-
-            const result = spawnSync(npxCmd, ['ts-node', 'scripts/pause.ts', '--reason', 'should-not-reach'], {
-                cwd: repoRoot,
-                env: childEnv,
-                shell: true,
-                encoding: 'utf8',
-                timeout: 60_000,
+            // The child runs on the sentinel test env through the railed spawner
+            // (SAFE-02 D-03): the parent env is never copied in, and the child's
+            // rails block any read of the repo .env. The override blanks the key
+            // so the script's `if (!apiKey)` check (which catches '' as falsy)
+            // exits 1 before any network call.
+            const result = spawnRailedChild('npx', ['ts-node', 'scripts/pause.ts', '--reason', 'should-not-reach'], {
+                envOverrides: { DASHBOARD_API_KEY: '' },
             });
 
             expect(result.status).toBe(1);
-            const combined = (result.stdout ?? '') + (result.stderr ?? '');
+            const combined = result.stdout + result.stderr;
             expect(combined).toMatch(/DASHBOARD_API_KEY not set/i);
         },
         90_000, // give vitest 90s for this single subprocess test (ts-node cold start on Windows ~3-5s)

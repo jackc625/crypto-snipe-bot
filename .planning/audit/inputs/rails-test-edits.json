@@ -1,0 +1,51 @@
+{
+  "description": "Test edits made to accommodate the Phase 22 rails. No test was deleted, skipped or todo'd (NAC-04). 22-29 registers each entry as a test-quality finding.",
+  "registered_by_plan": "22-11",
+  "entries": [
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 1: subprocess exit code is bounded 0 or 1 (never 2 = uncaught throw) when run against the sentinel test env",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild on the sentinel test env. Title and comment changed from 'against current .env' to 'against the sentinel test env'. Assertions unchanged (status not null, 0 or 1, never 2).",
+      "reason": "The test depended on the operator's real .env, network and DB: it spawned preflight with the parent environment, so the child reloaded real configuration. RESEARCH Pitfall 7, D-03.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 2: subprocess emits structured FAIL log lines when ENABLED_CHAINS includes a chain with an unreachable RPC",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild with envOverrides. Override key ETH_WS_RPC_URL corrected to ETH_WS_URL. Assertions unchanged.",
+      "reason": "D-03: no child env from the parent. ETH_WS_RPC_URL is a key the code never reads (src/chainRegistry.ts:211 reads ETH_WS_URL) and it is not a test/.env.test key, so spawnRailedChild refuses it. The old override was silently a no-op.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 3: subprocess prints honeypot-checker FAIL when getCode returns 0x",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Child now started through spawnRailedChild with envOverrides. Override key ETH_WS_RPC_URL corrected to ETH_WS_URL. Assertions unchanged.",
+      "reason": "D-03, and the same wrong key as Test 2.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "Test 4: subprocess does NOT print startMultiChainBot or bot-startup markers (OPS-LIVE-10 hard requirement)",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Both children now started through spawnRailedChild; second run's override key corrected to ETH_WS_URL. Assertions unchanged. The first run is named passResult but runs on sentinels, where every RPC is refused, so it is now also a failing preflight: the test no longer observes a real all-pass run.",
+      "reason": "D-03. The old pass case depended on the operator's real .env and network, which no test may reach.",
+      "register_as": "test-quality"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "Test 4: missing DASHBOARD_API_KEY → CLI FATAL exit 1 with stderr containing DASHBOARD_API_KEY not set",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "Parent-env copy and direct spawn replaced by spawnRailedChild with envOverrides {DASHBOARD_API_KEY: ''}. The comment explaining the old env-copy trick was replaced. Assertions unchanged (exit 1, output matches DASHBOARD_API_KEY not set).",
+      "reason": "D-03: the child was built from a copy of the parent environment.",
+      "register_as": "test-quality"
+    }
+  ]
+}
