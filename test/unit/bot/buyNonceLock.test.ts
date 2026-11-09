@@ -41,7 +41,7 @@ vi.mock('../../../src/utils/txManager', () => ({
 
 // Logger is module-level in bot.ts.
 vi.mock('../../../src/utils/logger', () => ({
-    logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), fatal: vi.fn() }) },
+    logger: { child: () => ({ info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), fatal: vi.fn() }), info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), fatal: vi.fn() },
 }));
 
 // Silence the side-effecty leaves of the bot import graph that are irrelevant here.

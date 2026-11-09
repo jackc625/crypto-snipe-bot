@@ -20,6 +20,8 @@ import { decodeReceipt } from './utils/receiptDecoder';
 // shorter `unsubscribeAntiRug` alias to read cleanly at the call site
 // (caller does not care about internal registry mechanics).
 import { unregisterAntiRugPosition as unsubscribeAntiRug } from './anti-rug/detector';
+import { EPOCH } from './guards/epoch';
+import { registerSingleton } from './guards/singleton';
 
 const log = logger.child({ module: 'exitEngine' });
 
@@ -1418,6 +1420,7 @@ class ExitWorker {
     }
 }
 
+registerSingleton('exitEngine', __filename, EPOCH);
 const exitWorker = new ExitWorker();
 
 /**

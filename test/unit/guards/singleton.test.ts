@@ -31,6 +31,27 @@ const GUARDED_MODULES: GuardedModule[] = [
         load: () => import('../../../src/utils/nonceAuthority'),
         loadAlias: () => import('../../../src/utils/NonceAuthority'),
     },
+    {
+        name: 'exitManager',
+        relPath: 'src/utils/exitManager.ts',
+        aliasBase: 'ExitManager.ts',
+        load: () => import('../../../src/utils/exitManager'),
+        loadAlias: () => import('../../../src/utils/ExitManager'),
+    },
+    {
+        name: 'exitEngine',
+        relPath: 'src/exitEngine.ts',
+        aliasBase: 'ExitEngine.ts',
+        load: () => import('../../../src/exitEngine'),
+        loadAlias: () => import('../../../src/ExitEngine'),
+    },
+    {
+        name: 'antiRugDetector',
+        relPath: 'src/anti-rug/detector.ts',
+        aliasBase: 'Detector.ts',
+        load: () => import('../../../src/anti-rug/detector'),
+        loadAlias: () => import('../../../src/anti-rug/Detector'),
+    },
 ];
 
 interface DuplicateError {
@@ -45,6 +66,18 @@ function runProbe(mode: string, relPaths: string[], nodeOptions: string[] = []):
     const line = RESULT_LINE.exec(result.stdout)?.[0]?.trim() ?? '';
     return { line, detail: `probe line: ${JSON.stringify(line)}; exit ${result.status}; stderr: ${result.stderr.slice(0, 2000)}` };
 }
+
+describe('duplicate-load guard: normal boot shape', () => {
+    it(
+        'plain Node: all four guarded modules load once each in one process, dependents first',
+        () => {
+            const paths = ['src/exitEngine.ts', 'src/anti-rug/detector.ts', 'src/utils/exitManager.ts', 'src/utils/nonceAuthority.ts'];
+            const { line, detail } = runProbe('single', paths);
+            expect(line, detail).toBe('LOADED_ONCE');
+        },
+        TEST_TIMEOUT_MS,
+    );
+});
 
 describe.each(GUARDED_MODULES)('duplicate-load guard: $name', (mod) => {
     const realAbs = path.join(REPO_ROOT, ...mod.relPath.split('/'));

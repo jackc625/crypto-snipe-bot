@@ -1,0 +1,161 @@
+{
+  "base_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "frozen_by_plan": "22-12",
+  "regex": "vi.(resetModules|doMock|isolateModules)",
+  "it_count_regex": "\b(it|test)s*(",
+  "files": [
+    {
+      "path": "test/integration/anti-rug/wsReconnectBackfill.test.ts",
+      "it_count_at_base": 9
+    },
+    {
+      "path": "test/integration/api/wsPush.test.ts",
+      "it_count_at_base": 4
+    },
+    {
+      "path": "test/integration/exitMonitor.test.ts",
+      "it_count_at_base": 22
+    },
+    {
+      "path": "test/integration/honeypotDispatch.test.ts",
+      "it_count_at_base": 2
+    },
+    {
+      "path": "test/integration/honeypotUnknownFailsClosed.test.ts",
+      "it_count_at_base": 4
+    },
+    {
+      "path": "test/integration/killswitchCheckpoints.test.ts",
+      "it_count_at_base": 8
+    },
+    {
+      "path": "test/integration/mevStrategies.test.ts",
+      "it_count_at_base": 13
+    },
+    {
+      "path": "test/integration/midRunWalletCheck.test.ts",
+      "it_count_at_base": 4
+    },
+    {
+      "path": "test/integration/pauseFlow.test.ts",
+      "it_count_at_base": 9
+    },
+    {
+      "path": "test/integration/preflightInvocation.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/integration/txManager.test.ts",
+      "it_count_at_base": 15
+    },
+    {
+      "path": "test/integration/v2HoneypotIntegration.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/integration/v3HoneypotIntegration.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/integration/v3LiquidityWait.test.ts",
+      "it_count_at_base": 1
+    },
+    {
+      "path": "test/integration/wsReconnect.test.ts",
+      "it_count_at_base": 12
+    },
+    {
+      "path": "test/unit/anti-rug/allowlist.test.ts",
+      "it_count_at_base": 7
+    },
+    {
+      "path": "test/unit/bot/buyNonceLock.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/unit/bot/deliberateBuyAffordability.test.ts",
+      "it_count_at_base": 6
+    },
+    {
+      "path": "test/unit/bot/deliberateBuyArmMonitoring.test.ts",
+      "it_count_at_base": 7
+    },
+    {
+      "path": "test/unit/bot/noDoubleBuyReconcile.test.ts",
+      "it_count_at_base": 15
+    },
+    {
+      "path": "test/unit/bot/snipeFailClean.test.ts",
+      "it_count_at_base": 2
+    },
+    {
+      "path": "test/unit/bot/watchdog.test.ts",
+      "it_count_at_base": 5
+    },
+    {
+      "path": "test/unit/chainRegistry.test.ts",
+      "it_count_at_base": 15
+    },
+    {
+      "path": "test/unit/chainRegistry/antiRugConfig.test.ts",
+      "it_count_at_base": 27
+    },
+    {
+      "path": "test/unit/configEnvVar.test.ts",
+      "it_count_at_base": 10
+    },
+    {
+      "path": "test/unit/ethersV6BigIntArithmetic.test.ts",
+      "it_count_at_base": 7
+    },
+    {
+      "path": "test/unit/exitEngine/antiRugBounded.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/unit/exitEngine/exitWorker.test.ts",
+      "it_count_at_base": 5
+    },
+    {
+      "path": "test/unit/exitEngine/exitWorkerRealPath.test.ts",
+      "it_count_at_base": 2
+    },
+    {
+      "path": "test/unit/exitEngine/opEnrichment.test.ts",
+      "it_count_at_base": 11
+    },
+    {
+      "path": "test/unit/exitEngine/sellNonceLock.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/unit/exitEngineZeroBalance.test.ts",
+      "it_count_at_base": 7
+    },
+    {
+      "path": "test/unit/honeypotDispatch.test.ts",
+      "it_count_at_base": 3
+    },
+    {
+      "path": "test/unit/honeypotTaxThreshold.test.ts",
+      "it_count_at_base": 4
+    },
+    {
+      "path": "test/unit/mevStrategies/inclusionReconciliationConfig.test.ts",
+      "it_count_at_base": 23
+    },
+    {
+      "path": "test/unit/provider.test.ts",
+      "it_count_at_base": 4
+    },
+    {
+      "path": "test/unit/riskManager.test.ts",
+      "it_count_at_base": 8
+    }
+  ],
+  "added_in_phase_22": [
+    "test/integration/dbInit.test.ts",
+    "test/unit/guards/singleton.test.ts",
+    "test/unit/rails/dbTripwireSrc.test.ts"
+  ]
+}

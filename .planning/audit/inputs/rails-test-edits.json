@@ -112,6 +112,16 @@
       "never_executed_in_phase_22": true,
       "first_execution_owner_phase": 25,
       "register_as": "test-quality"
+    },
+    {
+      "file": "test/unit/bot/buyNonceLock.test.ts",
+      "test": "Phase 21.2 / WR-01 — the buy submit routes through the REAL withNonceLock (observable serialization), all three cases (module-level vi.mock of src/utils/logger)",
+      "it_count_before": 3,
+      "it_count_after": 3,
+      "change": "The logger mock gained top-level info, warn, debug, error and fatal vi.fn()s beside the existing child(). No assertion, import, or mocked mechanism changed. withNonceLock stays real.",
+      "reason": "Found by plan 22-12's run of the 37 reset/doMock files; not caused by the duplicate-load guard (same TypeError with registerSingleton neutralised). The mock exposed only logger.child, and src/utils/dbSchema.ts migrateSchema calls logger.info when it creates a fresh database. Under the rails DB_PATH is an empty per-worker temp file, so the migration now runs; before the rails this test opened the live data/bot.db at schema version 7, so that branch never ran (AUD-TESTU-001).",
+      "register_as": "test-quality",
+      "added_by_plan": "22-12"
     }
   ]
 }
