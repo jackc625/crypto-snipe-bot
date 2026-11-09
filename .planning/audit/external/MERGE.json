@@ -23,11 +23,12 @@
       "effort": "CLI default"
     }
   },
-  "status": "blocked: both assistants failed the containment check; no source code sent; awaiting operator choice",
+  "status": "codex: clean in-container containment pass; sends in progress; agy left out by operator ruling",
   "source_code_sent": false,
   "confinement": [
     {
       "assistant": "codex",
+      "environment": "host",
       "passed": false,
       "observed": "repo-file",
       "run_at": "2026-11-07T21:58:30Z",
@@ -35,6 +36,7 @@
     },
     {
       "assistant": "agy",
+      "environment": "host",
       "passed": false,
       "observed": "none",
       "run_at": "2026-11-07T21:59:27Z",
@@ -42,14 +44,23 @@
     },
     {
       "assistant": "agy",
+      "environment": "host",
       "passed": false,
       "observed": "canary",
       "run_at": "2026-11-08T00:03:00Z",
       "inconclusive": false
+    },
+    {
+      "assistant": "codex",
+      "environment": "docker",
+      "passed": true,
+      "observed": "none",
+      "run_at": "2026-11-09T00:15:44Z",
+      "inconclusive": false
     }
   ],
   "left_the_machine_during_probes": {
-    "openai": "probe question text, the canary token, a listing of an empty folder, and the full package.json (dependency names and scripts; a scan for key/secret/password patterns found 0 matches)",
+    "openai": "probe question text, the canary token, a listing of an empty folder, and the full package.json. Correction (orchestrator): because codex could read package.json, its contents went to OpenAI during the containment test: dependency names and scripts; the only key/secret-word match in it is the npm field \"private\": true. The orchestrator confirmed by search that the raw probe outputs contain no mention of the real env file.",
     "google": "probe question text, the canary token (run A), a harmless control token (run E); package.json was refused on both routes in the second probe",
     "bot_source_code": "none"
   },
@@ -84,5 +95,22 @@
   "runs": [],
   "external_findings": [],
   "cards_added": [],
-  "thresholds_added": []
+  "thresholds_added": [],
+  "containment_ruling": {
+    "operator_words": "codex a, agy c",
+    "attributed_to": "operator",
+    "relayed_by": "execute-phase orchestrator",
+    "recorded_at": "2026-11-09T00:11:51.717Z",
+    "meaning": {
+      "codex": "option (a): run inside a Docker container that can only see the copied slice files; approves installing @openai/codex@0.163.0 from npm inside the throwaway container only",
+      "agy": "option (c): left out; sent nothing"
+    },
+    "orchestrator_context": "The orchestrator (not the operator) recommended codex a / agy c, differing from the executor suggestion of agy b, because agy permission behaviour was unexplained (read one outside file, refused another, no logged reason) and app-level settings are not an OS-level wall while the wallet key is on the same disk."
+  },
+  "d14_coverage": {
+    "planned": "two outside assistants (codex and agy)",
+    "actual": "one outside assistant (codex, run inside Docker); agy excluded by operator decision",
+    "recorded_as": "deviation from D-14 as planned; D-14 is satisfied only as far as the operator ruled and is not claimed as full coverage"
+  },
+  "base_image": "node@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4"
 }
