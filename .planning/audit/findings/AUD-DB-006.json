@@ -94,5 +94,10 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "fixed_by": [
+    "1d1991d"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 11, 12, 13 (22-09-2-version-probe.txt, 22-09-3-refuse-to-create.txt, 22-09-4-write-boundary.txt)",
+  "fix_scope": "Closes the newer-schema half only: a database at a higher version is refused with its bytes unchanged. The other half of the title, that every import of db.ts writes the database (the unconditional user_version write and the normalizeLegacyMainnetRows update), is not changed by the rail, so the status stays confirmed. Phase 24 decides whether import-time writes change."
 }

@@ -1,0 +1,43 @@
+{
+  "id": "AUD-TX-026",
+  "title": "The process lock folder follows the OS user and HOME, so two bots on one wallet under different users or a changed HOME each get their own lock",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [
+    "C15"
+  ],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S3, equal to the estimate: the exclusion needs a second bot started under another OS user or a changed HOME, which is a deliberate unusual act; the header documents it.",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#4"
+  ],
+  "owner_phase": "24",
+  "files": [
+    "src/utils/processLock.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/processLock.ts:82@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the lock directory is derived from the OS user home folder"
+    }
+  ],
+  "sibling_sites_checked": "Lock file path comes only from defaultLockDir and the wallet address. Nothing else relocates the lock (no env var or flag, by design).",
+  "recommendation": "Phase 24 decides on a machine-wide lock location. Documented in src/utils/processLock.ts."
+}

@@ -43,7 +43,7 @@
     }
   ],
   "sibling_sites_checked": "In-process signing all goes through withNonceLock (AUD-TX-001 sibling list). Out-of-process signers (scripts/deliberate-buy.ts, scripts/recover-sell-ladys.ts) are a separate known gap owned by Phase 29 (HYG-03) and the SCRIPTS slice. The second-key case (two bots with different wallets sharing data/bot.db) is a 22-CONTEXT deferred idea for the DB slice. A duplicate module in one process is AUD-TX-004.",
-  "status": "confirmed",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-18"
@@ -65,5 +65,13 @@
     "claude (22-20 executor)"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "fixed_by": [
+    "569f08c",
+    "3786e2e",
+    "961d269",
+    "5378478"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 24, 25, 26 (22-13-1-lock-pin.txt, 22-13-2-lock-refusal.txt, 22-13-3-direct-entry-first-import.txt)",
+  "status_note": "The re-audit reviewed src/utils/processLock.ts, src/main.ts and src/guards/directEntry.ts in full. A second bot process on the same wallet is refused at boot. Out-of-process signing scripts honoring the lock stays with Phase 29 (HYG-03), and the lock folder follows the OS user (AUD-TX-026)."
 }

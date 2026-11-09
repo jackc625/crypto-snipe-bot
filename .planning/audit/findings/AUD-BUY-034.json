@@ -1,0 +1,56 @@
+{
+  "id": "AUD-BUY-034",
+  "title": "A non-empty VITEST in the bot environment or .env switched a real start to test behaviour: a temporary database with no open positions, and every Telegram alert refused, while the bot kept trading",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [
+    "C18"
+  ],
+  "capital_impact": "EXPOSURE",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S2, equal to the estimate: low likelihood (nobody sets VITEST by hand), but silent and it would have hidden real positions and muted alerts. Fixed before the bot was started.",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "input_refs": [
+    "rails-discoveries.json#3"
+  ],
+  "files": [
+    "src/main.ts",
+    "src/utils/db.ts",
+    "src/utils/notifier.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/main.ts:67@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the fix: VITEST set refuses before the lock"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/notifier.ts:45@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "why the bug existed: the src-layer rails key on VITEST"
+    },
+    {
+      "type": "command",
+      "ref": "red-proofs/22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+      "note": "RED before the fix, GREEN after; tests in test/unit/mainEntry.test.ts"
+    }
+  ],
+  "sibling_sites_checked": "Every VITEST read in src/: db.ts, notifier.ts, config.ts, main.ts. Scripts that load db.ts under a shell VITEST do not reach the signing path; preflight with VITEST set gets the temp DB and a failing report rather than a false pass.",
+  "fixed_by": "5378478",
+  "red_proof": "22-review-1-boot-and-db-guards.txt (INDEX.md row 29)",
+  "recommendation": "Done (5378478). src/main.ts refuses to start when VITEST is set, in the shell or in .env."
+}

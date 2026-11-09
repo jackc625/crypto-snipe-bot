@@ -1,0 +1,40 @@
+{
+  "id": "AUD-ROOT-010",
+  "title": "capture-baselines --out with no value writes to the committed baseline folder",
+  "kind": "finding",
+  "related": [],
+  "tags": [],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "S4, equal to the estimate: a tooling edge.",
+  "area": "scripts",
+  "slice": "ROOT",
+  "severity": "S4",
+  "input_refs": [
+    "rails-discoveries.json#12"
+  ],
+  "files": [
+    "scripts/capture-baselines.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#12 (IN-03)",
+      "note": "recorded by the code review; read of the --out argument handling confirmed the default falls back to the committed folder"
+    }
+  ],
+  "sibling_sites_checked": "Only this script has an --out default that points inside the repo.",
+  "recommendation": "Require a value for --out when the flag is given."
+}

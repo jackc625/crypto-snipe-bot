@@ -1,0 +1,54 @@
+{
+  "id": "AUD-TESTQ-003",
+  "title": "The live HoneypotChecker bytecode test sat in the default integration suite; it was moved to the fork project by operator ruling and has not run since",
+  "kind": "finding",
+  "related": [
+    "AUD-TESTQ-034",
+    "AUD-TESTI-011"
+  ],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": "ESC-RAILS-01",
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S3: no bot code at fault; the test could not pass under the rails.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#2",
+    "rails-test-edits.json#14"
+  ],
+  "files": [
+    "test/integration/honeypotDeploy.eth.test.ts",
+    "test/fork/honeypotDeploy.eth.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#2 and ESC-RAILS-01",
+      "note": "moved in d66d8d0; assertions word for word"
+    },
+    {
+      "type": "code",
+      "ref": "test/fork/honeypotDeploy.eth.fork.test.ts:33@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "the moved test"
+    }
+  ],
+  "sibling_sites_checked": "test/integration/*: no other test calls a live mainnet RPC directly (AUD-TESTI-011 enumerated the fork project side).",
+  "fixed_by": "d66d8d0",
+  "red_proof": "operator ruling ESC-RAILS-01; first real run is obligation UFV-05 (AUD-TESTQ-034)",
+  "recommendation": "Done as ruled. The real run is AUD-TESTQ-034, owner Phase 25."
+}

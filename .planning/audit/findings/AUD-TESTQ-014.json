@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-014",
+  "title": "captureRehearsal fork test: FORK_RPC routed through resolveForkRpcUrl",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "As above.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-test-edits.json#8"
+  ],
+  "files": [
+    "test/fork/captureRehearsal.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#8",
+      "note": "Fork RPC read routed through resolveForkRpcUrl, fallback removed: the module-scope FORK_RPC constant now calls resolveForkRpcUrl(). Reason: AC-17 shell-only: the old fallback read a variable the fork-mode rails replace with a sentinel (and which used to come from .env)."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/fork/captureRehearsal.fork.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None beyond the fork obligation (AUD-TESTQ-035, owner Phase 25)."
+}

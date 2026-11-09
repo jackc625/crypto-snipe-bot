@@ -1,0 +1,45 @@
+{
+  "id": "AUD-TESTQ-020",
+  "title": "Seven rail test files trigger their own rail denials on purpose; they are proofs that a rail fires, not test-quality defects",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S4 informational: expected behaviour of proof tests.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "files": [
+    "test/integration/rails/notifierRefusalIntegration.test.ts",
+    "test/integration/rails/railsIntegration.test.ts",
+    "test/unit/rails/dbTripwireSetup.test.ts",
+    "test/unit/rails/dbTripwireSrc.test.ts",
+    "test/unit/rails/envSentinel.test.ts",
+    "test/unit/rails/netDeny.test.ts",
+    "test/unit/rails/notifierRefusal.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "inputs/full-suite-ledger-summary.json triggeringTestFiles (run vpu-20261109T055941-14196-47d53c)",
+      "note": "filtered to test/*/rails/ paths: 7 files. Ledger entries per file: notifier refusals; env, data, DB and network denials against fakes or loopback; net-allow to 127.0.0.1"
+    }
+  ],
+  "sibling_sites_checked": "The other nine triggering files are registered individually.",
+  "recommendation": "None."
+}

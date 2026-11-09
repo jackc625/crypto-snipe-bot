@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-010",
+  "title": "pauseCli Test 4 now uses spawnRailedChild with envOverrides",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "The assertions are unchanged.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "input_refs": [
+    "rails-test-edits.json#4"
+  ],
+  "files": [
+    "test/integration/pauseCli.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#4",
+      "note": "Parent-env copy and direct spawn replaced by spawnRailedChild with envOverrides {DASHBOARD_API_KEY: ''}. The comment explaining the old env-copy trick was replaced. Assertions unchanged (exit 1, output matches DASHBOARD_API_KEY not set). Reason: D-03: the child was built from a copy of the parent environment."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/integration/pauseCli.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}

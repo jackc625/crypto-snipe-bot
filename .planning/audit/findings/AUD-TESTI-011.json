@@ -147,5 +147,16 @@
   "affected_cases": [
     "every case of the files listed under files"
   ],
-  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect. What stays green while it happens: preflightCli Test 1 opens and migrates data/bot.db in its child and calls the mainnet RPC with the operator's key-bearing URL, and passes whether preflight succeeds (exit 0) or fails (exit 1)."
+  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect. What stays green while it happens: preflightCli Test 1 opens and migrates data/bot.db in its child and calls the mainnet RPC with the operator's key-bearing URL, and passes whether preflight succeeds (exit 0) or fails (exit 1).",
+  "fixed_by": [
+    "6a254a1",
+    "31b7854",
+    "791e811",
+    "1d1991d",
+    "03412cf",
+    "be3c572",
+    "d66d8d0"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-21",
+  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files. Fork-side items are the unrun obligations AUD-TESTQ-030 to AUD-TESTQ-035."
 }

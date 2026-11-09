@@ -9,7 +9,9 @@
   "items": [
     "input:rails-discoveries.json#2"
   ],
-  "resolved_items": [],
+  "resolved_items": [
+    "AUD-TESTQ-003"
+  ],
   "summary": "The first full railed run of the test suite had one red test: test/integration/honeypotDeploy.eth.test.ts, 'has bytecode at deployedAddress (not 0x)'. It is a live mainnet check sitting in the default integration suite: it asks an RPC whether the HoneypotChecker contract really has code on chain. Under the safety rails ETH_RPC_URL is a fake local address, so the call is refused and the test fails. No bot code is at fault and no capital path is involved. It could not go green under the rails without a forbidden edit (skip, delete, or a fake RPC returning canned bytecode). Three options were presented: (a) keep the test failing and register an escalated finding; (b) move this one test to the fork project, inside plan 22-15, keeping the real bytecode check against forked mainnet, with a tracked obligation for Phase 25 because the moved test will not actually run until then; (c) stop Phase 22. The operator chose (b).",
   "presented_at": "2026-11-09 session: the 22-15 Task 1 blocking checkpoint, relayed to the operator by the execute-phase orchestrator",
   "operator_response": "b",

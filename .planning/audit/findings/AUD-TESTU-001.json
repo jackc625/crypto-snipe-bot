@@ -131,5 +131,15 @@
   "affected_cases": [
     "every case in the files listed under files"
   ],
-  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect itself. Example of what stays green while it happens: a change to src/utils/db.ts:9-24 that writes to the DB at import (for example a new migration step) runs against data/bot.db whenever bot/twoStageSigint.test.ts or bot/buyNonceLock.test.ts loads src/bot before the rails, and both tests still pass."
+  "escaped_regression": "Not a hidden-regression finding: the defect is the side effect itself. Example of what stays green while it happens: a change to src/utils/db.ts:9-24 that writes to the DB at import (for example a new migration step) runs against data/bot.db whenever bot/twoStageSigint.test.ts or bot/buyNonceLock.test.ts loads src/bot before the rails, and both tests still pass.",
+  "fixed_by": [
+    "6a254a1",
+    "31b7854",
+    "791e811",
+    "1d1991d",
+    "03412cf",
+    "be3c572"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-18",
+  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files."
 }

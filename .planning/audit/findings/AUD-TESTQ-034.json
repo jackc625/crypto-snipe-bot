@@ -1,0 +1,45 @@
+{
+  "id": "AUD-TESTQ-034",
+  "title": "UFV-05 (AC-22 / HONEY-03): this fork assertion has not run under the real fork project",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality",
+    "unrun-verification"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "d66d8d061cd0760af9269b5e48cf8e5ef6cfca7b",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S2 by the plan: an unexecuted rail assertion can hide a fork-mode leak. Capital none: no fork test runs against live funds and the bot is off.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S2",
+  "owner_phase": "25",
+  "input_refs": [
+    "unrun-fork-verifications.json#4"
+  ],
+  "files": [
+    "test/fork/honeypotDeploy.eth.fork.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "unrun-fork-verifications.json#4",
+      "note": "Assertion: HONEY-03: HoneypotChecker deployed on ETH > has bytecode at deployedAddress (not 0x): the ETH HoneypotChecker has real code on mainnet (the code is not 0x and is longer than 100 characters). Moved from test/integration/honeypotDeploy.eth.test.ts by operator ruling ESC-RAILS-01; it has not run in its new file. Why not run: The test needs a real mainnet RPC through ETH_FORK_RPC_URL under the fork project, and npm run test:fork starts Hardhat through the fork globalSetup (test/fork/setup.ts). Phase 22 runs no Hardhat command (AC-08). Rehearsal: A scratchpad Vitest config with the fork project's setupFiles (test/rails/setup-fork.cjs), fileParallelism and timeout, without the Hardhat globalSetup, wrapped with --net-watch, ETH_FORK_RPC_URL pointing at a loopback fake JSON-RPC server on 127.0.0.1 and verdict untouched each time. Fake returned 402 characters of bytecode: passed, and the fake logged eth_getCode for 0x8243dbea5cad296b9e72a6ed557d7e0febee13ed on the /rehearsal-marker path, so the URL came from the resolver and not from ETH_RPC_URL (run vpu-20261109T044252-20672-15c2d6). Fake returned 0x: failed on expect(code).not.toBe (run vpu-20261109T044257-2304-03f813). Fake returned 0x6080: failed on the length assertion (run vpu-20261109T044329-5352-897f8e). ETH_FORK_RPC_URL unset: failed with the resolver's error naming the variable, and the fake got 0 requests (run vpu-20261109T044303-11500-42705a). This proves the test's wiring only. It is NOT proof the contract exists: the bytecode came from the fake. Result: pass (vpu-20261109T044252-20672-15c2d6)"
+    }
+  ],
+  "sibling_sites_checked": "Each entry of unrun-fork-verifications.json has one obligation. Proven meanwhile by: npm run preflight (checkHoneypotCheckerCode in src/preflight.ts) performs the same live getCode check, but only when the operator runs it. Nothing in Phase 22 runs it against the real RPC, so nothing automated confirms the contract exists during this phase.",
+  "escaped_regression": "A HoneypotChecker that does not exist at the configured mainnet address (wrong address, wrong chain) passes the rehearsal, because the rehearsal bytecode came from a loopback fake.",
+  "recommendation": "Run it by name at the first npm run test:fork of v7.0, owner Phase 25 (ROADMAP Phase 25 success criterion 3) or any earlier phase that runs the fork suite, and record pass or fail for this named assertion."
+}

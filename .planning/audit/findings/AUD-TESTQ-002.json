@@ -1,0 +1,50 @@
+{
+  "id": "AUD-TESTQ-002",
+  "title": "vi.doMock('../../src/db') in test/unit/configEnvVar.test.ts named a module that does not exist, so the mock was a silent no-op from the day the test was written",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "fixed",
+  "severity_rationale": "S3: the claim under test was still proven; no test passed because of the no-op.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "input_refs": [
+    "rails-discoveries.json#1",
+    "rails-test-edits.json#12"
+  ],
+  "files": [
+    "test/unit/configEnvVar.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/unit/configEnvVar.test.ts:146@26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+      "note": "corrected specifier"
+    },
+    {
+      "type": "command",
+      "ref": "rails-discoveries.json#1",
+      "note": "with the broken specifier one run added three files to the per-worker test-DB folder; with the fix, none; the same ten tests pass both ways"
+    }
+  ],
+  "sibling_sites_checked": "The vi.mock specifier gate (scripts/check-vi-mock-paths.ts) checks every call: 583 resolved, this one did not.",
+  "fixed_by": "27f21a8",
+  "red_proof": "SAFE-06 gate (INDEX rows 27 and 28)",
+  "recommendation": "Done. Keep the SAFE-06 gate in CI."
+}

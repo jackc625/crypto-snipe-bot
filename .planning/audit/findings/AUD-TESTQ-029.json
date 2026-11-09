@@ -1,0 +1,39 @@
+{
+  "id": "AUD-TESTQ-029",
+  "title": "test/unit/api/antiRug.test.ts appears in the rail ledger as a net-allow to loopback",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "re-audit",
+  "status": "confirmed",
+  "severity_rationale": "S4 informational: a loopback connection is allowed by design. It is listed because the plan asks for every triggering file.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S4",
+  "files": [
+    "test/unit/api/antiRug.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rail ledger of run vpu-20261109T055941-14196-47d53c",
+      "note": "net-allow to 127.0.0.1 from an HTTP test client against the local API under test. No deny, no block, no data or env entry in this run."
+    }
+  ],
+  "sibling_sites_checked": "Ledger entries for this run were aggregated by test file (stack frames); this file holds only net-allow to 127.0.0.1.",
+  "recommendation": "None."
+}

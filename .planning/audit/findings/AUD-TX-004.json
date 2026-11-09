@@ -44,7 +44,7 @@
     }
   ],
   "sibling_sites_checked": "The other module-state singletons named by RC-17 (sell lock exitManager.ts:14/:53/:104, ExitWorker exitEngine.ts:1421, anti-rug registry detector.ts:192/:197/:247) are in the EXIT and ANTIRUG slices; their slices own those entries. In this slice the only lock/registry singleton is nonceAuthority.ts:43; provider.ts:7-8 caches providers in module Maps, where a duplicate instance means a second provider, not a capital defect.",
-  "status": "confirmed",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-17"
@@ -85,5 +85,11 @@
       ],
       "status": "candidate"
     }
-  ]
+  ],
+  "fixed_by": [
+    "ac4cd88",
+    "b3617f6"
+  ],
+  "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 22, 23 (22-12-1-singleton-guard.txt, 22-12-2-singleton-epoch.txt)",
+  "status_note": "The re-audit reviewed src/guards/singleton.ts and all four registrations in full: the guard throws before the guarded state exists, and casing, junction and cache aliases converge on one registry entry. Moved to fixed on that evidence; the Phase 26 ESM conversion must re-check it (AUD-REAUDIT-002)."
 }

@@ -1,0 +1,42 @@
+{
+  "id": "AUD-TESTQ-006",
+  "title": "preflightCli Test 1 changed from 'against current .env' to 'against the sentinel test env'",
+  "kind": "finding",
+  "related": [],
+  "tags": [
+    "test-quality"
+  ],
+  "duplicate_of": null,
+  "escalation_ref": null,
+  "od_ref": null,
+  "rc": [],
+  "research_suggested_severity": null,
+  "reported_by": [
+    "claude (22-29 executor)"
+  ],
+  "found_date": "2026-11-09",
+  "audited_sha": "26e01b4c10845fcadc7b53fe4d92fe056c98689d",
+  "classes": [],
+  "capital_impact": "none",
+  "origin": "rails-discovery",
+  "status": "confirmed",
+  "severity_rationale": "The test depended on the real environment; the edit removes that. Severity S3 because the test name and its claim changed to what it can now observe.",
+  "area": "test",
+  "slice": "TESTQ",
+  "severity": "S3",
+  "input_refs": [
+    "rails-test-edits.json#0"
+  ],
+  "files": [
+    "test/integration/preflightCli.test.ts"
+  ],
+  "evidence": [
+    {
+      "type": "command",
+      "ref": "rails-test-edits.json#0",
+      "note": "Child now started through spawnRailedChild on the sentinel test env. Title and comment changed from 'against current .env' to 'against the sentinel test env'. Assertions unchanged (status not null, 0 or 1, never 2). Reason: The test depended on the operator's real .env, network and DB: it spawned preflight with the parent environment, so the child reloaded real configuration. RESEARCH Pitfall 7, D-03."
+    }
+  ],
+  "sibling_sites_checked": "Every entry of rails-test-edits.json is registered individually or merged with its discovery. The diff of test/integration/preflightCli.test.ts was re-read against audit_base_sha.",
+  "recommendation": "None; the edit stands."
+}
