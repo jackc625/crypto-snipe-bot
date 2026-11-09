@@ -48,7 +48,7 @@ Task IDs are filled in by the plans. Commands below come from the requirement ma
 | TBD | TBD | 1 | CHAR-01 (AC-02) | — | N/A | gate + self-test | mock-list check `--self-test` | ❌ W1 | ⬜ pending |
 | TBD | TBD | 1 | CHAR-05 (AC-04 to AC-06) | — | N/A | integration | `npx vitest run --project realpath migrations` | ❌ W1 | ⬜ pending |
 | TBD | TBD | 1 | CHAR-05 (AC-07) | — | N/A | unit | `npx vitest run --project unit helpers.smoke db.test` | ✅ needs edit | ⬜ pending |
-| TBD | TBD | 2 | AUDIT-02 (AC-08 to AC-18) | — | N/A | register + tests | `.planning/audit/tools/check.ts --stage final` and `npx vitest run --project realpath triage` | ❌ W2 | ⬜ pending |
+| TBD | TBD | 2 | AUDIT-02 (AC-08 to AC-18) | — | N/A | register + tests | `.planning/audit/tools/check.ts --stage triage` and `npx vitest run --project realpath triage` | ❌ W2 | ⬜ pending |
 | TBD | TBD | 3 | CHAR-02 (AC-19 to AC-26) | — | Recordings hold only inert test values (AC-51) | integration | `npx vitest run --project realpath scenarios`, three runs for AC-24 | ❌ W3 | ⬜ pending |
 | TBD | TBD | 3 | CHAR-03 (AC-27 to AC-29) | — | Snapshots hold only inert test values (AC-51) | integration | `npx vitest run --project realpath env` | ❌ W3 | ⬜ pending |
 | TBD | TBD | 3 | CHAR-04 (AC-30, AC-31) | — | N/A | integration | `npx vitest run --project realpath ordering` | ❌ W3 | ⬜ pending |

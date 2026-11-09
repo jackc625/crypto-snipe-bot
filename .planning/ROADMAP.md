@@ -222,7 +222,61 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: TBD
+**Plans**: 26 plans in 11 execution waves
+
+Plans:
+**Wave 1**
+- [ ] 23-01-PLAN.md — Real-path harness tracer: one real buy end to end; unknown methods, reads and URLs fail loudly; all launch routes (AC-01, AC-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 23-02-PLAN.md — Ordered timeline with DB capture, known-bug marker, mock-list gate wired into npm and CI (AC-02, D-07, D-08, D-14)
+- [ ] 23-03-PLAN.md — Migration golden tests and the real-migration test database helper (AC-04 to AC-07)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 23-04-PLAN.md — Register checker: triage outcomes, D-21 rules, --stage triage, set-triage.ts
+
+**Cross-cutting constraints:** <!-- gsd:generated -->
+- AC-08: Each of the 59 register entries has exactly one outcome from Requirement 3, or is on a list of unreproduced entries the operator has reviewed.
+- AC-11: A test covering several entries asserts each one, and every entry names its own status and test.
+- AC-17: Every S0/S1 closed as NOT-A-BUG has a recorded operator ruling.
+- AC-09: Each expected-fail test asserts the correct behavior and fails on that assertion. A setup error, type error or timeout reports as a real failure.
+- D-10: one test file per root cause, named after the lead finding
+- AC-12: Race findings are shown by forcing the exact order of events, with no reliance on sleeps or timing.
+- AC-38: A test removed rather than converted appears by name with its reason in the plan summary.
+- AC-20: Each scenario's recording contains its op logs, submitted transaction requests and calldata, relay request bodies, and database writes.
+- AC-24: 3 runs in a row produce byte-identical output.
+- Each recording is committed once and tagged per the Tag rule
+
+**Wave 4 (triage, one file per root cause)**
+- [ ] 23-05-PLAN.md — Buy submission and money out: AUD-BUY-002, -003, -015, -030, -033, AUD-TX-007
+- [ ] 23-06-PLAN.md — Entry gates and alerts, including the S0: AUD-BUY-001, -006, -009, -011, -027, -028
+- [ ] 23-07-PLAN.md — Exit monitoring and pricing: AUD-EXIT-001, -002, -003, -004, -013, -015
+- [ ] 23-08-PLAN.md — Exit lifecycle and dashboard sells: AUD-EXIT-005, -007, -008, -014, AUD-API-001
+- [ ] 23-09-PLAN.md — Nonce lock and concurrency: AUD-TX-001, -002, -003, AUD-BUY-004, -010, -025, AUD-EXIT-009
+- [ ] 23-10-PLAN.md — WebSocket lifecycle and anti-rug: AUD-ANTIRUG-001, -003, -004, -005, AUD-API-002, AUD-BUY-008
+- [ ] 23-11-PLAN.md — Risk limits and database: AUD-DB-001, -002, -003, -004, -007, -021
+- [ ] 23-12-PLAN.md — Crash-class child processes: AUD-ANTIRUG-002, AUD-API-008, AUD-TX-009, AUD-BUY-005
+- [ ] 23-13-PLAN.md — Static and import-order proofs, including AC-14: AUD-SCRIPTS-001, -002, AUD-BUY-007, AUD-DB-005, -006
+- [ ] 23-14-PLAN.md — Closures by rail test (AC-13): AUD-TX-004, -005, AUD-RAIL-001, -002, AUD-TESTI-001, -011, AUD-TESTU-001
+- [ ] 23-15-PLAN.md — Candidate 26 manual relay request, after operator approval: AUD-TX-006 (AC-15)
+**Wave 5**
+- [ ] 23-16-PLAN.md — Plain-language operator batch from three identical runs, rulings, and a passing register (AC-08, AC-10, AC-16 to AC-18)
+**Wave 6**
+- [ ] 23-17-PLAN.md — Standing signing census gate with named exceptions (AC-32 to AC-36)
+- [ ] 23-18-PLAN.md — Source-text conversion, part 1 of 2
+**Wave 7**
+- [ ] 23-19-PLAN.md — Source-text conversion, part 2 of 2, and the standing AST check (AC-37)
+**Wave 8**
+- [ ] 23-20-PLAN.md — Recording format and update command; Flashbots V2 with all five exits (AC-20 to AC-26)
+**Wave 9**
+- [ ] 23-21-PLAN.md — Flashbots V3 recordings
+- [ ] 23-22-PLAN.md — bloXroute and public routes, risk gate, fee and gas recordings (AC-19, AC-22)
+- [ ] 23-23-PLAN.md — Env-matrix snapshot across config, chain registry and risk manager (AC-27 to AC-29)
+- [ ] 23-24-PLAN.md — Boot, resume and arm ordering, listener counts, same-block order, singleton identity (AC-30, AC-31)
+**Wave 10**
+- [ ] 23-25-PLAN.md — Commit check protecting the recordings and the env snapshot (AC-39 to AC-44)
+**Wave 11**
+- [ ] 23-26-PLAN.md — Successor seal, seal-tool fix, full-suite gate and src/ diff review (AC-45, AC-49 to AC-52)
 
 ### Phase 24: Capital-Safety Fixes
 **Goal**: Every confirmed capital-safety finding is fixed on the current layout, with RED→GREEN real-path proof. After this phase:
