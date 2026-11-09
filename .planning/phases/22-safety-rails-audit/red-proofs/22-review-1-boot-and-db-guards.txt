@@ -1,0 +1,22 @@
+Phase 22 code-review fixes (WR-01, WR-03, WR-04, WR-05), applied before the 22-29 seal.
+New tests were written first and run against the unfixed code, then the fix was applied and the same files re-run.
+
+=== RED: unfixed code
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL   integration  test/integration/dbGuards.test.ts > the probe itself leaves no trace (no new files, no changed bytes) > a failed temp-copy cleanup does not turn a good probe into a failure (review WR-04)
+ FAIL   unit  test/unit/mainEntry.test.ts > SAFE-04 boot entry > a set VITEST refuses the start before the lock is touched and never starts the bot (review WR-01)
+ FAIL   unit  test/unit/mainEntry.test.ts > SAFE-04 boot entry > readStartEnv reads the file into a private object, lets the shell win, and leaves process.env untouched (review WR-03)
+TypeError: readStartEnv is not a function
+ FAIL   unit  test/unit/mainEntry.test.ts > SAFE-04 boot entry > (1) starts the bot exactly once, only after the lock is held
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > a data folder that is a link > refuses a target reached through a junction or symlink at <repo>/data (review WR-05)
+AssertionError: expected 'NO-THROW' to be 'RAIL_DB_TRIPWIRE_SRC' // Object.is equality
+ Test Files  3 failed (3)
+      Tests  5 failed | 31 passed (36)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T053832-18104-082521 | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T053832-18104-082521\summary.json
+
+(1) starts the bot exactly once failed only as a knock-on: with no refusal yet, the WR-01 test really acquired and pinned the lock in that worker.
+
+=== GREEN: fixed code
+ Test Files  7 passed (7)
+      Tests  61 passed (61)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T053949-17484-a9ba81 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T053949-17484-a9ba81\summary.json

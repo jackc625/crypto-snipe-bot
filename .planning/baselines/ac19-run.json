@@ -1,5 +1,5 @@
 {
-  "run_id": "vpu-20261109T045355-20916-8a9783",
+  "run_id": "vpu-20261109T054111-22024-02ecc1",
   "command": [
     "npm",
     "test",
@@ -10,8 +10,8 @@
   "exit_code": 0,
   "child_status": 0,
   "verdict": "untouched",
-  "started_at": "2026-11-09T04:53:56.883Z",
-  "finished_at": "2026-11-09T04:55:19.452Z",
+  "started_at": "2026-11-09T05:41:13.840Z",
+  "finished_at": "2026-11-09T05:43:01.823Z",
   "node_version": "v22.16.0",
   "npm_version": "11.17.0",
   "before": {
@@ -52,29 +52,29 @@
   "manifest_match": true,
   "data_listing_unchanged": true,
   "ledger": {
-    "summary_path": "C:/Users/jackc/AppData/Local/Temp/crypto-snipe-bot-rail-ledger/vpu-20261109T045355-20916-8a9783/summary.json",
-    "summary_sha256": "1758571d707f96cdd2b9fa70677093fec4f44a4fe73e8d466a41b7711636bcf4",
+    "summary_path": "C:/Users/jackc/AppData/Local/Temp/crypto-snipe-bot-rail-ledger/vpu-20261109T054111-22024-02ecc1/summary.json",
+    "summary_sha256": "269e2414c20726fb313fcf85c4c762e9bfcaa385f787ef84dc650718f52e4baf",
     "projects": [
       "integration",
       "unit"
     ],
     "workers_by_project_counts": {
       "integration": 34,
-      "none": 208,
-      "unit": 101
+      "none": 207,
+      "unit": 99
     },
     "countsByKind": {
       "worker-start": 357,
       "net-allow": 90,
+      "env-read-blocked": 12,
       "env-override": 61,
       "net-deny": 16,
-      "dns-deny": 2,
-      "udp-deny": 2,
-      "fork-shell-key": 18,
-      "env-read-blocked": 12,
       "db-tripwire": 21,
       "data-access-blocked": 24,
-      "notifier-refused": 6
+      "notifier-refused": 6,
+      "fork-shell-key": 18,
+      "dns-deny": 2,
+      "udp-deny": 2
     },
     "nonLoopbackAllowed": 0,
     "telegramAllowed": 0,
@@ -83,25 +83,25 @@
   "net_watch": {
     "ok": true,
     "problems": [],
-    "samples": 99,
+    "samples": 109,
     "sample_errors": 0,
-    "max_descendants": 64,
+    "max_descendants": 66,
     "non_loopback_observed": [],
     "loopback_connections_seen": 2,
     "vitest_main_observed": true,
-    "vitest_main_samples": 97,
+    "vitest_main_samples": 107,
     "descendant_names_at_peak": {
-      "cmd.exe": 15,
-      "node.exe": 32,
+      "cmd.exe": 16,
+      "node.exe": 33,
       "conhost.exe": 16,
       "git.exe": 1
     }
   },
   "report": {
     "path": "C:/Users/jackc/AppData/Local/Temp/claude/6e5f7d5f059d8da4/300890f7-8a1b-4f38-b47b-9cd167503d34/scratchpad/final-run.json",
-    "sha256": "03b504ce81c7fa2d032853f1e099a178f4c1ab6260cd7d83a90f8e86d07cfc4e",
+    "sha256": "59dd38156486265b9c5b1f7b1f70fa8834e4b32f36196039dd11d719e936ecae",
     "totals": {
-      "numPassedTests": 1194,
+      "numPassedTests": 1198,
       "numFailedTests": 0,
       "numPendingTests": 0,
       "numTodoTests": 0

@@ -1,8 +1,8 @@
 {
   "base_sha": "23a64617dca167976adc4645fed0e2c69e384820",
-  "head_sha": "36d567175828d884f82c7766d40070d5f78b3e97",
+  "head_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
   "head_source": "working tree",
-  "report_sha256": "03b504ce81c7fa2d032853f1e099a178f4c1ab6260cd7d83a90f8e86d07cfc4e",
+  "report_sha256": "59dd38156486265b9c5b1f7b1f70fa8834e4b32f36196039dd11d719e936ecae",
   "totals": {
     "files_at_base": 120,
     "files_at_head": 146,
@@ -34,10 +34,7 @@
       "status": "passed"
     }
   ],
-  "projects_ran": [
-    "integration",
-    "unit"
-  ],
+  "projects_ran": null,
   "missing_file": [],
   "files": {
     "test/fork/antiRugDetector.fork.test.ts": {

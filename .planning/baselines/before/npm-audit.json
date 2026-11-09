@@ -27,8 +27,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/abi",
@@ -47,8 +47,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/abstract-provider",
@@ -67,8 +67,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/abstract-signer",
@@ -87,8 +87,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/hash",
@@ -107,8 +107,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/signing-key",
@@ -127,8 +127,8 @@
         ],
         "fixAvailable": {
           "isSemVerMajor": true,
-          "name": "@nomicfoundation/hardhat-verify",
-          "version": "3.1.4"
+          "name": "hardhat",
+          "version": "3.21.2"
         },
         "isDirect": false,
         "name": "@ethersproject/transactions",
