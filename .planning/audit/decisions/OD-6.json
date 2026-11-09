@@ -43,7 +43,8 @@
   "findings": [
     "AUD-BUY-005",
     "AUD-BUY-002",
-    "AUD-BUY-008"
+    "AUD-BUY-008",
+    "AUD-TX-009"
   ],
   "decided": null,
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"

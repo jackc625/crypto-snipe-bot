@@ -37,5 +37,6 @@
     "AUD-TX-021"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-55"
 }

@@ -60,6 +60,6 @@
     "AUD-TX-010"
   ],
   "tags": [],
-  "od_ref": "DB-06",
+  "od_ref": "OD-63",
   "recommendation": "Generate the env list from one typed schema that the parsers use (key, type, range, default, required-when), add a sync test against .env.example (22-05 already syncs test/.env.test with .env.example), and drop or wire the dead keys. Card DB-06. Phase 27/29."
 }

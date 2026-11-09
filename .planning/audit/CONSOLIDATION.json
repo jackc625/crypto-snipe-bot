@@ -164,6 +164,51 @@
       "item": "AUD-BUY-015 raised to S1",
       "kind": "regrade",
       "outcome": "Moved up by the code-level re-grade; see regrade and ESC-BUY-04."
+    },
+    {
+      "item": "DB-07 / OD-18",
+      "kind": "card-link",
+      "outcome": "Linked, not numbered. DB-07 asks whether to run synchronous=FULL, which OD-18 already holds (its title and the full-only and intent-row-and-full options). Two cards would allow contradictory rulings on one setting. AUD-DB-021 moves to OD-18, and the one option OD-18 lacked (flush after critical writes only) is carried over as critical-flush-only."
+    },
+    {
+      "item": "DB-01 / OD-25",
+      "kind": "card-unlink",
+      "outcome": "Numbered, and the earlier linked_od to OD-25 (set at 22-21) is replaced by related_od. They are separate decisions: DB-01 is what the risk limits measure (units, open positions, partial sells), OD-25 is their values and parsing. OD-25 has no accounting option and depends on DB-01 being decided first. Left linked, DB-01 would have been reduced to a table row in OPERATOR-DECISIONS.md, losing an S1 capital decision and its options."
+    },
+    {
+      "item": "BUY-02 / OD-18",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "One shared option (write an intent row first), but BUY-02 decides the failure handling after a broadcast (reconcile on throw, split bookkeeping), which OD-18 does not cover. Kept separate, related_od set, and the recommendation tells the operator to decide them together."
+    },
+    {
+      "item": "TX-01 / OD-17",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Both touch the nonce lock and AUD-TX-002, but TX-01 decides how long one op may hold it and OD-17 decides who gets it next. Kept separate, related_od set, cross-reference added."
+    },
+    {
+      "item": "BUY-04 / ANTIRUG-05",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Both concern dashboard Stop chain, but one decides whether buying stops and the other whether anti-rug monitoring continues: different recommended behaviour, so not merged."
+    },
+    {
+      "item": "EXIT-03 / TX-02",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Fee ceilings on two different paths: TX-02 covers the private-submit ceiling wiring, EXIT-03 covers approvals and the public fallback (see the TH-EXIT-23 reconciliation). Not merged."
+    },
+    {
+      "item": "ANTIRUG-07 / EXIT-12 / DB-06 / OD-25",
+      "kind": "card-overlap-kept-separate",
+      "outcome": "Each validates a different group of settings and they are owned by different phases (24, 27), so not merged; DB-06 already sequences itself with OD-25."
+    },
+    {
+      "item": "BUY-05, DB-06, TX-04",
+      "kind": "card-capital-flag",
+      "outcome": "capital set to true because linked findings carry a capital_impact: BUY-05 (AUD-BUY-015, 027, 028, all S1), DB-06 (AUD-DB-020 STRAND), TX-04 (AUD-TX-014, AUD-DB-009, AUD-DB-010 EXPOSURE). BUY-05 now covers S1 findings, so its default and needed_by no longer allow Phase 29 or resting on the default."
+    },
+    {
+      "item": "card findings lists",
+      "kind": "card-findings-completed",
+      "outcome": "Added findings whose od_ref named a card that did not list them: OD-25 (AUD-API-003), OD-6 (AUD-TX-009), DB-01 (AUD-API-016, 017), TX-04 (AUD-DB-009, 010), BUY-03 (AUD-EXIT-018), EXIT-11 (AUD-ANTIRUG-004). AUD-ANTIRUG-011 is a duplicate and is not listed. Findings shared by two cards keep their single od_ref (AUD-TX-002, AUD-BUY-002, AUD-BUY-008, AUD-ANTIRUG-001, AUD-ANTIRUG-004); AUD-BUY-020 stays od_ref null because its own fix changes no behaviour."
     }
   ],
   "alias_resolutions": {
@@ -3120,5 +3165,276 @@
       "description": "D-14 (external second opinion) was only partly covered: codex only (Docker, no tools, code embedded in the prompt); agy was excluded by the operator ruling \"codex a, agy c\" (recorded in .planning/audit/external/MERGE.json)."
     }
   ],
-  "card_assignments": []
+  "card_assignments": [
+    {
+      "proposed_id": "BUY-01",
+      "assigned_id": "OD-26",
+      "slice": "BUY",
+      "title": "Protection of a deliberately bought position after the operator script exits"
+    },
+    {
+      "proposed_id": "BUY-02",
+      "assigned_id": "OD-27",
+      "slice": "BUY",
+      "title": "What the snipe path does when something fails after the buy may have been broadcast"
+    },
+    {
+      "proposed_id": "BUY-03",
+      "assigned_id": "OD-28",
+      "slice": "BUY",
+      "title": "Buy-entry concurrency: double buys of one token and risk limits across concurrent handlers"
+    },
+    {
+      "proposed_id": "BUY-04",
+      "assigned_id": "OD-29",
+      "slice": "BUY",
+      "title": "What dashboard \"stop chain\" means for buying"
+    },
+    {
+      "proposed_id": "BUY-05",
+      "assigned_id": "OD-30",
+      "slice": "BUY",
+      "title": "Token safety gates that do not test what they are named for"
+    },
+    {
+      "proposed_id": "BUY-06",
+      "assigned_id": "OD-31",
+      "slice": "BUY",
+      "title": "Telegram alpha intake: cooldown, processed set, V3 pools that already have liquidity"
+    },
+    {
+      "proposed_id": "BUY-07",
+      "assigned_id": "OD-32",
+      "slice": "BUY",
+      "title": "Buy deadline across private escalation attempts"
+    },
+    {
+      "proposed_id": "BUY-08",
+      "assigned_id": "OD-33",
+      "slice": "BUY",
+      "title": "Factory event processing and chain reorgs"
+    },
+    {
+      "proposed_id": "BUY-09",
+      "assigned_id": "OD-34",
+      "slice": "BUY",
+      "title": "Whether the deliberate public buy may use a new nonce after a private attempt"
+    },
+    {
+      "proposed_id": "EXIT-01",
+      "assigned_id": "OD-35",
+      "slice": "EXIT",
+      "title": "What happens when the exit monitor cannot take its first price"
+    },
+    {
+      "proposed_id": "EXIT-02",
+      "assigned_id": "OD-36",
+      "slice": "EXIT",
+      "title": "How the exit engine measures price"
+    },
+    {
+      "proposed_id": "EXIT-03",
+      "assigned_id": "OD-37",
+      "slice": "EXIT",
+      "title": "How and when sell approvals are sent, and which fee ceiling applies to them and to the public fallback"
+    },
+    {
+      "proposed_id": "EXIT-04",
+      "assigned_id": "OD-38",
+      "slice": "EXIT",
+      "title": "Exit-path liveness: overlapping polls, quote timeout, awaited alerts, watchdog order"
+    },
+    {
+      "proposed_id": "EXIT-05",
+      "assigned_id": "OD-39",
+      "slice": "EXIT",
+      "title": "Selling transfer-taxed tokens"
+    },
+    {
+      "proposed_id": "EXIT-06",
+      "assigned_id": "OD-40",
+      "slice": "EXIT",
+      "title": "What a failed exit with no further route does (V3 no fallback, unknown dex, paused)"
+    },
+    {
+      "proposed_id": "EXIT-07",
+      "assigned_id": "OD-41",
+      "slice": "EXIT",
+      "title": "Operator manual sells versus the routine retry pause"
+    },
+    {
+      "proposed_id": "EXIT-08",
+      "assigned_id": "OD-42",
+      "slice": "EXIT",
+      "title": "Exit bookkeeping and teardown confirmation"
+    },
+    {
+      "proposed_id": "EXIT-09",
+      "assigned_id": "OD-43",
+      "slice": "EXIT",
+      "title": "Freshness of the public-fallback floor"
+    },
+    {
+      "proposed_id": "EXIT-10",
+      "assigned_id": "OD-44",
+      "slice": "EXIT",
+      "title": "Which dex an existing position is monitored and sold on"
+    },
+    {
+      "proposed_id": "EXIT-11",
+      "assigned_id": "OD-45",
+      "slice": "EXIT",
+      "title": "Anti-rug precedence over in-flight exits and nonce-lock hold time"
+    },
+    {
+      "proposed_id": "EXIT-12",
+      "assigned_id": "OD-46",
+      "slice": "EXIT",
+      "title": "Validating exit settings at load"
+    },
+    {
+      "proposed_id": "ANTIRUG-01",
+      "assigned_id": "OD-47",
+      "slice": "ANTIRUG",
+      "title": "Anti-rug trigger dedupe, retry and circuit-breaker counting"
+    },
+    {
+      "proposed_id": "ANTIRUG-02",
+      "assigned_id": "OD-48",
+      "slice": "ANTIRUG",
+      "title": "What a backfill does with an unsafe verdict, and how its window is measured"
+    },
+    {
+      "proposed_id": "ANTIRUG-03",
+      "assigned_id": "OD-49",
+      "slice": "ANTIRUG",
+      "title": "V3 rug signals: sell-impact check and the meaning of a lock"
+    },
+    {
+      "proposed_id": "ANTIRUG-04",
+      "assigned_id": "OD-50",
+      "slice": "ANTIRUG",
+      "title": "Circuit-breaker trip across a restart"
+    },
+    {
+      "proposed_id": "ANTIRUG-05",
+      "assigned_id": "OD-51",
+      "slice": "ANTIRUG",
+      "title": "What dashboard Stop chain does to anti-rug monitoring"
+    },
+    {
+      "proposed_id": "ANTIRUG-06",
+      "assigned_id": "OD-52",
+      "slice": "ANTIRUG",
+      "title": "A chain whose anti-rug allowlist verification failed at boot"
+    },
+    {
+      "proposed_id": "ANTIRUG-07",
+      "assigned_id": "OD-53",
+      "slice": "ANTIRUG",
+      "title": "Validation of anti-rug numeric settings"
+    },
+    {
+      "proposed_id": "TX-01",
+      "assigned_id": "OD-54",
+      "slice": "TX",
+      "title": "What a signing op may wait for while it holds the wallet nonce lock: wait() and RPC timeouts, and what happens on a timeout, a replacement or a reorg"
+    },
+    {
+      "proposed_id": "TX-02",
+      "assigned_id": "OD-55",
+      "slice": "TX",
+      "title": "Private-submit fee model: which ceiling caps buys and sells, what base fee the affordability math uses, and per-chain escalation steps"
+    },
+    {
+      "proposed_id": "TX-03",
+      "assigned_id": "OD-56",
+      "slice": "TX",
+      "title": "Keep, move or remove the Flashbots getBundleStatsV2 telemetry"
+    },
+    {
+      "proposed_id": "TX-04",
+      "assigned_id": "OD-57",
+      "slice": "TX",
+      "title": "Log redaction for relay and RPC errors, and whether to check existing logs and rotate the bloXroute header and RPC keys"
+    },
+    {
+      "proposed_id": "DB-01",
+      "assigned_id": "OD-58",
+      "slice": "DB",
+      "title": "Risk accounting basis: units of stored amounts, which positions count as open, how partial sells and gas count, and whether per-chain max capital is a cap"
+    },
+    {
+      "proposed_id": "DB-02",
+      "assigned_id": "OD-59",
+      "slice": "DB",
+      "title": "One database per wallet: record the wallet on every trade, or lock the database file, or refuse a database owned by another wallet"
+    },
+    {
+      "proposed_id": "DB-03",
+      "assigned_id": "OD-60",
+      "slice": "DB",
+      "title": "Retire the one-time .bot-state.json import that runs on every database load"
+    },
+    {
+      "proposed_id": "DB-04",
+      "assigned_id": "OD-61",
+      "slice": "DB",
+      "title": "Preflight strictness: finite block-age tolerance, future blocks, checker bytecode, one ENABLED_CHAINS parse"
+    },
+    {
+      "proposed_id": "DB-05",
+      "assigned_id": "OD-62",
+      "slice": "DB",
+      "title": "Always broadcast alerts to the dashboard, whether or not Telegram is configured"
+    },
+    {
+      "proposed_id": "DB-06",
+      "assigned_id": "OD-63",
+      "slice": "DB",
+      "title": "Env contract: one typed schema for every key (required-when, type, range, default), ETH_RPC_URL as the required key, legacy CONFIG removed"
+    },
+    {
+      "proposed_id": "API-01",
+      "assigned_id": "OD-64",
+      "slice": "API",
+      "title": "Should the dashboard's emergency-sell and force-sell controls reach failed-held positions?"
+    },
+    {
+      "proposed_id": "API-02",
+      "assigned_id": "OD-65",
+      "slice": "API",
+      "title": "How should Emergency Sell All run: in the HTTP request one position after another (today), or as a bounded background job, and should it pause buying first?"
+    },
+    {
+      "proposed_id": "API-03",
+      "assigned_id": "OD-66",
+      "slice": "API",
+      "title": "Dashboard trust boundary: accept only known Host names and Origins (HTTP and WebSocket), limit login attempts, mark the cookie Secure outside loopback, add logout, and move money fields out of the public /health"
+    },
+    {
+      "proposed_id": "DASH-01",
+      "assigned_id": "OD-67",
+      "slice": "DASH",
+      "title": "What evidence must exist before a chain's anti-rug is switched from dry-run to live selling, given the dashboard review panel shows only one browser session?"
+    },
+    {
+      "proposed_id": "SCRIPTS-01",
+      "assigned_id": "OD-68",
+      "slice": "SCRIPTS",
+      "title": "How do out-of-process signing scripts exclude the running bot?"
+    },
+    {
+      "proposed_id": "SCRIPTS-02",
+      "assigned_id": "OD-69",
+      "slice": "SCRIPTS",
+      "title": "Which bot guards apply to a deliberate buy, and how does the operator confirm before it signs?"
+    },
+    {
+      "proposed_id": "SCRIPTS-03",
+      "assigned_id": "OD-70",
+      "slice": "SCRIPTS",
+      "title": "What happens to the one-off and broken signing scripts (addLiquidity, deploySepoliaTest, recover-sell-ladys)?"
+    }
+  ]
 }

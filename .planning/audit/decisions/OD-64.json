@@ -1,0 +1,37 @@
+{
+  "id": "OD-64",
+  "title": "Should the dashboard's emergency-sell and force-sell controls reach failed-held positions?",
+  "area": "API",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: the controls and the position list select trades.status = 'pending' buys only",
+      "behavior_impact": "none",
+      "risk": "A held position whose exit failed through the catch path cannot be sold from the dashboard: force-sell answers 404 'Trade not found or already closed', emergency sell reports 'No open positions to sell' (or a clean success) while the tokens remain, and the position is not listed (AUD-API-001, S1 STRAND)."
+    },
+    {
+      "id": "resume-set",
+      "name": "Select open positions the way getResumeExitMonitorTrades does: status = 'pending' buys UNION exit_state.exit_status = 'exit_failed_held', in the controls, the position list and the open/closed label",
+      "behavior_impact": "Failed-held positions appear in Open Positions with a Force Sell button and are included in emergency sell; trade history shows them as open; balanceOf inside executeFullSell still decides whether anything is sold.",
+      "risk": "The routine pause still refuses these sells unless card OD-41 also gives operator sells their own path; counts and totals on the dashboard change."
+    },
+    {
+      "id": "status-lifecycle",
+      "name": "Stop marking still-held positions trades.status = 'failed' (keep 'pending', or add a distinct 'held_failed' status) so every pending-only query includes them, with the failure shown from exit_state",
+      "behavior_impact": "Every status-filtered query (dashboard and risk limits) counts the position as open without per-query unions.",
+      "risk": "Changes the meaning of trades.status for the risk queries too (overlaps card OD-58 and AUD-DB-003) and needs a migration of existing rows; the \"failed\" visibility the current code wants must move to exit_state."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "Decide together with OD-58 (what the risk limits count as open) and OD-41 (operator sells versus the routine pause); either change option closes the gap, keep-current does not. This is an S1 capital item (ESC-PRE-04) and cannot rest on the default.",
+  "default": "Keep current behaviour until Phase 24 rules (milestone contract). This card covers an S1 capital finding, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether a still-held position whose exit failed can be seen and sold from the dashboard.",
+  "findings": [
+    "AUD-API-001"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 capital discussion (AUDIT-05), before Wave A",
+  "proposed_from": "API-01"
+}

@@ -107,7 +107,7 @@
     "capital"
   ],
   "escalation_ref": "ESC-BUY-02",
-  "od_ref": "BUY-03",
+  "od_ref": "OD-28",
   "recommendation": "Phase 24: claim the token synchronously (before the first await) in an in-process set keyed by chain+token, and re-check the claim and the DB inside the nonce lock before submitting; release the claim on a genuine fail-clean. The exact mechanism and whether risk budget is reserved at the same time is card BUY-03. Nothing is changed in Phase 22.",
   "reported_by": [
     "claude (22-17 executor)",

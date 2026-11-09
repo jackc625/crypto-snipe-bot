@@ -55,7 +55,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-02",
+  "od_ref": "OD-65",
   "recommendation": "Decide (card API-02) whether Emergency Sell All sets the global pause first (and says so), and add a Pause control to the dashboard. Phase 24 with the emergency-sell rework.",
   "reported_by": [
     "claude (22-22 executor)"

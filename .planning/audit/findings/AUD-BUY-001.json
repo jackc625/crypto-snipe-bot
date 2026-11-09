@@ -94,7 +94,7 @@
     "d-stop-the-line"
   ],
   "escalation_ref": "ESC-BUY-01",
-  "od_ref": "BUY-01",
+  "od_ref": "OD-26",
   "recommendation": "Phase 24 (capital fix, after a Phase 23 real-path proof): make the protection of a deliberately bought position not depend on the short-lived script process. Options to decide on the card: (a) the script hands the new position to the running main bot (for example the main bot re-scans pending buys without a monitor on a timer, or an explicit IPC/DB-flag handoff), (b) the script refuses to run unless the main bot is stopped and then tells the operator, loudly, to start the main bot at once (and the main bot's boot resume already covers the row), (c) the script stays alive and keeps monitoring until the position is closed. Until fixed, after any landed deliberate buy the operator must start or restart the main bot immediately. Nothing is changed in Phase 22 (NAC-13).",
   "reported_by": [
     "claude (22-17 executor)"

@@ -38,5 +38,6 @@
   "findings": [
     "AUD-DB-015"
   ],
-  "needed_by": "Phase 24 discussion (with the 22-13 lock re-audit in 22-29)"
+  "needed_by": "Phase 24 discussion (with the 22-13 lock re-audit in 22-29)",
+  "assigned_id": "OD-59"
 }

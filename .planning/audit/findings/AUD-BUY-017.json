@@ -45,7 +45,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "BUY-06",
+  "od_ref": "OD-31",
   "recommendation": "For an alpha drop, check current pool liquidity instead of waiting for a new Mint, and choose the fee tier by depth. Behaviour change (more alpha buys), card BUY-06.",
   "reported_by": [
     "claude (22-17 executor)",

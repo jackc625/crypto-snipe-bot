@@ -60,7 +60,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Show \"unknown\" instead of a fallback in other units; quote the on-chain balanceOf amount; mark P&L stale together with the price. Fix together with the units decision (card DB-01). Phase 29.",
   "reported_by": [
     "claude (22-22 executor)"

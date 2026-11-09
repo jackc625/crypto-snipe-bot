@@ -42,7 +42,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-03",
+  "od_ref": "OD-66",
   "recommendation": "Keep an unauthenticated liveness answer (status, chains connected) and move the position and P&L fields behind the session; cache the block-number probe for a few seconds. Card API-03. Phase 29.",
   "reported_by": [
     "claude (22-22 executor)"

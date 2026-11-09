@@ -104,7 +104,7 @@
     "cross-class"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-02",
+  "od_ref": "OD-55",
   "recommendation": "Phase 24 (card TX-02): pass the leg to the strategy (sendTransaction option) so sells use the sell ceiling and no second-sell reserve; decide what MEV_MAX_PRIORITY_FEE_GWEI means (remove it or make it the hard cap); correct the two operator messages. Behaviour-changing (fee ceilings), so it is a card decision.",
   "reported_by": [
     "claude (22-20 executor)",

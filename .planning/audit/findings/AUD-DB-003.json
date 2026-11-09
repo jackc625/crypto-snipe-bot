@@ -74,6 +74,6 @@
   "tags": [
     "capital"
   ],
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Count a position as open from its exit lifecycle (pending buy, or exit_state row present, including exit_failed_held) rather than from trades.status, in every risk query; keep the operator-visible 'failed' label separately. Card DB-01. Phase 24; nothing is changed in Phase 22."
 }

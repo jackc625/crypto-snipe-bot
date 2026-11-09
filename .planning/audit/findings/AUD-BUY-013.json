@@ -69,7 +69,7 @@
     "safety-gate"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-05",
+  "od_ref": "OD-30",
   "recommendation": "Either make each gate test what it is named for (strip the prefix, drop the allowance selector, give the blocklist a data source) or remove it and stop printing its result. Fixing it would block more tokens, so it is a behaviour change on card BUY-05. Phase 24 or 29 per the card.",
   "reported_by": [
     "claude (22-17 executor)",

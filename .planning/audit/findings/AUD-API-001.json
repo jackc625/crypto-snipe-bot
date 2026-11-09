@@ -120,7 +120,7 @@
     "cross-class"
   ],
   "escalation_ref": "ESC-PRE-04",
-  "od_ref": "API-01",
+  "od_ref": "OD-64",
   "recommendation": "Select 'open' the way the bot's own recovery does: the dashboard sell controls, the position list and the open/closed label should use one shared definition of an open position (status='pending' buys UNION exit_state.exit_status='exit_failed_held', as getResumeExitMonitorTrades already does), with balanceOf as the final truth inside executeFullSell. Emergency sell must report every position it did not sell and why. Real-path test: drive a position through the catch path (a sell that throws while the balance stays) and assert that force-sell and emergency-sell both reach it. The behaviour change is card API-01, owned by the Phase 24 capital discussion (AUDIT-05); nothing is changed in Phase 22 (NAC-13).",
   "reported_by": [
     "codex-review",

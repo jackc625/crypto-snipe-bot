@@ -77,6 +77,6 @@
   "tags": [
     "section-c:SC-14"
   ],
-  "od_ref": "DB-06",
+  "od_ref": "OD-63",
   "recommendation": "Make ETH_RPC_URL the required key (ALCHEMY_URL an explicit alias resolved in one place), drop the non-null assertions, and remove the legacy CONFIG addresses and gas values with their dead consumers. Card DB-06 (env contract). Phase 27/29."
 }

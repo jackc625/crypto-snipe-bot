@@ -5,7 +5,7 @@
   "decided": null,
   "keep_current_option_id": "keep-current",
   "title": "Env contract: one typed schema for every key (required-when, type, range, default), ETH_RPC_URL as the required key, legacy CONFIG removed",
-  "capital": false,
+  "capital": true,
   "options": [
     {
       "id": "keep-current",
@@ -28,5 +28,6 @@
     "AUD-DB-016",
     "AUD-DB-020"
   ],
-  "needed_by": "Phase 27 discussion (env module), coordinated with OD-25 in Phase 24"
+  "needed_by": "Phase 27 discussion (env module), coordinated with OD-25 in Phase 24",
+  "assigned_id": "OD-63"
 }

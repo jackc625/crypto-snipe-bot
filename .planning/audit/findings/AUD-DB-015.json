@@ -61,6 +61,6 @@
   "tags": [
     "capital"
   ],
-  "od_ref": "DB-02",
+  "od_ref": "OD-59",
   "recommendation": "Either record the wallet address on every trade and scope every query by it, or lock the database file for one wallet (a second lock keyed by DB path), or refuse a database whose recorded owner differs. Card DB-02. Phase 24 or 29."
 }

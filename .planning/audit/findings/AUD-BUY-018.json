@@ -47,7 +47,7 @@
     "section-c:SC-01"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-07",
+  "od_ref": "OD-32",
   "recommendation": "Rebuild the tx (fresh deadline) per attempt, or size the deadline to the whole escalation budget; the fix sits in the TX slice's sendTxWithRetry. Card BUY-07.",
   "reported_by": [
     "claude (22-17 executor)"

@@ -21,21 +21,22 @@
       "id": "change-specific-defaults",
       "name": "Change specific defaults (for example an exposure cap scaled to the snipe size or the wallet, per currency; block-age tolerances that follow one rule)",
       "behavior_impact": "The changed limits bind in normal operation; more snipes may be refused.",
-      "risk": "Without the parser change and the accounting fix (card DB-01) a new default can still be disabled by a typo or mis-measured."
+      "risk": "Without the parser change and the accounting fix (card OD-58) a new default can still be disabled by a typo or mis-measured."
     },
     {
       "id": "align-and-change",
       "name": "Both: one strict parser and the chosen new defaults",
       "behavior_impact": "Limits that bind and cannot be turned off by a typo.",
-      "risk": "Largest behaviour change; needs the accounting fix (DB-01) first so that new defaults measure what they say."
+      "risk": "Largest behaviour change; needs the accounting fix (OD-58) first so that new defaults measure what they say."
     }
   ],
   "keep_current_option_id": "keep-current",
-  "recommendation": "Research recommendation (research SUMMARY OD-25): surface the defaults in the thresholds inventory and leave them unchanged unless decided. Audit note for the decision: the daily-loss and exposure limits do not currently measure what their defaults describe (AUD-DB-002, AUD-DB-003, card DB-01), so a choice of values is only meaningful after that is fixed; the parser question (align-one-parser) is independent of the values. Context (added at the 22-21 Task 3 close-out, supplied by the execute-phase orchestrator; not an operator ruling, ESC-DB-01): decide this card treating today's daily-loss and exposure limits as NOT working. The daily-loss breaker and the exposure cap mix decimal native-unit buy amounts with wei sell and gas amounts (AUD-DB-002) and skip positions held after a failed sell (AUD-DB-003), so changing their default values changes nothing until those are fixed (card DB-01).",
+  "recommendation": "Research recommendation (research SUMMARY OD-25): surface the defaults in the thresholds inventory and leave them unchanged unless decided. Audit note for the decision: the daily-loss and exposure limits do not currently measure what their defaults describe (AUD-DB-002, AUD-DB-003, card OD-58), so a choice of values is only meaningful after that is fixed; the parser question (align-one-parser) is independent of the values. Context (added at the 22-21 Task 3 close-out, supplied by the execute-phase orchestrator; not an operator ruling, ESC-DB-01): decide this card treating today's daily-loss and exposure limits as NOT working. The daily-loss breaker and the exposure cap mix decimal native-unit buy amounts with wei sell and gas amounts (AUD-DB-002) and skip positions held after a failed sell (AUD-DB-003), so changing their default values changes nothing until those are fixed (card OD-58).",
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides which risk limits can bind, what a malformed setting does, and the default values of every flagged threshold row.",
   "findings": [
-    "AUD-DB-001"
+    "AUD-DB-001",
+    "AUD-API-003"
   ],
   "threshold_rows": [
     "TH-DB-01",
@@ -50,5 +51,5 @@
     "TH-DB-18"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion before Wave A (capital fixes), after card DB-01"
+  "needed_by": "Phase 24 discussion before Wave A (capital fixes), after card OD-58"
 }

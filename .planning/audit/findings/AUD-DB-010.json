@@ -60,6 +60,6 @@
   "tags": [
     "credential-exposure"
   ],
-  "od_ref": "TX-04",
+  "od_ref": "OD-57",
   "recommendation": "Build preflight reasons from error.code and a masked host only (api/routes/chains.ts already has maskUrl), never err.message; with card TX-04, check the Telegram chat history and rotate the RPC key if a FATAL reason ever contained it."
 }

@@ -3,7 +3,7 @@
     {
       "id": "TH-EXIT-01",
       "recommendation": "Validate 0 < STOP_LOSS_PCT < 100 at load and fail loud; compare against a real price (card EXIT-02).",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Fixed stop-loss percent (active below 2x, before trailing activates)",
       "current_value": "25",
       "definition_sites": [
@@ -31,7 +31,7 @@
     {
       "id": "TH-EXIT-02",
       "recommendation": "Guard NaN and validate min <= base <= max at load (fail loud).",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Trailing stop base percent (pullback from the high-water mark, active at >= 2x)",
       "current_value": "15",
       "definition_sites": [
@@ -58,7 +58,7 @@
     {
       "id": "TH-EXIT-03",
       "recommendation": "Guard NaN and require min <= max.",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Trailing stop minimum percent after adjustment",
       "current_value": "5",
       "definition_sites": [
@@ -86,7 +86,7 @@
     {
       "id": "TH-EXIT-04",
       "recommendation": "Guard NaN and require max < 100 and >= min.",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Trailing stop maximum percent after adjustment",
       "current_value": "40",
       "definition_sites": [
@@ -114,7 +114,7 @@
     {
       "id": "TH-EXIT-05",
       "recommendation": "Keep the number; base it on a real price (card EXIT-02).",
-      "od_ref": "EXIT-02",
+      "od_ref": "OD-36",
       "name": "Trailing stop activation multiple",
       "current_value": "2.0",
       "definition_sites": [
@@ -137,7 +137,7 @@
     {
       "id": "TH-EXIT-06",
       "recommendation": "Require multiples > 1 at load; base tiers on a real price (card EXIT-02).",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Partial sell tiers",
       "current_value": "'' (no partial sells)",
       "definition_sites": [
@@ -166,7 +166,7 @@
     {
       "id": "TH-EXIT-07",
       "recommendation": "Self-rescheduling timer or skip-if-running, plus a quote timeout below the interval (card EXIT-04).",
-      "od_ref": "EXIT-04",
+      "od_ref": "OD-38",
       "name": "Exit poll interval per position",
       "current_value": "5000 ms",
       "definition_sites": [
@@ -192,7 +192,7 @@
     {
       "id": "TH-EXIT-08",
       "recommendation": "Let the urgency exit fire even when the price quote is null (card EXIT-02).",
-      "od_ref": "EXIT-02",
+      "od_ref": "OD-36",
       "name": "Urgency window (hard market exit deadline)",
       "current_value": "30 minutes (1800000 ms)",
       "definition_sites": [
@@ -242,7 +242,7 @@
     {
       "id": "TH-EXIT-10",
       "recommendation": "Cap at a small value (for example 100 bps) at load and fail loud above it.",
-      "od_ref": "EXIT-12",
+      "od_ref": "OD-46",
       "name": "Dust threshold for \"position closed\"",
       "current_value": "1 bps of the original token amount, with an absolute floor of 1000 base units",
       "definition_sites": [
@@ -269,7 +269,7 @@
     {
       "id": "TH-EXIT-11",
       "recommendation": "Require >= 1; exempt operator sells from the pause (card EXIT-07).",
-      "od_ref": "EXIT-07",
+      "od_ref": "OD-41",
       "name": "Consecutive routine exit failures before routine retries pause",
       "current_value": "5",
       "definition_sites": [
@@ -296,7 +296,7 @@
     {
       "id": "TH-EXIT-12",
       "recommendation": "Keep attempts * confirm window below the watchdog budget, or derive one from the other (card EXIT-11).",
-      "od_ref": "EXIT-11",
+      "od_ref": "OD-45",
       "name": "Private sell attempts before the public fallback",
       "current_value": "routine 2; anti-rug 1 (hard-coded)",
       "definition_sites": [
@@ -322,7 +322,7 @@
     {
       "id": "TH-EXIT-13",
       "recommendation": "Re-quote right before the swap (card EXIT-09).",
-      "od_ref": "EXIT-09",
+      "od_ref": "OD-43",
       "name": "Routine public-fallback slippage",
       "current_value": "5 %",
       "definition_sites": [
@@ -450,7 +450,7 @@
     {
       "id": "TH-EXIT-18",
       "recommendation": "Re-quote after the approve (card EXIT-09).",
-      "od_ref": "EXIT-09",
+      "od_ref": "OD-43",
       "name": "Public fallback deadline",
       "current_value": "now + 600 s, computed after the approve wait",
       "definition_sites": [
@@ -503,7 +503,7 @@
     {
       "id": "TH-EXIT-20",
       "recommendation": "Apply the anti-rug fee policy to the approve and the public fallback too, under a ceiling (card EXIT-03).",
-      "od_ref": "EXIT-03",
+      "od_ref": "OD-37",
       "name": "Anti-rug gas multiplier",
       "current_value": "2.0 (template default per chain)",
       "definition_sites": [
@@ -537,7 +537,7 @@
     {
       "id": "TH-EXIT-21",
       "recommendation": "Derive the budget from attempts * confirm window, and release the sell lock when an exit is abandoned (cards EXIT-11, EXIT-04).",
-      "od_ref": "EXIT-11",
+      "od_ref": "OD-45",
       "name": "Exit watchdog budget (worker submits and the direct anti-rug exit)",
       "current_value": "60000 ms",
       "definition_sites": [
@@ -571,7 +571,7 @@
     {
       "id": "TH-EXIT-22",
       "recommendation": "See TH-EXIT-12 / TH-EXIT-21.",
-      "od_ref": "EXIT-11",
+      "od_ref": "OD-45",
       "name": "Sell-leg confirm window and poll",
       "current_value": "confirm window 45000 ms, poll 4000 ms",
       "definition_sites": [
@@ -612,7 +612,7 @@
     {
       "id": "TH-EXIT-23",
       "recommendation": "Wire the leg through to the strategies so this ceiling applies to private sells (card TX-02, AUD-TX-010), and apply a sell ceiling to approvals and the public fallback (card EXIT-03).",
-      "od_ref": "EXIT-03",
+      "od_ref": "OD-37",
       "name": "Sell-leg priority fee ceiling",
       "current_value": "25 gwei (no effect on any private sell: the strategies call buildReconcileConfig with no leg, so private sells use the buy ceiling MEV_BUY_MAX_PRIORITY_FEE_GWEI; AUD-TX-010)",
       "definition_sites": [
@@ -644,7 +644,7 @@
     {
       "id": "TH-EXIT-24",
       "recommendation": "Card EXIT-02.",
-      "od_ref": "EXIT-02",
+      "od_ref": "OD-36",
       "name": "Price probe amount",
       "current_value": "parseEther(buy amount) at start (snipe amount, or the deliberate amount); parseEther(current snipe amount) on resume and re-arm",
       "definition_sites": [
@@ -725,7 +725,7 @@
     {
       "id": "TH-EXIT-26",
       "recommendation": "Price the reserve with the same fee rule the fallback actually uses (card EXIT-03).",
-      "od_ref": "EXIT-03",
+      "od_ref": "OD-37",
       "name": "Exit-reserve base-fee multiplier in the buy-time affordability gate",
       "current_value": "2.0",
       "definition_sites": [
@@ -763,7 +763,7 @@
     {
       "id": "TH-EXIT-27",
       "recommendation": "Card EXIT-03.",
-      "od_ref": "EXIT-03",
+      "od_ref": "OD-37",
       "name": "Approval amount",
       "current_value": "exactly the amount being sold",
       "definition_sites": [

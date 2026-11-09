@@ -67,7 +67,7 @@
     "safety-gate"
   ],
   "escalation_ref": "ESC-BUY-04",
-  "od_ref": "BUY-05",
+  "od_ref": "OD-30",
   "recommendation": "Measure V3 depth directly (in-range liquidity or the WETH balance of the pool, or compare the quoted output against an expected price) and use one threshold semantics for V2 and V3. Behaviour change on card BUY-05.",
   "reported_by": [
     "claude (22-17 executor)",

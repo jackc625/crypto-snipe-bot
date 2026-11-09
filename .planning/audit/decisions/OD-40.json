@@ -1,0 +1,37 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-40",
+  "title": "What a failed exit with no further route does (V3 no fallback, unknown dex, paused)",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: return false, no failed-held record, no timer re-arm",
+      "behavior_impact": "none",
+      "risk": "After an anti-rug or dashboard exit the position is held with no routine poll while the alert says it is monitored (AUD-EXIT-007)."
+    },
+    {
+      "id": "uniform-failed-held",
+      "name": "Route every non-closing return through the balance-truth handling (persist exit_failed_held, re-arm, truthful alert)",
+      "behavior_impact": "Every still-held position ends with a poll timer and a persisted state.",
+      "risk": "Counts these as failures toward the routine pause."
+    },
+    {
+      "id": "v3-public-fallback",
+      "name": "Additionally add a V3 public fallback (exactInputSingle with a bounded floor)",
+      "behavior_impact": "V3 positions get the same guaranteed lever as V2.",
+      "risk": "New code on the money path; needs its own fork proof."
+    }
+  ],
+  "recommendation": "uniform-failed-held now, and decide v3-public-fallback with OD-39.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether any exit failure can leave a position unmonitored.",
+  "findings": [
+    "AUD-EXIT-007"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "EXIT-06"
+}

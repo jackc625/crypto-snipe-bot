@@ -1,0 +1,35 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-42",
+  "title": "Exit bookkeeping and teardown confirmation",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "A partial tier can be re-sold after a crash, landed repriced sells have no row, sold positions resume as failed, and one balance read at one confirmation decides an irreversible teardown."
+    },
+    {
+      "id": "crash-safe-records",
+      "name": "Persist tier completion and sell rows from chain truth (tx hash, receipt) before slow steps; wrap teardown in a transaction; re-check balance after a few blocks before teardown",
+      "behavior_impact": "Records match the chain after a crash; no double tier sells.",
+      "risk": "Slightly later teardown; more writes."
+    }
+  ],
+  "recommendation": "crash-safe-records (the tier re-sell part in Phase 24, the rest in Phase 29).",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
+  "behavior_impact": "Decides how exit state survives crashes and reorgs.",
+  "findings": [
+    "AUD-EXIT-010",
+    "AUD-EXIT-017",
+    "AUD-EXIT-020",
+    "AUD-EXIT-023",
+    "AUD-EXIT-025"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "EXIT-08"
+}

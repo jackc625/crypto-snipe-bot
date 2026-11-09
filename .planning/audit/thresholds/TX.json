@@ -104,7 +104,7 @@
       "no-upper-bound"
     ],
     "recommendation": "Pass the leg to the strategies so this caps buys only, bound the accepted range at load, and parse gwei from the string rather than through a float (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-04",
@@ -134,7 +134,7 @@
       "gwei-float-toFixed"
     ],
     "recommendation": "Wire it to the private sell leg or delete it and fix the alert text (card TX-02).",
-    "od_ref": "TX-02",
+    "od_ref": "OD-55",
     "also_defined_in": [
       "TH-EXIT-23"
     ]
@@ -166,7 +166,7 @@
       "operator-text-names-dead-knob"
     ],
     "recommendation": "Decide on card TX-02 whether it becomes the hard cap over both legs or is removed; fix .env.example and the alert text either way.",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-06",
@@ -195,7 +195,7 @@
       "floor-on-first-attempt"
     ],
     "recommendation": "Make the step and first-attempt floor per chain or relative to the observed priority fee (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-07",
@@ -223,7 +223,7 @@
       "sell-leg-reserves-second-sell"
     ],
     "recommendation": "Apply the reserve to buys only once the strategies know the leg (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-08",
@@ -247,7 +247,7 @@
       "compounds-doubled-base-fee"
     ],
     "recommendation": "Re-derive the buffer once the real base fee is used (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-09",
@@ -273,7 +273,7 @@
       "doubled-base-fee"
     ],
     "recommendation": "Use the latest block baseFeePerGas for affordability; keep 2 x base + tip only as the submitted cap (card TX-02, AUD-TX-007).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-10",
@@ -298,7 +298,7 @@
       "one-value-for-all-chains"
     ],
     "recommendation": "Treat a failed priority query as unknown (log it) rather than as 1 gwei on L2s (card TX-02).",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-11",
@@ -325,7 +325,7 @@
       "can-outlive-attempt"
     ],
     "recommendation": "Keep N x block time below the bundle wait + confirm window, or reconcile every attempt's hash (AUD-BUY-002 fix, card BUY-02).",
-    "od_ref": "BUY-02"
+    "od_ref": "OD-27"
   },
   {
     "id": "TH-TX-12",
@@ -530,7 +530,7 @@
       "no-timeout-configured"
     ],
     "recommendation": "Construct providers and relay requests with an explicit bounded timeout (card TX-01, AUD-TX-008).",
-    "od_ref": "TX-01"
+    "od_ref": "OD-54"
   },
   {
     "id": "TH-TX-20",
@@ -555,7 +555,7 @@
       "misleading-doc"
     ],
     "recommendation": "Wire it (TH-TX-19) or remove the registration (card TX-01).",
-    "od_ref": "TX-01"
+    "od_ref": "OD-54"
   },
   {
     "id": "TH-TX-21",
@@ -580,7 +580,7 @@
       "held-under-nonce-lock"
     ],
     "recommendation": "Pass a bounded timeout and reconcile on timeout (card TX-01).",
-    "od_ref": "TX-01"
+    "od_ref": "OD-54"
   },
   {
     "id": "TH-TX-22",
@@ -671,7 +671,7 @@
       "clamped-away"
     ],
     "recommendation": "State in the anti-rug config docs that the multiplier is clamped; decide on card TX-02 whether anti-rug exits get their own ceiling.",
-    "od_ref": "TX-02"
+    "od_ref": "OD-55"
   },
   {
     "id": "TH-TX-26",

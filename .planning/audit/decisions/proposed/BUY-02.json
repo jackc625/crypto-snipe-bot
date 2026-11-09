@@ -31,7 +31,7 @@
     }
   ],
   "keep_current_option_id": "keep-current",
-  "recommendation": "intent-row-first together with reconcile-on-throw (covers every trace, including the strategy throwing after a broadcast), using the inserted row id for all later links (AUD-BUY-020) and one transaction for the post-buy writes where possible.",
+  "recommendation": "intent-row-first together with reconcile-on-throw (covers every trace, including the strategy throwing after a broadcast), using the inserted row id for all later links (AUD-BUY-020) and one transaction for the post-buy writes where possible. Overlaps OD-18 on the intent row: decide the two together so the row is designed once.",
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides how the bot records and protects a buy whose bookkeeping fails.",
   "findings": [
@@ -39,5 +39,7 @@
     "AUD-BUY-020"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "related_od": "OD-18",
+  "assigned_id": "OD-27"
 }

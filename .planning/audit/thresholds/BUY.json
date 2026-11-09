@@ -146,7 +146,7 @@
       "no-rationale"
     ],
     "recommendation": "Rebuild the deadline per attempt or size it to the whole escalation budget (card BUY-07).",
-    "od_ref": "BUY-07"
+    "od_ref": "OD-32"
   },
   {
     "id": "TH-BUY-05",
@@ -173,7 +173,7 @@
       "no-rationale"
     ],
     "recommendation": "Derive the private deadline from the attempt budget and document why the public leg uses ten times as long (card BUY-07).",
-    "od_ref": "BUY-07"
+    "od_ref": "OD-32"
   },
   {
     "id": "TH-BUY-06",
@@ -229,7 +229,7 @@
       "overlap"
     ],
     "recommendation": "Claim the token before waiting (card BUY-03) and handle alpha drops without waiting for a new Mint (card BUY-06).",
-    "od_ref": "BUY-03"
+    "od_ref": "OD-28"
   },
   {
     "id": "TH-BUY-08",
@@ -261,7 +261,7 @@
       "nan-crash"
     ],
     "recommendation": "Validate at registry load (fail loud), parse inside the try, measure depth directly, and use the same threshold semantics for V2 (TH-BUY-09) and V3 (card BUY-05).",
-    "od_ref": "BUY-05"
+    "od_ref": "OD-30"
   },
   {
     "id": "TH-BUY-09",
@@ -287,7 +287,7 @@
       "no-rationale"
     ],
     "recommendation": "Use the per-chain <envPrefix>_MIN_LIQUIDITY for V2 as well, so V2 and V3 share one threshold (card BUY-05).",
-    "od_ref": "BUY-05"
+    "od_ref": "OD-30"
   },
   {
     "id": "TH-BUY-10",
@@ -314,7 +314,7 @@
       "no-rationale"
     ],
     "recommendation": "Use a self-scheduling timer or an in-flight flag, advance lastBlock before dispatch, keep the handle so stop can clear it (cards BUY-03, BUY-04).",
-    "od_ref": "BUY-03"
+    "od_ref": "OD-28"
   },
   {
     "id": "TH-BUY-11",
@@ -508,7 +508,7 @@
       "no-rationale"
     ],
     "recommendation": "Per-address rate limit and record only after routing succeeded (card BUY-06).",
-    "od_ref": "BUY-06"
+    "od_ref": "OD-31"
   },
   {
     "id": "TH-BUY-18",
@@ -624,7 +624,7 @@
       "no-rationale"
     ],
     "recommendation": "Choose the pool by depth and include the 100 tier (card BUY-06).",
-    "od_ref": "BUY-06"
+    "od_ref": "OD-31"
   },
   {
     "id": "TH-BUY-23",
@@ -728,7 +728,7 @@
       "no-rationale"
     ],
     "recommendation": "One bounded timeout for every external call on the buy path, Telegram alerts included (card BUY-05).",
-    "od_ref": "BUY-05"
+    "od_ref": "OD-30"
   },
   {
     "id": "TH-BUY-27",
@@ -784,7 +784,7 @@
       "differing-defaults"
     ],
     "recommendation": "Validate the risk env values at load (fail loud as the tax bps do) and reserve the cooldown and budget at canSnipe time (card BUY-03). riskManager.ts belongs to the DB slice (22-21); recorded here because the buy path consumes it.",
-    "od_ref": "BUY-03",
+    "od_ref": "OD-28",
     "also_defined_in": [
       "TH-API-06",
       "TH-DB-04",

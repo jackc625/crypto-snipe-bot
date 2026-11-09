@@ -1,0 +1,44 @@
+{
+  "id": "OD-26",
+  "title": "Protection of a deliberately bought position after the operator script exits",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: the script arms protection in its own process and exits",
+      "behavior_impact": "none",
+      "risk": "Every landed deliberate buy is unprotected (no exit, no anti-rug) until the main bot is next started; if the main bot was already running it never picks the position up until restarted (S0)."
+    },
+    {
+      "id": "handoff-to-running-bot",
+      "name": "Hand the position to the running main bot",
+      "behavior_impact": "The main bot picks up new pending buys while running (for example a periodic re-scan of pending rows without a monitor, or an explicit handoff flag), so protection does not depend on the script.",
+      "risk": "A re-scan must not double-arm positions it already monitors; needs its own interval and idempotency test."
+    },
+    {
+      "id": "refuse-while-running-and-prompt",
+      "name": "Refuse to run while the main bot runs, and tell the operator loudly to start the bot right after the buy",
+      "behavior_impact": "Only one process signs for the wallet at a time; the boot resume arms the new position.",
+      "risk": "Still depends on the operator acting on the message; the position is unprotected until the bot starts."
+    },
+    {
+      "id": "script-stays-alive",
+      "name": "Keep the script running and monitoring until the position is closed",
+      "behavior_impact": "The script becomes a second long-lived trading process for that position.",
+      "risk": "Two processes sign for one wallet without a shared nonce lock (RC-18); closing the terminal kills protection again."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "handoff-to-running-bot, combined with the refuse-while-running guard for the period before the handoff exists; decide together with RC-18 (out-of-process signer).",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides how a manual buy gets exit and rug protection.",
+  "findings": [
+    "AUD-BUY-001"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "interim_rule": "Operator ruling ESC-BUY-01 (acknowledge-continue, severity S0 kept): until this is fixed, after any landed deliberate buy start (or restart) the main bot immediately so its boot resume arms the exit monitor and anti-rug for the new position.",
+  "proposed_from": "BUY-01"
+}

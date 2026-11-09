@@ -15,7 +15,7 @@
       "id": "honor-after-redaction",
       "name": "Load .env before the logger is created, after logger-level redaction of err objects, RPC URLs, auth headers and the bot token is in place",
       "behavior_impact": "LOG_LEVEL in .env takes effect; at debug the bot writes whole RPC error objects (14 debug sites, for example exitEngine.ts:342 once per position every 5 s on a failing price query), so volume rises sharply.",
-      "risk": "Depends on the redaction work (card TX-04) landing first; debug volume can fill disks on long runs."
+      "risk": "Depends on the redaction work (card OD-57) landing first; debug volume can fill disks on long runs."
     },
     {
       "id": "honor-now",
@@ -38,5 +38,5 @@
     "AUD-DB-005"
   ],
   "decided": null,
-  "needed_by": "Phase 29 discussion (S2-S4 fixes), together with card TX-04 (log redaction)"
+  "needed_by": "Phase 29 discussion (S2-S4 fixes), together with card OD-57 (log redaction)"
 }

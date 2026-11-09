@@ -7,7 +7,7 @@
   "research_suggested_severity": null,
   "duplicate_of": null,
   "escalation_ref": null,
-  "od_ref": "SCRIPTS-02",
+  "od_ref": "OD-69",
   "reported_by": [
     "claude (22-25 executor)"
   ],

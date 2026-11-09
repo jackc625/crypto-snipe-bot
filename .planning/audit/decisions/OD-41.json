@@ -1,0 +1,37 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-41",
+  "title": "Operator manual sells versus the routine retry pause",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: dashboard sells are routine and are refused while paused",
+      "behavior_impact": "none",
+      "risk": "The operator is told to act manually and the dashboard refuses with a misleading message (AUD-EXIT-008)."
+    },
+    {
+      "id": "operator-reason",
+      "name": "Give operator sells their own reason that bypasses the pause, and report the real reason when a sell does not run",
+      "behavior_impact": "The dashboard can always try to sell a held position.",
+      "risk": "An operator can keep retrying a sell that always reverts (gas)."
+    },
+    {
+      "id": "explicit-resume",
+      "name": "Keep the pause for operator sells but add an explicit resume control",
+      "behavior_impact": "One more click; the pause stays meaningful.",
+      "risk": "Two steps in an emergency."
+    }
+  ],
+  "recommendation": "operator-reason, decided together with the ESC-PRE-04 selection fix.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides whether the operator can always sell from the dashboard.",
+  "findings": [
+    "AUD-EXIT-008"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "EXIT-07"
+}

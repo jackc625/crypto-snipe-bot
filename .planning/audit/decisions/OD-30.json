@@ -1,0 +1,43 @@
+{
+  "id": "OD-30",
+  "title": "Token safety gates that do not test what they are named for",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "The anti-bot selector scan and the blocklist never fire, proxy tokens pass the mutability scan, the V3 liquidity check does not enforce its threshold, the GoPlus lock check queries the wrong address, Unicrypt can hang; alerts print results of gates that did not run."
+    },
+    {
+      "id": "fix-each-gate",
+      "name": "Make each gate test what it is named for",
+      "behavior_impact": "More tokens are blocked (anti-bot, proxies, thin V3 pools); some currently-blocked GoPlus-chain snipes may pass once locks are read correctly; every external call gets a timeout.",
+      "risk": "Stricter gates reduce the number of snipes; each gate needs a fork test with a known good and a known bad token."
+    },
+    {
+      "id": "remove-dead-gates",
+      "name": "Remove the gates that cannot work and print \"not checked\"",
+      "behavior_impact": "Alerts stop implying checks that do not happen; the remaining gates are unchanged.",
+      "risk": "Leaves the real risks (proxies, thin pools) unguarded but honest."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "fix-each-gate for the V3 depth check, proxy handling and timeouts; remove-dead-gates for the anti-bot selector scan unless a correct selector list is supplied.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides which tokens the safety bank lets through.",
+  "findings": [
+    "AUD-BUY-013",
+    "AUD-BUY-014",
+    "AUD-BUY-015",
+    "AUD-BUY-016",
+    "AUD-BUY-027",
+    "AUD-BUY-028",
+    "AUD-BUY-032"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "BUY-05"
+}

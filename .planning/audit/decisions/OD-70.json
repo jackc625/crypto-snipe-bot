@@ -1,0 +1,44 @@
+{
+  "id": "OD-70",
+  "title": "What happens to the one-off and broken signing scripts (addLiquidity, deploySepoliaTest, recover-sell-ladys)?",
+  "area": "SCRIPTS",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: leave all three files as they are",
+      "behavior_impact": "none",
+      "risk": "Two files that cannot load but would sign with the trading wallet on mainnet if their imports were \"fixed\" (AUD-SCRIPTS-001), and a one-off public sell with a 10% band and no fee cap (AUD-SCRIPTS-003); README.md keeps describing the first two as Sepolia helpers."
+    },
+    {
+      "id": "delete-all",
+      "name": "Delete all three",
+      "behavior_impact": "no Sepolia bootstrap helper and no ready-made recovery sell; a stuck position is recovered with the bot exit engine or a new script written for that case",
+      "risk": "If LADYS (or another lost position) is still held, the operator loses a ready tool and must use the dashboard force-sell or a new script."
+    },
+    {
+      "id": "delete-broken-keep-recovery",
+      "name": "Delete the two broken scripts; turn recover-sell-ladys into a general, hardened recovery sell",
+      "behavior_impact": "one recovery script that takes token and router as arguments, holds the process lock (OD-68), sells privately with a tax-aware minimum, a short deadline and the bot fee caps",
+      "risk": "A new money-path tool that needs its own tests; until it exists the old one stays as is."
+    },
+    {
+      "id": "rebuild-sepolia-tool",
+      "name": "Delete addLiquidity; rebuild deploySepoliaTest as a real Sepolia rehearsal tool",
+      "behavior_impact": "a Sepolia-only deploy tool (SEPOLIA_RPC_URL, refuses unless chainId 11155111, testnet key only, constructor-correct FakeToken)",
+      "risk": "Work for a tool nothing in the milestone needs; the contracts it deploys (Uniswap V2 router/factory, WETH) are not in the repo and would have to be added."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "delete-broken-keep-recovery if the operator wants a recovery tool, otherwise delete-all. The two broken scripts have no user (nothing reads src/addresses.json) and are a hazard if repaired.",
+  "default": "Keep current behaviour until the owning phase rules (milestone contract); nothing changes in Phase 22. None of these scripts runs unless the operator starts it, and two cannot load.",
+  "behavior_impact": "Decides which manual signing tools exist after Phase 29.",
+  "findings": [
+    "AUD-SCRIPTS-001",
+    "AUD-SCRIPTS-003"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 HYG-03 discussion (broken scripts removed or fixed)",
+  "proposed_from": "SCRIPTS-03"
+}

@@ -11,7 +11,7 @@
     "capital"
   ],
   "escalation_ref": null,
-  "od_ref": "EXIT-03",
+  "od_ref": "OD-37",
   "reported_by": [
     "claude (22-18 executor)",
     "codex"

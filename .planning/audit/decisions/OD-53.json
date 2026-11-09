@@ -1,0 +1,37 @@
+{
+  "area": "ANTIRUG",
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-53",
+  "title": "Validation of anti-rug numeric settings",
+  "capital": true,
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: empty LP_REMOVAL_PCT and CONFIRM_BLOCKS mean 0, GAS_MULTIPLIER has no ceiling, WATCHDOG_BUDGET_MS accepts a numeric prefix",
+      "behavior_impact": "none",
+      "risk": "Ordinary .env mistakes silently change when and how hard the bot sells in an emergency (AUD-ANTIRUG-017)."
+    },
+    {
+      "id": "strict-fail-loud",
+      "name": "Reject empty, 0 (where meaningless), above-ceiling and suffixed values at boot with a fatal error",
+      "behavior_impact": "A bad value stops the bot at boot instead of changing behaviour.",
+      "risk": "An existing .env with an empty line stops booting until fixed."
+    },
+    {
+      "id": "empty-means-default",
+      "name": "Treat empty as unset (use the default), cap the multiplier, parse durations strictly",
+      "behavior_impact": "Empty values fall back to defaults; other bad values fail loud.",
+      "risk": "An operator who meant 0 by an empty value gets the default."
+    }
+  ],
+  "recommendation": "strict-fail-loud, matching how the other anti-rug keys already fail at boot.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract).",
+  "behavior_impact": "Decides how a malformed anti-rug setting is handled.",
+  "findings": [
+    "AUD-ANTIRUG-017"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "ANTIRUG-07"
+}

@@ -39,5 +39,6 @@
   ],
   "decided": null,
   "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
-  "interim_rule": "Operator ruling ESC-BUY-01 (acknowledge-continue, severity S0 kept): until this is fixed, after any landed deliberate buy start (or restart) the main bot immediately so its boot resume arms the exit monitor and anti-rug for the new position."
+  "interim_rule": "Operator ruling ESC-BUY-01 (acknowledge-continue, severity S0 kept): until this is fixed, after any landed deliberate buy start (or restart) the main bot immediately so its boot resume arms the exit monitor and anti-rug for the new position.",
+  "assigned_id": "OD-26"
 }

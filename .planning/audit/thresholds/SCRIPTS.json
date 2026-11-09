@@ -102,7 +102,7 @@
         "abort-depends-on-ctrl-c"
       ],
       "recommendation": "Decide on card SCRIPTS-02 (typed confirmation instead of, or in addition to, a timed window).",
-      "od_ref": "SCRIPTS-02",
+      "od_ref": "OD-69",
       "overlap": "precedes the private leg; independent of the bot timers",
       "id": "TH-SCRIPTS-04",
       "name": "Deliberate buy abort window before signing",
@@ -127,7 +127,7 @@
         "bypasses-risk-gate"
       ],
       "recommendation": "Decide on card SCRIPTS-02 whether the risk gate (or an explicit typed override) applies to a deliberate buy.",
-      "od_ref": "SCRIPTS-02",
+      "od_ref": "OD-69",
       "overlap": "bypasses the risk gate caps (TH-DB-03 MAX_POSITION_SIZE, exposure, open positions) that apply to snipes",
       "id": "TH-SCRIPTS-05",
       "name": "Deliberate buy amount (operator argument)",
@@ -153,7 +153,7 @@
         "quote-ignores-transfer-tax"
       ],
       "recommendation": "Card SCRIPTS-03: delete the one-off, or set minOut from a tax-aware simulated sell and send privately.",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-06",
       "name": "LADYS recovery sell minimum output",
@@ -177,7 +177,7 @@
         "long-public-deadline"
       ],
       "recommendation": "Card SCRIPTS-03: shorten if the script is kept.",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "the script waits for the receipt with no timeout (:82)",
       "id": "TH-SCRIPTS-07",
       "name": "LADYS recovery sell deadline",
@@ -200,7 +200,7 @@
         "no-ceiling"
       ],
       "recommendation": "Card SCRIPTS-03: if kept, reuse the bot fee caps.",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "the bot caps its own fees (TX slice: MEV_MAX_PRIORITY_FEE_GWEI family)",
       "id": "TH-SCRIPTS-08",
       "name": "LADYS recovery sell fee ceiling",
@@ -226,7 +226,7 @@
         "wraps-whole-balance"
       ],
       "recommendation": "Card SCRIPTS-03 (delete the script).",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-09",
       "name": "addLiquidity gas reserve left unwrapped",
@@ -251,7 +251,7 @@
         "zero-minimum"
       ],
       "recommendation": "Card SCRIPTS-03 (delete the script).",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-10",
       "name": "addLiquidity liquidity minimums",
@@ -275,7 +275,7 @@
         "latent-script-cannot-load"
       ],
       "recommendation": "Card SCRIPTS-03 (delete the script).",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-11",
       "name": "addLiquidity gas limit",
@@ -299,7 +299,7 @@
         "latent-script-cannot-load"
       ],
       "recommendation": "Card SCRIPTS-03 (delete the script).",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-12",
       "name": "addLiquidity deadline",
@@ -323,7 +323,7 @@
         "latent-script-cannot-load"
       ],
       "recommendation": "Card SCRIPTS-03 (delete the script).",
-      "od_ref": "SCRIPTS-03",
+      "od_ref": "OD-70",
       "overlap": "n/a (not a timer or interval)",
       "id": "TH-SCRIPTS-13",
       "name": "addLiquidity token amount minted and paired",

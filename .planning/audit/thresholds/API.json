@@ -260,7 +260,7 @@
         "missing-bound",
         "serial-per-position"
       ],
-      "od_ref": "API-02",
+      "od_ref": "OD-65",
       "id": "TH-API-08",
       "name": "Time bound on a dashboard force-sell or emergency-sell request",
       "env_key": null,
@@ -285,7 +285,7 @@
       "flags": [
         "missing-limit"
       ],
-      "od_ref": "API-03",
+      "od_ref": "OD-66",
       "id": "TH-API-09",
       "name": "Login attempt rate limit",
       "env_key": null,

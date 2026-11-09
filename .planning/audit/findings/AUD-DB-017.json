@@ -63,6 +63,6 @@
     "AUD-DB-001"
   ],
   "tags": [],
-  "od_ref": "DB-04",
+  "od_ref": "OD-61",
   "recommendation": "Require a finite tolerance with an upper bound, treat a future block beyond a small skew as a failure, compare the checker code hash with the deployed artifact, and parse ENABLED_CHAINS in one place. Card DB-04 (preflight strictness). Phase 29."
 }

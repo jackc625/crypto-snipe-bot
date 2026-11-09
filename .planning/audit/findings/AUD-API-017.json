@@ -61,7 +61,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Return per-chain used and threshold in the same unit the breaker compares (and a percentage of it), from riskManager; render per chain. Depends on card DB-01 (risk accounting basis). Phase 29 after the Phase 24 units fix.",
   "reported_by": [
     "claude (22-22 executor)"

@@ -67,7 +67,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-03",
+  "od_ref": "OD-66",
   "recommendation": "Check the Host header against an allowlist (DASHBOARD_HOST:PORT, 127.0.0.1/localhost/[::1] on the configured port, any configured public name, the vite dev host) before CORS and reject others (421/403), and derive \"same origin\" from that configured list rather than from Host; add login rate limiting with backoff. Card API-03 (it changes which requests are accepted). Phase 29 unless the dashboard is exposed beyond 127.0.0.1 earlier.",
   "reported_by": [
     "claude (22-22 executor)"

@@ -103,7 +103,7 @@
     "capital",
     "cross-class"
   ],
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Store every amount in one unit (wei integer strings, as the receipts already are) and compare in bigint, or convert at the SQL boundary in one place; backfill existing buy rows with a migration. Add a real-path test that writes rows through the real insert sites and asserts the breaker trips. How the risk limits should count (units, failed-held positions, partial sells, per-chain cap) is card DB-01. Phase 24; nothing is changed in Phase 22.",
   "sub_claims": [
     {

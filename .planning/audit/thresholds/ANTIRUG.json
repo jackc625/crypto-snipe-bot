@@ -29,7 +29,7 @@
       "sole-v3-gate"
     ],
     "recommendation": "Treat an empty value as unset, reject 0, and document why 50 % (card ANTIRUG-07; V3 semantics card ANTIRUG-03).",
-    "od_ref": "ANTIRUG-07"
+    "od_ref": "OD-53"
   },
   {
     "id": "TH-ANTIRUG-02",
@@ -59,7 +59,7 @@
       "same-blocks-different-time"
     ],
     "recommendation": "Treat empty as unset; count from the log block; state the intended delay in seconds per chain, since 1 block is 12 s on ETH and about 0.25 s on Arbitrum (cards ANTIRUG-07, ANTIRUG-01).",
-    "od_ref": "ANTIRUG-07"
+    "od_ref": "OD-53"
   },
   {
     "id": "TH-ANTIRUG-03",
@@ -90,7 +90,7 @@
       "in-memory-only"
     ],
     "recommendation": "Count per position or rug event, not per log (card ANTIRUG-01), and persist the trip (card ANTIRUG-04).",
-    "od_ref": "ANTIRUG-01"
+    "od_ref": "OD-47"
   },
   {
     "id": "TH-ANTIRUG-04",
@@ -120,7 +120,7 @@
       "integer-hours-only"
     ],
     "recommendation": "Persist the history and trip state (card ANTIRUG-04); allow minutes if a shorter window is wanted.",
-    "od_ref": "ANTIRUG-04"
+    "od_ref": "OD-50"
   },
   {
     "id": "TH-ANTIRUG-05",
@@ -152,7 +152,7 @@
       "float-on-fee"
     ],
     "recommendation": "Add an upper bound and fail loud above it (card ANTIRUG-07); confirm the TX-slice multiplication is exact bigint math.",
-    "od_ref": "ANTIRUG-07",
+    "od_ref": "OD-53",
     "also_defined_in": [
       "TH-EXIT-20"
     ]
@@ -184,7 +184,7 @@
       "serial-calls-on-registration-path"
     ],
     "recommendation": "Keep the per-provider cap but run the backfill off the buy path (AUD-ANTIRUG-005, card ANTIRUG-02). The differing ETH default has a stated reason.",
-    "od_ref": "ANTIRUG-02"
+    "od_ref": "OD-48"
   },
   {
     "id": "TH-ANTIRUG-07",
@@ -214,7 +214,7 @@
       "window-measured-from-last-subscription"
     ],
     "recommendation": "Express the window in time per chain and measure the gap from the last seen live block (card ANTIRUG-02).",
-    "od_ref": "ANTIRUG-02"
+    "od_ref": "OD-48"
   },
   {
     "id": "TH-ANTIRUG-08",
@@ -267,7 +267,7 @@
       "v3-owner-semantics"
     ],
     "recommendation": "Decide what a lock means on V3 (card ANTIRUG-03).",
-    "od_ref": "ANTIRUG-03"
+    "od_ref": "OD-49"
   },
   {
     "id": "TH-ANTIRUG-10",
@@ -317,7 +317,7 @@
       "trips-on-4x-price-move"
     ],
     "recommendation": "Replace with a sell-impact quote for the held amount (card ANTIRUG-03).",
-    "od_ref": "ANTIRUG-03"
+    "od_ref": "OD-49"
   },
   {
     "id": "TH-ANTIRUG-12",
@@ -342,7 +342,7 @@
       "unit-mismatch"
     ],
     "recommendation": "Compare like units (card ANTIRUG-03).",
-    "od_ref": "ANTIRUG-03"
+    "od_ref": "OD-49"
   },
   {
     "id": "TH-ANTIRUG-13",
@@ -499,7 +499,7 @@
       "parseInt-prefix"
     ],
     "recommendation": "Parse strictly and fail loud (card ANTIRUG-07); size it from the anti-rug attempt budget and confirm window (card EXIT-11).",
-    "od_ref": "ANTIRUG-07",
+    "od_ref": "OD-53",
     "also_defined_in": [
       "TH-BUY-14",
       "TH-EXIT-21"

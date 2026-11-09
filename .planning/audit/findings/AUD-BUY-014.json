@@ -41,7 +41,7 @@
     "safety-gate"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-05",
+  "od_ref": "OD-30",
   "recommendation": "Decide on card BUY-05 whether proxy tokens are blocked outright, scanned through their implementation slot, or accepted as today; match selectors only at PUSH4 positions if the scan stays. Behaviour change, Phase 24 or 29 per the card.",
   "reported_by": [
     "claude (22-17 executor)"

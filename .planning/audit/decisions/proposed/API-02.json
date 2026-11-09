@@ -39,5 +39,6 @@
     "AUD-API-015"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof), together with EXIT-07"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof), together with EXIT-07",
+  "assigned_id": "OD-65"
 }

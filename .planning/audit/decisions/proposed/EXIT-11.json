@@ -30,7 +30,9 @@
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides whether an anti-rug exit always gets its emergency treatment.",
   "findings": [
-    "AUD-EXIT-014"
+    "AUD-EXIT-014",
+    "AUD-ANTIRUG-004"
   ],
-  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-45"
 }

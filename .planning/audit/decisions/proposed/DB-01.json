@@ -33,8 +33,11 @@
     "AUD-DB-002",
     "AUD-DB-003",
     "AUD-DB-013",
-    "AUD-DB-014"
+    "AUD-DB-014",
+    "AUD-API-016",
+    "AUD-API-017"
   ],
   "needed_by": "Phase 24 discussion before Wave A (capital fixes, after the Phase 23 real-path proof)",
-  "linked_od": "OD-25"
+  "related_od": "OD-25",
+  "assigned_id": "OD-58"
 }

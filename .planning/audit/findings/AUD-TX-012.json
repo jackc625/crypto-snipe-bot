@@ -55,7 +55,7 @@
     "section-c"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-01",
+  "od_ref": "OD-54",
   "recommendation": "Phase 29 unless Phase 24 decides otherwise on card TX-01: record the inclusion block hash and re-check it after N blocks (or require N confirmations before teardown), with N per chain.",
   "reported_by": [
     "claude (22-20 executor)",

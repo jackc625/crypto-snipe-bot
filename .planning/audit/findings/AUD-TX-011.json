@@ -57,7 +57,7 @@
     "section-c"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-01",
+  "od_ref": "OD-54",
   "recommendation": "Phase 24 with card TX-01: classify wait() errors: on TRANSACTION_REPLACED use err.receipt (status 1 and reason repriced = our swap landed under the replacement hash; return that hash), on CALL_EXCEPTION report reverted, otherwise reconcile. Return the replacement hash to the caller so the trade row and receipt decoding use the hash that mined.",
   "reported_by": [
     "claude (22-20 executor)"

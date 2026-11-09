@@ -104,7 +104,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-02",
+  "od_ref": "OD-65",
   "recommendation": "Run a dashboard sell as a server-side job with an id: refuse a second emergency job while one runs (idempotency), stream or poll per-position progress, bound each position by a wall-clock budget (as the worker watchdog does), and report the real reason for every position not sold. Disable the confirm buttons while a request is pending. Which reason and speed an operator sell should use is card EXIT-07 (AUD-EXIT-008); whether emergency sell should pause buying first is card API-02. Phase 24 with the RC-10/RC-11 fixes.",
   "reported_by": [
     "claude (22-22 executor)"

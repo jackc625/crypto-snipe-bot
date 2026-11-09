@@ -69,7 +69,7 @@
     "capital"
   ],
   "escalation_ref": "ESC-BUY-02",
-  "od_ref": "BUY-03",
+  "od_ref": "OD-28",
   "recommendation": "Reserve the risk budget synchronously when a handler passes canSnipe (count, exposure and cooldown) and release it on a fail-clean, or serialize the buy pipeline per chain. Card BUY-03. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [
     "claude (22-17 executor)",

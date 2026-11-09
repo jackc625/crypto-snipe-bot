@@ -69,6 +69,6 @@
   "tags": [
     "credential-exposure"
   ],
-  "od_ref": "TX-04",
+  "od_ref": "OD-57",
   "recommendation": "Log only error.message / code / response status for Telegram failures and add logger-level redaction (card TX-04); check persisted logs and rotate the bot token if any contains it."
 }

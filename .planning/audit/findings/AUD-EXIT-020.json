@@ -6,7 +6,7 @@
   "related": [],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "EXIT-08",
+  "od_ref": "OD-42",
   "reported_by": [
     "claude (22-18 executor)",
     "codex"

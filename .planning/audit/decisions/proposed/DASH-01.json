@@ -32,5 +32,6 @@
     "AUD-DASH-003"
   ],
   "decided": null,
-  "needed_by": "Phase 24 capital discussion (AUDIT-05), before any ANTIRUG_LIVE_EXECUTE switch is turned on"
+  "needed_by": "Phase 24 capital discussion (AUDIT-05), before any ANTIRUG_LIVE_EXECUTE switch is turned on",
+  "assigned_id": "OD-67"
 }

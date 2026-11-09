@@ -57,7 +57,7 @@
     "telemetry"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-03",
+  "od_ref": "OD-56",
   "recommendation": "Phase 29 (card TX-03): verify the endpoint in Phase 23; if it is dead, remove the call and the operator text that relies on it and reconcile by receipts only (research recommendation); if kept, move it out of the nonce lock and give it a short timeout.",
   "reported_by": [
     "claude (22-20 executor)"

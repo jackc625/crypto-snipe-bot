@@ -46,7 +46,7 @@
     "safety-gate"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-05",
+  "od_ref": "OD-30",
   "recommendation": "Query GoPlus by the token address (its lp_holders describe the token's LP) and add a timeout to the Unicrypt call matching the other providers. Behaviour change (more snipes can pass), card BUY-05.",
   "reported_by": [
     "claude (22-17 executor)"

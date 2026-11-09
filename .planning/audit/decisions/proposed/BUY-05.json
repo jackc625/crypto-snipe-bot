@@ -2,7 +2,7 @@
   "id": "BUY-05",
   "title": "Token safety gates that do not test what they are named for",
   "area": "BUY",
-  "capital": false,
+  "capital": true,
   "status": "open",
   "options": [
     {
@@ -26,7 +26,7 @@
   ],
   "keep_current_option_id": "keep-current",
   "recommendation": "fix-each-gate for the V3 depth check, proxy handling and timeouts; remove-dead-gates for the anti-bot selector scan unless a correct selector list is supplied.",
-  "default": "Keep current behaviour until the owning phase decides (milestone contract). The linked findings are S2/S3, so the default may stand until then.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides which tokens the safety bank lets through.",
   "findings": [
     "AUD-BUY-013",
@@ -38,5 +38,6 @@
     "AUD-BUY-032"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion (or Phase 29 if the operator rates these non-capital)"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "assigned_id": "OD-30"
 }

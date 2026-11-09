@@ -25,7 +25,7 @@
     }
   ],
   "keep_current_option_id": "keep-current",
-  "recommendation": "bounded-wait-reconcile, with RPC_TIMEOUT_MS wired to every provider and relay call, wait() errors classified (replacement receipt used), and a per-chain confirmation depth before teardown.",
+  "recommendation": "bounded-wait-reconcile, with RPC_TIMEOUT_MS wired to every provider and relay call, wait() errors classified (replacement receipt used), and a per-chain confirmation depth before teardown. Decide with OD-17: this card sets how long one op may hold the nonce lock, OD-17 sets who gets the lock next.",
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides whether one stuck or slow transaction can block every later trade of the wallet.",
   "findings": [
@@ -36,5 +36,7 @@
     "AUD-TX-020"
   ],
   "decided": null,
-  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)"
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "related_od": "OD-17",
+  "assigned_id": "OD-54"
 }

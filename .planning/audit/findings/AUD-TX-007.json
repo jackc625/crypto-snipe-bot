@@ -79,7 +79,7 @@
     "capital"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-02",
+  "od_ref": "OD-55",
   "recommendation": "Phase 24 (card TX-02): use the real base fee (latest block baseFeePerGas, optionally projected one block ahead) for affordability and the sell reserve, keep 2 x base + tip only as the submitted maxFeePerGas cap, and do the same in preflight deriveFeeWei. Decide whether the sell leg should reserve gas at all (AUD-TX-010).",
   "reported_by": [
     "claude (22-20 executor)"

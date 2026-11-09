@@ -50,7 +50,7 @@
     "fees"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-02",
+  "od_ref": "OD-55",
   "recommendation": "Phase 24 with card TX-02: make the escalation step and floor per chain (or relative to the observed priority fee) when the fee-ceiling wiring is redone.",
   "reported_by": [
     "claude (22-20 executor)"

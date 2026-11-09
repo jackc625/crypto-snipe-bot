@@ -58,6 +58,6 @@
     "AUD-DB-007"
   ],
   "tags": [],
-  "od_ref": "DB-03",
+  "od_ref": "OD-60",
   "recommendation": "Retire the one-time JSON import (it has done its job) or move it into npm run db:init behind an explicit flag. Card DB-03. Phase 29."
 }

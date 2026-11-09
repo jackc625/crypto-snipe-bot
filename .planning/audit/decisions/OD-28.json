@@ -1,0 +1,45 @@
+{
+  "id": "OD-28",
+  "title": "Buy-entry concurrency: double buys of one token and risk limits across concurrent handlers",
+  "area": "BUY",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: check at handler start, record after landing",
+      "behavior_impact": "none",
+      "risk": "Two handlers for one token both buy (2x spend), and a burst of new tokens can pass the cooldown, position and exposure limits together."
+    },
+    {
+      "id": "sync-claim-and-reserve",
+      "name": "Claim the token and reserve the risk budget synchronously before the first await; re-check inside the nonce lock",
+      "behavior_impact": "At most one buy per token; limits hold under bursts; claims and reservations are released on a proven fail-clean.",
+      "risk": "A claim that is never released (crash, bug) blocks that token or budget until restart; needs a clear release path."
+    },
+    {
+      "id": "serialize-per-chain",
+      "name": "Run the whole buy pipeline one token at a time per chain",
+      "behavior_impact": "No concurrency at all on the buy side.",
+      "risk": "Slow checks (30 s Mint wait, provider timeouts) delay every other opportunity on that chain."
+    },
+    {
+      "id": "recheck-in-lock-only",
+      "name": "Only re-check isTokenSniped and the limits inside the nonce lock",
+      "behavior_impact": "Stops the second same-token buy if the first already inserted its row.",
+      "risk": "Does not stop it when the first has not inserted yet, and does not fix risk-limit bursts."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "sync-claim-and-reserve, plus an in-flight guard on the HTTP pollers (TH-BUY-10) so one event is never dispatched twice.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S0/S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
+  "behavior_impact": "Decides how many buys can be in flight at once and how limits are enforced under bursts.",
+  "findings": [
+    "AUD-BUY-004",
+    "AUD-BUY-010",
+    "AUD-EXIT-018"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "BUY-03"
+}

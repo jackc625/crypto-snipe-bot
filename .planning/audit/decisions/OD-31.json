@@ -1,0 +1,38 @@
+{
+  "id": "OD-31",
+  "title": "Telegram alpha intake: cooldown, processed set, V3 pools that already have liquidity",
+  "area": "BUY",
+  "capital": false,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour",
+      "behavior_impact": "none",
+      "risk": "Addresses within 5 s of another are lost, a failed routing is never retried, the processed set grows without bound, and V3 alpha drops on pools that already have liquidity are dropped."
+    },
+    {
+      "id": "per-address-robust",
+      "name": "Per-address rate limit, record after routing succeeds, bounded set, current-liquidity check for V3 alpha drops chosen by depth",
+      "behavior_impact": "More alpha signals reach the buy path.",
+      "risk": "More buys from Telegram, so it should follow the OD-16 allowlist decision."
+    },
+    {
+      "id": "fix-v3-only",
+      "name": "Only fix the V3 alpha liquidity path",
+      "behavior_impact": "V3 alpha drops work; intake rate limiting unchanged.",
+      "risk": "Signals are still lost to the global cooldown."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "per-address-robust, after OD-16 is decided.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). The linked findings are S3.",
+  "behavior_impact": "Decides which Telegram signals reach the buy path.",
+  "findings": [
+    "AUD-BUY-017",
+    "AUD-BUY-021"
+  ],
+  "decided": null,
+  "needed_by": "Phase 24 discussion (with OD-16) or Phase 29",
+  "proposed_from": "BUY-06"
+}

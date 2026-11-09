@@ -133,7 +133,7 @@
     "rediscovery"
   ],
   "escalation_ref": "ESC-PRE-02",
-  "od_ref": "TX-01",
+  "od_ref": "OD-54",
   "recommendation": "Phase 24 (card TX-01): never wait without a bound while holding the wallet lock. Give every wait() inside the lock (passthrough.ts:140, bot.ts:750, exitEngine.ts:422/:545/:556) an explicit timeout, and on timeout reconcile against chain state (receipt + latest nonce) the way reconcileInclusion does, then decide replace/cancel/keep-waiting outside the lock or with a bounded replacement. Keep the lock until the nonce is settled or explicitly replaced, because releasing it while a public tx is still pending would let the next op sign the same nonce (ethers contract sends take nonce \"pending\", strategies take \"latest\"). Prove it in Phase 23 with a never-mined tx on a local chain. Nothing is changed in Phase 22.",
   "reported_by": [
     "claude (22-20 executor)",

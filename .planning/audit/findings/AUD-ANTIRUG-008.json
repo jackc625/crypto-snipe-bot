@@ -10,7 +10,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "ANTIRUG-06",
+  "od_ref": "OD-52",
   "reported_by": [
     "claude (22-19 executor)",
     "codex"

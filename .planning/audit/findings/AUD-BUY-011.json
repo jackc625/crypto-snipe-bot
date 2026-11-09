@@ -78,7 +78,7 @@
     "capital"
   ],
   "escalation_ref": "ESC-BUY-02",
-  "od_ref": "BUY-04",
+  "od_ref": "OD-29",
   "recommendation": "Make \"stopped\" a state every buy entry point honours (handlers, pollers and Telegram routing), keep the poller handle so stop clears it and start cannot duplicate it, or remove the per-chain stop/start in favour of the global pause. Card BUY-04. Until fixed, use the global pause, not per-chain stop, to halt buying. Phase 24; nothing is changed in Phase 22.",
   "reported_by": [
     "claude (22-17 executor)",

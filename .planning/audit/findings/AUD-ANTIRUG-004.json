@@ -13,7 +13,7 @@
     "capital"
   ],
   "escalation_ref": "ESC-ANTIRUG-01",
-  "od_ref": "EXIT-11",
+  "od_ref": "OD-45",
   "reported_by": [
     "claude (22-19 executor)",
     "codex"

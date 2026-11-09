@@ -77,7 +77,7 @@
     "cross-class"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-01",
+  "od_ref": "OD-54",
   "recommendation": "Phase 24 with card TX-01: wire RPC_TIMEOUT_MS (or delete its registration): construct providers with a bounded FetchRequest timeout and staticNetwork, bound each await inside the lock, and check the confirm-window deadline per call. Bounding the calls is not a behaviour change of trading logic, but the timeout value is, so it rides on TX-01.",
   "reported_by": [
     "claude (22-20 executor)"

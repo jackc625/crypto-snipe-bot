@@ -12,7 +12,7 @@
     "capital"
   ],
   "escalation_ref": "ESC-ANTIRUG-01",
-  "od_ref": "ANTIRUG-02",
+  "od_ref": "OD-48",
   "reported_by": [
     "claude (22-19 executor)",
     "codex"

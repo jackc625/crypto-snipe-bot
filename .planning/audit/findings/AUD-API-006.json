@@ -54,7 +54,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-03",
+  "od_ref": "OD-66",
   "recommendation": "Check Origin on the WebSocket upgrade against the same allowlist as HTTP (and the Host allowlist from AUD-API-005); reject with 403. Card API-03. Phase 29.",
   "reported_by": [
     "claude (22-22 executor)"

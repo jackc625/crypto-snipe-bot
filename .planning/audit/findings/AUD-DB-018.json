@@ -52,6 +52,6 @@
     "AUD-EXIT-021"
   ],
   "tags": [],
-  "od_ref": "DB-05",
+  "od_ref": "OD-62",
   "recommendation": "Always broadcast (as sendCtxAlert does) and infer severity the same way in both senders. Card DB-05. Phase 29."
 }

@@ -74,7 +74,7 @@
     "credential-exposure"
   ],
   "escalation_ref": null,
-  "od_ref": "TX-04",
+  "od_ref": "OD-57",
   "recommendation": "Phase 29 (card TX-04 for the log policy): add pino redact paths (err.config.headers.Authorization, err.config.data, err.request, err.info.requestUrl and similar) or log err.message/code only at these sites; decide on card TX-04 whether the operator should check existing log files and rotate the bloXroute header and RPC keys.",
   "reported_by": [
     "claude (22-20 executor)",

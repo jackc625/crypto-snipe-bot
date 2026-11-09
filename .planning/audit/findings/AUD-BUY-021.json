@@ -54,7 +54,7 @@
     "section-c:SC-09"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-06",
+  "od_ref": "OD-31",
   "recommendation": "Rate-limit per address (not globally), record an address only after routing succeeded, and bound the set (TTL or LRU). Behaviour change in what gets bought, card BUY-06.",
   "reported_by": [
     "claude (22-17 executor)"

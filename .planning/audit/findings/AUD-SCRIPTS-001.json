@@ -172,7 +172,7 @@
     "side-effects-traced"
   ],
   "escalation_ref": null,
-  "od_ref": "SCRIPTS-03",
+  "od_ref": "OD-70",
   "recommendation": "Phase 29 (HYG-03: broken scripts are removed or fixed): decide on card SCRIPTS-03. The recommendation is to delete both scripts (nothing reads src/addresses.json any more and the contracts they deploy are not in the repo). If the operator wants a Sepolia rehearsal tool instead, rebuild it from scratch: read SEPOLIA_RPC_URL, refuse unless the chainId is 11155111, sign with a testnet-only key (never PRIVATE_KEY), match the FakeToken constructor, use non-zero liquidity minimums and write any output file atomically and only after every transaction succeeded.",
   "reported_by": [
     "claude (22-25 executor)"

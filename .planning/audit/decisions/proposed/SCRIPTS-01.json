@@ -44,5 +44,6 @@
   "decision_owner": "Phase 29 (HYG-03) discussion: must rule on this card before the HYG-03 script changes are planned, with the outcome of card BUY-01 (deliberate-buy protection, Phase 24 capital discussion) in front of it. If BUY-01 picks handoff-to-running-bot, the deliberate buy becomes a bot-performed operation and no separate script signs for it; if BUY-01 picks refuse-while-running-and-prompt, that matches hold-lock here. The D-06 wording in 22-CONTEXT.md (\"the query API for Phase 29 scripts is try-acquire-then-release\") stays unchanged until Phase 29 rules.",
   "related_cards": [
     "BUY-01"
-  ]
+  ],
+  "assigned_id": "OD-68"
 }

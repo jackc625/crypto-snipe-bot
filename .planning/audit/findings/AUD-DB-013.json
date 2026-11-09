@@ -67,6 +67,6 @@
   "tags": [
     "capital"
   ],
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Define realized loss per position (proceeds minus cost of the part sold minus all gas), exposure as remaining cost basis, and keep totals per currency (or convert explicitly). Card DB-01. Phase 24."
 }

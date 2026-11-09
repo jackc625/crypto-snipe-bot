@@ -41,7 +41,7 @@
     "section-c:SC-05"
   ],
   "escalation_ref": null,
-  "od_ref": "BUY-08",
+  "od_ref": "OD-33",
   "recommendation": "Decide on card BUY-08 whether to keep head processing for speed and add an overlap rescan, or wait for confirmations.",
   "reported_by": [
     "claude (22-17 executor)"

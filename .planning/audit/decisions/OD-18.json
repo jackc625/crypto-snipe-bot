@@ -18,6 +18,12 @@
       "risk": "Does nothing for the stop/crash window, which is the larger exposure."
     },
     {
+      "id": "critical-flush-only",
+      "name": "Keep synchronous=NORMAL and force a flush after critical writes only (buys and exit-state writes)",
+      "behavior_impact": "Only buys and exit-state writes pay the fsync cost; other writes stay as they are.",
+      "risk": "Any critical write that misses the flush stays exposed to a power loss; does nothing for the stop/crash window."
+    },
+    {
       "id": "shutdown-drain",
       "name": "First signal waits (up to SIGINT_GRACE_MS) for in-flight buys to finish and write their row before closing the DB; no schema change",
       "behavior_impact": "A routine stop no longer loses a landing buy; stopping can take up to the grace period.",
@@ -31,11 +37,12 @@
     }
   ],
   "keep_current_option_id": "keep-current",
-  "recommendation": "Research recommendation (research SUMMARY OD-18): synchronous=FULL (negligible cost); the intent row only if the audit confirms the crash window. The audit confirms the window and finds the routine shutdown path inside it (AUD-DB-004), which matches intent-row-and-full.",
+  "recommendation": "Research recommendation (research SUMMARY OD-18): synchronous=FULL (negligible cost); the intent row only if the audit confirms the crash window. The audit confirms the window and finds the routine shutdown path inside it (AUD-DB-004), which matches intent-row-and-full. Durability note (added at 22-28): AUD-DB-021 (S2) is the synchronous=NORMAL finding; the proposed durability card that asked the same question was linked here, and its flush-after-critical-writes option is carried as critical-flush-only.",
   "default": "Keep current behaviour until the owning phase decides (milestone contract). This card covers S1 capital findings, which cannot rest on the default: until it is decided and fixed it blocks the live re-entry gate.",
   "behavior_impact": "Decides whether a buy can land without the bot knowing about it, how a stop treats an in-flight buy, and the database durability mode.",
   "findings": [
-    "AUD-DB-004"
+    "AUD-DB-004",
+    "AUD-DB-021"
   ],
   "decided": null,
   "needed_by": "Phase 24 discussion before Wave A (capital fixes, after the Phase 23 real-path proof)"

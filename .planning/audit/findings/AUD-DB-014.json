@@ -62,6 +62,6 @@
   "tags": [
     "capital"
   ],
-  "od_ref": "DB-01",
+  "od_ref": "OD-58",
   "recommendation": "Either enforce deployed-per-chain <= maxCapital in canSnipe or rename the setting to what it does (daily-loss base). Card DB-01. Phase 24."
 }

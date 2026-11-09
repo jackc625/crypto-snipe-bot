@@ -77,7 +77,7 @@
     "capital"
   ],
   "escalation_ref": null,
-  "od_ref": "DASH-01",
+  "od_ref": "OD-67",
   "recommendation": "Decide (card DASH-01) what evidence gates the live-execute switch; at least remove or label the placeholder charts and the no-op filter as not wired, and stop presenting a session-only list as a 7-day record. Real-path test: record dry-run detections with the tab closed, reopen and assert they are shown. Nothing changed in Phase 22.",
   "reported_by": [
     "claude (22-22 executor)"

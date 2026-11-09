@@ -1,0 +1,39 @@
+{
+  "id": "OD-57",
+  "title": "Log redaction for relay and RPC errors, and whether to check existing logs and rotate the bloXroute header and RPC keys",
+  "area": "TX",
+  "capital": true,
+  "status": "open",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: log whole error objects",
+      "behavior_impact": "none",
+      "risk": "Every bloXroute relay failure writes the auth header, and every HTTP-level RPC error the RPC URL with its key, into the logs (AUD-TX-014); anyone who sees the logs can use them."
+    },
+    {
+      "id": "redact-only",
+      "name": "Add logger-level redaction (and log message/code only at these sites); no rotation",
+      "behavior_impact": "New logs are clean.",
+      "risk": "Credentials already in old log files stay valid."
+    },
+    {
+      "id": "redact-and-rotate",
+      "name": "Redact, have the operator check old log files, and rotate the bloXroute header and RPC keys if any line contains them",
+      "behavior_impact": "New logs clean and leaked values revoked.",
+      "risk": "Operator work; a rotation touches .env (operator-only)."
+    }
+  ],
+  "keep_current_option_id": "keep-current",
+  "recommendation": "redact-and-rotate if BSC (bloXroute) was ever enabled or logs were ever shared; otherwise redact-only. Context (added at the 22-20 Task 3 close-out, supplied by the execute-phase orchestrator; not an operator ruling): the backup copies of the only persisted log files (data/bot-capture-21-07.log, data/capture-21-07.log, data/capture-21-07b.log) were covered by the operator's D-22 exact-value check, which found none of BLOXROUTE_AUTH_HEADER, ALCHEMY_URL or any set *_RPC_URL / *_WS_URL value (.planning/baselines/safe01-offmachine.json exact_value_check; AUD-TX-014 last evidence entry). So the \"check old log files\" step of redact-and-rotate is already done for persisted logs; what the rotation question still depends on is terminal output that was never saved, which cannot be checked.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract); S2 EXPOSURE (credentials in logs), so the default may stand until then.",
+  "behavior_impact": "Decides what error detail the logs keep and whether credentials are rotated.",
+  "findings": [
+    "AUD-TX-014",
+    "AUD-DB-009",
+    "AUD-DB-010"
+  ],
+  "decided": null,
+  "needed_by": "Phase 29 discussion (S2-S4 fixes); the operator may choose to check logs earlier",
+  "proposed_from": "TX-04"
+}

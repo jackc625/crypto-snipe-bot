@@ -62,7 +62,7 @@
   ],
   "tags": [],
   "escalation_ref": null,
-  "od_ref": "API-03",
+  "od_ref": "OD-66",
   "recommendation": "Add per-IP and global login backoff; set Secure from the actual scheme (or always when DASHBOARD_HOST is not loopback) instead of NODE_ENV; add a logout that deletes the server-side session; close WebSockets whose session has expired (timer or per-broadcast check); compare fixed-length digests (HMAC of both values) so length is not observable. Card API-03 (behaviour change for remote access). Phase 29.",
   "reported_by": [
     "claude (22-22 executor)"

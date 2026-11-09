@@ -1,0 +1,45 @@
+{
+  "area": "EXIT",
+  "capital": true,
+  "status": "open",
+  "keep_current_option_id": "keep-current",
+  "decided": null,
+  "id": "OD-37",
+  "title": "How and when sell approvals are sent, and which fee ceiling applies to them and to the public fallback",
+  "options": [
+    {
+      "id": "keep-current",
+      "name": "Keep current behaviour: exact-amount public approve right before each sell, ethers default fees, no ceiling",
+      "behavior_impact": "none",
+      "risk": "Every first exit waits for a public approve (an unbounded wait, AUD-EXIT-009), signals the sell, and pays fees outside the ceiling (AUD-EXIT-004)."
+    },
+    {
+      "id": "approve-at-buy",
+      "name": "Approve the router once right after the buy lands (bounded or max allowance to that one router)",
+      "behavior_impact": "Exits, including anti-rug, start with the private sell at once.",
+      "risk": "A standing allowance to the router; an extra tx per buy."
+    },
+    {
+      "id": "bundle-approve",
+      "name": "Put the approve in the same private bundle as the sell",
+      "behavior_impact": "No public approve; one private inclusion.",
+      "risk": "Only where the strategy supports multi-tx bundles (not passthrough chains)."
+    },
+    {
+      "id": "ceiling-only",
+      "name": "Keep approving at exit time but apply the sell fee ceiling and anti-rug fee policy to approvals and the public fallback",
+      "behavior_impact": "Bounded fees; same latency.",
+      "risk": "Keeps the latency and the public signal."
+    }
+  ],
+  "recommendation": "approve-at-buy plus the ceiling for whatever approves remain.",
+  "default": "Keep current behaviour until the owning phase decides (milestone contract). Capital-relevant, but the linked findings are S2 or lower, so the default is safe to rest on until then.",
+  "behavior_impact": "Decides how much delay and public signal stand in front of every exit.",
+  "findings": [
+    "AUD-EXIT-004",
+    "AUD-BUY-029",
+    "AUD-EXIT-024"
+  ],
+  "needed_by": "Phase 24 discussion (capital fixes, after the Phase 23 real-path proof)",
+  "proposed_from": "EXIT-03"
+}

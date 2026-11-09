@@ -32,5 +32,6 @@
   "findings": [
     "AUD-BUY-030"
   ],
-  "needed_by": "Phase 24 discussion (capital fixes)"
+  "needed_by": "Phase 24 discussion (capital fixes)",
+  "assigned_id": "OD-34"
 }
