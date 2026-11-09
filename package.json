@@ -17,7 +17,8 @@
     "preflight": "ts-node scripts/preflight.ts",
     "pause": "ts-node scripts/pause.ts",
     "resume": "ts-node scripts/resume.ts",
-    "db:init": "ts-node scripts/db-init.ts"
+    "db:init": "ts-node scripts/db-init.ts",
+    "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",

@@ -1,0 +1,202 @@
+# RED proof 22-14-2-vi-mock-gate-mutation (AC-27 / SAFE-06, the gate's own test fails with the checker disabled)
+Date: 2026-11-09T04:13:38.000Z
+File neutralised (working tree only, never committed): scripts/check-vi-mock-paths.ts
+sha256 before and after restore: ee95e05bdb2d6f48add71e5a660fc4d0a5b2682c3d1629de29eeb1ba5dd2eb95 / ee95e05bdb2d6f48add71e5a660fc4d0a5b2682c3d1629de29eeb1ba5dd2eb95
+git status of the file after restore: []
+
+## What this proves
+
+With checkViMockPaths returning an empty array the suite scan would pass trivially; the seeded-violation expectations fail, so the gate cannot be silently disabled.
+
+## Diff applied
+
+diff --git a/scripts/check-vi-mock-paths.ts b/scripts/check-vi-mock-paths.ts
+index feca82c..9a7093a 100644
+--- a/scripts/check-vi-mock-paths.ts
++++ b/scripts/check-vi-mock-paths.ts
+@@ -235,7 +235,7 @@ function scan(files: string[]): ScanResult {
+ 
+ /** Every mock specifier in the given files that does not name a real module. */
+ export function checkViMockPaths(files: string[]): Violation[] {
+-    return scan(files).violations;
++    return []; // RED 22-14-2: the checker is disabled
+ }
+ 
+ /**
+
+## Command (wrapped)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/viMockGate.test.ts
+
+## RED output (exit 1)
+
+verify-prod-untouched: run vpu-20261109T041332-10456-1c630e — snapshot before: 6 entries under C:\Users\jackc\WebstormProjects\crypto-snipe-bot\data
+
+ RUN  v4.1.1 C:/Users/jackc/WebstormProjects/crypto-snipe-bot
+
+[SAFE-02 rails] run vpu-20261109T041332-10456-1c630e — project unit — ledger C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T041332-10456-1c630e
+ ❯  unit  test/unit/viMockGate.test.ts (9 tests | 5 failed) 68ms
+     × reports exactly the four seeded violations and nothing from the valid fixtures 14ms
+     × reports the file, line and call as written for an aliased vi 3ms
+     × rejects a mock of a declaration file with no runtime module beside it 7ms
+     × finds the call through the vitest export name and through bracket access 12ms
+     × treats a no-substitution template as a literal and every other form as non-literal 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   unit  test/unit/viMockGate.test.ts > SAFE-06 vi.mock specifier gate > reports exactly the four seeded violations and nothing from the valid fixtures
+AssertionError: expected [] to deeply equal [ { …(3) }, { …(3) }, { …(3) }, …(1) ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "file": "broken-aliased.fixture.ts",
+-     "kind": "unresolved-relative",
+-     "specifier": "./also-missing",
+-   },
+-   {
+-     "file": "broken-bare.fixture.ts",
+-     "kind": "unresolved-bare",
+-     "specifier": "no-such-package-csb-gate",
+-   },
+-   {
+-     "file": "broken-relative.fixture.ts",
+-     "kind": "unresolved-relative",
+-     "specifier": "./does-not-exist",
+-   },
+-   {
+-     "file": "non-literal.fixture.ts",
+-     "kind": "non-literal",
+-     "specifier": "someVariable",
+-   },
+- ]
++ []
+
+ ❯ test/unit/viMockGate.test.ts:45:64
+     43| describe('SAFE-06 vi.mock specifier gate', () => {
+     44|     it('reports exactly the four seeded violations and nothing from th…
+     45|         expect(byFileAndKind(checkViMockPaths(FIXTURE_FILES))).toEqual…
+       |                                                                ^
+     46|             { file: 'broken-aliased.fixture.ts', kind: 'unresolved-rel…
+     47|             { file: 'broken-bare.fixture.ts', kind: 'unresolved-bare',…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL   unit  test/unit/viMockGate.test.ts > SAFE-06 vi.mock specifier gate > reports the file, line and call as written for an aliased vi
+AssertionError: expected undefined to match object { line: 5, call: 'v.mock', …(2) }
+
+- Expected:
+{
+  "call": "v.mock",
+  "kind": "unresolved-relative",
+  "line": 5,
+  "specifier": "./also-missing",
+}
+
++ Received:
+undefined
+
+ ❯ test/unit/viMockGate.test.ts:55:27
+     53|     it('reports the file, line and call as written for an aliased vi',…
+     54|         const [violation] = checkViMockPaths([path.join(FIXTURE_DIR, '…
+     55|         expect(violation).toMatchObject({ line: 5, call: 'v.mock', spe…
+       |                           ^
+     56|     });
+     57|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL   unit  test/unit/viMockGate.test.ts > SAFE-06 vi.mock specifier gate > rejects a mock of a declaration file with no runtime module beside it
+AssertionError: expected [] to deeply equal [ { file: 'case.ts', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "file": "case.ts",
+-     "kind": "unresolved-relative",
+-     "specifier": "./types-only",
+-   },
+- ]
++ []
+
+ ❯ test/unit/viMockGate.test.ts:78:97
+     76|         const source = `import { vi } from 'vitest';\nvi.mock('./types…
+     77|         const declaration = 'export declare const x: number;\n';
+     78|         expect(byFileAndKind(checkTemp({ 'case.ts': source, 'types-onl…
+       |                                                                                                 ^
+     79|             { file: 'case.ts', kind: 'unresolved-relative', specifier:…
+     80|         ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL   unit  test/unit/viMockGate.test.ts > SAFE-06 vi.mock specifier gate > finds the call through the vitest export name and through bracket access
+AssertionError: expected [] to deeply equal [ { file: 'case.ts', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "file": "case.ts",
+-     "kind": "unresolved-relative",
+-     "specifier": "./gone",
+-   },
+- ]
++ []
+
+ ❯ test/unit/viMockGate.test.ts:88:69
+     86|         const viaBracket = `import { vi } from 'vitest';\nvi['doMock']…
+     87|         for (const source of [viaExport, viaBracket]) {
+     88|             expect(byFileAndKind(checkTemp({ 'case.ts': source }))).to…
+       |                                                                     ^
+     89|                 { file: 'case.ts', kind: 'unresolved-relative', specif…
+     90|             ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL   unit  test/unit/viMockGate.test.ts > SAFE-06 vi.mock specifier gate > treats a no-substitution template as a literal and every other form as non-literal
+AssertionError: expected [] to deeply equal [ { file: 'case.ts', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "file": "case.ts",
+-     "kind": "unresolved-relative",
+-     "specifier": "./gone",
+-   },
+- ]
++ []
+
+ ❯ test/unit/viMockGate.test.ts:95:113
+     93|
+     94|     it('treats a no-substitution template as a literal and every other…
+     95|         expect(byFileAndKind(checkTemp({ 'case.ts': 'import { vi } fro…
+       |                                                                                                                 ^
+     96|             { file: 'case.ts', kind: 'unresolved-relative', specifier:…
+     97|         ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 4 passed (9)
+   Start at  23:13:33
+   Duration  1.04s (transform 155ms, setup 70ms, import 629ms, tests 68ms, environment 0ms)
+
+[SAFE-02 rails] run vpu-20261109T041332-10456-1c630e — project unit finished — summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T041332-10456-1c630e\summary.json
+[SAFE-02 rails]   kind          count
+[SAFE-02 rails]   worker-start  1
+verify-prod-untouched: verdict: untouched | run vpu-20261109T041332-10456-1c630e | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T041332-10456-1c630e\summary.json
+verify-prod-untouched: (the wrapped command failed; its exit status is passed through)
+
+## GREEN after restore (exit 0)
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T041336-18360-6d3152 | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T041336-18360-6d3152\summary.json
