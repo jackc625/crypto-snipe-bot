@@ -1,0 +1,53 @@
+# RED proof 22-13-3-direct-entry-first-import (AC-18 / D-07, the direct-entry guard is the first statement of src/bot.ts)
+Date: 2026-11-09T03:58:58.431Z
+File neutralised (working tree only, never committed): src/bot.ts
+sha256 before and after restore: 604b506a2bdc189447b388c945e84a3403c35049425ef863398e18301a28a346
+
+## What this proves
+
+With the guard moved below the ./config import, a direct start would run config and its side effects before refusing. The AST check that the guard is the first statement must fail.
+
+## Diff applied
+
+diff --git a/src/bot.ts b/src/bot.ts
+index 0ec8948..4e5306a 100644
+--- a/src/bot.ts
++++ b/src/bot.ts
+@@ -1,7 +1,6 @@
+-// SAFE-04 / D-07: must stay the FIRST statement; a direct start refuses here, before any stateful import runs (start via src/main.ts).
+-import './guards/directEntry';
+ import { ethers, Contract, WebSocketProvider, EventLog } from "ethers";
+ import { CONFIG } from "./config";
++import './guards/directEntry'; // RED 22-13-3
+ import { getGasOptions } from "./utils/gasManager";
+ import {
+     checkTokenMetadata,
+
+
+## Command (wrapped, ran ONLY this test, selected with -t)
+
+node node_modules/ts-node/dist/bin.js scripts/verify-prod-untouched.ts --manifest C:/Users/jackc/crypto-snipe-bot-backups/2026-11-06/MANIFEST.json --require-ledger --expect-projects unit -- node node_modules/vitest/vitest.mjs run --project unit test/unit/mainEntry.test.ts -t bot.ts
+
+## RED result: exit 1
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035852-23960-78c93e | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035852-23960-78c93e\summary.json
+ FAIL   unit  test/unit/mainEntry.test.ts > SAFE-04 boot entry > (5) src/bot.ts: the first statement is the direct-entry guard and require.main refuses
+AssertionError: expected 'ethers' to be './guards/directEntry' // Object.is equality
+
+## Wrapper verdict during RED
+
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035852-23960-78c93e | child exit 1 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035852-23960-78c93e\summary.json
+
+## Restore
+
+git -c core.autocrlf=true checkout -- src/bot.ts (byte-exact for this file's line endings)
+sha256 after restore: 604b506a2bdc189447b388c945e84a3403c35049425ef863398e18301a28a346
+git status --porcelain src: (empty)
+
+## GREEN rerun: exit 0
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 6 skipped (7)
+verify-prod-untouched: verdict: untouched | run vpu-20261109T035856-20524-52086a | child exit 0 | manifest: equal | ledger: ok | summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\vpu-20261109T035856-20524-52086a\summary.json
