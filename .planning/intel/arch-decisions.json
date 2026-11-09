@@ -1,16 +1,32 @@
 {
   "_meta": {
-    "updated_at": "2026-11-06T18:51:04.488Z",
-    "version": 2
+    "updated_at": "2026-11-09T14:59:20.370Z",
+    "version": 3
   },
   "entries": {
     "overview": {
-      "pattern": "Single-process multi-chain event-driven trading bot with embedded API/dashboard",
-      "description": "src/bot.ts startMultiChainBot builds per-chain contexts (src/chainRegistry.ts), listens for new DEX V2 pairs / V3 pools and Telegram alpha calls, runs safety checks, buys, then manages exits and anti-rug monitoring; Express API + WebSocket (src/api/server.ts) serves the React dashboard (dashboard/)."
+      "pattern": "Single-process-per-wallet, multi-chain, event-driven trading bot with embedded API and dashboard",
+      "description": "src/main.ts takes the wallet lock, then src/bot.ts startMultiChainBot runs preflight, builds per-chain contexts (src/chainRegistry.ts), listens for new DEX V2 pairs, V3 pools and Telegram alpha calls, runs safety checks, buys, and manages exits and anti-rug monitoring. Express and WebSocket (src/api/server.ts) serve the React dashboard (dashboard/)."
+    },
+    "entry-point": {
+      "flow": "npm start -> ts-node src/main.ts -> readStartEnv -> runMain (refuse if VITEST set; derive wallet address from PRIVATE_KEY; acquireProcessLock) -> lazy require('./bot') -> startMultiChainBot()",
+      "description": "src/main.ts is the only start path. It has no static import of config, DB, notifier, logger or bot, so nothing stateful loads before the lock; refusals go to stderr with exit 1. startMultiChainBot is called without await or catch. src/bot.ts is a library module to main.ts and cannot be started directly: its first statement imports src/guards/directEntry.ts, which exits 1 before any stateful import when bot is the process entry file, and a require.main === module block at the end of src/bot.ts also refuses. Importing src/bot.ts from elsewhere is allowed (scripts/deliberate-buy.ts does)."
     },
     "data-flow": {
       "flow": "DEX factory events / Telegram (src/telegramListener.ts -> src/alphaDrop.ts) -> handleNewPairForChain (src/bot.ts) -> tokenSafety + honeypot simulation -> riskManager.canSnipe -> txManager/MEV strategy buy -> db.insertTrade -> exitEngine + anti-rug detector -> sell",
       "description": "State persisted in SQLite (src/utils/db.ts); alerts via src/utils/notifier.ts and WS broadcast."
+    },
+    "component:ProcessLock": {
+      "path": "src/utils/processLock.ts",
+      "responsibility": "One bot process per wallet: SQLite exclusive file lock in a per-user folder (defaultLockDir), released by the OS on process death, pinned on globalThis so GC cannot close it. Fails closed with PROCESS_LOCK_HELD or PROCESS_LOCK_MECHANISM; no env var or flag skips it. Only src/main.ts acquires it; preflight, pause, resume, deliberate-buy and recover-sell scripts do not."
+    },
+    "component:SingletonGuard": {
+      "path": "src/guards/singleton.ts, src/guards/epoch.ts",
+      "responsibility": "Throws SINGLETON_DUPLICATE when a stateful module loads twice in one process (path-casing or link alias, query re-import). Registered by src/utils/nonceAuthority.ts, src/utils/exitManager.ts, src/exitEngine.ts, src/anti-rug/detector.ts. A full module-graph reset (new EPOCH) is allowed."
+    },
+    "component:Database": {
+      "path": "src/utils/db.ts, src/utils/dbPath.ts, src/utils/dbSchema.ts, src/utils/repoRoot.ts, scripts/db-init.ts",
+      "responsibility": "db.ts holds the handle and queries. dbPath.ts resolves the path against the repo root (findRepoRoot) and openGuardedDb refuses a missing, empty, uninitialised, replaced or newer-schema file. dbSchema.ts owns migrateSchema and CURRENT_SCHEMA_VERSION. The database is created only by npm run db:init, never at boot."
     },
     "component:ChainRegistry": {
       "path": "src/chainRegistry.ts",
@@ -18,43 +34,45 @@
     },
     "component:SafetyPipeline": {
       "path": "src/utils/tokenSafety.ts, src/utils/honeypot/, src/utils/safetyProviders/, contracts/honeypot/HoneypotChecker.sol",
-      "responsibility": "Honeypot/roundtrip simulation, external providers (GoPlus, honeypot.is, Mudra, Unicrypt), blocklist, LP lock and limits checks"
+      "responsibility": "Honeypot roundtrip simulation, external providers (GoPlus, honeypot.is, Mudra, Unicrypt), blocklist, LP lock and limits checks"
     },
     "component:RiskManager": {
       "path": "src/riskManager.ts",
-      "responsibility": "Exposure, position count, daily loss gating (canSnipe)"
+      "responsibility": "Exposure, position count and daily loss gating (canSnipe)"
     },
     "component:MevSubmission": {
-      "path": "src/utils/txManager.ts, src/utils/mevStrategies/",
-      "responsibility": "Private submission (Flashbots, bloXroute) with inclusion reconciliation and public fallback; nonce serialization in src/utils/nonceAuthority.ts"
+      "path": "src/utils/txManager.ts, src/utils/mevStrategies/, src/utils/nonceAuthority.ts",
+      "responsibility": "Private submission (Flashbots, bloXroute, passthrough) with inclusion reconciliation; per-wallet nonce serialization via withNonceLock"
     },
     "component:ExitEngine": {
       "path": "src/exitEngine.ts, src/utils/exitManager.ts, src/utils/exitWatchdog.ts",
-      "responsibility": "Stop-loss, take-profit tiers, trailing, timed sells; per-token sell locks; serialized exit state"
+      "responsibility": "Stop-loss, take-profit tiers, trailing and timed sells; per-token sell locks; serialized exit state"
     },
     "component:AntiRug": {
       "path": "src/anti-rug/",
-      "responsibility": "LP burn/removal detection, LP baseline, exit trigger, per-chain circuit breaker, race telemetry"
+      "responsibility": "LP burn and removal detection, LP baseline, exit trigger, per-chain circuit breaker, race telemetry"
     },
     "component:API": {
       "path": "src/api/",
-      "responsibility": "Express 5 routes with session auth middleware, helmet, WS broadcaster; serves dashboard/dist SPA"
+      "responsibility": "Express 5 routes with session auth, helmet, WS on /ws; serves dashboard/dist. Binds DASHBOARD_HOST:DASHBOARD_PORT, default 127.0.0.1:8080"
     },
     "component:Preflight": {
       "path": "src/preflight.ts, scripts/preflight.ts",
-      "responsibility": "Read-only cold-start checks: RPC chainId/block age, balances, gas affordability, MEV health, checker bytecode"
+      "responsibility": "Cold-start checks (RPC chainId and block age, balances, gas affordability, MEV health, checker bytecode). preflight() runs inside startMultiChainBot; npm run preflight is the read-only operator path"
     },
     "security": {
-      "auth": "Session cookies via src/api/middleware/auth.ts protect /api/*",
-      "keys": "Wallet from env via src/utils/provider.ts getWallet"
+      "auth": "Session cookies via src/api/middleware/auth.ts protect /api/* except /api/auth; /ws validates the same session on upgrade; /health is public",
+      "keys": "Wallet from env via src/utils/provider.ts getWallet; src/main.ts derives only the address for the lock and uses fixed error text so a rejected key is never echoed"
     },
     "testing": {
-      "framework": "Vitest unit/integration/fork projects (vitest.config.ts); Hardhat for contracts (hardhat.config.ts)"
+      "framework": "Vitest unit, integration and fork projects (vitest.config.ts); Hardhat for contracts (hardhat.config.ts)",
+      "rails": "test/rails/ setup files plus src-layer tripwires: VITEST selects a temp DB and refuses the live data folder (src/utils/dbPath.ts), skips .env (src/config.ts) and refuses Telegram sends (src/utils/notifier.ts). src/main.ts refuses to start with VITEST set",
+      "ci": ".github/workflows/test.yml: unit, integration, vi.mock specifier gate, .todo ban, tsc on three tsconfigs; Hardhat, Slither and Mythril gates on contracts/** changes"
     },
     "conventions": {
       "naming": "camelCase modules, _resetXForTesting test hooks",
-      "file-organization": "src/ top-level domain modules, src/utils/ infrastructure, src/anti-rug/ and src/api/ subsystems",
-      "imports": "relative TS imports, CommonJS output via tsc"
+      "file-organization": "src/ top-level domain modules, src/guards/ load-time guards, src/utils/ infrastructure, src/anti-rug/ and src/api/ subsystems",
+      "imports": "Relative TS imports, CommonJS output via tsc. Import order in src/bot.ts is load-bearing: guards/directEntry must stay first. require.main guards must be re-checked under any ESM conversion"
     }
   }
 }

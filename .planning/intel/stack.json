@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "updated_at": "2026-11-06T18:51:03.300Z",
-    "version": 2
+    "updated_at": "2026-11-09T14:59:18.988Z",
+    "version": 3
   },
   "languages": [
     "TypeScript",
@@ -12,9 +12,9 @@
     "ethers v6",
     "Express 5",
     "Hardhat",
-    "React (dashboard/)",
-    "Vite (dashboard/)",
-    "Tailwind CSS (dashboard/)"
+    "React 19 (dashboard/)",
+    "Vite 8 (dashboard/)",
+    "Tailwind CSS 4 (dashboard/)"
   ],
   "tools": [
     "Vitest",
@@ -24,15 +24,19 @@
     "hardhat-gas-reporter",
     "pino",
     "ts-node",
-    "better-sqlite3"
+    "better-sqlite3",
+    "GitHub Actions (.github/workflows/test.yml)",
+    "Slither (CI)",
+    "Mythril (CI)"
   ],
-  "build_system": "npm scripts (tsc; dashboard via vite)",
-  "test_framework": "Vitest (projects: unit, integration, fork; vitest.config.ts)",
+  "build_system": "npm scripts (tsc via tsconfig.json; tsconfig.bot.json type-checks src/ in CI; dashboard via vite)",
+  "test_framework": "Vitest (projects: unit, integration, fork; vitest.config.ts; safety rails in test/rails/)",
   "package_manager": "npm",
   "content_formats": [
     "Solidity contracts (contracts/FakeToken.sol, contracts/honeypot/HoneypotChecker.sol)",
-    "SQLite database (src/utils/db.ts)",
-    "dotenv environment config (src/config.ts)",
+    "SQLite database (src/utils/db.ts, schema in src/utils/dbSchema.ts)",
+    "SQLite lock file per wallet (src/utils/processLock.ts)",
+    "dotenv environment config (src/config.ts, src/main.ts)",
     "Markdown planning docs (.planning/)"
   ]
 }
