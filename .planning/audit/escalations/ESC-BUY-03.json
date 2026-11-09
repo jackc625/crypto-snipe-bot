@@ -14,8 +14,12 @@
   "resolved_items": [],
   "summary": "New S1 entries from the 22-27 independent second opinion (codex, gpt-6.1-sol, run in a locked-down container with no file or shell tools), presented together once the merge was complete. Three entries, all in the BUY area. AUD-BUY-027: new-pair events are not limited to pairs with the wrapped-native token, so the checks can read one pair and the buy use another. AUD-BUY-028: the liquidity-lock gate passes on any active lock, however small a share of the LP tokens it covers. AUD-BUY-030 (candidate, not reproduced): the deliberate public buy is not pinned to the private attempt nonce, so a late private landing can make it a second buy.",
   "presented_at": "2026-11-09 session: the 22-27 Task 3 area-batch blocking checkpoint (gate blocking-human), relayed to the operator by the execute-phase orchestrator",
-  "operator_response": null,
-  "acknowledgement_evidence": "Awaiting the operator reply at the 22-27 Task 3 area-batch blocking checkpoint; the continuation executor records the verbatim reply here and in operator_response.",
+  "operator_response": "Acknowledge continue",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim reply, kept exactly as typed). Presented at presented_at through the 22-27 Task 3 blocking checkpoint (gate blocking-human).",
   "ruling": "none",
-  "phase_continued": true
+  "phase_continued": true,
+  "operator_response_recorded_at": "2026-11-09T01:40:17.637Z",
+  "operator_response_channel": "typed by the operator at the 22-27 Task 3 area-batch blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 22-27 executor, which recorded it at operator_response_recorded_at",
+  "ruling_option_text": "acknowledge-continue: The three stay registered, get proof and fixes in Phases 23 and 24, and the audit carries on.",
+  "ruling_note": "Interpretation recorded as relayed by the orchestrator: the operator chose the acknowledge-continue option for AUD-BUY-027, AUD-BUY-028 and AUD-BUY-030. No severity was changed, no decimal phase is inserted, and Phase 22 continues. Context attributed to the execute-phase orchestrator and NOT to the operator: the orchestrator told the operator that codex rated 43 findings S1 which the register rates lower (19 unique new entries, the rest existing), with the merge executor setting those grades and no second reader yet; the orchestrator will instruct 22-28 to re-grade all 43 against the code rather than accept either side, and to bring the operator anything that moves up to S1. Named examples: AUD-TX-020, AUD-EXIT-020, AUD-TX-012, AUD-TX-019."
 }

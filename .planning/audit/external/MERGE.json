@@ -23,7 +23,7 @@
       "effort": "CLI default"
     }
   },
-  "status": "merge complete; three new BUY S1 entries escalated in ESC-BUY-03; awaiting operator reply at the blocking checkpoint",
+  "status": "merge complete; new S1 batch acknowledged by the operator (ESC-BUY-03); re-grade of codex S1 disagreements assigned to 22-28",
   "source_code_sent": true,
   "confinement": [
     {
@@ -2521,5 +2521,333 @@
       "S4": 8,
       "S3": 11
     }
+  },
+  "consolidation_required": {
+    "owner": "plan 22-28",
+    "instruction": "Plan 22-28 must re-grade every entry where codex rated the finding S1 and the register rates it S2, S3 or S4, against the code at the audit base (audit_base_sha 23a64617dca167976adc4645fed0e2c69e384820). Neither side is to be accepted as given. Anything that moves up to S1 is brought to the operator.",
+    "why": "The grades on these entries were set or kept by the 22-27 merge executor and have had no second reader yet.",
+    "attributed_to": "execute-phase orchestrator (not the operator); relayed to the 22-27 executor after the operator acknowledged the S1 batch",
+    "named_examples": [
+      "AUD-TX-020",
+      "AUD-EXIT-020",
+      "AUD-TX-012",
+      "AUD-TX-019"
+    ],
+    "count_external_findings": 43,
+    "count_unique_register_entries": 39,
+    "count_unique_new_entries": 19,
+    "entries": [
+      {
+        "ext_id": "codex-BUY-06",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-BUY-029",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-BUY-12",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-BUY-015",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-BUY-13",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-BUY-015",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-BUY-17",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-BUY-012",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-02",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-017",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-05",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-EXIT-022",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-EXIT-06",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-016",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-10",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-004",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-11",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-EXIT-020",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-12",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-EXIT-023",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-EXIT-13",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-EXIT-024",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-EXIT-14",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-011",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-EXIT-15",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-025",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-EXIT-16",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-006",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-01",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-006",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-04",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-018",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-ANTIRUG-05",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-007",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-06",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-007",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-09",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-012",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-10",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-019",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-ANTIRUG-11",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-020",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-ANTIRUG-15",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-008",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-16",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-022",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-ANTIRUG-17",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-013",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-18",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-ANTIRUG-010",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-ANTIRUG-19",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-ANTIRUG-021",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-01",
+        "codex_severity": "S1",
+        "register_severity": "S4",
+        "register_id": "AUD-TX-022",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-02",
+        "codex_severity": "S1",
+        "register_severity": "S4",
+        "register_id": "AUD-TX-023",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-07",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-TX-018",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-08",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-TX-020",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-09",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-TX-012",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-TX-10",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-TX-010",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-TX-12",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-TX-021",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-13",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-TX-019",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-TX-14",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-TX-014",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-DB-04",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-DB-020",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-DB-05",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-DB-020",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-DB-06",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-EXIT-016",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-DB-07",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-DB-012",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-DB-08",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-DB-021",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-DB-09",
+        "codex_severity": "S1",
+        "register_severity": "S4",
+        "register_id": "AUD-DB-022",
+        "register_entry_is_new_in_22_27": true
+      },
+      {
+        "ext_id": "codex-DB-10",
+        "codex_severity": "S1",
+        "register_severity": "S3",
+        "register_id": "AUD-DB-019",
+        "register_entry_is_new_in_22_27": false
+      },
+      {
+        "ext_id": "codex-DB-11",
+        "codex_severity": "S1",
+        "register_severity": "S2",
+        "register_id": "AUD-DB-009",
+        "register_entry_is_new_in_22_27": false
+      }
+    ]
+  },
+  "s1_batch": {
+    "escalation": "ESC-BUY-03",
+    "items": [
+      "AUD-BUY-027",
+      "AUD-BUY-028",
+      "AUD-BUY-030"
+    ],
+    "operator_response": "Acknowledge continue",
+    "recorded_at": "2026-11-09T01:40:17.637Z"
   }
 }
