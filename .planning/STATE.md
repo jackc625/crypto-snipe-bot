@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 22
 current_phase_name: Safety Rails & Audit
 status: executing
-stopped_at: Completed 22-16-PLAN.md
-last_updated: "2026-11-09T05:20:47.448Z"
+stopped_at: Completed 22-29-PLAN.md
+last_updated: "2026-11-09T06:49:29.999Z"
 last_activity: 2026-11-08
 last_activity_desc: Phase 22 execution started
-state_head: 4093437a0aa588040d010190ddb4f93902bcd48e
+state_head: 22255a7db3804ac70b989485dc382b1d10d29ae9
 progress:
   total_phases: 11
   completed_phases: 0
   total_plans: 29
-  completed_plans: 28
+  completed_plans: 29
   percent: 0
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start)
 ## Current Position
 
 Phase: 22 (Safety Rails & Audit) — EXECUTING
-Plan: 18 of 29
+Plan: 19 of 29
 Status: Ready to execute
 Last activity: 2026-11-08 — Phase 22 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -106,11 +106,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 | Phase 22 P14 | 8min | 2 tasks | 17 files |
 | Phase 22 P15 | 18min (continuation) | 2 tasks | 15 files |
 | Phase 22 P16 | 18min | 2 tasks | 11 files |
+| Phase 22 P29 | 28min | 3 tasks | 79 files |
 
 ## Session
 
-**Last session:** 2026-11-09T05:20:47.356Z
-**Stopped at:** Completed 22-16-PLAN.md
+**Last session:** 2026-11-09T06:49:29.902Z
+**Stopped at:** Completed 22-29-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -204,3 +205,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 100/100 requi
 - [Phase 22]: 22-16: ESLint phase_start 350/22 equals STATE.md; post_rails 351/22 (+1: src/bot.ts -1, src/main.ts +1, src/utils/repoRoot.ts +1), all from the rails' own src changes
 - [Phase 22]: 22-16 for Phase 26: npm ls exits 1 from ethers 6.16.0 vs the 6.7.1 peer of @flashbots/ethers-provider-bundle, vitest 4.1.1 vs the 4.1.2 peer of @vitest/coverage-v8, and an extraneous @emnapi/core folder
 - [Phase 22]: 22-16: the plan's tmp-path regex matches the npm registry URL of the package named tmp; data left intact, check run with URLs removed, script asserts no os.tmpdir() in outputs
+- [Phase 22]: Fork-project gap ruled accept-rehearsal-plus-obligation: fork halves of AC-13/AC-16/AC-17 and the AC-22 live bytecode test stay rehearsal-only until Phase 25
+- [Phase 22]: AUD-TESTQ-002 merged into AUD-TESTU-023; canonical stays confirmed because the stale statement names in the mock factory are not fixed
+- [Phase 22]: Phase 22 sealed on 93d90297b58a8b333519873112473156fe45d6bf with a clean NAC-11 scan; later bookkeeping paths are exempt by pattern but still scanned

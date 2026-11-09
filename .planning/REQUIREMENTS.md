@@ -9,8 +9,8 @@
 
 ### Safety Rails (SAFE)
 
-- [ ] **SAFE-01**: Ignition deployment state (`ignition/deployments/`, incl. gitignored `journal.jsonl` + per-future artifacts) and `data/` (`bot.db` + `-wal` + `-shm` together, or checkpoint + `db.backup()`) are backed up outside the repo with a verified hash manifest before any `npm install`, Hardhat invocation, sweep, or relocation; `ignition/deployments/` is then tracked in git (OD-21).
-- [ ] **SAFE-02**: Test runs cannot read the real `.env`, open `data/bot.db`, reach the network, or send Telegram alerts — enforced by a dummy test env, a prod-DB tripwire that throws under Vitest, an outbound-network deny, and a notifier that refuses to send under Vitest; each rail is proven by a test that fails if the rail is removed.
+- [x] **SAFE-01**: Ignition deployment state (`ignition/deployments/`, incl. gitignored `journal.jsonl` + per-future artifacts) and `data/` (`bot.db` + `-wal` + `-shm` together, or checkpoint + `db.backup()`) are backed up outside the repo with a verified hash manifest before any `npm install`, Hardhat invocation, sweep, or relocation; `ignition/deployments/` is then tracked in git (OD-21).
+- [x] **SAFE-02**: Test runs cannot read the real `.env`, open `data/bot.db`, reach the network, or send Telegram alerts — enforced by a dummy test env, a prod-DB tripwire that throws under Vitest, an outbound-network deny, and a notifier that refuses to send under Vitest; each rail is proven by a test that fails if the rail is removed.
 - [x] **SAFE-03**: Lock/registry singletons (`withNonceLock`, sell lock, ExitWorker, anti-rug registry) throw on duplicate load in one process (e.g. `Symbol.for` guard catching Windows path-casing aliases), and `forceConsistentCasingInFileNames` is enabled in every tsconfig.
 - [x] **SAFE-04**: A second bot process for the same wallet refuses to start (single-instance process lock acquired at boot).
 - [x] **SAFE-05**: The bot refuses to boot against a DB whose `user_version` is newer than the code supports, and refuses to silently create a fresh DB in production (absolute `DB_PATH` resolution, refuse-to-create).
@@ -19,9 +19,9 @@
 
 ### Audit (AUDIT)
 
-- [ ] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
+- [x] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
 - [ ] **AUDIT-02**: All 28 research-surfaced candidates (SUMMARY.md §Audit Candidates) are triaged to confirmed (RED real-path test or fork script) or NOT-A-BUG (with evidence).
-- [ ] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
+- [x] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
 - [x] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
 - [x] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
 - [ ] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
@@ -194,16 +194,16 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SAFE-01 | Phase 22 | Pending |
-| SAFE-02 | Phase 22 | Pending |
+| SAFE-01 | Phase 22 | Complete |
+| SAFE-02 | Phase 22 | Complete |
 | SAFE-03 | Phase 22 | Complete |
 | SAFE-04 | Phase 22 | Complete |
 | SAFE-05 | Phase 22 | Complete |
 | SAFE-06 | Phase 22 | Complete |
 | SAFE-07 | Phase 22 | Complete |
-| AUDIT-01 | Phase 22 | Pending |
+| AUDIT-01 | Phase 22 | Complete |
 | AUDIT-02 | Phase 23 | Pending |
-| AUDIT-03 | Phase 22 | Pending |
+| AUDIT-03 | Phase 22 | Complete |
 | AUDIT-04 | Phase 22 | Complete |
 | AUDIT-05 | Phase 22 | Complete |
 | AUDIT-06 | Phase 23 | Pending |
