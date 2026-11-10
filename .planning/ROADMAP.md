@@ -215,27 +215,35 @@ Plans:
   3. A golden-master decision trace is captured: `op` logs, submitted tx requests and calldata including relay request bodies, and DB writes. It covers V2 and V3 buys, every exit type, the risk gate, and fee/gas computation. Confirmed-bug behavior is tagged `SUSPECT(<finding-id>)`, never `KEEP`. An env-matrix snapshot covers `{unset, '', '0', 'abc', valid}` for config and chain-registry parsing.
   4. Tests pin boot/resume/arm ordering, listener counts, same-block ordering, and singleton identity. A signing-site census asserts that every signing path goes through `withNonceLock`, with a positive `>= N` count. Source-text tests are converted to path-agnostic behavioral checks.
   5. A commit check fails any `refactor:`/`lint:`/`fmt:`/`deps:` commit that changes the decision trace, and any `behavior:` commit without a decision ID. Both cases are demonstrated against deliberately violating commits.
-**Waves**:
-  - Wave 1: harness, real-migration test DB, and migration golden tests.
-  - Wave 2: candidate triage (RED or NOT-A-BUG), then re-surfacing of confirmed S0/S1 to the operator.
-  - Wave 3: golden master, env matrix, ordering/identity tests, signing census, source-text conversion, commit-taxonomy check.
+**Waves** (execution waves, as numbered in the plan list below):
+  - Waves 1-4: harness, real-migration test DB, migration golden tests, known-bug marker, mock-list gate and register checker.
+  - Waves 5-6: candidate triage (RED or NOT-A-BUG), then re-surfacing of confirmed S0/S1 to the operator.
+  - Waves 7-11: signing census and source-text conversion.
+  - Waves 12-13: golden master, env matrix and ordering/identity tests.
+  - Wave 14: commit-taxonomy check.
+  - Wave 15: successor seal and the full-suite gate.
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 26 plans in 11 execution waves
+**Plans**: 31 plans in 15 execution waves
 
 Plans:
 **Wave 1**
-- [ ] 23-01-PLAN.md — Real-path harness tracer: one real buy end to end; unknown methods, reads and URLs fail loudly; all launch routes (AC-01, AC-03)
+- [ ] 23-01-PLAN.md — Real-path harness tracer: one real buy end to end; unknown methods, reads and URLs fail loudly (AC-01, AC-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 23-02-PLAN.md — Ordered timeline with DB capture, known-bug marker, mock-list gate wired into npm and CI (AC-02, D-07, D-08, D-14)
+- [ ] 23-28-PLAN.md — Simulated node's transaction, fee and log model, and every launch route
 - [ ] 23-03-PLAN.md — Migration golden tests and the real-migration test database helper (AC-04 to AC-07)
 
 **Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 23-02-PLAN.md — Ordered timeline with DB capture, known-bug marker, mock-list gate wired into npm and CI (AC-02, D-07, D-08, D-14)
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 23-04-PLAN.md — Register checker: triage outcomes, D-21 rules, --stage triage, set-triage.ts
+- [ ] 23-27-PLAN.md — Harness restart on a real temp-file database, and a real child process sharing it and subscribing over a loopback socket
 
 **Cross-cutting constraints:** <!-- gsd:generated -->
+- D-04: chain data is synthetic and built with real ethers encoders
 - AC-08: Each of the 59 register entries has exactly one outcome from Requirement 3, or is on a list of unreproduced entries the operator has reviewed.
 - AC-11: A test covering several entries asserts each one, and every entry names its own status and test.
 - AC-17: Every S0/S1 closed as NOT-A-BUG has a recorded operator ruling.
@@ -243,11 +251,13 @@ Plans:
 - D-10: one test file per root cause, named after the lead finding
 - AC-12: Race findings are shown by forcing the exact order of events, with no reliance on sleeps or timing.
 - AC-38: A test removed rather than converted appears by name with its reason in the plan summary.
+- SPEC Requirement 8: each file is converted and keeps protecting the same behavior
+- A conversion that changes a test title or removes a test is recorded in .planning/audit/inputs/rails-test-edits.json with its before and after, so test-identity can honour it
 - AC-20: Each scenario's recording contains its op logs, submitted transaction requests and calldata, relay request bodies, and database writes.
 - AC-24: 3 runs in a row produce byte-identical output.
 - Each recording is committed once and tagged per the Tag rule
 
-**Wave 4 (triage, one file per root cause)**
+**Wave 5 (triage, one file per root cause)**
 - [ ] 23-05-PLAN.md — Buy submission and money out: AUD-BUY-002, -003, -015, -030, -033, AUD-TX-007
 - [ ] 23-06-PLAN.md — Entry gates and alerts, including the S0: AUD-BUY-001, -006, -009, -011, -027, -028
 - [ ] 23-07-PLAN.md — Exit monitoring and pricing: AUD-EXIT-001, -002, -003, -004, -013, -015
@@ -259,23 +269,29 @@ Plans:
 - [ ] 23-13-PLAN.md — Static and import-order proofs, including AC-14: AUD-SCRIPTS-001, -002, AUD-BUY-007, AUD-DB-005, -006
 - [ ] 23-14-PLAN.md — Closures by rail test (AC-13): AUD-TX-004, -005, AUD-RAIL-001, -002, AUD-TESTI-001, -011, AUD-TESTU-001
 - [ ] 23-15-PLAN.md — Candidate 26 manual relay request, after operator approval: AUD-TX-006 (AC-15)
-**Wave 5**
-- [ ] 23-16-PLAN.md — Plain-language operator batch from three identical runs, rulings, and a passing register (AC-08, AC-10, AC-16 to AC-18)
 **Wave 6**
-- [ ] 23-17-PLAN.md — Standing signing census gate with named exceptions (AC-32 to AC-36)
-- [ ] 23-18-PLAN.md — Source-text conversion, part 1 of 2
+- [ ] 23-16-PLAN.md — Plain-language operator batch from three identical runs, rulings, and a passing register (AC-08, AC-10, AC-16 to AC-18)
 **Wave 7**
-- [ ] 23-19-PLAN.md — Source-text conversion, part 2 of 2, and the standing AST check (AC-37)
+- [ ] 23-17-PLAN.md — Standing signing census gate with named exceptions (AC-32 to AC-36)
+- [ ] 23-29-PLAN.md — In-memory mutant mechanism and proof runner for the source-text conversions
 **Wave 8**
-- [ ] 23-20-PLAN.md — Recording format and update command; Flashbots V2 with all five exits (AC-20 to AC-26)
+- [ ] 23-18-PLAN.md — Source-text conversion, part 1 of 4: bot wiring test
 **Wave 9**
+- [ ] 23-31-PLAN.md — Source-text conversion, part 2 of 4: CLI, lock and entry-point tests
+**Wave 10**
+- [ ] 23-30-PLAN.md — Source-text conversion, part 3 of 4: anti-rug and config tests
+**Wave 11**
+- [ ] 23-19-PLAN.md — Source-text conversion, part 4 of 4, and the standing AST check (AC-37)
+**Wave 12**
+- [ ] 23-20-PLAN.md — Recording format and update command; Flashbots V2 with all five exits (AC-20 to AC-26)
+**Wave 13**
 - [ ] 23-21-PLAN.md — Flashbots V3 recordings
 - [ ] 23-22-PLAN.md — bloXroute and public routes, risk gate, fee and gas recordings (AC-19, AC-22)
 - [ ] 23-23-PLAN.md — Env-matrix snapshot across config, chain registry and risk manager (AC-27 to AC-29)
 - [ ] 23-24-PLAN.md — Boot, resume and arm ordering, listener counts, same-block order, singleton identity (AC-30, AC-31)
-**Wave 10**
+**Wave 14**
 - [ ] 23-25-PLAN.md — Commit check protecting the recordings and the env snapshot (AC-39 to AC-44)
-**Wave 11**
+**Wave 15**
 - [ ] 23-26-PLAN.md — Successor seal, seal-tool fix, full-suite gate and src/ diff review (AC-45, AC-49 to AC-52)
 
 ### Phase 24: Capital-Safety Fixes
