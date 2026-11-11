@@ -80,11 +80,25 @@ function cursor(sc: Scenario): number | undefined {
 
 /**
  * Wait until the bought position's anti-rug arming finished: the subscription covers the pair and
- * the backfill cursor reached the head. armPositionMonitoring runs it after startExitMonitor
- * returns, whether or not an exit monitor started, so this wait holds under the bug and a fix.
+ * the backfill wrote its cursor at or past the head seen when the wait began (the buy's block).
+ * armPositionMonitoring runs it after startExitMonitor returns, whether or not an exit monitor
+ * started, so this wait holds under the bug and a fix. Meanwhile any public transaction of the
+ * bot's wallet is mined in the next block, as the network would (today's arming sends none; a fix
+ * that approves at buy time does; the cursor may then trail the head by the block ethers' 250 ms
+ * request cache answered, which plan 23-05 recorded as benign).
  */
 export async function waitAntiRugArmed(sc: Scenario): Promise<void> {
-    await stepUntilTrue(() => subscribedTo(sc, sc.pair) && cursor(sc) === sc.node.head, { what: 'the anti-rug arming of the bought position', maxSteps: 20_000 });
+    const wallet = sc.wallet.address.toLowerCase();
+    const atStart = sc.node.head;
+    await stepUntilTrue(
+        () => {
+            const pending = sc.node.submitted.filter((s) => s.route === 'public' && s.status === 'accepted' && s.tx.from?.toLowerCase() === wallet).map((s) => s.hash);
+            if (pending.length > 0) sc.node.mine({ include: pending });
+            const c = cursor(sc);
+            return subscribedTo(sc, sc.pair) && c !== undefined && c >= atStart;
+        },
+        { what: 'the anti-rug arming of the bought position', maxSteps: 20_000 },
+    );
 }
 
 export interface TradeRow {

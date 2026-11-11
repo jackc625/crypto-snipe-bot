@@ -117,8 +117,10 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         const fromCall = sc.node.callLog.length;
         await listen(sc);
         await buyAndMine(sc);
-        await stepUntilTrue(() => opLogged('exit.monitor.started'), { what: 'the exit monitor starting', maxSteps: 20_000 });
+        // The arming wait first: it mines any public transaction of the wallet, so a fix that
+        // approves at buy time does not stall the setup of this file.
         await waitAntiRugArmed(sc);
+        expect(opLogged('exit.monitor.started')).toBe(true);
         await stepFor(2 * pollMs, 50);
         const quotes = exitQuotes(sc, fromCall);
         expect(quotes.length).toBeGreaterThanOrEqual(3);
@@ -173,11 +175,12 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
             actualPlain: 'The first quote of a high-supply token answered 0 and was kept as the entry price; after a 1 percent rise the ratio read Infinity, trailing activated and the 2x and 5x tiers sold half the position at once.',
         });
         // Bug details: the entry price 0 is stored, trailing activated at Infinity, one combined
-        // partial sell of both tiers (half the position, no output floor) confirmed, no full exit.
+        // partial sell of both tiers (half the position) confirmed, no full exit. (The sell's
+        // output floor is AUD-EXIT-001's claim, proven in that file.)
         expect(exitStateRow(sc, tradeId)).toEqual(expect.objectContaining({ entry_price: 0, original_token_amount: bought.toString() }));
         expect(opEntries('exit.trailing.activated', fromLog).map((e) => e.priceMultiple)).toEqual(['Infinity']);
         expect(opEntries('exit.partial.submitted', fromLog).map((e) => e.tiers)).toEqual(['2x:25%+5x:25%']);
-        expect(sold).toEqual([expect.objectContaining({ to: sellRouterOf(sc), call: 'swapExactTokensForETH', amountIn: bought / 2n, minOut: 0n })]);
+        expect(sold).toEqual([expect.objectContaining({ to: sellRouterOf(sc), call: 'swapExactTokensForETH', amountIn: bought / 2n })]);
         expect(opLogged('exit.partial.executed', fromLog)).toBe(true);
         expect(exitTriggers(fromLog)).toEqual([]);
     });
@@ -203,12 +206,12 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
             actualPlain: 'The first quote of a high-supply token answered 0 and was kept as the entry price; with the pool unchanged the next quote was 0 too, 0/0 gave NaN, and the stop-loss sold the whole position on the first tick.',
         });
         // Bug details: the stop-loss (the NaN ratio in its alert text) and a market sell of
-        // everything, no output floor.
+        // everything.
         expect(exitStateRow(sc, tradeId)).toEqual(expect.objectContaining({ entry_price: 0, original_token_amount: bought.toString() }));
         expect(new Set(exitTriggers(fromLog))).toEqual(new Set(['exit.trigger.stop-loss']));
         expect(String(opEntries('exit.trigger.stop-loss', fromLog)[0].detail)).toBe('Fixed stop-loss at NaNx (+NaN%)');
         const { sell } = await landNextSell(sc, { fromSubmit });
-        expect(sell).toEqual(expect.objectContaining({ call: 'swapExactTokensForETH', amountIn: bought, minOut: 0n }));
+        expect(sell).toEqual(expect.objectContaining({ call: 'swapExactTokensForETH', amountIn: bought }));
         await stepUntilTrue(() => buyRow(sc)!.status === 'sold', { what: 'the position closing after the stop-loss sell', maxSteps: 20_000 });
     });
 

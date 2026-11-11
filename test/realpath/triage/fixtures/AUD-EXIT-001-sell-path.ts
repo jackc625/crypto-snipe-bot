@@ -22,7 +22,7 @@
 // poll of ethers' bundle wait records the head), together with any other bundle transaction from
 // the wallet it carries (a fix that bundles the approve with the sell).
 
-import { Interface, Transaction, getAddress, type Result } from 'ethers';
+import { Interface, Transaction, Wallet, ethers, getAddress, parseEther, type Result } from 'ethers';
 import type { Submitted } from '../../harness/chain';
 import { encodeResult } from '../../harness/chain';
 import { stepFor, stepUntilTrue, v2AmountOut, v3AmountOut, type Scenario } from '../../harness/world';
@@ -65,8 +65,16 @@ export function sellRouterOf(sc: Scenario): string {
     return getAddress(sc.dex.dexType === 'v2' ? sc.dex.routerAddress : sc.dex.swapRouterAddress);
 }
 
-/** Decode a raw signed transaction as a sell through `router`, or null when it is not one. */
-export function decodeSellRaw(raw: string, router: string): Omit<DecodedSell, 'hash' | 'route'> | null {
+/**
+ * Decode a raw signed transaction as a sell of `token` through `router`, or null when it is not one
+ * (a V3 buy is also a multicall to the same router, with WETH as tokenIn, and is not a sell).
+ */
+export function decodeSellRaw(raw: string, router: string, token: string): Omit<DecodedSell, 'hash' | 'route'> | null {
+    const d = decodeSwapRaw(raw, router);
+    return d && d.tokenIn === getAddress(token) ? d : null;
+}
+
+function decodeSwapRaw(raw: string, router: string): Omit<DecodedSell, 'hash' | 'route'> | null {
     const tx = Transaction.from(raw);
     if (!tx.to || getAddress(tx.to) !== getAddress(router)) return null;
     for (const name of V2_SELLS) {
@@ -98,7 +106,7 @@ export function sellsSubmitted(sc: Scenario): DecodedSell[] {
     const out: DecodedSell[] = [];
     for (const s of sc.node.submitted) {
         if (s.tx.from?.toLowerCase() !== sc.wallet.address.toLowerCase()) continue;
-        const d = decodeSellRaw(s.raw, router);
+        const d = decodeSellRaw(s.raw, router, sc.token);
         if (d) out.push({ hash: s.hash, route: s.route, ...d });
     }
     return out;
@@ -139,9 +147,9 @@ export function installSellPath(sc: Scenario, opts: { bought: bigint }): void {
     const router = sellRouterOf(sc);
     const soldThrough = (spender?: string): bigint =>
         minedFromWallet(sc)
-            .map((s) => ({ s, d: decodeSellRaw(s.raw, router) }))
-            .filter((x) => x.d !== null && x.d.tokenIn === getAddress(token) && (spender === undefined || getAddress(spender) === router))
-            .reduce((a, x) => a + x.d!.amountIn, 0n);
+            .map((s) => decodeSellRaw(s.raw, router, token))
+            .filter((d) => d !== null && (spender === undefined || getAddress(spender) === router))
+            .reduce((a, d) => a + d!.amountIn, 0n);
 
     node.setRead(token, 'balanceOf(address)', ({ args }) => {
         const who = String(args[0]).toLowerCase();
@@ -162,8 +170,8 @@ export function installSellPath(sc: Scenario, opts: { bought: bigint }): void {
                 if (getAddress(a[0] as string) === spender) allowance = a[1] as bigint;
                 continue;
             }
-            const d = decodeSellRaw(s.raw, router);
-            if (d && d.tokenIn === getAddress(token) && spender === router) allowance = allowance > d.amountIn ? allowance - d.amountIn : 0n;
+            const d = decodeSellRaw(s.raw, router, token);
+            if (d && spender === router) allowance = allowance > d.amountIn ? allowance - d.amountIn : 0n;
         }
         return encodeResult(['uint256'], [allowance]);
     });
@@ -171,7 +179,8 @@ export function installSellPath(sc: Scenario, opts: { bought: bigint }): void {
     if (sc.dex.dexType === 'v2') {
         for (const name of V2_SELLS) {
             node.setReceiptLogs({ to: router, selector: V2_ROUTER.getFunction(name)!.selector }, (tx) => {
-                const d = decodeSellRaw(tx.serialized, router)!;
+                const d = decodeSellRaw(tx.serialized, router, token);
+                if (!d) return [];
                 const e = WETH9.encodeEventLog('Withdrawal', [router, v2AmountOut(d.amountIn, reserves.token, reserves.weth)]);
                 return [{ address: weth, topics: e.topics, data: e.data }];
             });
@@ -179,7 +188,9 @@ export function installSellPath(sc: Scenario, opts: { bought: bigint }): void {
     } else {
         const fee = sc.feeTier!;
         node.setReceiptLogs({ to: router, selector: V3_ROUTER.getFunction('multicall')!.selector }, (tx) => {
-            const d = decodeSellRaw(tx.serialized, router)!;
+            // The bot's own V3 buy is a multicall to this router too: it is not a sell.
+            const d = decodeSellRaw(tx.serialized, router, token);
+            if (!d) return [];
             const e = WETH9.encodeEventLog('Transfer', [pair, d.recipient, v3AmountOut(d.amountIn, reserves.token, reserves.weth, fee)]);
             return [{ address: weth, topics: e.topics, data: e.data }];
         });
@@ -198,7 +209,7 @@ export async function landNextSell(sc: Scenario, opts: { fromSubmit: number; max
     const from = opts.fromSubmit;
     const router = sellRouterOf(sc);
     const fresh = (): Submitted[] => node.submitted.slice(from).filter((s) => s.tx.from?.toLowerCase() === sc.wallet.address.toLowerCase());
-    const sellOf = (): Submitted | undefined => fresh().find((s) => decodeSellRaw(s.raw, router) !== null);
+    const sellOf = (): Submitted | undefined => fresh().find((s) => decodeSellRaw(s.raw, router, sc.token) !== null);
     for (;;) {
         await stepUntilTrue(() => sellOf() !== undefined || fresh().some((s) => s.route === 'public' && s.status === 'accepted'), { what: 'the bot sending its sell (or an approve first)', maxSteps: opts.maxSteps ?? 20_000 });
         const sell = sellOf();
@@ -218,7 +229,7 @@ export async function landNextSell(sc: Scenario, opts: { fromSubmit: number; max
             .map((s) => s.hash);
         node.mine({ include: sameBundle });
     }
-    const d = decodeSellRaw(sell.raw, router)!;
+    const d = decodeSellRaw(sell.raw, router, sc.token)!;
     return { sell: { hash: sell.hash, route: sell.route, ...d }, approvals: approvalsSubmitted(sc).filter((a) => node.submitted.findIndex((s) => s.hash === a.hash) >= from) };
 }
 
@@ -247,4 +258,85 @@ export async function driveExits(sc: Scenario, opts: { fromSubmit: number; forMs
         }
     }
     return sellsSubmitted(sc).filter((s) => node.submitted.findIndex((x) => x.hash === s.hash) >= opts.fromSubmit && node.statusOf(s.hash) === 'mined');
+}
+
+const PAIR_EVENTS = new Interface([
+    'event Sync(uint112 reserve0, uint112 reserve1)',
+    'event Swap(address indexed sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, address indexed to)',
+]);
+const POOL_EVENTS = new Interface(['event Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)']);
+
+/**
+ * Another wallet trades the token on the scenario's DEX: a real signed router call (V2
+ * swapExactETHForTokens / swapExactTokensForETH, V3 exactInputSingle on SwapRouter02), mined with
+ * the pool's own events (V2 Swap and Sync, V3 Swap), and the reserves move by the router's own
+ * constant-product answer. `buyEth` spends ETH on the token; `sellTokens` sells tokens for ETH.
+ * Neither event is one anti-rug subscribes to (it watches LP Burn and LP Transfer).
+ */
+export async function foreignTrade(sc: Scenario, trade: { buyEth: bigint } | { sellTokens: bigint }): Promise<void> {
+    const trader = new Wallet(ethers.id('realpath.plan-23-07.other-trader'));
+    sc.node.setBalance(trader.address, parseEther('100'));
+    const { reserves, weth, token } = sc;
+    const fee = sc.feeTier;
+    const quote = (amountIn: bigint, rin: bigint, rout: bigint): bigint => (sc.dex.dexType === 'v2' ? v2AmountOut(amountIn, rin, rout) : v3AmountOut(amountIn, rin, rout, fee!));
+    const buying = 'buyEth' in trade;
+    const amountIn = buying ? trade.buyEth : trade.sellTokens;
+    const out = buying ? quote(amountIn, reserves.weth, reserves.token) : quote(amountIn, reserves.token, reserves.weth);
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
+    let to: string;
+    let data: string;
+    if (sc.dex.dexType === 'v2') {
+        to = sc.dex.routerAddress;
+        data = buying
+            ? V2_ROUTER.encodeFunctionData('swapExactETHForTokens', [0n, [weth, token], trader.address, deadline])
+            : V2_ROUTER.encodeFunctionData('swapExactTokensForETH', [amountIn, 0n, [token, weth], trader.address, deadline]);
+    } else {
+        to = sc.dex.swapRouterAddress;
+        data = V3_ROUTER.encodeFunctionData('exactInputSingle', [[buying ? weth : token, buying ? token : weth, fee!, trader.address, amountIn, 0n, 0n]]);
+    }
+    const raw = await trader.signTransaction({
+        chainId: sc.node.chainId, nonce: sc.node.minedCount(trader.address), to, value: buying ? amountIn : 0n, gasLimit: 250_000n, type: 2,
+        maxFeePerGas: 200_000_000_000n, maxPriorityFeePerGas: 2_000_000_000n, data,
+    });
+    const hash = sc.node.addForeignTransaction(raw);
+    if (buying) {
+        reserves.weth += amountIn;
+        reserves.token -= out;
+    } else {
+        reserves.token += amountIn;
+        reserves.weth -= out;
+    }
+    const wethIs0 = weth.toLowerCase() < token.toLowerCase();
+    const wethDelta = buying ? amountIn : -out;
+    const tokenDelta = buying ? -out : amountIn;
+    const pos = (x: bigint): bigint => (x > 0n ? x : 0n);
+    const neg = (x: bigint): bigint => (x < 0n ? -x : 0n);
+    let logs: Array<{ address: string; topics: string[]; data: string; transactionHash: string }>;
+    if (sc.dex.dexType === 'v2') {
+        const [r0, r1] = wethIs0 ? [reserves.weth, reserves.token] : [reserves.token, reserves.weth];
+        const [d0, d1] = wethIs0 ? [wethDelta, tokenDelta] : [tokenDelta, wethDelta];
+        const sync = PAIR_EVENTS.encodeEventLog('Sync', [r0, r1]);
+        const swap = PAIR_EVENTS.encodeEventLog('Swap', [to, pos(d0), pos(d1), neg(d0), neg(d1), trader.address]);
+        logs = [
+            { address: sc.pair, topics: sync.topics, data: sync.data, transactionHash: hash },
+            { address: sc.pair, topics: swap.topics, data: swap.data, transactionHash: hash },
+        ];
+    } else {
+        const [a0, a1] = wethIs0 ? [wethDelta, tokenDelta] : [tokenDelta, wethDelta];
+        const [r0, r1] = wethIs0 ? [reserves.weth, reserves.token] : [reserves.token, reserves.weth];
+        const swap = POOL_EVENTS.encodeEventLog('Swap', [to, trader.address, a0, a1, isqrt((r1 << 192n) / r0), isqrt(r0 * r1), 0]);
+        logs = [{ address: sc.pair, topics: swap.topics, data: swap.data, transactionHash: hash }];
+    }
+    sc.node.mine({ include: [hash], logs });
+}
+
+function isqrt(n: bigint): bigint {
+    if (n < 2n) return n;
+    let x = n;
+    let y = (x + 1n) / 2n;
+    while (y < x) {
+        x = y;
+        y = (x + n / x) / 2n;
+    }
+    return x;
 }

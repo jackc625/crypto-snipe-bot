@@ -25,7 +25,7 @@
 //     intervals after the restart, with the pool unchanged. Correct: none. Today: the 0.002 probe
 //     answers about a fifth of the stored 0.01 output, priceMultiple about 0.2, and the 25 percent
 //     stop-loss fires on the first tick. After the marker the market sell is landed and decoded:
-//     the whole position sold, with no output floor (AUD-EXIT-001), and the position closed.
+//     the whole position sold and the position closed.
 // The sell side of the chain (allowance, the wallet's balance after the sell, the sell receipt's
 // WETH Withdrawal) comes from fixtures/AUD-EXIT-001-sell-path.ts, computed from mined transactions.
 //
@@ -56,8 +56,10 @@ describe('AUD-EXIT-015: resume quotes with the current snipe amount, not the pro
         await listen(sc);
         const { buy } = await buyAndMine(sc);
         expect(buy.tx.value).toBe(entryProbe);
-        await stepUntilTrue(() => opLogged('exit.monitor.started'), { what: 'the exit monitor starting', maxSteps: 20_000 });
+        // The arming wait first: it mines any public transaction of the wallet, so a fix that
+        // approves at buy time does not stall the setup of this file.
         await waitAntiRugArmed(sc);
+        expect(opLogged('exit.monitor.started')).toBe(true);
         const row = buyRow(sc)!;
         const bought = v2AmountOut(buy.tx.value, sc.reserves.weth, sc.reserves.token);
         const saved = exitStateRow(sc, row.id)!;
@@ -116,7 +118,8 @@ describe('AUD-EXIT-015: resume quotes with the current snipe amount, not the pro
         const detail = String(opEntries('exit.trigger.stop-loss', fromLog)[0].detail);
         expect(detail).toBe('Fixed stop-loss at 0.20x (-80.0%)');
         const { sell } = await landNextSell(sc, { fromSubmit });
-        expect(sell).toEqual(expect.objectContaining({ to: sellRouterOf(sc), call: 'swapExactTokensForETH', amountIn: bought, minOut: 0n, tokenOut: getAddress(sc.weth) }));
+        // (Its output floor is AUD-EXIT-001's claim, proven in that file.)
+        expect(sell).toEqual(expect.objectContaining({ to: sellRouterOf(sc), call: 'swapExactTokensForETH', amountIn: bought, tokenOut: getAddress(sc.weth) }));
         await stepUntilTrue(() => buyRow(sc)!.status === 'sold', { what: 'the position closing after the stop-loss sell', maxSteps: 20_000 });
         expect(exitStateRow(sc, row.id)).toBeUndefined();
     });

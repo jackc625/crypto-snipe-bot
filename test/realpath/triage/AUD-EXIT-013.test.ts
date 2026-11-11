@@ -66,8 +66,10 @@ describe('AUD-EXIT-013: after a restart a position bought on a second dex is quo
         await listen(sc);
         const { buy } = await buyAndMine(sc);
         expect(getAddress(buy.tx.to!)).toBe(sushiRouter);
-        await stepUntilTrue(() => opLogged('exit.monitor.started'), { what: 'the exit monitor starting', maxSteps: 20_000 });
+        // The arming wait first: it mines any public transaction of the wallet, so a fix that
+        // approves at buy time does not stall the setup of this file.
         await waitAntiRugArmed(sc);
+        expect(opLogged('exit.monitor.started')).toBe(true);
         const row = buyRow(sc)!;
         expect(row).toEqual(expect.objectContaining({ status: 'pending', dex_name: 'sushiswap-v2', pool_type: 'v2' }));
         // Control, before the restart: the in-process monitor quotes the dex the position was bought on.

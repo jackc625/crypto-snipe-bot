@@ -93,5 +93,11 @@
       ],
       "outcome": "State written on a clean full exit: a trades row (action sell, status sold, amount_in = amount actually sold); the buy row moved pending -> sold; exit_state row deleted; poll timer cleared; anti-rug unsubscribed. The sell itself carried no output floor on the private leg."
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-07) for all four private sell paths on ETH (Flashbots): a V2 and a V3 stop-loss full sell (another wallet dumps 30 percent of the pool's tokens) and a V2 and a V3 2x take-profit partial sell (another wallet buys with half the pool's ETH) each decode, from node.submitted and from the relay's eth_sendBundle body, with amountOutMin / amountOutMinimum 0. A positive-floor fix reads looks fixed on each path, and a V2-only fix flips only the V2 tests. Whether 0 stays for anti-rug exits is card OD-14.",
+    "test_id": "AUD-EXIT-001"
+  }
 }
