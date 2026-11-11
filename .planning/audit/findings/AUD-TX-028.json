@@ -1,0 +1,85 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-008",
+    "AUD-EXIT-005",
+    "AUD-EXIT-014"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-08 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-TX-028",
+  "title": "Every call of a chain's HTTP provider waits on one shared eth_chainId network check that ethers sends in the same JSON-RPC batch as the call that started it, so one stalled HTTP call stalls every later call of that provider (every exit poll, the anti-rug evaluation and confirm gate, every sell read) until it returns, up to the 300 s idle timeout",
+  "severity": "S2",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "src/utils/provider.ts",
+    "src/chainRegistry.ts",
+    "src/exitEngine.ts",
+    "src/anti-rug/detector.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/provider.ts:23@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "getProvider builds new ethers.JsonRpcProvider(url) with no network argument and no staticNetwork option, so the provider re-checks its network on every call"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:1065-1067@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "createChainContext: httpProvider = getProvider(chain.name, chain.httpRpcUrl) and the wallet is connected to it, so every HTTP read and every signing read of the chain shares this one provider"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/abstract-provider.js:707-719",
+      "note": "#checkNetwork(promise) resolves getNetwork() together with the call; call(), getBalance, getTransactionCount and the other account reads all go through it (getNetwork at :554-576 awaits _detectNetwork every time)"
+    },
+    {
+      "type": "command",
+      "ref": "ethers@6.16.0 node_modules/ethers/lib.commonjs/providers/provider-jsonrpc.js:401-430",
+      "note": "_detectNetwork: with no staticNetwork, one #pendingDetectNetwork promise is shared by every caller and its eth_chainId goes out through send(), which batches it (batchStallTime 10 ms, :64 and :257) with the call that started the check"
+    },
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:335-337@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "queryPrice: the exit quote goes through ctx.httpProvider (getAmountsOut), as do the V3 quote and every executeFullSell read through ctx.wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1574-1577@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "evaluateV2Signals reads the pair (getReserves, totalSupply) through ctx.httpProvider; the confirm gate's getBlockNumber at :1845 too"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-028.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "real ETH V2 snipe, armed; the next exit quote is held on the node; a real 95 percent liquidity pull is delivered to the detector, whose getReserves and totalSupply reads are answered by the node at once, yet the evaluation does not finish while the quote is held (no antirug.confirm-gate.scheduled), and no eth_chainId reaches the node; on release the batch's eth_chainId is answered and the evaluation finishes (claim stalled-call-stalls-antirug-evaluation). staticNetwork on the provider reads looks fixed (scratch src mutation, restored identical)"
+    }
+  ],
+  "sibling_sites_checked": "Every provider the bot builds (git grep -n -e \"JsonRpcProvider(\" -e \"WebSocketProvider(\" -- src at 23a6461 and HEAD): src/utils/provider.ts:23 is the only HTTP provider and is affected; the WebSocket providers (provider.ts:37, bot.ts:1563/:1605, detector.ts:924) take a chainId but send each request as its own message, so a stalled WS call is not batched with anything (the shared network check can still wait on a stalled eth_chainId itself, not covered by a test). Callers of the HTTP provider: the exit poll (queryPrice), executeFullSell and executePartialSell reads (balanceOf, allowance, getAmountsOut, reconcile probes), the anti-rug evaluation, confirm gate and backfill (getLogs), the buy path's safety reads, the MEV strategies' fee and balance reads, preflight and the dashboard's live prices. All of them wait while one batch is unanswered. The FetchRequest timeout that ends the wait is AUD-TX-008's (300 s idle, RPC_TIMEOUT_MS read nowhere).",
+  "status": "confirmed",
+  "severity_rationale": "S2, capital STRAND, graded by the 23-08 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. Proven on the real path: while one HTTP call of the chain's provider is unanswered, every later call of that provider gets its answer from the node and still cannot return, so the whole chain's exit polls, sells and anti-rug evaluation stop together, not only the stalled call's own work. The plausible condition is an RPC request whose response never comes back (a dropped connection, an overloaded endpoint): the wait ends at the FetchRequest idle timeout, 300 s (AUD-TX-008). Same grade as AUD-TX-008: the stall is bounded, but for its length every position on the chain is held without a working exit, a rug included. Not S1 on its own because the stall is bounded and a later call recovers.",
+  "recommendation": "Give the HTTP provider a static network (new JsonRpcProvider(url, chainId, { staticNetwork: true }), the chain ID is known from the template) so calls no longer share a network check; and bound calls with a real timeout (AUD-TX-008, RPC_TIMEOUT_MS) so one stalled request cannot hold the batch it is in. test/realpath/triage/AUD-TX-028.test.ts reads looks fixed for the static network. Phase 24 together with AUD-TX-008 (OD-54), or Phase 29. Nothing is fixed in Phase 23.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Found by 23-08 while proving AUD-EXIT-005: the bot's HTTP provider has no static network, so every call waits on one shared eth_chainId sent in the batch of the call that started it. With a real exit quote held on the node, a real 95 percent liquidity pull's anti-rug evaluation gets its getReserves and totalSupply answered and still cannot finish until the quote's batch is answered (claim stalled-call-stalls-antirug-evaluation). staticNetwork on the provider reads looks fixed. Not in the frozen population; recorded so check.ts can locate its claim.",
+    "test_id": "AUD-TX-028"
+  }
+}

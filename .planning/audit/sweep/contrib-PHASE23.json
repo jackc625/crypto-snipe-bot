@@ -40,6 +40,14 @@
         "AUD-TESTI-028"
       ],
       "search": "23-07 scratch probe (a throwing test-file afterEach, then harnessState() read in the next test) and scratch copies of the plan 23-07 triage files with a throwing afterEach, plus a read of every teardown path in test/realpath/harness (git grep -n afterEach -- test/realpath; disposers, disposeScenarios, restartGraph, createTempDbFile) at 384be2f and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "src",
+      "ids": [
+        "AUD-TX-028"
+      ],
+      "search": "23-08 real-path AUD-EXIT-005 and AUD-TX-028 proofs (an exit quote held on the node, ethers debug sendRpcPayload/receiveRpcResult traces of the bot's HTTP provider, the detector's pair reads answered while the quote was held) plus a read of every provider construction in src (git grep -n -e \"JsonRpcProvider(\" -e \"WebSocketProvider(\" -- src) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider getNetwork/#checkNetwork and provider-jsonrpc _detectNetwork/#scheduleDrain"
     }
   ]
 }

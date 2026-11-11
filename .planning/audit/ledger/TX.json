@@ -109,7 +109,8 @@
     "findings": [
       "AUD-ANTIRUG-002",
       "AUD-TX-008",
-      "AUD-TX-024"
+      "AUD-TX-024",
+      "AUD-TX-028"
     ]
   },
   {
