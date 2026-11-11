@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-27-PLAN.md
-last_updated: "2026-11-11T15:33:32.008Z"
+stopped_at: Completed 23-15-PLAN.md
+last_updated: "2026-11-11T16:14:42.712Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: d17df7ed9b9e3b973316d8dc508e45f50bd1dc9d
+state_head: f04ea5b231417b3cfeb6374ea259e284255f9b7a
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 35
+  completed_plans: 36
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 7 of 31
+Plan: 8 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -118,11 +118,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P02 | 22min | 3 tasks | 12 files |
 | Phase 23 P04 | 28min | 2 tasks | 7 files |
 | Phase 23 P27 | 28min | 3 tasks | 9 files |
+| Phase 23 P15 | 32min (wall-clock incl. two operator waits; continuation 15min) | 3 tasks | 6 files |
 
 ## Session
 
-**Last session:** 2026-11-11T15:33:31.615Z
-**Stopped at:** Completed 23-27-PLAN.md
+**Last session:** 2026-11-11T16:14:42.322Z
+**Stopped at:** Completed 23-15-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -241,3 +242,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-27 harness contract: createTempDbFile() + createScenario({ db: { file } }) give a graph on a temp SQLite file; restartGraph(sc, { env }) stops the graph like dispose (holds released with an error, bot timer registry and EVERY fake timer cleared, providers destroyed, closeDb, old sockets and the Telegram client dropped) and reloads the whole graph on the same file and FakeNode; alerts, logs and timeline are kept; the test calls the real resume paths itself. loadGraph refuses, before any src/ import, a file whose real path is outside os.tmpdir() and, in memory mode, any DB_PATH other than :memory:.
 - [Phase 23]: 23-27 two-process contract: serveLoopback(node) serves one FakeNode on real 127.0.0.1 HTTP and ws ports (each socket passes its own connection, so eth_subscribe and pushes are the in-process code; a closed socket loses its subscriptions); start children only with runRailedChildToEnd (spawnRailedChildAsync; a child still running at teardown is killed and fails the test); wait for a child with node.waitForSubscriptions(n) raced against its end (no timer); a real-time child needs node.autoMine({ confirmations }); give each child a ledgerRunId and assert its case ledger loopback-only (takeCaseLedger in harnessRestart.test.ts).
 - [Phase 23]: 23-27 Telegram contract: graph.telegramListener.startTelegramListener([ctx]) registers on the setup.ts client fake; deliverTelegramMessage({ text, senderId, chatId }) (wrap in stepUntil) reaches the real inline allowlist handler with the library's own big-integer IDs, throws "no Telegram handler registered" with none, refuses a filtered NewMessage builder; telegramHandlerCount(). From now until the phase ends the Harness Gap Procedure in 23-27-PLAN.md applies: triage and scenario plans never write test/realpath/harness/ (23-20 adds only serializer.ts).
+- [Phase 23]: 23-15: AC-15 done. The one approved Flashbots request (operator verbatim "Approve, use block 1"; block 1, zero bundle hash, throwaway 0xebE2a24e436f85A2f0509Af24B7960fb6643818d, sent once 2026-11-11T15:57:34Z with the command sandbox off so a block could not spend the one attempt) got HTTP 403 Forbidden, body -32601 "rpc method is not whitelisted" (header x-proxyd-cache-status). Class inconclusive by the pre-fixed rule. AUD-TX-006 stays candidate, outcome unreproduced (proven stats-call-inside-lock, open endpoint-still-answers, manual evidence .planning/audit/inputs/aud-tx-006-relay-response.json); 23-16 must record the operator's keep-open ruling (AC-08). No further Flashbots request may be sent.
+- [Phase 23]: 23-15 HARNESS GAP (Harness Gap Procedure, operator "Allow the change (Recommended)" = allow-harness-change; the "(Recommended)" label was the orchestrator's): harness commit 65172c9 lets a setRelay handler return { http: { status, body, statusMessage?, headers? } }, sent as that HTTP status with that raw body byte for byte (content-type application/json unless given; standard reason phrase by default). Everything without http still goes out as HTTP 200 exactly as before; an invalid http answer or one inside a JSON-RPC batch is a harness error (stray, -32603). FakeNode.handle() returns a RelayHttpReply (isRelayHttpReply) for such a call. Re-run on Node 22: 76/76 realpath, the 71 baseline rows identical incl. knownBug records, check-realpath-mocks 0 violations. Later plans needing a relay non-2xx answer use this; the gap is closed and harness ownership returns to the procedure.
+- [Phase 23]: 23-15: AUD-TX-006.test.ts replays the recorded 403 read from the evidence file and asserts that after the held stats call is released the bot logs one flashbots.bundle.stats.error warning (err "Request failed with status 403 (URL: <relay>): <body>") and no flashbots.bundle.stats; at HTTP 200 with the same text the bot logs nothing (mutant caught). So with a relay that refuses the signer, today's code logs that warning on every ETH attempt and the src/bot.ts:382 operator text points at logs with no stats (Phase 29 card TX-03).
