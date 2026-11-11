@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-10-PLAN.md
-last_updated: "2026-11-11T22:16:17.089Z"
+stopped_at: Completed 23-11-PLAN.md
+last_updated: "2026-11-11T23:02:08.671Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: b3908f0fb979aba1b4b8b222ac0b62299a3106eb
+state_head: b8ce37fe5388cf988818fc066a07a09cfc30be9c
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 42
+  completed_plans: 43
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 11 of 31
+Plan: 12 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -126,11 +126,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P08 | 51min | 2 tasks | 17 files |
 | Phase 23 P09 | 41min | 3 tasks | 19 files |
 | Phase 23 P10 | 46min | 3 tasks | 24 files |
+| Phase 23 P11 | 32min | 3 tasks | 16 files |
 
 ## Session
 
-**Last session:** 2026-11-11T22:15:56.791Z
-**Stopped at:** Completed 23-10-PLAN.md
+**Last session:** 2026-11-11T23:02:08.353Z
+**Stopped at:** Completed 23-11-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -270,3 +271,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-10: AUD-API-002, AUD-ANTIRUG-001, AUD-BUY-008, AUD-ANTIRUG-003, -004, -005 and the two orchestrator-added population entries AUD-ANTIRUG-024 and AUD-ANTIRUG-018 (population gap: both joined the frozen 61 by 23-01 operator rulings and no plan owned them) confirmed on the real path (test/realpath/triage/<ID>.test.ts, 13 knownBug claims with AUD-BUY-036; every claim reads looks fixed under its own fix-shaped src mutation and a full cross-file batch shows each mutation flips only its own claims). Reconnect races are forced by a server-side node.dropSocket() and fake time; AUD-ANTIRUG-003 carries needs_fork (the log count of a real mainnet removal). AUD-BUY-008 and AUD-ANTIRUG-003 status candidate -> confirmed. 23-16 must acknowledge the seven S1 entries (API-002, ANTIRUG-001, BUY-008, ANTIRUG-003, -004, -005, -018), add AUD-ANTIRUG-003's UFV entry (owner 25) and set fork_ref.
 - [Phase 23]: 23-10 new finding under the standing instruction (no stop): AUD-BUY-036 (S3, capital none, confirmed, C10, proven by AUD-BUY-036.test.ts): src/bot.ts startHttpPollingListener (and the V3 poller) asks lastBlock+1..head in one eth_getLogs and advances only on success, so after an RPC outage longer than the provider log-range limit every poll is refused and the HTTP DEX listener never sees a new pair until a restart (only "HTTP polling error" logged). Same unchunked shape as AUD-ANTIRUG-018; fix both with one chunked poll helper (card OD-48 area).
 - [Phase 23]: 23-10 for later triage plans: fixtures/AUD-API-002-restart.ts gives bootListeners (every DEX listener, as boot step 4) and the dashboard Start callback as a line-for-line mirror of the private src/bot.ts onRestart, pinned by a sha256 of the closure text (any edit fails with "onRestart changed"; re-point mirror and hash with a Phase 24 onRestart fix). fixtures/AUD-ANTIRUG-018-range-limit.ts limitLogRange refuses eth_getLogs wider than 10 blocks (Alchemy free tier, repo evidence 19-RESEARCH CRITICAL #1 and the 21-03 README) through the public FakeNode.failNext, deciding each request from its own range via the last node.callLog entry (no harness gap). fixtures/AUD-ANTIRUG-003-live.ts gives live anti-rug gates (ETH_ANTIRUG_LIVE_EXECUTE/CONFIRM_BLOCKS/CIRCUIT_BREAKER_TRIGGERS overrides), the graph's circuitBreaker module and driveFor (one bundle-slot map for the whole window; an empty block only while no bundle waits, else bundles miss their targets). A pro-rata liquidity pull leaves the price unchanged, so the routine stop-loss does not fire on it.
+- [Phase 23]: 23-11: AUD-DB-002, -001, -003, -004 (S1) and AUD-DB-021 (S2) confirmed on the real path (test/realpath/triage/<ID>.test.ts; AUD-DB-021 in AUD-DB-004.test.ts), 11 knownBug claims. Every row comes from the real buy and sell insert sites and the real receipt decoder (never written by a test), and every claim reads looks fixed under its own fix-shaped src mutation; a cross-file batch shows each flips only its own claims. AUD-DB-007 re-measured on the real db.ts outside Vitest (railed children) from another working folder and closed as fixed: nothing remains after the 22-09 rail; its marker sits beside "AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing" (RED proof row 12), status confirmed -> fixed. AUD-DB-001 nuance: the boot preflight refuses MAX_OPEN_POSITIONS=abc, so in the running bot only the other four limits are off. 23-16 must acknowledge AUD-DB-001, -002, -003 and -004, and its run evidence must include an integration run so AUD-DB-007's rail_test is in passed_tests. No new finding, no severity change.
+- [Phase 23]: 23-11 for later triage plans: fixtures/AUD-DB-001-limits.ts checks a limit parsed at import twice on one temp database through whole-graph reloads (restartGraph), at a valid value and at abc; a failed reload (a fix that refuses to start) is returned as { loaded: false } with the failed load's DB connection closed so teardown can remove the folder, and facts needed from the database are read on the valid graph before the abc reload (limitPair facts). fixtures/AUD-DB-002-risk.ts gives the graph's own canSnipe and risk statements. Editing a Phase 22 test file that has a ledger row (added after audit_base_sha) needs a reviewed re_audit entry ending at the edit's commit or --stage partial fails, so commit the edit alone first (23-11: dbGuards.test.ts marker 29c13f9, entry in ledger/TESTI.json).
