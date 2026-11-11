@@ -78,5 +78,17 @@
       "evidence": "research web claim (STACK P-6); not re-measured: no network calls in Phase 22 audit plans",
       "status": "candidate"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "unreproduced",
+    "phase": "23",
+    "note": "In-lock claim proven by test/realpath/triage/AUD-TX-006.test.ts (stats-call-inside-lock). Endpoint claim open: the one AC-15 request, approved by the operator at plan 23-15 Task 2 (verbatim: \"Approve, use block 1\"), was sent once at 2026-11-11T15:57:34Z (block 1, zero bundle hash, signed by throwaway 0xebE2a24e436f85A2f0509Af24B7960fb6643818d) and the relay answered HTTP 403 Forbidden with JSON-RPC error -32601 \"rpc method is not whitelisted\" (header names include x-proxyd-cache-status, which suggests a JSON-RPC proxy with a method allowlist in front of the relay). Class inconclusive by the rule fixed before sending (any 401/403/429/5xx is inconclusive whatever the body says): \"not whitelisted\" can mean the method is closed to everyone or open only to allowlisted signers, and one request from an unknown throwaway signer cannot tell which. It matches the research claim (403 since 2025-06-09) for an unlisted signer; if the bot signer gets the same answer, today's code logs flashbots.bundle.stats.error on every ETH attempt and the operator text at src/bot.ts:382 points at logs that never carry stats. Operator reviews in plan 23-16; Phase 29 card TX-03.",
+    "manual_evidence": ".planning/audit/inputs/aud-tx-006-relay-response.json",
+    "proven_claims": [
+      "stats-call-inside-lock"
+    ],
+    "open_claims": [
+      "endpoint-still-answers"
+    ]
+  }
 }
