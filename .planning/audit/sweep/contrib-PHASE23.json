@@ -48,6 +48,14 @@
         "AUD-TX-028"
       ],
       "search": "23-08 real-path AUD-EXIT-005 and AUD-TX-028 proofs (an exit quote held on the node, ethers debug sendRpcPayload/receiveRpcResult traces of the bot's HTTP provider, the detector's pair reads answered while the quote was held) plus a read of every provider construction in src (git grep -n -e \"JsonRpcProvider(\" -e \"WebSocketProvider(\" -- src) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider getNetwork/#checkNetwork and provider-jsonrpc _detectNetwork/#scheduleDrain"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-TX-029"
+      ],
+      "search": "23-09 real-path AUD-TX-029 proof (a real ETH V2 snipe whose four private attempts are never included, every attempt's maxPriorityFeePerGas decoded with real ethers) and the warn/error lines of the AUD-TX-003 run, plus a read of every throw of the escalation loop in src/utils/mevStrategies/reconciliation.ts and of every emitter of op mev.escalation.ceiling-hit (git grep -n \"ceiling-hit\" -- src) at 23a6461 and HEAD"
     }
   ]
 }

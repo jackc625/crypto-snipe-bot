@@ -1,0 +1,74 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-010",
+    "AUD-TX-017",
+    "AUD-TX-003"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23",
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-09 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-TX-029",
+  "title": "A private escalation that ends because its attempt budget ran out is logged as mev.escalation.ceiling-hit and reported as \"priority-fee ceiling reached\", although the fee never got near the ceiling, so after a missed snipe the operator is told to raise a ceiling that did not bind",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/reconciliation.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:606-614@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "one branch for two causes: if (ceilingHit || attempt >= cfg.maxRetries) logs op mev.escalation.ceiling-hit and throws \"MEV bundle not included after N attempt(s); priority-fee ceiling (<ceiling> wei) reached. Increase MEV_MAX_PRIORITY_FEE_GWEI ...\" whichever cause ended the loop"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:551-553@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "ceilingHit is computed (the clamped fee at the ceiling or the affordability bound) but the message does not use it"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:502@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "escalated fee = step x (attempt + 1); with the defaults (priorityFeeStepGwei 1 at :77, buyMaxPriorityFeeGwei 25 at :69) a snipe's four attempts bid 1, 2, 3 and 4 gwei, so the attempt budget always ends a calm-gas snipe long before the ceiling"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:360-385@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emitSnipeFailClean puts the thrown text in the buy.snipe.fail-clean reason, next to a remediation that says to raise MEV_BUY_MAX_PRIORITY_FEE_GWEI; called from both snipe handlers (:1188 V2, :1513 V3)"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-029.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "real ETH V2 snipe, no bundle ever included: four attempts at one nonce with maxPriorityFeePerGas 1, 2, 3 and 4 gwei (decoded with real ethers); the bot logs mev.escalation.ceiling-hit at attempt 3 with ceilingWei 25000000000 and buy.snipe.fail-clean reason \"MEV bundle not included after 4 attempt(s); priority-fee ceiling (25000000000 wei) reached. ...\" (claim attempt-budget-reported-as-ceiling-hit). A separate message for the attempt-budget case reads looks fixed (scratch src mutation, restored identical). First seen in the warn/error lines of AUD-TX-003's run"
+    }
+  ],
+  "sibling_sites_checked": "Every throw of the escalation loop in reconciliation.ts at 23a6461 (unaffordable :529-542, mined-but-reverted :593-596 and landed-not-ours :599-602, the ceiling-or-budget branch :606-614, the defensive loop-exhausted throw :624-628): only :606-614 merges two causes into one ceiling text. The defensive throw after the loop, normally unreachable because :606 throws first on the last attempt, has a correct text but is also logged under op mev.escalation.ceiling-hit. Its callers: the three strategies' submitWithReconciliation (flashbots, bloxroute, passthrough), so the deliberate private leg (bot.ts escalatePrivateBuy, DELIBERATE_BUY_PRIVATE_ATTEMPTS default 2) and the private sells (escalatePrivateSell, MEV_SELL_FALLBACK_ATTEMPTS default 2) get the same text when their budgets run out. The wrong knob name in the same text is AUD-TX-010; that the helper's own alert never reaches Telegram is AUD-TX-017.",
+  "status": "confirmed",
+  "severity_rationale": "S3, capital none, graded by the 23-09 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The bot's behavior is correct (the snipe fails clean, nothing is spent); what is wrong is the diagnosis it gives. At default settings every calm-gas snipe that misses ends on the attempt budget, and the operator is told the fee ceiling was reached, so the natural reaction (raise the ceiling) changes nothing, while the levers that matter (the step, the attempt count, builder coverage) are not named. That is the Phase 21.3 calm-gas problem being misreported. No capital effect and no safety bypass, so S3.",
+  "recommendation": "Give the two causes their own outcome: when ceilingHit is false and the budget ran out, log and throw an attempt-budget message (attempts used, highest fee bid, the ceiling) under its own op, and point the remediation at MEV_PRIORITY_FEE_STEP_GWEI / the attempt budget and builder coverage; keep the ceiling text for a real ceiling or affordability hit. Fix the knob name with AUD-TX-010 (Phase 29 card TX-03 area). test/realpath/triage/AUD-TX-029.test.ts reads looks fixed for a separate attempt-budget message. Nothing is fixed in Phase 23.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Found by 23-09 while diagnosing the warn/error lines of AUD-TX-003's run: a real ETH V2 snipe whose four private attempts are never included bids 1, 2, 3 and 4 gwei (decoded with real ethers), yet the bot logs mev.escalation.ceiling-hit with ceilingWei 25000000000 and gives buy.snipe.fail-clean the reason 'priority-fee ceiling (25000000000 wei) reached' (claim attempt-budget-reported-as-ceiling-hit). A separate message for the attempt-budget case reads looks fixed. Not in the frozen population; recorded so check.ts can locate its claim.",
+    "test_id": "AUD-TX-029"
+  }
+}
