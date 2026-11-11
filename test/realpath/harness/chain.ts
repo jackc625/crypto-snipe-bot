@@ -663,6 +663,10 @@ export class FakeNode {
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
+    /** Waiters of waitForSubscriptions, resolved from the subscribe path (plan 23-27). */
+    readonly #subscriptionWaiters: Array<{ n: number; resolve: () => void }> = [];
+    /** autoMine: confirmations per accepted public transaction, or null when off (default). */
+    #autoMineConfirmations: number | null = null;
 
     constructor(opts: FakeNodeOptions) {
         this.chainId = opts.chainId;
@@ -1221,9 +1225,57 @@ export class FakeNode {
 
     detachSocket(ws: FakeWebSocket): void {
         this.#sockets.delete(ws);
+        this.detachConnection(ws.connection);
+    }
+
+    /**
+     * A connection closed (an in-process FakeWebSocket or a real loopback socket, loopback.ts):
+     * its subscriptions go, so no later push is ever written to a dead socket.
+     */
+    detachConnection(connection: Connection): void {
         for (let i = this.subscriptions.length - 1; i >= 0; i--) {
-            if (this.subscriptions[i].connection === ws.connection) this.subscriptions.splice(i, 1);
+            if (this.subscriptions[i].connection === connection) this.subscriptions.splice(i, 1);
         }
+    }
+
+    /**
+     * Resolve once at least `n` subscriptions exist. Resolved from the subscribe path itself, with
+     * no timer, so a test under the fixed clock can wait for a real child process to subscribe.
+     * It never rejects: race it against the child's end so a child that dies is a loud failure.
+     */
+    waitForSubscriptions(n: number): Promise<void> {
+        if (!Number.isInteger(n) || n < 1) throw new Error(`waitForSubscriptions: n must be a positive integer, got ${String(n)}`);
+        if (this.subscriptions.length >= n) return Promise.resolve();
+        return new Promise((resolve) => this.#subscriptionWaiters.push({ n, resolve }));
+    }
+
+    #wakeSubscriptionWaiters(): void {
+        for (let i = this.#subscriptionWaiters.length - 1; i >= 0; i--) {
+            const w = this.#subscriptionWaiters[i];
+            if (this.subscriptions.length >= w.n) {
+                this.#subscriptionWaiters.splice(i, 1);
+                w.resolve();
+            }
+        }
+    }
+
+    /**
+     * For a child process running on real time (plan 23-27): every public transaction
+     * eth_sendRawTransaction accepts as pending is mined at once by the existing mining model
+     * (mine(), the includable pool), and when it was included, `confirmations - 1` empty blocks
+     * follow in the same tick, as an automining dev node would do. A transaction the model cannot
+     * include (a queued future nonce, a fee cap under the base fee) stays where it is, because a
+     * real block could not hold it either. Off by default; autoMine(false) turns it off. A
+     * fake-clock scenario never needs it.
+     */
+    autoMine(opts: { confirmations: number } | false): void {
+        if (opts === false) {
+            this.#autoMineConfirmations = null;
+            return;
+        }
+        const c = opts?.confirmations;
+        if (!Number.isInteger(c) || c < 1) throw new Error(`autoMine: confirmations must be a positive integer, got ${String(c)}`);
+        this.#autoMineConfirmations = c;
     }
 
     // -- JSON-RPC entry point ----------------------------------------------------------------
@@ -1350,7 +1402,12 @@ export class FakeNode {
             }
             case 'eth_sendRawTransaction': {
                 const r = this.#admitPublic(String(p[0]), 'public');
-                return 'error' in r ? r : { result: r.hash };
+                if ('error' in r) return r;
+                if (this.#autoMineConfirmations !== null && this.statusOf(r.hash) === 'accepted') {
+                    this.mine();
+                    if (this.isMined(r.hash)) for (let i = 1; i < this.#autoMineConfirmations; i++) this.mine({ include: [] });
+                }
+                return { result: r.hash };
             }
             case 'eth_getTransactionReceipt':
                 return { result: this.#formatReceipt(String(p[0])) };
@@ -1586,6 +1643,7 @@ export class FakeNode {
         this.#subSeq += 1;
         const id = toQuantity(BigInt(keccak256(toUtf8Bytes(`realpath-sub:${this.#subSeq}`))) >> 128n);
         this.subscriptions.push({ id, kind, filter: p[1] ?? {}, connection });
+        this.#wakeSubscriptionWaiters();
         return { result: id };
     }
 
