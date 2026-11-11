@@ -44,7 +44,7 @@ Capital-impact classes (`capital_impact`):
 | EXPOSURE | A risk limit or trust boundary is bypassed. |
 | none | No capital effect. |
 
-Lifecycle (`status`): `candidate -> confirmed -> decided -> fixed -> verified`, or `NOT-A-BUG`. In Phase 22 no research candidate (an entry with a non-empty `rc`) may be `NOT-A-BUG`. An RC entry graded below `research_suggested_severity` needs a written `severity_rationale` (NAC-10). The status `deferred` does not exist anywhere in the register (AC-39).
+Lifecycle (`status`): `candidate -> confirmed -> decided -> fixed -> verified`, or `NOT-A-BUG`. In Phase 22 no research candidate (an entry with a non-empty `rc`) may be `NOT-A-BUG`. From Phase 23 a research candidate may close as `NOT-A-BUG` only through a Phase 23 triage record (section 7). An RC entry graded below `research_suggested_severity` needs a written `severity_rationale` (NAC-10). The status `deferred` does not exist anywhere in the register (AC-39).
 
 Bug classes are `C01`..`C20` (`classes.json`, AUDIT-03 order). The sweep areas (matrix columns) are `src`, `dashboard`, `test`, `scripts`, `contracts`.
 
@@ -193,4 +193,58 @@ Every register file is written atomically: a temp file outside the scanned folde
   - `partial`: run by each audit plan, usually with `--slice <SLICE>`.
   - `consolidation`: run by 22-28 and 22-29 after numbering cards.
   - `final`: run by 22-29. Universe and ledger equality are checked at HEAD, every changed file is re-audited to its last-change SHA, every `input:` alias is resolved, and the census (`census/signing-sites.json`) and full-history scan (`inputs/history-scan.json`) are present.
+  - `triage`: the Phase 23 gate (section 7).
 - **Exit codes.** `check.ts` exits 0 on pass, 1 on a check failure (each failure is printed with its file and field) and 2 on a crash.
+
+## 7. Phase 23 triage record (D-21; AC-08, AC-11, AC-13, AC-16, AC-17, AC-18)
+
+Phase 23 gives every entry in the triage population exactly one recorded outcome, and `check.ts` checks each outcome's evidence mechanically. Tests are found **by finding ID, never by a file path**, so moving a test file later cannot leave a stale pointer.
+
+**Which stage to run.** `check.ts --stage triage` is Phase 23's gate. It runs the per-file checks, the escalation links, the references and the triage rules, with the triage rules as FAIL. It never runs the consolidation checks or the HEAD universe check. `--stage final` stays the Phase 22 audit completeness stage: it also demands a ledger row and a re-audit row for every file changed since the audit, which is Phase 22's machinery, not this phase's. At `partial` (and `consolidation`, `final`) an unfinished triage item prints as PENDING. One per-file rule still applies at every stage: if a Phase 23 commit edits a file that was **added after `audit_base_sha`** and already has a ledger row, that row needs a `re_audit` entry ending at the file's last-change SHA (for a real review of the diff), or `partial` and `triage` fail.
+
+**The population** is frozen in `inputs/triage-population.json` (`frozen_at_sha`, `count`, sorted `ids`, `severity_at_freeze`). It was written once by plan 23-04: every non-duplicate finding with a non-empty `rc` or severity S0 or S1, plus AUD-ANTIRUG-024 on the operator's ruling (ESC-ANTIRUG-02), 61 IDs. The checker uses these IDs joined with the same computation over the live register, so a later severity change or duplicate link can never shrink the set. A frozen ID whose finding file is gone fails. Never edit the file to remove an ID.
+
+**The record.** A finding's optional `triage` block. Write it only with `tools/set-triage.ts` (the one writer), never by hand:
+
+```bash
+node $T .planning/audit/tools/set-triage.ts --id AUD-BUY-002 --outcome confirmed --test-id AUD-BUY-002 --note "<one line>"
+node $T .planning/audit/tools/set-triage.ts --help
+```
+
+| Key | Meaning |
+|---|---|
+| `outcome` | `confirmed`, `NOT-A-BUG`, `fixed` or `unreproduced` (exactly one). |
+| `phase` | the string `"23"`. |
+| `note` | a one-line note. |
+| `test_id` | the finding ID of the triage test file that asserts this entry (the lead finding of a shared-cause file). Required for `confirmed`. |
+| `proof`, `rail_test` | `fixed`: the rail test and its RED proof; the rail test's exact full title path. |
+| `ruling_ref` | the operator review record (`reviews/<ID>.json`) that holds this finding's ruling. |
+| `needs_fork`, `fork_question`, `fork_ref` | AC-16: an item that truly needs a fork run; the question; the Phase 25 `UFV-NN` entry in `inputs/unrun-fork-verifications.json`. |
+| `manual_evidence` | a repo-relative file holding manual evidence (for example a recorded response); it must exist. |
+| `proven_claims`, `open_claims` | `unreproduced`: the knownBug claims that are proven, and what stays unproven. |
+| `evidence` | `[{type: code|command, ref, note}]`: why a `NOT-A-BUG` is not a bug (NAC-09 applies). |
+
+Unknown keys fail. `set-triage.ts` sets the status: `confirmed` -> `confirmed`, `NOT-A-BUG` -> `NOT-A-BUG`, `fixed` -> `fixed` (a `verified` finding stays `verified`), `unreproduced` -> unchanged (an unreproduced entry stays open: `candidate`, `confirmed` or `decided`). Recording the same outcome again merges the new flags over the block; a different outcome replaces it.
+
+**The evidence zone and the known-bug marker.** A real-path test proves a bug with `knownBug(ctx, '<finding ID>', { claim: '<kebab-case>', ... })` (`test/realpath/harness/knownBug.ts`). `check.ts` parses every source file under `test/` (TypeScript AST, no type-checking) and only a call in a file `test/realpath/triage/**/<finding ID>.test.ts`, named for a finding in the register, feeds a finding rule. A location guard fails, at every stage, naming the file and the ID:
+
+- a call outside the evidence zone, unless the file is outside `test/realpath/triage/` and the ID is exactly the reserved self-test literal `HARNESS-SELFTEST` (the harness's own self-tests; read by no finding rule, and `ID_RE.finding` refuses it);
+- `HARNESS-SELFTEST` anywhere inside `test/realpath/triage/`;
+- an ID that is not a string literal, anywhere;
+- any use of the name `knownBug` other than a direct call, an unaliased named import (`import { knownBug } from ...`) or its declaration in `test/realpath/harness/knownBug.ts`. An alias, a namespace or default import, a re-export, `require()` or passing it as a value is refused, because it would hide calls from the scan.
+
+The scan reads the working tree, so run the gate on a committed tree.
+
+**Rules per outcome.**
+
+- **`confirmed`**: at least one `knownBug` carrying its own ID in the evidence zone; `test_id` names an existing zone file, and that file asserts this ID (a test covering several entries asserts each one, AC-11). At stage triage: a run-evidence tuple for it from a zone file, and, if it is (or was at the freeze) S0 or S1, its ID in the `acknowledged` list of a review record with an operator response (AC-18).
+- **`NOT-A-BUG`**: non-empty `evidence`. If it is S0 or S1 now, or was at the freeze, `ruling_ref` must name a review record with a non-null `operator_response` whose `rulings` lists this exact finding with `ruling: "not-a-bug"` (AC-17, AC-47). A general reply does not count.
+- **`fixed`**: a literal marker line `closes-finding: <ID>` next to the rail test in a file under `test/` (for example `// closes-finding: AUD-TX-004 (rail test, RED proof row N of red-proofs/INDEX.md)`), a non-empty `proof`, and `rail_test` with the exact full title path. At stage triage `rail_test` must be in `passed_tests` of the run evidence (AC-13).
+- **`unreproduced`**: `ruling_ref` to a review record with an operator response that rules `keep-open` on this finding (AC-08; PENDING at partial, FAIL at triage, because the skip path records the outcome before the review exists). If any `knownBug` cites it, `open_claims` must say what stays unproven, and every `proven_claims` entry must have its `knownBug` call (and, at triage, its run-evidence tuple).
+- **`needs_fork: true`**: `fork_question`, and `fork_ref` to a UFV entry whose `owner_phase` is 25 (AC-16; PENDING at partial, FAIL at triage).
+
+**Claim-level proof.** Every `knownBug` in the evidence zone carries a `claim` string literal. A value taken from a variable, a table row or a later spread is not a literal and fails, so a test with several cases writes one call per case, each with its own literal claim (sharing a helper for the setup). A call is valid when its finding's outcome is `confirmed`, or `unreproduced` with the call's claim in `proven_claims`. Any other citation is an orphan and fails (a citation of a finding with no triage record yet is PENDING at partial, FAIL at triage).
+
+**Run evidence** `inputs/triage-evidence.json` is written by plan 23-16 from real Vitest JSON reports: `{tuples: [{finding, file, title, claim, expected, actual}], passed_tests: [full test title]}`, with repo-relative forward-slash paths and no timestamp. A tuple from outside the evidence zone counts for nothing (it prints a WARN). Missing: PENDING at partial, FAIL at triage.
+
+**Operator review record** `reviews/<ID>.json` (for example `TRIAGE-REVIEW-01`), a record type separate from escalations, so no finding's `escalation_ref` or one-record rule changes: `id`, `date`, `summary`, `presented_at`, `operator_response` (verbatim, or `null` before the operator replies), `operator_response_recorded_at`, `acknowledged` (finding IDs), `rulings` (keyed by finding ID, each `{ruling: "not-a-bug" | "keep-open", reason, operator_words}` with the operator's own words for that finding) and `phase_continued`. A record with no operator response holds no acknowledgement or ruling. A `rulings` key must be a population ID. The register must follow each ruling: `not-a-bug` needs outcome `NOT-A-BUG`, `keep-open` needs `unreproduced` or `confirmed` (FAIL at triage). Operator words are never invented or paraphrased.
