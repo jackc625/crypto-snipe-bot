@@ -219,5 +219,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-08): a real ETH V2 snipe; a real dashboard force-sell (real login, real routes over loopback) sends two private attempts that miss their slots, then the public fallback swap is refused at gas estimation (geth code 3, TransferHelper: TRANSFER_FROM_FAILED), so the catch path sets trades.status failed and exit_status exit_failed_held with every token still held. Then force-sell answers 404 'Trade not found or already closed' and emergency-sell answers 'No open positions to sell'; neither sends a sell (claims force-sell-skips-failed-held, emergency-sell-skips-failed-held). Selecting pending plus exit_failed_held (and, for emergency-sell, reporting the skipped position) reads looks fixed.",
+    "test_id": "AUD-API-001"
+  }
 }

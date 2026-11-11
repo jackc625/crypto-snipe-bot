@@ -66,5 +66,11 @@
   "sibling_sites_checked": "Both dashboard sell routes (controls.ts force-sell :96-104, emergency-sell :169-177) and the pause check (:824-830). The success-still-held path (:1110) and the inconclusive path (:995) leave the buy row pending, so those positions are selectable by the dashboard but then refused by the pause; positions failed through the catch are marked failed (:1163) and are not selectable at all, which is the ESC-PRE-04 sibling owned by 22-22 (key:API:failed-held-sell-selection). The two gaps together mean a paused position cannot be sold from the dashboard either way. The only exits left are anti-rug (bypasses the pause) or a restart.",
   "status": "confirmed",
   "severity_rationale": "S1. Proven by the code. The plausible condition is the one the pause is built for: five failed routine exits on a still-held position (a sell-reverting token, a relay outage). The bot then tells the operator to act manually, and the dashboard controls refuse with a misleading \"already in progress\". Not S0 because anti-rug still fires and a restart lifts the pause for one more attempt.",
-  "recommendation": "Give operator sells their own reason that bypasses the routine pause (as anti-rug does), report the real reason a sell did not run, and offer an explicit resume. Card EXIT-07. Phase 24 together with the ESC-PRE-04 fix."
+  "recommendation": "Give operator sells their own reason that bypasses the routine pause (as anti-rug does), report the real reason a sell did not run, and offer an explicit resume. Card EXIT-07. Phase 24 together with the ESC-PRE-04 fix.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-08), on a row that stays pending: EXIT_ROUTINE_MAX_FAILURES=1, a real ETH V2 stop-loss sell lands in the same block as another holder's real token transfer to the wallet, so balanceOf after the sell stays above dust and the success path runs keepMonitoringFailedHeld; isRoutinePaused is true and exit.failed.held.routine-paused is logged. The real dashboard force-sell then answers 409 'Sell already in progress for this position', logs exit.routine.paused-skip for reason urgency-market-sell and sends no sell (claim operator-sell-refused-while-routine-paused). An operator bypass of the routine pause reads looks fixed.",
+    "test_id": "AUD-EXIT-008"
+  }
 }

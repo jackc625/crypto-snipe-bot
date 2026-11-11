@@ -92,5 +92,11 @@
       ],
       "outcome": "State written: trades.status=failed on the buy row(s) of that token; exit_state.exit_status=exit_failed_held with an incremented failure count; anti-rug kept; timer re-armed. The early returns this finding names (:829, :878, :1036) write none of this."
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-08) through the dashboard caller, which clears the poll timer first: a real ETH Uniswap V3 force-sell whose two private attempts miss their slots takes the V3 no-fallback return (exit.fallback.unsupported-dex, alert 'stays held + monitored') and the still-held position has no exit-monitor timer, exit_status null, failure count 0 (claim v3-private-not-landed-leaves-no-poll). The unknown-dex return, reached with a V3 row whose fee_tier is NULL (no current writer produces one), leaves the same state (claim unknown-dex-leaves-no-poll). keepMonitoringFailedHeld on these returns, or a caller re-arm, reads looks fixed. The routine-pause return (:829) is the AUD-EXIT-008 path and stays code-read here.",
+    "test_id": "AUD-EXIT-007"
+  }
 }
