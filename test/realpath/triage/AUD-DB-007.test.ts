@@ -49,8 +49,10 @@ import { migrateSchema, CURRENT_SCHEMA_VERSION } from '../../../src/utils/dbSche
 import { harnessState } from '../harness/chain';
 import { runRailedChildToEnd, type ChildRun } from '../harness/loopback';
 
-// Measured on Node 22 (alone and under the full parallel run): each child takes a few seconds to
-// start ts-node, far below this limit.
+// Each test starts one railed child that registers ts-node. Measured on Node 22: about 0.8 s per
+// test alone and 1.7 to 2.1 s under the full parallel npm test, below half the 15 s default. The
+// explicit limit is headroom for a child process on a loaded machine (the dbGuards.test.ts
+// children, which start through npx, take 8 to 10 s under the same full run).
 const CHILD_TIMEOUT = 120_000;
 const LEDGER_ROOT = path.join(os.tmpdir(), 'crypto-snipe-bot-rail-ledger');
 const REAL_ROOT = fs.realpathSync.native(REPO_ROOT);
