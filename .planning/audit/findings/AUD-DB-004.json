@@ -118,5 +118,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path (AUD-DB-004.test.ts, claim row-written-after-submit): a real ETH V2 snipe whose one signed bundle misses its first two target blocks and lands in its third (forced by mined blocks and fake time); by timeline position no database record of the buy exists at its first submission or when it is mined, the trades insert follows the submit and every relay body, and the table was empty while the bundle was held; sub-claim 2 (the first shutdown signal closes the database without waiting, a private closure of the boot) and sub-claim 4 (no boot reconciliation of wallet holdings) stay code-read; the synchronous half is AUD-DB-021",
+    "test_id": "AUD-DB-004"
+  }
 }

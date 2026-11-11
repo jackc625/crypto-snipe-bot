@@ -51,5 +51,11 @@
   "recommendation": "Decide whether critical writes need FULL durability in card OD-18, which holds the synchronous=FULL options (the proposed durability card was linked to it at 22-28). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-DB-08"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path (AUD-DB-004.test.ts, claim synchronous-normal): on a temp database file the bot's own connection, right after it wrote a real buy's position record, reads PRAGMA synchronous 1 (NORMAL) with journal_mode wal; that a power loss or OS crash can then roll back the last commits is documented SQLite behavior no test can prove, so the test proves the setting only",
+    "test_id": "AUD-DB-004"
+  }
 }
