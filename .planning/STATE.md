@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-06-PLAN.md
-last_updated: "2026-11-11T17:47:25.642Z"
+stopped_at: Completed 23-07-PLAN.md
+last_updated: "2026-11-11T18:50:49.395Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: fa50bb1fd7a9039e246d79a61dfba63956cf02cd
+state_head: "0ba1f553364ea26be9e99a938a981a7d1ac487e5"
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 38
+  completed_plans: 39
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 10 of 31
+Plan: 11 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -122,11 +122,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P15 | 32min (wall-clock incl. two operator waits; continuation 15min) | 3 tasks | 6 files |
 | Phase 23 P05 | 38min | 3 tasks | 16 files |
 | Phase 23 P06 | 39min | 3 tasks | 19 files |
+| Phase 23 P07 | 56min | 3 tasks | 20 files |
 
 ## Session
 
-**Last session:** 2026-11-11T17:47:12.918Z
-**Stopped at:** Completed 23-06-PLAN.md
+**Last session:** 2026-11-11T18:50:48.944Z
+**Stopped at:** Completed 23-07-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -254,3 +255,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-06: AUD-BUY-001 (S0) confirmed on the real path with two OS processes on one temp SQLite file: the real scripts/deliberate-buy.ts (railed child, sentinel key, loopback base node with autoMine) lands a buy, arms exit monitor and anti-rug in its own process and exits 0; the running bot (test process) sees the pending row in both resume queries but after 10 exit-poll intervals holds neither; only restart + resume re-arms it. AUD-BUY-006, -009, -011, -027, -028 also confirmed (12 knownBug claims over 7 files, each shown looks-fixed under a fix-shaped src mutation, src restored identical).
 - [Phase 23]: 23-06 new finding under the standing instruction (no stop): AUD-ANTIRUG-025 (S1, STRAND, confirmed, ESC-ANTIRUG-04 with no operator words yet): every boot that resumes an open position drops the anti-rug WebSocket subscription (resumeAntiRugMonitoring step 3 registers, step 4 re-arms; detector.ts calls wsProvider.off() then on() of the same filter without await; inside ethers on() attaches to the old subscriber before off() stops it; no eth_subscribe follows). Proven by test/realpath/triage/AUD-ANTIRUG-025.test.ts. It weakens the ESC-BUY-01 interim rule (restart the main bot after a deliberate buy): that restart re-arms the exit monitor but not anti-rug. 23-16 must acknowledge it with the S0/S1 batch and put the interim-rule consequence to the operator; Phase 24 should fix it with or before AUD-BUY-001.
 - [Phase 23]: 23-06 for later plans: the real dashboard API (startApiServer, real login, real routes) can be driven from a triage test through test/realpath/triage/fixtures/AUD-BUY-011-dashboard.ts (free loopback port set as DASHBOARD_PORT before the graph loads, node:http, fake 10 ms step alternated with a real event-loop turn because the server's RPC reads wait on ethers' fake drain timer; Vitest also fakes the timers module, so the real setImmediate is captured at load). A per-test API answer change re-wraps the scenario's own route handler on harnessState().httpRoutes (no new mock, no harness edit). The rails ledger lists that fixture as a triggering file (loopback net-allow only).
+- [Phase 23]: 23-07: AUD-EXIT-001, -002, -003, -004, -013 and -015 confirmed on the real path (test/realpath/triage/<ID>.test.ts, 16 knownBug claims; every claim reads looks fixed under a fix-shaped src mutation, and a full cross-file batch shows each mutation flips only its own finding). AUD-EXIT-003 carries needs_fork for sub-claims 2 and 3 (real tokens and pools); 23-16 must add its UFV entry (owner 25), set fork_ref, and acknowledge the five S1 entries (001, 002, 003, 013, 015).
+- [Phase 23]: 23-07 new findings under the standing instruction (no stop): AUD-EXIT-027 (S3, capital none, confirmed, proven by AUD-EXIT-027.test.ts): a V3 exit is multicall([exactInputSingle(tokenOut WETH, recipient the wallet)]) with no unwrapWETH9 and nothing in src or scripts unwraps, so V3 proceeds stay WETH while buys, gas and the wallet floor use native ETH (Phase 29). AUD-TESTI-028 (S3, capital none): realpath scenarios are torn down only in setup.ts afterEach, which Vitest 4.1.1 skips when a test file's own afterEach throws first, so the old graph keeps running into the next test; no committed file is affected.
+- [Phase 23]: 23-07 for later triage plans: until AUD-TESTI-028 is fixed, no test/realpath file may declare an afterEach that can throw. test/realpath/triage/fixtures/AUD-EXIT-001-sell-path.ts gives the sell side of the chain from mined transactions (allowance, balance after sells, sell receipts), real foreign trades with pool events (foreignTrade) and a chain driver (landNextSell, driveExits); fixtures/AUD-EXIT-002-position.ts has buy/arm helpers whose arming wait mines the wallet's public transactions. Keep setup facts valid under other findings' fixes: assert another finding's detail only in its own file.
