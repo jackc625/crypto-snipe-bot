@@ -32,25 +32,61 @@
       "type": "code",
       "ref": "src/utils/safetyProviders/goplus.ts:33-36@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "contrast: GoPlus sets timeout 10000"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:977@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V2 safety bank passes pairAddress to isLiquidityLockedForChain (HEAD :979); tokenSafety.ts:324 sends it to goplusLiquidityLockCheck when the chain's liquidityLock is goplus; a false lock skips the snipe at bot.ts:1026 (HEAD :1028)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:329@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "base sets liquidityLock goplus; arb does the same at :386; both unchanged at HEAD"
+    },
+    {
+      "type": "command",
+      "ref": "GoPlus documentation, https://docs.gopluslabs.io/reference/response-details (read through the Context7 docs index /websites/gopluslabs_io on 2026-11-11 by the 23-28 executor; no call to the GoPlus API)",
+      "note": "lp_holders, lp_holder_count and lp_total_supply: 'When \"is_in_dex\": \"0\", there will be no return'. is_in_dex: 'Returns \"1\" if the token can be traded in a decentralized exchange; \"0\" if not ... Only true if the token has a marketing pair with mainstream coins/tokens.' An LP pair contract asked about as a token has no such market, so lp_holders is absent and goplus.ts:60 returns false (\"no lock info = not locked\"). This is GoPlus's published answer contract, not a measured live answer."
+    },
+    {
+      "type": "code",
+      "ref": "test/realpath/harness.test.ts:965-1026@344ba3cd3bbc61e8c5b55ecc8815cfb60a578be3",
+      "note": "real-path test 'AUD-BUY-016 today' (plan 23-28, commits ff4ddf1 and 344ba3c) for base and arb V2: real listener, real safety bank and real goplus.ts against a GoPlus fake that answers only what GoPlus documents (AC-48). GoPlus is asked about the pair only, locked is the only failed check, the alert reads Locked: No, nothing is sent and no trades row is written. The same fake answered for the token reads locked, so the query is the cause. The test fails with 'AUD-BUY-016 looks fixed' when the query is fixed."
+    },
+    {
+      "type": "command",
+      "ref": "export PATH=\"/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH\"; node node_modules/vitest/vitest.mjs run --project realpath test/realpath/harness.test.ts (2026-11-11, 23-28 continuation executor)",
+      "note": "29/29 on three runs, rail ledger worker-start only (no network). RED: making bot.ts ask about the token (the fix) fails both AUD-BUY-016 tests with 'AUD-BUY-016 looks fixed', the trail showing 'All safety checks passed, buying' then 'TX sent (passthrough)'; a fake that returns lp_holders for the pair fails them the same way. Files restored byte-for-byte."
     }
   ],
-  "sibling_sites_checked": "All four providers read: goplus (timeout 10000), honeypotIs (timeout 10000, dead path), mudra (timeout 10000, falls back to GoPlus), unicrypt (no timeout). Which chain uses which lock provider is set in chainRegistry.ts (DB slice), not changed here. Whether GoPlus answers a pair address in token_security is an external API fact to confirm in Phase 23.",
-  "status": "candidate",
+  "sibling_sites_checked": "All four providers read: goplus (timeout 10000), honeypotIs (timeout 10000, dead path), mudra (timeout 10000, falls back to GoPlus), unicrypt (no timeout). Which chain uses which lock provider is set in chainRegistry.ts (DB slice), not changed here. Re-checked 2026-11-11 (23-28): base (chainRegistry.ts:329) and arb (:386) use goplus for the lock, so every V2 launch on those chains is skipped; ETH uses unicrypt (:203); BSC uses mudra (:272), which falls back to GoPlus with the same pair address on any Mudra error (mudra.ts:30-33 at the audit base), so a BSC V2 launch also reads not locked whenever Mudra fails. The V3 bank has no lock check (bot.ts:1313-1318 at the audit base), so V3 launches are not affected, matching the base and arb V3 real-path buys in the same test file. The external GoPlus fact this entry left 'to confirm in Phase 23' is settled by GoPlus's documentation (evidence above), not by a live call. Open for the Phase 24 fix: the same documentation writes lp_holders is_locked values in quotes (\"1\" means true) while goplus.ts:64 compares the number 1; the live answer type was not measured (no live GoPlus call in Phase 23), so the fix must confirm it, or a token query could still read not locked.",
+  "status": "confirmed",
   "origin": "independent",
   "rc": [],
   "research_suggested_severity": null,
-  "severity_rationale": "S3: both fail toward not buying. A wrong GoPlus query returns no lp_holders, so the lock reads as not locked and the V2 snipe is skipped on every chain that uses GoPlus for locks; a hung Unicrypt request stalls the safety bank (and the handler) with no timeout. Missed opportunities and stuck handlers, no capital loss.",
+  "severity_rationale": "S3: both fail toward not buying. A wrong GoPlus query returns no lp_holders, so the lock reads as not locked and the V2 snipe is skipped on every chain that uses GoPlus for locks; a hung Unicrypt request stalls the safety bank (and the handler) with no timeout. Missed opportunities and stuck handlers, no capital loss. Grade re-read on 2026-11-11 (23-28) and unchanged: the real-path run shows a skip before any signing, nothing is spent. Status candidate -> confirmed on 2026-11-11 by the 23-28 executor under the operator's standing instruction (2026-11-11, verbatim: \"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"). Reasoning: in this register 'confirmed' means the mechanism is established by evidence, and Phase 22 confirmed entries from code reading without a live reproduction (for example AUD-ANTIRUG-018). This entry stayed a candidate only because of one external fact, whether GoPlus returns lp_holders for a pair address. GoPlus's published response contract says it does not (lp_holders has no return when is_in_dex is 0), and the committed real-path test shows the consequence end to end on a fake held to that contract (AC-48), with the token query reading locked on the same fake. The Unicrypt half is a code fact at the audit base, unchanged at HEAD. Not measured: a live GoPlus answer for an LP pair address, because Phase 23 makes no live third-party call; if GoPlus answered against its own documentation the first half would not reproduce live, and the recommended fix (query by the token) is the documented way either way.",
   "duplicate_of": null,
   "related": [],
   "tags": [
-    "safety-gate"
+    "safety-gate",
+    "phase-23"
   ],
   "escalation_ref": null,
   "od_ref": "OD-30",
-  "recommendation": "Query GoPlus by the token address (its lp_holders describe the token's LP) and add a timeout to the Unicrypt call matching the other providers. Behaviour change (more snipes can pass), card BUY-05.",
+  "recommendation": "Query GoPlus by the token address (its lp_holders describe the token's LP) and add a timeout to the Unicrypt call matching the other providers. Behaviour change (more snipes can pass), card BUY-05. When fixing, confirm the live type of lp_holders is_locked (goplus.ts:64 compares the number 1). The real-path tests 'AUD-BUY-016 today' in test/realpath/harness.test.ts are the before-and-after proof: they fail with 'AUD-BUY-016 looks fixed' once the query is fixed and should then be rewritten as the base and arb V2 buys on route public.",
   "reported_by": [
-    "claude (22-17 executor)"
+    "claude (22-17 executor)",
+    "claude (23-28 executor, GoPlus documentation and real-path test, 2026-11-11)"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "status_history": [
+    {
+      "from": "candidate",
+      "to": "confirmed",
+      "date": "2026-11-11",
+      "by": "claude (23-28 executor), under the operator's standing instruction of 2026-11-11",
+      "evidence": "GoPlus response-details documentation and the real-path test at test/realpath/harness.test.ts (commits ff4ddf1, 344ba3c)"
+    }
+  ]
 }
