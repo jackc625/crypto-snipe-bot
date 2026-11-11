@@ -1,21 +1,26 @@
 // test/realpath/triage/fixtures/AUD-API-001-dashboard-sell.ts
 // Phase 23 plan 23-08 (AUDIT-02): helpers shared by the dashboard-sell and exit-lifecycle triage
-// files of this plan (AUD-API-001, AUD-EXIT-008, AUD-EXIT-007). Lives beside its tests: the harness
-// is read-only for triage plans. It adds no behavior to the simulated node; every answer still
-// comes from the scenario's reads, the sell-path reads of fixtures/AUD-EXIT-001-sell-path.ts, or a
-// read set here through the public FakeNode API from transactions the node really mined.
+// files of this plan (AUD-API-001, AUD-EXIT-008, AUD-EXIT-007, and AUD-EXIT-014 for driveChain).
+// Lives beside its tests: the harness is read-only for triage plans. It adds no behavior to the
+// simulated node; every answer still comes from the scenario's reads, the sell-path reads of
+// fixtures/AUD-EXIT-001-sell-path.ts, or a read set here through the public FakeNode API from
+// transactions the node really mined.
 //
 // - openDashboard: the real dashboard API (src/api/server.ts startApiServer, the real auth flow)
 //   on a loopback port, through fixtures/AUD-BUY-011-dashboard.ts.
+// - driveChain: drive the chain the way the network would answer the bot's wallet until a
+//   condition holds: a public transaction of the wallet is mined in the next block; a bundle
+//   transaction either lands one slot (12 s) after it was first seen, at a block it targets
+//   ('land'), or the slot passes with an empty block, as a builder that did not include it would
+//   leave it ('miss'). Every wait is a step of fake time followed by one real event-loop turn (an
+//   HTTP answer is real I/O), never a sleep.
 // - postDriven: one POST to a real dashboard route, over node:http (never axios: the realpath
-//   setup routes axios to the harness, so a call through it never reaches the real route), while
-//   the chain is driven the way the network would answer the sell the route may start: a public
-//   transaction of the wallet is mined in the next block; a bundle transaction either lands one
-//   slot (12 s) after it was first seen ('land'), or the slot passes with an empty block, as a
-//   builder that did not include it would leave it ('miss'). Every wait is a step of fake time
-//   followed by one real event-loop turn (the HTTP answer is real I/O), never a sleep.
+//   setup routes axios to the harness, so a call through it never reaches the real route), with
+//   driveChain running until the answer arrives.
 // - heldPosition: a real snipe through the real listener, bought, armed (exit monitor and
 //   anti-rug), with the sell side of the chain installed.
+// - incomingHolder: another holder's real ERC-20 transfer to the wallet, counted in balanceOf once
+//   mined.
 
 import * as http from 'node:http';
 import { vi } from 'vitest';
