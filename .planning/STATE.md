@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-01-PLAN.md
-last_updated: "2026-11-11T05:21:10.474Z"
+stopped_at: Completed 23-03-PLAN.md
+last_updated: "2026-11-11T05:41:23.798Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: 4a108b807eb65822363e28443d85b63fc4f6aaaa
+state_head: bb1ac556bc797ad63ab0f8e0ca745f0d7e369aa9
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 30
+  completed_plans: 31
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 2 of 31
+Plan: 3 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -112,11 +112,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 22 P16 | 18min | 2 tasks | 11 files |
 | Phase 22 P29 | 28min | 3 tasks | 79 files |
 | Phase 23 P01 | 55min (wall-clock incl. two operator waits) | 2 tasks | 12 files |
+| Phase 23 P03 | 13min | 2 tasks | 8 files |
 
 ## Session
 
-**Last session:** 2026-11-11T05:21:10.108Z
-**Stopped at:** Completed 23-01-PLAN.md
+**Last session:** 2026-11-11T05:41:23.392Z
+**Stopped at:** Completed 23-03-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -220,3 +221,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-01: AUD-ANTIRUG-024 registered (new, S3, capital none; ESC-ANTIRUG-02, operator "New finding, S3 (Recommended)") and AUD-ANTIRUG-018 raised S2 -> S1 (ESC-ANTIRUG-03, operator "Raise to S1 (Recommended)"; asked whether any chain runs without a WS URL: "Not sure"). Plans that count the 59 register entries (for example 23-04 AC-08 and 23-16) must also include AUD-ANTIRUG-024; AUD-ANTIRUG-018 is now S1 and must be in the Wave 5 triage set and the 23-16 S0/S1 batch report.
 - [Phase 23]: Standing operator instruction (2026-11-11, verbatim): "All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading". Applies to every later Phase 23 plan: an executor applies a severity change itself per PROTOCOL.md with reasoning and file:line evidence, and registers a bug not in the register itself with its own grade, quoting this instruction, and lists every such change under its own SUMMARY heading; it does not stop. It overrides the "severity increase" and "bug not in the register" stop triggers in 23-SPEC line 103 and the plans' phase-wide rules. Still stop for: anything that overturns a plan's or locked decision's premise, a NOT-A-BUG closure of an S0/S1 (D-11), an unreproduced entry (AC-08), or anything unsafe. The D-11 batch report is unchanged.
 - [Phase 23]: 23-01 harness contract: FakeNode.failNext/hold return handles (fired/heldCount, describe()) and must fire or afterEach fails; arming refuses a selector/to the method cannot carry; a call still parked at teardown is answered with a JSON-RPC error, never a node answer; bare-node tests through a real JsonRpcProvider need cacheTimeout -1 (ethers 250 ms perform cache).
+- [Phase 23]: 23-03: createTestDb is built by the real migrateSchema (user_version = CURRENT_SCHEMA_VERSION, every production column incl. exit_failure_count/exit_status/pause_state); migration golden tests AC-04..06 compare against test/realpath/migrations/fixtures/schema-v7.json, and fixtures/v4Schema.ts is a frozen historic v4 fixture that must never follow later migrations. A version 8 migration must regenerate the recording.
+- [Phase 23]: 23-03: RESEARCH E9 was incomplete: the stored trades SQL also differs by a -- comment (old helper body) and SQLite RENAME quoting ("trades"); golden tests normalize whitespace, comments outside literals and plain-identifier quotes, and compare literals and all pragma structure exactly. check.ts --stage final now 12 FAILs (same two bookkeeping kinds as 23-01, out of Phase 23 scope per 23-04); --stage triage is the gate.
