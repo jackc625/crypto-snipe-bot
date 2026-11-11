@@ -84,7 +84,8 @@
         "src/exitEngine.ts:1866@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:328@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:337@23a64617dca167976adc4645fed0e2c69e384820",
-        "no decimals() read anywhere in the slice (sweep C03 search)"
+        "no decimals() read anywhere in the slice (sweep C03 search)",
+        "test/realpath/triage/AUD-EXIT-003.test.ts claim probe-is-eth-buy-wei-as-token-amount (plan 23-07, real path: a 9-decimal token is probed with 1e16 raw units)"
       ],
       "status": "confirmed"
     },
@@ -117,7 +118,8 @@
         "src/exitEngine.ts:1732@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:1774@23a64617dca167976adc4645fed0e2c69e384820",
         "src/exitEngine.ts:1781-1783@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/exitEngine.ts:1665@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/exitEngine.ts:1665@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/realpath/triage/AUD-EXIT-003.test.ts claims zero-entry-infinite-ratio-fires-every-partial-tier and zero-entry-nan-ratio-fires-stop-loss (plan 23-07, real path: a 0 first quote is kept, Infinity sells both partial tiers, NaN fires the stop-loss)"
       ],
       "status": "confirmed"
     }
@@ -125,5 +127,13 @@
   "sibling_sites_checked": "Every consumer of queryPrice: startExitMonitor (:1869), resumeExitMonitor no-row branch (:1980), pollExitStrategy (:1708). Every consumer of priceMultiple: getUnfilledTiers (:1732), trailing activation (:1774), formatExitReason (:1661-1680), the partial alert (:1521). The probe amount source differs per entry: bot.ts:422 (buyAmountNative of the buy), bot.ts:1483 and :1948/:1955 and exitEngine.ts:731 (ctx.chain.snipeAmount); the consequence of that difference is AUD-EXIT-015. The anti-rug slice measures the pool by reserves, not by this probe (not re-audited here).",
   "status": "confirmed",
   "severity_rationale": "S1, equal to the research suggestion. Sub-claims 1 and 4 are proven by the code; 2 and 3 are proven as mechanisms, but their size for real tokens needs a Phase 23 measurement, so they stay candidate. The entry stays confirmed because the defect itself (the signal is a fixed-probe output ratio, not a decimals-aware price) is a code fact. Capital class STRAND for the null-quote path (no exit at all, not even urgency); the zero/non-finite paths instead sell at the wrong time (LOSS), noted in the sub-claims.",
-  "recommendation": "Replace the probe with a decimals-aware spot price (read decimals once, quote a small fixed fraction of the position or read reserves/slot0), persist the probe definition with the entry, reject a 0 or non-finite entry, and let the 30-minute urgency exit fire even when the quote is null. Decide on card EXIT-02 (Phase 24, after a Phase 23 fork measurement on real low-decimal and high-supply tokens)."
+  "recommendation": "Replace the probe with a decimals-aware spot price (read decimals once, quote a small fixed fraction of the position or read reserves/slot0), persist the probe definition with the entry, reject a 0 or non-finite entry, and let the 30-minute urgency exit fire even when the quote is null. Decide on card EXIT-02 (Phase 24, after a Phase 23 fork measurement on real low-decimal and high-supply tokens).",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Sub-claims 1 and 4 reproduced on the real path (plan 23-07): for a 9-decimal token every exit quote's amountIn is parseEther(snipe) (1e16 raw = 10,000,000 tokens); on a 1-quadrillion-token 1 ETH pool with a 0.001 snipe the 1e15 probe quotes 0 and 0 is kept as the entry, so a 1 percent price rise reads Infinity and sells both partial tiers (50 percent) at once, and an unchanged pool reads NaN and the stop-loss sells everything on the first tick; with every exit quote refused for 31 minutes the urgency exit never fires. Sub-claims 2 and 3 need real tokens (fork).",
+    "test_id": "AUD-EXIT-003",
+    "needs_fork": true,
+    "fork_question": "On real tokens and pools (low-decimal tokens, very high supply 18-decimal tokens, thin pools, fee-on-transfer tokens), how far does the fixed-probe output ratio drift from the real price ratio: does the quote saturate so the ratio tracks about the square root of the price (sub-claim 2, a 25 percent stop-loss firing only near a 44 percent drop), and how coarse are few-wei quotes (sub-claim 3)?"
+  }
 }
