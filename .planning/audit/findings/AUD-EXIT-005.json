@@ -66,5 +66,11 @@
   "sibling_sites_checked": "In the slice: the two exit intervals (:1906, :2007); exitWatchdog.ts and withTimeout.ts use setTimeout only, cleared in finally. Duplicate triggers from overlapping cycles are absorbed: enqueueExit dedupes per position (tryEnqueuePosition, exitManager.ts:66-71), and partial detection-to-lock is synchronous (:1732 -> :1822 -> tryAcquireSellLock :1483 with no await between), and tiers are marked before the sell lock is released (:1568-1575 before finally :1590), so no double partial was found. Same-pattern siblings outside the slice, named by path only (owned by their slices): src/bot.ts (:1636, :1660, :1740, :1774), src/anti-rug/detector.ts (:1261), src/api/server.ts (:186).",
   "status": "confirmed",
   "severity_rationale": "S2, equal to the research suggestion. Overlap is proven by the code. Its money effect is bounded because the queue and sell locks absorb duplicate triggers; what remains is unbounded pile-up of pending cycles and sockets during an RPC stall, stale-ordered state writes, and no exit decisions until the stall clears (a stalled quote also skips the urgency exit, AUD-EXIT-003).",
-  "recommendation": "Run each position poll as a self-rescheduling setTimeout (or skip a tick while one is in flight) and bound queryPrice with withTimeout. Card EXIT-04 (exit-path liveness). Phase 29 unless Phase 24 folds it into the exit fixes."
+  "recommendation": "Run each position poll as a self-rescheduling setTimeout (or skip a tick while one is in flight) and bound queryPrice with withTimeout. Card EXIT-04 (exit-path liveness). Phase 29 unless Phase 24 folds it into the exit fixes.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with the order forced (plan 23-08, AC-12: holds and fake-time steps only): a real ETH V2 snipe, the next exit quote held on the node; past the next 5 s tick a second poll cycle of the same position starts and sends its own quote while the first is pending, two cycles in flight read from the exact event order (claim poll-cycles-overlap-on-slow-quote); on release both cycles write the one shared exit_state, the later write carrying every sample of the earlier plus its own, and only the first reports the overrun. An in-flight guard, or a quote timeout shorter than the poll, reads looks fixed.",
+    "test_id": "AUD-EXIT-005"
+  }
 }

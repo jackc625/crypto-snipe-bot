@@ -88,8 +88,47 @@ function senderOf(s: Submitted): string {
 }
 
 /**
- * POST `urlPath` on the real dashboard with the session cookie and drive the chain until the
- * answer arrives (see the file header). Throws if no answer arrives within `maxVirtualMs`.
+ * Drive the chain the way the network answers the bot's wallet (see the file header) until
+ * `until()` holds: one fake 50 ms step and one real event-loop turn at a time; the wallet's public
+ * transactions are mined in the next block; each bundle transaction gets one slot (12 s) from when
+ * it was first seen, then a block is mined that holds it ('land': the newest transaction per
+ * nonce that targets that block; one whose targets have passed misses, as at a real builder) or
+ * not ('miss'). Throws if `until()` does not hold within `maxVirtualMs`.
+ */
+export async function driveChain(sc: Scenario, opts: { mode: BundleMode; until: () => boolean; what: string; maxVirtualMs?: number }): Promise<void> {
+    const { node } = sc;
+    const wallet = sc.wallet.address.toLowerCase();
+    const slotStart = new Map<string, number>();
+    const maxVirtualMs = opts.maxVirtualMs ?? 600_000;
+    const end = Date.now() + maxVirtualMs;
+    while (!opts.until() && Date.now() < end) {
+        await vi.advanceTimersByTimeAsync(50);
+        await realTurn();
+        const waiting = node.submitted.filter((s) => s.status === 'accepted' && senderOf(s) === wallet);
+        const publicTxs = waiting.filter((s) => s.route === 'public').map((s) => s.hash);
+        if (publicTxs.length > 0) node.mine({ include: publicTxs });
+        const bundled = waiting.filter((s) => s.route === 'bundle');
+        for (const s of bundled) if (!slotStart.has(s.hash)) slotStart.set(s.hash, Date.now());
+        const due = bundled.filter((s) => Date.now() - slotStart.get(s.hash)! >= 12_000);
+        if (due.length === 0) continue;
+        if (opts.mode === 'miss') {
+            // The slot passes and the builder's block does not hold the bundle.
+            node.mine({ include: [] });
+        } else {
+            // The newest transaction per nonce that targets the next block lands.
+            const next = node.head + 1;
+            const byNonce = new Map<number, Submitted>();
+            for (const s of bundled) if (s.targetBlocks.includes(next)) byNonce.set(s.tx.nonce, s);
+            node.mine({ include: [...byNonce.values()].sort((a, b) => a.tx.nonce - b.tx.nonce).map((s) => s.hash) });
+        }
+        for (const s of due) slotStart.set(s.hash, Date.now());
+    }
+    if (!opts.until()) throw new Error(`driveChain: ${opts.what} did not happen within ${maxVirtualMs} virtual ms`);
+}
+
+/**
+ * POST `urlPath` on the real dashboard with the session cookie and drive the chain (driveChain)
+ * until the answer arrives. Throws if no answer arrives within `maxVirtualMs`.
  */
 export async function postDriven(sc: Scenario, dash: Dashboard, urlPath: string, cookie: string, mode: BundleMode, maxVirtualMs = 600_000): Promise<DrivenReply> {
     const port = Number(new URL(dash.baseUrl).port);
@@ -108,35 +147,7 @@ export async function postDriven(sc: Scenario, dash: Dashboard, urlPath: string,
             err = e;
         },
     );
-    const { node } = sc;
-    const wallet = sc.wallet.address.toLowerCase();
-    const slotStart = new Map<string, number>();
-    const end = Date.now() + maxVirtualMs;
-    while (!done && Date.now() < end) {
-        await vi.advanceTimersByTimeAsync(50);
-        await realTurn();
-        const waiting = node.submitted.filter((s) => s.status === 'accepted' && senderOf(s) === wallet);
-        const publicTxs = waiting.filter((s) => s.route === 'public').map((s) => s.hash);
-        if (publicTxs.length > 0) node.mine({ include: publicTxs });
-        const bundled = waiting.filter((s) => s.route === 'bundle');
-        for (const s of bundled) if (!slotStart.has(s.hash)) slotStart.set(s.hash, Date.now());
-        const due = bundled.filter((s) => Date.now() - slotStart.get(s.hash)! >= 12_000);
-        if (due.length === 0) continue;
-        if (mode === 'miss') {
-            // The slot passes and the builder's block does not hold the bundle.
-            node.mine({ include: [] });
-            for (const s of due) slotStart.set(s.hash, Date.now());
-        } else {
-            // The newest transaction per nonce that targets the next block lands.
-            const next = node.head + 1;
-            const byNonce = new Map<number, Submitted>();
-            for (const s of bundled) if (s.targetBlocks.includes(next)) byNonce.set(s.tx.nonce, s);
-            const include = [...byNonce.values()].sort((a, b) => a.tx.nonce - b.tx.nonce).map((s) => s.hash);
-            node.mine({ include });
-            for (const s of due) slotStart.set(s.hash, Date.now());
-        }
-    }
-    if (!done) throw new Error(`postDriven ${urlPath}: no answer within ${maxVirtualMs} virtual ms`);
+    await driveChain(sc, { mode, until: () => done, what: `the answer to POST ${urlPath}`, maxVirtualMs });
     if (failed) throw err;
     return reply;
 }
