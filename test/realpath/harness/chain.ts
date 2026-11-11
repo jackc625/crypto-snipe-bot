@@ -575,7 +575,6 @@ type Outcome = { result: unknown } | { error: JsonRpcError };
 export type RelayHandler = (params: unknown, entry: RelayEntry) => Outcome | Promise<Outcome>;
 
 const ZERO_HASH = '0x' + '00'.repeat(32);
-const ZERO_BLOOM = '0x' + '00'.repeat(256);
 const MINER = '0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5';
 const GWEI = 1_000_000_000n;
 const DEFAULT_ESTIMATE = 150_000n;
@@ -629,6 +628,10 @@ export class FakeNode {
     #futureNoncePolicy: 'queue' | 'reject' = 'queue';
     /** A chain with no EIP-1559 fields (setFees({ legacy: true })). */
     #legacy = false;
+    /** setFees overrides; undefined answers from the head block and the defaults. */
+    #gasPrice: bigint | undefined;
+    #estimateGas: bigint | undefined;
+    readonly #receiptRules: ReceiptRule[] = [];
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
@@ -947,6 +950,7 @@ export class FakeNode {
      */
     mine(opts: MineOptions = {}): number {
         const number = this.#head.number + 1;
+        if (this.#legacy && opts.baseFeePerGas !== undefined) throw new Error('mine: a legacy chain (setFees({ legacy: true })) has no base fee');
         const baseFeePerGas = opts.baseFeePerGas ?? this.#head.baseFeePerGas;
         const exclude = new Set(opts.exclude ?? []);
         for (const h of exclude) if (!this.#txs.has(h)) throw new Error(`mine: exclude names ${h}, which this node never accepted`);
@@ -991,6 +995,14 @@ export class FakeNode {
         }
         const parent = this.#head;
         const hashes = picked.map((p) => p.t.hash);
+        // Validate explicit logs before any state changes: a real log always comes from a
+        // transaction in its own block.
+        const explicit = (opts.logs ?? []).map((l, i) => {
+            const txHash = l.transactionHash ?? (hashes.length === 1 ? hashes[0] : undefined);
+            if (txHash === undefined) throw new Error(`mine: logs[${i}] names no transactionHash and block ${number} holds ${hashes.length} transactions (a log must come from one of them)`);
+            if (!hashes.includes(txHash)) throw new Error(`mine: logs[${i}] names ${txHash}, which is not in block ${number}`);
+            return { ...l, transactionHash: txHash };
+        });
         let gasUsed = 0n;
         picked.forEach(({ t, used, effectiveGasPrice }, index) => {
             gasUsed += used;
@@ -1028,24 +1040,126 @@ export class FakeNode {
         this.#head = block;
         // A relay transaction mined at a nonce can close a gap in the public queue.
         for (const s of senders) this.#promote(s);
+        // Logs: each matching setReceiptLogs rule per mined transaction, then the explicit logs,
+        // ordered by transaction index (a real block numbers its logs in transaction order).
+        const queued: Array<LogInput & { transactionHash: string }> = [];
+        for (const { t } of picked) {
+            for (const rule of this.#receiptRules) {
+                if (!receiptRuleMatches(rule, t.tx)) continue;
+                for (const l of rule.make(t.tx)) queued.push({ address: l.address, topics: l.topics, data: l.data, transactionHash: t.hash });
+            }
+        }
+        queued.push(...explicit);
+        const ordered = queued.map((l, i) => ({ l, i })).sort((a, b) => hashes.indexOf(a.l.transactionHash) - hashes.indexOf(b.l.transactionHash) || a.i - b.i);
+        const stored = this.#storeLogs(block, ordered.map((x) => x.l));
+        // A real node announces the head, then each matching log, in block order.
         for (const s of this.subscriptions) {
             if (s.kind === 'newHeads') this.#push(s, this.#formatBlock(block, false, true));
         }
+        this.#deliverLogs(stored);
         return number;
+    }
+
+    /** Store logs in block `b` with the real positional fields; returns them as stored. */
+    #storeLogs(b: BlockRecord, logs: Array<LogInput & { transactionHash: string }>): FakeLog[] {
+        let logIndex = this.logs.filter((l) => l.blockHash === b.hash).length;
+        const out: FakeLog[] = [];
+        for (const l of logs) {
+            const txIndex = b.transactions.indexOf(l.transactionHash);
+            if (txIndex < 0) throw new Error(`log: ${l.transactionHash} is not in block ${b.number}`);
+            const log: FakeLog = {
+                address: getAddress(l.address).toLowerCase(),
+                topics: l.topics.map((t) => t.toLowerCase()),
+                data: l.data.toLowerCase(),
+                blockNumber: toQuantity(b.number),
+                blockHash: b.hash,
+                transactionHash: l.transactionHash,
+                transactionIndex: toQuantity(txIndex),
+                logIndex: toQuantity(logIndex),
+                removed: false,
+            };
+            logIndex += 1;
+            this.logs.push(log);
+            out.push(log);
+        }
+        return out;
+    }
+
+    #deliverLogs(logs: FakeLog[]): void {
+        for (const log of logs) {
+            for (const s of this.subscriptions) {
+                if (s.kind === 'logs' && logMatches(log, s.filter)) this.#push(s, log);
+            }
+        }
+    }
+
+    /**
+     * Logs a matching mined transaction's receipt (and block) carries, for example the WETH
+     * Withdrawal of a V2 sell that src/utils/receiptDecoder.ts reads. `to` and `selector` (4-byte
+     * or a human signature) narrow which transactions match; `make` builds the logs with real
+     * encoders. Rules apply in the order they were set.
+     */
+    setReceiptLogs(match: { to?: string; selector?: string }, make: (tx: Transaction) => LogInput[]): void {
+        let selector: string | undefined;
+        if (match.selector !== undefined) {
+            selector = match.selector.includes('(') ? FunctionFragment.from(match.selector).selector : match.selector.toLowerCase();
+            if (!/^0x[0-9a-f]{8}$/.test(selector)) throw new Error(`setReceiptLogs: "${match.selector}" is not a 4-byte selector or a function signature`);
+        }
+        this.#receiptRules.push({ to: match.to === undefined ? undefined : getAddress(match.to).toLowerCase(), selector, make });
+    }
+
+    /**
+     * Fee answers, kept until changed. `gasPrice` answers eth_gasPrice (default: base fee plus the
+     * priority fee); `maxPriorityFeePerGas` answers eth_maxPriorityFeePerGas; `estimateGas`
+     * answers eth_estimateGas. `legacy: true` makes this a chain with no EIP-1559: blocks carry no
+     * baseFeePerGas (nor the later Shanghai and Cancun fields), eth_maxPriorityFeePerGas answers
+     * -32601 as such a node does, and a type-2 transaction is refused as not supported.
+     */
+    setFees(fees: { gasPrice?: bigint; maxPriorityFeePerGas?: bigint; estimateGas?: bigint; legacy?: boolean }): void {
+        for (const [k, v] of Object.entries(fees)) {
+            if (k === 'legacy') {
+                if (typeof v !== 'boolean') throw new Error('setFees: legacy must be a boolean');
+            } else if (k === 'gasPrice' || k === 'maxPriorityFeePerGas' || k === 'estimateGas') {
+                if (typeof v !== 'bigint' || v < 0n) throw new Error(`setFees: ${k} must be a non-negative bigint`);
+            } else {
+                throw new Error(`setFees: unknown field ${k}`);
+            }
+        }
+        if (fees.gasPrice !== undefined) this.#gasPrice = fees.gasPrice;
+        if (fees.maxPriorityFeePerGas !== undefined) this.priorityFeePerGas = fees.maxPriorityFeePerGas;
+        if (fees.estimateGas !== undefined) this.#estimateGas = fees.estimateGas;
+        if (fees.legacy !== undefined) this.#legacy = fees.legacy;
     }
 
     blockHash(number: number): string {
         return this.#blockAt(number)?.hash ?? ZERO_HASH;
     }
 
-    /** Deliver logs, in exactly the given order, to every logs subscription whose filter matches. */
-    emitLogs(logs: FakeLog[]): void {
-        for (const log of logs) {
-            this.logs.push(log);
-            for (const s of this.subscriptions) {
-                if (s.kind === 'logs' && logMatches(log, s.filter)) this.#push(s, log);
+    /**
+     * Store logs on the head block (or the block a FakeLog names) and deliver them, in the given
+     * order, to every logs subscription whose filter matches. Each comes from a transaction in its
+     * block; block number, hash and the transaction and log indexes are the node's own, and a
+     * FakeLog whose fields disagree with them throws.
+     */
+    emitLogs(logs: Array<FakeLog | LogInput>): void {
+        const stored: FakeLog[] = [];
+        for (const [i, l] of logs.entries()) {
+            const full = l as Partial<FakeLog>;
+            const b = full.blockNumber !== undefined ? this.#blocks.get(Number(BigInt(full.blockNumber))) : this.#head;
+            if (!b) throw new Error(`emitLogs: logs[${i}] names block ${full.blockNumber}, which this node never mined`);
+            if (full.blockHash !== undefined && full.blockHash.toLowerCase() !== b.hash) throw new Error(`emitLogs: logs[${i}] block hash ${full.blockHash} is not the hash of block ${b.number}`);
+            const txHash = l.transactionHash ?? (b.transactions.length === 1 ? b.transactions[0] : undefined);
+            if (txHash === undefined) throw new Error(`emitLogs: logs[${i}] names no transactionHash and block ${b.number} holds ${b.transactions.length} transactions`);
+            const [log] = this.#storeLogs(b, [{ address: l.address, topics: l.topics, data: l.data, transactionHash: txHash }]);
+            for (const k of ['transactionIndex', 'logIndex'] as const) {
+                if (full[k] !== undefined && BigInt(full[k]!) !== BigInt(log[k])) {
+                    this.logs.pop();
+                    throw new Error(`emitLogs: logs[${i}] ${k} ${full[k]} disagrees with the node (${log[k]})`);
+                }
             }
+            stored.push(log);
         }
+        this.#deliverLogs(stored);
     }
 
     /** Server-side close of every open socket on this node (default code 1006, abnormal). */
@@ -1164,11 +1278,14 @@ export class FakeNode {
             case 'eth_blockNumber':
                 return { result: toQuantity(this.#head.number) };
             case 'eth_gasPrice':
-                return { result: toQuantity(this.#head.baseFeePerGas + this.priorityFeePerGas) };
+                return { result: toQuantity(this.#gasPrice ?? (this.#legacy ? 0n : this.#head.baseFeePerGas) + this.priorityFeePerGas) };
             case 'eth_maxPriorityFeePerGas':
+                // A node with no EIP-1559 does not serve this method: geth's own text and no stray,
+                // because a real node of that kind answers exactly this.
+                if (this.#legacy) return { error: { code: -32601, message: 'the method eth_maxPriorityFeePerGas does not exist/is not available' } };
                 return { result: toQuantity(this.priorityFeePerGas) };
             case 'eth_estimateGas':
-                return { result: toQuantity(DEFAULT_ESTIMATE) };
+                return { result: toQuantity(this.#estimateGas ?? DEFAULT_ESTIMATE) };
             case 'eth_getBalance':
                 return { result: toQuantity(this.#balances.get(lc(p[0])) ?? 0n) };
             case 'eth_getCode':
@@ -1194,7 +1311,7 @@ export class FakeNode {
             case 'eth_call':
                 return this.#ethCall(p, entry);
             case 'eth_getLogs':
-                return { result: this.#getLogs(p[0]) };
+                return this.#getLogs(p[0]);
             case 'eth_subscribe':
                 return this.#subscribe(p, connection);
             case 'eth_unsubscribe': {
@@ -1257,7 +1374,7 @@ export class FakeNode {
             parentHash: b.parentHash,
             nonce: '0x0000000000000000',
             sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
-            logsBloom: ZERO_BLOOM,
+            logsBloom: bloomOf(this.logs.filter((l) => l.blockHash === b.hash)),
             transactionsRoot: keccak256(concat([toUtf8Bytes('tx-root'), ...b.transactions])),
             stateRoot: keccak256(toUtf8Bytes(`state-root:${b.number}`)),
             receiptsRoot: keccak256(toUtf8Bytes(`receipts-root:${b.number}`)),
@@ -1269,16 +1386,19 @@ export class FakeNode {
             gasLimit: toQuantity(b.gasLimit),
             gasUsed: toQuantity(b.gasUsed),
             timestamp: toQuantity(b.timestamp),
-            baseFeePerGas: toQuantity(b.baseFeePerGas),
             mixHash: keccak256(toUtf8Bytes(`mix:${b.number}`)),
-            withdrawalsRoot: keccak256(toUtf8Bytes(`withdrawals:${b.number}`)),
-            blobGasUsed: '0x0',
-            excessBlobGas: '0x0',
-            parentBeaconBlockRoot: keccak256(toUtf8Bytes(`beacon:${b.number}`)),
         };
+        // A chain with no EIP-1559 has no base fee and none of the later (Shanghai, Cancun) fields.
+        if (!this.#legacy) {
+            out.baseFeePerGas = toQuantity(b.baseFeePerGas);
+            out.withdrawalsRoot = keccak256(toUtf8Bytes(`withdrawals:${b.number}`));
+            out.blobGasUsed = '0x0';
+            out.excessBlobGas = '0x0';
+            out.parentBeaconBlockRoot = keccak256(toUtf8Bytes(`beacon:${b.number}`));
+        }
         if (!header) {
             out.uncles = [];
-            out.withdrawals = [];
+            if (!this.#legacy) out.withdrawals = [];
             out.transactions = fullTx ? b.transactions.map((h) => this.#formatTxByHash(h)) : [...b.transactions];
         }
         return out;
@@ -1345,7 +1465,7 @@ export class FakeNode {
             effectiveGasPrice: toQuantity(r.effectiveGasPrice),
             contractAddress: null,
             logs: this.logs.filter((l) => l.transactionHash === hash),
-            logsBloom: ZERO_BLOOM,
+            logsBloom: bloomOf(this.logs.filter((l) => l.transactionHash === hash)),
             status: toQuantity(r.status),
             type: toQuantity(t.tx.type ?? 0),
         };
@@ -1374,15 +1494,38 @@ export class FakeNode {
         return { error: { code: 3, message: 'execution reverted', data: result.revert } };
     }
 
-    #getLogs(filter: unknown): FakeLog[] {
+    /**
+     * eth_getLogs with a geth node's rules: `blockHash` excludes a range; fromBlock and toBlock
+     * default to latest; a named range with from above to is refused; a range wholly above the head
+     * is empty and toBlock is capped at the head; address and topics filter as subscriptions do.
+     */
+    #getLogs(filter: unknown): Outcome {
         const f = (filter ?? {}) as { fromBlock?: unknown; toBlock?: unknown; blockHash?: string };
-        const from = this.#resolveBlock(f.fromBlock ?? 'latest')?.number ?? 0;
-        const to = this.#resolveBlock(f.toBlock ?? 'latest')?.number ?? this.#head.number;
-        return this.logs.filter((l) => {
-            const n = Number(BigInt(l.blockNumber));
-            if (f.blockHash) return l.blockHash === lc(f.blockHash) && logMatches(l, filter);
-            return n >= from && n <= to && logMatches(l, filter);
-        });
+        if (f.blockHash !== undefined && f.blockHash !== null) {
+            if (f.fromBlock !== undefined || f.toBlock !== undefined) {
+                return { error: { code: -32602, message: 'invalid argument 0: cannot specify both BlockHash and FromBlock/ToBlock, choose one or the other' } };
+            }
+            const b = [...this.#blocks.values()].find((x) => x.hash === lc(f.blockHash));
+            if (!b) return { error: { code: -32000, message: 'unknown block' } };
+            return { result: this.logs.filter((l) => l.blockHash === b.hash && logMatches(l, filter)) };
+        }
+        const num = (tag: unknown): number => {
+            if (tag === undefined || tag === null || tag === 'latest' || tag === 'pending' || tag === 'safe' || tag === 'finalized') return this.#head.number;
+            if (tag === 'earliest') return 0;
+            return Number(BigInt(String(tag)));
+        };
+        const from = num(f.fromBlock);
+        const to = num(f.toBlock);
+        if (from > to) return { error: { code: -32000, message: 'invalid block range params' } };
+        const head = this.#head.number;
+        if (from > head) return { result: [] };
+        const top = to > head ? head : to;
+        return {
+            result: this.logs.filter((l) => {
+                const n = Number(BigInt(l.blockNumber));
+                return n >= from && n <= top && logMatches(l, filter);
+            }),
+        };
     }
 
     #subscribe(p: unknown[], connection: Connection | undefined): Outcome {
@@ -1445,7 +1588,7 @@ export class FakeNode {
 
     #callBundle(p: Record<string, unknown> | undefined): Outcome {
         const txs = (p?.txs ?? []) as string[];
-        const baseFee = this.#head.baseFeePerGas;
+        const baseFee = this.#legacy ? 0n : this.#head.baseFeePerGas;
         let totalGas = 0;
         let totalFees = 0n;
         const results = txs.map((raw) => {
@@ -1704,6 +1847,48 @@ export interface MineOptions {
     include?: string[];
     /** Hashes left out of this block only. */
     exclude?: string[];
+    /**
+     * Real-encoded logs stored in the new block, after any setReceiptLogs logs. Each names the
+     * mined transaction it came from (optional when the block holds exactly one).
+     */
+    logs?: LogInput[];
+}
+
+/** A log before the node places it: the positional fields come from the block it lands in. */
+export interface LogInput {
+    address: string;
+    topics: string[];
+    data: string;
+    transactionHash?: string;
+}
+
+interface ReceiptRule {
+    to: string | undefined;
+    selector: string | undefined;
+    make: (tx: Transaction) => LogInput[];
+}
+
+function receiptRuleMatches(rule: ReceiptRule, tx: Transaction): boolean {
+    if (rule.to !== undefined && (tx.to === null || tx.to.toLowerCase() !== rule.to)) return false;
+    if (rule.selector !== undefined && tx.data.slice(0, 10).toLowerCase() !== rule.selector) return false;
+    return true;
+}
+
+/** geth bloom9: three 11-bit indexes from keccak256 of each address and topic. */
+function bloomOf(logs: Array<{ address: string; topics: string[] }>): string {
+    const bits = new Uint8Array(256);
+    const add = (hex: string): void => {
+        const h = ethers.getBytes(keccak256(hex));
+        for (let i = 0; i < 6; i += 2) {
+            const v = ((h[i] << 8) | h[i + 1]) & 2047;
+            bits[255 - (v >> 3)] |= 1 << (v & 7);
+        }
+    };
+    for (const l of logs) {
+        add(l.address);
+        for (const t of l.topics) add(t);
+    }
+    return ethers.hexlify(bits);
 }
 
 function minBig(a: bigint, b: bigint): bigint {

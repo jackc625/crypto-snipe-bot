@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import axios from 'axios';
 import { FetchRequest, Interface, JsonRpcProvider, Network, Transaction, WebSocketProvider, Wallet, ethers, parseEther, parseUnits, getAddress, toQuantity } from 'ethers';
 import { FakeNode, FakeWebSocket, encodeResult, harnessState, installSeams, labelAddress } from './harness/chain';
+import { decodeReceipt } from '../../src/utils/receiptDecoder';
 import {
     assertAllFaultsFired,
     assertNoStrays,
@@ -634,5 +635,180 @@ describe('simulated node: the public route (23-28 Task 1, D-03, AC-48)', () => {
         const refused = await broadcast(provider, await signed({ nonce: 5 }));
         expect(errorText(refused.err)).toContain('nonce too high: next nonce 2, tx nonce 5');
         expect(node.submitted).toHaveLength(2);
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Plan 23-28 Task 2 (AC-48): fee answers, stored logs, subscription filtering and receipt logs.
+// ---------------------------------------------------------------------------------------------
+
+const EMITTER_A = labelAddress('23-28.emitter.a');
+const EMITTER_B = labelAddress('23-28.emitter.b');
+const EMITTER_C = labelAddress('23-28.emitter.c');
+const EVENTS = new Interface(['event Ping(address indexed who, uint256 n)', 'event Pong(address indexed who, uint256 n)', 'event Other(address indexed who, uint256 n)']);
+
+function eventLog(address: string, name: 'Ping' | 'Pong' | 'Other', n: bigint): { address: string; topics: string[]; data: string } {
+    const e = EVENTS.encodeEventLog(name, [SENDER.address, n]);
+    return { address, topics: e.topics, data: e.data };
+}
+
+/** A real WebSocketProvider on the bare node, destroyed by the afterEach disposers. */
+function bareWs(): WebSocketProvider {
+    const ws = new WebSocketProvider(BARE_WS, 1);
+    harnessState().disposers.push(async () => {
+        await ws.destroy();
+        FakeWebSocket.instances.length = 0;
+    });
+    return ws;
+}
+
+describe('simulated node: fees, logs and receipts (23-28 Task 2, AC-48)', () => {
+    it('a legacy fee node: real getFeeData gives a null maxFeePerGas and the set gasPrice, blocks carry no baseFeePerGas, and no stray is recorded', async () => {
+        const { node, provider } = bareNode();
+        node.setFees({ legacy: true, gasPrice: 7n * GWEI });
+        const fee = await stepUntil(provider.getFeeData());
+        expect(fee.maxFeePerGas).toBeNull();
+        expect(fee.maxPriorityFeePerGas).toBeNull();
+        expect(fee.gasPrice).toBe(7n * GWEI);
+        expect((await stepUntil(provider.getBlock('latest')))?.baseFeePerGas).toBeNull();
+        const rawBlock = (await stepUntil(provider.send('eth_getBlockByNumber', ['latest', false]))) as Record<string, unknown>;
+        for (const field of ['baseFeePerGas', 'withdrawalsRoot', 'withdrawals', 'blobGasUsed', 'parentBeaconBlockRoot']) expect(rawBlock).not.toHaveProperty(field);
+        // The method a legacy node does not serve: geth's own answer, which is not a stray.
+        const tip = await stepUntil(provider.send('eth_maxPriorityFeePerGas', []).then(() => null, (e: unknown) => e));
+        expect((tip as { error?: { code?: number } }).error?.code ?? (tip as { info?: { error?: { code?: number } } }).info?.error?.code).toBe(-32601);
+        expect(errorText(tip)).toContain('the method eth_maxPriorityFeePerGas does not exist/is not available');
+        expect(node.strays).toEqual([]);
+
+        // Settings persist until changed; a type-2 transaction is refused; a type-0 one mines at its gasPrice.
+        node.setFees({ estimateGas: 90_000n });
+        expect(await stepUntil(provider.estimateGas({ to: RECIPIENT }))).toBe(90_000n);
+        expect((await stepUntil(provider.getFeeData())).gasPrice).toBe(7n * GWEI);
+        node.setBalance(SENDER.address, parseEther('1'));
+        const eip1559 = await broadcast(provider, await signed({ nonce: 0 }));
+        expect(errorText(eip1559.err)).toContain('transaction type not supported');
+        const legacyTx = await broadcast(provider, await signed({ nonce: 0, gasPriceGwei: 7n }));
+        node.mine();
+        expect((await stepUntil(provider.getTransactionReceipt(legacyTx.hash!)))?.gasPrice).toBe(7n * GWEI);
+        expect(() => node.mine({ baseFeePerGas: 1n })).toThrow(/legacy chain .* has no base fee/);
+        expect(() => node.setFees({ gasPrice: -1n })).toThrow(/non-negative bigint/);
+    });
+
+    it('a type-0 same-nonce replacement needs the 10 percent bump on gasPrice, on a legacy node and on an EIP-1559 node alike', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        for (const legacy of [true, false]) {
+            node.setFees({ legacy });
+            const nonce = node.minedCount(SENDER.address);
+            const first = await broadcast(provider, await signed({ nonce, gasPriceGwei: 100n }));
+            expect(first.hash).toBeDefined();
+            const under = await broadcast(provider, await signed({ nonce, gasPriceGwei: 109n, value: 2n }));
+            expect(errorText(under.err)).toContain('replacement transaction underpriced');
+            const bumped = await broadcast(provider, await signed({ nonce, gasPriceGwei: 110n, value: 2n }));
+            expect(bumped.hash).toBeDefined();
+            expect(node.statusOf(first.hash!)).toBe('replaced');
+            node.mine();
+            expect(node.isMined(bumped.hash!)).toBe(true);
+        }
+    });
+
+    it('a log placed by mine({ logs }) and one placed by emitLogs each come back from a real queryFilter over their block and not over another', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        expect(() => node.mine({ logs: [eventLog(EMITTER_A, 'Ping', 0n)] })).toThrow(/names no transactionHash and block \d+ holds 0 transactions/);
+        const before = node.head;
+
+        const tx1 = await broadcast(provider, await signed({ nonce: 0 }));
+        const b1 = node.mine({ logs: [eventLog(EMITTER_A, 'Ping', 1n)] });
+        const tx2 = await broadcast(provider, await signed({ nonce: 1 }));
+        const b2 = node.mine();
+        node.emitLogs([eventLog(EMITTER_A, 'Ping', 2n)]);
+        expect(node.head).toBe(before + 2);
+
+        const contract = new ethers.Contract(EMITTER_A, EVENTS, provider);
+        const inB1 = (await stepUntil(contract.queryFilter(contract.filters.Ping(), b1, b1))) as ethers.EventLog[];
+        expect(inB1).toHaveLength(1);
+        expect(inB1[0].args.n).toBe(1n);
+        expect(inB1[0]).toMatchObject({ blockNumber: b1, blockHash: node.blockHash(b1), transactionHash: tx1.hash, transactionIndex: 0, index: 0 });
+        const inB2 = (await stepUntil(contract.queryFilter(contract.filters.Ping(), b2, b2))) as ethers.EventLog[];
+        expect(inB2.map((e) => e.args.n)).toEqual([2n]);
+        expect(inB2[0]).toMatchObject({ blockNumber: b2, transactionHash: tx2.hash });
+        // Another block holds neither, a range above the head is empty, and a range covering both returns both in order.
+        expect(await stepUntil(contract.queryFilter(contract.filters.Ping(), before, before))).toEqual([]);
+        expect(await stepUntil(contract.queryFilter(contract.filters.Ping(), b2 + 1, b2 + 5))).toEqual([]);
+        expect(((await stepUntil(contract.queryFilter(contract.filters.Ping(), b1, b2))) as ethers.EventLog[]).map((e) => e.args.n)).toEqual([1n, 2n]);
+        // Address and topic filtering: another emitter or another event finds nothing.
+        expect(await stepUntil(new ethers.Contract(EMITTER_B, EVENTS, provider).queryFilter('Ping', b1, b2))).toEqual([]);
+        expect(await stepUntil(contract.queryFilter(contract.filters.Pong(), b1, b2))).toEqual([]);
+        // The log is in its transaction's receipt and the block's bloom is no longer empty.
+        expect((await stepUntil(provider.getTransactionReceipt(tx1.hash!)))?.logs).toHaveLength(1);
+        const blockRaw = (await stepUntil(provider.send('eth_getBlockByNumber', [toQuantity(b1), false]))) as { logsBloom: string };
+        expect(BigInt(blockRaw.logsBloom)).not.toBe(0n);
+        // A real node's range rules.
+        const bad = await stepUntil(provider.send('eth_getLogs', [{ fromBlock: toQuantity(b2), toBlock: toQuantity(b1) }]).then(() => null, (e: unknown) => e));
+        expect(errorText(bad)).toContain('invalid block range params');
+    });
+
+    it('a subscription with an address list and an OR topic list receives only the logs that match, after the block head, in order', async () => {
+        const { node } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const ws = bareWs();
+        const got: ethers.Log[] = [];
+        const filter = { address: [EMITTER_A, EMITTER_B], topics: [[EVENTS.getEvent('Ping')!.topicHash, EVENTS.getEvent('Pong')!.topicHash]] };
+        await ws.on(filter, (log: ethers.Log) => got.push(log));
+        await stepUntilTrue(() => node.subscriptions.some((s) => s.kind === 'logs'), { what: 'the logs subscription' });
+
+        // A raw connection beside it, to see the order the node pushes in.
+        const pushed: Array<{ params: { result: { number?: string; address?: string } } }> = [];
+        const conn = { send: (text: string): void => void pushed.push(JSON.parse(text) as (typeof pushed)[number]) };
+        await node.handle({ jsonrpc: '2.0', id: 1, method: 'eth_subscribe', params: ['newHeads'] }, conn, { endpoint: 'ws', url: BARE_WS });
+        await node.handle({ jsonrpc: '2.0', id: 2, method: 'eth_subscribe', params: ['logs', filter] }, conn, { endpoint: 'ws', url: BARE_WS });
+
+        const raw = await signed({ nonce: 0 });
+        const hash = node.addForeignTransaction(raw);
+        const block = node.mine({
+            logs: [
+                eventLog(EMITTER_A, 'Ping', 1n), // matches
+                eventLog(EMITTER_C, 'Ping', 2n), // address not in the list
+                eventLog(EMITTER_B, 'Other', 3n), // topic not in the OR list
+                eventLog(EMITTER_B, 'Pong', 4n), // matches
+            ],
+        });
+        await stepUntilTrue(() => got.length === 2, { what: 'the two matching logs' });
+        await stepFor(1_000);
+        expect(got).toHaveLength(2);
+        expect(got.map((l) => getAddress(l.address))).toEqual([getAddress(EMITTER_A), getAddress(EMITTER_B)]);
+        expect(got.map((l) => EVENTS.parseLog(l)?.args.n)).toEqual([1n, 4n]);
+        expect(got.every((l) => l.blockNumber === block && l.transactionHash === hash)).toBe(true);
+        // The node pushed the head first, then the matching logs in block order (logIndex 0 and 3).
+        expect(pushed.map((m) => (m.params.result.number !== undefined ? 'head' : m.params.result.address))).toEqual(['head', EMITTER_A.toLowerCase(), EMITTER_B.toLowerCase()]);
+        expect(pushed.slice(1).map((m) => (m.params.result as { logIndex: string }).logIndex)).toEqual(['0x0', '0x3']);
+    });
+
+    it('a WETH Withdrawal set through setReceiptLogs is in the sell receipt and the real decodeReceipt reads it', async () => {
+        const { node, provider } = bareNode();
+        const wallet = SENDER.connect(provider);
+        node.setBalance(wallet.address, parseEther('1'));
+        const router = labelAddress('23-28.router');
+        const weth = labelAddress('23-28.weth');
+        const SELL = new Interface(['function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline) returns (uint256[] amounts)']);
+        const WETH9 = new Interface(['event Withdrawal(address indexed src, uint256 wad)']);
+        node.setReceiptLogs({ to: router, selector: 'swapExactTokensForETH(uint256,uint256,address[],address,uint256)' }, (tx) => {
+            const wad = (SELL.decodeFunctionData('swapExactTokensForETH', tx.data)[1] as bigint) + 1n;
+            const e = WETH9.encodeEventLog('Withdrawal', [router, wad]);
+            return [{ address: weth, topics: e.topics, data: e.data }];
+        });
+        const sellData = SELL.encodeFunctionData('swapExactTokensForETH', [1000n, 41n, [labelAddress('23-28.token'), weth], wallet.address, 9_999_999_999n]);
+        const sell = await stepUntil(wallet.sendTransaction({ to: router, data: sellData }));
+        const plain = await stepUntil(wallet.sendTransaction({ to: router, value: 1n }));
+        node.mine();
+
+        const decoded = await stepUntil(decodeReceipt(sell.hash, provider, weth, wallet.address));
+        const receipt = (await stepUntil(provider.getTransactionReceipt(sell.hash)))!;
+        expect(decoded).toEqual({ amountOut: '42', gasCost: (receipt.gasUsed * receipt.gasPrice).toString(), blockNumber: receipt.blockNumber });
+        expect(receipt.logs).toHaveLength(1);
+        expect(receipt.logs[0].transactionHash).toBe(sell.hash);
+        // A transaction the rule does not match carries no log.
+        expect((await stepUntil(provider.getTransactionReceipt(plain.hash)))?.logs).toEqual([]);
+        expect(() => node.setReceiptLogs({ selector: 'nope' }, () => [])).toThrow(/not a 4-byte selector/);
     });
 });
