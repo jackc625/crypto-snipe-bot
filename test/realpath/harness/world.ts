@@ -130,6 +130,48 @@ export function describeRecent(n = 12): string {
     ].join('\n');
 }
 
+/**
+ * Prove `promise` is still pending after `virtualMs` of fake time (RESEARCH Pattern 2: deadlock
+ * findings). Steps the clock and fails, naming when, if the promise resolves or rejects inside
+ * the window. Its rejection is observed here, so a settled promise never becomes unhandled.
+ */
+export async function expectStillPending(promise: Promise<unknown>, virtualMs: number, opts: { stepMs?: number; what?: string } = {}): Promise<void> {
+    if (!vi.isFakeTimers()) throw new Error('expectStillPending: the fixed clock is not installed (call useFixedClock or createScenario first)');
+    if (!(virtualMs > 0)) throw new Error(`expectStillPending: virtualMs must be positive, got ${virtualMs}`);
+    const stepMs = opts.stepMs ?? 10;
+    const what = opts.what ?? 'the promise';
+    const start = Date.now();
+    // Widened on purpose: the callbacks assign it, which control-flow narrowing cannot see.
+    let state = 'pending' as 'pending' | 'resolved' | 'rejected';
+    let outcome: unknown;
+    let settledAt = 0;
+    promise.then(
+        (v) => {
+            state = 'resolved';
+            outcome = v;
+            settledAt = Date.now() - start;
+        },
+        (e: unknown) => {
+            state = 'rejected';
+            outcome = e;
+            settledAt = Date.now() - start;
+        },
+    );
+    // One microtask turn first, so an already-settled promise is caught before any time passes.
+    await Promise.resolve();
+    const end = start + virtualMs;
+    while (state === 'pending' && Date.now() < end) await vi.advanceTimersByTimeAsync(Math.min(stepMs, end - Date.now()));
+    if (state === 'pending') return;
+    const shown = state === 'rejected' ? (outcome instanceof Error ? `${outcome.name}: ${outcome.message}` : String(outcome)) : (() => {
+        try {
+            return JSON.stringify(outcome);
+        } catch {
+            return String(outcome);
+        }
+    })();
+    throw new Error(`expectStillPending: ${what} settled (${state}) after ${settledAt} of ${virtualMs} virtual ms: ${shown}`);
+}
+
 /** Step `virtualMs` of fake time (for example one 12 s slot). */
 export async function stepFor(virtualMs: number, stepMs = 10): Promise<void> {
     const end = Date.now() + virtualMs;
@@ -253,13 +295,16 @@ export function assertNoStrays(): void {
     throw new Error(`realpath harness: stray call: ${strays[0].detail}${more}`);
 }
 
-/** Throw naming a fault or hold that never fired (plan 23-01 Task 2 arms faults). */
+/**
+ * Throw naming a fault or hold that never fired: a fault aimed at the wrong operation, or armed
+ * behind an `after` stage the scenario never reached, would otherwise pass unnoticed.
+ */
 export function assertAllFaultsFired(): void {
     const st = harnessState();
-    for (const node of st.nodes) {
-        const unfired = (node as unknown as { faults?: Array<{ fired: number; describe(): string }> }).faults?.find((f) => f.fired === 0);
-        if (unfired) throw new Error(`realpath harness: a fault never fired: ${unfired.describe()}`);
-    }
+    const unfired = st.nodes.flatMap((n) => n.faults.filter((f) => f.fired === 0));
+    if (unfired.length === 0) return;
+    const more = unfired.length > 1 ? ` (and ${unfired.length - 1} more: ${unfired.slice(1, 6).map((f) => f.describe()).join('; ')})` : '';
+    throw new Error(`realpath harness: a ${unfired[0].kind} never fired: ${unfired[0].describe()}${more}`);
 }
 
 /** Clear per-test state after the afterEach checks (setup.ts). */
@@ -359,8 +404,14 @@ export async function createScenario(opts: ScenarioOptions): Promise<Scenario> {
                 errors.push(new Error(`dispose: ${what} failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e }));
             }
         };
-        // 1. Nothing stays parked.
-        await step('release held calls', () => built.node?.releaseAll());
+        // 1. Nothing stays parked. A call still parked is answered with an error (never a node
+        //    answer), and microtasks drain before timers stop and providers are destroyed, so the
+        //    answer reaches its caller instead of a "provider destroyed" cancellation. Microtasks
+        //    only: no timer-driven work runs during teardown.
+        await step('release held calls', async () => {
+            const parked = built.node?.releaseAll() ?? 0;
+            if (parked > 0) for (let i = 0; i < 50; i++) await Promise.resolve();
+        });
         // 2. Timers: the bot's own registry, then every fake timer.
         await step('clear bot timers', () => built.graph?.exitManager.clearAllTimers());
         await step('clear fake timers', () => {

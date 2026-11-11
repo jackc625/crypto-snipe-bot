@@ -16,6 +16,8 @@
 //     receipts. Contract reads come from a per-scenario table built with real ethers encoders
 //     (D-04); a read, method or URL it does not know is recorded as a stray and fails the test in
 //     afterEach (AC-03), because a caller's catch can swallow the returned error.
+//     failNext() and hold() name the exact operation they target (method, selector, target,
+//     stage); one that never fires fails the test in afterEach (assertAllFaultsFired).
 //
 // The count at `latest` moves only when a transaction is mined. A relay acceptance changes no
 // count and a receipt is a valid null until mine() includes that hash (review HIGH on 23-01:
@@ -582,6 +584,8 @@ export class FakeNode {
     /** Transactions from other actors (for example a launch's addLiquidityETH). */
     readonly foreign: KnownTx[] = [];
     readonly logs: FakeLog[] = [];
+    /** Every fault and hold armed on this node, in arming order (assertAllFaultsFired reads it). */
+    readonly faults: Array<FaultHandle | HoldHandle> = [];
     priorityFeePerGas: bigint;
 
     readonly #endpoints = new Map<string, Endpoint>();
@@ -595,6 +599,7 @@ export class FakeNode {
     readonly #sockets = new Set<FakeWebSocket>();
     #head: BlockRecord;
     #subSeq = 0;
+    #socketsOpened = 0;
 
     constructor(opts: FakeNodeOptions) {
         this.chainId = opts.chainId;
@@ -655,9 +660,54 @@ export class FakeNode {
         this.#relayOverrides.set(method, handler);
     }
 
-    /** Placeholder for plan 23-01 Task 2 (holds); nothing is parked yet. */
-    releaseAll(): void {
-        // Task 2 adds hold(); until then there is never a parked call.
+    // -- faults and holds (AC-03: each names its exact operation and proves it fired) --------
+
+    /**
+     * Fail the next matching call(s) of `method` with a JSON-RPC error. `selector` (4-byte hex or
+     * a human signature such as `getReserves()`) and `to` narrow an eth_call or eth_estimateGas;
+     * `to` also narrows eth_getBalance, eth_getCode and eth_getTransactionCount by their address.
+     * `after` arms the fault only while it returns true, so a fault cannot hit an earlier call.
+     * Works for relay methods (eth_sendBundle, eth_callBundle, flashbots_getBundleStatsV2) too.
+     * A fault that never fires fails the test in afterEach (assertAllFaultsFired).
+     */
+    failNext(method: string, opts: FaultOptions = {}): FaultHandle {
+        const f = new Fault(method, normaliseMatch(method, opts), opts.times ?? 1, opts.error);
+        this.faults.push(f);
+        return f;
+    }
+
+    /**
+     * Park every matching call of `method` until `release()`. The call is logged (and, for a
+     * relay method, recorded on `relay`) when it arrives; it is answered only once released.
+     * Releasing ends the hold, so later calls pass. A hold that never parked a call fails the
+     * test in afterEach (assertAllFaultsFired).
+     */
+    hold(method: string, opts: OperationMatch = {}): HoldHandle {
+        const h = new Hold(method, normaliseMatch(method, opts));
+        this.faults.push(h);
+        return h;
+    }
+
+    /**
+     * Teardown: release every hold. Calls still parked are answered with a JSON-RPC error, so a
+     * call parked at teardown can never look like a node answer. Returns how many were parked.
+     */
+    releaseAll(): number {
+        let parked = 0;
+        for (const f of this.faults) {
+            if (f instanceof Hold) parked += f.releaseForTeardown();
+        }
+        return parked;
+    }
+
+    /** Sockets ever opened on this node (a teardown proof needs to know one was live). */
+    get socketsOpened(): number {
+        return this.#socketsOpened;
+    }
+
+    /** Sockets currently open on this node. */
+    get openSocketCount(): number {
+        return this.#sockets.size;
     }
 
     // -- transactions from other actors ------------------------------------------------------
@@ -771,6 +821,7 @@ export class FakeNode {
 
     attachSocket(ws: FakeWebSocket): void {
         this.#sockets.add(ws);
+        this.#socketsOpened += 1;
     }
 
     detachSocket(ws: FakeWebSocket): void {
@@ -812,9 +863,21 @@ export class FakeNode {
         const method = typeof r?.method === 'string' ? r.method : '';
         const params = r?.params;
         const entry = this.#logCall(method, params, id, via);
+        let relayEntry: RelayEntry | undefined;
+        if (via.endpoint === 'relay') {
+            relayEntry = { seq: nextSeq(), method, params, url: via.url };
+            this.relay.push(relayEntry);
+        }
         let outcome: Outcome;
         try {
-            outcome = await this.#dispatch(method, params, connection, via, entry);
+            const op: Operation = { method, params, to: targetOf(method, params), selector: entry.selector };
+            // A fault answers at once; a hold parks the call until released (or torn down).
+            const fault = this.faults.find((f): f is Fault => f instanceof Fault && f.claims(op));
+            const hold = fault ? undefined : this.faults.find((f): f is Hold => f instanceof Hold && f.claims(op));
+            const parked = hold ? await hold.park() : undefined;
+            if (fault) outcome = { error: fault.error };
+            else if (parked) outcome = { error: parked };
+            else outcome = await this.#dispatch(method, params, connection, via, entry, relayEntry);
         } catch (e) {
             // A harness bug must not look like a node answer: fail loudly in afterEach as well.
             const detail = `harness error answering ${method}: ${e instanceof Error ? e.message : String(e)}`;
@@ -856,8 +919,8 @@ export class FakeNode {
         return entry;
     }
 
-    async #dispatch(method: string, params: unknown, connection: Connection | undefined, via: Via, entry: CallLogEntry): Promise<Outcome> {
-        if (via.endpoint === 'relay') return this.#relayMethod(method, params, via);
+    async #dispatch(method: string, params: unknown, connection: Connection | undefined, via: Via, entry: CallLogEntry, relayEntry?: RelayEntry): Promise<Outcome> {
+        if (via.endpoint === 'relay') return this.#relayMethod(method, params, relayEntry ?? { seq: nextSeq(), method, params, url: via.url });
         const p = (Array.isArray(params) ? params : []) as unknown[];
         switch (method) {
             case 'eth_chainId':
@@ -1103,9 +1166,8 @@ export class FakeNode {
 
     // -- relay (Flashbots JSON-RPC) ----------------------------------------------------------
 
-    async #relayMethod(method: string, params: unknown, via: Via): Promise<Outcome> {
-        const entry: RelayEntry = { seq: nextSeq(), method, params, url: via.url };
-        this.relay.push(entry);
+    /** `entry` is already on `relay` (recorded on arrival, before any hold or fault). */
+    async #relayMethod(method: string, params: unknown, entry: RelayEntry): Promise<Outcome> {
         const override = this.#relayOverrides.get(method);
         if (override) return override(params, entry);
         const p0 = (Array.isArray(params) ? params[0] : undefined) as Record<string, unknown> | undefined;
@@ -1198,6 +1260,198 @@ export class FakeNode {
                 sealedByBuildersAt: sub && sub.block === block ? [builder] : [],
             },
         };
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Faults and holds
+// ---------------------------------------------------------------------------------------------
+
+/** Narrows a fault or hold to one exact operation. */
+export interface OperationMatch {
+    /** 4-byte selector (`0x0902f1ac`) or human signature (`getReserves()`); eth_call / eth_estimateGas only. */
+    selector?: string;
+    /** Call target (eth_call, eth_estimateGas) or queried address (eth_getBalance, eth_getCode, eth_getTransactionCount). */
+    to?: string;
+    /** Armed only while this returns true (for example once the scenario reached a stage). */
+    after?: () => boolean;
+}
+
+export interface FaultOptions extends OperationMatch {
+    /** How many matching calls fail (default 1). */
+    times?: number;
+    /** The JSON-RPC error returned (default code -32000 naming the injected fault). */
+    error?: JsonRpcError;
+}
+
+export interface FaultHandle {
+    readonly kind: 'fault';
+    readonly method: string;
+    /** Matching calls this fault has failed so far. */
+    readonly fired: number;
+    readonly times: number;
+    describe(): string;
+}
+
+export interface HoldHandle {
+    readonly kind: 'hold';
+    readonly method: string;
+    /** Calls this hold has parked so far. */
+    readonly heldCount: number;
+    /** Same as heldCount: a hold "fired" once it parked a call. */
+    readonly fired: number;
+    /** Calls parked right now. */
+    readonly parkedNow: number;
+    readonly released: boolean;
+    /** Answer every parked call normally and end the hold (later calls pass). */
+    release(): void;
+    describe(): string;
+}
+
+export type { JsonRpcError };
+
+interface Operation {
+    method: string;
+    params: unknown;
+    to: string | undefined;
+    selector: string | undefined;
+}
+
+interface NormalisedMatch {
+    selector?: string;
+    to?: string;
+    after?: () => boolean;
+    text: string;
+}
+
+const SELECTOR_METHODS = new Set(['eth_call', 'eth_estimateGas']);
+const ADDRESS_METHODS = new Set(['eth_call', 'eth_estimateGas', 'eth_getBalance', 'eth_getCode', 'eth_getTransactionCount']);
+
+/** Validate a match at arming time, so a fault that could never match fails at once, by name. */
+function normaliseMatch(method: string, m: OperationMatch): NormalisedMatch {
+    if (typeof method !== 'string' || method === '') throw new Error('fault/hold: a method name is required');
+    let selector: string | undefined;
+    if (m.selector !== undefined) {
+        if (!SELECTOR_METHODS.has(method)) throw new Error(`fault/hold on ${method}: selector applies only to ${[...SELECTOR_METHODS].join(', ')}`);
+        selector = m.selector.includes('(') ? FunctionFragment.from(m.selector).selector : m.selector.toLowerCase();
+        if (!/^0x[0-9a-f]{8}$/.test(selector)) throw new Error(`fault/hold on ${method}: "${m.selector}" is not a 4-byte selector or a function signature`);
+    }
+    let to: string | undefined;
+    if (m.to !== undefined) {
+        if (!ADDRESS_METHODS.has(method)) throw new Error(`fault/hold on ${method}: to applies only to ${[...ADDRESS_METHODS].join(', ')}`);
+        to = getAddress(m.to).toLowerCase();
+    }
+    const parts = [`"${method}"`];
+    if (m.selector !== undefined) parts.push(`selector ${m.selector}${m.selector.includes('(') ? ` (${selector})` : ''}`);
+    if (to) parts.push(`to ${to}`);
+    if (m.after) parts.push('after <predicate>');
+    return { selector, to, after: m.after, text: parts.join(', ') };
+}
+
+/** The address an operation targets, lower-case, for the `to` match. */
+function targetOf(method: string, params: unknown): string | undefined {
+    const p = Array.isArray(params) ? params : [];
+    if (SELECTOR_METHODS.has(method)) {
+        const t = (p[0] ?? {}) as { to?: string };
+        return t.to ? lc(t.to) : undefined;
+    }
+    if (ADDRESS_METHODS.has(method)) return typeof p[0] === 'string' ? lc(p[0]) : undefined;
+    return undefined;
+}
+
+function matches(m: NormalisedMatch, method: string, op: Operation): boolean {
+    if (op.method !== method) return false;
+    if (m.selector !== undefined && op.selector !== m.selector) return false;
+    if (m.to !== undefined && op.to !== m.to) return false;
+    if (m.after && !m.after()) return false;
+    return true;
+}
+
+class Fault implements FaultHandle {
+    readonly kind = 'fault' as const;
+    readonly method: string;
+    readonly times: number;
+    readonly error: JsonRpcError;
+    readonly #match: NormalisedMatch;
+    #fired = 0;
+
+    constructor(method: string, match: NormalisedMatch, times: number, error: JsonRpcError | undefined) {
+        if (!Number.isInteger(times) || times < 1) throw new Error(`failNext ${match.text}: times must be a positive integer, got ${times}`);
+        this.method = method;
+        this.times = times;
+        this.#match = match;
+        this.error = error ?? { code: -32000, message: `realpath harness: injected fault on ${method}` };
+    }
+
+    get fired(): number {
+        return this.#fired;
+    }
+
+    /** True, and counted, when this fault takes the call. A spent fault takes nothing. */
+    claims(op: Operation): boolean {
+        if (this.#fired >= this.times || !matches(this.#match, this.method, op)) return false;
+        this.#fired += 1;
+        return true;
+    }
+
+    describe(): string {
+        return `failNext(${this.#match.text}, times ${this.times}): fired ${this.#fired} of ${this.times}`;
+    }
+}
+
+class Hold implements HoldHandle {
+    readonly kind = 'hold' as const;
+    readonly method: string;
+    readonly #match: NormalisedMatch;
+    #held = 0;
+    #released = false;
+    #waiting: Array<(teardownError: JsonRpcError | undefined) => void> = [];
+
+    constructor(method: string, match: NormalisedMatch) {
+        this.method = method;
+        this.#match = match;
+    }
+
+    get heldCount(): number {
+        return this.#held;
+    }
+
+    get fired(): number {
+        return this.#held;
+    }
+
+    get parkedNow(): number {
+        return this.#waiting.length;
+    }
+
+    get released(): boolean {
+        return this.#released;
+    }
+
+    claims(op: Operation): boolean {
+        return !this.#released && matches(this.#match, this.method, op);
+    }
+
+    /** Resolves on release (undefined: answer normally) or teardown (the error to answer with). */
+    park(): Promise<JsonRpcError | undefined> {
+        this.#held += 1;
+        return new Promise((resolve) => this.#waiting.push(resolve));
+    }
+
+    release(): void {
+        this.#released = true;
+        for (const w of this.#waiting.splice(0)) w(undefined);
+    }
+
+    releaseForTeardown(): number {
+        this.#released = true;
+        const waiting = this.#waiting.splice(0);
+        for (const w of waiting) w({ code: -32000, message: `realpath harness: the scenario was torn down while ${this.method} was held` });
+        return waiting.length;
+    }
+
+    describe(): string {
+        return `hold(${this.#match.text}): held ${this.#held} call(s)${this.#released ? ', released' : ''}`;
     }
 }
 
