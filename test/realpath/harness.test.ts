@@ -983,7 +983,15 @@ describe('scenario builder: every chain and DEX type on its real route (23-28 Ta
 
             type SkipLine = { checks: Record<string, unknown> };
             const skip = (): SkipLine | undefined => harnessState().logs.find((l) => l.msg === 'Safety checks failed, skipping')?.obj as SkipLine | undefined;
-            await stepUntilTrue(() => skip() !== undefined, { what: `the ${chain} V2 safety bank deciding`, maxSteps: 20_000 });
+            const buying = (): boolean => harnessState().logs.some((l) => l.msg === 'All safety checks passed, buying');
+            await stepUntilTrue(() => skip() !== undefined || buying(), { what: `the ${chain} V2 safety bank deciding`, maxSteps: 20_000 });
+            // The fix signal (D-08): once the lock query is fixed the bank passes and the bot buys.
+            if (buying()) {
+                throw new Error(
+                    `AUD-BUY-016 looks fixed: the ${chain} V2 launch passed the lock check and the bot is buying. ` +
+                        `Take this test off AUD-BUY-016 and rewrite it as the ${chain} V2 buy on route public.`,
+                );
+            }
 
             // The safety path ran: the on-chain honeypot roundtrip was served for this token and router.
             const checks = checkerReads(sc, 'checkV2');
