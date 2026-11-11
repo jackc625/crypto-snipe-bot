@@ -59,5 +59,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-09, AC-11, AC-12) in the RC-10 file AUD-TX-002.test.ts: a real ETH V2 deliberate buy whose two private attempts are not included clears its guard and sends the public swap inside withNonceLock, then awaits stx.wait() with no timeout; the node never mines it (valid null receipt) while 150 blocks are mined, and a later operation for the same wallet through the real lock does not start within the 30-minute fake-time window (claim deliberate-public-wait-holds-wallet-lock; bounded observation). Control: mined with three confirmations, the lock is freed, the later operation starts and the buy completes. A wait with a timeout reads looks fixed.",
+    "test_id": "AUD-TX-002"
+  }
 }
