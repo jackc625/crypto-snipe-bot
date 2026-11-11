@@ -74,5 +74,11 @@
   "sibling_sites_checked": "All three monitor entry points: startExitMonitor (:1857-1946, returns on null at :1870-1873), resumeExitMonitor no-row branch (:1978-1984, same), resumeExitMonitor with a row (:1968-1977, no quote needed, starts). Callers at the base SHA: bot.ts:422 (armPositionMonitoring, V2 snipe and deliberate buy), bot.ts:1483 (V3 snipe), bot.ts:1948/:1955 (restart resume), exitEngine.ts:731 (re-arm after a failed exit; has a row, so it starts). The parseEther(buyAmountNative) at :1866 throws instead of returning for an invalid amount, which rejects armPositionMonitoring before the anti-rug registration (BUY slice, AUD-BUY-002 family).",
   "status": "confirmed",
   "severity_rationale": "S1, equal to the research suggestion. Proven by the code: on a null first quote the function returns with no timer, no persisted state, no alert and no retry. The plausible condition is a single RPC error or quoter revert in the seconds after a buy (busy launch block). Anti-rug registration still runs, so the position is not fully unprotected, and a restart re-tries once; that bounds it below S0. Until then there is no stop-loss, trailing stop, partial take-profit or 30-minute urgency exit.",
-  "recommendation": "Never return without an armed monitor: retry the first quote with backoff, or persist exit_state with an unknown entry price and keep the interval armed so it baselines on the first good quote; alert the operator on any start failure. Decide the policy on card EXIT-01 (Phase 24)."
+  "recommendation": "Never return without an armed monitor: retry the first quote with backoff, or persist exit_state with an unknown entry price and keep the interval armed so it baselines on the first good quote; alert the operator on any start failure. Decide the policy on card EXIT-01 (Phase 24).",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-07): one failed getAmountsOut at exit-monitor start (fault on the router, armed after the buy mined, fired once) leaves the held ETH V2 position with no exit-monitor timer, no exit_state row and no alert; over six 5 s poll intervals nothing retries, re-arms or alerts, while anti-rug still registers the position. A retry or an unprotected alert both read looks fixed.",
+    "test_id": "AUD-EXIT-002"
+  }
 }
