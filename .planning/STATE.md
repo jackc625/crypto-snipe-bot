@@ -53,7 +53,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 
 ## Blockers / Concerns
 
-- **Merge Phase 22 before starting Phase 23:** `phase-22-safety-rails-audit` is unmerged and has no copy on GitHub, and new phase branches start from `main`. `main` tracks only 4 of the 10 `ignition/deployments/` files (see the checkout warning under Operating Notes). Run `/gsd-ship 22` first.
+- **Phase 23 paused 2026-11-11 after plan 23-07 (10 of 31 plans done, wave 5 partly done):** resume with `/gsd-resume-work`, then `/gsd-execute-phase 23`; the handoff is `.planning/phases/23-test-safety-net-harness-triage-characterization/.continue-here.md`. (The old "merge Phase 22 first" blocker is resolved: PR #2 merged into `main` as 657d27b, and this branch forked from `main`.)
 - **Phase 25 owes the real fork run (UFV-01..UFV-05):** deferred at the Phase 22 UAT on 2026-11-09; Phase 25 success criterion 6 names the five checks. Until then the fork-project halves of the isolation rails are rehearsed only.
 - **Phase 24 item (found by the 22 security audit after the seal):** the startup DB probe copies a WAL-mode database to the OS temp folder, and a crash or failed cleanup can leave that copy behind (trade data, no keys). Not in the sealed register; see 22-SECURITY.md.
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
