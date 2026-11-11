@@ -19,10 +19,15 @@
 // - missBundlesUntil: run the chain for a wallet whose private bundles are never included (each
 //   bundle transaction gets its 12 s slot, then an empty block is mined), never mining a public
 //   transaction, until a condition holds.
+// - settleAntiRugArming: before teardown, wait until `registrations` anti-rug registrations have
+//   each run their backfill and the node's eth_subscribe / eth_unsubscribe traffic has not changed
+//   for one second of fake time, so no subscription change is still queued in ethers when the
+//   harness destroys the providers (a queued one is cancelled into an unhandled rejection).
 
 import { vi } from 'vitest';
 import type { Submitted } from '../../harness/chain';
-import { expectStillPending, type Scenario } from '../../harness/world';
+import { recordedLogs } from '../../harness/capture';
+import { expectStillPending, stepUntilTrue, type Scenario } from '../../harness/world';
 
 type NonceAuthorityModule = typeof import('../../../../src/utils/nonceAuthority');
 
@@ -114,4 +119,27 @@ export async function missBundlesUntil(sc: Scenario, opts: { until: () => boolea
         node.mine({ include: [] });
         for (const s of due) slotStart.set(s.hash, Date.now());
     }
+}
+
+/** See the file header. */
+export async function settleAntiRugArming(sc: Scenario, registrations: number): Promise<void> {
+    const opCount = (pred: (op: string) => boolean): number => recordedLogs().filter((l) => typeof l.obj?.op === 'string' && pred(l.obj.op as string)).length;
+    await stepUntilTrue(() => opCount((op) => op === 'antirug.register') >= registrations && opCount((op) => op.startsWith('antirug.backfill.')) >= registrations, {
+        what: `${registrations} anti-rug registration(s) and their backfills`,
+        maxSteps: 20_000,
+    });
+    const traffic = (): number => sc.node.callLog.filter((c) => c.method === 'eth_subscribe' || c.method === 'eth_unsubscribe').length;
+    let last = traffic();
+    let stableSince = Date.now();
+    await stepUntilTrue(
+        () => {
+            const n = traffic();
+            if (n !== last) {
+                last = n;
+                stableSince = Date.now();
+            }
+            return Date.now() - stableSince >= 1_000;
+        },
+        { what: 'the subscription traffic settling', maxSteps: 20_000 },
+    );
 }

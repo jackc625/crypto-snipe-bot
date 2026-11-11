@@ -114,5 +114,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with the order forced (plan 23-09, AC-12): a real ETH V2 launch reaches the real listener, whose handler passes the already-sniped check and every gate and starts its buy inside the wallet lock, where its Flashbots simulation (eth_callBundle on the relay, not a provider read, so AUD-TX-028 cannot stall the second handler) is held; with no row written yet the same PairCreated is handed to the real handleNewPairForChain (the alpha-drop shape), which passes the check too; released, both bundles land: two swapExactETHForTokens of the same token at consecutive nonces, decoded with real ethers, and two pending trades rows (claim double-buy-same-token). An in-process claim set before the first await reads looks fixed.",
+    "test_id": "AUD-BUY-004"
+  }
 }
