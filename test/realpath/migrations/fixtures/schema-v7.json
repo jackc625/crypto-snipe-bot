@@ -1,0 +1,681 @@
+{
+  "user_version": 7,
+  "tables": {
+    "chain_state": {
+      "sql": "CREATETABLEchain_state(chainTEXTPRIMARYKEY,last_seen_blockINTEGERNOTNULL,last_updated_tsINTEGERNOTNULL,antirug_dry_run_startedINTEGER)",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "chain",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "last_seen_block",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 2,
+          "name": "last_updated_ts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 3,
+          "name": "antirug_dry_run_started",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "sqlite_autoindex_chain_state_1",
+          "unique": 1,
+          "origin": "pk",
+          "partial": 0,
+          "sql": null,
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "chain",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        }
+      ],
+      "foreign_keys": []
+    },
+    "exit_state": {
+      "sql": "CREATETABLEexit_state(trade_idINTEGERPRIMARYKEY,entry_priceREALNOTNULL,high_water_markREALNOTNULL,trailing_activatedINTEGERNOTNULLDEFAULT0,partial_tiers_completedTEXTNOTNULLDEFAULT'[]',original_token_amountTEXTNOTNULL,urgency_start_tsINTEGERNOTNULL,volatility_samplesTEXTNOTNULLDEFAULT'[]',exit_failure_countINTEGERNOTNULLDEFAULT0,exit_statusTEXT,FOREIGNKEY(trade_id)REFERENCEStrades(id))",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "trade_id",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "entry_price",
+          "type": "REAL",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 2,
+          "name": "high_water_mark",
+          "type": "REAL",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 3,
+          "name": "trailing_activated",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 4,
+          "name": "partial_tiers_completed",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 5,
+          "name": "original_token_amount",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 6,
+          "name": "urgency_start_ts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 7,
+          "name": "volatility_samples",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'[]'",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 8,
+          "name": "exit_failure_count",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 9,
+          "name": "exit_status",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_exit_state_trade",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_exit_state_tradeONexit_state(trade_id)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 0,
+              "name": "trade_id",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "trades",
+          "from": "trade_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ]
+    },
+    "lp_baseline": {
+      "sql": "CREATETABLElp_baseline(trade_idINTEGERPRIMARYKEY,pool_typeTEXTNOTNULLCHECK(pool_typeIN('v2','v3')),pair_or_pool_addressTEXTNOTNULLCOLLATENOCASE,v2_token0_reserveTEXT,v2_token1_reserveTEXT,v2_lp_total_supplyTEXT,v3_active_liquidityTEXT,v3_tick_at_snapshotINTEGER,v3_position_nft_idTEXT,v3_fee_tierINTEGER,snapshot_blockINTEGERNOTNULL,snapshot_tsINTEGERNOTNULL,FOREIGNKEY(trade_id)REFERENCEStrades(id))",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "trade_id",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "pool_type",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 2,
+          "name": "pair_or_pool_address",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 3,
+          "name": "v2_token0_reserve",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 4,
+          "name": "v2_token1_reserve",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 5,
+          "name": "v2_lp_total_supply",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 6,
+          "name": "v3_active_liquidity",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 7,
+          "name": "v3_tick_at_snapshot",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 8,
+          "name": "v3_position_nft_id",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 9,
+          "name": "v3_fee_tier",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 10,
+          "name": "snapshot_block",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 11,
+          "name": "snapshot_ts",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_lp_baseline_pool",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_lp_baseline_poolONlp_baseline(pair_or_pool_address)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "pair_or_pool_address",
+              "desc": 0,
+              "coll": "NOCASE",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "trades",
+          "from": "trade_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION",
+          "match": "NONE"
+        }
+      ]
+    },
+    "pause_state": {
+      "sql": "CREATETABLEpause_state(idINTEGERPRIMARYKEYCHECK(id=1),pausedINTEGERNOTNULLDEFAULT0,paused_atINTEGER,paused_byTEXT,reasonTEXT)",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "paused",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 2,
+          "name": "paused_at",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 3,
+          "name": "paused_by",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 4,
+          "name": "reason",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [],
+      "foreign_keys": []
+    },
+    "sqlite_sequence": {
+      "sql": "CREATETABLEsqlite_sequence(name,seq)",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "name",
+          "type": "",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "seq",
+          "type": "",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [],
+      "foreign_keys": []
+    },
+    "trades": {
+      "sql": "CREATETABLEtrades(idINTEGERPRIMARYKEYAUTOINCREMENT,tokenTEXTNOTNULLCOLLATENOCASE,chainTEXTNOTNULLDEFAULT'eth',actionTEXTNOTNULLCHECK(actionIN('buy','sell','partial_sell','fail')),tx_hashTEXT,blockINTEGER,timestampINTEGERNOTNULLDEFAULT(unixepoch()),amount_inTEXT,amount_outTEXT,gas_costTEXT,price_at_actionTEXT,statusTEXTNOTNULLDEFAULT'pending'CHECK(statusIN('pending','sold','failed')),pool_typeTEXTDEFAULT'v2'CHECK(pool_typeIN('v2','v3')),fee_tierINTEGER,dex_nameTEXTDEFAULTNULL)",
+      "columns": [
+        {
+          "cid": 0,
+          "name": "id",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 1,
+          "hidden": 0
+        },
+        {
+          "cid": 1,
+          "name": "token",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 2,
+          "name": "chain",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'eth'",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 3,
+          "name": "action",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 4,
+          "name": "tx_hash",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 5,
+          "name": "block",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 6,
+          "name": "timestamp",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "unixepoch()",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 7,
+          "name": "amount_in",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 8,
+          "name": "amount_out",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 9,
+          "name": "gas_cost",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 10,
+          "name": "price_at_action",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 11,
+          "name": "status",
+          "type": "TEXT",
+          "notnull": 1,
+          "dflt_value": "'pending'",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 12,
+          "name": "pool_type",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "'v2'",
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 13,
+          "name": "fee_tier",
+          "type": "INTEGER",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0,
+          "hidden": 0
+        },
+        {
+          "cid": 14,
+          "name": "dex_name",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": "NULL",
+          "pk": 0,
+          "hidden": 0
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_trades_chain",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_trades_chainONtrades(chain)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 2,
+              "name": "chain",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        },
+        {
+          "name": "idx_trades_status",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_trades_statusONtrades(status)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 11,
+              "name": "status",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        },
+        {
+          "name": "idx_trades_timestamp",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_trades_timestampONtrades(timestamp)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 6,
+              "name": "timestamp",
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        },
+        {
+          "name": "idx_trades_token",
+          "unique": 0,
+          "origin": "c",
+          "partial": 0,
+          "sql": "CREATEINDEXidx_trades_tokenONtrades(token)",
+          "columns": [
+            {
+              "seqno": 0,
+              "cid": 1,
+              "name": "token",
+              "desc": 0,
+              "coll": "NOCASE",
+              "key": 1
+            },
+            {
+              "seqno": 1,
+              "cid": -1,
+              "name": null,
+              "desc": 0,
+              "coll": "BINARY",
+              "key": 0
+            }
+          ]
+        }
+      ],
+      "foreign_keys": []
+    }
+  },
+  "other_objects": []
+}
