@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-07-PLAN.md
-last_updated: "2026-11-11T18:50:49.395Z"
-last_activity: 2026-11-10
+stopped_at: Completed 23-08-PLAN.md
+last_updated: "2026-11-11T20:25:45.304Z"
+last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: "0ba1f553364ea26be9e99a938a981a7d1ac487e5"
+state_head: c95c820505b11cdecf39d8d9b3c25fd5b8f0b757
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 39
+  completed_plans: 40
   percent: 9
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 11 of 31
+Plan: 9 of 31
 Status: Ready to execute
-Last activity: 2026-11-10 — Phase 23 execution started
+Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
@@ -123,11 +123,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P05 | 38min | 3 tasks | 16 files |
 | Phase 23 P06 | 39min | 3 tasks | 19 files |
 | Phase 23 P07 | 56min | 3 tasks | 20 files |
+| Phase 23 P08 | 51min | 2 tasks | 17 files |
 
 ## Session
 
-**Last session:** 2026-11-11T18:50:48.944Z
-**Stopped at:** Completed 23-07-PLAN.md
+**Last session:** 2026-11-11T20:25:44.950Z
+**Stopped at:** Completed 23-08-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -258,3 +259,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-07: AUD-EXIT-001, -002, -003, -004, -013 and -015 confirmed on the real path (test/realpath/triage/<ID>.test.ts, 16 knownBug claims; every claim reads looks fixed under a fix-shaped src mutation, and a full cross-file batch shows each mutation flips only its own finding). AUD-EXIT-003 carries needs_fork for sub-claims 2 and 3 (real tokens and pools); 23-16 must add its UFV entry (owner 25), set fork_ref, and acknowledge the five S1 entries (001, 002, 003, 013, 015).
 - [Phase 23]: 23-07 new findings under the standing instruction (no stop): AUD-EXIT-027 (S3, capital none, confirmed, proven by AUD-EXIT-027.test.ts): a V3 exit is multicall([exactInputSingle(tokenOut WETH, recipient the wallet)]) with no unwrapWETH9 and nothing in src or scripts unwraps, so V3 proceeds stay WETH while buys, gas and the wallet floor use native ETH (Phase 29). AUD-TESTI-028 (S3, capital none): realpath scenarios are torn down only in setup.ts afterEach, which Vitest 4.1.1 skips when a test file's own afterEach throws first, so the old graph keeps running into the next test; no committed file is affected.
 - [Phase 23]: 23-07 for later triage plans: until AUD-TESTI-028 is fixed, no test/realpath file may declare an afterEach that can throw. test/realpath/triage/fixtures/AUD-EXIT-001-sell-path.ts gives the sell side of the chain from mined transactions (allowance, balance after sells, sell receipts), real foreign trades with pool events (foreignTrade) and a chain driver (landNextSell, driveExits); fixtures/AUD-EXIT-002-position.ts has buy/arm helpers whose arming wait mines the wallet's public transactions. Keep setup facts valid under other findings' fixes: assert another finding's detail only in its own file.
+- [Phase 23]: 23-08: AUD-API-001, AUD-EXIT-007, -008, -014 (S1) and AUD-EXIT-005 (S2) confirmed on the real path (test/realpath/triage/<ID>.test.ts, 8 knownBug claims with AUD-TX-028; every claim reads looks fixed under a fix-shaped src mutation, and a full cross-file batch shows each mutation flips only its own finding). AUD-API-001 is two tests on the real dashboard routes (a real force-sell drives the catch path, then force-sell answers 404 and emergency-sell "No open positions to sell"); AUD-EXIT-008 proves the 409 on a row that stays pending (sell lands with a real incoming transfer, EXIT_ROUTINE_MAX_FAILURES=1); AUD-EXIT-007's unknown-dex claim uses a V3 row with fee_tier NULL, which no current writer produces. 23-16 must acknowledge the four S1 entries.
+- [Phase 23]: 23-08 new finding under the standing instruction (no stop): AUD-TX-028 (S2, STRAND, confirmed, class C12, proven by AUD-TX-028.test.ts): src/utils/provider.ts builds JsonRpcProvider(url) with no static network, so every call of a chain's HTTP provider waits on one shared eth_chainId that ethers sends in the JSON-RPC batch of the call that started it; while that batch is unanswered every later call (every exit poll, the anti-rug evaluation and confirm gate, every sell read) waits too, up to the 300 s idle timeout (AUD-TX-008). Proven: with an exit quote held, a real 95 percent liquidity pull's anti-rug evaluation gets its pair reads answered and cannot finish; staticNetwork reads looks fixed. Phase 24 with AUD-TX-008 (OD-54) or Phase 29.
+- [Phase 23]: 23-08 for later triage plans: a held HTTP read (FakeNode.hold on an eth_call of the bot's httpProvider) stalls every later call of that provider (AUD-TX-028), so to keep an exit in flight without stalling everything else hold a relay call (eth_callBundle, eth_sendBundle) instead, or make sure the stall does not decide the result. test/realpath/triage/fixtures/AUD-API-001-dashboard-sell.ts gives driveChain (public wallet txs mined next block; each bundle gets one 12 s slot and lands only at a block it targets, or misses), postDriven (a POST to a real dashboard route over node:http while the chain is driven), heldPosition and incomingHolder; fixtures/AUD-EXIT-014-rug.ts gives pullLiquidity (a real router removeLiquidityETH with the pair's Transfer, Sync and Burn logs). ethers Transaction.from recovers the sender on every read: cache it in any per-step loop. Measure overlaps from the shared seq counter (calls and logs), not by sampling.
