@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-03-PLAN.md
-last_updated: "2026-11-11T05:41:23.798Z"
+stopped_at: Completed 23-28-PLAN.md
+last_updated: "2026-11-11T13:50:42.641Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: bb1ac556bc797ad63ab0f8e0ca745f0d7e369aa9
+state_head: ffa58f348edadc65b3131e788df097e3c64a1933
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 31
+  completed_plans: 32
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 3 of 31
+Plan: 4 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -59,6 +59,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
 - **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. The operator does not know whether any chain runs without a WS URL, so exposure on the current setup is unknown.
+- **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected.
 
 ## Operating Notes (carry to next session)
 
@@ -113,11 +114,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 22 P29 | 28min | 3 tasks | 79 files |
 | Phase 23 P01 | 55min (wall-clock incl. two operator waits) | 2 tasks | 12 files |
 | Phase 23 P03 | 13min | 2 tasks | 8 files |
+| Phase 23 P28 | 8h 8m (wall-clock incl. operator wait; continuation 16min) | 3 tasks | 5 files |
 
 ## Session
 
-**Last session:** 2026-11-11T05:41:23.392Z
-**Stopped at:** Completed 23-03-PLAN.md
+**Last session:** 2026-11-11T13:50:42.230Z
+**Stopped at:** Completed 23-28-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -223,3 +225,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-01 harness contract: FakeNode.failNext/hold return handles (fired/heldCount, describe()) and must fire or afterEach fails; arming refuses a selector/to the method cannot carry; a call still parked at teardown is answered with a JSON-RPC error, never a node answer; bare-node tests through a real JsonRpcProvider need cacheTimeout -1 (ethers 250 ms perform cache).
 - [Phase 23]: 23-03: createTestDb is built by the real migrateSchema (user_version = CURRENT_SCHEMA_VERSION, every production column incl. exit_failure_count/exit_status/pause_state); migration golden tests AC-04..06 compare against test/realpath/migrations/fixtures/schema-v7.json, and fixtures/v4Schema.ts is a frozen historic v4 fixture that must never follow later migrations. A version 8 migration must regenerate the recording.
 - [Phase 23]: 23-03: RESEARCH E9 was incomplete: the stored trades SQL also differs by a -- comment (old helper body) and SQLite RENAME quoting ("trades"); golden tests normalize whitespace, comments outside literals and plain-identifier quotes, and compare literals and all pragma structure exactly. check.ts --stage final now 12 FAILs (same two bookkeeping kinds as 23-01, out of Phase 23 scope per 23-04); --stage triage is the gate.
+- [Phase 23]: 23-28 operator ruling ("Test today's skip"): the plan's "base V2 buy" became a "base V2 skip" test (arb V2 added beside it). On base and Arbitrum the V2 lock check asks GoPlus about the pair address and reads "not locked", so base and arb V2 buys cannot succeed on the real path until AUD-BUY-016 is fixed. Later scenario plans (23-20..23-22 golden recordings, notably 23-22 public-v2-buy on chain base) must not expect a base or arb V2 buy; base/arb V3 buys are unaffected. The skip tests fail with "AUD-BUY-016 looks fixed" when Phase 24 fixes the query and should then be rewritten as the V2 buys on route public.
+- [Phase 23]: 23-28: AUD-BUY-016 status candidate -> confirmed (S3, capital none, OD-30/BUY-05 unchanged) by the executor under the standing instruction: GoPlus response-details docs (lp_holders not returned when is_in_dex is 0) plus the real-path test on a doc-faithful fake; no live GoPlus call. Open for Phase 24: the live type of lp_holders is_locked (docs quote "1", goplus.ts:64 compares the number 1). Sibling: BSC's Mudra-error fallback also asks GoPlus about the pair.
+- [Phase 23]: 23-28 harness contract: createScenario({ chain: eth|bsc|base|arb, dexType: v2|v3, dexName?, feeTier? }) with fireNewPair/fireNewPool; FakeNode setFees (legacy), setReceiptLogs, setFutureNoncePolicy, neverMine, mine({ include, exclude, logs }), emitLogs stored for eth_getLogs, filtered subscriptions; httpLog entries carry the axios request params. External answer shapes not measured live: bloXroute hash without 0x, the Mudra lock shape, GoPlus is_locked as a number.

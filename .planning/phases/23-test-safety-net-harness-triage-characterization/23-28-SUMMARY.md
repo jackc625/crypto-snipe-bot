@@ -245,3 +245,9 @@ None. No external service configuration required.
 ---
 *Phase: 23-test-safety-net-harness-triage-characterization*
 *Completed: 2026-11-11*
+
+## Self-Check: PASSED
+
+- Files present: test/realpath/harness/{chain,world}.ts, test/realpath/harness.test.ts, findings/AUD-BUY-016.json, AUDIT-FINDINGS.md, this SUMMARY.
+- Commits on this branch: 48fd1ef, 6b49ed1, 94960d4, ff4ddf1, 344ba3c, b68d9ed, ffa58f3 (evaluation-scope resolved them from plan subjects).
+- Acceptance re-run: ETH V3, bsc V2 and the base/arb route tests pass and assert the decoded transaction and route; each non-ETH test asserts the checker read; `git status --porcelain src` empty.
