@@ -751,8 +751,8 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 - **Sub-claims:**
   - [confirmed] A single balanceOf RPC error after a mined buy flips the trade row to failed and the position is never re-armed, even after restart (evidence: src/bot.ts:1158-1159@23a64617dca167976adc4645fed0e2c69e384820, src/bot.ts:1189@23a64617dca167976adc4645fed0e2c69e384820, src/utils/db.ts:597-604@23a64617dca167976adc4645fed0e2c69e384820)
   - [confirmed] A SQLite error in the post-mine bookkeeping leaves a mined buy with no row, no monitor and broken dedup (evidence: src/bot.ts:1118-1146@23a64617dca167976adc4645fed0e2c69e384820, src/bot.ts:1177-1191@23a64617dca167976adc4645fed0e2c69e384820)
-  - [candidate] An earlier same-nonce attempt that mines is reported as landed-not-ours and the snipe path records nothing (evidence: src/utils/mevStrategies/reconciliation.ts:476-497@23a64617dca167976adc4645fed0e2c69e384820, src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820)
-  - [candidate] A Flashbots fanout error after the first send throws while the sent bundle can still land (evidence: src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820)
+  - [confirmed] An earlier same-nonce attempt that mines is reported as landed-not-ours and the snipe path records nothing (evidence: src/utils/mevStrategies/reconciliation.ts:476-497@23a64617dca167976adc4645fed0e2c69e384820, src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820, test/realpath/triage/AUD-BUY-002.test.ts (knownBug claim earlier-attempt-lands-no-trade-row, plan 23-05))
+  - [confirmed] A Flashbots fanout error after the first send throws while the sent bundle can still land (evidence: src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820, test/realpath/triage/AUD-BUY-002.test.ts (knownBug claim fanout-error-after-send-no-trade-row, plan 23-05))
   - [confirmed] The V3 catch can flip a concurrent same-token handler's live pending row to failed (evidence: src/bot.ts:1417-1419@23a64617dca167976adc4645fed0e2c69e384820, src/bot.ts:1514@23a64617dca167976adc4645fed0e2c69e384820, src/utils/db.ts:325-327@23a64617dca167976adc4645fed0e2c69e384820)
   - [candidate] A stale balanceOf of 0 is accepted as the original token amount (evidence: src/bot.ts:1159@23a64617dca167976adc4645fed0e2c69e384820, src/exitEngine.ts:615-621@23a64617dca167976adc4645fed0e2c69e384820, src/exitEngine.ts:1736@23a64617dca167976adc4645fed0e2c69e384820)
 - **Recommendation:** Phase 24 (after a Phase 23 real-path proof of at least the balanceOf-throw and earlier-attempt-landed traces): separate "did money leave the wallet" from "did bookkeeping succeed". Once a submit may have broadcast, never run the zero-spend branch: reconcile against chain truth (token balance delta plus nonce, like the deliberate guard at bot.ts:617-662), record the row, and arm monitoring with retries; on any post-landing failure alert loudly that a position is held and unprotected. The direction (intent row before broadcast vs reconcile-on-throw, retry policy) is a behaviour decision on card BUY-02. Nothing is changed in Phase 22.
@@ -7563,7 +7563,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | scripts/capture-baselines.ts | e095ab5 | AUD-ROOT-009, AUD-ROOT-010 | re-audit: 23a6461..e095ab5 AUD-ROOT-009, AUD-ROOT-010 |
 | scripts/capture-launch.ts | 23a6461 | AUD-SCRIPTS-005, AUD-SCRIPTS-009 | - |
 | scripts/check-empty-files.sh | 23a6461 | AUD-SCRIPTS-010 | - |
-| scripts/check-vi-mock-paths.ts | 27f21a8 | none | re-audit: 23a6461..27f21a8 none |
+| scripts/check-vi-mock-paths.ts | 27f21a8 | none | re-audit: 23a6461..27f21a8 none; 27f21a8..1669fa5 none |
 | scripts/db-init.ts | fe4649e | none | re-audit: 23a6461..fe4649e none |
 | scripts/deliberate-buy.ts | 23a6461 | AUD-SCRIPTS-002, AUD-SCRIPTS-004, AUD-SCRIPTS-005, AUD-BUY-001, AUD-TESTU-006, AUD-TESTI-027 | - |
 | scripts/deploySepoliaTest.ts | 23a6461 | AUD-SCRIPTS-001, AUD-SCRIPTS-002, AUD-SCRIPTS-005 | - |
@@ -7596,7 +7596,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | .DS_Store | 23a6461 | AUD-ROOT-005 | - |
 | .env.example | 23a6461 | AUD-ROOT-004, AUD-API-005, AUD-API-008, AUD-DB-007, AUD-DB-011, AUD-DB-014, AUD-DB-016, AUD-SCRIPTS-001, AUD-SCRIPTS-005, AUD-SCRIPTS-008 | re-audit: 23a6461..6a254a1 none |
 | .gitattributes | 23a6461 | AUD-OD21-001 | - |
-| .gitignore | 23a6461 | AUD-ROOT-005 | re-audit: 23a6461..ce3851e none |
+| .gitignore | 23a6461 | AUD-ROOT-005 | re-audit: 23a6461..ce3851e none; ce3851e..7d0b7b3 none |
 | .graphifyignore | 23a6461 | none | - |
 | .idea/.gitignore | 23a6461 | AUD-ROOT-005 | - |
 | .idea/crypto-snipe-bot.iml | 23a6461 | AUD-ROOT-005 | - |
@@ -7607,11 +7607,11 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | eslint.config.mjs | 23a6461 | AUD-ROOT-006 | - |
 | ignition/.gitignore | 23a6461 | none | re-audit: 23a6461..ce3851e none |
 | package-lock.json | 23a6461 | AUD-ROOT-001 | - |
-| package.json | 23a6461 | AUD-ROOT-001, AUD-ROOT-002, AUD-ROOT-006, AUD-ROOT-007, AUD-SCRIPTS-007, AUD-TESTI-017 | re-audit: 23a6461..e095ab5 none |
+| package.json | 23a6461 | AUD-ROOT-001, AUD-ROOT-002, AUD-ROOT-006, AUD-ROOT-007, AUD-SCRIPTS-007, AUD-TESTI-017 | re-audit: 23a6461..e095ab5 none; e095ab5..1669fa5 none |
 | reports/.gitkeep | 23a6461 | none | - |
 | tsconfig.bot.json | 23a6461 | AUD-ROOT-003, AUD-TESTU-008, AUD-TX-004 | re-audit: 23a6461..b3617f6 none |
 | tsconfig.json | 23a6461 | AUD-ROOT-003, AUD-ROOT-007, AUD-TESTU-008 | - |
-| vitest.config.ts | 23a6461 | AUD-RAIL-001, AUD-RAIL-002, AUD-ROOT-002, AUD-TESTI-011, AUD-TESTI-017, AUD-TESTU-001, AUD-TESTU-008 | re-audit: 23a6461..31b7854 none |
+| vitest.config.ts | 23a6461 | AUD-RAIL-001, AUD-RAIL-002, AUD-ROOT-002, AUD-TESTI-011, AUD-TESTI-017, AUD-TESTU-001, AUD-TESTU-008 | re-audit: 23a6461..31b7854 none; 31b7854..05c1665 none |
 
 ## Thresholds inventory (money and timing)
 
