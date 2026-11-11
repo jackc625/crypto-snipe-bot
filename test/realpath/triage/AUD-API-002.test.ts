@@ -15,7 +15,7 @@
 // the fake node's own list). A control LP transfer to an allowlisted locker is evaluated, so the
 // delivery path is shown working before Stop. The real dashboard (real login, real routes, a
 // loopback port, node:http; fixtures/AUD-BUY-011-dashboard.ts) stops the chain, and in the second
-// test starts it again. The Start route's callback is a source-pinned mirror of src/bot.ts
+// test starts it again. The second test's Start route callback is a source-pinned mirror of src/bot.ts
 // onRestart (fixtures/AUD-API-002-restart.ts: the real closure exists only inside a full boot,
 // which this phase never runs; the mirror fails by name if that closure's text changes). One
 // heartbeat later, right after one of the exit monitor's polls (so the routine stop-loss cannot
@@ -42,7 +42,7 @@ import { harnessState } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, v2AmountOut, type Scenario } from '../harness/world';
-import { dashboardOverrides, stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
+import { dashboardOverrides, openDashboard, stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 import { bootListeners, chainRoute, openDashboardWithRestart } from './fixtures/AUD-API-002-restart';
 import { installSellPath } from './fixtures/AUD-EXIT-001-sell-path';
 import { buyAndMine, buyRow, exitQuotes, opEntries, opLogged, waitAntiRugArmed } from './fixtures/AUD-EXIT-002-position';
@@ -123,7 +123,8 @@ describe('AUD-API-002: dashboard Stop removes the anti-rug subscription and Star
         expect(subscriptionsCovering(sc, sc.pair)).toBe(1);
         await controlTransferEvaluated(sc, tradeId);
 
-        const { dash, cookie } = await openDashboardWithRestart(sc);
+        // Stop needs no restart callback: the real server without one, as AUD-API-001 drives it.
+        const { dash, cookie } = await openDashboard(sc);
         const fromCall = sc.node.callLog.length;
         const fromBroadcast = harnessState().broadcasts.length;
         expect(await chainRoute(dash, cookie, 'eth', 'stop')).toEqual({ ok: true, chain: 'eth', status: 'stopped' });
