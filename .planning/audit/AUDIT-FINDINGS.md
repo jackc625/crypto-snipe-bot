@@ -1289,7 +1289,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-DB-007: Section C SC-21: the database path resolves against the current working directory (unset DB_PATH and the shipped DB_PATH=./data/bot.db alike), and db.ts creates the folder and an empty database when none is there, so starting from another directory boots on a fresh database: kill-switch off, open positions not resumed, dedup and loss history empty
 
-- **Severity / capital impact / status:** S1 / STRAND / confirmed
+- **Severity / capital impact / status:** S1 / STRAND / fixed
 - **Slice / origin:** DB / research-candidate
 - **Classes:** C18 (env validation), C13 (SQLite transaction boundaries and crash consistency)
 - **Severity rationale:** S1 STRAND: a plausible operator slip (starting the bot from a subfolder, an IDE run configuration or a scheduled task with another working directory) gives a bot that is unpaused even if the operator had paused it, monitors none of the positions the wallet holds (no exits, no anti-rug), may re-buy tokens it already holds and starts with an empty daily-loss history, all without an error. Mitigated by the 22-09 rail; status stays confirmed until 22-29 verifies it.
@@ -7682,7 +7682,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/api/trades.test.ts | 23a6461 | AUD-TESTI-012 | quality: mocks_mechanism=yes, hollow=no, real_state=no |
 | test/integration/api/wsPush.test.ts | 23a6461 | AUD-TESTI-015, AUD-TESTI-016 | quality: mocks_mechanism=partial, hollow=yes, real_state=no |
 | test/integration/backupState.test.ts | d3555d9 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..d3555d9 none |
-| test/integration/dbGuards.test.ts | 5378478 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none |
+| test/integration/dbGuards.test.ts | 5378478 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..29c13f9 none |
 | test/integration/dbInit.test.ts | fe4649e | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..fe4649e none |
 | test/integration/directEntryGuard.test.ts | 3786e2e | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..3786e2e none |
 | test/integration/exitMonitor.test.ts | 23a6461 | AUD-TESTI-010 | quality: mocks_mechanism=partial, hollow=yes, real_state=no |

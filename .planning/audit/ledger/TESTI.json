@@ -1871,6 +1871,12 @@
         "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
         "findings": "none",
         "note": "Reviewed: Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path."
+      },
+      {
+        "from_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "to_sha": "29c13f9cbb343d4645e593a3271758dd1713bd87",
+        "findings": "none",
+        "note": "Reviewed by plan 23-11 (git diff 5378478 29c13f9 -- test/integration/dbGuards.test.ts): one comment line added, the closes-finding marker for AUD-DB-007 next to the AC-26 rail test \"a missing path refuses, names the absolute path and creates nothing\"; no test behavior, assertion or mock changed."
       }
     ]
   },
