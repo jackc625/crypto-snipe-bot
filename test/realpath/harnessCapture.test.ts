@@ -6,6 +6,10 @@
 //     function, and SQLite's unixepoch() on the fake clock. A capture problem never throws into
 //     SQLite; it fails the test from afterEach, so a production catch cannot hide it.
 //   - The plain log and alert lists (recordedLogs, recordedAlerts), which never feed the timeline.
+//   - The known-bug marker (D-07, D-08): only the exact recorded failure passes and is recorded on
+//     task meta; a fixed bug and a changed failure both fail. Every knownBug call in this file
+//     cites the reserved literal HARNESS-SELFTEST, never a finding ID (plan 23-04 accepts that
+//     literal outside test/realpath/triage/ and reads it for no finding rule).
 // Only the logger, notifier, broadcaster, axios and the Telegram library are mocked
 // (harness/setup.ts); the chain is a transport seam (harness/chain.ts).
 //
@@ -26,6 +30,7 @@ import {
     type DbEntry,
     type TimelineEntry,
 } from './harness/capture';
+import { knownBug } from './harness/knownBug';
 import { FIXED_EPOCH_MS, createScenario, loadGraph, stepFor, stepUntilTrue, type Scenario } from './harness/world';
 import { logger } from '../../src/utils/logger';
 import { sendTelegramAlert } from '../../src/utils/notifier';
@@ -39,6 +44,16 @@ function opLogged(op: string): boolean {
 /** JSON with BigInt as whole-number text, for searching a timeline. */
 function textOf(v: unknown): string {
     return JSON.stringify(v, (_k, x: unknown) => (typeof x === 'bigint' ? x.toString() : x));
+}
+
+/** The error `fn` throws (fails the test if it throws nothing). */
+function thrown(fn: () => unknown): Error {
+    try {
+        fn();
+    } catch (e) {
+        return e as Error;
+    }
+    throw new Error('expected the call to throw');
 }
 
 function dbEntries(entries: readonly TimelineEntry[], table: string, op?: DbEntry['op']): DbEntry[] {
@@ -293,5 +308,62 @@ describe('realpath harness: timeline and DB capture (plan 23-02 Task 1)', () => 
         expect(recordedLogs().some((l) => l.msg === 'logged before the scenario')).toBe(false);
         expect(sc.timeline).not.toBe(earlier);
         expect(sc.timeline.entries.some((e) => e.kind === 'op' && e.op === 'harness.before-scenario')).toBe(false);
+    });
+});
+
+describe('realpath harness: the known-bug marker (plan 23-02 Task 2, D-07, D-08)', () => {
+    const plain = { expectedPlain: 'Five units are owed.', actualPlain: 'Four units are owed.' };
+
+    it('D-07: still broken exactly as recorded passes and records the proof on task meta, BigInt as text', (ctx) => {
+        knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-still-broken', correct: { owed: 5n }, observed: { owed: 4n }, actual: { owed: 4n }, ...plain });
+        const expected = [{ id: 'HARNESS-SELFTEST', claim: 'selftest-still-broken', expected: { owed: '5' }, actual: { owed: '4' }, expectedPlain: 'Five units are owed.', actualPlain: 'Four units are owed.' }];
+        expect(ctx.task.meta.knownBugs).toEqual(expected);
+        // What the JSON reporter writes (E10): the stored record survives JSON as is.
+        expect(JSON.parse(JSON.stringify(ctx.task.meta)).knownBugs).toEqual(expected);
+    });
+
+    it('D-08: a marked value that now equals the correct one throws the looks-fixed message and records nothing', (ctx) => {
+        const e = thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-fixed', correct: { owed: 5n }, observed: { owed: 4n }, actual: { owed: 5n }, ...plain }));
+        expect(e.message).toBe('HARNESS-SELFTEST now behaves correctly: remove this marker (it looks fixed)');
+        expect(ctx.task.meta.knownBugs).toBeUndefined();
+    });
+
+    it('D-07: any third value fails with the failure-changed message and records nothing', (ctx) => {
+        const e = thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-changed', correct: { owed: 5n }, observed: { owed: 4n }, actual: { owed: 3n }, ...plain }));
+        expect(e.message.startsWith('HARNESS-SELFTEST: the failure changed from what was recorded')).toBe(true);
+        expect(e.message).toContain('3n');
+        expect(e.message).toContain('4n');
+        expect(ctx.task.meta.knownBugs).toBeUndefined();
+    });
+
+    it('AC-11: a shared-cause file calls the marker once per claim, and task meta holds both entries', (ctx) => {
+        knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-first-claim', correct: 'locked', observed: 'unlocked', actual: 'unlocked', expectedPlain: 'The pair reads locked.', actualPlain: 'The pair reads unlocked.' });
+        knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-second-claim', correct: [1n, 2n], observed: [1n], actual: [1n], expectedPlain: 'Two transactions are sent.', actualPlain: 'One transaction is sent.' });
+        const bugs = ctx.task.meta.knownBugs!;
+        expect(bugs).toHaveLength(2);
+        expect(bugs.map((b) => [b.id, b.claim, b.expected, b.actual])).toEqual([
+            ['HARNESS-SELFTEST', 'selftest-first-claim', 'locked', 'unlocked'],
+            ['HARNESS-SELFTEST', 'selftest-second-claim', ['1', '2'], ['1']],
+        ]);
+    });
+
+    it('D-07: a malformed marker is refused before any assertion (claim not kebab-case, correct equal to observed, a repeated claim)', (ctx) => {
+        expect(thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'Not Kebab', correct: 1, observed: 2, actual: 2, ...plain })).message).toMatch(/claim must be a short kebab-case literal/);
+        expect(thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-same', correct: 2, observed: 2, actual: 2, ...plain })).message).toMatch(/correct and observed are equal/);
+        knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-once', correct: 1, observed: 2, actual: 2, ...plain });
+        expect(thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-once', correct: 1, observed: 2, actual: 2, ...plain })).message).toMatch(/claim selftest-once is already recorded in this test/);
+        expect(ctx.task.meta.knownBugs?.map((b) => b.claim)).toEqual(['selftest-once']);
+    });
+
+    it('D-07: the marker catches nothing else: an error raised while it compares reaches the test unchanged', (ctx) => {
+        const broken = {
+            get owed(): bigint {
+                throw new TypeError('a broken value, not the bug');
+            },
+        };
+        const e = thrown(() => knownBug(ctx, 'HARNESS-SELFTEST', { claim: 'selftest-broken-value', correct: { owed: 5n }, observed: { owed: 4n }, actual: broken as { owed: bigint }, ...plain }));
+        expect(e).toBeInstanceOf(TypeError);
+        expect(e.message).toBe('a broken value, not the bug');
+        expect(ctx.task.meta.knownBugs).toBeUndefined();
     });
 });
