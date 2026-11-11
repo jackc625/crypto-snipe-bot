@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-02-PLAN.md
-last_updated: "2026-11-11T14:22:37.865Z"
+stopped_at: Completed 23-04-PLAN.md
+last_updated: "2026-11-11T15:00:05.123Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: f649ea846c3681846ccb5af6ca97f93928b5c45c
+state_head: 917733b415bcd4263267457f9c136c5c0140bc1f
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 33
+  completed_plans: 34
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 5 of 31
+Plan: 6 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -116,11 +116,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P03 | 13min | 2 tasks | 8 files |
 | Phase 23 P28 | 8h 8m (wall-clock incl. operator wait; continuation 16min) | 3 tasks | 5 files |
 | Phase 23 P02 | 22min | 3 tasks | 12 files |
+| Phase 23 P04 | 28min | 2 tasks | 7 files |
 
 ## Session
 
-**Last session:** 2026-11-11T14:22:37.362Z
-**Stopped at:** Completed 23-02-PLAN.md
+**Last session:** 2026-11-11T15:00:04.765Z
+**Stopped at:** Completed 23-04-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -233,3 +234,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-02: today's real AC-01 buy timeline (CAP-14 baseline): relay eth_callBundle, relay eth_sendBundle, submit bundle, three more eth_sendBundle, op flashbots.bundle.included, relay flashbots_getBundleStatsV2, op flashbots.bundle.stats, then db trades.insert (after every relay body).
 - [Phase 23]: 23-02: knownBug(ctx, id, { claim, correct, observed, actual, expectedPlain, actualPlain }) records { id, claim, expected, actual, expectedPlain, actualPlain } on ctx.task.meta.knownBugs (BigInt as text, reaches the JSON reporter); refuses a non finding-shaped id, a non kebab-case claim, correct equal to observed and a repeated claim. Harness self-tests cite only the literal HARNESS-SELFTEST, which 23-04 must accept outside test/realpath/triage/.
 - [Phase 23]: 23-02: AC-02 gate scripts/check-realpath-mocks.ts (npm run check:realpath-mocks, CI step "Real-path mock-list gate (CHAR-01)") allows vi.mock/doMock/unmock/doUnmock only of logger, notifier, broadcaster, axios, telegram, telegram/sessions, telegram/events (by resolved file) and vi.spyOn only as vi.spyOn(process, 'exit') with no local process; refuses stubGlobal, importMock, mockObject, any alias or computed use of vi, a free vi, require/import of vitest and re-exports of vi; scans .ts/.js/.cjs/.mjs/.tsx under test/realpath. npm test now includes --project realpath.
+- [Phase 23]: 23-04: the triage population is 61, frozen in .planning/audit/inputs/triage-population.json at 7d1c699 (60 computed from the HEAD register because AUD-ANTIRUG-018 is now S1, plus AUD-ANTIRUG-024 by operator ruling). Plans that count "59 entries" (23-16 and any report) must use 61; check.ts joins the frozen IDs with the live set.
+- [Phase 23]: 23-04 triage contract for 23-05..23-16: record outcomes only with .planning/audit/tools/set-triage.ts; confirmed needs --test-id (the lead finding ID of the triage test file, which must assert the entry) and a knownBug(ctx, '<ID>', { claim: '<literal>' }) in test/realpath/triage/**/<finding ID>.test.ts; NOT-A-BUG needs --evidence '{"type","ref","note"}' at every severity and, for an entry S0/S1 now or at the freeze, --ruling to a review record ruling not-a-bug on it; unreproduced needs a keep-open ruling (PENDING until stage triage) and open_claims if it keeps a knownBug; fixed needs a "closes-finding: <ID>" marker line under test/, --proof and --rail-test. check.ts --stage triage is the phase gate.
+- [Phase 23]: 23-04 for later plans: a Phase 23 commit that edits a file added after audit_base_sha (for example scripts/check-vi-mock-paths.ts, edited by 23-02 and found failing --stage partial) makes partial and triage fail until a reviewed re_audit row reaches its last-change SHA; 23-04 added those rows for check-vi-mock-paths.ts, .gitignore, package.json and vitest.config.ts. --stage final still has 16 FAILs from 23-01..23-03 files (Phase 22 bookkeeping, out of scope).
