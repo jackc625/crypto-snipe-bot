@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-15-PLAN.md
-last_updated: "2026-11-11T16:14:42.712Z"
+stopped_at: Completed 23-05-PLAN.md
+last_updated: "2026-11-11T16:57:02.374Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: f04ea5b231417b3cfeb6374ea259e284255f9b7a
+state_head: 3d228fb3b3f7cdcbab57813a4208fd933aa12389
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 36
+  completed_plans: 37
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 8 of 31
+Plan: 9 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -119,11 +119,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P04 | 28min | 2 tasks | 7 files |
 | Phase 23 P27 | 28min | 3 tasks | 9 files |
 | Phase 23 P15 | 32min (wall-clock incl. two operator waits; continuation 15min) | 3 tasks | 6 files |
+| Phase 23 P05 | 38min | 3 tasks | 16 files |
 
 ## Session
 
-**Last session:** 2026-11-11T16:14:42.322Z
-**Stopped at:** Completed 23-15-PLAN.md
+**Last session:** 2026-11-11T16:57:01.994Z
+**Stopped at:** Completed 23-05-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -245,3 +246,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-15: AC-15 done. The one approved Flashbots request (operator verbatim "Approve, use block 1"; block 1, zero bundle hash, throwaway 0xebE2a24e436f85A2f0509Af24B7960fb6643818d, sent once 2026-11-11T15:57:34Z with the command sandbox off so a block could not spend the one attempt) got HTTP 403 Forbidden, body -32601 "rpc method is not whitelisted" (header x-proxyd-cache-status). Class inconclusive by the pre-fixed rule. AUD-TX-006 stays candidate, outcome unreproduced (proven stats-call-inside-lock, open endpoint-still-answers, manual evidence .planning/audit/inputs/aud-tx-006-relay-response.json); 23-16 must record the operator's keep-open ruling (AC-08). No further Flashbots request may be sent.
 - [Phase 23]: 23-15 HARNESS GAP (Harness Gap Procedure, operator "Allow the change (Recommended)" = allow-harness-change; the "(Recommended)" label was the orchestrator's): harness commit 65172c9 lets a setRelay handler return { http: { status, body, statusMessage?, headers? } }, sent as that HTTP status with that raw body byte for byte (content-type application/json unless given; standard reason phrase by default). Everything without http still goes out as HTTP 200 exactly as before; an invalid http answer or one inside a JSON-RPC batch is a harness error (stray, -32603). FakeNode.handle() returns a RelayHttpReply (isRelayHttpReply) for such a call. Re-run on Node 22: 76/76 realpath, the 71 baseline rows identical incl. knownBug records, check-realpath-mocks 0 violations. Later plans needing a relay non-2xx answer use this; the gap is closed and harness ownership returns to the procedure.
 - [Phase 23]: 23-15: AUD-TX-006.test.ts replays the recorded 403 read from the evidence file and asserts that after the held stats call is released the bot logs one flashbots.bundle.stats.error warning (err "Request failed with status 403 (URL: <relay>): <body>") and no flashbots.bundle.stats; at HTTP 200 with the same text the bot logs nothing (mutant caught). So with a relay that refuses the signer, today's code logs that warning on every ETH attempt and the src/bot.ts:382 operator text points at logs with no stats (Phase 29 card TX-03).
+- [Phase 23]: 23-05: AUD-BUY-002, -003, -015, -030, -033 and AUD-TX-007 confirmed on the real path (test/realpath/triage/<ID>.test.ts, 11 knownBug claims, each shown to give the D-08 looks-fixed message under a fix-shaped src mutation). AUD-BUY-015 (real QuoterV2 on a thin pool) and AUD-BUY-033 (router keeps unspent ETH, refundETH pays any caller) carry needs_fork with fork questions; 23-16 must add their UFV entries (owner 25) and set fork_ref, and acknowledge the five S1 entries.
+- [Phase 23]: 23-05 register changes under the standing instruction (no stop): AUD-BUY-015, -030, -033 status candidate -> confirmed; AUD-BUY-002 sub-claims 3 (earlier same-nonce attempt lands) and 4 (fanout refusal after the first send) candidate -> confirmed; new AUD-TX-027 (S3, capital none): all three MEV strategies reserve sell gas at the buy's eth_estimateGas gas limit (uncapped), not the chain maxGasLimit their comment names, while the entry gate prices both legs at maxGasLimit. No severity changed. AUDIT-FINDINGS.md re-render also brought four 23-04 re_audit ledger rows current.
+- [Phase 23]: 23-05 for Phase 24: (1) AUD-BUY-030 fix: pin the public send to the private nonce; a re-check of latest through the bot's ethers provider can be answered from ethers' 250 ms identical-request cache and miss the late landing (shown by mutation). (2) The AUD-TX-007 fix (card TX-02) must also settle AUD-TX-027's gas basis: the doubled base fee currently hides the strategies' smaller sell reserve. (3) Triage tests measure the harm (unbounded swap sent, buys landed), so either recommended fix reads looks-fixed; AUD-BUY-033's marker does not see a wrap-only-what-is-consumed fix and must be revisited with that fix.
