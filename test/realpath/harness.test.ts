@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import axios from 'axios';
 import { FetchRequest, Interface, JsonRpcProvider, Network, Transaction, WebSocketProvider, Wallet, ethers, parseEther, parseUnits, getAddress, toQuantity } from 'ethers';
+import { FlashbotsBundleProvider } from '@flashbots/ethers-provider-bundle';
 import { FakeNode, FakeWebSocket, encodeResult, harnessState, installSeams, labelAddress } from './harness/chain';
 import { decodeReceipt } from '../../src/utils/receiptDecoder';
 import { recordedAlerts } from './harness/capture';
@@ -1026,4 +1027,163 @@ describe('scenario builder: every chain and DEX type on its real route (23-28 Ta
             expect(await stepUntil(goplus.goplusLiquidityLockCheck(ctx, pair))).toBe(false);
         });
     }
+});
+
+// ---------------------------------------------------------------------------------------------
+// Plan 23-15 harness gap (Harness Gap Procedure, 23-27-PLAN.md): a relay answer with its own HTTP
+// status and raw body. A real relay can refuse with a non-2xx status (the one AC-15 request got
+// HTTP 403); the Flashbots library throws on any non-2xx (its request() calls assertOk), so a fake
+// that can only answer 200 cannot show what production does on that answer.
+// ---------------------------------------------------------------------------------------------
+
+const RELAY_HTTP = 'https://relay-http.realpath.invalid/';
+/** The body the live relay sent with its 403 (.planning/audit/inputs/aud-tx-006-relay-response.json). */
+const NOT_WHITELISTED = '{"jsonrpc":"2.0","error":{"code":-32601,"message":"rpc method is not whitelisted"},"id":1}\n';
+const STATS_HASH = '0x' + 'ab'.repeat(32);
+
+/** A real FlashbotsBundleProvider on the bare node's relay URL, signing with a fixed test key. */
+async function bareFlashbots(provider: JsonRpcProvider): Promise<FlashbotsBundleProvider> {
+    return stepUntil(FlashbotsBundleProvider.create(provider, new Wallet(ethers.id('realpath.relay-http.auth')), RELAY_HTTP));
+}
+
+/** One JSON-RPC request through a real ethers FetchRequest, as the library's request() sends it. */
+function relayRequest(body: unknown): FetchRequest {
+    const r = new FetchRequest(RELAY_HTTP);
+    r.setHeader('Content-Type', 'application/json');
+    r.body = JSON.stringify(body);
+    return r;
+}
+
+const STATS_CALL = { jsonrpc: '2.0', id: 7, method: 'flashbots_getBundleStatsV2', params: [{ bundleHash: STATS_HASH, blockNumber: '0x1' }] };
+
+describe('simulated relay: an answer with its own HTTP status and raw body (plan 23-15 harness gap)', () => {
+    it('a relay override answering { http: { status, body } } reaches real ethers as that status, status text and exact body, and the real Flashbots library throws on it as on a live 403', async () => {
+        const { node, provider } = bareNode();
+        node.serve({ relay: [RELAY_HTTP] });
+        node.setRelay('flashbots_getBundleStatsV2', () => ({ http: { status: 403, statusMessage: 'Forbidden', body: NOT_WHITELISTED } }));
+
+        const resp = await stepUntil(relayRequest(STATS_CALL).send());
+        expect(resp.statusCode).toBe(403);
+        expect(resp.statusMessage).toBe('Forbidden');
+        expect(resp.bodyText).toBe(NOT_WHITELISTED);
+        expect(resp.headers['content-type']).toBe('application/json');
+        expect(resp.ok()).toBe(false);
+
+        // The real library: getBundleStatsV2 -> request() -> assertOk() throws with the status and body.
+        const fb = await bareFlashbots(provider);
+        const err = await stepUntil(fb.getBundleStatsV2(STATS_HASH, 1)).then(
+            () => null,
+            (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toBe(`Request failed with status 403 (URL: ${RELAY_HTTP}): ${NOT_WHITELISTED}`);
+
+        // Both calls arrived and are on the relay record, as any relay call is.
+        expect(node.relay.map((r) => r.method)).toEqual(['flashbots_getBundleStatsV2', 'flashbots_getBundleStatsV2']);
+        expect(node.relay.every((r) => r.url === RELAY_HTTP)).toBe(true);
+        expect(node.strays).toEqual([]);
+    });
+
+    it('headers given with the answer are sent (names lower-cased); content-type stays application/json unless one is given', async () => {
+        const { node } = bareNode();
+        node.serve({ relay: [RELAY_HTTP] });
+        node.setRelay('flashbots_getBundleStatsV2', () => ({ http: { status: 429, body: 'slow down', headers: { 'Content-Type': 'text/plain', 'Retry-After': '1' } } }));
+        const req = relayRequest(STATS_CALL);
+        // No retry here: real ethers would otherwise retry a 429 (its own throttle rule), which is
+        // ethers behavior, not the harness's.
+        req.retryFunc = async () => false;
+        const resp = await stepUntil(req.send());
+        expect(resp.statusCode).toBe(429);
+        expect(resp.bodyText).toBe('slow down');
+        expect(resp.headers['content-type']).toBe('text/plain');
+        expect(resp.headers['retry-after']).toBe('1');
+        expect(node.strays).toEqual([]);
+    });
+
+    it('control: without an http answer nothing changes: a JSON-RPC error override, the default stats answer and an unknown relay method all go out as HTTP 200, and the library returns the error quietly', async () => {
+        const { node, provider } = bareNode();
+        node.serve({ relay: [RELAY_HTTP] });
+        const fb = await bareFlashbots(provider);
+
+        // Default answer (no override): HTTP 200 with a JSON-RPC result.
+        const plain = await stepUntil(relayRequest(STATS_CALL).send());
+        expect(plain.statusCode).toBe(200);
+        expect(plain.statusMessage).toBe('OK');
+        expect(plain.headers['content-type']).toBe('application/json');
+        expect(plain.bodyJson).toMatchObject({ jsonrpc: '2.0', id: 7 });
+        expect('result' in (plain.bodyJson as object)).toBe(true);
+
+        // The same error text as the live relay's, but as a JSON-RPC error at HTTP 200: the library
+        // does not throw; it returns { error } and the caller sees no failure.
+        node.setRelay('flashbots_getBundleStatsV2', () => ({ error: { code: -32601, message: 'rpc method is not whitelisted' } }));
+        const atOk = await stepUntil(relayRequest(STATS_CALL).send());
+        expect(atOk.statusCode).toBe(200);
+        expect(atOk.bodyJson).toEqual({ jsonrpc: '2.0', id: 7, error: { code: -32601, message: 'rpc method is not whitelisted' } });
+        expect(await stepUntil(fb.getBundleStatsV2(STATS_HASH, 1))).toEqual({ error: { message: 'rpc method is not whitelisted', code: -32601 } });
+
+        // An unknown relay method is still a stray answered at HTTP 200 with -32601.
+        const unknown = await stepUntil(relayRequest({ jsonrpc: '2.0', id: 8, method: 'flashbots_frobnicate', params: [] }).send());
+        expect(unknown.statusCode).toBe(200);
+        expect((unknown.bodyJson as { error?: { code?: number } }).error?.code).toBe(-32601);
+        expect(() => assertNoStrays()).toThrow(/flashbots_frobnicate/);
+        node.strays.length = 0;
+    });
+
+    it('a held relay call answered with an HTTP status is parked until release and then gets that status', async () => {
+        const { node, provider } = bareNode();
+        node.serve({ relay: [RELAY_HTTP] });
+        node.setRelay('flashbots_getBundleStatsV2', () => ({ http: { status: 403, statusMessage: 'Forbidden', body: NOT_WHITELISTED } }));
+        const held = node.hold('flashbots_getBundleStatsV2');
+        const fb = await bareFlashbots(provider);
+
+        let settled: unknown = 'pending';
+        const call = fb.getBundleStatsV2(STATS_HASH, 1).then(
+            (v) => (settled = { value: v }),
+            (e: unknown) => (settled = e),
+        );
+        await stepUntilTrue(() => held.parkedNow === 1, { what: 'the stats call being held' });
+        await stepFor(30_000, 100);
+        expect(settled).toBe('pending');
+
+        held.release();
+        await stepUntil(call);
+        expect(settled).toBeInstanceOf(Error);
+        expect((settled as Error).message).toBe(`Request failed with status 403 (URL: ${RELAY_HTTP}): ${NOT_WHITELISTED}`);
+        expect(held.heldCount).toBe(1);
+        expect(node.strays).toEqual([]);
+    });
+
+    it('an http answer that cannot be sent is a harness error, never a node answer: a status outside 200-599, a body that is not text, one mixed with result, and one inside a JSON-RPC batch each record a stray', async () => {
+        const { node } = bareNode();
+        node.serve({ relay: [RELAY_HTTP] });
+        const bad: unknown[] = [
+            { http: { status: 99, body: 'x' } },
+            { http: { status: 600, body: 'x' } },
+            { http: { status: 403.5, body: 'x' } },
+            { http: { status: 403, body: { not: 'text' } } },
+            { http: { status: 403, body: 'x' }, result: 1 },
+        ];
+        for (const answer of bad) {
+            node.setRelay('flashbots_getBundleStatsV2', () => answer as never);
+            const resp = await stepUntil(relayRequest(STATS_CALL).send());
+            // A harness error answers like the harness's other internal errors: -32603 at HTTP 200.
+            expect(resp.statusCode).toBe(200);
+            expect((resp.bodyJson as { error?: { code?: number } }).error?.code).toBe(-32603);
+        }
+        expect(node.strays).toHaveLength(bad.length);
+        expect(node.strays.every((s) => s.kind === 'method' && /harness error answering flashbots_getBundleStatsV2: .*http answer/.test(s.detail))).toBe(true);
+        node.strays.length = 0;
+
+        // One HTTP response carries one status, so an http answer inside a batch cannot be sent.
+        node.setRelay('flashbots_getBundleStatsV2', () => ({ http: { status: 403, body: NOT_WHITELISTED } }));
+        const batch = await stepUntil(relayRequest([STATS_CALL, { ...STATS_CALL, id: 9 }]).send());
+        expect(batch.statusCode).toBe(200);
+        expect((batch.bodyJson as Array<{ id: unknown; error?: { code?: number } }>).map((r) => [r.id, r.error?.code])).toEqual([
+            [7, -32603],
+            [9, -32603],
+        ]);
+        expect(node.strays).toHaveLength(2);
+        expect(node.strays.every((s) => /inside a JSON-RPC batch/.test(s.detail))).toBe(true);
+        node.strays.length = 0;
+    });
 });

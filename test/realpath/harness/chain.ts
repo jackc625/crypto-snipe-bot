@@ -18,6 +18,10 @@
 //     afterEach (AC-03), because a caller's catch can swallow the returned error.
 //     failNext() and hold() name the exact operation they target (method, selector, target,
 //     stage); one that never fires fails the test in afterEach (assertAllFaultsFired).
+//   - Relay answers go out as HTTP 200 with a JSON-RPC body, unless a setRelay handler returns
+//     `{ http: { status, body } }`: then that status and that raw body are sent as they are (plan
+//     23-15 harness gap: a live relay refuses with a non-2xx status, which the Flashbots library
+//     throws on, and a 200 cannot show that).
 //
 // Transaction state (plan 23-28 Task 1), per account and explicit:
 //   - `latest` counts mined transactions only; `pending` adds the public pool's contiguous run. A
@@ -33,6 +37,7 @@
 
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
+import { STATUS_CODES } from 'node:http';
 import {
     ethers,
     AbiCoder,
@@ -312,6 +317,10 @@ async function fetchHook(request: GetUrlRequest): Promise<GetUrlResponse> {
     }
     const text = request.body ? Buffer.from(request.body).toString('utf8') : '';
     const reply = await node.handle(text, undefined, { endpoint, url });
+    // A relay handler's http answer: its own status, headers and raw body (plan 23-15 harness gap).
+    if (isRelayHttpReply(reply)) {
+        return { statusCode: reply.status, statusMessage: reply.statusMessage, headers: { ...reply.headers }, body: Buffer.from(reply.body, 'utf8') };
+    }
     return jsonResponse(reply);
 }
 
@@ -612,7 +621,63 @@ interface JsonRpcError {
 
 type Outcome = { result: unknown } | { error: JsonRpcError };
 
-export type RelayHandler = (params: unknown, entry: RelayEntry) => Outcome | Promise<Outcome>;
+/**
+ * A relay answer sent as its own HTTP response instead of a JSON-RPC envelope at HTTP 200 (plan
+ * 23-15 harness gap). `status` is an integer from 200 to 599; `body` is the raw response text,
+ * sent byte for byte (it is not parsed, and its JSON-RPC `id` is not matched to the request, so a
+ * recorded live response replays exactly); `statusMessage` defaults to the standard reason phrase;
+ * `headers` are added to `content-type: application/json` (names lower-cased; a given content-type
+ * replaces the default). Only a setRelay handler can return one. One HTTP response carries one
+ * status, so an http answer inside a JSON-RPC batch is a harness error (a stray), as is an
+ * invalid one, never a node answer.
+ */
+export interface RelayHttpAnswer {
+    http: { status: number; statusMessage?: string; body: string; headers?: Record<string, string> };
+}
+
+export type RelayHandler = (params: unknown, entry: RelayEntry) => Outcome | RelayHttpAnswer | Promise<Outcome | RelayHttpAnswer>;
+
+/**
+ * What FakeNode.handle() returns for a relay http answer, in place of a JSON-RPC envelope; the
+ * HTTP seam (fetchHook) sends it as it is. Branded with a registry symbol, not a class, so the
+ * check holds across the module copies vi.resetModules() creates (see harnessState).
+ */
+const RELAY_HTTP_REPLY = Symbol.for('csb.realpath.relayHttpReply');
+
+export interface RelayHttpReply {
+    readonly [RELAY_HTTP_REPLY]: true;
+    readonly status: number;
+    readonly statusMessage: string;
+    readonly headers: Readonly<Record<string, string>>;
+    readonly body: string;
+}
+
+export function isRelayHttpReply(x: unknown): x is RelayHttpReply {
+    return typeof x === 'object' && x !== null && (x as Record<symbol, unknown>)[RELAY_HTTP_REPLY] === true;
+}
+
+function isRelayHttpAnswer(x: unknown): x is RelayHttpAnswer {
+    return typeof x === 'object' && x !== null && 'http' in x;
+}
+
+/** Check a handler's http answer and build the reply; throws ("relay http answer: ...") if invalid. */
+function toRelayHttpReply(answer: RelayHttpAnswer): RelayHttpReply {
+    if ('result' in answer || 'error' in answer) throw new Error('relay http answer: an http answer cannot also carry result or error');
+    const h = answer.http as Partial<RelayHttpAnswer['http']> | null | undefined;
+    if (typeof h !== 'object' || h === null) throw new Error(`relay http answer: http must be an object, got ${String(h)}`);
+    const { status, body, statusMessage, headers } = h;
+    if (typeof status !== 'number' || !Number.isInteger(status) || status < 200 || status > 599) {
+        throw new Error(`relay http answer: status must be an integer from 200 to 599, got ${String(status)}`);
+    }
+    if (typeof body !== 'string') throw new Error(`relay http answer: body must be the raw response text (a string), got ${typeof body}`);
+    if (statusMessage !== undefined && typeof statusMessage !== 'string') throw new Error(`relay http answer: statusMessage must be a string, got ${typeof statusMessage}`);
+    const out: Record<string, string> = { 'content-type': 'application/json' };
+    for (const [k, v] of Object.entries(headers ?? {})) {
+        if (typeof v !== 'string') throw new Error(`relay http answer: header ${k} must be a string, got ${typeof v}`);
+        out[k.toLowerCase()] = v;
+    }
+    return Object.freeze({ [RELAY_HTTP_REPLY]: true as const, status, statusMessage: statusMessage ?? STATUS_CODES[status] ?? '', headers: Object.freeze(out), body });
+}
 
 const ZERO_HASH = '0x' + '00'.repeat(32);
 const MINER = '0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5';
@@ -734,7 +799,11 @@ export class FakeNode {
         this.#reads.set(`${lc(address)}|${fragment.selector}`, { fragment, result });
     }
 
-    /** Override the response of a relay method such as eth_callBundle. */
+    /**
+     * Override the response of a relay method such as eth_callBundle. The handler returns a
+     * JSON-RPC `{ result }` or `{ error }`, sent at HTTP 200, or `{ http: { status, body } }`, sent
+     * as that HTTP status with that raw body (RelayHttpAnswer).
+     */
     setRelay(method: string, handler: RelayHandler): void {
         this.#relayOverrides.set(method, handler);
     }
@@ -1295,7 +1364,9 @@ export class FakeNode {
     /**
      * The one entry point for every JSON-RPC call (HTTP, WebSocket and relay). `body` is one
      * request or a batch (object, array or JSON text); `connection` is the server-side end a
-     * subscription delivers through (FakeWebSocket passes its own; HTTP leaves it out).
+     * subscription delivers through (FakeWebSocket passes its own; HTTP leaves it out). For a
+     * single relay call whose setRelay handler returns an http answer, it returns that
+     * RelayHttpReply (isRelayHttpReply) instead of a JSON-RPC envelope.
      */
     async handle(body: unknown, connection?: Connection, via: Via = { endpoint: 'rpc', url: '' }): Promise<unknown> {
         let parsed: unknown = body;
@@ -1310,6 +1381,14 @@ export class FakeNode {
             const out: unknown[] = [];
             for (const r of parsed) {
                 const one = await this.#one(r as JsonRpcRequest, connection, via);
+                if (isRelayHttpReply(one)) {
+                    // One HTTP response carries one status: a harness error, never a node answer.
+                    const rq = r as JsonRpcRequest;
+                    const m = typeof rq?.method === 'string' ? rq.method : '';
+                    this.strays.push({ seq: nextSeq(), kind: 'method', method: m, detail: `harness error answering ${m}: a relay http answer cannot be sent inside a JSON-RPC batch (one HTTP response carries one status)` });
+                    out.push({ jsonrpc: '2.0', id: rq?.id ?? null, error: { code: -32603, message: 'internal error' } });
+                    continue;
+                }
                 if (one !== undefined) out.push(one);
             }
             return out;
@@ -1329,6 +1408,7 @@ export class FakeNode {
             harnessState().timeline?.record({ kind: 'relay', relay: 'flashbots', url: via.url, method, params });
         }
         let outcome: Outcome;
+        let httpReply: RelayHttpReply | undefined;
         try {
             const op: Operation = { method, params, to: targetOf(method, params), selector: entry.selector };
             // A fault answers at once; a hold parks the call until released (or torn down).
@@ -1337,13 +1417,24 @@ export class FakeNode {
             const parked = hold ? await hold.park() : undefined;
             if (fault) outcome = { error: fault.error };
             else if (parked) outcome = { error: parked };
-            else outcome = await this.#dispatch(method, params, connection, via, entry, relayEntry);
+            else {
+                const answered = await this.#dispatch(method, params, connection, via, entry, relayEntry);
+                // A setRelay handler's http answer (plan 23-15 harness gap); checked here, so an
+                // invalid one lands in the catch below as a harness error.
+                if (isRelayHttpAnswer(answered)) {
+                    httpReply = toRelayHttpReply(answered);
+                    outcome = { result: undefined };
+                } else outcome = answered;
+            }
         } catch (e) {
             // A harness bug must not look like a node answer: fail loudly in afterEach as well.
             const detail = `harness error answering ${method}: ${e instanceof Error ? e.message : String(e)}`;
             this.strays.push({ seq: nextSeq(), kind: 'method', method, detail });
             outcome = { error: { code: -32603, message: 'internal error' } };
+            httpReply = undefined;
         }
+        // An http answer is a whole HTTP response, sent whatever the request id.
+        if (httpReply) return httpReply;
         if (r?.id === undefined) return undefined;
         return 'error' in outcome ? { jsonrpc: '2.0', id, error: outcome.error } : { jsonrpc: '2.0', id, result: outcome.result };
     }
@@ -1379,7 +1470,7 @@ export class FakeNode {
         return entry;
     }
 
-    async #dispatch(method: string, params: unknown, connection: Connection | undefined, via: Via, entry: CallLogEntry, relayEntry?: RelayEntry): Promise<Outcome> {
+    async #dispatch(method: string, params: unknown, connection: Connection | undefined, via: Via, entry: CallLogEntry, relayEntry?: RelayEntry): Promise<Outcome | RelayHttpAnswer> {
         if (via.endpoint === 'relay') return this.#relayMethod(method, params, relayEntry ?? { seq: nextSeq(), method, params, url: via.url });
         const p = (Array.isArray(params) ? params : []) as unknown[];
         switch (method) {
@@ -1666,7 +1757,7 @@ export class FakeNode {
     // -- relay (Flashbots JSON-RPC) ----------------------------------------------------------
 
     /** `entry` is already on `relay` (recorded on arrival, before any hold or fault). */
-    async #relayMethod(method: string, params: unknown, entry: RelayEntry): Promise<Outcome> {
+    async #relayMethod(method: string, params: unknown, entry: RelayEntry): Promise<Outcome | RelayHttpAnswer> {
         const override = this.#relayOverrides.get(method);
         if (override) return override(params, entry);
         const p0 = (Array.isArray(params) ? params[0] : undefined) as Record<string, unknown> | undefined;
