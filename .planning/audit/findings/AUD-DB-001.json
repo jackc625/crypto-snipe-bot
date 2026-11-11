@@ -339,5 +339,11 @@
     "logger.ts:7 LOG_LEVEL",
     "config.ts:260 NETWORK",
     "chainRegistry.ts:647 ENABLED_CHAINS"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path (AUD-DB-001.test.ts, five claims, one per variable): for MAX_OPEN_POSITIONS, MAX_TOTAL_EXPOSURE, DAILY_LOSS_PCT, SNIPE_COOLDOWN_MS and MAX_POSITION_SIZE a state built by the real buy/sell paths (or the real recordSnipe) trips only that rule; after a whole-graph reload on the same temp database the valid limit makes the real canSnipe refuse with that rule's own reason and details, and the value abc loads and is allowed outright; MAX_OPEN_POSITIONS only: the boot preflight checkWalletBalance refuses abc (asserted), so the running bot is fail-closed for that one variable while the risk gate itself is not; the per-chain <PREFIX>_MAX_CAPITAL sub-claim stays code-read",
+    "test_id": "AUD-DB-001"
+  }
 }
