@@ -812,3 +812,153 @@ describe('simulated node: fees, logs and receipts (23-28 Task 2, AC-48)', () => 
         expect(() => node.setReceiptLogs({ selector: 'nope' }, () => [])).toThrow(/not a 4-byte selector/);
     });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Plan 23-28 Task 3: every chain and DEX type through createScenario, each on its real route.
+// ---------------------------------------------------------------------------------------------
+
+const V2_ROUTER = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
+const V3_ROUTER = new Interface([
+    'function multicall(uint256 deadline, bytes[] data) payable returns (bytes[] results)',
+    'function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params) payable returns (uint256 amountOut)',
+]);
+const CHECKER = new Interface(['function checkV2(address router, address token, uint256 amountIn)', 'function checkV3(address router, address quoter, address token, uint256 amountIn, uint24 fee)']);
+
+type TradeRow = { status: string; action: string; token: string; chain: string; tx_hash: string; pool_type: string; fee_tier: number | null; dex_name: string };
+
+/** Wait until the buy's position is armed: trades row, exit monitor, anti-rug subscription, block cursor. */
+async function armed(sc: Scenario): Promise<TradeRow> {
+    const { node, graph } = sc;
+    const row = (): TradeRow | undefined => graph.db.prepare('SELECT status, action, token, chain, tx_hash, pool_type, fee_tier, dex_name FROM trades').get() as TradeRow | undefined;
+    await stepUntilTrue(() => row() !== undefined, { what: `the ${sc.chain} trades row for the buy`, maxSteps: 20_000 });
+    const cursor = (): number | undefined => (graph.db.prepare('SELECT last_seen_block AS b FROM chain_state WHERE chain = ?').get(sc.chain) as { b: number } | undefined)?.b;
+    await stepUntilTrue(
+        () =>
+            opLogged('exit.monitor.started') &&
+            node.subscriptions.some((s) => s.kind === 'logs' && JSON.stringify(s.filter).toLowerCase().includes(sc.pair.toLowerCase())) &&
+            cursor() === node.head,
+        { what: `the ${sc.chain} position being armed (exit monitor, anti-rug subscription, block cursor)` },
+    );
+    return row()!;
+}
+
+/** The checker reads the safety path made (proves the honeypot gate actually ran on this chain). */
+function checkerReads(sc: Scenario, fn: 'checkV2' | 'checkV3'): Array<{ args: ethers.Result }> {
+    const selector = CHECKER.getFunction(fn)!.selector;
+    return sc.node.callLog
+        .filter((c) => c.method === 'eth_call' && c.to === sc.checker.toLowerCase() && c.selector === selector)
+        .map((c) => ({ args: CHECKER.decodeFunctionData(fn, c.data!) }));
+}
+
+describe('scenario builder: every chain and DEX type on its real route (23-28 Task 3)', () => {
+    it('route bundle: an ETH V3 buy from a real PoolCreated, with the same-block Mint found through eth_getLogs, decodes as SwapRouter02 multicall(exactInputSingle)', async () => {
+        const sc = await createScenario({ chain: 'eth', dexType: 'v3' });
+        const { node, ctx, dex, token, weth, wallet } = sc;
+        await listen(sc);
+        const launch = await sc.fireNewPool();
+        expect(launch.poolCreated.address).toBe(dex.factoryAddress.toLowerCase());
+        expect(launch.mint.address).toBe(sc.pair.toLowerCase());
+
+        await stepUntilTrue(() => node.submitted.length === 1, { what: 'the bot submitting its V3 buy bundle' });
+        const buy = node.submitted[0];
+        expect(buy.route).toBe('bundle');
+        // waitForLiquidity found the Mint in the PoolCreated block through a real eth_getLogs.
+        const mintQuery = node.callLog.find((c) => c.method === 'eth_getLogs' && JSON.stringify(c.params).toLowerCase().includes(sc.pair.toLowerCase()));
+        expect(mintQuery).toBeDefined();
+        expect(harnessState().logs.some((l) => l.msg === 'Mint found in same block as PoolCreated')).toBe(true);
+        expect(checkerReads(sc, 'checkV3').length).toBeGreaterThan(0);
+        expect(checkerReads(sc, 'checkV3').every((r) => getAddress(r.args.token as string) === getAddress(token) && Number(r.args.fee) === 3000)).toBe(true);
+
+        await stepFor(12_000);
+        expect(node.mine({ include: [buy.hash] })).toBe(launch.block + 1);
+        const row = await armed(sc);
+
+        const tx = Transaction.from(buy.raw);
+        expect(getAddress(tx.to!)).toBe(getAddress(dex.swapRouterAddress));
+        expect(tx.chainId).toBe(1n);
+        expect(tx.value).toBe(parseEther(ctx.chain.snipeAmount));
+        const outer = V3_ROUTER.parseTransaction({ data: tx.data, value: tx.value });
+        expect(outer?.name).toBe('multicall');
+        const inner = V3_ROUTER.parseTransaction({ data: (outer!.args[1] as string[])[0], value: tx.value });
+        expect(inner?.name).toBe('exactInputSingle');
+        const p = inner!.args[0] as unknown as { tokenIn: string; tokenOut: string; fee: bigint; recipient: string; amountIn: bigint };
+        expect([getAddress(p.tokenIn), getAddress(p.tokenOut), Number(p.fee), getAddress(p.recipient), p.amountIn]).toEqual([getAddress(weth), getAddress(token), 3000, getAddress(wallet.address), parseEther(ctx.chain.snipeAmount)]);
+        expect(row).toMatchObject({ status: 'pending', action: 'buy', chain: 'eth', tx_hash: buy.hash, pool_type: 'v3', fee_tier: 3000, dex_name: 'uniswap-v3' });
+    });
+
+    it('route bloxroute: a bsc V2 buy goes to bloXroute as a type-0 chain-56 transaction, the scenario checker ran, and only mine() includes it', async () => {
+        const sc = await createScenario({ chain: 'bsc', dexType: 'v2' });
+        const { node, ctx, dex, token, weth, wallet } = sc;
+        expect(process.env.BSC_HONEYPOT_CHECKER_ADDRESS).toBe(sc.checker);
+        expect(ctx.chain.honeypotChecker.deployedAddress).toBe(sc.checker);
+        await listen(sc);
+        const launch = await sc.fireNewPair();
+
+        await stepUntilTrue(() => node.submitted.length === 1, { what: 'the bot relaying its buy to bloXroute' });
+        const buy = node.submitted[0];
+        expect(buy.route).toBe('bloxroute');
+        expect(node.minedCount(wallet.address)).toBe(0);
+        const relayed = harnessState().httpLog.filter((h) => h.method === 'post' && h.url === ctx.chain.mevConfig.endpoint);
+        expect(relayed.map((h) => (h.data as { method?: string }).method)).toContain('bsc_private_tx');
+        const checks = checkerReads(sc, 'checkV2');
+        expect(checks.length).toBeGreaterThan(0);
+        expect(checks.every((r) => getAddress(r.args.token as string) === getAddress(token) && getAddress(r.args.router as string) === getAddress(dex.routerAddress))).toBe(true);
+        // The Mudra lock answer was asked for this pair.
+        expect(harnessState().httpLog.some((h) => h.url.toLowerCase() === `https://api.mudra.website/api/v1/locker/pair/${sc.pair.toLowerCase()}`)).toBe(true);
+
+        // Virtual time alone does not land it.
+        await stepFor(8_000);
+        expect(node.isMined(buy.hash)).toBe(false);
+        node.mine({ include: [buy.hash] });
+        expect(node.head).toBeGreaterThan(launch.block);
+        const row = await armed(sc);
+
+        const tx = Transaction.from(buy.raw);
+        expect(tx.type).toBe(0);
+        expect(tx.chainId).toBe(56n);
+        expect(tx.gasPrice).toBeGreaterThan(0n);
+        expect(getAddress(tx.to!)).toBe(getAddress(dex.routerAddress));
+        expect(tx.value).toBe(parseEther(ctx.chain.snipeAmount));
+        const call = V2_ROUTER.parseTransaction({ data: tx.data, value: tx.value });
+        expect(call?.name).toBe('swapExactETHForTokens');
+        expect((call!.args[1] as string[]).map((a) => getAddress(a))).toEqual([getAddress(weth), getAddress(token)]);
+        expect(row).toMatchObject({ status: 'pending', action: 'buy', chain: 'bsc', tx_hash: buy.hash, pool_type: 'v2', dex_name: 'pancakeswap-v2' });
+    });
+
+    for (const [chain, chainId] of [['base', 8453n], ['arb', 42161n]] as const) {
+        it(`route public: a ${chain} V3 buy goes through eth_sendRawTransaction, the scenario checker ran, and tx.wait(3) needs three blocks`, async () => {
+            const sc = await createScenario({ chain, dexType: 'v3' });
+            const { node, ctx, dex, token, weth, wallet } = sc;
+            expect(ctx.chain.mevStrategy).toBe('passthrough');
+            expect(process.env[`${chain.toUpperCase()}_HONEYPOT_CHECKER_ADDRESS`]).toBe(sc.checker);
+            await listen(sc);
+            const launch = await sc.fireNewPool();
+            await stepUntilTrue(() => node.submitted.length === 1, { what: `the bot sending its ${chain} V3 buy publicly` });
+            const buy = node.submitted[0];
+            expect(buy.route).toBe('public');
+            expect(node.statusOf(buy.hash)).toBe('accepted');
+            const checks = checkerReads(sc, 'checkV3');
+            expect(checks.length).toBeGreaterThan(0);
+            expect(checks.every((r) => getAddress(r.args.token as string) === getAddress(token) && getAddress(r.args.router as string) === getAddress(dex.swapRouterAddress))).toBe(true);
+            // Accepted is not mined: no trades row until the receipt has three confirmations.
+            expect(node.mine()).toBe(launch.block + 1);
+            expect(node.isMined(buy.hash)).toBe(true);
+            await stepFor(8_000);
+            expect(sc.graph.db.prepare('SELECT 1 FROM trades').get()).toBeUndefined();
+            node.mine();
+            node.mine();
+            const row = await armed(sc);
+            const tx = Transaction.from(buy.raw);
+            expect(tx.chainId).toBe(chainId);
+            expect(tx.type).toBe(2);
+            expect(getAddress(tx.to!)).toBe(getAddress(dex.swapRouterAddress));
+            expect(tx.value).toBe(parseEther(ctx.chain.snipeAmount));
+            const outer = V3_ROUTER.parseTransaction({ data: tx.data, value: tx.value });
+            const inner = V3_ROUTER.parseTransaction({ data: (outer!.args[1] as string[])[0], value: tx.value });
+            expect(inner?.name).toBe('exactInputSingle');
+            const p = inner!.args[0] as unknown as { tokenIn: string; tokenOut: string; recipient: string };
+            expect([getAddress(p.tokenIn), getAddress(p.tokenOut), getAddress(p.recipient)]).toEqual([getAddress(weth), getAddress(token), getAddress(wallet.address)]);
+            expect(row).toMatchObject({ status: 'pending', action: 'buy', chain, tx_hash: buy.hash, pool_type: 'v3', fee_tier: 3000, dex_name: 'uniswap-v3' });
+        });
+    }
+});
