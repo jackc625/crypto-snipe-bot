@@ -96,6 +96,7 @@ describe('AC-24 schema version guard', () => {
 });
 
 describe('AC-26 refuse-to-create outside Vitest', () => {
+    // closes-finding: AUD-DB-007 (rail test, RED proof row 12 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md)
     it('a missing path refuses, names the absolute path and creates nothing', { timeout: CHILD_TIMEOUT }, () => {
         const dir = tempDir();
         const p = path.join(dir, 'missing.db');
