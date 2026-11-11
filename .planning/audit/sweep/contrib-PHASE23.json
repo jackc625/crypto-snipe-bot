@@ -56,6 +56,14 @@
         "AUD-TX-029"
       ],
       "search": "23-09 real-path AUD-TX-029 proof (a real ETH V2 snipe whose four private attempts are never included, every attempt's maxPriorityFeePerGas decoded with real ethers) and the warn/error lines of the AUD-TX-003 run, plus a read of every throw of the escalation loop in src/utils/mevStrategies/reconciliation.ts and of every emitter of op mev.escalation.ceiling-hit (git grep -n \"ceiling-hit\" -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-036"
+      ],
+      "search": "23-10 real-path AUD-BUY-036 proof (an ETH chain without a WebSocket URL, the real HTTP DEX poller, a provider refusing eth_getLogs wider than 10 blocks, a 12-block eth_blockNumber outage while the bot runs) found while proving AUD-ANTIRUG-018, plus a read of every eth_getLogs and queryFilter caller in src (git grep -n -e \"queryFilter(\" -e \"getLogs(\" -- src) at 23a6461 and HEAD"
     }
   ]
 }

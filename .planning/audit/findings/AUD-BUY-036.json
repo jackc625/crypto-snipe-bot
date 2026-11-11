@@ -1,0 +1,79 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-018",
+    "AUD-BUY-004",
+    "AUD-BUY-011",
+    "AUD-BUY-005"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23",
+    "external-only"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-10 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-BUY-036",
+  "title": "The HTTP DEX poller (a chain without a WebSocket URL) asks for its whole outstanding range in one eth_getLogs, so after an RPC outage longer than the provider log-range limit every poll is refused and the listener stays blind to new pairs until the bot restarts, with only an \"HTTP polling error\" log line",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1632@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startHttpPollingListener seeds lastBlock with getBlockNumber() when it starts (V2); the V3 poller the same at :1656"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1641@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "dexFactory.queryFilter('PairCreated', lastBlock + 1, currentBlock): the whole outstanding range in one request, unchunked (V3 :1665 the same for PoolCreated)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1647-1650@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "lastBlock advances only after a successful poll; a failed tick only logs \"HTTP polling error\" (V3 :1672-1675, \"V3 HTTP polling error\"), so the next tick asks for the same, wider range"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:223-230@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the repo assumes a 10-block eth_getLogs range on ETH (\"Alchemy free-tier safe\"; backfillCapBlocks 10, 500 elsewhere), and the chunked getLogsForBackfill exists in src/anti-rug/detector.ts, but the DEX pollers use neither"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1627-1654@05c166529fe736ecfbf21c0407acf74db82e6f14",
+      "note": "same code at the Phase 23 HEAD (src unchanged in Phase 23): seed :1634, query :1643, advance :1649, error log :1651; V3 :1656-1679"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-BUY-036.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "real path: an ETH chain without a WebSocket URL, the real HTTP DEX poller, a provider refusing eth_getLogs wider than 10 blocks (fixtures/AUD-ANTIRUG-018-range-limit.ts); a 12-block outage of eth_blockNumber while the bot runs, then every factory query asks pre-outage+1..head in one request and is refused, and a launch mined after the outage is never found within 60 s of fake time; a poller catching up in backfillCapBlocks windows reads looks fixed"
+    }
+  ],
+  "sibling_sites_checked": "Every eth_getLogs / queryFilter caller in src at 23a6461 and HEAD (git grep -n -e \"queryFilter(\" -e \"getLogs(\" -- src): the V2 and V3 HTTP DEX pollers (this entry, src/bot.ts), the anti-rug HTTP poller (AUD-ANTIRUG-018, same unchunked shape but resumed from the stored block, so a restart does not clear it), the anti-rug backfill (chunked through getLogsForBackfill, correct), and the V3 Mint wait. Unlike AUD-ANTIRUG-018 a restart clears this one, because the DEX pollers seed at the head on start, and every launch inside the gap is lost. Overlapping ticks of the same poller (no in-flight guard) are AUD-BUY-004; Stop not stopping the HTTP poller is AUD-BUY-011; an RPC rejection of the first getBlockNumber at start is AUD-BUY-005.",
+  "status": "confirmed",
+  "severity_rationale": "S3, capital none, graded by the 23-10 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. No funds are lost, stranded or overspent: held positions keep their exit monitor and anti-rug (which have their own paths), and a blind listener only stops new buys. The harm is operational and silent: on a chain without a WebSocket URL, after an RPC outage longer than the provider range limit (about 2 minutes on ETH at 10 blocks; a limit of 500 elsewhere is about 17 minutes on Base), the bot stops seeing launches on that chain until a restart, while the dashboard shows the chain running and the only signal is a repeating error log line. Exposure is unknown: the operator does not know whether any chain runs without a WebSocket URL (ESC-ANTIRUG-03, \"Not sure\"). Graded below AUD-ANTIRUG-018 (S1 STRAND) because no held position loses protection.",
+  "recommendation": "Catch up in provider-sized windows (at most the chain's backfillCapBlocks per request, the same chunking as getLogsForBackfill) and advance lastBlock per window; bound how far a catch-up may go back and alert when a gap is skipped; surface a failing poll as a chain health change instead of a log line. Fix together with AUD-ANTIRUG-018 (one shared chunked poll helper) in Phase 24 or Phase 29.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Found by 23-10 while proving AUD-ANTIRUG-018 (the same unchunked eth_getLogs range in the DEX pollers). Proven on the real path: an ETH chain without a WebSocket URL, the real HTTP DEX poller, a provider refusing eth_getLogs wider than 10 blocks (Alchemy free tier; fixtures/AUD-ANTIRUG-018-range-limit.ts); the control finds a launch with the RPC healthy; after a 12-block eth_blockNumber outage while the bot runs, every factory query asks pre-outage+1..head in one request and is refused, and a launch mined afterwards is never found within 60 s of fake time (claim outage-blinds-http-dex-poller). A poller catching up in backfillCapBlocks windows reads looks fixed. Not in the frozen 61; recorded so check.ts can locate its claim.",
+    "test_id": "AUD-BUY-036"
+  }
+}
