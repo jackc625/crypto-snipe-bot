@@ -64,5 +64,11 @@
   "recommendation": "Require a minimum locked share of total LP supply (a number to decide in card BUY-05, with its AC-37 threshold row at that point). Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-BUY-11"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path: ordinary V2 launches with the lock API answering, in the provider's own shape, an active lock of 1 percent of the pair's LP supply: ETH Unicrypt (claim unicrypt-one-percent-lock-passes) and BSC Mudra (claim mudra-one-percent-lock-passes) both pass and the bot buys; requiring locks to cover half the LP reads looks fixed per provider and still buys fully locked pairs (harness.test.ts 34/34); the GoPlus site (holder.percent unread) is unreachable on base/arb today because AUD-BUY-016 skips every V2 launch first",
+    "test_id": "AUD-BUY-028"
+  }
 }

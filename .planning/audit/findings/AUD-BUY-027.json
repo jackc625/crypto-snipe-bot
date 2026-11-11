@@ -65,5 +65,11 @@
   "recommendation": "Require that exactly one side of the pair is the chain wrapped-native token before any check runs, and drop the event otherwise. Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-BUY-10"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path: a real addLiquidity(A, B) with its PairCreated (A/B pair at its CREATE2 address, 2 B, LP 95 percent burned) through the real listener: the bot processes it as a snipe, reads B's reserve as 2.0 ETH of liquidity, passes the Unicrypt-404 burn fallback, buys A through WETH (a pool no check read) and arms anti-rug on the A/B pair (claim non-native-pair-checked-and-bought); dropping non-native pairs reads looks fixed",
+    "test_id": "AUD-BUY-027"
+  }
 }
