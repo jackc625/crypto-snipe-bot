@@ -19,11 +19,17 @@
 //     failNext() and hold() name the exact operation they target (method, selector, target,
 //     stage); one that never fires fails the test in afterEach (assertAllFaultsFired).
 //
-// The count at `latest` moves only when a transaction is mined. A relay acceptance changes no
-// count and a receipt is a valid null until mine() includes that hash (review HIGH on 23-01:
-// production stops retrying once `latest` moves, src/utils/mevStrategies/reconciliation.ts:478).
-// Plan 23-28 adds the public route's nonce and chain ID rules, fee schedules, receipt logs and
-// replacements on this base.
+// Transaction state (plan 23-28 Task 1), per account and explicit:
+//   - `latest` counts mined transactions only; `pending` adds the public pool's contiguous run. A
+//     relay acceptance (bundle, bloXroute) changes no count and a receipt is a valid null until
+//     mine() includes that hash (review HIGH on 23-01: production stops retrying once `latest`
+//     moves, src/utils/mevStrategies/reconciliation.ts:478).
+//   - eth_sendRawTransaction admits with a geth node's checks and text: chain ID, nonce too low,
+//     intrinsic gas, funds, the 10 percent same-nonce replacement bump, and a future nonce that
+//     is queued (or refused with `nonce too high` under setFutureNoncePolicy('reject')).
+//   - mine() takes named hashes or the includable public pool; another transaction at a nonce it
+//     consumes is dropped; neverMine() and `exclude` keep hashes out. Every transition is in
+//     `history`, in order.
 
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
@@ -451,14 +457,29 @@ export interface CallLogEntry {
     blockTag: unknown;
 }
 
+/** How a transaction reached the node: the public pool, a relay, or a harness-made other actor. */
+export type TxRoute = 'public' | 'bundle' | 'bloxroute' | 'foreign';
+
+/**
+ * Where a transaction is now. `accepted` is pending (public pool, next nonce in line) or held by a
+ * relay; `queued` is a public future nonce waiting for its gap to fill; `replaced` lost its pool
+ * slot to a same-nonce transaction paying the bump; `dropped` lost its nonce to another
+ * transaction that was mined; `mined` is in a block.
+ */
+export type TxStatus = 'accepted' | 'queued' | 'replaced' | 'dropped' | 'mined';
+
 export interface HistoryEvent {
     seq: number;
-    event: 'accepted' | 'mined';
+    /** `queued` and `promoted` belong to the public pool's future-nonce queue. */
+    event: 'accepted' | 'queued' | 'promoted' | 'replaced' | 'dropped' | 'mined';
     hash: string;
     from: string;
     nonce: number;
-    route: string;
+    route: TxRoute;
+    /** Target block for a bundle, the earliest block for a pool transaction, the block for `mined`. */
     block: number;
+    /** For `replaced`, the replacement; for `dropped`, the transaction mined at this nonce. */
+    by?: string;
 }
 
 export interface Subscription {
@@ -468,12 +489,14 @@ export interface Subscription {
     connection: Connection;
 }
 
+/** A transaction the code under test sent: through the public RPC, a bundle, or bloXroute. */
 export interface Submitted {
     raw: string;
     hash: string;
     tx: Transaction;
-    route: 'bundle';
-    status: 'accepted' | 'mined';
+    route: Exclude<TxRoute, 'foreign'>;
+    status: TxStatus;
+    /** Bundle target blocks (empty for the public pool and bloXroute, which name no block). */
     targetBlocks: number[];
     block: number | null;
 }
@@ -510,15 +533,20 @@ interface BlockRecord {
 }
 
 interface KnownTx {
+    /** Arrival order, so the default block fills the pool first come, first served. */
+    seq: number;
     raw: string;
     hash: string;
     tx: Transaction;
     from: string;
-    route: string;
-    status: 'accepted' | 'mined';
+    route: TxRoute;
+    status: TxStatus;
     block: number | null;
     index: number | null;
 }
+
+/** Refused by the node: the JSON-RPC error a real node returns for this transaction. */
+type Refusal = { error: JsonRpcError };
 
 interface Receipt {
     hash: string;
@@ -597,6 +625,10 @@ export class FakeNode {
     readonly #txs = new Map<string, KnownTx>();
     readonly #receipts = new Map<string, Receipt>();
     readonly #sockets = new Set<FakeWebSocket>();
+    readonly #neverMine = new Set<string>();
+    #futureNoncePolicy: 'queue' | 'reject' = 'queue';
+    /** A chain with no EIP-1559 fields (setFees({ legacy: true })). */
+    #legacy = false;
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
@@ -712,14 +744,31 @@ export class FakeNode {
 
     // -- transactions from other actors ------------------------------------------------------
 
-    /** A signed transaction from an actor other than the bot, waiting in the public pool. */
+    /**
+     * A signed transaction from an actor other than the bot, entering the public pool. It passes
+     * the same admission rules as eth_sendRawTransaction; a refusal throws with the node's text,
+     * because a scenario that builds an impossible foreign transaction is a harness mistake.
+     */
     addForeignTransaction(raw: string): string {
+        const r = this.#admitPublic(raw, 'foreign');
+        if ('error' in r) throw new Error(`addForeignTransaction: the node refused it: ${r.error.message}`);
+        return r.hash;
+    }
+
+    /**
+     * Record a relay acceptance (bloXroute's bsc_private_tx; eth_sendBundle records its own). It
+     * changes no count: only mine({ include }) can put it in a block. Returns the real hash.
+     */
+    acceptRelayTransaction(raw: string, route: 'bloxroute'): string {
         const tx = Transaction.from(raw);
-        if (!tx.from || !tx.hash) throw new Error('addForeignTransaction: the transaction is not signed');
-        const known: KnownTx = { raw, hash: tx.hash, tx, from: tx.from, route: 'foreign', status: 'accepted', block: null, index: null };
-        this.#txs.set(tx.hash, known);
-        this.foreign.push(known);
-        this.history.push({ seq: nextSeq(), event: 'accepted', hash: tx.hash, from: tx.from, nonce: tx.nonce, route: 'foreign', block: this.#head.number + 1 });
+        if (!tx.from || !tx.hash) throw new Error(`acceptRelayTransaction: the ${route} transaction is not signed`);
+        let sub = this.submitted.find((s) => s.hash === tx.hash);
+        if (!sub) {
+            sub = { raw, hash: tx.hash, tx, route, status: 'accepted', targetBlocks: [], block: null };
+            this.submitted.push(sub);
+            if (!this.#txs.has(tx.hash)) this.#txs.set(tx.hash, { seq: nextSeq(), raw, hash: tx.hash, tx, from: tx.from, route, status: 'accepted', block: null, index: null });
+            this.history.push({ seq: nextSeq(), event: 'accepted', hash: tx.hash, from: tx.from, nonce: tx.nonce, route, block: this.#head.number + 1 });
+        }
         return tx.hash;
     }
 
@@ -728,59 +777,242 @@ export class FakeNode {
         return this.#receipts.has(hash);
     }
 
+    /** Where `hash` is now (undefined when this node never accepted it). */
+    statusOf(hash: string): TxStatus | undefined {
+        return this.#txs.get(hash)?.status;
+    }
+
+    /** Transactions from `address` mined at or before `atBlock`: the count at that block. */
     minedCount(address: string, atBlock = this.#head.number): number {
         let n = 0;
         for (const t of this.#txs.values()) if (t.status === 'mined' && t.block !== null && t.block <= atBlock && lc(t.from) === lc(address)) n += 1;
         return n;
     }
 
+    /** The count at `pending`: mined, plus the public pool's contiguous run from the next nonce. */
+    pendingCount(address: string): number {
+        let n = this.minedCount(address);
+        const pool = this.#poolOf(address).filter((t) => t.status === 'accepted');
+        while (pool.some((t) => t.tx.nonce === n)) n += 1;
+        return n;
+    }
+
     /**
-     * Mine one block. `include` names exact hashes; each must be waiting, carry the sender's next
-     * nonce and this chain's ID, and, for a bundle, target this block, or mine() throws (a real
-     * block could not hold it). Returns the new block number.
+     * What a future nonce (above the pending count) gets. `queue` (default) parks it until the gap
+     * fills, as a geth pool does. `reject` refuses it with `nonce too high`, as some nodes and
+     * provider front ends do.
      */
-    mine(opts: { baseFeePerGas?: bigint; include?: string[] } = {}): number {
-        const number = this.#head.number + 1;
-        const include = opts.include ?? [];
-        const nextNonce = new Map<string, number>();
-        const picked: KnownTx[] = [];
-        for (const hash of include) {
-            const t = this.#txs.get(hash);
-            if (!t) throw new Error(`mine: ${hash} was never accepted by this node`);
-            if (t.status !== 'accepted') throw new Error(`mine: ${hash} is already mined`);
-            if (t.tx.chainId !== BigInt(this.chainId)) throw new Error(`mine: ${hash} is signed for chain ${t.tx.chainId}, this node is chain ${this.chainId}`);
-            const sub = this.submitted.find((s) => s.hash === hash);
-            if (sub && !sub.targetBlocks.includes(number)) {
-                throw new Error(`mine: bundle ${hash} targets blocks ${sub.targetBlocks.join(', ')}, not ${number}`);
-            }
-            const key = lc(t.from);
-            const expected = nextNonce.get(key) ?? this.minedCount(t.from);
-            if (t.tx.nonce !== expected) throw new Error(`mine: ${hash} has nonce ${t.tx.nonce} but the next nonce for ${t.from} is ${expected}`);
-            nextNonce.set(key, expected + 1);
-            picked.push(t);
+    setFutureNoncePolicy(policy: 'queue' | 'reject'): void {
+        if (policy !== 'queue' && policy !== 'reject') throw new Error(`setFutureNoncePolicy: unknown policy ${String(policy)}`);
+        this.#futureNoncePolicy = policy;
+    }
+
+    /**
+     * Keep `hash` out of every block (a transaction no builder or validator picks up). Its receipt
+     * stays a valid null while later blocks mine; naming it in mine({ include }) throws. If its
+     * nonce is mined by another transaction it becomes dropped, as on a real chain.
+     */
+    neverMine(hash: string): void {
+        if (!this.#txs.has(hash)) throw new Error(`neverMine: ${hash} was never accepted by this node`);
+        this.#neverMine.add(hash);
+    }
+
+    // -- public pool admission (eth_sendRawTransaction) ----------------------------------------
+
+    /** Public-pool transactions from `address` still waiting (pending or queued). */
+    #poolOf(address: string): KnownTx[] {
+        const a = lc(address);
+        return [...this.#txs.values()].filter((t) => (t.route === 'public' || t.route === 'foreign') && (t.status === 'accepted' || t.status === 'queued') && lc(t.from) === a);
+    }
+
+    /**
+     * Admit a raw transaction to the public pool with a real node's checks and text (geth
+     * txpool / internal/ethapi). Accepted at the next nonce it is pending; above it, queued (or
+     * refused under setFutureNoncePolicy('reject')); at a nonce the pool already holds, it
+     * replaces that transaction only with a 10 percent bump on both fee fields.
+     */
+    #admitPublic(raw: string, route: 'public' | 'foreign'): { hash: string } | Refusal {
+        const refuse = (message: string): Refusal => ({ error: { code: -32000, message } });
+        let tx: Transaction;
+        try {
+            tx = Transaction.from(raw);
+        } catch (e) {
+            // The harness cannot be sure its decode text matches a node's, so this is also a stray.
+            const detail = `eth_sendRawTransaction could not decode the raw transaction: ${e instanceof Error ? e.message : String(e)}`;
+            this.strays.push({ seq: nextSeq(), kind: 'method', method: 'eth_sendRawTransaction', detail });
+            return refuse('rlp: invalid transaction encoding');
         }
+        if (!tx.signature || !tx.from || !tx.hash) return refuse('invalid sender');
+        if (tx.type === 0 && tx.chainId === 0n) return refuse('only replay-protected (EIP-155) transactions allowed over RPC');
+        if (this.#legacy && (tx.type ?? 0) >= 2) return refuse('transaction type not supported');
+        if (tx.gasLimit > this.#head.gasLimit) return refuse('exceeds block gas limit');
+        if (tx.type === 2 && tx.maxPriorityFeePerGas! > tx.maxFeePerGas!) return refuse('max priority fee per gas higher than max fee per gas');
+        if (tx.chainId !== BigInt(this.chainId)) return refuse(`invalid sender: invalid chain id for signer: have ${tx.chainId} want ${this.chainId}`);
+        const intrinsic = intrinsicGas(tx);
+        if (tx.gasLimit < intrinsic) return refuse(`intrinsic gas too low: gas ${tx.gasLimit}, minimum needed ${intrinsic}`);
+        // geth answers "already known" only for a hash still in its pool; a mined one falls
+        // through to the nonce check, and a relay-held one is not in the public pool at all.
+        const known = this.#txs.get(tx.hash);
+        if (known && (known.route === 'public' || known.route === 'foreign') && (known.status === 'accepted' || known.status === 'queued')) return refuse('already known');
+        const from = tx.from;
+        const next = this.minedCount(from);
+        if (tx.nonce < next) return refuse(`nonce too low: next nonce ${next}, tx nonce ${tx.nonce}`);
+
+        // Funds: this transaction alone, then with what the sender's other pool transactions spend.
+        const balance = this.#balances.get(lc(from)) ?? 0n;
+        const cost = txCost(tx);
+        if (balance < cost) return refuse(`insufficient funds for gas * price + value: balance ${balance}, tx cost ${cost}, overshot ${cost - balance}`);
+        const pool = this.#poolOf(from);
+        const existing = pool.find((t) => t.tx.nonce === tx.nonce);
+        // geth ExistingExpenditure: everything the sender's pool transactions can spend.
+        const spent = pool.reduce((a, t) => a + txCost(t.tx), 0n);
+        if (existing) {
+            const bump = cost - txCost(existing.tx);
+            const need = spent + bump;
+            if (balance < need) return refuse(`insufficient funds for gas * price + value: balance ${balance}, queued cost ${spent}, tx bumped ${bump}, overshot ${need - balance}`);
+            // geth PriceBump 10: both the fee cap and the tip must clear old * 110 / 100.
+            const capFloor = (feeCap(existing.tx) * 110n) / 100n;
+            const tipFloor = (tipCap(existing.tx) * 110n) / 100n;
+            if (feeCap(tx) < capFloor || tipCap(tx) < tipFloor) return refuse('replacement transaction underpriced');
+        } else {
+            const need = spent + cost;
+            if (balance < need) return refuse(`insufficient funds for gas * price + value: balance ${balance}, queued cost ${spent}, overshot ${need - balance}`);
+            const pendingNext = this.pendingCount(from);
+            if (tx.nonce > pendingNext && this.#futureNoncePolicy === 'reject') return refuse(`nonce too high: next nonce ${pendingNext}, tx nonce ${tx.nonce}`);
+        }
+
+        const status: TxStatus = existing ? existing.status : tx.nonce > this.pendingCount(from) ? 'queued' : 'accepted';
+        const entry: KnownTx = { seq: nextSeq(), raw, hash: tx.hash, tx, from, route, status, block: null, index: null };
+        this.#txs.set(tx.hash, entry);
+        if (route === 'foreign') this.foreign.push(entry);
+        else this.submitted.push({ raw, hash: tx.hash, tx, route, status, targetBlocks: [], block: null });
+        this.history.push({ seq: nextSeq(), event: status === 'queued' ? 'queued' : 'accepted', hash: tx.hash, from, nonce: tx.nonce, route, block: this.#head.number + 1 });
+        if (existing) {
+            this.#setStatus(existing, 'replaced');
+            this.history.push({ seq: nextSeq(), event: 'replaced', hash: existing.hash, from, nonce: existing.tx.nonce, route: existing.route, block: this.#head.number + 1, by: tx.hash });
+        }
+        this.#promote(from);
+        return { hash: tx.hash };
+    }
+
+    /** Move queued transactions whose gap has filled into the pending run, in nonce order. */
+    #promote(address: string): void {
+        let n = this.minedCount(address);
+        const pool = this.#poolOf(address);
+        for (;;) {
+            const t = pool.find((x) => x.tx.nonce === n);
+            if (!t) return;
+            if (t.status === 'queued') {
+                this.#setStatus(t, 'accepted');
+                this.history.push({ seq: nextSeq(), event: 'promoted', hash: t.hash, from: t.from, nonce: t.tx.nonce, route: t.route, block: this.#head.number + 1 });
+            }
+            n += 1;
+        }
+    }
+
+    #setStatus(t: KnownTx, status: TxStatus): void {
+        t.status = status;
+        for (const sub of this.submitted) if (sub.hash === t.hash) sub.status = status;
+    }
+
+    /** Why `t` cannot go in block `number` right now, or undefined when it can. */
+    #notIncludable(t: KnownTx, number: number, baseFeePerGas: bigint, expectedNonce: number, spent: bigint, gasUsed: bigint): string | undefined {
+        if (t.status !== 'accepted') return `it is ${t.status}`;
+        if (t.tx.chainId !== BigInt(this.chainId)) return `it is signed for chain ${t.tx.chainId}, this node is chain ${this.chainId}`;
+        if (t.route === 'bundle') {
+            const sub = this.submitted.find((s) => s.hash === t.hash);
+            if (sub && !sub.targetBlocks.includes(number)) return `the bundle targets blocks ${sub.targetBlocks.join(', ')}, not ${number}`;
+        }
+        if (t.tx.nonce !== expectedNonce) return `it has nonce ${t.tx.nonce} but the next nonce for ${t.from} is ${expectedNonce}`;
+        if (this.#legacy && (t.tx.type ?? 0) >= 2) return 'this chain has no EIP-1559 (transaction type not supported)';
+        if (!this.#legacy && feeCap(t.tx) < baseFeePerGas) return `its fee cap ${feeCap(t.tx)} is below the block base fee ${baseFeePerGas}`;
+        if (gasUsed + t.tx.gasLimit > this.#head.gasLimit) return 'it does not fit the block gas limit';
+        const balance = (this.#balances.get(lc(t.from)) ?? 0n) - spent;
+        if (balance < txCost(t.tx)) return `insufficient funds for gas * price + value: balance ${balance}, tx cost ${txCost(t.tx)}`;
+        return undefined;
+    }
+
+    /**
+     * Mine one block and return its number.
+     * - `include` names exact hashes, in order. Each must be includable now: accepted (pending, or
+     *   held by a relay), this chain's ID, the sender's next nonce, a bundle's target block, a fee
+     *   cap at or above the base fee, and funds for gas and value. Otherwise mine() throws, because
+     *   a real block could not hold it.
+     * - Without `include`, the block takes every includable public pending transaction, first
+     *   come first served, each sender's nonces in order. Relay transactions (bundle, bloXroute)
+     *   go in only when named.
+     * - `exclude` leaves the named hashes out of this block only; neverMine() keeps one out of
+     *   every block.
+     * A transaction whose nonce this block consumes through another transaction becomes dropped.
+     */
+    mine(opts: MineOptions = {}): number {
+        const number = this.#head.number + 1;
         const baseFeePerGas = opts.baseFeePerGas ?? this.#head.baseFeePerGas;
-        const parent = this.#head;
-        const hashes = picked.map((t) => t.hash);
-        let gasUsed = 0n;
-        picked.forEach((t, index) => {
+        const exclude = new Set(opts.exclude ?? []);
+        for (const h of exclude) if (!this.#txs.has(h)) throw new Error(`mine: exclude names ${h}, which this node never accepted`);
+        const nextNonce = new Map<string, number>();
+        const spent = new Map<string, bigint>();
+        const picked: Array<{ t: KnownTx; used: bigint; effectiveGasPrice: bigint }> = [];
+        let blockGas = 0n;
+        const expectedOf = (t: KnownTx): number => nextNonce.get(lc(t.from)) ?? this.minedCount(t.from);
+        const take = (t: KnownTx): void => {
             const used = t.tx.gasLimit < DEFAULT_ESTIMATE ? t.tx.gasLimit : DEFAULT_ESTIMATE;
+            const effectiveGasPrice = this.#legacy || t.tx.type !== 2 ? (t.tx.gasPrice ?? 0n) : minBig(t.tx.maxFeePerGas!, baseFeePerGas + t.tx.maxPriorityFeePerGas!);
+            const key = lc(t.from);
+            nextNonce.set(key, t.tx.nonce + 1);
+            spent.set(key, (spent.get(key) ?? 0n) + used * effectiveGasPrice + t.tx.value);
+            blockGas += used;
+            picked.push({ t, used, effectiveGasPrice });
+        };
+        const whyNot = (t: KnownTx): string | undefined => this.#notIncludable(t, number, baseFeePerGas, expectedOf(t), spent.get(lc(t.from)) ?? 0n, blockGas);
+        if (opts.include) {
+            for (const hash of opts.include) {
+                const t = this.#txs.get(hash);
+                if (!t) throw new Error(`mine: ${hash} was never accepted by this node`);
+                if (exclude.has(hash)) throw new Error(`mine: ${hash} is named in both include and exclude`);
+                if (this.#neverMine.has(hash)) throw new Error(`mine: ${hash} is under neverMine`);
+                if (picked.some((p) => p.t === t)) throw new Error(`mine: ${hash} is named twice`);
+                const why = whyNot(t);
+                if (why) throw new Error(`mine: ${hash} cannot go in block ${number}: ${why}`);
+                take(t);
+            }
+        } else {
+            const pool = [...this.#txs.values()]
+                .filter((t) => (t.route === 'public' || t.route === 'foreign') && t.status === 'accepted' && !exclude.has(t.hash) && !this.#neverMine.has(t.hash))
+                .sort((a, b) => a.seq - b.seq);
+            for (let progress = true; progress; ) {
+                progress = false;
+                for (const t of pool) {
+                    if (picked.some((p) => p.t === t) || whyNot(t) !== undefined) continue;
+                    take(t);
+                    progress = true;
+                }
+            }
+        }
+        const parent = this.#head;
+        const hashes = picked.map((p) => p.t.hash);
+        let gasUsed = 0n;
+        picked.forEach(({ t, used, effectiveGasPrice }, index) => {
             gasUsed += used;
-            const effectiveGasPrice =
-                t.tx.type === 2
-                    ? (t.tx.maxFeePerGas! < baseFeePerGas + t.tx.maxPriorityFeePerGas! ? t.tx.maxFeePerGas! : baseFeePerGas + t.tx.maxPriorityFeePerGas!)
-                    : (t.tx.gasPrice ?? 0n);
-            t.status = 'mined';
+            this.#setStatus(t, 'mined');
             t.block = number;
             t.index = index;
+            for (const sub of this.submitted) if (sub.hash === t.hash) sub.block = number;
             this.#receipts.set(t.hash, { hash: t.hash, block: number, index, gasUsed: used, effectiveGasPrice, status: 1 });
-            const sub = this.submitted.find((s) => s.hash === t.hash);
-            if (sub) {
-                sub.status = 'mined';
-                sub.block = number;
-            }
+            // The sender pays for the gas it used and the value it sent.
+            const key = lc(t.from);
+            this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - t.tx.value);
             this.history.push({ seq: nextSeq(), event: 'mined', hash: t.hash, from: t.from, nonce: t.tx.nonce, route: t.route, block: number });
         });
+        // Every other transaction at a nonce this block consumed is dropped, on every route.
+        const senders = new Set(picked.map((p) => lc(p.t.from)));
+        for (const other of this.#txs.values()) {
+            if (other.status !== 'accepted' && other.status !== 'queued') continue;
+            if (!senders.has(lc(other.from)) || other.tx.nonce >= nextNonce.get(lc(other.from))!) continue;
+            const winner = picked.find((p) => lc(p.t.from) === lc(other.from) && p.t.tx.nonce === other.tx.nonce);
+            this.#setStatus(other, 'dropped');
+            this.history.push({ seq: nextSeq(), event: 'dropped', hash: other.hash, from: other.from, nonce: other.tx.nonce, route: other.route, block: number, ...(winner ? { by: winner.t.hash } : {}) });
+        }
         const block: BlockRecord = {
             number,
             hash: blockHashOf(number, parent.hash, hashes),
@@ -794,6 +1026,8 @@ export class FakeNode {
         };
         this.#blocks.set(number, block);
         this.#head = block;
+        // A relay transaction mined at a nonce can close a gap in the public queue.
+        for (const s of senders) this.#promote(s);
         for (const s of this.subscriptions) {
             if (s.kind === 'newHeads') this.#push(s, this.#formatBlock(block, false, true));
         }
@@ -949,6 +1183,10 @@ export class FakeNode {
                 const b = [...this.#blocks.values()].find((x) => x.hash === lc(p[0]));
                 return { result: b ? this.#formatBlock(b, p[1] === true, false) : null };
             }
+            case 'eth_sendRawTransaction': {
+                const r = this.#admitPublic(String(p[0]), 'public');
+                return 'error' in r ? r : { result: r.hash };
+            }
             case 'eth_getTransactionReceipt':
                 return { result: this.#formatReceipt(String(p[0])) };
             case 'eth_getTransactionByHash':
@@ -976,11 +1214,9 @@ export class FakeNode {
     }
 
     #nonceAt(address: string, tag: unknown): number {
-        if (tag === 'pending') {
-            let n = this.minedCount(address);
-            for (const t of this.foreign) if (t.status === 'accepted' && lc(t.from) === lc(address)) n += 1;
-            return n;
-        }
+        // 'latest' counts mined transactions only; 'pending' adds the public pool's contiguous run.
+        // A relay acceptance moves neither (review HIGH on 23-01, reconciliation.ts:478).
+        if (tag === 'pending') return this.pendingCount(address);
         const b = this.#resolveBlock(tag ?? 'latest');
         return this.minedCount(address, b ? b.number : this.#head.number);
     }
@@ -1051,8 +1287,10 @@ export class FakeNode {
     #formatTxByHash(hash: string): Record<string, unknown> | null {
         const t = this.#txs.get(hash);
         if (!t) return null;
-        // A private bundle is invisible to a node until it is mined.
-        if (t.status !== 'mined' && t.route === 'bundle') return null;
+        // A private transaction (bundle, bloXroute) is invisible to a node until it is mined, and
+        // a replaced or dropped one has left the pool.
+        if (t.status !== 'mined' && (t.route === 'bundle' || t.route === 'bloxroute')) return null;
+        if (t.status === 'replaced' || t.status === 'dropped') return null;
         const tx = t.tx;
         const block = t.block !== null ? this.#blocks.get(t.block)! : null;
         const sig = tx.signature!;
@@ -1195,7 +1433,7 @@ export class FakeNode {
             if (!sub) {
                 sub = { raw, hash, tx, route: 'bundle', status: 'accepted', targetBlocks: [], block: null };
                 this.submitted.push(sub);
-                this.#txs.set(hash, { raw, hash, tx, from: tx.from!, route: 'bundle', status: 'accepted', block: null, index: null });
+                if (!this.#txs.has(hash)) this.#txs.set(hash, { seq: nextSeq(), raw, hash, tx, from: tx.from!, route: 'bundle', status: 'accepted', block: null, index: null });
             }
             if (!sub.targetBlocks.includes(target)) {
                 sub.targetBlocks.push(target);
@@ -1457,6 +1695,45 @@ class Hold implements HoldHandle {
 
 function bundleHashOf(txHashes: string[]): string {
     return keccak256('0x' + txHashes.map((h) => h.slice(2)).join(''));
+}
+
+export interface MineOptions {
+    /** Base fee of the new block (default: the parent's). */
+    baseFeePerGas?: bigint;
+    /** Exact hashes to include, in order (default: every includable public pending transaction). */
+    include?: string[];
+    /** Hashes left out of this block only. */
+    exclude?: string[];
+}
+
+function minBig(a: bigint, b: bigint): bigint {
+    return a < b ? a : b;
+}
+
+/** The fee cap a pool compares: maxFeePerGas for EIP-1559, gasPrice otherwise. */
+function feeCap(tx: Transaction): bigint {
+    return tx.type === 2 ? tx.maxFeePerGas! : (tx.gasPrice ?? 0n);
+}
+
+/** The tip a pool compares: maxPriorityFeePerGas for EIP-1559, gasPrice otherwise. */
+function tipCap(tx: Transaction): bigint {
+    return tx.type === 2 ? tx.maxPriorityFeePerGas! : (tx.gasPrice ?? 0n);
+}
+
+/** geth tx.Cost(): gas limit times fee cap, plus value. */
+function txCost(tx: Transaction): bigint {
+    return tx.gasLimit * feeCap(tx) + tx.value;
+}
+
+/** geth core.IntrinsicGas after Shanghai (EIP-2028 calldata, EIP-2930 access list, EIP-3860 initcode). */
+function intrinsicGas(tx: Transaction): bigint {
+    const creation = tx.to === null;
+    let gas = creation ? 53_000n : 21_000n;
+    const data = ethers.getBytes(tx.data);
+    for (const b of data) gas += b === 0 ? 4n : 16n;
+    if (creation) gas += 2n * BigInt(Math.ceil(data.length / 32));
+    for (const entry of tx.accessList ?? []) gas += 2_400n + 1_900n * BigInt(entry.storageKeys.length);
+    return gas;
 }
 
 /** eth_subscribe / eth_getLogs filter: address (one or a list) and positional topics with OR lists. */

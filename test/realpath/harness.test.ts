@@ -14,7 +14,7 @@ import * as net from 'node:net';
 import { describe, it, expect, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import axios from 'axios';
-import { FetchRequest, Interface, JsonRpcProvider, Network, Transaction, WebSocketProvider, parseEther, getAddress } from 'ethers';
+import { FetchRequest, Interface, JsonRpcProvider, Network, Transaction, WebSocketProvider, Wallet, ethers, parseEther, parseUnits, getAddress, toQuantity } from 'ethers';
 import { FakeNode, FakeWebSocket, encodeResult, harnessState, installSeams, labelAddress } from './harness/chain';
 import {
     assertAllFaultsFired,
@@ -398,5 +398,241 @@ describe('realpath harness', () => {
         const late = new Promise((resolve) => setTimeout(resolve, 2_000));
         await expectStillPending(late, 1_000);
         await stepUntil(late);
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Plan 23-28 Task 1 (D-03, AC-48): the public route's whole transaction life on the node.
+// ---------------------------------------------------------------------------------------------
+
+const GWEI = 1_000_000_000n;
+const SENDER = new Wallet(ethers.id('realpath.23-28.sender'));
+const RECIPIENT = labelAddress('23-28.recipient');
+const RELAY = 'https://relay.realpath.invalid/';
+
+interface SignOpts {
+    nonce: number;
+    chainId?: number;
+    maxFeeGwei?: bigint;
+    tipGwei?: bigint;
+    /** Sign a type-0 transaction with this gas price instead of EIP-1559 fields. */
+    gasPriceGwei?: bigint;
+    gasLimit?: bigint;
+    value?: bigint;
+    data?: string;
+}
+
+/** A real signed transaction from SENDER (real ethers signing, real serialization, real hash). */
+function signed(o: SignOpts): Promise<string> {
+    const base = { chainId: o.chainId ?? 1, nonce: o.nonce, to: RECIPIENT, value: o.value ?? parseEther('0.01'), gasLimit: o.gasLimit ?? 21_000n, data: o.data ?? '0x' };
+    if (o.gasPriceGwei !== undefined) return SENDER.signTransaction({ ...base, type: 0, gasPrice: o.gasPriceGwei * GWEI });
+    return SENDER.signTransaction({ ...base, type: 2, maxFeePerGas: (o.maxFeeGwei ?? 30n) * GWEI, maxPriorityFeePerGas: (o.tipGwei ?? 2n) * GWEI });
+}
+
+/** Broadcast through the real provider; resolves to the hash or to the refusal. */
+async function broadcast(provider: JsonRpcProvider, raw: string): Promise<{ hash?: string; err?: unknown }> {
+    return stepUntil(provider.broadcastTransaction(raw)).then(
+        (r) => ({ hash: r.hash }),
+        (err: unknown) => ({ err }),
+    );
+}
+
+async function counts(provider: JsonRpcProvider, who: string): Promise<{ latest: number; pending: number }> {
+    return { latest: await stepUntil(provider.getTransactionCount(who, 'latest')), pending: await stepUntil(provider.getTransactionCount(who, 'pending')) };
+}
+
+/** A relay eth_sendBundle as the bot's Flashbots library sends it (via the relay endpoint). */
+async function sendBundle(node: FakeNode, raws: string[], target: number): Promise<unknown> {
+    node.serve({ relay: [RELAY] });
+    return node.handle({ jsonrpc: '2.0', id: 1, method: 'eth_sendBundle', params: [{ txs: raws, blockNumber: toQuantity(target) }] }, undefined, { endpoint: 'relay', url: RELAY });
+}
+
+describe('simulated node: the public route (23-28 Task 1, D-03, AC-48)', () => {
+    it('tracer: a real signed public transaction is accepted, stays pending, and becomes visible only by being mined, with a real receipt', async () => {
+        const { node, provider } = bareNode();
+        const wallet = SENDER.connect(provider);
+        node.setBalance(wallet.address, parseEther('1'));
+
+        expect(await counts(provider, wallet.address)).toEqual({ latest: 0, pending: 0 });
+        // Real ethers populates (pending count, estimate, fee data, chain) and signs.
+        const sent = await stepUntil(wallet.sendTransaction({ to: RECIPIENT, value: parseEther('0.1') }));
+        expect(sent.hash).toBe(ethers.keccak256(node.submitted[0].raw));
+        expect(node.submitted).toHaveLength(1);
+        expect(node.submitted[0]).toMatchObject({ route: 'public', status: 'accepted', block: null });
+
+        // Accepted is not mined: latest is unchanged, pending has risen, the receipt is a valid null.
+        expect(await counts(provider, wallet.address)).toEqual({ latest: 0, pending: 1 });
+        expect(await stepUntil(provider.getTransactionReceipt(sent.hash))).toBeNull();
+        const seen = await stepUntil(provider.getTransaction(sent.hash));
+        expect(seen?.blockNumber).toBeNull();
+
+        // Virtual time alone mines nothing.
+        const waiting = sent.wait();
+        await stepFor(30_000);
+        expect(node.isMined(sent.hash)).toBe(false);
+
+        const block = node.mine();
+        const receipt = await stepUntil(waiting);
+        expect(receipt?.status).toBe(1);
+        expect(receipt?.hash).toBe(sent.hash);
+        expect(receipt?.blockNumber).toBe(block);
+        expect(receipt?.from).toBe(wallet.address);
+        expect(await counts(provider, wallet.address)).toEqual({ latest: 1, pending: 1 });
+        expect(node.submitted[0]).toMatchObject({ status: 'mined', block });
+        expect(node.history.filter((h) => h.hash === sent.hash).map((h) => h.event)).toEqual(['accepted', 'mined']);
+        // The sender paid for the gas it used and the value it sent.
+        const spent = receipt!.gasUsed * receipt!.gasPrice + parseEther('0.1');
+        expect(await stepUntil(provider.getBalance(wallet.address))).toBe(parseEther('1') - spent);
+    });
+
+    it('refuses a wrong chain ID, a nonce too low, short gas and missing funds with the real node text, and none grows node.submitted', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const first = await broadcast(provider, await signed({ nonce: 0 }));
+        expect(first.hash).toBeDefined();
+        node.mine();
+        expect(node.submitted).toHaveLength(1);
+
+        const cases: Array<[SignOpts, RegExp]> = [
+            [{ nonce: 1, chainId: 5 }, /invalid sender: invalid chain id for signer: have 5 want 1/],
+            [{ nonce: 0 }, /nonce too low: next nonce 1, tx nonce 0/],
+            [{ nonce: 1, gasLimit: 20_000n }, /intrinsic gas too low: gas 20000, minimum needed 21000/],
+            [{ nonce: 1, value: parseEther('5') }, /insufficient funds for gas \* price \+ value: balance \d+, tx cost \d+, overshot \d+/],
+        ];
+        for (const [opts, text] of cases) {
+            const r = await broadcast(provider, await signed(opts));
+            expect(r.hash, `${String(text)} was accepted`).toBeUndefined();
+            expect(errorText(r.err)).toMatch(text);
+        }
+        expect(node.submitted).toHaveLength(1);
+        expect(node.history.map((h) => h.event)).toEqual(['accepted', 'mined']);
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 1, pending: 1 });
+        // ethers maps the nonce refusal to its own code, as it would on a real node.
+        const low = await broadcast(provider, await signed({ nonce: 0 }));
+        expect((low.err as { code?: string }).code).toBe('NONCE_EXPIRED');
+    });
+
+    it('a same-nonce replacement needs a 10 percent bump on both fees: below it is refused with the real text, at it the old hash becomes replaced', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const original = await broadcast(provider, await signed({ nonce: 0, maxFeeGwei: 100n, tipGwei: 10n }));
+        expect(original.hash).toBeDefined();
+        // Each misses on one field only: the cap up 9 percent (tip up 10), then the tip unchanged (cap up 10).
+        for (const fees of [{ maxFeeGwei: 109n, tipGwei: 11n }, { maxFeeGwei: 110n, tipGwei: 10n }]) {
+            const r = await broadcast(provider, await signed({ nonce: 0, value: parseEther('0.02'), ...fees }));
+            expect(errorText(r.err)).toContain('replacement transaction underpriced');
+            expect((r.err as { code?: string }).code).toBe('REPLACEMENT_UNDERPRICED');
+        }
+        expect(node.submitted).toHaveLength(1);
+        // Exactly 10 percent on both: accepted, and the original leaves the pool.
+        const replacement = await broadcast(provider, await signed({ nonce: 0, value: parseEther('0.02'), maxFeeGwei: 110n, tipGwei: 11n }));
+        expect(replacement.hash).toBeDefined();
+        expect(node.statusOf(original.hash!)).toBe('replaced');
+        expect(node.history.find((h) => h.event === 'replaced')).toMatchObject({ hash: original.hash, by: replacement.hash });
+        expect(await stepUntil(provider.getTransaction(original.hash!))).toBeNull();
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 1 });
+
+        node.mine();
+        expect(node.isMined(replacement.hash!)).toBe(true);
+        expect(await stepUntil(provider.getTransactionReceipt(original.hash!))).toBeNull();
+        expect(node.history.filter((h) => h.hash === original.hash).map((h) => h.event)).toEqual(['accepted', 'replaced']);
+    });
+
+    it('a relay acceptance moves neither count, stays invisible, and is never mined by default', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const raw = await signed({ nonce: 0 });
+        const target = node.head + 1;
+        const reply = (await sendBundle(node, [raw], target)) as { result?: { bundleHash?: string } };
+        expect(reply.result?.bundleHash).toMatch(/^0x[0-9a-f]{64}$/);
+        const hash = ethers.keccak256(raw);
+        expect(node.submitted).toMatchObject([{ hash, route: 'bundle', status: 'accepted', targetBlocks: [target] }]);
+        const bloxHash = node.acceptRelayTransaction(await signed({ nonce: 1 }), 'bloxroute');
+        expect(node.submitted[1]).toMatchObject({ hash: bloxHash, route: 'bloxroute', status: 'accepted', targetBlocks: [] });
+
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 0 });
+        expect(await stepUntil(provider.getTransaction(hash))).toBeNull();
+        expect(await stepUntil(provider.getTransactionReceipt(hash))).toBeNull();
+        expect(await stepUntil(provider.getTransaction(bloxHash))).toBeNull();
+        // A default block takes only the public pool.
+        node.mine();
+        expect(node.isMined(hash)).toBe(false);
+        expect(node.isMined(bloxHash)).toBe(false);
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 0 });
+        // A bundle can only go in its target block; the next one is past it.
+        expect(() => node.mine({ include: [hash] })).toThrow(/targets blocks \d+, not \d+/);
+    });
+
+    it('of two transactions competing for one nonce the one mined wins and the other is dropped, with a receipt only for the winner', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const target = node.head + 1;
+        const bundleRaw = await signed({ nonce: 0, gasLimit: 21_016n, data: '0x01' });
+        await sendBundle(node, [bundleRaw], target);
+        const first = ethers.keccak256(bundleRaw);
+        const competitor = await broadcast(provider, await signed({ nonce: 0, gasLimit: 21_016n, data: '0x02' }));
+        expect(competitor.hash).toBeDefined();
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 1 });
+
+        expect(node.mine({ include: [first] })).toBe(target);
+        expect(node.statusOf(first)).toBe('mined');
+        expect(node.statusOf(competitor.hash!)).toBe('dropped');
+        expect(node.history.find((h) => h.event === 'dropped')).toMatchObject({ hash: competitor.hash, by: first, block: target });
+        expect((await stepUntil(provider.getTransactionReceipt(first)))?.status).toBe(1);
+        expect(await stepUntil(provider.getTransactionReceipt(competitor.hash!))).toBeNull();
+        expect(await stepUntil(provider.getTransaction(competitor.hash!))).toBeNull();
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 1, pending: 1 });
+        expect(() => node.mine({ include: [competitor.hash!] })).toThrow(/it is dropped/);
+    });
+
+    it('neverMine keeps a hash out of every block while later blocks mine; exclude leaves one out of one block only', async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const stuck = await broadcast(provider, await signed({ nonce: 0 }));
+        node.neverMine(stuck.hash!);
+        const head = node.head;
+        node.mine();
+        node.mine();
+        expect(node.head).toBe(head + 2);
+        expect(await stepUntil(provider.getTransactionReceipt(stuck.hash!))).toBeNull();
+        expect(node.statusOf(stuck.hash!)).toBe('accepted');
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 1 });
+        expect(() => node.mine({ include: [stuck.hash!] })).toThrow(/under neverMine/);
+        expect(() => node.neverMine('0x' + 'ab'.repeat(32))).toThrow(/never accepted/);
+
+        const other = new Wallet(ethers.id('realpath.23-28.other'), provider);
+        node.setBalance(other.address, parseEther('1'));
+        const later = await stepUntil(other.sendTransaction({ to: RECIPIENT, value: 1n }));
+        node.mine({ exclude: [later.hash] });
+        expect(node.isMined(later.hash)).toBe(false);
+        node.mine();
+        expect(node.isMined(later.hash)).toBe(true);
+        expect(node.isMined(stuck.hash!)).toBe(false);
+    });
+
+    it("a future nonce stays queued until its gap fills; under setFutureNoncePolicy('reject') it is refused with nonce too high", async () => {
+        const { node, provider } = bareNode();
+        node.setBalance(SENDER.address, parseEther('1'));
+        const ahead = await broadcast(provider, await signed({ nonce: 1 }));
+        expect(node.statusOf(ahead.hash!)).toBe('queued');
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 0 });
+        node.mine();
+        expect(node.isMined(ahead.hash!)).toBe(false);
+        expect(() => node.mine({ include: [ahead.hash!] })).toThrow(/it is queued/);
+
+        const gap = await broadcast(provider, await signed({ nonce: 0 }));
+        expect(node.statusOf(ahead.hash!)).toBe('accepted');
+        expect(await counts(provider, SENDER.address)).toEqual({ latest: 0, pending: 2 });
+        const block = node.mine();
+        expect((await stepUntil(provider.getTransactionReceipt(gap.hash!)))?.index).toBe(0);
+        const aheadReceipt = await stepUntil(provider.getTransactionReceipt(ahead.hash!));
+        expect(aheadReceipt?.index).toBe(1);
+        expect(aheadReceipt?.blockNumber).toBe(block);
+        expect(node.history.filter((h) => h.hash === ahead.hash).map((h) => h.event)).toEqual(['queued', 'promoted', 'mined']);
+
+        node.setFutureNoncePolicy('reject');
+        const refused = await broadcast(provider, await signed({ nonce: 5 }));
+        expect(errorText(refused.err)).toContain('nonce too high: next nonce 2, tx nonce 5');
+        expect(node.submitted).toHaveLength(2);
     });
 });
