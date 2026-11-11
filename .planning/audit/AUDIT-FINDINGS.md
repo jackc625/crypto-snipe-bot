@@ -456,7 +456,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-ANTIRUG-003: The circuit breaker counts dispatches, not rugs: every matching log of one LP removal starts its own confirm gate and exit attempt, refused duplicates still count, so one rug can trip the chain breaker and suppress every later anti-rug exit on that chain
 
-- **Severity / capital impact / status:** S1 / STRAND / candidate
+- **Severity / capital impact / status:** S1 / STRAND / confirmed
 - **Slice / origin:** ANTIRUG / independent
 - **Classes:** C14 (idempotent exits), C15 (TOCTOU), C12 (timer leaks)
 - **Severity rationale:** S1 candidate. The counting rule is a code fact (sub-claims 1, 3, 4). Whether one real rug reaches three dispatches depends on how many matched logs one removal emits (sub-claim 2), which needs a Phase 23 fork replay of a complete removal transaction; with two per removal, two rugs within an hour trip the breaker, which is the serial-rugger case. After a trip, every other open position on the chain has no anti-rug exit until the operator resets the breaker or restarts. Live mode only: in dry-run (the default) the breaker is never reached (exitTrigger.ts:179-216).

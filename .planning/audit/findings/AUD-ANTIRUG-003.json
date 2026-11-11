@@ -120,7 +120,7 @@
     }
   ],
   "sibling_sites_checked": "Every path into triggerAntiRugExit: the confirm gate (detector.ts:1834, :1900) reached from the live WS dispatcher (:652), the HTTP poller (:1297), the backfill replay (:1155, AUD-ANTIRUG-005) and the V3 grace watcher (:2140). Every call site of incrementCircuitBreaker (exitTrigger.ts:316 only) and isCircuitBreakerTripped (exitTrigger.ts:221, api/routes/antiRug.ts:59). Multipliers of the count: duplicate subscriptions (AUD-ANTIRUG-001), stacked HTTP pollers (AUD-ANTIRUG-007), backfill replays (AUD-ANTIRUG-005), stale gates of closed positions (this entry).",
-  "status": "candidate",
+  "status": "confirmed",
   "severity_rationale": "S1 candidate. The counting rule is a code fact (sub-claims 1, 3, 4). Whether one real rug reaches three dispatches depends on how many matched logs one removal emits (sub-claim 2), which needs a Phase 23 fork replay of a complete removal transaction; with two per removal, two rugs within an hour trip the breaker, which is the serial-rugger case. After a trip, every other open position on the chain has no anti-rug exit until the operator resets the breaker or restarts. Live mode only: in dry-run (the default) the breaker is never reached (exitTrigger.ts:179-216).",
   "sub_claims": [
     {
@@ -160,5 +160,13 @@
       "status": "confirmed"
     }
   ],
-  "recommendation": "Keep one in-flight anti-rug dispatch per position (keyed by tradeId, with the triggering tx hash as evidence), count the breaker per position or per rug event rather than per log, cancel pending gates and grace watchers on unregister, and send a Telegram alert for every suppressed exit. Card ANTIRUG-01. Phase 24, after a fork replay of a complete removal transaction."
+  "recommendation": "Keep one in-flight anti-rug dispatch per position (keyed by tradeId, with the triggering tx hash as evidence), count the breaker per position or per rug event rather than per log, cancel pending gates and grace watchers on unregister, and send a Telegram alert for every suppressed exit. Card ANTIRUG-01. Phase 24, after a fork replay of a complete removal transaction.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with the order forced (plan 23-10, AC-12): ETH anti-rug live (LIVE_EXECUTE true, CONFIRM_BLOCKS 1, CIRCUIT_BREAKER_TRIGGERS 3); one real 95 percent router liquidity pull (the pair's own Transfer, Transfer, Sync, Burn logs, real encoders) trips all three signals; its three matching logs schedule three confirm gates and, at the confirm block, three anti-rug dispatches; the first exit is held at its Flashbots simulation (relay, not a provider read) while the two duplicates are refused by the sell lock and counted at once, then released and sold, counted after its sell returned. The real breaker counts three triggers for the one rug and trips (claim breaker-counts-dispatches-not-rugs). One in-flight dispatch per position that does not count refused duplicates reads looks fixed. Status candidate -> confirmed; sub-claim 2 (the log count of a real mainnet removal) needs the fork run.",
+    "test_id": "AUD-ANTIRUG-003",
+    "needs_fork": true,
+    "fork_question": "Sub-claim 2: how many logs that the anti-rug filter matches (V2 Burn and the pair's V2 Transfer; V3 Burn and Collect for a pool) does one real removeLiquidityETH through the Uniswap V2 router emit on mainnet, and in what order? The real-path test replays UniswapV2Pair's own event order written from the contract (Transfer remover->pair, Transfer pair->0, Sync, Burn), which gives three matched logs, three dispatches and a tripped breaker at the default threshold 3; a fork replay of a complete real removal transaction must count the dispatched logs."
+  }
 }

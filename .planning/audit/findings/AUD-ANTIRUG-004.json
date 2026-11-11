@@ -141,5 +141,11 @@
       "status": "confirmed"
     }
   ],
-  "recommendation": "Keep per-position anti-rug state: an unsafe verdict stays pending until a successful exit or a genuine close, and a refused, aborted or failed escape is retried on the next block (bounded, with the anti-rug parameters) with an alert each time; re-arm the poll timer on every false return after clearing it. Precedence over in-flight exits is card EXIT-11; dedupe and retry are card ANTIRUG-01. Phase 24."
+  "recommendation": "Keep per-position anti-rug state: an unsafe verdict stays pending until a successful exit or a genuine close, and a refused, aborted or failed escape is retried on the next block (bounded, with the anti-rug parameters) with an alert each time; re-arm the poll timer on every false return after clearing it. Precedence over in-flight exits is card EXIT-11; dedupe and retry are card ANTIRUG-01. Phase 24.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10): ETH anti-rug live (LIVE_EXECUTE true, CONFIRM_BLOCKS 1, breaker threshold 100 so it cannot decide); a real 95 percent router liquidity pull trips all three signals, the confirm block passes and the anti-rug exit is dispatched; the node refuses its approval's eth_sendRawTransaction once (failNext aimed at that call, geth 'transaction underpriced'), so the escape fails before any sell on a still-held position; over 2 minutes of fake time (10 blocks, the wallet's transactions landed) anti-rug never dispatches the escape again and no anti-rug sell is ever submitted (claim failed-escape-not-retried). A gate that re-dispatches on a later block while the position is held reads looks fixed. A refusal by the sell lock was not used because it is AUD-EXIT-014's claim and its fix would remove it; sub-claim 2 (no timer re-arm after a lock refusal) and the budget-overrun path stay code-read.",
+    "test_id": "AUD-ANTIRUG-004"
+  }
 }

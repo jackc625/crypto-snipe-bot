@@ -159,5 +159,11 @@
       "outcome": "A double trigger, not a skipped one. There is no double sell (the sell lock serializes), but the duplicate costs one circuit-breaker count, puts a false exit-failed state and a too-late event on the dashboard while the real exit is in flight, and clears the timers a second time. With confirmBlocks 0 the duplicate runs inside the backfill and the registering buy waits for it."
     }
   ],
-  "recommendation": "Advance last_seen_block from the live stream (every dispatched log block, or a block subscription) so a replay covers the real outage; decide on card ANTIRUG-02 whether backfilled unsafe verdicts for still-held positions should exit (today they do, against the comment) and make code and docs agree; alert on a failed backfill; never run a backfill inside a buy registration. Phase 24."
+  "recommendation": "Advance last_seen_block from the live stream (every dispatched log block, or a block subscription) so a replay covers the real outage; decide on card ANTIRUG-02 whether backfilled unsafe verdicts for still-held positions should exit (today they do, against the comment) and make code and docs agree; alert on a failed backfill; never run a backfill inside a buy registration. Phase 24.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10): ETH anti-rug live (LIVE_EXECUTE true, CONFIRM_BLOCKS 1, breaker threshold 100). A real 95 percent router pull mined while the fake node had closed the socket is replayed by the reconnect's real backfill, which logs antirug.backfill.too-late and still reaches triggerAntiRugExit through the live evaluator's confirm gate and submits an anti-rug sell (claim backfill-fires-live-exit; contract per the code's own D-BACKFILL comments, policy is card ANTIRUG-02); a pull delivered live and dispatched leaves chain_state.last_seen_block at the arming backfill block in the real DB after the position is sold (claim live-dispatch-does-not-advance-cursor). A replay that cannot schedule the gate, and a dispatcher that writes the dispatched block, each read looks fixed on its own claim only. Sub-claims 3-5 stay code-read.",
+    "test_id": "AUD-ANTIRUG-005"
+  }
 }
