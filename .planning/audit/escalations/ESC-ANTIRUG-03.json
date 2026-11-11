@@ -1,0 +1,25 @@
+{
+  "id": "ESC-ANTIRUG-03",
+  "date": "2026-11-11",
+  "tier": "immediate",
+  "tags": [
+    "phase-23",
+    "severity-increase",
+    "23-01-task-1",
+    "capital"
+  ],
+  "items": [
+    "AUD-ANTIRUG-018"
+  ],
+  "resolved_items": [],
+  "summary": "Phase 23 stop-the-line record for a possible severity increase on a registered capital finding (23-SPEC line 103). While registering AUD-ANTIRUG-024 the 23-01 executor re-read the related HTTP poller finding AUD-ANTIRUG-018 (S2, STRAND, confirmed) and found its rationale (\"only chains running without a WebSocket URL, after an outage larger than the provider range limit ... Protection then stays off until restart\") wrong on two points, confirmed by the execute-phase orchestrator re-reading the code at HEAD. (1) A restart does not clear it: the HTTP poller re-reads its start block from chain_state on restart (src/anti-rug/detector.ts:1228-1232 at the audit base, :1231-1235 at HEAD); the row advances only after a successful poll (:1300-1306 base, :1303-1309 HEAD) or a tick with no registered positions (:1269-1276 base, :1272-1279 HEAD); held positions are re-registered before the poller starts (src/bot.ts:2120-2144 base, :2122-2146 HEAD). (2) Ordinary downtime triggers it: getLogs requests lastBlock+1..currentBlock in one call (:1279-1291 base, :1282-1294 HEAD) and the repo's own range assumption is 10 blocks on ETH (\"Alchemy free-tier safe\", src/chainRegistry.ts:223-230) and 500 elsewhere, so about two minutes of downtime on ETH is enough. It is silent: the dashboard shows the chain connected (AUD-ANTIRUG-007) and only antirug.http-polling.error log lines appear. Not reproduced; whether the operator's provider refuses these ranges is unmeasured. The operator was asked what grade it should have and whether any chain runs without a WebSocket URL.",
+  "presented_at": "2026-11-11 session: the second 23-01 blocking checkpoint (checkpoint:decision, gate blocking-human, possible severity increase on a registered capital finding), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "Q \"What grade should it have?\": \"Raise to S1 (Recommended)\". Q \"Does any chain you run go without a WebSocket address in .env?\": \"Not sure\".",
+  "operator_response_recorded_at": "2026-11-11T05:08:13Z",
+  "operator_response_channel": "selected by the operator at the second 23-01 blocking checkpoint (two questions); relayed verbatim by the execute-phase orchestrator to the 23-01 continuation executor, which recorded both selections at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response holds the operator's own verbatim selections, kept exactly as relayed). Presented at presented_at through the 23-01 blocking checkpoint (gate blocking-human).",
+  "ruling": "raise-to-s1",
+  "ruling_option_text": "Raise to S1 (Recommended): raise AUD-ANTIRUG-018 to S1, correct its rationale, add an escalation record with the ruling; it joins the Phase 24 capital fixes, and Phase 23 Wave 5 gives it a real-path test that fails today (option meaning as relayed by the execute-phase orchestrator)",
+  "ruling_note": "Recorded by the 23-01 continuation executor: AUD-ANTIRUG-018 severity S2 -> S1 (capital_impact STRAND unchanged, status confirmed unchanged), rationale corrected with sub-claims (1) restart does not clear it and (2) ordinary downtime triggers it, card OD-48 (needed_by Phase 24) unchanged. The \"(Recommended)\" label was part of the option as presented and is the recommendation of the execute-phase orchestrator, NOT the operator's own. Context from the second answer (\"Not sure\"): exposure on the operator's current setup is unknown, because the operator does not know whether any chain runs without a WebSocket URL; .env was not read to find out (D-14); the grade does not depend on it. Consequences for Phase 23: AUD-ANTIRUG-018 is now S1, so it belongs in the Wave 5 triage set and the 23-16 S0/S1 batch report; plans that count the 59 register entries (for example 23-04 AC-08 and 23-16) must also include AUD-ANTIRUG-024. Phase 23 continues.",
+  "phase_continued": true
+}
