@@ -20,6 +20,8 @@
 //     running graph (timers, providers, held calls, closeDb) and loads the whole graph again on
 //     the same file and the same FakeNode, as a process restart would.
 //   - routeHttp(): per-scenario routes for the axios mock; an unmatched URL is a stray.
+//   - The graph also holds the real src/telegramListener; its Telegram client is the setup.ts
+//     fake, and scenario disposal (and a restart) empties the registered handlers (plan 23-27).
 //   - createScenario(): one chain (eth, bsc, base or arb), one DEX (V2 or V3), a token, a pair or
 //     pool and the reads a real node would answer, all built with real ethers encoders (D-04).
 //     A non-ETH chain gets its *_HONEYPOT_CHECKER_ADDRESS before the graph loads (RESEARCH Open
@@ -205,6 +207,7 @@ type DbModule = typeof import('../../../src/utils/db');
 type ExitEngineModule = typeof import('../../../src/exitEngine');
 type DetectorModule = typeof import('../../../src/anti-rug/detector');
 type ExitManagerModule = typeof import('../../../src/utils/exitManager');
+type TelegramListenerModule = typeof import('../../../src/telegramListener');
 
 export interface Graph {
     bot: BotModule;
@@ -213,6 +216,8 @@ export interface Graph {
     exitEngine: ExitEngineModule;
     detector: DetectorModule;
     exitManager: ExitManagerModule;
+    /** The real Telegram alpha listener; its client is the setup.ts fake (plan 23-27, telegram.ts). */
+    telegramListener: TelegramListenerModule;
     /** The real better-sqlite3 connection src/utils/db.ts opened (its existing `db` export). */
     db: DbModule['db'];
 }
@@ -350,13 +355,14 @@ export async function loadGraph(opts: LoadGraphOptions = {}): Promise<Graph> {
     const exitEngine = await import('../../../src/exitEngine');
     const detector = await import('../../../src/anti-rug/detector');
     const bot = await import('../../../src/bot');
+    const telegramListener = await import('../../../src/telegramListener');
     const db = dbModule.db;
     // The capture and the SQL clock, one call, on every new connection (Pitfall 5). unixepoch()
     // with no argument reads the fake clock; an argument is a capture violation (capture.ts).
     const st = harnessState();
     if (!st.timeline) st.timeline = createTimeline();
     installDbCapture(db, st.timeline);
-    currentGraph = { bot, chainRegistry, dbModule, exitEngine, detector, exitManager, db };
+    currentGraph = { bot, chainRegistry, dbModule, exitEngine, detector, exitManager, telegramListener, db };
     return currentGraph;
 }
 
@@ -450,7 +456,7 @@ export function resetTestState(): void {
     st.broadcasts = [];
     st.httpRoutes = [];
     st.httpLog = [];
-    st.telegram = { clients: [] };
+    st.telegram = { clients: [], handlers: [] };
     st.timeline = createTimeline();
     st.violations = [];
     // Each folder's disposer removed it already (a failed removal failed the test by name).
@@ -710,6 +716,10 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         await step('clear routes', () => {
             if (st.node === built.node) st.node = null;
             st.httpRoutes = [];
+        });
+        await step('clear Telegram handlers', () => {
+            st.telegram.handlers.length = 0;
+            st.telegram.clients.length = 0;
         });
         await step('restore clock', () => {
             if (installedClock && vi.isFakeTimers()) vi.useRealTimers();
@@ -1114,6 +1124,12 @@ export async function restartGraph<D extends ScenarioDexType>(scenario: Scenario
         }
     };
     await stopGraphParts(built, step);
+    await step('drop the old graph Telegram client', () => {
+        // The old process's Telegram client and its handlers die with it; a delivery after the
+        // restart reaches only a handler the new graph registers.
+        st.telegram.handlers.length = 0;
+        st.telegram.clients.length = 0;
+    });
     await step('close the old graph sockets', () => {
         for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
         FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));

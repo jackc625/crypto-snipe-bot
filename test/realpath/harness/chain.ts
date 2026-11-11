@@ -106,6 +106,17 @@ export interface HttpReply {
 
 export type HttpHandler = (req: HttpRequestInfo) => HttpReply | Promise<HttpReply>;
 
+/**
+ * One handler registered on the Telegram client fake (setup.ts): the callback the real
+ * src/telegramListener.ts passes to addEventHandler, the event builder it passed with it, and the
+ * client it was registered on (plan 23-27). telegram.ts delivers to these.
+ */
+export interface TelegramHandlerEntry {
+    handler: unknown;
+    builder: unknown;
+    client: unknown;
+}
+
 export interface HarnessState {
     seq: number;
     seamsInstalled: boolean;
@@ -124,7 +135,8 @@ export interface HarnessState {
     httpRoutes: HttpRoute[];
     /** Every axios call; `params` is the request's axios `params` (the query string), as given. */
     httpLog: Array<{ seq: number; method: string; url: string; data: unknown; params?: unknown; matched: boolean }>;
-    telegram: { clients: unknown[] };
+    /** The Telegram client fake's record: every client built and every handler registered, in order. */
+    telegram: { clients: unknown[]; handlers: TelegramHandlerEntry[] };
     /** Awaited by disposeScenarios() in reverse order. */
     disposers: Array<() => Promise<void>>;
     /** Set by world.ts; the axios mock in setup.ts delegates to it. */
@@ -153,7 +165,7 @@ export function harnessState(): HarnessState {
             broadcasts: [],
             httpRoutes: [],
             httpLog: [],
-            telegram: { clients: [] },
+            telegram: { clients: [], handlers: [] },
             disposers: [],
             routeAxios: null,
             timeline: null,

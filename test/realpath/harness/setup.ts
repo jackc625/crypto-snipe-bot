@@ -133,23 +133,33 @@ vi.mock('axios', () => {
     return { default: axios, ...axios };
 });
 
+// The Telegram client fake (plan 23-27): the real allowlist handler is an inline function inside
+// src/telegramListener.ts startTelegramListener, so a fake client that keeps what the listener
+// registers is the only way a test can reach it (SPEC Background). The client keeps its
+// constructor arguments; connect, disconnect and destroy resolve, with the real signatures
+// (gramjs TelegramClient.d.ts: connect(): Promise<boolean>); addEventHandler(handler, builder)
+// appends { handler, builder, client } to telegram.handlers on the shared harness state, which
+// test/realpath/harness/telegram.ts delivers to. Nothing here ever opens a connection.
 vi.mock('telegram', () => {
     const KEY = Symbol.for('csb.realpath.harness');
+    type TelegramRecord = { clients: unknown[]; handlers: Array<{ handler: unknown; builder: unknown; client: unknown }> };
+    const record = (): TelegramRecord => {
+        const s = (globalThis as unknown as Record<symbol, { telegram: TelegramRecord } | undefined>)[KEY];
+        if (!s) throw new Error('realpath harness: state missing when the Telegram client fake was used');
+        return s.telegram;
+    };
     class TelegramClient {
         readonly session: unknown;
         readonly apiId: unknown;
         readonly apiHash: unknown;
         readonly options: unknown;
-        readonly handlers: Array<{ handler: unknown; event: unknown }> = [];
         connected = false;
         constructor(session: unknown, apiId: unknown, apiHash: unknown, options: unknown) {
             this.session = session;
             this.apiId = apiId;
             this.apiHash = apiHash;
             this.options = options;
-            const s = (globalThis as unknown as Record<symbol, { telegram: { clients: unknown[] } } | undefined>)[KEY];
-            if (!s) throw new Error('realpath harness: state missing when a Telegram client was built');
-            s.telegram.clients.push(this);
+            record().clients.push(this);
         }
         async connect(): Promise<boolean> {
             this.connected = true;
@@ -161,12 +171,13 @@ vi.mock('telegram', () => {
         async destroy(): Promise<void> {
             this.connected = false;
         }
-        addEventHandler(handler: unknown, event: unknown): void {
-            this.handlers.push({ handler, event });
+        addEventHandler(handler: unknown, builder?: unknown): void {
+            record().handlers.push({ handler, builder, client: this });
         }
-        removeEventHandler(handler: unknown): void {
-            const i = this.handlers.findIndex((h) => h.handler === handler);
-            if (i >= 0) this.handlers.splice(i, 1);
+        removeEventHandler(handler: unknown, builder?: unknown): void {
+            const list = record().handlers;
+            const i = list.findIndex((h) => h.handler === handler && h.client === this && (builder === undefined || h.builder === builder));
+            if (i >= 0) list.splice(i, 1);
         }
     }
     return { TelegramClient };
