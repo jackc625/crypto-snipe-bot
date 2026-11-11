@@ -150,6 +150,12 @@
         "to_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
         "findings": "none",
         "note": "Reviewed. AST gate over vi.mock family calls; reads source only; exits 1 on a broken specifier; tested by viMockGate.test.ts."
+      },
+      {
+        "from_sha": "27f21a85598e9e7def67b63bcbe7ce8f1eb38a5b",
+        "to_sha": "1669fa5771408421c198073100aa498bd058b02d",
+        "findings": "none",
+        "note": "Reviewed by plan 23-04 (git diff 27f21a8 1669fa5 -- scripts/check-vi-mock-paths.ts): adds export to collectViBindings, isViReceiver, mockMethodOf, literalSpecifier, loadResolverOptions and the ResolverOptions/ViBindings types, and turns resolves() into resolveSpecifier() returning the resolved file; resolves() now wraps it and is truthy on exactly the same branches (built-in, TypeScript resolution, createRequire fallback). No behavior change; importing the module runs no check (main() only when executed directly)."
       }
     ]
   },

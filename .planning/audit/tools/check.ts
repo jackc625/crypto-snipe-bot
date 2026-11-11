@@ -7,7 +7,7 @@
 //
 // Usage (Node 22.16.0, ABI 127; D-21):
 //   PATH="$N22:$PATH" node node_modules/ts-node/dist/bin.js .planning/audit/tools/check.ts \
-//       --stage partial|consolidation|final [--slice <SLICE>]... [--root <dir>] [--repo <dir>]
+//       --stage partial|triage|consolidation|final [--slice <SLICE>]... [--root <dir>] [--repo <dir>]
 //   PATH="$N22:$PATH" node node_modules/ts-node/dist/bin.js .planning/audit/tools/check.ts --self-test
 //
 // Stages:
@@ -20,6 +20,14 @@
 //                  unresolved reference) print as PENDING (exit stays 0).
 //                  --slice <S> (repeatable, partial only) limits the per-file
 //                  checks to that slice's files; ID uniqueness stays global.
+//                  The Phase 23 triage rules (checkTriage) run here too: a
+//                  triage outcome that is not finished prints PENDING.
+//   triage         (Phase 23, D-21) partial's checks with the triage rules
+//                  promoted to FAIL: every member of the frozen triage
+//                  population (inputs/triage-population.json joined with the
+//                  live set) has exactly one outcome and its evidence. It never
+//                  runs the consolidation or HEAD-universe checks, so files this
+//                  phase adds do not need Phase 22 audit rows to pass it.
 //   consolidation  partial with every PENDING promoted to FAIL, plus: RC-01..28
 //                  mapped, required cards present, proposed cards numbered,
 //                  20 sweep cells per sweep slice and every finding in the cells
@@ -53,6 +61,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as cp from 'child_process';
+import * as ts from 'typescript';
 import {
     Io,
     consoleIo,
@@ -95,8 +104,8 @@ import { run as runSliceFiles } from './slice-files';
 import { run as runRender, mergedSweep } from './render';
 
 type Level = 'FAIL' | 'PENDING' | 'WARN';
-type Stage = 'partial' | 'consolidation' | 'final';
-const STAGES: Stage[] = ['partial', 'consolidation', 'final'];
+type Stage = 'partial' | 'triage' | 'consolidation' | 'final';
+const STAGES: Stage[] = ['partial', 'triage', 'consolidation', 'final'];
 
 class Report {
     private items = new Set<string>();
@@ -158,6 +167,11 @@ function pend(R: Reg): Level {
     return R.strict ? 'FAIL' : 'PENDING';
 }
 
+/** Level for Phase 23 triage work that may legitimately not be finished yet: FAIL only at stage triage. */
+function tri(R: Reg): Level {
+    return R.stage === 'triage' ? 'FAIL' : 'PENDING';
+}
+
 function findingSlice(id: string): string | undefined {
     return ID_RE.finding.exec(id)?.[1];
 }
@@ -189,7 +203,9 @@ function loadRegister(root: string, repo: string, stage: Stage, sel: Set<string>
         root,
         repo,
         stage,
-        strict: stage !== 'partial',
+        // Only consolidation and final promote PENDING to FAIL; triage keeps
+        // Phase 22's unfinished-audit items at PENDING and fails on its own rules.
+        strict: stage === 'consolidation' || stage === 'final',
         cfg,
         slices: cfg.slices,
         sliceBy: new Map(cfg.slices.filter((s) => s && typeof s.slice === 'string').map((s) => [s.slice, s])),
@@ -316,10 +332,280 @@ function checkFinding(R: Reg, f: RegFile): void {
     if ('found_date' in d && !ID_RE.date.test(String(d.found_date))) add('found_date', 'must be YYYY-MM-DD');
     if ('audited_sha' in d && !ID_RE.sha.test(String(d.audited_sha))) add('audited_sha', 'must be a full 40-hex commit SHA');
     checkNac09(R, file, evidenceRefs(d));
-    // NAC-10 / P10
-    if (rc.length && d.status === 'NOT-A-BUG') add('status', `NAC-10: research candidate ${rc.join(', ')} may not be closed as NOT-A-BUG in Phase 22`);
+    // NAC-10 / P10. Phase 23 (D-21) lifts the Phase 22 ban: a research candidate
+    // may close as NOT-A-BUG only through a Phase 23 triage record, whose own
+    // rules (evidence, and an operator ruling for S0/S1) checkTriage enforces.
+    if (rc.length && d.status === 'NOT-A-BUG' && !isObj(d.triage))
+        add('status', `NAC-10: research candidate ${rc.join(', ')} may be closed as NOT-A-BUG only with a Phase 23 triage record (triage block with outcome NOT-A-BUG)`);
+    if ('triage' in d) checkTriageField(R, file, d);
     if (rc.length && SEVERITIES.includes(d.research_suggested_severity) && SEVERITIES.includes(d.severity) && sevNum(d.severity) > sevNum(d.research_suggested_severity) && !isStr(d.severity_rationale))
         add('severity_rationale', `NAC-10: severity ${d.severity} is below the research suggestion ${d.research_suggested_severity} without a written severity_rationale`);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 23 triage record (D-21; AC-08, AC-11, AC-13, AC-16, AC-17, AC-18)
+// ---------------------------------------------------------------------------
+
+export const TRIAGE_OUTCOMES = ['confirmed', 'NOT-A-BUG', 'fixed', 'unreproduced'];
+export const TRIAGE_KEYS = [
+    'outcome', 'phase', 'note', 'test_id', 'proof', 'rail_test', 'ruling_ref', 'needs_fork', 'fork_question',
+    'fork_ref', 'manual_evidence', 'proven_claims', 'open_claims', 'evidence',
+];
+/** The one literal a harness self-test may cite; read by no finding rule (ID_RE.finding refuses it). */
+export const HARNESS_SELFTEST_ID = 'HARNESS-SELFTEST';
+/** The evidence zone: every <finding ID>.test.ts at any depth under this folder. */
+export const TRIAGE_DIR = 'test/realpath/triage/';
+/** The only file that may declare the marker function. */
+export const KNOWN_BUG_DECL_FILE = 'test/realpath/harness/knownBug.ts';
+export const POPULATION_REL = 'inputs/triage-population.json';
+export const EVIDENCE_REL = 'inputs/triage-evidence.json';
+/** Same claim shape the marker itself enforces (test/realpath/harness/knownBug.ts CLAIM_RE). */
+export const CLAIM_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Operator review records: reviews/<ID>.json, for example TRIAGE-REVIEW-01. */
+export const REVIEW_ID_RE = /^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-\d{2,}$/;
+export const UFV_ID_RE = /^UFV-\d{2,}$/;
+/** Outcome -> the finding statuses it is consistent with (unreproduced keeps its open status). */
+const OUTCOME_STATUS: Record<string, string[]> = {
+    confirmed: ['confirmed'],
+    'NOT-A-BUG': ['NOT-A-BUG'],
+    fixed: ['fixed', 'verified'],
+    unreproduced: ['candidate', 'confirmed', 'decided'],
+};
+
+function isStrArray(v: unknown): v is string[] {
+    return Array.isArray(v) && v.every((x) => isStr(x));
+}
+
+/** Schema of the optional `triage` block (PROTOCOL.md "Phase 23 triage record"). */
+function checkTriageField(R: Reg, file: string, d: any): void {
+    const add = (field: string, msg: string) => R.r.add('FAIL', file, field, msg);
+    const t = d.triage;
+    if (!isObj(t)) {
+        add('triage', 'must be an object {outcome, phase, note, ...} (Phase 23 triage record)');
+        return;
+    }
+    for (const k of Object.keys(t)) if (!TRIAGE_KEYS.includes(k)) add(`triage.${k}`, `unknown triage key ${k} (allowed: ${TRIAGE_KEYS.join(', ')})`);
+    if (!TRIAGE_OUTCOMES.includes(t.outcome)) add('triage.outcome', `must be one of ${TRIAGE_OUTCOMES.join(', ')}`);
+    if (t.phase !== '23') add('triage.phase', 'must be the string "23"');
+    if (!isStr(t.note)) add('triage.note', 'must be a non-empty one-line note');
+    const allowed = OUTCOME_STATUS[String(t.outcome)];
+    if (allowed && !allowed.includes(d.status))
+        add('status', `triage outcome ${t.outcome} needs status ${allowed.join(' or ')} (status is ${d.status})${t.outcome === 'unreproduced' ? '; an unreproduced entry stays open' : ''}`);
+    if ('test_id' in t && !ID_RE.finding.test(String(t.test_id))) add('triage.test_id', 'must be the finding ID of the triage test file that asserts this entry (test/realpath/triage/**/<ID>.test.ts)');
+    for (const k of ['proof', 'rail_test', 'fork_question', 'manual_evidence']) if (k in t && !isStr(t[k])) add(`triage.${k}`, 'must be a non-empty string');
+    if ('ruling_ref' in t && !REVIEW_ID_RE.test(String(t.ruling_ref))) add('triage.ruling_ref', 'must name an operator review record (reviews/<ID>.json, for example TRIAGE-REVIEW-01)');
+    if ('fork_ref' in t && !UFV_ID_RE.test(String(t.fork_ref))) add('triage.fork_ref', 'must name a UFV entry (UFV-NN) in inputs/unrun-fork-verifications.json');
+    if ('needs_fork' in t && typeof t.needs_fork !== 'boolean') add('triage.needs_fork', 'must be true or false');
+    for (const k of ['proven_claims', 'open_claims']) {
+        if (!(k in t)) continue;
+        if (!isStrArray(t[k])) add(`triage.${k}`, 'must be an array of non-empty strings');
+        else if (new Set(t[k]).size !== t[k].length) add(`triage.${k}`, 'must not repeat a claim');
+    }
+    if (isStrArray(t.proven_claims) && t.proven_claims.some((c) => !CLAIM_RE.test(c))) add('triage.proven_claims', 'each proven claim is the kebab-case claim literal of a knownBug call');
+    if (isStrArray(t.proven_claims) && isStrArray(t.open_claims) && t.proven_claims.some((c) => t.open_claims.includes(c)))
+        add('triage.open_claims', 'a claim cannot be both proven and open');
+    if ('evidence' in t) {
+        if (!Array.isArray(t.evidence) || !t.evidence.length) add('triage.evidence', 'must be a non-empty array of {type, ref, note}');
+        else {
+            t.evidence.forEach((e: any, i: number) => {
+                if (!isObj(e) || !EVIDENCE_TYPES.includes(e.type) || !isStr(e.ref) || !isStr(e.note))
+                    add(`triage.evidence[${i}]`, 'must be {type: code|command, ref: non-empty, note: non-empty}');
+                else if (e.type === 'code' && !ID_RE.codeRef.test(e.ref)) add(`triage.evidence[${i}].ref`, `code ref '${e.ref}' must be path:line[-line]@sha`);
+            });
+            checkNac09(R, file, t.evidence.map((e: any) => String(e?.ref ?? '')));
+        }
+    }
+}
+
+/** One knownBug call found by the AST scan. */
+interface KbCall {
+    file: string;
+    line: number;
+    id: string | null;
+    claim: string | null;
+}
+
+const SCAN_EXT = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+
+function scriptKindOf(rel: string): ts.ScriptKind {
+    if (/\.tsx$/.test(rel)) return ts.ScriptKind.TSX;
+    if (/\.jsx$/.test(rel)) return ts.ScriptKind.JSX;
+    if (/\.(?:js|mjs|cjs)$/.test(rel)) return ts.ScriptKind.JS;
+    return ts.ScriptKind.TS;
+}
+
+/** Every source file under <repo>/test/, repo-relative with forward slashes, sorted. */
+function testSourceFiles(repo: string): string[] {
+    const out: string[] = [];
+    const walk = (abs: string, rel: string) => {
+        for (const ent of fs.readdirSync(abs, { withFileTypes: true })) {
+            if (ent.name === 'node_modules') continue;
+            const a = path.join(abs, ent.name);
+            const r = `${rel}/${ent.name}`;
+            if (ent.isDirectory()) walk(a, r);
+            else if (ent.isFile() && SCAN_EXT.test(ent.name)) out.push(r);
+        }
+    };
+    const top = path.join(repo, 'test');
+    if (fs.existsSync(top)) walk(top, 'test');
+    return out.sort(cmp);
+}
+
+/** True when a module specifier names the marker module (last path segment knownBug, any extension). */
+function isKnownBugModule(spec: string): boolean {
+    const last = spec.split('/').pop() ?? '';
+    return last.replace(/\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, '') === 'knownBug';
+}
+
+/** The literal claim of a knownBug spec object, or null when it is not a literal the scan can trust. */
+function literalClaim(arg: ts.Expression | undefined): string | null {
+    if (!arg || !ts.isObjectLiteralExpression(arg)) return null;
+    let claim: string | null = null;
+    for (const p of arg.properties) {
+        const name = p.name && (ts.isIdentifier(p.name) || ts.isStringLiteralLike(p.name)) ? p.name.text : undefined;
+        if (ts.isSpreadAssignment(p)) {
+            // A spread after the claim could replace it at run time.
+            claim = null;
+            continue;
+        }
+        if (name !== 'claim') continue;
+        claim = ts.isPropertyAssignment(p) && ts.isStringLiteralLike(p.initializer) ? p.initializer.text : null;
+    }
+    return claim;
+}
+
+interface KbScan {
+    /** Calls in the evidence zone citing anything but the reserved literal: these feed the finding rules. */
+    zone: KbCall[];
+    /** Location-guard failures: file, line, message. */
+    problems: { file: string; line: number; msg: string }[];
+}
+
+/**
+ * AST scan of every source file under test/ for the name knownBug (no type-checking).
+ * Only a direct call in a file test/realpath/triage/**\/<finding ID>.test.ts feeds a finding rule;
+ * the location guard refuses every other use except the reserved literal outside the triage folder.
+ */
+function scanKnownBug(R: Reg): KbScan {
+    const zone: KbCall[] = [];
+    const problems: { file: string; line: number; msg: string }[] = [];
+    for (const rel of testSourceFiles(R.repo)) {
+        const text = fs.readFileSync(path.join(R.repo, ...rel.split('/')), 'utf8');
+        if (!text.includes('knownBug')) continue;
+        const sf = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true, scriptKindOf(rel));
+        const inTriageDir = rel.startsWith(TRIAGE_DIR);
+        const base = path.posix.basename(rel);
+        const zoneFile = inTriageDir && base.endsWith('.test.ts') && R.fById.has(base.slice(0, -'.test.ts'.length));
+        const lineOf = (n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+        const refuse = (n: ts.Node, msg: string) => problems.push({ file: rel, line: lineOf(n), msg });
+        const visit = (node: ts.Node): void => {
+            // Module-level forms that would reach the marker without its name.
+            if (ts.isImportDeclaration(node) && ts.isStringLiteralLike(node.moduleSpecifier) && isKnownBugModule(node.moduleSpecifier.text)) {
+                const c = node.importClause;
+                if (c?.name) refuse(node, 'default import of the knownBug module; import { knownBug } by name with no alias');
+                if (c?.namedBindings && ts.isNamespaceImport(c.namedBindings)) refuse(node, 'namespace import of the knownBug module; import { knownBug } by name with no alias');
+            } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier) && isKnownBugModule(node.moduleSpecifier.text)) {
+                refuse(node, 're-export of the knownBug module');
+            } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && ts.isStringLiteralLike(node.moduleReference.expression) && isKnownBugModule(node.moduleReference.expression.text)) {
+                refuse(node, 'import = require() of the knownBug module');
+            } else if (
+                ts.isCallExpression(node) &&
+                (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+                node.arguments[0] &&
+                ts.isStringLiteralLike(node.arguments[0]) &&
+                isKnownBugModule(node.arguments[0].text)
+            ) {
+                refuse(node, 'require() or import() of the knownBug module');
+            }
+            if (ts.isIdentifier(node) && node.text === 'knownBug') {
+                const p = node.parent;
+                if (ts.isCallExpression(p) && p.expression === node) {
+                    const a1 = p.arguments[1];
+                    const id = a1 && ts.isStringLiteralLike(a1) ? a1.text : null;
+                    const call: KbCall = { file: rel, line: lineOf(p), id, claim: literalClaim(p.arguments[2]) };
+                    if (id === null) refuse(p, `knownBug's second argument must be a string literal (a finding ID, or ${HARNESS_SELFTEST_ID} outside ${TRIAGE_DIR}); a computed ID cannot be located by finding ID`);
+                    else if (id === HARNESS_SELFTEST_ID) {
+                        if (inTriageDir) refuse(p, `knownBug(${id}): the reserved self-test literal may not be used inside ${TRIAGE_DIR}`);
+                    } else if (!zoneFile)
+                        refuse(p, `knownBug(${id}) is outside the evidence zone ${TRIAGE_DIR}**/<finding ID>.test.ts, so it proves nothing; only ${HARNESS_SELFTEST_ID} may be cited elsewhere`);
+                    else zone.push(call);
+                } else if (ts.isImportSpecifier(p) && p.name === node && !p.propertyName) {
+                    // import { knownBug } from '.../knownBug': allowed.
+                } else if (ts.isFunctionDeclaration(p) && p.name === node && rel === KNOWN_BUG_DECL_FILE) {
+                    // The marker's own declaration: allowed.
+                } else
+                    refuse(node, `use of the name knownBug other than a direct call, an unaliased named import or its declaration in ${KNOWN_BUG_DECL_FILE} (an alias, re-export or value use hides calls from the D-21 scan)`);
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(sf);
+    }
+    return { zone, problems };
+}
+
+interface Population {
+    /** Frozen IDs joined with the live computation. */
+    ids: string[];
+    frozen: Set<string>;
+    /** Severity at freeze, for the S0/S1 rules (a later downgrade never removes the ruling requirement). */
+    frozenSev: Map<string, string>;
+}
+
+function triagePopulation(R: Reg): Population {
+    const rel = POPULATION_REL;
+    const f = readJson(path.join(R.root, ...rel.split('/')), rel);
+    const frozen = new Set<string>();
+    const frozenSev = new Map<string, string>();
+    if (f.error) R.r.add(tri(R), rel, '(file)', `the frozen triage population is missing or unreadable (${f.error}); it is written once from the register (D-21)`);
+    else if (!isObj(f.data)) R.r.add('FAIL', rel, '(file)', 'must be {frozen_at_sha, count, ids, severity_at_freeze}');
+    else {
+        const d = f.data;
+        if (!ID_RE.sha.test(String(d.frozen_at_sha))) R.r.add('FAIL', rel, 'frozen_at_sha', 'must be a full 40-hex commit SHA');
+        if (!isStrArray(d.ids) || d.ids.some((x) => !ID_RE.finding.test(x))) R.r.add('FAIL', rel, 'ids', 'must be an array of finding IDs');
+        else {
+            const sorted = [...d.ids].sort(cmp);
+            if (sorted.join('\n') !== d.ids.join('\n') || new Set(sorted).size !== sorted.length) R.r.add('FAIL', rel, 'ids', 'must be sorted and unique');
+            if (d.count !== d.ids.length) R.r.add('FAIL', rel, 'count', `must equal the number of ids (${d.ids.length})`);
+            for (const id of d.ids) frozen.add(id);
+        }
+        if ('severity_at_freeze' in d) {
+            const s = d.severity_at_freeze;
+            if (!isObj(s) || Object.keys(s).sort(cmp).join('\n') !== [...frozen].sort(cmp).join('\n') || Object.values(s).some((v) => !SEVERITIES.includes(String(v))))
+                R.r.add('FAIL', rel, 'severity_at_freeze', 'must map every frozen ID, and only those, to S0..S4');
+            else for (const [k, v] of Object.entries(s)) frozenSev.set(k, String(v));
+        }
+    }
+    for (const id of [...frozen].sort(cmp)) if (!R.fById.has(id)) R.r.add('FAIL', rel, 'ids', `frozen triage population ID ${id} names no finding (a frozen ID is never dropped)`);
+    const live = [...R.fById.values()].filter((F) => !F.duplicate_of && ((Array.isArray(F.rc) && F.rc.length) || F.severity === 'S0' || F.severity === 'S1')).map((F) => String(F.id));
+    const ids = [...new Set([...frozen, ...live])].sort(cmp);
+    return { ids, frozen, frozenSev };
+}
+
+/** The D-21 rules over the register, the test tree and (stage triage) the run evidence. */
+function checkTriage(R: Reg): void {
+    const pop = triagePopulation(R);
+    const scan = scanKnownBug(R);
+    for (const p of scan.problems) R.r.add('FAIL', p.file, `knownBug(line ${p.line})`, p.msg);
+    const callsFor = new Map<string, KbCall[]>();
+    for (const c of scan.zone) (callsFor.get(String(c.id)) ?? callsFor.set(String(c.id), []).get(String(c.id))!).push(c);
+
+    // Every population member has a triage record (FAIL at stage triage, PENDING otherwise).
+    for (const id of pop.ids) {
+        const F = R.fById.get(id);
+        if (!F || !inSel(R, findingSlice(id))) continue;
+        if (!isObj(F.triage)) R.r.add(tri(R), fileOfFinding(R, id), 'triage', `${id} is in the Phase 23 triage population and has no triage record (outcome ${TRIAGE_OUTCOMES.join(' | ')})`);
+    }
+
+    // Per-outcome rules, for every finding that carries a triage record.
+    for (const F of R.fById.values()) {
+        const t = F.triage;
+        if (!isObj(t) || !inSel(R, findingSlice(String(F.id)))) continue;
+        const id = String(F.id);
+        const file = fileOfFinding(R, id);
+        const mine = callsFor.get(id) ?? [];
+        if (t.outcome === 'confirmed' && !mine.length)
+            R.r.add('FAIL', file, 'triage', `${id}: outcome confirmed needs a knownBug call carrying ${id} in the evidence zone ${TRIAGE_DIR}**/<finding ID>.test.ts (D-21)`);
+    }
 }
 
 const ESC_REQUIRED = ['id', 'date', 'tier', 'items', 'resolved_items', 'summary', 'presented_at', 'operator_response', 'ruling', 'phase_continued'];
@@ -920,8 +1206,11 @@ export function check(root: string, repo: string, stage: Stage, slicesSel: strin
 
     checkEscalationLinks(R);
     checkReferences(R);
+    checkTriage(R);
 
-    if (stage !== 'partial') {
+    // Consolidation and the universe checks belong to Phase 22's audit
+    // completeness; stage triage (Phase 23) never runs them.
+    if (stage === 'consolidation' || stage === 'final') {
         checkConsolidation(R);
         if (stage === 'consolidation') checkUniverseAt(R, R.baseSha, 'audit_base_sha');
         else {
@@ -944,13 +1233,14 @@ export function run(argv: string[], io: Io = consoleIo): number {
     try {
         const { flags, positional } = parseArgs(argv, SPEC as unknown as Record<string, 'string' | 'bool' | 'multi'>);
         if (flags.help) {
-            io.out('usage: check.ts --stage partial|consolidation|final [--slice S]... [--root d] [--repo d] | --self-test');
+            io.out('usage: check.ts --stage partial|triage|consolidation|final [--slice S]... [--root d] [--repo d] | --self-test');
+            io.out('  triage: Phase 23 gate (D-21): per-file checks plus the triage rules as FAIL; never the consolidation or HEAD-universe checks');
             return 0;
         }
         if (positional.length) throw new UsageError(`unexpected argument '${positional[0]}'`);
         if (flags['self-test']) return selfTest(io);
         const stage = flags.stage as Stage;
-        if (!STAGES.includes(stage)) throw new UsageError('--stage must be partial, consolidation or final');
+        if (!STAGES.includes(stage)) throw new UsageError('--stage must be partial, triage, consolidation or final');
         const sel = (flags.slice as string[] | undefined) ?? [];
         if (sel.length && stage !== 'partial') throw new UsageError('--slice is only valid with --stage partial');
         const loc = locations(flags);
@@ -1168,6 +1458,26 @@ function buildFixture(): Fixture {
     F.push(finding('AUD-SRCB-001', { duplicate_of: 'AUD-SRC-001', files: ['src/b.ts'], reported_by: ['second-model'] }, base));
     F.push(finding('AUD-SRCB-002', { pre_phase_key: 'fixture-key', escalation_ref: 'ESC-PRE-01', files: ['src/b.ts'] }, base));
     F.push(finding('AUD-RAIL-001', { area: 'test', severity: 'S1', capital_impact: 'EXPOSURE', tags: ['rail'], classes: ['C18'], files: ['test/helpers/h.ts'], escalation_ref: 'ESC-RAIL-01' }, base));
+    // Phase 23 triage (D-21): the corrected fixture is fully triaged so it passes
+    // stage triage as well. Population = non-duplicate RC or S0/S1 entries:
+    // AUD-SRC-001..029 confirmed (shared-cause file named for AUD-SRC-001, own
+    // file for AUD-SRC-029) and AUD-RAIL-001 fixed by a rail test.
+    const popIds: string[] = [];
+    const popSev: Record<string, string> = {};
+    for (const d of F) {
+        if (d.duplicate_of || !(d.rc.length || d.severity === 'S0' || d.severity === 'S1')) continue;
+        popIds.push(d.id);
+        popSev[d.id] = d.severity;
+        if (d.id === 'AUD-RAIL-001') {
+            d.status = 'fixed';
+            d.triage = { outcome: 'fixed', phase: '23', note: 'fixture: the rail closes it', proof: 'fixture RED proof row 1', rail_test: FIXTURE_RAIL_TEST };
+        } else {
+            d.status = 'confirmed';
+            d.triage = { outcome: 'confirmed', phase: '23', note: 'fixture: reproduced on the real path', test_id: d.id === 'AUD-SRC-029' ? 'AUD-SRC-029' : 'AUD-SRC-001' };
+        }
+    }
+    popIds.sort(cmp);
+    putJson(root, POPULATION_REL, { frozen_at_sha: base, count: popIds.length, ids: popIds, severity_at_freeze: popSev });
     for (const d of F) putJson(root, `findings/${d.id}.json`, d);
 
     putJson(root, 'escalations/ESC-SRC-01.json', esc('ESC-SRC-01', ['rc:RC-10'], ['AUD-SRC-010'], { tier: 'pre-phase' }));
@@ -1211,7 +1521,33 @@ function buildFixture(): Fixture {
     for (const k of AC37_FIELDS) th[k] = 'fixture';
     Object.assign(th, { id: 'TH-SRC-01', definition_sites: ['src/a.ts:1'], flags: [], recommendation: null, od_ref: null, env_key: null, hardcoded: true });
     putJson(root, 'thresholds/SRC.json', [th]);
+    // Triage test files live in the fixture repo's working tree, untracked, so
+    // the git-based ledger and universe checks never see them.
+    for (const [rel, content] of Object.entries(fixtureTestFiles())) put(repo, rel, content);
     return { tmp, repo, root, base, head, side };
+}
+
+const FIXTURE_RAIL_TEST = 'fixture rails > denies the fixture reach';
+
+/** One knownBug call line for a fixture test file (claim omitted when undefined). */
+function kbCall(id: string, claim?: string): string {
+    const c = claim === undefined ? '' : `claim: '${claim}', `;
+    return `knownBug(ctx, '${id}', { ${c}correct: 1, observed: 2, actual: 2, expectedPlain: 'fixture expected', actualPlain: 'fixture actual' });`;
+}
+
+function kbFile(body: string[], imp = "import { knownBug } from '../harness/knownBug';"): string {
+    return `${imp}\nit('fixture case', (ctx) => {\n${body.map((b) => '    ' + b).join('\n')}\n});\n`;
+}
+
+function fixtureTestFiles(): Record<string, string> {
+    const shared: string[] = [];
+    for (let n = 1; n <= 28; n++) shared.push(kbCall(`AUD-SRC-${String(n).padStart(3, '0')}`, 'fixture-claim'));
+    return {
+        [KNOWN_BUG_DECL_FILE]: 'export function knownBug(ctx: unknown, id: string, spec: unknown): void {\n    void ctx;\n    void id;\n    void spec;\n}\n',
+        'test/realpath/triage/AUD-SRC-001.test.ts': kbFile(shared),
+        'test/realpath/triage/AUD-SRC-029.test.ts': kbFile([kbCall('AUD-SRC-029', 'fixture-claim')]),
+        'test/unit/rail.test.ts': `// closes-finding: AUD-RAIL-001 (fixture rail test)\nit('denies the fixture reach', () => {});\n`,
+    };
 }
 
 function cloneRoot(fx: Fixture, name: string): string {
@@ -1280,10 +1616,13 @@ function selfTest(io: Io): number {
             const res = runCheckIn(root, repo, 'partial');
             record('03 evidence citing a SUMMARY doc fails (NAC-09)', hasFail(res, 'NAC-09'), firstFail(res, 'NAC-09'));
         }
-        // 4. RC entry closed as NOT-A-BUG (NAC-10), and severity lowered without rationale
+        // 4. RC entry closed as NOT-A-BUG with no Phase 23 triage record (NAC-10), and severity lowered without rationale
         {
             const root = mutate('04', (r) => {
-                edit(r, 'findings/AUD-SRC-004.json', (d) => (d.status = 'NOT-A-BUG'));
+                edit(r, 'findings/AUD-SRC-004.json', (d) => {
+                    d.status = 'NOT-A-BUG';
+                    delete d.triage;
+                });
                 edit(r, 'findings/AUD-SRC-006.json', (d) => {
                     d.research_suggested_severity = 'S1';
                     d.severity = 'S3';
@@ -1291,8 +1630,8 @@ function selfTest(io: Io): number {
             });
             const res = runCheckIn(root, repo, 'partial');
             record(
-                '04 RC entry NOT-A-BUG / severity lowered without rationale fails (NAC-10)',
-                hasFail(res, 'NAC-10: research candidate RC-04') && hasFail(res, 'NAC-10: severity S3 is below'),
+                '04 RC entry NOT-A-BUG with no Phase 23 triage record / severity lowered without rationale fails (NAC-10)',
+                hasFail(res, 'NAC-10: research candidate RC-04 may be closed as NOT-A-BUG only with a Phase 23 triage record') && hasFail(res, 'NAC-10: severity S3 is below'),
                 firstFail(res, 'NAC-10'),
             );
         }
@@ -1429,11 +1768,174 @@ function selfTest(io: Io): number {
                 firstFail(res, 'NAC-12'),
             );
         }
+        // ---- Phase 23 triage rules (D-21) ----
+        // Writes test files into the fixture repo's working tree for one case and
+        // removes them afterwards, so no case sees another's files.
+        const withFiles = <T>(files: Record<string, string>, fn: () => T): T => {
+            for (const rel of Object.keys(files)) if (fs.existsSync(path.join(repo, ...rel.split('/')))) throw new Error(`self-test: ${rel} already exists in the fixture repo`);
+            try {
+                for (const [rel, content] of Object.entries(files)) put(repo, rel, content);
+                return fn();
+            } finally {
+                for (const rel of Object.keys(files)) fs.rmSync(path.join(repo, ...rel.split('/')), { force: true });
+            }
+        };
+        const hasLine = (r: Res, file: string, s: string) => r.code === 1 && r.lines.some((l) => l.startsWith(`FAIL ${file} `) && l.includes(s));
+        // A register where AUD-SRCB-002 (S2, outside the population) is recorded confirmed.
+        const confirmedRoot = (name: string) =>
+            mutate(name, (r) =>
+                edit(r, 'findings/AUD-SRCB-002.json', (d) => {
+                    d.status = 'confirmed';
+                    d.triage = { outcome: 'confirmed', phase: '23', note: 'fixture', test_id: 'AUD-SRCB-002' };
+                }),
+            );
+        const NOCALL = 'AUD-SRCB-002: outcome confirmed needs a knownBug call carrying AUD-SRCB-002';
+        const OUTSIDE = 'knownBug(AUD-SRCB-002) is outside the evidence zone';
+        const HARNESS = 'test/realpath/harnessCapture.test.ts';
+        const HARNESS_IMPORT = "import { knownBug } from './harness/knownBug';";
+        // 17. confirmed needs a knownBug call carrying its own ID in the evidence zone
+        {
+            const root = confirmedRoot('17');
+            const no = runCheckIn(root, repo, 'partial');
+            const yes = withFiles({ 'test/realpath/triage/AUD-SRCB-002.test.ts': kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            record('17 confirmed outcome with no knownBug call carrying its ID fails; with the call it passes (D-21)', hasFail(no, NOCALL) && passes(yes), `${firstFail(no, NOCALL)} | with call exit ${yes.code} ${firstFail(yes, 'FAIL')}`);
+        }
+        // 18. stage triage never runs the consolidation or HEAD-universe check
+        {
+            const root = mutate('18', (r) => {
+                edit(r, 'scope.json', (d) => (d.out_of_scope = []));
+                fs.rmSync(path.join(r, 'decisions', 'OD-25.json'));
+            });
+            const t = runCheckIn(root, repo, 'triage');
+            const c = runCheckIn(root, repo, 'consolidation');
+            const f = runCheckIn(root, repo, 'final');
+            record(
+                '18 stage triage passes a tree with a tracked file outside the universe manifest and a missing required card (no consolidation or HEAD-universe check)',
+                passes(t) && hasFail(c, 'docs/x.md (tracked at audit_base_sha) belongs to no slice') && hasFail(c, 'required decision card OD-25 is missing') && hasFail(f, 'docs/x.md (tracked at HEAD) belongs to no slice'),
+                `triage exit ${t.code} ${firstFail(t, 'FAIL')} | consolidation exit ${c.code} | final exit ${f.code}`,
+            );
+        }
+        // 19. the frozen population can never shrink
+        {
+            const sev = mutate('19a', (r) =>
+                edit(r, 'findings/AUD-SRC-029.json', (d) => {
+                    d.severity = 'S3';
+                    d.status = 'candidate';
+                    delete d.triage;
+                }),
+            );
+            const gone = mutate('19b', (r) => fs.rmSync(path.join(r, 'findings', 'AUD-SRC-029.json')));
+            const MSG = 'AUD-SRC-029 is in the Phase 23 triage population and has no triage record';
+            const t = runCheckIn(sev, repo, 'triage');
+            const p = runCheckIn(sev, repo, 'partial');
+            const g = runCheckIn(gone, repo, 'triage');
+            record(
+                '19 a frozen ID changed to S3 is still required (FAIL at triage, PENDING at partial); a frozen ID whose finding file is gone fails',
+                hasFail(t, MSG) && p.code === 0 && p.lines.some((l) => l.startsWith('PENDING ') && l.includes(MSG)) && hasFail(g, 'frozen triage population ID AUD-SRC-029 names no finding'),
+                `${firstFail(t, MSG)} | partial exit ${p.code} | ${firstFail(g, 'frozen triage population')}`,
+            );
+        }
+        // 20-30. knownBug location: only the evidence zone feeds a finding rule
+        {
+            const root = confirmedRoot('20');
+            const res = withFiles({ [HARNESS]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')], HARNESS_IMPORT) }, () => runCheckIn(root, repo, 'partial'));
+            record('20 knownBug location: real ID at the harness path cannot satisfy confirmed', hasFail(res, NOCALL) && hasLine(res, HARNESS, OUTSIDE), `${firstFail(res, NOCALL)} | ${firstFail(res, OUTSIDE)}`);
+        }
+        {
+            const files = { [HARNESS]: kbFile([kbCall(HARNESS_SELFTEST_ID, 'selftest-with-claim'), kbCall(HARNESS_SELFTEST_ID)], HARNESS_IMPORT) };
+            const p = withFiles(files, () => runCheckIn(fx.root, repo, 'partial'));
+            const t = withFiles(files, () => runCheckIn(fx.root, repo, 'triage'));
+            const clean = (r: Res) => passes(r) && !r.lines.some((l) => l.includes(HARNESS));
+            record('21 knownBug location: reserved ID at the harness path cannot orphan (with and without a claim)', clean(p) && clean(t), `partial exit ${p.code} ${firstFail(p, HARNESS)} | triage exit ${t.code} ${firstFail(t, HARNESS)}`);
+        }
+        {
+            const MSG = 'the reserved self-test literal may not be used inside test/realpath/triage/';
+            const a = withFiles({ 'test/realpath/triage/AUD-SRCB-002.test.ts': kbFile([kbCall(HARNESS_SELFTEST_ID, 'selftest-claim')]) }, () => runCheckIn(fx.root, repo, 'partial'));
+            const b = withFiles({ 'test/realpath/triage/helpers/selftest.ts': kbFile([kbCall(HARNESS_SELFTEST_ID, 'selftest-claim')], "import { knownBug } from '../../harness/knownBug';") }, () =>
+                runCheckIn(fx.root, repo, 'partial'),
+            );
+            record(
+                '22 knownBug location: reserved ID inside the triage folder fails (zone file and helper)',
+                hasLine(a, 'test/realpath/triage/AUD-SRCB-002.test.ts', MSG) && hasLine(b, 'test/realpath/triage/helpers/selftest.ts', MSG),
+                `${firstFail(a, MSG)} | ${firstFail(b, MSG)}`,
+            );
+        }
+        {
+            const root = confirmedRoot('23');
+            const a = withFiles({ 'test/realpath/triage/not-a-finding.test.ts': kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            const b = withFiles({ 'test/realpath/triage/AUD-SRC-999.test.ts': kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            record(
+                '23 knownBug location: real ID in a triage file not named for a finding fails and does not satisfy confirmed',
+                hasLine(a, 'test/realpath/triage/not-a-finding.test.ts', OUTSIDE) && hasFail(a, NOCALL) && hasLine(b, 'test/realpath/triage/AUD-SRC-999.test.ts', OUTSIDE) && hasFail(b, NOCALL),
+                `${firstFail(a, OUTSIDE)} | ${firstFail(b, OUTSIDE)}`,
+            );
+        }
+        {
+            const root = confirmedRoot('24');
+            const H = 'test/realpath/triage/fixtures/helper.ts';
+            const res = withFiles({ [H]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')], "import { knownBug } from '../../harness/knownBug';") }, () => runCheckIn(root, repo, 'partial'));
+            record('24 knownBug location: real ID in a triage helper fails and does not satisfy confirmed', hasLine(res, H, OUTSIDE) && hasFail(res, NOCALL), firstFail(res, OUTSIDE));
+        }
+        {
+            const root = confirmedRoot('25');
+            const A = 'test/realpath/triageLookalike.test.ts';
+            const B = 'test/realpath/triage-old/AUD-SRCB-002.test.ts';
+            const a = withFiles({ [A]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')], HARNESS_IMPORT) }, () => runCheckIn(root, repo, 'partial'));
+            const b = withFiles({ [B]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            record('25 knownBug location: lookalike folder is outside the zone (real ID fails, does not satisfy confirmed)', hasLine(a, A, OUTSIDE) && hasFail(a, NOCALL) && hasLine(b, B, OUTSIDE) && hasFail(b, NOCALL), `${firstFail(a, OUTSIDE)} | ${firstFail(b, OUTSIDE)}`);
+        }
+        {
+            const root = confirmedRoot('26');
+            const S = 'test/realpath/scenarios/AUD-SRCB-002.test.ts';
+            const O = 'test/realpath/ordering/AUD-SRCB-002.test.ts';
+            const s = withFiles({ [S]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            const o = withFiles({ [O]: kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')]) }, () => runCheckIn(root, repo, 'partial'));
+            record('26 knownBug location: real ID in scenarios or ordering fails and does not satisfy confirmed', hasLine(s, S, OUTSIDE) && hasFail(s, NOCALL) && hasLine(o, O, OUTSIDE) && hasFail(o, NOCALL), `${firstFail(s, OUTSIDE)} | ${firstFail(o, OUTSIDE)}`);
+        }
+        {
+            const root = confirmedRoot('27');
+            const res = withFiles({ 'test/realpath/triage/nested/AUD-SRCB-002.test.ts': kbFile([kbCall('AUD-SRCB-002', 'fixture-claim')], "import { knownBug } from '../../harness/knownBug';") }, () =>
+                runCheckIn(root, repo, 'partial'),
+            );
+            record('27 knownBug location: nested triage test named for a finding counts', passes(res) && !res.lines.some((l) => l.includes(NOCALL)), `exit ${res.code} ${firstFail(res, 'FAIL')}`);
+        }
+        {
+            const root = confirmedRoot('28');
+            const Z = 'test/realpath/triage/AUD-SRCB-002.test.ts';
+            const USE = 'use of the name knownBug other than a direct call';
+            const alias = withFiles({ [Z]: `import { knownBug as k } from '../harness/knownBug';\nit('x', (ctx) => {\n    k(ctx, 'AUD-SRCB-002', { claim: 'a', correct: 1, observed: 2, actual: 2, expectedPlain: 'e', actualPlain: 'a' });\n});\n` }, () =>
+                runCheckIn(root, repo, 'partial'),
+            );
+            const value = withFiles({ [Z]: `import { knownBug } from '../harness/knownBug';\nconst k = knownBug;\nit('x', (ctx) => {\n    k(ctx, 'AUD-SRCB-002', { claim: 'a', correct: 1, observed: 2, actual: 2, expectedPlain: 'e', actualPlain: 'a' });\n});\n` }, () =>
+                runCheckIn(root, repo, 'partial'),
+            );
+            const ns = withFiles({ [Z]: `import * as m from '../harness/knownBug';\nit('x', (ctx) => {\n    m.knownBug(ctx, 'AUD-SRCB-002', { claim: 'a', correct: 1, observed: 2, actual: 2, expectedPlain: 'e', actualPlain: 'a' });\n});\n` }, () =>
+                runCheckIn(root, repo, 'partial'),
+            );
+            const reexp = withFiles({ 'test/realpath/harness/index.ts': `export { knownBug } from './knownBug';\n` }, () => runCheckIn(fx.root, repo, 'partial'));
+            record(
+                '28 knownBug location: an alias or namespace import fails (import as, const alias, import * as, re-export)',
+                hasLine(alias, Z, USE) && hasFail(alias, NOCALL) && hasLine(value, Z, USE) && hasFail(value, NOCALL) && hasLine(ns, Z, 'namespace import of the knownBug module') && hasLine(ns, Z, USE) && hasFail(ns, NOCALL) &&
+                    hasLine(reexp, 'test/realpath/harness/index.ts', 're-export of the knownBug module'),
+                `${firstFail(alias, USE)} | ${firstFail(value, USE)} | ${firstFail(ns, 'namespace')} | ${firstFail(reexp, 're-export')}`,
+            );
+        }
+        {
+            const MSG = "knownBug's second argument must be a string literal";
+            const Z = 'test/realpath/triage/AUD-SRCB-002.test.ts';
+            const O = 'test/realpath/elsewhere.test.ts';
+            const body = ["const id = 'AUD-SRCB-002';", "knownBug(ctx, id, { claim: 'a', correct: 1, observed: 2, actual: 2, expectedPlain: 'e', actualPlain: 'a' });"];
+            const z = withFiles({ [Z]: kbFile(body) }, () => runCheckIn(fx.root, repo, 'partial'));
+            const o = withFiles({ [O]: kbFile(body, HARNESS_IMPORT) }, () => runCheckIn(fx.root, repo, 'partial'));
+            record('29 knownBug location: non-literal ID fails, inside and outside the zone', hasLine(z, Z, MSG) && hasLine(o, O, MSG), `${firstFail(z, MSG)} | ${firstFail(o, MSG)}`);
+        }
+        record('30 knownBug location: reserved ID is not a finding ID', !ID_RE.finding.test(HARNESS_SELFTEST_ID), `ID_RE.finding.test(${HARNESS_SELFTEST_ID}) = ${ID_RE.finding.test(HARNESS_SELFTEST_ID)}`);
+
         // Corrected fixture passes every stage
         const stages = STAGES.map((st) => ({ st, res: runCheckIn(fx.root, repo, st) }));
         const allPass = stages.every((x) => passes(x.res) && !x.res.lines.some((l) => l.startsWith('PENDING ')));
         record(
-            'FX corrected fixture passes partial, consolidation and final with no PENDING',
+            'FX corrected fixture passes partial, triage, consolidation and final with no PENDING',
             allPass,
             stages.map((x) => `${x.st}=${x.res.code}${passes(x.res) ? '' : ' ' + firstFail(x.res, 'FAIL')}`).join(' '),
         );
