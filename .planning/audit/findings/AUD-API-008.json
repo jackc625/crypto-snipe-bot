@@ -75,5 +75,11 @@
     "claude (22-22 executor)"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced as a real process death (plan 23-12): fixtures/hostHeaderCrash.ts runs as a railed child, loads src/main and src/bot, builds the context with the real buildChainRegistry and createChainContext, starts the real startApiServer([]) on a free loopback port (which registers the real handleUpgrade), then opens a raw TCP connection and sends GET /ws with Upgrade: websocket and Host 'a b', no credentials. The process exits with code 1 and stderr 'TypeError: Invalid URL', thrown at src/api/ws/handler.ts:43 inside the http server's upgrade emit (claim malformed-host-upgrade-exits). Healthy control (Host 127.0.0.1:<port>) is answered 401 by the real handler and survives. Contained (process handlers first): the process survives but the malformed request is never answered and its socket is never closed, so a process-level handler alone keeps the bot up and leaks one open socket per such request. Phase 24 reading: parsing the upgrade URL inside a try (or parsing only the path) and answering 400 with the socket destroyed flips the claim to looks fixed (shown by a fix-shaped mutation that flips only this claim); a process-level handler installed when src/main or src/bot loads, alone, changes the failure to survived-work-pending (the socket leak), so the claim then fails as the failure changed rather than reading fixed; a handler installed only inside runMain or startMultiChainBot is out of reach, so the proof stays failing rather than reporting a false fix.",
+    "test_id": "AUD-API-008"
+  }
 }
