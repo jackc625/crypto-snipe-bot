@@ -122,5 +122,11 @@
       ],
       "outcome": "The rug is not detected; the position is only protected by the routine stop-loss poll until a new position registers, the socket reconnects, or the bot restarts."
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10): a real ETH V2 snipe through every DEX listener of the chain (as boot starts them), bought and armed, its anti-rug subscription on the node's own list and a control LP transfer to an allowlisted locker evaluated; the real dashboard (real login, real routes over loopback) stops the chain: the Stop route's removeAllListeners() unsubscribes the anti-rug filter with the factory listeners, a real 95 percent router liquidity pull one heartbeat later is never evaluated within 3 s of fake time, and the dashboard is still told connected (claim stop-disarms-antirug); after Stop and Start (the Start callback is a source-pinned mirror of the private src/bot.ts onRestart, which fails by name if that closure changes) the factory listeners return but anti-rug does not and the pull is again never evaluated (claim start-does-not-rearm-antirug). A Stop that removes only the factory listeners reads looks fixed on both.",
+    "test_id": "AUD-API-002"
+  }
 }
