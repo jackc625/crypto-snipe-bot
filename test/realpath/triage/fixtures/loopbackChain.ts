@@ -340,8 +340,13 @@ export async function startLoopbackChain(opts: LoopbackChainOptions = {}): Promi
                 return toQuantity(PRIORITY_FEE);
             case 'eth_getBalance':
                 return toQuantity(balance);
-            case 'eth_getTransactionCount':
-                return '0x0';
+            case 'eth_getTransactionCount': {
+                // The sender's mined transactions (every account starts at nonce 0 here).
+                const who = lc(p[0]);
+                let n = 0;
+                for (const rec of receipts.values()) if (lc(rec.tx.from) === who) n += 1;
+                return toQuantity(n);
+            }
             case 'eth_getTransactionReceipt':
                 return receiptOf(String(p[0]));
             case 'eth_getLogs':
