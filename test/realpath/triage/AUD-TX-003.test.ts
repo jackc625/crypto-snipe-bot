@@ -41,19 +41,20 @@
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
 import { describe, expect, it } from 'vitest';
-import { getAddress } from 'ethers';
+import { Transaction, getAddress } from 'ethers';
 import type { OpEntry, SubmitEntry } from '../harness/capture';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
 import { driveChain, heldPosition } from './fixtures/AUD-API-001-dashboard-sell';
-import { buyRow, exitQuotes, opLogged, subscribedTo } from './fixtures/AUD-EXIT-002-position';
-import { approvalsSubmitted, sellsSubmitted } from './fixtures/AUD-EXIT-001-sell-path';
+import { ERC20, buyRow, exitQuotes, opLogged, subscribedTo } from './fixtures/AUD-EXIT-002-position';
+import { decodeSellRaw, sellRouterOf, sellsSubmitted } from './fixtures/AUD-EXIT-001-sell-path';
 import { pullLiquidity } from './fixtures/AUD-EXIT-014-rug';
 import { missBundlesUntil } from './fixtures/AUD-TX-002-lock';
 import { secondLaunch } from './fixtures/AUD-TX-003-second-launch';
 
 const BUDGET_MS = 60_000;
+const APPROVE = ERC20.getFunction('approve')!.selector;
 
 function opsAt(sc: Scenario, op: string, from = 0): OpEntry[] {
     return sc.timeline.entries.slice(from).filter((e): e is OpEntry => e.kind === 'op' && e.op === op);
@@ -64,7 +65,10 @@ function submitsAt(sc: Scenario, from = 0): SubmitEntry[] {
 }
 
 describe('AUD-TX-003: a snipe buy holds the wallet nonce lock through its private attempts, so an anti-rug exit of another position cannot start (RC-11)', () => {
-    it('antirug-exit-queued-behind-buy: a rug of position A while a snipe of token B escalates privately gets an emergency sell that does not start within its 60 s budget and runs only after the buy lets go', async (ctx) => {
+    // Own time limit: about 6 minutes of fake time are stepped. Measured on Node 22.16.0: 1.8 s alone
+    // and 6.2 s in the full parallel `npm test` run, above 40 percent of the 15 s default (before
+    // the submission classifier was cached it took 9 s alone and timed out at 15 s in the full run).
+    it('antirug-exit-queued-behind-buy: a rug of position A while a snipe of token B escalates privately gets an emergency sell that does not start within its 60 s budget and runs only after the buy lets go', { timeout: 30_000 }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_ANTIRUG_LIVE_EXECUTE: 'true' } });
         const { node } = sc;
         expect(sc.ctx.chain.antiRug.liveExecute).toBe(true);
@@ -97,9 +101,23 @@ describe('AUD-TX-003: a snipe buy holds the wallet nonce lock through its privat
         expect(dispatch.fields.tradeId).toBe(pos.tradeId);
 
         // A's emergency sell has started once the wallet sends an approve or sell of A, or logs it.
+        // Each submission is classified once (a Transaction recovers its sender on every read of
+        // `from`, too slow to repeat at every 50 ms step); the timeline entry already carries the
+        // sender and target, and the raw transaction is decoded with real ethers.
+        const isAExit = new Map<string, boolean>();
+        const classify = (e: SubmitEntry): boolean => {
+            let v = isAExit.get(e.hash);
+            if (v === undefined) {
+                const fromWallet = e.from === getAddress(sc.wallet.address);
+                const approveOfA = e.to === getAddress(sc.token) && Transaction.from(e.raw).data.startsWith(APPROVE);
+                v = fromWallet && (approveOfA || decodeSellRaw(e.raw, sellRouterOf(sc), sc.token) !== null);
+                isAExit.set(e.hash, v);
+            }
+            return v;
+        };
         const aStarts = (): number[] => [
             ...submitsAt(sc, fromEntry)
-                .filter((e) => approvalsSubmitted(sc).some((a) => a.hash === e.hash) || sellsSubmitted(sc).some((s) => s.hash === e.hash))
+                .filter(classify)
                 .map((e) => e.at),
             ...opsAt(sc, 'exit.full.submitted', fromEntry).filter((e) => e.fields.reason === 'anti-rug').map((e) => e.at),
         ];
