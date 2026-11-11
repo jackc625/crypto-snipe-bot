@@ -1,0 +1,24 @@
+{
+  "id": "ESC-ANTIRUG-02",
+  "date": "2026-11-10",
+  "tier": "immediate",
+  "tags": [
+    "phase-23",
+    "new-bug-not-in-register",
+    "23-01-task-1"
+  ],
+  "items": [
+    "AUD-ANTIRUG-024"
+  ],
+  "resolved_items": [],
+  "summary": "Phase 23 stop-the-line record (23-SPEC: work stops and goes to the operator at once for a bug not already in the register). While building the real-path harness, the 23-01 Task 1 executor saw the first anti-rug start on a chain with a fresh database raise a GAP DETECTED alert for the whole chain history: the dry-run stamp (src/anti-rug/detector.ts:588 at HEAD, :585 at the audit base) inserts the chain_state row with last_seen_block 0 (src/utils/db.ts:509-514 at HEAD) before backfillSinceLastSeen reads it, so the backfill's no-row seed branch never runs, the gap from block 0 exceeds maxBackfillBlocks, and the gap branch logs an error, sends the Telegram alert \"[GAP DETECTED] eth missed 21000000 blocks\" and broadcasts antirug_event kind gap-detected before moving the cursor to the head. Observed on the fake chain (op trail antirug.register > antirug.listener.subscribed > antirug.backfill.gap-detected) and confirmed by the execute-phase orchestrator re-reading the code. No capital action is taken in that branch. Not covered by AUD-ANTIRUG-005 (backfill contract) or AUD-ANTIRUG-009 (meaning of the dry-run stamp). The tier is immediate because the Phase 23 rule stops the line at once for any new bug; the item itself is S3 and needs no escalation under the Phase 22 tier rules.",
+  "presented_at": "2026-11-10 session: the 23-01 Task 1 blocking checkpoint (checkpoint:decision, gate blocking-human, new bug not in the register), relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "New finding, S3 (Recommended)",
+  "operator_response_recorded_at": "2026-11-11T05:00:00Z",
+  "operator_response_channel": "selected by the operator at the 23-01 Task 1 blocking checkpoint; relayed verbatim by the execute-phase orchestrator to the 23-01 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_evidence": "not required (operator_response is the operator's own verbatim selection, kept exactly as relayed). Presented at presented_at through the 23-01 Task 1 blocking checkpoint (gate blocking-human).",
+  "ruling": "new-finding-s3",
+  "ruling_option_text": "New finding, S3 (Recommended): register it now as a new AUD-ANTIRUG finding, severity S3, no capital impact; it gets a failing real-path test in the Wave 5 triage; plan 23-01 continues unchanged with Task 2 (option meaning as relayed by the execute-phase orchestrator)",
+  "ruling_note": "Recorded by the 23-01 continuation executor as AUD-ANTIRUG-024 (S3, capital_impact none, status confirmed). The \"(Recommended)\" label was part of the option as presented and is the recommendation of the 23-01 executor and the execute-phase orchestrator, NOT the operator's own. The finding is outside the 59 Phase 23 triage entries counted in 23-SPEC; plans that count those entries (for example 23-04 AC-08 and 23-16) must now also account for AUD-ANTIRUG-024. Phase 23 continues.",
+  "phase_continued": true
+}

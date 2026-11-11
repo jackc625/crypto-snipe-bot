@@ -1,0 +1,13 @@
+{
+  "name": "PHASE23",
+  "contributions": [
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-ANTIRUG-024"
+      ],
+      "search": "23-01 real-path harness run (AC-01 scenario) plus a read of every chain_state writer and reader in src (git grep chain_state, upsertChainState, getChainState, setAntirugDryRunStarted) at 23a6461 and 05c1665"
+    }
+  ]
+}
