@@ -59,5 +59,11 @@
     "claude (22-17 executor)"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path: ordinary ETH V2 and V3 launches through the real listener and safety bank; the on-chain HoneypotChecker roundtrip ran (checker eth_calls) and the exact sendCtxAlert text prints a bare Honeypot No from the hard-coded constant (claims v2-alert-honeypot-field-is-constant, v3-alert-honeypot-field-is-constant); printing the roundtrip verdict, or removing the V2 field, reads looks fixed",
+    "test_id": "AUD-BUY-009"
+  }
 }

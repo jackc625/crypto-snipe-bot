@@ -64,5 +64,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path: a real ETH V2 launch (no DEX listener) and the real startTelegramListener inline handler on the Telegram client fake; a real-shaped message naming the token from a sender and chat on no list routes through the real alphaDrop into handleNewPairForChain and a buy bundle is submitted, with both lists empty (claim empty-lists-accept-any-source) and with only the sender list set (claim sender-only-list-accepts-any-sender); control with both lists set rejects before any chain call; fail-closed default reads looks fixed on both claims, AND semantics on the sender-only claim",
+    "test_id": "AUD-BUY-006"
+  }
 }
