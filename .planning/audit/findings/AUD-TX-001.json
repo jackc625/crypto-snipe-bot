@@ -92,5 +92,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real module (plan 23-09): with the graph's own withNonceLock, an op for the scenario wallet that calls withNonceLock again for the same wallet (checksummed spelling) inside its body never settles, the nested op never runs, and a third op queued for the wallet does not start, watched with expectStillPending over a 30-minute fake-time window (bounded observation), with no warning, error or alert (claim nested-acquire-never-settles). Control: the same nesting across two different wallets completes at once. A throw-on-nested-acquire guard (AsyncLocalStorage holder tracking) reads looks fixed and flips no other test of the plan, consistent with the confirmed sub-claim that no production path nests today.",
+    "test_id": "AUD-TX-001"
+  }
 }

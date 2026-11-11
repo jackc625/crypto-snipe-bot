@@ -147,5 +147,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with the order forced (plan 23-09, AC-12): one ETH wallet holds position A (uniswap-v2, anti-rug live, bought and armed); 31 s later the bot snipes token B on sushiswap-v2 and B's bundles are never included, so submitBuyTx holds the wallet lock; right after an exit poll of A, a real 95 percent liquidity pull is evaluated unsafe and the anti-rug exit is dispatched; its approval queues on the wallet lock, nothing of A is sent, and antirug.exit.bounded-abort is logged exactly 60000 fake ms after antirug.exit.dispatch on the timeline (claim antirug-exit-queued-behind-buy). B keeps the lock through its fourth attempt (over 3 minutes) and fails clean; only then does A's abandoned exit send its approval and sell the remains. An anti-rug approval that skips the queue reads looks fixed. The pull's extra dispatches refused by the held sell lock are AUD-ANTIRUG-003 / AUD-EXIT-014 territory and are not counted here.",
+    "test_id": "AUD-TX-003"
+  }
 }
