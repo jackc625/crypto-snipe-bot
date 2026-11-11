@@ -12,6 +12,13 @@
 //     `db` export; no getter is added (D-14 as corrected, SPEC Amendment A-3). Every new
 //     connection gets the DB capture and the SQL clock in the same helper, so a reset can never
 //     leave a connection uncaptured (RESEARCH Pitfall 5).
+//   - A file database (plan 23-27): createTempDbFile() makes a new folder under os.tmpdir() and
+//     returns a database path inside it; loadGraph({ db: { file } }) and createScenario({ db })
+//     open the graph on that file. Before any src/ import, loadGraph refuses a file whose real
+//     path is not inside the OS temp folder, and refuses a DB_PATH other than :memory: in memory
+//     mode, so no proof can be pointed at the live database (T-23-43). restartGraph() stops the
+//     running graph (timers, providers, held calls, closeDb) and loads the whole graph again on
+//     the same file and the same FakeNode, as a process restart would.
 //   - routeHttp(): per-scenario routes for the axios mock; an unmatched URL is a stray.
 //   - createScenario(): one chain (eth, bsc, base or arb), one DEX (V2 or V3), a token, a pair or
 //     pool and the reads a real node would answer, all built with real ethers encoders (D-04).
@@ -26,6 +33,7 @@
 // accepts `.exec()` only on named receivers.
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
@@ -215,16 +223,128 @@ function closeGraphDb(graph: Graph | null): void {
     if (graph && graph.db.open) graph.dbModule.closeDb();
 }
 
+// ---------------------------------------------------------------------------------------------
+// File databases (plan 23-27, T-23-43)
+// ---------------------------------------------------------------------------------------------
+
+/** Where a graph's database lives: a fresh :memory: database (the default) or a temp file. */
+export type GraphDb = 'memory' | { file: string };
+
+export interface LoadGraphOptions {
+    db?: GraphDb;
+}
+
+const IS_WIN = process.platform === 'win32';
+const TEMP_DB_PREFIX = 'csb-realpath-db-';
+
+/** The real path of the nearest existing ancestor plus the rest; opens nothing, creates nothing. */
+function realPathOf(p: string): string {
+    const tail: string[] = [];
+    let cur = path.resolve(p);
+    for (;;) {
+        try {
+            return path.join(fs.realpathSync.native(cur), ...tail);
+        } catch {
+            const parent = path.dirname(cur);
+            if (parent === cur) return path.resolve(p);
+            tail.unshift(path.basename(cur));
+            cur = parent;
+        }
+    }
+}
+
+function comparable(p: string): string {
+    const s = p.replace(/[\\/]+$/, '');
+    return IS_WIN ? s.toLowerCase() : s;
+}
+
+/** True when `p` really sits inside `dir` (not equal to it), after resolving links on both. */
+function isInside(p: string, dir: string): boolean {
+    const target = comparable(realPathOf(p));
+    const root = comparable(realPathOf(dir));
+    return target.startsWith(root + path.sep);
+}
+
+/**
+ * Refuse any database file a proof could use to reach a real database: it must be an absolute
+ * path whose real location is inside the OS temp folder. Win32 device, UNC and alternate data
+ * stream spellings are refused outright, because their real target cannot be read from the text.
+ * Returns the path as given, resolved. Never opens or creates anything.
+ */
+export function assertTempDbFile(file: unknown): string {
+    const rule = `a harness database file must be an absolute path inside the operating system's temp folder (${os.tmpdir()}), so no proof can reach the live database`;
+    const refuse = (why: string): never => {
+        throw new Error(`loadGraph: refused database file ${JSON.stringify(file)}: ${why}; ${rule}`);
+    };
+    if (typeof file !== 'string' || file === '') return refuse('it is not a non-empty string');
+    if (file === ':memory:') return refuse(":memory: is not a file (use db: 'memory')");
+    if (!path.isAbsolute(file)) return refuse('it is a relative path (src/utils/db.ts would resolve it against the repository root)');
+    if (IS_WIN) {
+        if (/^[\\/]{2}/.test(file)) return refuse('a UNC or device path cannot be checked');
+        if (file.slice(2).includes(':')) return refuse('an alternate data stream name cannot be checked');
+        if (file.split(/[\\/]+/).some((seg, i) => i > 0 && /[. ]$/.test(seg) && seg !== '.' && seg !== '..')) return refuse('a segment ending in a dot or space is renamed by Windows');
+    }
+    if (!isInside(file, os.tmpdir())) return refuse(`its real path ${realPathOf(file)} is not inside the temp folder`);
+    return path.resolve(file);
+}
+
+/**
+ * A database path inside a new folder under os.tmpdir(). The file itself does not exist yet (the
+ * real db.ts creates and migrates it under Vitest). The folder is removed by the disposer of the
+ * scenario that runs on it, or, if no scenario does, by its own disposer in afterEach.
+ */
+export function createTempDbFile(): string {
+    const st = harnessState();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), TEMP_DB_PREFIX));
+    st.tempDbDirs.push(dir);
+    st.disposers.push(async () => removeTempDbDir(dir));
+    return path.join(dir, 'graph.db');
+}
+
+/** Remove a folder createTempDbFile made (and only such a folder). Idempotent. */
+function removeTempDbDir(dir: string): void {
+    const st = harnessState();
+    const i = st.tempDbDirs.indexOf(dir);
+    if (i < 0) return;
+    if (!path.basename(dir).startsWith(TEMP_DB_PREFIX) || !isInside(dir, os.tmpdir())) throw new Error(`removeTempDbDir: ${dir} is not a harness temp folder`);
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    if (fs.existsSync(dir)) throw new Error(`removeTempDbDir: ${dir} is still there after removal`);
+    st.tempDbDirs.splice(i, 1);
+}
+
+/** The createTempDbFile folder holding `file`, or undefined when the file is not in one. */
+function tempDbDirOf(file: string): string | undefined {
+    const dir = path.dirname(path.resolve(file));
+    return harnessState().tempDbDirs.find((d) => comparable(d) === comparable(dir));
+}
+
 /**
  * Close the previous graph's DB, reset every module, and import the real graph on a fresh
- * :memory: database. Fixes SQLite's clock to the fake one (D-05).
+ * :memory: database, or on `db.file` (see assertTempDbFile). Fixes SQLite's clock to the fake
+ * one (D-05). Every refusal happens before any src/ module is imported.
  */
-export async function loadGraph(): Promise<Graph> {
+export async function loadGraph(opts: LoadGraphOptions = {}): Promise<Graph> {
+    const dbOpt = opts.db ?? 'memory';
+    let file: string | null = null;
+    if (dbOpt === 'memory') {
+        const raw = process.env.DB_PATH;
+        if (raw !== undefined && raw !== '' && raw !== ':memory:') {
+            throw new Error(`loadGraph: refused DB_PATH ${JSON.stringify(raw)} in memory mode: a harness graph opens :memory: or a temp file given as db: { file } (createTempDbFile), so no proof can reach the live database`);
+        }
+    } else if (typeof dbOpt === 'object' && dbOpt !== null && 'file' in dbOpt) {
+        file = assertTempDbFile(dbOpt.file);
+    } else {
+        throw new Error(`loadGraph: db must be 'memory' or { file }, got ${JSON.stringify(dbOpt)}`);
+    }
     closeGraphDb(currentGraph);
     currentGraph = null;
     vi.resetModules();
-    if (process.env.DB_PATH === undefined || process.env.DB_PATH === '') process.env.DB_PATH = ':memory:';
+    process.env.DB_PATH = file ?? ':memory:';
     const dbModule = await import('../../../src/utils/db');
+    if (file !== null && comparable(realPathOf(dbModule.getDbFilePath())) !== comparable(realPathOf(file))) {
+        dbModule.closeDb();
+        throw new Error(`loadGraph: the graph opened ${dbModule.getDbFilePath()}, not the requested ${file}`);
+    }
     const chainRegistry = await import('../../../src/chainRegistry');
     const exitManager = await import('../../../src/utils/exitManager');
     const exitEngine = await import('../../../src/exitEngine');
@@ -333,6 +453,8 @@ export function resetTestState(): void {
     st.telegram = { clients: [] };
     st.timeline = createTimeline();
     st.violations = [];
+    // Each folder's disposer removed it already (a failed removal failed the test by name).
+    st.tempDbDirs = [];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -434,6 +556,12 @@ export interface ScenarioOptions<D extends ScenarioDexType = ScenarioDexType> {
     /** Env values applied before the graph loads and restored by dispose. */
     overrides?: Record<string, string | undefined>;
     /**
+     * The graph's database: 'memory' (default) or { file } inside the OS temp folder, normally
+     * from createTempDbFile(). A file database survives restartGraph(); dispose removes the
+     * folder when createTempDbFile made it.
+     */
+    db?: GraphDb;
+    /**
      * Self-test hook (plan 23-01 Task 2): throw after this stage so the partial-startup cleanup
      * can be proven. Never set by a scenario.
      */
@@ -484,6 +612,60 @@ export interface Scenario<D extends ScenarioDexType = ScenarioDexType> {
     dispose(): Promise<void>;
 }
 
+interface BuiltParts {
+    node?: FakeNode;
+    graph?: Graph;
+    ctx?: ChainContext;
+}
+
+/** What restartGraph needs from a scenario that the scenario object does not expose. */
+interface ScenarioInternals {
+    built: BuiltParts;
+    db: GraphDb;
+    chainName: ScenarioChain;
+    dexName: string;
+    isDisposed(): boolean;
+}
+
+const SCENARIO_INTERNALS = new WeakMap<object, ScenarioInternals>();
+
+/**
+ * The graph-level half of teardown, shared by dispose and restartGraph so a restart stops the
+ * running graph exactly as a teardown does. Each step's error is collected, never thrown early.
+ */
+async function stopGraphParts(built: BuiltParts, step: (what: string, fn: () => unknown) => Promise<void>): Promise<void> {
+    // 1. Nothing stays parked. A call still parked is answered with an error (never a node
+    //    answer), and microtasks drain before timers stop and providers are destroyed, so the
+    //    answer reaches its caller instead of a "provider destroyed" cancellation. Microtasks
+    //    only: no timer-driven work runs during teardown.
+    await step('release held calls', async () => {
+        const parked = built.node?.releaseAll() ?? 0;
+        if (parked > 0) for (let i = 0; i < 50; i++) await Promise.resolve();
+    });
+    // 2. Timers: the bot's own registry, then every fake timer.
+    await step('clear bot timers', () => built.graph?.exitManager.clearAllTimers());
+    await step('clear fake timers', () => {
+        if (vi.isFakeTimers()) vi.clearAllTimers();
+    });
+    // 3. Providers: raw socket listeners first so a teardown close cannot start a reconnect.
+    await step('detach socket listeners', () => {
+        for (const ws of FakeWebSocket.instances) ws.removeAllListeners();
+    });
+    await step('destroy providers', async () => {
+        // ethers' destroy() cancels pending requests, marks the provider destroyed, then
+        // removes every listener; subscriber stop() then sees `destroyed` and sends no
+        // eth_unsubscribe. Calling removeAllListeners() first would queue eth_unsubscribe
+        // payloads that destroy() cancels into unhandled rejections (measured).
+        const providers = [built.ctx?.wsProvider, built.ctx?.httpProvider].filter((p) => p != null);
+        for (const p of providers) await p!.destroy();
+    });
+    // 4. Database.
+    await step('close database', () => {
+        closeGraphDb(built.graph ?? null);
+        if (built.graph && currentGraph === built.graph) currentGraph = null;
+    });
+}
+
 /** Build a scenario. Every partial start is cleaned up by the same disposer before rethrowing. */
 export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOptions<D>): Promise<Scenario<D>> {
     if (!(opts.chain in CHAIN_NODE)) throw new Error(`createScenario: unknown chain ${String(opts.chain)} (eth, bsc, base or arb)`);
@@ -491,7 +673,8 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
     const st = harnessState();
     const envSnapshot: Record<string, string | undefined> = { ...process.env };
     const installedClock = !vi.isFakeTimers();
-    const built: { node?: FakeNode; graph?: Graph; ctx?: ChainContext } = {};
+    const built: BuiltParts = {};
+    const dbOpt: GraphDb = opts.db ?? 'memory';
     let disposed = false;
 
     const dispose = async (): Promise<void> => {
@@ -505,35 +688,13 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
                 errors.push(new Error(`dispose: ${what} failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e }));
             }
         };
-        // 1. Nothing stays parked. A call still parked is answered with an error (never a node
-        //    answer), and microtasks drain before timers stop and providers are destroyed, so the
-        //    answer reaches its caller instead of a "provider destroyed" cancellation. Microtasks
-        //    only: no timer-driven work runs during teardown.
-        await step('release held calls', async () => {
-            const parked = built.node?.releaseAll() ?? 0;
-            if (parked > 0) for (let i = 0; i < 50; i++) await Promise.resolve();
-        });
-        // 2. Timers: the bot's own registry, then every fake timer.
-        await step('clear bot timers', () => built.graph?.exitManager.clearAllTimers());
-        await step('clear fake timers', () => {
-            if (vi.isFakeTimers()) vi.clearAllTimers();
-        });
-        // 3. Providers: raw socket listeners first so a teardown close cannot start a reconnect.
-        await step('detach socket listeners', () => {
-            for (const ws of FakeWebSocket.instances) ws.removeAllListeners();
-        });
-        await step('destroy providers', async () => {
-            // ethers' destroy() cancels pending requests, marks the provider destroyed, then
-            // removes every listener; subscriber stop() then sees `destroyed` and sends no
-            // eth_unsubscribe. Calling removeAllListeners() first would queue eth_unsubscribe
-            // payloads that destroy() cancels into unhandled rejections (measured).
-            const providers = [built.ctx?.wsProvider, built.ctx?.httpProvider].filter((p) => p != null);
-            for (const p of providers) await p!.destroy();
-        });
-        // 4. Database.
-        await step('close database', () => {
-            closeGraphDb(built.graph ?? null);
-            if (built.graph && currentGraph === built.graph) currentGraph = null;
+        // 1-4. Held calls, timers, providers, database.
+        await stopGraphParts(built, step);
+        // The temp folder of a file database, once its connection is closed.
+        await step('remove temp database folder', () => {
+            if (dbOpt === 'memory' || typeof dbOpt !== 'object' || dbOpt === null || typeof dbOpt.file !== 'string') return;
+            const dir = tempDbDirOf(dbOpt.file);
+            if (dir) removeTempDbDir(dir);
         });
         // 5. Environment, sockets, routes, clock.
         await step('restore environment', () => {
@@ -578,7 +739,6 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
             if (v === undefined) delete process.env[k];
             else process.env[k] = v;
         }
-        if (!process.env.DB_PATH) process.env.DB_PATH = ':memory:';
         installSeams();
 
         const profile = CHAIN_NODE[chainName];
@@ -587,7 +747,7 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         st.node = node;
         st.nodes.push(node);
 
-        const graph = await loadGraph();
+        const graph = await loadGraph({ db: dbOpt });
         built.graph = graph;
         if (opts.failAfter === 'graph') throw new Error('createScenario: injected failure after the graph loaded');
 
@@ -902,7 +1062,9 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
             return { block, poolCreated, mint };
         };
 
-        return { node, graph, registry, ctx, chain: chainName, dex: dex as ScenarioDex<D>, token, pair, feeTier, checker, wallet, weth, reserves, timeline, fireNewPair, fireNewPool, dispose };
+        const scenario: Scenario<D> = { node, graph, registry, ctx, chain: chainName, dex: dex as ScenarioDex<D>, token, pair, feeTier, checker, wallet, weth, reserves, timeline, fireNewPair, fireNewPool, dispose };
+        SCENARIO_INTERNALS.set(scenario, { built, db: dbOpt, chainName, dexName: dex.name, isDisposed: () => disposed });
+        return scenario;
     } catch (e) {
         let teardown: unknown;
         try {
@@ -913,6 +1075,80 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         if (teardown !== undefined) throw new AggregateError([e, teardown], `createScenario failed and its cleanup also failed: ${e instanceof Error ? e.message : String(e)}`);
         throw e;
     }
+}
+
+export interface RestartOptions {
+    /** Env values applied before the new graph loads (undefined deletes); dispose restores them. */
+    env?: Record<string, string | undefined>;
+}
+
+/**
+ * Restart the scenario's bot on the same database file and the same simulated chain, as a
+ * process restart would. The running graph is stopped by the same steps dispose uses (held calls
+ * answered with an error, the bot's timer registry cleared, every fake timer cleared, providers
+ * destroyed, closeDb), and any socket of the old graph still open is closed, because a dead
+ * process's timers and sockets die with it. The file, the FakeNode, the clock, the env snapshot
+ * and the scenario's alerts, logs and timeline stay: a restart is the same scenario continuing,
+ * and a test reads what happened on both sides of it. Then `env` is applied and loadGraph opens
+ * the whole graph again on the file, which reinstalls the DB capture and the SQL clock on the new
+ * connection (RESEARCH Pitfall 5). scenario.graph, registry, ctx, dex and wallet point at the new
+ * graph afterwards. Nothing is restarted: the test calls the real resume paths itself.
+ */
+export async function restartGraph<D extends ScenarioDexType>(scenario: Scenario<D>, opts: RestartOptions = {}): Promise<Scenario<D>> {
+    const internals = SCENARIO_INTERNALS.get(scenario);
+    if (!internals) throw new Error('restartGraph: this object was not made by createScenario');
+    if (internals.isDisposed()) throw new Error('restartGraph: the scenario was already disposed');
+    if (internals.db === 'memory') {
+        throw new Error('restartGraph: this scenario runs on an in-memory database, which no restart can keep; create it with db: { file: createTempDbFile() }');
+    }
+    const { built } = internals;
+    const st = harnessState();
+    const oldSockets = [...FakeWebSocket.instances];
+
+    const errors: unknown[] = [];
+    const step = async (what: string, fn: () => unknown): Promise<void> => {
+        try {
+            await fn();
+        } catch (e) {
+            errors.push(new Error(`restartGraph: ${what} failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e }));
+        }
+    };
+    await stopGraphParts(built, step);
+    await step('close the old graph sockets', () => {
+        for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
+        FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));
+    });
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, `restartGraph: ${errors.length} stop steps failed`);
+    built.graph = undefined;
+    built.ctx = undefined;
+
+    for (const [k, v] of Object.entries(opts.env ?? {})) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    }
+    // The node is the one every transport routes to again (a test may have pointed elsewhere).
+    if (built.node) st.node = built.node;
+    const graph = await loadGraph({ db: internals.db });
+    built.graph = graph;
+    const registry = graph.chainRegistry.buildChainRegistry();
+    const chain = registry.get(internals.chainName);
+    if (!chain || !chain.enabled) throw new Error(`restartGraph: the ${internals.chainName} chain is not enabled after the restart`);
+    if (built.node && chain.chainId !== built.node.chainId) throw new Error(`restartGraph: the ${internals.chainName} template is chain ${chain.chainId}, the scenario node is ${built.node.chainId}`);
+    if (chain.honeypotChecker.deployedAddress?.toLowerCase() !== scenario.checker.toLowerCase()) {
+        throw new Error(`restartGraph: the checker address changed across the restart (${chain.honeypotChecker.deployedAddress} vs ${scenario.checker})`);
+    }
+    const dex = chain.dexes.find((d) => d.name === internals.dexName);
+    if (!dex) throw new Error(`restartGraph: ${internals.chainName} has no DEX named ${internals.dexName} after the restart`);
+    const ctx = graph.chainRegistry.createChainContext(chain);
+    built.ctx = ctx;
+    if (ctx.wallet.address.toLowerCase() !== scenario.wallet.address.toLowerCase()) throw new Error('restartGraph: the bot wallet changed across the restart');
+    scenario.graph = graph;
+    scenario.registry = registry;
+    scenario.ctx = ctx;
+    scenario.dex = dex as ScenarioDex<D>;
+    scenario.wallet = ctx.wallet;
+    return scenario;
 }
 
 /** Await every registered disposer, newest first. Idempotent; never discards a teardown error. */

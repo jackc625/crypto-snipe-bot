@@ -133,6 +133,8 @@ export interface HarnessState {
     timeline: Timeline | null;
     /** Capture violations, checked by assertNoViolations() in afterEach (capture.ts). */
     violations: Violation[];
+    /** Folders made by world.ts createTempDbFile, each removed by its disposer (plan 23-27). */
+    tempDbDirs: string[];
 }
 
 export function harnessState(): HarnessState {
@@ -156,6 +158,7 @@ export function harnessState(): HarnessState {
             routeAxios: null,
             timeline: null,
             violations: [],
+            tempDbDirs: [],
         };
         g[HARNESS_KEY] = st;
     }
