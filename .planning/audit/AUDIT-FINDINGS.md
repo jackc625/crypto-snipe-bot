@@ -934,7 +934,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-BUY-008: DEX WebSocket reconnect: replaced providers are not destroyed, one reconnect loop per DEX races on ctx.wsProvider, no backfill, no heartbeat, and dashboard restart stacks a second close handler that later doubles every event
 
-- **Severity / capital impact / status:** S1 / OVERSPEND / candidate
+- **Severity / capital impact / status:** S1 / OVERSPEND / confirmed
 - **Slice / origin:** BUY / research-candidate
 - **Classes:** C10 (WS reconnect/backfill), C12 (timer leaks)
 - **Research candidates:** RC-20 (research suggested S2)
@@ -7169,7 +7169,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 | RC-17 | TX | AUD-TX-004 | fixed |
 | RC-18 | TX | AUD-TX-005 | fixed |
 | RC-19 | RAIL | AUD-RAIL-002, AUD-TESTI-011, AUD-TESTU-001 | candidate |
-| RC-20 | BUY | AUD-BUY-008 | candidate |
+| RC-20 | BUY | AUD-BUY-008 | confirmed |
 | RC-21 | EXIT | AUD-EXIT-005 | confirmed |
 | RC-22 | TX | AUD-TX-007 | confirmed |
 | RC-23 | DB | AUD-DB-005 | confirmed |
