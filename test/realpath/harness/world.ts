@@ -266,7 +266,8 @@ function axiosError(message: string, config: unknown, response?: AxiosLikeError[
 async function routeAxios(method: string, url: string, data: unknown, config: unknown): Promise<unknown> {
     const st = harnessState();
     const route = st.httpRoutes.find((r) => url.startsWith(r.prefix));
-    st.httpLog.push({ seq: nextSeq(), method, url, data, matched: route !== undefined });
+    const params = (config as { params?: unknown } | undefined)?.params;
+    st.httpLog.push({ seq: nextSeq(), method, url, data, ...(params !== undefined ? { params } : {}), matched: route !== undefined });
     if (!route) {
         const stray: Stray = { seq: nextSeq(), kind: 'url', url, detail: `unknown URL ${url} (axios ${method.toUpperCase()})` };
         if (st.node) st.node.strays.push(stray);

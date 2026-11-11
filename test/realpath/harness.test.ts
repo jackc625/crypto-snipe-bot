@@ -961,4 +961,59 @@ describe('scenario builder: every chain and DEX type on its real route (23-28 Ta
             expect(row).toMatchObject({ status: 'pending', action: 'buy', chain, tx_hash: buy.hash, pool_type: 'v3', fee_tier: 3000, dex_name: 'uniswap-v3' });
         });
     }
+
+    // AUD-BUY-016 (S3, card BUY-05). On base and Arbitrum the V2 lock check asks GoPlus
+    // token_security about the PAIR address as if it were a token and reads its lp_holders
+    // (src/utils/safetyProviders/goplus.ts:57-60). GoPlus returns lp_holders only for a token
+    // traded on a DEX ("When is_in_dex: 0, there will be no return", docs.gopluslabs.io response
+    // details), so the pair reads "not locked" and every V2 launch on these chains is skipped.
+    // Operator ruling at the 23-28 checkpoint ("Test today's skip"): this records today's
+    // behavior with a GoPlus fake that answers only what GoPlus documents (AC-48). It FAILS ON
+    // PURPOSE when Phase 24 fixes the query (the buy then goes out on the public route); rewrite
+    // it then as the base/arb V2 buy on route public.
+    for (const [chain, chainId] of [['base', 8453], ['arb', 42161]] as const) {
+        it(`AUD-BUY-016 today: a ${chain} V2 launch is skipped before route public, because GoPlus is asked about the pair and reads "not locked" while every other safety check passes`, async () => {
+            const sc = await createScenario({ chain, dexType: 'v2' });
+            const { node, ctx, dex, token, pair } = sc;
+            expect(ctx.chain.mevStrategy).toBe('passthrough');
+            expect(ctx.chain.safetyApis.liquidityLock).toBe('goplus');
+            expect(process.env[`${chain.toUpperCase()}_HONEYPOT_CHECKER_ADDRESS`]).toBe(sc.checker);
+            await listen(sc);
+            await sc.fireNewPair();
+
+            type SkipLine = { checks: Record<string, unknown> };
+            const skip = (): SkipLine | undefined => harnessState().logs.find((l) => l.msg === 'Safety checks failed, skipping')?.obj as SkipLine | undefined;
+            await stepUntilTrue(() => skip() !== undefined, { what: `the ${chain} V2 safety bank deciding`, maxSteps: 20_000 });
+
+            // The safety path ran: the on-chain honeypot roundtrip was served for this token and router.
+            const checks = checkerReads(sc, 'checkV2');
+            expect(checks.length).toBeGreaterThan(0);
+            expect(checks.every((r) => getAddress(r.args.token as string) === getAddress(token) && getAddress(r.args.router as string) === getAddress(dex.routerAddress))).toBe(true);
+
+            // GoPlus was asked about the pair, never the token: the query AUD-BUY-016 names.
+            const asked = harnessState()
+                .httpLog.filter((h) => h.method === 'get' && h.url === `https://api.gopluslabs.io/api/v1/token_security/${chainId}`)
+                .map((h) => String((h.params as { contract_addresses?: unknown } | undefined)?.contract_addresses).toLowerCase());
+            expect(asked).toEqual([pair.toLowerCase()]);
+
+            // The lock is the only failed check.
+            const result = skip()!.checks;
+            expect(result).toMatchObject({ isHoneypot: false, isBlacklisted: false, locked: false, sufficientLiquidity: true, validMetadata: true, canSwap: true, hasLimits: false, mutable: false });
+            expect(harnessState().alerts.some((a) => a.args.some((x) => typeof x === 'string' && x.includes('Locked: `No`')))).toBe(true);
+
+            // No buy: two more slots pass and nothing is sent on any route, no trades row is written.
+            await stepFor(24_000);
+            expect(harnessState().logs.some((l) => l.msg === 'All safety checks passed, buying')).toBe(false);
+            expect(node.submitted).toHaveLength(0);
+            expect(node.callLog.some((c) => c.method === 'eth_sendRawTransaction')).toBe(false);
+            expect(sc.graph.db.prepare('SELECT 1 FROM trades').get()).toBeUndefined();
+
+            // The same GoPlus fake does report the lock when asked about the token: the real
+            // goplusLiquidityLockCheck reads the token's answer as locked and the pair's as not, so
+            // the skip comes from the query, not from a fake that refuses every lock.
+            const goplus = await import('../../src/utils/safetyProviders/goplus');
+            expect(await stepUntil(goplus.goplusLiquidityLockCheck(ctx, token))).toBe(true);
+            expect(await stepUntil(goplus.goplusLiquidityLockCheck(ctx, pair))).toBe(false);
+        });
+    }
 });

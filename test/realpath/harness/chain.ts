@@ -104,7 +104,8 @@ export interface HarnessState {
     alerts: Array<{ seq: number; fn: string; args: unknown[] }>;
     broadcasts: Array<{ seq: number; type: string; data: unknown }>;
     httpRoutes: HttpRoute[];
-    httpLog: Array<{ seq: number; method: string; url: string; data: unknown; matched: boolean }>;
+    /** Every axios call; `params` is the request's axios `params` (the query string), as given. */
+    httpLog: Array<{ seq: number; method: string; url: string; data: unknown; params?: unknown; matched: boolean }>;
     telegram: { clients: unknown[] };
     /** Awaited by disposeScenarios() in reverse order. */
     disposers: Array<() => Promise<void>>;
