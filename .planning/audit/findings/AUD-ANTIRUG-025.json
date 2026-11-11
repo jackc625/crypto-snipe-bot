@@ -1,0 +1,108 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-016",
+    "AUD-ANTIRUG-005",
+    "AUD-BUY-001"
+  ],
+  "tags": [
+    "capital",
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": "ESC-ANTIRUG-04",
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-06 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-025",
+  "title": "Every boot that resumes an open position drops the anti-rug WebSocket subscription: resume registers the position and then re-arms the chain listener, whose un-awaited off() and on() of the same filter race inside ethers, so the new dispatcher lands on a stopped subscriber and no eth_subscribe is sent",
+  "severity": "S1",
+  "capital_impact": "STRAND",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2120@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeAntiRugMonitoring step 3: registerAntiRugPosition for each open position, which calls startChainAntiRugListener (detector.ts:447) and installs the address filter"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2130-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "step 4: startChainAntiRugListener(ctx) again for every verified chain, with the same registered address set"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:644@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "a dispatcher is already installed, so ctx.wsProvider.off(state.activeFilter, state.activeDispatcher) is called and not awaited"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:655@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "then ctx.wsProvider.on(filter, dispatcher), also not awaited, with a filter of the same addresses and topics, so ethers computes the same subscription tag"
+    },
+    {
+      "type": "command",
+      "ref": "sed -n 1040,1160p node_modules/ethers/lib.commonjs/providers/abstract-provider.js (ethers 6.16.0, the version package-lock.json pins for node_modules/ethers)",
+      "note": "on() and off() each await getSubscription before touching #subs; on() looks the tag up before off() deletes it, gets the old subscriber (already started, so nothing is started) and pushes the new listener onto it; off() then removes the old listener, finds none left, calls subscriber.stop() (eth_unsubscribe) and deletes the tag. Pure microtask order inside ethers, no network between, so a real node sees the same sequence"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:664@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "antirug.listener.subscribed is logged on both calls, so the log says the subscription was installed twice while none remains"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1805@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startMultiChainBot calls resumeAntiRugMonitoring once at every boot; the same code at HEAD (src unchanged in Phase 23): bot.ts:1807, :2122, :2132-2146; detector.ts:450, :647, :658, :667"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-ANTIRUG-025.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "real ETH V2 snipe on a temp-file database, armed; an LP Transfer to an allowlisted locker is evaluated (antirug.allowlist-hit); after restartGraph and the real resumeMultiChainMonitoring and resumeAntiRugMonitoring: two antirug.listener.subscribed lines, one eth_subscribe for the pair then its eth_unsubscribe and no other, the node holds no logs subscription, and a second LP Transfer to another locker is never evaluated (claim resume-drops-ws-subscription); the position is still in getRegisteredPositions and its exit monitor is armed. Fix-shaped mutations (await the off(); skip an unchanged re-subscribe) each read looks fixed, detector.ts restored identical"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-BUY-001.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "first seen here: on base, after the restart that picks up the script's deliberate position, the queued eth_unsubscribe drained and the node held zero subscriptions"
+    }
+  ],
+  "sibling_sites_checked": "Every caller of startChainAntiRugListener at the base: registerAntiRugPosition (detector.ts:447), the reconnect path (:943) and boot step 4 (bot.ts:2144). Reconnect: the new provider has no subscriber under the old tag, so off() is a no-op on it and on() subscribes (not affected; the old provider is AUD-ANTIRUG-001). registerAntiRugPosition for a position on a pair that is NOT yet watched changes the address set, so the tag differs and on() creates a new subscriber (not affected). registerAntiRugPosition for a second position on a pair that IS already watched (bucket.push, :416-421) keeps the address set unchanged and takes the same off()/on() path: by code reading the same race drops the subscription for every watched pair (not run). After a drop, the next registration of a new pair restores the subscription with the full set, so the blind window is from boot to the next new-pair buy. The HTTP-polling fallback (no WS URL) does not use the filter subscription. bot.ts DEX listeners call on() once per start (not affected). Interaction: the interim operator rule on AUD-BUY-001 (ESC-BUY-01, restart the main bot after any deliberate buy) re-arms the exit monitor but, through this finding, not the anti-rug subscription.",
+  "status": "confirmed",
+  "severity_rationale": "S1 (capital can be stranded under a plausible condition), STRAND, graded by the 23-06 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. Condition: any boot with an open position on a chain that has a WebSocket URL, which is the ordinary restart. Effect: the position is registered, the dashboard shows it monitored and the log says the subscription was installed, but no rug log reaches the evaluator until a later buy on a new pair re-subscribes, so liquidity removal is not seen for as long as that takes. The exit monitor is not affected. Graded like AUD-ANTIRUG-001 (S1, STRAND: the rug-log subscription can vanish after a dashboard stop); anti-rug live execution defaults to dry-run, which limits what a delivered log would do today but not the grade, as for AUD-ANTIRUG-001.",
+  "traces": [
+    {
+      "scenario": "Boot with one open position on a WebSocket chain (ETH V2 in the proof)",
+      "steps": [
+        "startMultiChainBot calls resumeAntiRugMonitoring (bot.ts:1805).",
+        "Step 3: registerAntiRugPosition adds the position and calls startChainAntiRugListener: no prior dispatcher, so on(F) subscribes (eth_subscribe for [pair]).",
+        "Step 4: startChainAntiRugListener again: a dispatcher exists, so off(F) then on(F') run without await; F and F' have the same tag.",
+        "Inside ethers, on(F') finds the existing subscriber and attaches the new dispatcher to it; off(F) then removes the old dispatcher, stops the subscriber (eth_unsubscribe) and deletes the tag.",
+        "No eth_subscribe follows; the node holds no subscription; LP Transfer and Burn logs on the pair are never delivered."
+      ],
+      "outcome": "Anti-rug is blind for every resumed position until a new pair is registered, while the registry, the dashboard and the logs show it armed."
+    }
+  ],
+  "recommendation": "Phase 24 (capital fix, with card OD-11's single WebSocket owner if that lands first): await the off() before the on(), or skip the re-subscribe when the watched address set is unchanged, and assert the node-side subscription after boot (test/realpath/triage/AUD-ANTIRUG-025.test.ts reads looks fixed for both shapes). Until fixed, after any restart with open positions on a WebSocket chain the anti-rug subscription is not live; this weakens the interim rule on AUD-BUY-001 (restart the main bot after a deliberate buy). Nothing is fixed in Phase 23.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Found by 23-06 while proving AUD-BUY-001; real ETH V2 snipe armed on a temp file, restartGraph, real resumeMultiChainMonitoring + resumeAntiRugMonitoring: the node holds no subscription for the pair and an LP transfer to an allowlisted locker is never evaluated (claim resume-drops-ws-subscription); before the restart the same transfer is evaluated; awaiting off() and skipping an unchanged re-subscribe each read looks fixed",
+    "test_id": "AUD-ANTIRUG-025"
+  }
+}

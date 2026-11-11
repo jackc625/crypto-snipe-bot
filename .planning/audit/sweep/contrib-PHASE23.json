@@ -16,6 +16,14 @@
         "AUD-TX-027"
       ],
       "search": "23-05 real-path AUD-TX-007 strategy test (eth_estimateGas 1 000 000, mev.escalation.unaffordable fields) plus a read of every buyGasLimit/sellGasLimit/maxGasLimit site in src/utils/mevStrategies, src/preflight.ts and the tx builders in src/bot.ts at 23a6461 and HEAD"
+    },
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-ANTIRUG-025"
+      ],
+      "search": "23-06 real-path AUD-BUY-001 restart and AUD-ANTIRUG-025 proof (node.subscriptions, eth_subscribe/eth_unsubscribe in callLog) plus a read of every startChainAntiRugListener caller and every wsProvider.on/off site in src (git grep startChainAntiRugListener, wsProvider.on, wsProvider.off) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider on/off/#getSub/#hasSub"
     }
   ]
 }
