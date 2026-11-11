@@ -8,6 +8,14 @@
         "AUD-ANTIRUG-024"
       ],
       "search": "23-01 real-path harness run (AC-01 scenario) plus a read of every chain_state writer and reader in src (git grep chain_state, upsertChainState, getChainState, setAntirugDryRunStarted) at 23a6461 and 05c1665"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-TX-027"
+      ],
+      "search": "23-05 real-path AUD-TX-007 strategy test (eth_estimateGas 1 000 000, mev.escalation.unaffordable fields) plus a read of every buyGasLimit/sellGasLimit/maxGasLimit site in src/utils/mevStrategies, src/preflight.ts and the tx builders in src/bot.ts at 23a6461 and HEAD"
     }
   ]
 }

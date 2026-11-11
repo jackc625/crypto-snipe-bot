@@ -1,0 +1,79 @@
+{
+  "id": "AUD-TX-027",
+  "title": "The MEV strategies reserve sell gas at the buy's estimated gas limit, not the chain maxGasLimit their comment names, and the buy's gas limit is the node's estimate with no cap, while the entry gate prices both legs at maxGasLimit",
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/utils/mevStrategies/passthrough.ts",
+    "src/utils/mevStrategies/bloxroute.ts",
+    "src/preflight.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:158-162@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "comment: \"the sell leg reserves the same chain gas budget (ctx.chain.gas.maxGasLimit equivalent - 300_000n on ETH)\"; code: buyGasLimit = txRequest.gasLimit ?? 300_000n, sellGasLimit = buyGasLimit"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:57-58@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same: buyGasLimit = txRequest.gasLimit ?? 500_000n, sellGasLimit = buyGasLimit (Base, Arbitrum)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/bloxroute.ts:84-85@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "same: buyGasLimit = txRequest.gasLimit ?? 500_000n, sellGasLimit = buyGasLimit (BSC)"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1102-1111@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the snipe tx builder is ctx.wallet.populateTransaction({ to, data, value }) with no gasLimit, so ethers fills gasLimit from eth_estimateGas (the same at :1433 for V3 and :545 for the deliberate private leg); nothing caps it at ctx.chain.gas.maxGasLimit"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:382-417@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the entry gate prices the buy at maxGasLimit x maxFeePerGas and the public-exit reserve at (maxGasLimit + 60 000) x base fee x buffer: a different gas basis from the strategies"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:321-336@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "computeAffordablePriorityFee reserves computePublicExitReserveWei({ baseFeeWei, sellGasLimit }) with the sellGasLimit the strategy passed (the buy estimate), via buildReconcileConfig(process.env, sellGasLimit, maxRetries)"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-007.test.ts",
+      "note": "real path (plan 23-05): with the node answering eth_estimateGas 1 000 000 the Flashbots strategy logged mev.escalation.unaffordable with buyGasLimit and sellGasLimit both 1000000, not the ETH maxGasLimit 300000"
+    }
+  ],
+  "sibling_sites_checked": "All three strategies (flashbots.ts:158-162, passthrough.ts:57-58, bloxroute.ts:84-85) take sellGasLimit = buyGasLimit = txRequest.gasLimit; all three snipe and deliberate tx builders (bot.ts:545, :1102, :1433) leave gasLimit to ethers populateTransaction (eth_estimateGas); the sell paths in exitEngine.ts pass their own built tx through the same strategies (on the sell leg the \"buy\" gas limit is the sell estimate, AUD-TX-010). The entry gate (preflight.ts checkEntryExitAffordability) is the only site that uses ctx.chain.gas.maxGasLimit for these terms. No site caps a buy at maxGasLimit.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3, capital_impact none, graded by the 23-05 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"). The code does not do what its comment says: the strategies' sell reserve follows the buy's gas estimate (typically about 150 000 on a V2 swap, half of ETH's 300 000 maxGasLimit), and a heavy token's buy can carry a gas limit above maxGasLimit. Today no capital effect was found: the entry gate runs first with the maxGasLimit basis, a 2x sell buffer and the per-chain cushion, and is stricter at every default; a buy whose real estimate cannot be afforded is refused by the strategy itself (AUD-TX-007 strategy test). It matters for Phase 24: the doubled base fee of AUD-TX-007 currently over-reserves and so hides the smaller gas basis; fixing AUD-TX-007 alone shrinks the strategy reserve to 1.5 x base fee x the buy estimate.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-007",
+    "AUD-TX-010"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 24, with the AUD-TX-007 fix (card TX-02 / OD-55): decide one gas basis for the buy-time reserve and use it in the gate and the strategies (the chain maxGasLimit, or the estimate plus a margin, with a cap); either cap the buy's gas limit at maxGasLimit or price the gate on the estimate; and correct the flashbots.ts comment. Nothing is fixed in Phase 23.",
+  "reported_by": [
+    "claude (23-05 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+}
