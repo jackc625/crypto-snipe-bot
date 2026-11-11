@@ -391,7 +391,7 @@ See `key-decisions`. In short:
 
 **Gates and type checks:**
 - `tsc --noEmit` exits 0 on tsconfig.json, tsconfig.bot.json and dashboard/tsconfig.json.
-- The scratch tsconfig extending the repo's (test/realpath/triage/**/*.ts, module esnext): 0 errors over 51 triage files.
+- The scratch tsconfig extending the repo's (test/realpath/triage/**/*.ts, module esnext): 0 errors over 52 triage files.
 - `npm run check:realpath-mocks`: 35 vi uses (7 mock calls) in 67 files, 0 violations.
 - `npm run check:vi-mock`: 591 mock calls in 241 files, 0 violations.
 
