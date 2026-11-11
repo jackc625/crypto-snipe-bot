@@ -75,5 +75,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-05): a failed snipe-size quote (V2 getAmountsOut, V3 QuoterV2 quoteExactInputSingle) leaves minOut 0 and the submitted swap decodes with amountOutMin 0 on both V2 and V3. The fractional-slippage RangeError path is latent (slippagePercent hard-coded 5) and not tested.",
+    "test_id": "AUD-BUY-003"
+  }
 }
