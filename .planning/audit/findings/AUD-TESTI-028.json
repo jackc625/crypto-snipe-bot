@@ -1,0 +1,63 @@
+{
+  "id": "AUD-TESTI-028",
+  "title": "The real-path harness tears a scenario down only in its own afterEach, so when a test file's afterEach throws first, Vitest skips it and the old graph (its exit-monitor timers, providers and open database) keeps running into the next test",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "test/realpath/harness/setup.ts",
+    "test/realpath/harness/world.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/realpath/harness/setup.ts:214-238@384be2f991992d822cbbc75c41d310997d1d3ecd",
+      "note": "the only teardown: one afterEach in the setup file runs disposeScenarios, the stray, fault and violation checks, then resetTestState"
+    },
+    {
+      "type": "code",
+      "ref": "test/realpath/harness/world.ts:686-731@384be2f991992d822cbbc75c41d310997d1d3ecd",
+      "note": "createScenario registers its disposer on harnessState().disposers and nothing else ends it: the next createScenario does not dispose a scenario still registered (loadGraph only closes the previous database)"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/_scratchprobe.test.ts (scratch probe, Node 22.16.0, 2026-11-11, deleted after)",
+      "note": "probe: test one creates a scenario and a test-file afterEach throws once; test two reads harnessState(): disposers=1, node=set, logs=8, so the setup-file afterEach did not run (Vitest 4.1.1 stops the afterEach chain at the first hook that throws) and the first scenario is still alive"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath (scratch copies of the plan 23-07 triage files with a throwing afterEach appended, 2026-11-11)",
+      "note": "observed effect: the previous test's exit-monitor interval kept polling in the next test's fake time against the new scenario's node; it read the next pool's price, fired a stop-loss and ran executeFullSell, which threw \"The database connection is not open\" (exit.full.failed, exit.worker.submit-failed); the next test's first log line was \"Database connection closed\" from loadGraph closing the leaked graph"
+    }
+  ],
+  "sibling_sites_checked": "Every teardown path of the harness: setup.ts afterEach (the only one), world.ts createScenario dispose and restartGraph (both run only when called), disposeScenarios (called only from setup.ts afterEach), createTempDbFile disposers (same list). No triage or harness test file declares its own afterEach today (git grep -n \"afterEach\" -- test/realpath shows only setup.ts), so no committed test is affected; the first test of such a pair still fails by its own hook, so CI cannot pass on it.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 (misleading behavior), capital none, graded by the 23-07 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The condition needs a test-file afterEach that throws, which no committed file has; the test whose hook threw is still reported failed, so the run is red; the harm is that the later tests of that file run with a live old graph whose timers trade on their node, so their results can mislead whoever reads them. Not S2: it cannot hide a failure behind a green run on its own.",
+  "duplicate_of": null,
+  "related": [],
+  "tags": [
+    "test-quality",
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Make scenario teardown independent of afterEach order: register the disposer with onTestFinished from inside createScenario (it runs even when another hook throws), and have createScenario refuse to start while an earlier scenario is still registered; add a harness self-test with a throwing test-file afterEach. A harness change, so in Phase 23 only through the Harness Gap Procedure (23-27-PLAN.md); otherwise Phase 28 test hygiene. Until then, a realpath test file must not declare an afterEach that can throw.",
+  "reported_by": [
+    "claude (23-07 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "384be2f991992d822cbbc75c41d310997d1d3ecd",
+  "affected_cases": [
+    "any test that follows, in the same file, a test whose own afterEach threw"
+  ],
+  "escaped_regression": "A later test in the same file can pass or fail on state from the previous scenario (its exit monitor selling on the new node, its logs and alerts), which misleads diagnosis; the run stays red because the hook failure itself is reported."
+}

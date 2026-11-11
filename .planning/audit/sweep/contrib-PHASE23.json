@@ -24,6 +24,22 @@
         "AUD-ANTIRUG-025"
       ],
       "search": "23-06 real-path AUD-BUY-001 restart and AUD-ANTIRUG-025 proof (node.subscriptions, eth_subscribe/eth_unsubscribe in callLog) plus a read of every startChainAntiRugListener caller and every wsProvider.on/off site in src (git grep startChainAntiRugListener, wsProvider.on, wsProvider.off) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider on/off/#getSub/#hasSub"
+    },
+    {
+      "class": "C04",
+      "area": "src",
+      "ids": [
+        "AUD-EXIT-027"
+      ],
+      "search": "23-07 real-path AUD-EXIT-001 and AUD-EXIT-027 V3 sell proofs (decoded SwapRouter02 multicall, wallet transactions after the sell) plus a read of every sell builder in src/exitEngine.ts, the receipt decoder and every getBalance/WETH reference in src and scripts (git grep unwrapWETH9, withdraw(, WETH_ABI, getBalance) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "test",
+      "ids": [
+        "AUD-TESTI-028"
+      ],
+      "search": "23-07 scratch probe (a throwing test-file afterEach, then harnessState() read in the next test) and scratch copies of the plan 23-07 triage files with a throwing afterEach, plus a read of every teardown path in test/realpath/harness (git grep -n afterEach -- test/realpath; disposers, disposeScenarios, restartGraph, createTempDbFile) at 384be2f and HEAD"
     }
   ]
 }
