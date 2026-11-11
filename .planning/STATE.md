@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-28-PLAN.md
-last_updated: "2026-11-11T13:50:42.641Z"
+stopped_at: Completed 23-02-PLAN.md
+last_updated: "2026-11-11T14:22:37.865Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: ffa58f348edadc65b3131e788df097e3c64a1933
+state_head: f649ea846c3681846ccb5af6ca97f93928b5c45c
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 32
+  completed_plans: 33
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 4 of 31
+Plan: 5 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -115,11 +115,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P01 | 55min (wall-clock incl. two operator waits) | 2 tasks | 12 files |
 | Phase 23 P03 | 13min | 2 tasks | 8 files |
 | Phase 23 P28 | 8h 8m (wall-clock incl. operator wait; continuation 16min) | 3 tasks | 5 files |
+| Phase 23 P02 | 22min | 3 tasks | 12 files |
 
 ## Session
 
-**Last session:** 2026-11-11T13:50:42.230Z
-**Stopped at:** Completed 23-28-PLAN.md
+**Last session:** 2026-11-11T14:22:37.362Z
+**Stopped at:** Completed 23-02-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -228,3 +229,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-28 operator ruling ("Test today's skip"): the plan's "base V2 buy" became a "base V2 skip" test (arb V2 added beside it). On base and Arbitrum the V2 lock check asks GoPlus about the pair address and reads "not locked", so base and arb V2 buys cannot succeed on the real path until AUD-BUY-016 is fixed. Later scenario plans (23-20..23-22 golden recordings, notably 23-22 public-v2-buy on chain base) must not expect a base or arb V2 buy; base/arb V3 buys are unaffected. The skip tests fail with "AUD-BUY-016 looks fixed" when Phase 24 fixes the query and should then be rewritten as the V2 buys on route public.
 - [Phase 23]: 23-28: AUD-BUY-016 status candidate -> confirmed (S3, capital none, OD-30/BUY-05 unchanged) by the executor under the standing instruction: GoPlus response-details docs (lp_holders not returned when is_in_dex is 0) plus the real-path test on a doc-faithful fake; no live GoPlus call. Open for Phase 24: the live type of lp_holders is_locked (docs quote "1", goplus.ts:64 compares the number 1). Sibling: BSC's Mudra-error fallback also asks GoPlus about the pair.
 - [Phase 23]: 23-28 harness contract: createScenario({ chain: eth|bsc|base|arb, dexType: v2|v3, dexName?, feeTier? }) with fireNewPair/fireNewPool; FakeNode setFees (legacy), setReceiptLogs, setFutureNoncePolicy, neverMine, mine({ include, exclude, logs }), emitLogs stored for eth_getLogs, filtered subscriptions; httpLog entries carry the axios request params. External answer shapes not measured live: bloXroute hash without 0x, the Mudra lock shape, GoPlus is_locked as a number.
+- [Phase 23]: 23-02 harness contract: createScenario returns timeline; timeline.entries kinds op|submit|relay|db, each with at (fake clock ms), never sorted. op {level, op, msg, fields, bindings}; submit {route public|bundle|bloxroute, hash, raw, from, to, nonce, status} for node acceptances only (a refused raw send is not a submit entry); relay {relay flashbots|bloxroute, url, method, params}; db {table, op insert|update|delete, row (INTEGER as BigInt), inTransaction}. recordedAlerts() holds {via telegram|chain|ctx, chain, message}; recordedLogs() holds every log call; alerts never reach the timeline. A write inside a transaction, unixepoch(x) or a capture error is a violation failed by afterEach (takeViolations clears a deliberate one).
+- [Phase 23]: 23-02: today's real AC-01 buy timeline (CAP-14 baseline): relay eth_callBundle, relay eth_sendBundle, submit bundle, three more eth_sendBundle, op flashbots.bundle.included, relay flashbots_getBundleStatsV2, op flashbots.bundle.stats, then db trades.insert (after every relay body).
+- [Phase 23]: 23-02: knownBug(ctx, id, { claim, correct, observed, actual, expectedPlain, actualPlain }) records { id, claim, expected, actual, expectedPlain, actualPlain } on ctx.task.meta.knownBugs (BigInt as text, reaches the JSON reporter); refuses a non finding-shaped id, a non kebab-case claim, correct equal to observed and a repeated claim. Harness self-tests cite only the literal HARNESS-SELFTEST, which 23-04 must accept outside test/realpath/triage/.
+- [Phase 23]: 23-02: AC-02 gate scripts/check-realpath-mocks.ts (npm run check:realpath-mocks, CI step "Real-path mock-list gate (CHAR-01)") allows vi.mock/doMock/unmock/doUnmock only of logger, notifier, broadcaster, axios, telegram, telegram/sessions, telegram/events (by resolved file) and vi.spyOn only as vi.spyOn(process, 'exit') with no local process; refuses stubGlobal, importMock, mockObject, any alias or computed use of vi, a free vi, require/import of vitest and re-exports of vi; scans .ts/.js/.cjs/.mjs/.tsx under test/realpath. npm test now includes --project realpath.
