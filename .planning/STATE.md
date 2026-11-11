@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-09-PLAN.md
-last_updated: "2026-11-11T21:19:30.097Z"
+stopped_at: Completed 23-10-PLAN.md
+last_updated: "2026-11-11T22:16:17.089Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: a15b787aa24ac8090e0397b6ad72ae420b36daac
+state_head: b3908f0fb979aba1b4b8b222ac0b62299a3106eb
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 41
+  completed_plans: 42
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 10 of 31
+Plan: 11 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -125,11 +125,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P07 | 56min | 3 tasks | 20 files |
 | Phase 23 P08 | 51min | 2 tasks | 17 files |
 | Phase 23 P09 | 41min | 3 tasks | 19 files |
+| Phase 23 P10 | 46min | 3 tasks | 24 files |
 
 ## Session
 
-**Last session:** 2026-11-11T21:19:29.774Z
-**Stopped at:** Completed 23-09-PLAN.md
+**Last session:** 2026-11-11T22:15:56.791Z
+**Stopped at:** Completed 23-10-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -266,3 +267,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-09: AUD-TX-001, -002, -003, AUD-BUY-004, -010, -025 and AUD-EXIT-009 confirmed on the real path through the real withNonceLock (test/realpath/triage/<ID>.test.ts; the three RC-10 never-settling sites AUD-TX-002, AUD-BUY-025 and AUD-EXIT-009 in AUD-TX-002.test.ts, each with a mined-with-three-confirmations control), 8 knownBug claims with AUD-TX-029; every claim reads looks fixed under a fix-shaped src mutation and a full cross-file batch shows each mutation flips only its own claim. The never-settling results are bounded observations over a 30-minute fake-time window, never "forever". 23-16 must acknowledge all seven (S1).
 - [Phase 23]: 23-09 new finding under the standing instruction (no stop): AUD-TX-029 (S3, capital none, confirmed, C16, proven by AUD-TX-029.test.ts): src/utils/mevStrategies/reconciliation.ts:606-614 reports an escalation that ran out of attempts as mev.escalation.ceiling-hit with "priority-fee ceiling (25000000000 wei) reached" (a calm-gas snipe bids 1 to 4 gwei against the 25 gwei buy ceiling), and buy.snipe.fail-clean hands that text to the operator; fix with AUD-TX-010 (Phase 29, card TX-03 area).
 - [Phase 23]: 23-09 for later triage plans: a never-mined transaction is FakeNode.neverMine (a valid null receipt) with blocks still mining, stated as a bounded fake-time window, never a held RPC call. fixtures/AUD-TX-002-lock.ts gives graphWithNonceLock, probeWalletLock, pendingWindow, missBundlesUntil and settleAntiRugArming; fixtures/AUD-TX-003-second-launch.ts launches token B on sushiswap-v2 on the same ETH node and wallet. Races between handlers are forced by holding the first buy's eth_callBundle on the relay, not a provider read (AUD-TX-028). When a second position is armed, call settleAntiRugArming before the test ends, or teardown cancels a queued eth_subscribe into an unhandled rejection. In a per-step loop classify each submission once (Transaction.from recovers the sender on every read of from).
+- [Phase 23]: 23-10: AUD-API-002, AUD-ANTIRUG-001, AUD-BUY-008, AUD-ANTIRUG-003, -004, -005 and the two orchestrator-added population entries AUD-ANTIRUG-024 and AUD-ANTIRUG-018 (population gap: both joined the frozen 61 by 23-01 operator rulings and no plan owned them) confirmed on the real path (test/realpath/triage/<ID>.test.ts, 13 knownBug claims with AUD-BUY-036; every claim reads looks fixed under its own fix-shaped src mutation and a full cross-file batch shows each mutation flips only its own claims). Reconnect races are forced by a server-side node.dropSocket() and fake time; AUD-ANTIRUG-003 carries needs_fork (the log count of a real mainnet removal). AUD-BUY-008 and AUD-ANTIRUG-003 status candidate -> confirmed. 23-16 must acknowledge the seven S1 entries (API-002, ANTIRUG-001, BUY-008, ANTIRUG-003, -004, -005, -018), add AUD-ANTIRUG-003's UFV entry (owner 25) and set fork_ref.
+- [Phase 23]: 23-10 new finding under the standing instruction (no stop): AUD-BUY-036 (S3, capital none, confirmed, C10, proven by AUD-BUY-036.test.ts): src/bot.ts startHttpPollingListener (and the V3 poller) asks lastBlock+1..head in one eth_getLogs and advances only on success, so after an RPC outage longer than the provider log-range limit every poll is refused and the HTTP DEX listener never sees a new pair until a restart (only "HTTP polling error" logged). Same unchunked shape as AUD-ANTIRUG-018; fix both with one chunked poll helper (card OD-48 area).
+- [Phase 23]: 23-10 for later triage plans: fixtures/AUD-API-002-restart.ts gives bootListeners (every DEX listener, as boot step 4) and the dashboard Start callback as a line-for-line mirror of the private src/bot.ts onRestart, pinned by a sha256 of the closure text (any edit fails with "onRestart changed"; re-point mirror and hash with a Phase 24 onRestart fix). fixtures/AUD-ANTIRUG-018-range-limit.ts limitLogRange refuses eth_getLogs wider than 10 blocks (Alchemy free tier, repo evidence 19-RESEARCH CRITICAL #1 and the 21-03 README) through the public FakeNode.failNext, deciding each request from its own range via the last node.callLog entry (no harness gap). fixtures/AUD-ANTIRUG-003-live.ts gives live anti-rug gates (ETH_ANTIRUG_LIVE_EXECUTE/CONFIRM_BLOCKS/CIRCUIT_BREAKER_TRIGGERS overrides), the graph's circuitBreaker module and driveFor (one bundle-slot map for the whole window; an empty block only while no bundle waits, else bundles miss their targets). A pro-rata liquidity pull leaves the price unchanged, so the routine stop-loss does not fire on it.
