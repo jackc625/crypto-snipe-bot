@@ -208,6 +208,32 @@
       "reason": "Found by a clean-clone replay of the CI steps on Windows at 776858c. The first test pays for the first dynamic import of src/bot and took 6295 ms against the unit default limit of 5000 ms. The other tests in the file take 61-90 ms.",
       "register_as": "test-quality",
       "found_in": "PR #2 CI replay"
+    },
+    {
+      "file": "test/unit/db.test.ts",
+      "test": "SQLite storage (TEST-02) > pragmas > Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION",
+      "it_count_before": 32,
+      "it_count_after": 32,
+      "change": "Expected value changed from the literal 4 to CURRENT_SCHEMA_VERSION (7), imported from src/utils/dbSchema.ts. Title changed from 'Schema v4: user_version pragma returns 4' to 'Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION'. A two-line comment added. No other assertion changed.",
+      "reason": "AC-07: the helper now returns CURRENT_SCHEMA_VERSION",
+      "register_as": "test-quality",
+      "title_before": "Schema v4: user_version pragma returns 4",
+      "title_after": "Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION",
+      "found_in_plan": "23-03",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-03-ac07-red.txt",
+      "related_finding": "AUD-TESTI-001"
+    },
+    {
+      "file": "test/unit/helpers.smoke.test.ts",
+      "test": "helpers smoke test > createTestDb returns a working in-memory DB",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Expected value changed from the literal 4 to CURRENT_SCHEMA_VERSION (7), imported from src/utils/dbSchema.ts; the comment above it now says the helper is built by the real migrations. Title unchanged. No other assertion changed. Recorded although the title did not change, so both AC-07 assertion edits are listed.",
+      "reason": "AC-07: the helper now returns CURRENT_SCHEMA_VERSION",
+      "register_as": "test-quality",
+      "found_in_plan": "23-03",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-03-ac07-red.txt",
+      "related_finding": "AUD-TESTI-001"
     }
   ]
 }

@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMockProvider, createMockContract } from '../helpers/mockProvider';
 import { createTestDb } from '../helpers/testDb';
+import { CURRENT_SCHEMA_VERSION } from '../../src/utils/dbSchema';
 import { mockHoneypotResponse, mockGoPlusResponse, MOCK_TOKEN_ADDRESS } from '../fixtures/tokenSafety.fixtures';
 import { createMockTxRequest, createMockBundleResponse, createMockFlashbotsProvider } from '../fixtures/txManager.fixtures';
 
@@ -29,9 +30,10 @@ describe('helpers smoke test', () => {
         expect(columns).toContain('token');
         expect(columns).toContain('pool_type');
         expect(columns).toContain('fee_tier');
-        // Verify user_version is 4
+        // Verify user_version is the current production schema version (the helper is built by
+        // the real migrations, Phase 23 plan 23-03, AC-07)
         const version = db.pragma('user_version', { simple: true });
-        expect(version).toBe(4);
+        expect(version).toBe(CURRENT_SCHEMA_VERSION);
         db.close();
     });
 });

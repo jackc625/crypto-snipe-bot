@@ -1,0 +1,132 @@
+RED proof 23-03-ac07 - createTestDb returns the old hand-written version 4
+Plan 23-03 (CHAR-05, AC-07). Cited by plan 23-14 as the RED proof for AUD-TESTI-001 (RC-28).
+Recorded 2026-11-11T05:33:57Z at HEAD 7a91783d932167c7f47223beb5b834a8f91a63a3, Node v22.16.0.
+Taken BEFORE test/helpers/testDb.ts changed: the helper is the HEAD blob e1acaf0ebe5e2284bb5a2ac47e792569ce23dbae (git diff --quiet test/helpers/testDb.ts: clean).
+Only the two F5 test edits were in the working tree; they assert CURRENT_SCHEMA_VERSION (7) in place of the literal 4.
+
+== Test edits under test (git diff) ==
+diff --git a/test/unit/db.test.ts b/test/unit/db.test.ts
+index 2232bc6..0d2fb61 100644
+--- a/test/unit/db.test.ts
++++ b/test/unit/db.test.ts
+@@ -5,6 +5,7 @@
+ import { describe, it, expect } from 'vitest';
+ import { createTestDb } from '../helpers/testDb';
+ import { normalizeLegacyMainnetRows, makeIsTokenSnipedStmt } from '../../src/utils/db';
++import { CURRENT_SCHEMA_VERSION } from '../../src/utils/dbSchema';
+ 
+ describe('SQLite storage (TEST-02)', () => {
+     describe('concurrent writes', () => {
+@@ -73,10 +74,12 @@ describe('SQLite storage (TEST-02)', () => {
+             db.close();
+         });
+ 
+-        it('Schema v4: user_version pragma returns 4', () => {
++        it('Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION', () => {
++            // Phase 23 plan 23-03 (AC-07): createTestDb is built by the real migrations, so it
++            // returns the production schema version, not the old hand-written 4.
+             const db = createTestDb();
+             const version = db.pragma('user_version', { simple: true });
+-            expect(version).toBe(4);
++            expect(version).toBe(CURRENT_SCHEMA_VERSION);
+             db.close();
+         });
+     });
+diff --git a/test/unit/helpers.smoke.test.ts b/test/unit/helpers.smoke.test.ts
+index a3e42df..20d03b1 100644
+--- a/test/unit/helpers.smoke.test.ts
++++ b/test/unit/helpers.smoke.test.ts
+@@ -5,6 +5,7 @@
+ import { describe, it, expect } from 'vitest';
+ import { createMockProvider, createMockContract } from '../helpers/mockProvider';
+ import { createTestDb } from '../helpers/testDb';
++import { CURRENT_SCHEMA_VERSION } from '../../src/utils/dbSchema';
+ import { mockHoneypotResponse, mockGoPlusResponse, MOCK_TOKEN_ADDRESS } from '../fixtures/tokenSafety.fixtures';
+ import { createMockTxRequest, createMockBundleResponse, createMockFlashbotsProvider } from '../fixtures/txManager.fixtures';
+ 
+@@ -29,9 +30,10 @@ describe('helpers smoke test', () => {
+         expect(columns).toContain('token');
+         expect(columns).toContain('pool_type');
+         expect(columns).toContain('fee_tier');
+-        // Verify user_version is 4
++        // Verify user_version is the current production schema version (the helper is built by
++        // the real migrations, Phase 23 plan 23-03, AC-07)
+         const version = db.pragma('user_version', { simple: true });
+-        expect(version).toBe(4);
++        expect(version).toBe(CURRENT_SCHEMA_VERSION);
+         db.close();
+     });
+ });
+
+== RED command ==
+export PATH="/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH"; node node_modules/vitest/vitest.mjs run --project unit test/unit/db.test.ts test/unit/helpers.smoke.test.ts
+
+== RED result: Vitest exit=1 (failed, as required); expected 7, received 4, in exactly the two edited tests ==
+Full output (ANSI stripped; rail ledger temp paths kept as printed):
+
+ RUN  v4.1.1 C:/Users/jackc/WebstormProjects/crypto-snipe-bot
+
+[SAFE-02 rails] run run-20261111T053343-14160-95246a — project unit — ledger C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\run-20261111T053343-14160-95246a
+ ❯  unit  test/unit/helpers.smoke.test.ts (10 tests | 1 failed) 13ms
+     × createTestDb returns a working in-memory DB 8ms
+{"level":30,"time":"2026-11-11T05:33:44.317Z","msg":"Created trades table (schema version 1)"}
+{"level":30,"time":"2026-11-11T05:33:44.318Z","msg":"Added pool_type and fee_tier columns (schema version 2)"}
+{"level":30,"time":"2026-11-11T05:33:44.320Z","msg":"Created exit_state table and expanded trades action CHECK (schema version 3)"}
+{"level":30,"time":"2026-11-11T05:33:44.320Z","msg":"Added dex_name column (schema version 4)"}
+{"level":30,"time":"2026-11-11T05:33:44.320Z","msg":"Created lp_baseline + chain_state tables (schema version 5)"}
+{"level":30,"time":"2026-11-11T05:33:44.321Z","msg":"Created pause_state table + antirug_dry_run_started column (schema version 6)"}
+{"level":30,"time":"2026-11-11T05:33:44.321Z","msg":"Added exit_failure_count + exit_status columns to exit_state (schema version 7)"}
+{"level":30,"time":"2026-11-11T05:33:44.360Z","rowsNormalized":1,"msg":"Normalized legacy mainnet → eth chain identifiers in trades table"}
+{"level":30,"time":"2026-11-11T05:33:44.361Z","rowsNormalized":1,"msg":"Normalized legacy mainnet → eth chain identifiers in trades table"}
+ ❯  unit  test/unit/db.test.ts (32 tests | 1 failed) 51ms
+       × Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   unit  test/unit/db.test.ts > SQLite storage (TEST-02) > pragmas > Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION
+AssertionError: expected 4 to be 7 // Object.is equality
+
+- Expected
++ Received
+
+- 7
++ 4
+
+ ❯ test/unit/db.test.ts:82:29
+     80|             const db = createTestDb();
+     81|             const version = db.pragma('user_version', { simple: true }…
+     82|             expect(version).toBe(CURRENT_SCHEMA_VERSION);
+       |                             ^
+     83|             db.close();
+     84|         });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL   unit  test/unit/helpers.smoke.test.ts > helpers smoke test > createTestDb returns a working in-memory DB
+AssertionError: expected 4 to be 7 // Object.is equality
+
+- Expected
++ Received
+
+- 7
++ 4
+
+ ❯ test/unit/helpers.smoke.test.ts:36:25
+     34|         // the real migrations, Phase 23 plan 23-03, AC-07)
+     35|         const version = db.pragma('user_version', { simple: true });
+     36|         expect(version).toBe(CURRENT_SCHEMA_VERSION);
+       |                         ^
+     37|         db.close();
+     38|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 40 passed (42)
+   Start at  00:33:43
+   Duration  580ms (transform 202ms, setup 157ms, import 348ms, tests 65ms, environment 0ms)
+
+[SAFE-02 rails] run run-20261111T053343-14160-95246a — project unit finished — summary C:\Users\jackc\AppData\Local\Temp\crypto-snipe-bot-rail-ledger\run-20261111T053343-14160-95246a\summary.json
+[SAFE-02 rails]   kind          count
+[SAFE-02 rails]   worker-start  2
