@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Phase 23 context gathered
-last_updated: "2026-11-10T00:05:16.876Z"
-last_activity: 2026-11-09
-last_activity_desc: "Phase 22 shipped as PR #2"
-state_head: 5502fc9f4b7930061d322d12dc10aa5ad0642707
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-11-11T05:21:10.474Z"
+last_activity: 2026-11-10
+last_activity_desc: Phase 23 execution started
+state_head: 4a108b807eb65822363e28443d85b63fc4f6aaaa
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 29
+  completed_plans: 30
   percent: 9
 ---
 
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 
 ## Current Position
 
-Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — READY TO EXECUTE
-Plan: Not started
+Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
+Plan: 2 of 31
 Status: Ready to execute
-Last activity: 2026-11-09 -- Phase 22 shipped as PR #2
+Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
@@ -58,6 +58,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - **Phase 24 item (found by the 22 security audit after the seal):** the startup DB probe copies a WAL-mode database to the OS temp folder, and a crash or failed cleanup can leave that copy behind (trade data, no keys). Not in the sealed register; see 22-SECURITY.md.
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
+- **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. The operator does not know whether any chain runs without a WS URL, so exposure on the current setup is unknown.
 
 ## Operating Notes (carry to next session)
 
@@ -110,12 +111,13 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 22 P15 | 18min (continuation) | 2 tasks | 15 files |
 | Phase 22 P16 | 18min | 2 tasks | 11 files |
 | Phase 22 P29 | 28min | 3 tasks | 79 files |
+| Phase 23 P01 | 55min (wall-clock incl. two operator waits) | 2 tasks | 12 files |
 
 ## Session
 
-**Last session:** 2026-11-09T16:47:10.526Z
-**Stopped at:** Phase 23 context gathered
-**Resume file:** .planning/phases/23-test-safety-net-harness-triage-characterization/23-CONTEXT.md
+**Last session:** 2026-11-11T05:21:10.108Z
+**Stopped at:** Completed 23-01-PLAN.md
+**Resume file:** None
 
 ## Decisions
 
@@ -215,3 +217,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 22]: UAT 2026-11-09: operator accepted AUD-REAUDIT-001, that 11 fork rehearsal runs before a08d650 very likely read the real env file into the Vitest main process
 - [Phase 22]: UAT 2026-11-09: operator accepted the per-user process lock for now and added CAP-18 to Phase 24 so AUD-TX-026 (S3) has a named owner
 - [Phase 22]: UAT 2026-11-09: operator deferred the real fork run to Phase 25 and had the five checks named in its success criteria
+- [Phase 23]: 23-01: AUD-ANTIRUG-024 registered (new, S3, capital none; ESC-ANTIRUG-02, operator "New finding, S3 (Recommended)") and AUD-ANTIRUG-018 raised S2 -> S1 (ESC-ANTIRUG-03, operator "Raise to S1 (Recommended)"; asked whether any chain runs without a WS URL: "Not sure"). Plans that count the 59 register entries (for example 23-04 AC-08 and 23-16) must also include AUD-ANTIRUG-024; AUD-ANTIRUG-018 is now S1 and must be in the Wave 5 triage set and the 23-16 S0/S1 batch report.
+- [Phase 23]: Standing operator instruction (2026-11-11, verbatim): "All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading". Applies to every later Phase 23 plan: an executor applies a severity change itself per PROTOCOL.md with reasoning and file:line evidence, and registers a bug not in the register itself with its own grade, quoting this instruction, and lists every such change under its own SUMMARY heading; it does not stop. It overrides the "severity increase" and "bug not in the register" stop triggers in 23-SPEC line 103 and the plans' phase-wide rules. Still stop for: anything that overturns a plan's or locked decision's premise, a NOT-A-BUG closure of an S0/S1 (D-11), an unreproduced entry (AC-08), or anything unsafe. The D-11 batch report is unchanged.
+- [Phase 23]: 23-01 harness contract: FakeNode.failNext/hold return handles (fired/heldCount, describe()) and must fire or afterEach fails; arming refuses a selector/to the method cannot carry; a call still parked at teardown is answered with a JSON-RPC error, never a node answer; bare-node tests through a real JsonRpcProvider need cacheTimeout -1 (ethers 250 ms perform cache).
