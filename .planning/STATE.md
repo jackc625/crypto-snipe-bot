@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-04-PLAN.md
-last_updated: "2026-11-11T15:00:05.123Z"
+stopped_at: Completed 23-27-PLAN.md
+last_updated: "2026-11-11T15:33:32.008Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: 917733b415bcd4263267457f9c136c5c0140bc1f
+state_head: d17df7ed9b9e3b973316d8dc508e45f50bd1dc9d
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 34
+  completed_plans: 35
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 6 of 31
+Plan: 7 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -117,11 +117,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P28 | 8h 8m (wall-clock incl. operator wait; continuation 16min) | 3 tasks | 5 files |
 | Phase 23 P02 | 22min | 3 tasks | 12 files |
 | Phase 23 P04 | 28min | 2 tasks | 7 files |
+| Phase 23 P27 | 28min | 3 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-11-11T15:00:04.765Z
-**Stopped at:** Completed 23-04-PLAN.md
+**Last session:** 2026-11-11T15:33:31.615Z
+**Stopped at:** Completed 23-27-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -237,3 +238,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-04: the triage population is 61, frozen in .planning/audit/inputs/triage-population.json at 7d1c699 (60 computed from the HEAD register because AUD-ANTIRUG-018 is now S1, plus AUD-ANTIRUG-024 by operator ruling). Plans that count "59 entries" (23-16 and any report) must use 61; check.ts joins the frozen IDs with the live set.
 - [Phase 23]: 23-04 triage contract for 23-05..23-16: record outcomes only with .planning/audit/tools/set-triage.ts; confirmed needs --test-id (the lead finding ID of the triage test file, which must assert the entry) and a knownBug(ctx, '<ID>', { claim: '<literal>' }) in test/realpath/triage/**/<finding ID>.test.ts; NOT-A-BUG needs --evidence '{"type","ref","note"}' at every severity and, for an entry S0/S1 now or at the freeze, --ruling to a review record ruling not-a-bug on it; unreproduced needs a keep-open ruling (PENDING until stage triage) and open_claims if it keeps a knownBug; fixed needs a "closes-finding: <ID>" marker line under test/, --proof and --rail-test. check.ts --stage triage is the phase gate.
 - [Phase 23]: 23-04 for later plans: a Phase 23 commit that edits a file added after audit_base_sha (for example scripts/check-vi-mock-paths.ts, edited by 23-02 and found failing --stage partial) makes partial and triage fail until a reviewed re_audit row reaches its last-change SHA; 23-04 added those rows for check-vi-mock-paths.ts, .gitignore, package.json and vitest.config.ts. --stage final still has 16 FAILs from 23-01..23-03 files (Phase 22 bookkeeping, out of scope).
+- [Phase 23]: 23-27 harness contract: createTempDbFile() + createScenario({ db: { file } }) give a graph on a temp SQLite file; restartGraph(sc, { env }) stops the graph like dispose (holds released with an error, bot timer registry and EVERY fake timer cleared, providers destroyed, closeDb, old sockets and the Telegram client dropped) and reloads the whole graph on the same file and FakeNode; alerts, logs and timeline are kept; the test calls the real resume paths itself. loadGraph refuses, before any src/ import, a file whose real path is outside os.tmpdir() and, in memory mode, any DB_PATH other than :memory:.
+- [Phase 23]: 23-27 two-process contract: serveLoopback(node) serves one FakeNode on real 127.0.0.1 HTTP and ws ports (each socket passes its own connection, so eth_subscribe and pushes are the in-process code; a closed socket loses its subscriptions); start children only with runRailedChildToEnd (spawnRailedChildAsync; a child still running at teardown is killed and fails the test); wait for a child with node.waitForSubscriptions(n) raced against its end (no timer); a real-time child needs node.autoMine({ confirmations }); give each child a ledgerRunId and assert its case ledger loopback-only (takeCaseLedger in harnessRestart.test.ts).
+- [Phase 23]: 23-27 Telegram contract: graph.telegramListener.startTelegramListener([ctx]) registers on the setup.ts client fake; deliverTelegramMessage({ text, senderId, chatId }) (wrap in stepUntil) reaches the real inline allowlist handler with the library's own big-integer IDs, throws "no Telegram handler registered" with none, refuses a filtered NewMessage builder; telegramHandlerCount(). From now until the phase ends the Harness Gap Procedure in 23-27-PLAN.md applies: triage and scenario plans never write test/realpath/harness/ (23-20 adds only serializer.ts).

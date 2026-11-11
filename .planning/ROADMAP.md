@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 5/31 plans executed in 15 execution waves
+**Plans**: 6/31 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -240,7 +240,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [x] 23-04-PLAN.md — Register checker: triage outcomes, D-21 rules, --stage triage, set-triage.ts
-- [ ] 23-27-PLAN.md — Harness restart on a real temp-file database, and a real child process sharing it and subscribing over a loopback socket
+- [x] 23-27-PLAN.md — Harness restart on a real temp-file database, and a real child process sharing it and subscribing over a loopback socket
 
 **Cross-cutting constraints:** <!-- gsd:generated -->
 - D-04: chain data is synthetic and built with real ethers encoders
@@ -602,7 +602,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
-| 23. Test Safety Net (Harness, Triage, Characterization) | 5/31 | In Progress | - |
+| 23. Test Safety Net (Harness, Triage, Characterization) | 6/31 | In Progress | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
 | 26. Toolchain & ESM | 0/TBD | Not started | - |
