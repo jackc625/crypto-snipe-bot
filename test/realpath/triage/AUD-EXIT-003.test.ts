@@ -140,7 +140,11 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         expect(quotes.every((q) => q.to === getAddress(sc.dex.routerAddress) && q.tokenOut === getAddress(sc.weth))).toBe(true);
     });
 
-    it('zero-entry-infinite-ratio-fires-every-partial-tier: a 0 first quote is kept as the entry, a 1 percent price rise reads Infinity and both partial tiers sell at once', async (ctx) => {
+    // Own limit: this test drives a minute of simulated chain time in small steps. Alone it runs
+    // in about 8.6 s; under the full parallel `npm test` load it went past the project's 15 s
+    // default twice in a row and took 29.7 s once given room (2026-11-11), so it gets 90 s,
+    // about 3x its measured run time under load.
+    it('zero-entry-infinite-ratio-fires-every-partial-tier: a 0 first quote is kept as the entry, a 1 percent price rise reads Infinity and both partial tiers sell at once', { timeout: 90_000 }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_SNIPE_AMOUNT: '0.001', PARTIAL_SELL_TARGETS: '2x:25,5x:25' } });
         const pollMs = sc.graph.exitEngine.exitConfig.pollIntervalMs;
         expect(sc.graph.exitEngine.exitConfig.partialSellTiers).toEqual([{ multiple: 2, percent: 25 }, { multiple: 5, percent: 25 }]);

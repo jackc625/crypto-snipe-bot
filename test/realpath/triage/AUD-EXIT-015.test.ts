@@ -45,7 +45,10 @@ import { buyAndMine, buyRow, exitQuotes, exitStateRow, listen, msgLogged, opEntr
 import { installSellPath, landNextSell, sellRouterOf } from './fixtures/AUD-EXIT-001-sell-path';
 
 describe('AUD-EXIT-015: resume quotes with the current snipe amount, not the probe behind the stored entry price', () => {
-    it('resume-probes-with-current-snipe-amount: after a restart with ETH_SNIPE_AMOUNT 0.01 -> 0.002 the resumed monitor probes 0.002 against an entry measured at 0.01, and the stop-loss fires with no price change', async (ctx) => {
+    // Own limit: a restart plus a driven stop-loss sell. Under the full parallel `npm test` load it
+    // took 11.6 s of the project's 15 s default (2026-11-11), the same pattern that made AUD-EXIT-003's
+    // zero-entry test time out, so it gets 60 s, about 5x its measured run time under load.
+    it('resume-probes-with-current-snipe-amount: after a restart with ETH_SNIPE_AMOUNT 0.01 -> 0.002 the resumed monitor probes 0.002 against an entry measured at 0.01, and the stop-loss fires with no price change', { timeout: 60_000 }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', db: { file: createTempDbFile() } });
         const { node } = sc;
         const pollMs = sc.graph.exitEngine.exitConfig.pollIntervalMs;
