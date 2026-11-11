@@ -124,5 +124,11 @@
       "by": "operator ruling at the 23-01 blocking checkpoint",
       "escalation_ref": "ESC-ANTIRUG-03"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10, orchestrator scope addition) against a provider that refuses an over-range eth_getLogs as Alchemy's free tier does (10 blocks inclusive per request; repo evidence 19-RESEARCH CRITICAL #1 and the 21-03 measurement on the configured key; no live request): a temp-file database, an ETH chain without a WebSocket URL booted as startMultiChainBot does (HTTP DEX poller, both resumes), a real snipe bought and armed with its anti-rug poll following the head; after 6 minutes of downtime (30 blocks) and a boot on the same file, every anti-rug poll asks stored+1..head in one request and is refused, the cursor never moves, a real 95 percent router pull is never evaluated within 2 minutes of fake time, and the dashboard was told connected (claim restart-gap-blinds-http-poller). A poller using the chunked getLogsForBackfill reads looks fixed.",
+    "test_id": "AUD-ANTIRUG-018"
+  }
 }
