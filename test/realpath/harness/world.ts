@@ -4,11 +4,14 @@
 //   - Fixed clock (D-05): every timer and the date are fake and stepped by the test, including
 //     ethers' 10 ms JSON-RPC batching timer and performance.now (src/exitEngine.ts measures with
 //     it). SQLite's unixepoch() is overridden on the test connection so DEFAULT (unixepoch())
-//     reads the same clock (RESEARCH Pattern 5).
+//     reads the same clock (RESEARCH Pattern 5); capture.ts installDbCapture does it together
+//     with the DB capture (plan 23-02).
 //   - loadGraph(): a whole-graph reset. closeDb() on the previous graph, vi.resetModules(), then
 //     dynamic imports of the real src/ modules on a fresh :memory: database built by the real
 //     migrations (src/utils/db.ts opens and migrates at import). The connection is the existing
-//     `db` export; no getter is added (D-14 as corrected, SPEC Amendment A-3).
+//     `db` export; no getter is added (D-14 as corrected, SPEC Amendment A-3). Every new
+//     connection gets the DB capture and the SQL clock in the same helper, so a reset can never
+//     leave a connection uncaptured (RESEARCH Pitfall 5).
 //   - routeHttp(): per-scenario routes for the axios mock; an unmatched URL is a stray.
 //   - createScenario(): one chain (eth, bsc, base or arb), one DEX (V2 or V3), a token, a pair or
 //     pool and the reads a real node would answer, all built with real ethers encoders (D-04).
@@ -43,6 +46,7 @@ import {
     type Stray,
     type FakeLog,
 } from './chain';
+import { createTimeline, installDbCapture, type Timeline } from './capture';
 
 // ---------------------------------------------------------------------------------------------
 // Fixed clock (D-05)
@@ -227,12 +231,11 @@ export async function loadGraph(): Promise<Graph> {
     const detector = await import('../../../src/anti-rug/detector');
     const bot = await import('../../../src/bot');
     const db = dbModule.db;
-    // unixepoch() with no argument reads the fake clock; any argument fails loudly, because a
-    // future unixepoch(x) would otherwise read the real clock unnoticed.
-    db.function('unixepoch', { varargs: true, deterministic: false }, (...args: unknown[]) => {
-        if (args.length > 0) throw new Error(`realpath harness unixepoch: arguments are not supported: ${JSON.stringify(args)}`);
-        return Math.floor(Date.now() / 1000);
-    });
+    // The capture and the SQL clock, one call, on every new connection (Pitfall 5). unixepoch()
+    // with no argument reads the fake clock; an argument is a capture violation (capture.ts).
+    const st = harnessState();
+    if (!st.timeline) st.timeline = createTimeline();
+    installDbCapture(db, st.timeline);
     currentGraph = { bot, chainRegistry, dbModule, exitEngine, detector, exitManager, db };
     return currentGraph;
 }
@@ -283,6 +286,9 @@ async function routeAxios(method: string, url: string, data: unknown, config: un
 }
 
 harnessState().routeAxios = routeAxios;
+// A timeline exists from the start, so no feed ever records into nothing; createScenario and
+// resetTestState start a fresh one.
+if (!harnessState().timeline) harnessState().timeline = createTimeline();
 
 // ---------------------------------------------------------------------------------------------
 // Stray and fault checks (AC-03)
@@ -325,6 +331,8 @@ export function resetTestState(): void {
     st.httpRoutes = [];
     st.httpLog = [];
     st.telegram = { clients: [] };
+    st.timeline = createTimeline();
+    st.violations = [];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -467,6 +475,8 @@ export interface Scenario<D extends ScenarioDexType = ScenarioDexType> {
     wallet: ChainContext['wallet'];
     weth: string;
     reserves: { weth: bigint; token: bigint };
+    /** The ordered timeline of this scenario: op logs, submissions, relay bodies, DB writes (D-13). */
+    timeline: Timeline;
     /** V2: mine the launch's addLiquidityETH and deliver its real PairCreated log (D-06). */
     fireNewPair(): Promise<{ block: number; log: FakeLog }>;
     /** V3: mine the launch's create-and-mint and deliver its real PoolCreated, with the same-block Mint stored for eth_getLogs. */
@@ -547,6 +557,12 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         if (errors.length > 1) throw new AggregateError(errors, `dispose: ${errors.length} teardown steps failed`);
     };
     st.disposers.push(dispose);
+
+    // A test reads only its own scenario: alerts, logs and the timeline start empty here.
+    st.alerts = [];
+    st.logs = [];
+    const timeline = createTimeline();
+    st.timeline = timeline;
 
     try {
         useFixedClock();
@@ -811,6 +827,8 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
                 const body = (req.data ?? {}) as { id?: unknown; method?: string; params?: { transaction?: string } };
                 const headers = ((req.config as { headers?: Record<string, string> } | undefined)?.headers ?? {}) as Record<string, string>;
                 const id = body.id ?? null;
+                // The relay body, on arrival (D-13), before anything is decided about it.
+                harnessState().timeline?.record({ kind: 'relay', relay: 'bloxroute', url: req.url, method: String(body.method), params: body.params });
                 if (req.method !== 'post' || req.url.replace(/\/$/, '') !== endpoint.replace(/\/$/, '')) return { status: 404, data: { message: 'not found' } };
                 if (!headers.Authorization || headers.Authorization !== process.env.BLOXROUTE_AUTH_HEADER) {
                     return { status: 401, data: { jsonrpc: '2.0', id, error: { code: 401, message: 'Unauthorized', data: 'account must have a valid Authorization header' } } };
@@ -884,7 +902,7 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
             return { block, poolCreated, mint };
         };
 
-        return { node, graph, registry, ctx, chain: chainName, dex: dex as ScenarioDex<D>, token, pair, feeTier, checker, wallet, weth, reserves, fireNewPair, fireNewPool, dispose };
+        return { node, graph, registry, ctx, chain: chainName, dex: dex as ScenarioDex<D>, token, pair, feeTier, checker, wallet, weth, reserves, timeline, fireNewPair, fireNewPool, dispose };
     } catch (e) {
         let teardown: unknown;
         try {

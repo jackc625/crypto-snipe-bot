@@ -45,6 +45,7 @@ import {
     concat,
     toUtf8Bytes,
 } from 'ethers';
+import type { Timeline } from './capture';
 
 // ---------------------------------------------------------------------------------------------
 // Shared state
@@ -59,6 +60,21 @@ export interface LogSinkEntry {
     obj: Record<string, unknown> | undefined;
     msg: string | undefined;
 }
+
+/** One notifier call, in call order, with the exact text the caller passed (plan 23-02). */
+export interface AlertEntry {
+    /** Which notifier function: sendTelegramAlert, sendChainAlert or sendCtxAlert. */
+    via: 'telegram' | 'chain' | 'ctx';
+    /** The chain display name (sendChainAlert), ctx.chain.name (sendCtxAlert), or null. */
+    chain: string | null;
+    message: unknown;
+}
+
+/** A capture problem, kept out of band so production catches cannot hide it (capture.ts). */
+export type Violation =
+    | { kind: 'db-in-transaction'; table: string; op: 'insert' | 'update' | 'delete' }
+    | { kind: 'unixepoch-argument'; args: unknown[] }
+    | { kind: 'capture-error'; message: string };
 
 export interface Stray {
     seq: number;
@@ -100,8 +116,10 @@ export interface HarnessState {
     nodes: FakeNode[];
     /** Strays seen while no node was current. */
     orphanStrays: Stray[];
+    /** Every log call, with or without an `op` field (capture.ts recordedLogs). */
     logs: LogSinkEntry[];
-    alerts: Array<{ seq: number; fn: string; args: unknown[] }>;
+    /** Every notifier call (capture.ts recordedAlerts). Never on the timeline. */
+    alerts: AlertEntry[];
     broadcasts: Array<{ seq: number; type: string; data: unknown }>;
     httpRoutes: HttpRoute[];
     /** Every axios call; `params` is the request's axios `params` (the query string), as given. */
@@ -111,6 +129,10 @@ export interface HarnessState {
     disposers: Array<() => Promise<void>>;
     /** Set by world.ts; the axios mock in setup.ts delegates to it. */
     routeAxios: ((method: string, url: string, data: unknown, config: unknown) => Promise<unknown>) | null;
+    /** The ordered timeline every feed appends to; createScenario starts a fresh one (capture.ts). */
+    timeline: Timeline | null;
+    /** Capture violations, checked by assertNoViolations() in afterEach (capture.ts). */
+    violations: Violation[];
 }
 
 export function harnessState(): HarnessState {
@@ -132,6 +154,8 @@ export function harnessState(): HarnessState {
             telegram: { clients: [] },
             disposers: [],
             routeAxios: null,
+            timeline: null,
+            violations: [],
         };
         g[HARNESS_KEY] = st;
     }
@@ -769,7 +793,7 @@ export class FakeNode {
         let sub = this.submitted.find((s) => s.hash === tx.hash);
         if (!sub) {
             sub = { raw, hash: tx.hash, tx, route, status: 'accepted', targetBlocks: [], block: null };
-            this.submitted.push(sub);
+            this.#pushSubmitted(sub);
             if (!this.#txs.has(tx.hash)) this.#txs.set(tx.hash, { seq: nextSeq(), raw, hash: tx.hash, tx, from: tx.from, route, status: 'accepted', block: null, index: null });
             this.history.push({ seq: nextSeq(), event: 'accepted', hash: tx.hash, from: tx.from, nonce: tx.nonce, route, block: this.#head.number + 1 });
         }
@@ -819,6 +843,25 @@ export class FakeNode {
     neverMine(hash: string): void {
         if (!this.#txs.has(hash)) throw new Error(`neverMine: ${hash} was never accepted by this node`);
         this.#neverMine.add(hash);
+    }
+
+    /**
+     * The one place a submission from the code under test is stored: on `submitted`, and as a
+     * `submit` entry on the harness timeline (plan 23-02, D-13), in arrival order.
+     */
+    #pushSubmitted(sub: Submitted): void {
+        if (sub.status !== 'accepted' && sub.status !== 'queued') throw new Error(`FakeNode: a new submission cannot arrive ${sub.status}`);
+        this.submitted.push(sub);
+        harnessState().timeline?.record({
+            kind: 'submit',
+            route: sub.route,
+            hash: sub.hash,
+            raw: sub.raw,
+            from: getAddress(sub.tx.from!),
+            to: sub.tx.to ? getAddress(sub.tx.to) : null,
+            nonce: sub.tx.nonce,
+            status: sub.status,
+        });
     }
 
     // -- public pool admission (eth_sendRawTransaction) ----------------------------------------
@@ -889,7 +932,7 @@ export class FakeNode {
         const entry: KnownTx = { seq: nextSeq(), raw, hash: tx.hash, tx, from, route, status, block: null, index: null };
         this.#txs.set(tx.hash, entry);
         if (route === 'foreign') this.foreign.push(entry);
-        else this.submitted.push({ raw, hash: tx.hash, tx, route, status, targetBlocks: [], block: null });
+        else this.#pushSubmitted({ raw, hash: tx.hash, tx, route, status, targetBlocks: [], block: null });
         this.history.push({ seq: nextSeq(), event: status === 'queued' ? 'queued' : 'accepted', hash: tx.hash, from, nonce: tx.nonce, route, block: this.#head.number + 1 });
         if (existing) {
             this.#setStatus(existing, 'replaced');
@@ -1216,6 +1259,7 @@ export class FakeNode {
         if (via.endpoint === 'relay') {
             relayEntry = { seq: nextSeq(), method, params, url: via.url };
             this.relay.push(relayEntry);
+            harnessState().timeline?.record({ kind: 'relay', relay: 'flashbots', url: via.url, method, params });
         }
         let outcome: Outcome;
         try {
@@ -1576,7 +1620,7 @@ export class FakeNode {
             let sub = this.submitted.find((s) => s.hash === hash);
             if (!sub) {
                 sub = { raw, hash, tx, route: 'bundle', status: 'accepted', targetBlocks: [], block: null };
-                this.submitted.push(sub);
+                this.#pushSubmitted(sub);
                 if (!this.#txs.has(hash)) this.#txs.set(hash, { seq: nextSeq(), raw, hash, tx, from: tx.from!, route: 'bundle', status: 'accepted', block: null, index: null });
             }
             if (!sub.targetBlocks.includes(target)) {

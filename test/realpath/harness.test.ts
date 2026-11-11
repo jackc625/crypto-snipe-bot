@@ -17,6 +17,7 @@ import axios from 'axios';
 import { FetchRequest, Interface, JsonRpcProvider, Network, Transaction, WebSocketProvider, Wallet, ethers, parseEther, parseUnits, getAddress, toQuantity } from 'ethers';
 import { FakeNode, FakeWebSocket, encodeResult, harnessState, installSeams, labelAddress } from './harness/chain';
 import { decodeReceipt } from '../../src/utils/receiptDecoder';
+import { recordedAlerts } from './harness/capture';
 import {
     assertAllFaultsFired,
     assertNoStrays,
@@ -1007,7 +1008,8 @@ describe('scenario builder: every chain and DEX type on its real route (23-28 Ta
             // The lock is the only failed check.
             const result = skip()!.checks;
             expect(result).toMatchObject({ isHoneypot: false, isBlacklisted: false, locked: false, sufficientLiquidity: true, validMetadata: true, canSwap: true, hasLimits: false, mutable: false });
-            expect(harnessState().alerts.some((a) => a.args.some((x) => typeof x === 'string' && x.includes('Locked: `No`')))).toBe(true);
+            // The real alert, with its exact text, sent through sendCtxAlert for this chain.
+            expect(recordedAlerts().some((a) => a.via === 'ctx' && a.chain === chain && typeof a.message === 'string' && a.message.includes('Locked: `No`'))).toBe(true);
 
             // No buy: two more slots pass and nothing is sent on any route, no trades row is written.
             await stepFor(24_000);

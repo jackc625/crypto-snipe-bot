@@ -5,19 +5,30 @@
 // and the Telegram client library. Everything else is real; the fake chain is a transport seam
 // (chain.ts installSeams), not a mock.
 //
-// Factories use plain functions, never vi.fn(): the project's mockReset: true wipes a vi.fn()
-// implementation before each test, so logger.child() would return undefined. Factories read the
-// shared state on globalThis at call time, because vi.resetModules() re-runs them.
+// Factories use plain functions, never Vitest mock functions: the project's mockReset: true wipes
+// a mock function's implementation before each test, so logger.child() would return undefined.
+// Factories read the shared state on globalThis at call time, because vi.resetModules() re-runs
+// them.
+//
+// Plan 23-02 feeds: the logger keeps every call on the plain `logs` list, and a call whose fields
+// carry `op` also goes on the ordered timeline (capture.ts). The notifier keeps every alert, with
+// its exact text, on the `alerts` list (read through capture.ts recordedAlerts); alerts never go
+// on the timeline.
 
 import { afterEach, vi } from 'vitest';
 import { harnessState } from './chain';
+import { assertNoViolations } from './capture';
 import { assertAllFaultsFired, assertNoStrays, disposeScenarios, resetTestState } from './world';
 
 harnessState();
 
 vi.mock('../../../src/utils/logger', () => {
     const KEY = Symbol.for('csb.realpath.harness');
-    type Sink = { seq: number; logs: Array<{ seq: number; level: string; bindings: Record<string, unknown>; obj: Record<string, unknown> | undefined; msg: string | undefined }> };
+    type Sink = {
+        seq: number;
+        logs: Array<{ seq: number; level: string; bindings: Record<string, unknown>; obj: Record<string, unknown> | undefined; msg: string | undefined }>;
+        timeline: { record(entry: { kind: 'op'; level: string; op: string; msg: string | undefined; fields: Record<string, unknown>; bindings: Record<string, unknown> }): unknown } | null;
+    };
     const sink = (): Sink => {
         const s = (globalThis as unknown as Record<symbol, Sink | undefined>)[KEY];
         if (!s) throw new Error('realpath harness: state missing when the logger was called (setup.ts did not run first)');
@@ -31,13 +42,14 @@ vi.mock('../../../src/utils/logger', () => {
                 s.seq += 1;
                 const first = args[0];
                 const isObj = typeof first === 'object' && first !== null;
-                s.logs.push({
-                    seq: s.seq,
-                    level,
-                    bindings,
-                    obj: isObj ? (first as Record<string, unknown>) : undefined,
-                    msg: isObj ? (typeof args[1] === 'string' ? args[1] : undefined) : typeof first === 'string' ? first : undefined,
-                });
+                const obj = isObj ? (first as Record<string, unknown>) : undefined;
+                const msg = isObj ? (typeof args[1] === 'string' ? args[1] : undefined) : typeof first === 'string' ? first : undefined;
+                s.logs.push({ seq: s.seq, level, bindings, obj, msg });
+                // Only op-carrying calls feed the recording (AC-20 names `op` logs).
+                if (obj !== undefined && obj.op !== undefined) {
+                    if (!s.timeline) throw new Error('realpath harness: no timeline when an op log arrived (world.ts did not load)');
+                    s.timeline.record({ kind: 'op', level, op: String(obj.op), msg, fields: obj, bindings });
+                }
             };
         return {
             level: 'info',
@@ -56,19 +68,21 @@ vi.mock('../../../src/utils/logger', () => {
     return { logger: make({}) };
 });
 
+// The real module's three functions, as plain functions with the real signatures
+// (src/utils/notifier.ts:59, :89, :98). Each records one { via, chain, message } in call order.
 vi.mock('../../../src/utils/notifier', () => {
     const KEY = Symbol.for('csb.realpath.harness');
-    const record = (fn: string, args: unknown[]): Promise<void> => {
-        const s = (globalThis as unknown as Record<symbol, { seq: number; alerts: Array<{ seq: number; fn: string; args: unknown[] }> } | undefined>)[KEY];
+    type Alert = { via: 'telegram' | 'chain' | 'ctx'; chain: string | null; message: unknown };
+    const record = (via: Alert['via'], chain: string | null, message: unknown): Promise<void> => {
+        const s = (globalThis as unknown as Record<symbol, { alerts: Alert[] } | undefined>)[KEY];
         if (!s) throw new Error('realpath harness: state missing when the notifier was called');
-        s.seq += 1;
-        s.alerts.push({ seq: s.seq, fn, args });
+        s.alerts.push({ via, chain, message });
         return Promise.resolve();
     };
     return {
-        sendTelegramAlert: (...args: unknown[]) => record('sendTelegramAlert', args),
-        sendChainAlert: (...args: unknown[]) => record('sendChainAlert', args),
-        sendCtxAlert: (ctx: { chain?: { name?: string } }, message: unknown) => record('sendCtxAlert', [ctx?.chain?.name, message]),
+        sendTelegramAlert: (message: string) => record('telegram', null, message),
+        sendChainAlert: (chainDisplayName: string, message: string) => record('chain', chainDisplayName, message),
+        sendCtxAlert: (ctx: { chain?: { name?: string } }, message: string) => record('ctx', ctx?.chain?.name ?? null, message),
     };
 });
 
@@ -183,7 +197,9 @@ vi.mock('telegram/events', () => {
 
 // One awaited hook, in this order: tear every scenario down, then fail on any stray call
 // (AC-03: a caller's catch can swallow the error the fake returned, so the record decides),
-// then on any fault or hold that never fired. Per-test state is cleared whatever happened.
+// then on any fault or hold that never fired, then on any DB capture violation (plan 23-02: the
+// recording function never throws into SQLite, where a production catch would hide it). Per-test
+// state is cleared whatever happened.
 afterEach(async () => {
     const errors: unknown[] = [];
     try {
@@ -198,6 +214,11 @@ afterEach(async () => {
     }
     try {
         assertAllFaultsFired();
+    } catch (e) {
+        errors.push(e);
+    }
+    try {
+        assertNoViolations();
     } catch (e) {
         errors.push(e);
     }
