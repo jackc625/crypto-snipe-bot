@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-05-PLAN.md
-last_updated: "2026-11-11T16:57:02.374Z"
+stopped_at: Completed 23-06-PLAN.md
+last_updated: "2026-11-11T17:47:25.642Z"
 last_activity: 2026-11-10
 last_activity_desc: Phase 23 execution started
-state_head: 3d228fb3b3f7cdcbab57813a4208fd933aa12389
+state_head: fa50bb1fd7a9039e246d79a61dfba63956cf02cd
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 37
+  completed_plans: 38
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 9 of 31
+Plan: 10 of 31
 Status: Ready to execute
 Last activity: 2026-11-10 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -60,6 +60,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
 - **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. The operator does not know whether any chain runs without a WS URL, so exposure on the current setup is unknown.
 - **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected.
+- **AUD-ANTIRUG-025 (new S1, found by 23-06):** every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 interim rule for AUD-BUY-001 ("restart the main bot right after a deliberate buy") restores the exit monitor only, not anti-rug. 23-16 must acknowledge it with the S0/S1 batch and put this to the operator; Phase 24 should fix it with or before AUD-BUY-001. Bot is OFF, so no exposure today.
 
 ## Operating Notes (carry to next session)
 
@@ -120,11 +121,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P27 | 28min | 3 tasks | 9 files |
 | Phase 23 P15 | 32min (wall-clock incl. two operator waits; continuation 15min) | 3 tasks | 6 files |
 | Phase 23 P05 | 38min | 3 tasks | 16 files |
+| Phase 23 P06 | 39min | 3 tasks | 19 files |
 
 ## Session
 
-**Last session:** 2026-11-11T16:57:01.994Z
-**Stopped at:** Completed 23-05-PLAN.md
+**Last session:** 2026-11-11T17:47:12.918Z
+**Stopped at:** Completed 23-06-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -249,3 +251,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-05: AUD-BUY-002, -003, -015, -030, -033 and AUD-TX-007 confirmed on the real path (test/realpath/triage/<ID>.test.ts, 11 knownBug claims, each shown to give the D-08 looks-fixed message under a fix-shaped src mutation). AUD-BUY-015 (real QuoterV2 on a thin pool) and AUD-BUY-033 (router keeps unspent ETH, refundETH pays any caller) carry needs_fork with fork questions; 23-16 must add their UFV entries (owner 25) and set fork_ref, and acknowledge the five S1 entries.
 - [Phase 23]: 23-05 register changes under the standing instruction (no stop): AUD-BUY-015, -030, -033 status candidate -> confirmed; AUD-BUY-002 sub-claims 3 (earlier same-nonce attempt lands) and 4 (fanout refusal after the first send) candidate -> confirmed; new AUD-TX-027 (S3, capital none): all three MEV strategies reserve sell gas at the buy's eth_estimateGas gas limit (uncapped), not the chain maxGasLimit their comment names, while the entry gate prices both legs at maxGasLimit. No severity changed. AUDIT-FINDINGS.md re-render also brought four 23-04 re_audit ledger rows current.
 - [Phase 23]: 23-05 for Phase 24: (1) AUD-BUY-030 fix: pin the public send to the private nonce; a re-check of latest through the bot's ethers provider can be answered from ethers' 250 ms identical-request cache and miss the late landing (shown by mutation). (2) The AUD-TX-007 fix (card TX-02) must also settle AUD-TX-027's gas basis: the doubled base fee currently hides the strategies' smaller sell reserve. (3) Triage tests measure the harm (unbounded swap sent, buys landed), so either recommended fix reads looks-fixed; AUD-BUY-033's marker does not see a wrap-only-what-is-consumed fix and must be revisited with that fix.
+- [Phase 23]: 23-06: AUD-BUY-001 (S0) confirmed on the real path with two OS processes on one temp SQLite file: the real scripts/deliberate-buy.ts (railed child, sentinel key, loopback base node with autoMine) lands a buy, arms exit monitor and anti-rug in its own process and exits 0; the running bot (test process) sees the pending row in both resume queries but after 10 exit-poll intervals holds neither; only restart + resume re-arms it. AUD-BUY-006, -009, -011, -027, -028 also confirmed (12 knownBug claims over 7 files, each shown looks-fixed under a fix-shaped src mutation, src restored identical).
+- [Phase 23]: 23-06 new finding under the standing instruction (no stop): AUD-ANTIRUG-025 (S1, STRAND, confirmed, ESC-ANTIRUG-04 with no operator words yet): every boot that resumes an open position drops the anti-rug WebSocket subscription (resumeAntiRugMonitoring step 3 registers, step 4 re-arms; detector.ts calls wsProvider.off() then on() of the same filter without await; inside ethers on() attaches to the old subscriber before off() stops it; no eth_subscribe follows). Proven by test/realpath/triage/AUD-ANTIRUG-025.test.ts. It weakens the ESC-BUY-01 interim rule (restart the main bot after a deliberate buy): that restart re-arms the exit monitor but not anti-rug. 23-16 must acknowledge it with the S0/S1 batch and put the interim-rule consequence to the operator; Phase 24 should fix it with or before AUD-BUY-001.
+- [Phase 23]: 23-06 for later plans: the real dashboard API (startApiServer, real login, real routes) can be driven from a triage test through test/realpath/triage/fixtures/AUD-BUY-011-dashboard.ts (free loopback port set as DASHBOARD_PORT before the graph loads, node:http, fake 10 ms step alternated with a real event-loop turn because the server's RPC reads wait on ethers' fake drain timer; Vitest also fakes the timers module, so the real setImmediate is captured at load). A per-test API answer change re-wraps the scenario's own route handler on harnessState().httpRoutes (no new mock, no harness edit). The rails ledger lists that fixture as a triggering file (loopback net-allow only).
