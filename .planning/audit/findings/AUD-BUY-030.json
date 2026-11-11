@@ -50,10 +50,16 @@
     }
   ],
   "sibling_sites_checked": "Only the deliberate buy path has this private-then-public shape on the buy side. The snipe path has no public fallback. The sell public fallback is AUD-EXIT-011.",
-  "status": "candidate",
+  "status": "confirmed",
   "severity_rationale": "S1 candidate: the guard itself says a double buy is the unrecoverable harm, and it is a check-then-act gap. The window is narrow and the path is operator-run, so it stays candidate until Phase 23 tries to reproduce it.",
   "recommendation": "Pin the public send to the private attempt nonce so it can only replace that attempt; decide in card BUY-09. Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-BUY-07"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-05): two private attempts at one nonce are not included, the no-double-buy guard reads latest and clears, the last private attempt lands while the public leg's nonce read is held, and the public buy takes the next nonce and lands too (two buys for one deliberate intent). Status candidate -> confirmed. Fix note: a re-check through the bot's ethers provider can be served from ethers' 250 ms request cache; pin the nonce.",
+    "test_id": "AUD-BUY-030"
+  }
 }

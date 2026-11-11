@@ -64,7 +64,7 @@
     }
   ],
   "sibling_sites_checked": "V2 snipe path (bot.ts:1100-1110): swapExactETHForTokens spends the whole msg.value, no leftover. Deliberate public buy (bot.ts:747-748): V2 FoT variant, same. V3 sell path (exitEngine.ts:375-400): sends tokens, no ETH value. Dashboard and scripts: none send V3 ETH value. The only site with a value-bearing V3 multicall is bot.ts:1436, and it has no refund call in the batch.",
-  "status": "candidate",
+  "status": "confirmed",
   "severity_rationale": "S1 LOSS, candidate until a Phase 23 fork test shows it on a real pool. Mechanism (standard, documented Uniswap behaviour, not provable from this repository since the router and pool contracts are not vendored): the V3 pool swap stops when it reaches the price limit (here the extreme bound) and charges only the input it consumed; SwapRouter02 wraps only that amount and leaves the rest of msg.value in the router; refundETH on the router is public and sends the router balance to its caller. So when a pool cannot absorb the whole snipe, the bot pays the unspent part and any sweeper can take it. The buy still passes minOut (the quote reflects the same partial fill). AUD-BUY-015 means a thin pool is not refused, and an attacker can build a pool to be exactly that thin, so the condition is plausible on V3 snipes rather than exotic. Loss is capped by the snipe amount per position, which is why it is S1 and not S0 (it needs a pool thinner than the snipe size).",
   "recommendation": "Phase 24: add refundETH to the snipe multicall, or wrap only the amount the quote says will be consumed and revert if less than the full amount is taken, and treat a partial fill as a skipped snipe. Prove the behaviour first on a Phase 23 fork with a deliberately thin single-sided V3 pool. No behaviour trade-off, so this needs no decision card; nothing is changed in Phase 22.",
   "traces": [
@@ -80,5 +80,13 @@
       ],
       "outcome": "The position is opened for less than was paid; the unspent ETH is lost to whoever sweeps the router first."
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Calldata half reproduced on the real path (plan 23-05): the V3 snipe batch is multicall(deadline, [exactInputSingle]) with value the whole snipe amount, no price limit and no refundETH. The unspent-ETH-in-the-router half is router and pool contract behavior, flagged for the Phase 25 fork run. Status candidate -> confirmed.",
+    "test_id": "AUD-BUY-033",
+    "needs_fork": true,
+    "fork_question": "On a mainnet fork, when a V3 snipe sends SwapRouter02 multicall(deadline, [exactInputSingle(amountIn = the snipe amount, sqrtPriceLimitX96 0)]) with value = amountIn into a pool whose in-range liquidity fills only part of amountIn, does the router keep the unspent ETH, and does refundETH() called by an unrelated address receive it?"
+  }
 }

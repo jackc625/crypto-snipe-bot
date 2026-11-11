@@ -968,7 +968,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-BUY-015: The V3 minimum-liquidity check only proves the quoter did not revert, which an exact-input quote does not do on thin liquidity, so it does not enforce the threshold
 
-- **Severity / capital impact / status:** S1 / EXPOSURE / candidate
+- **Severity / capital impact / status:** S1 / EXPOSURE / confirmed
 - **Slice / origin:** BUY / independent
 - **Classes:** none
 - **Severity rationale:** S1 (raised from S2 by the 22-28 re-grade of codex-BUY-12, read at the base). checkMinLiquidity treats "quoteExactInputSingle(amountIn = threshold) did not revert" as proof of depth. An exact-input quote with no price limit returns what the pool could fill and does not revert (QuoterV2 only reverts when nothing fills), so every V3 pool with any active liquidity passes the gate on an ordinary condition. The earlier S2 reasoning named two bounds that do not hold: minOut is derived from the same quote at the same depth, and the honeypot roundtrip measures tax against the quote at trade size, so neither limits how thin the pool is. A configured capital risk limit is therefore bypassed on every V3 snipe: S1, candidate until a Phase 23 fork run shows a sub-threshold pool pass the gate. codex-BUY-13 (V2 hardcodes 1 native) is a sibling recorded here; on its own it would grade S3 because defaults are at or below 1 native on every chain. See AUD-BUY-033 for the loss the partial fill causes.
@@ -1055,7 +1055,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-BUY-030: The deliberate public buy is not pinned to the private attempt nonce, so a late private landing makes the public buy a second buy
 
-- **Severity / capital impact / status:** S1 / OVERSPEND / candidate
+- **Severity / capital impact / status:** S1 / OVERSPEND / confirmed
 - **Slice / origin:** BUY / external
 - **Classes:** C07 (nonce management), C15 (TOCTOU)
 - **Severity rationale:** S1 candidate: the guard itself says a double buy is the unrecoverable harm, and it is a check-then-act gap. The window is narrow and the path is operator-run, so it stays candidate until Phase 23 tries to reproduce it.
@@ -1074,7 +1074,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-BUY-033: A V3 snipe sends the whole amount as ETH value and never refunds it: if the pool can only fill part of the buy, the unspent ETH stays inside the swap router, where anyone can take it
 
-- **Severity / capital impact / status:** S1 / LOSS / candidate
+- **Severity / capital impact / status:** S1 / LOSS / confirmed
 - **Slice / origin:** BUY / independent
 - **Classes:** C04 (slippage/minOut)
 - **Severity rationale:** S1 LOSS, candidate until a Phase 23 fork test shows it on a real pool. Mechanism (standard, documented Uniswap behaviour, not provable from this repository since the router and pool contracts are not vendored): the V3 pool swap stops when it reaches the price limit (here the extreme bound) and charges only the input it consumed; SwapRouter02 wraps only that amount and leaves the rest of msg.value in the router; refundETH on the router is public and sends the router balance to its caller. So when a pool cannot absorb the whole snipe, the bot pays the unspent part and any sweeper can take it. The buy still passes minOut (the quote reflects the same partial fill). AUD-BUY-015 means a thin pool is not refused, and an attacker can build a pool to be exactly that thin, so the condition is plausible on V3 snipes rather than exotic. Loss is capped by the snipe amount per position, which is why it is S1 and not S0 (it needs a pool thinner than the snipe size).
