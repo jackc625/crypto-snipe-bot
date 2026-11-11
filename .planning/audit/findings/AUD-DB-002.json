@@ -145,5 +145,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path (AUD-DB-002.test.ts): the real V2 snipe writes the buy row with decimal amount_in, the real stop-loss executeFullSell and the real 2x executePartialSell write wei amount_out and gas through the real receipt decoder; after a 0.05 ETH buy sold for about 0.022 ETH (limit 0.02 ETH) getDailyRealizedLoss is 0 and the real canSnipe allows the next snipe (ordinary-loss-not-counted), and one partial sell of a quarter makes getTotalExposure about -5.6e15 so the 0.012 exposure cap allows a snipe it should refuse (partial-sell-makes-exposure-negative); sub-claim 4 (dashboard P&L display) stays code-read",
+    "test_id": "AUD-DB-002"
+  }
 }
