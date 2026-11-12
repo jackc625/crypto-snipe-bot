@@ -106,7 +106,7 @@ Config granularity `fine` applies to plan sizing, not phase count.
 - **High-stakes-ops protocol** (Phases 30 and 32): testnet rehearsal first, step-by-step verification, and address checks at every step.
 
 - [x] **Phase 22: Safety Rails & Audit** - Back up Ignition state and the live DB first, wall tests off from production, then a read-only audit with findings register and decision cards (completed 2026-11-09)
-- [ ] **Phase 23: Test Safety Net (Harness, Triage, Characterization)** - Real-path harness, all 28 candidates proven RED or NOT-A-BUG, golden-master trace and commit-taxonomy check
+- [x] **Phase 23: Test Safety Net (Harness, Triage, Characterization)** - Real-path harness, all 28 candidates proven RED or NOT-A-BUG, golden-master trace and commit-taxonomy check (completed 2026-11-12)
 - [ ] **Phase 24: Capital-Safety Fixes** - Every confirmed S0/S1 fixed on the current layout with RED→GREEN real-path proof: nonce/containment, buy path, exit/anti-rug
 - [ ] **Phase 25: Behavior-Neutral Cleanup & Dependencies** - Line endings and Prettier, dead code and cycles out, contracts package on Hardhat 2, all runtime deps at latest with 0 prod vulns
 - [ ] **Phase 26: Toolchain & ESM** - Vitest 5, ESLint 10 config, nodenext tsconfigs, SHA-pinned Node 24/26 CI, ESM under Node type stripping, TS 7 gate
@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 33/33 plans executed in 15 execution waves
+**Plans**: 33/33 plans complete in 15 execution waves
 
 Plans:
 **Wave 1**
