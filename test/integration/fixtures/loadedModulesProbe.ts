@@ -10,7 +10,8 @@
 //     <outFile>  an absolute path under os.tmpdir(); the record is written there as JSON:
 //                { loaded: [{ file, exports }] }, file repo-relative with forward slashes, exports
 //                the module's own export names (Object.keys of module.exports).
-//     <module>   the module to load, repo-relative or absolute.
+//     <module>   the module to load, repo-relative or absolute; only a .ts file under src/ or
+//                scripts/ is accepted (exit 3 otherwise).
 //     --run      let the loaded module run to its own end (a CLI that calls process.exit itself).
 //                Without it the probe exits 0 as soon as the load returns, so a module that leaves
 //                a handle open cannot keep the child alive.
@@ -63,5 +64,13 @@ process.on('exit', () => {
     fs.writeFileSync(outFile, JSON.stringify({ loaded }), 'utf8');
 });
 
-require(path.resolve(REPO_ROOT, target));
+// The one computed require in test/ besides the SAFE-03 probe (test/unit/rails/spawnSites.test.ts
+// lists both): only a TypeScript module under src/ or scripts/ may be loaded.
+const targetFile = path.resolve(REPO_ROOT, target);
+const targetRel = repoRelative(targetFile);
+if (targetRel === null || !/^(src|scripts)\/.+\.ts$/.test(targetRel)) {
+    process.stderr.write(`loadedModulesProbe: refusing ${JSON.stringify(target)}: only a .ts module under src/ or scripts/ may be loaded\n`);
+    process.exit(3);
+}
+require(targetFile);
 if (!flags.includes('--run')) process.exit(0);

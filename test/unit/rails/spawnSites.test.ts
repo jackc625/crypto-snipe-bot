@@ -52,6 +52,10 @@ const ALLOWED_FILES = new Map<string, string>([
 // every spawn call in these files are still flagged.
 const COMPUTED_REQUIRE_FILES = new Map<string, string>([
     ['test/rails/probes/duplicateLoadProbe.cjs', 'the SAFE-03 probe has to load a guarded module through a casing or junction alias path computed at run time; it runs only as a railed child'],
+    [
+        'test/integration/fixtures/loadedModulesProbe.ts',
+        'plan 23-31 (CHAR-06): the load probe has to load the module a test found by the symbol it exports, a path computed at run time, to record which repo modules that load pulls in; it refuses any path outside src/ and scripts/ and runs only as a railed child',
+    ],
 ]);
 
 interface Offence {
