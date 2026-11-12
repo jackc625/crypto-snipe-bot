@@ -96,6 +96,23 @@
         "AUD-BUY-038"
       ],
       "search": "23-24 real-path in-process boot (test/realpath/ordering/boot.test.ts: a real V2 snipe, a restart on the same file, then the real startMultiChainBot; resume invocation and completion order read from the logs list and node.callLog on the shared sequence counter) plus a read of startMultiChainBot steps 7 and 7.5, resumeMultiChainMonitoring, resumeAntiRugMonitoring and armPositionMonitoring (git grep -n -e resumeMultiChainMonitoring -e resumeAntiRugMonitoring -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C17",
+      "area": "test",
+      "ids": [
+        "AUD-SECRET-006",
+        "AUD-SECRET-007"
+      ],
+      "search": "23-26 betterleaks 1.10.0 three-pass git-mode phase scan of 7d0b7b38ce229b019953d6f9f355dc8dbf655ba5..597d6db59dad4c3ec0d4a636adee86403e534178 (seal-verify.ts --phase-scan --start 7d0b7b3, 209 commits: 959 public-address, 2 non-public), then a read of each non-public hit line at its commit, and git grep at 597d6db of every hand-written WebSocket handshake nonce (Sec-WebSocket-Key) and every http(s) URL carrying a user name and password in src, test, scripts and dashboard"
+    },
+    {
+      "class": "C17",
+      "area": "test",
+      "ids": [
+        "AUD-SECRET-008"
+      ],
+      "search": "23-26 continuation diagnosis of an intermittent seal-verify.ts self-test failure: 3000 entropy-qualified addresses, 1000 64-hex keys with a hex-letter word inside, and 20000 addresses under the no-four-letter-run rule, each scanned in git mode by the verified betterleaks 1.10.0 binary with extended.toml and the pass-1 flags, plus a read of every random-value fixture under .planning/audit/tools (randomHexStrong and randomAlnumLower in seal-verify.ts and fixture-check.ts) at 597d6db"
     }
   ]
 }
