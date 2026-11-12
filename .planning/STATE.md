@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-31-PLAN.md
-last_updated: "2026-11-12T06:46:49.465Z"
+stopped_at: Completed 23-30-PLAN.md
+last_updated: "2026-11-12T13:41:40.583Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 7eb5e5645ef58ba2ca852af155cd30185089715c
+state_head: 9e0a87f158cb3ed8f47fb3efe2c5164aeb267118
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 51
+  completed_plans: 52
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 20 of 31
+Plan: 21 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -137,11 +137,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P29 | 28min | 3 tasks | 3 files |
 | Phase 23 P18 | 16min | 2 tasks | 4 files |
 | Phase 23 P31 | 52min | 3 tasks | 12 files |
+| Phase 23 P30 | 22min | 3 tasks | 6 files |
 
 ## Session
 
-**Last session:** 2026-11-12T06:46:49.067Z
-**Stopped at:** Completed 23-31-PLAN.md
+**Last session:** 2026-11-12T13:41:40.131Z
+**Stopped at:** Completed 23-30-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -309,3 +310,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-31: test/integration/preflightCli.test.ts, pauseCli.test.ts, processLock.test.ts and test/unit/mainEntry.test.ts read no named src/ or scripts/ file (CHAR-06). Modules are found by the symbol they export in a directory walk (startMultiChainBot, runMain, acquireProcessLock, refuseIfDirectEntry; test/helpers/sourceGraph.ts, ts.createProgram) and loaded in railed children under test/integration/fixtures/loadedModulesProbe.ts, which records only the repo modules a load added to require.cache. pauseCli runs pause.ts and resume.ts as railed children against closed loopback ports or a loopback dashboard answering 401; the AC-23d scan is its own import-graph test (processLock 7 it() to 8; every existing title, AUD-TX-005's rail test and marker unchanged). 5 own-title renames recorded in rails-test-edits.json, test-identity 0 missing; no test removed (no AC-38 removed line).
 - [Phase 23]: 23-31 RED proofs: groups cli-preflight (1), cli-pause (12, reach child), cli-lock (5, reach worker), cli-entry (9) all RED-OK, three rounds byte-identical; GUARD_MUTANTS row main-starts-before-lock keeps test (4)'s old lock-before-start reading on test (1) (only = (1); it also fails (2) and (3), measured). --check-manifest MANIFEST-OK rows 23 files 5 guards 1 (23-30 needs 32/8/1, 23-26 36/11/1). The probe's computed require is on spawnSites.test.ts COMPUTED_REQUIRE_FILES beside the SAFE-03 probe, and the probe refuses any target that is not a .ts module under src/ or scripts/; 23-19's AST gate must accept ts.createProgram over a directory walk and reads of a temp load record or package.json.
 - [Phase 23]: 23-31 gates: full railed npm test on Node 22 (da3cfa2 tree): 199 files, 1397/1397, wall 178 s, unit 946 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0 (the first run failed only the spawn-site gate on the probe's computed require, fixed in bab9121). No test near half its limit (AC-23d 42 s of 300 s). tsc clean x3; check:realpath-mocks 0, check:vi-mock 593 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS after reviewed re_audit rows for processLock.test.ts, mainEntry.test.ts and spawnSites.test.ts (a0811f0); --stage final 118 FAILs, 4 new (ledger rows for the 2 new test files, re_audit for pauseCli and preflightCli), the out-of-scope bookkeeping kind. No new finding, no severity change.
+- [Phase 23]: 23-30: test/unit/api/antiRug.test.ts, test/unit/chainRegistry/antiRugConfig.test.ts and test/unit/exitEngine/antiRugReason.test.ts read no named src/ or scripts/ file (CHAR-06). Test 6 sends a real request to the real startApiServer (port read from a spy on http.Server.prototype.listen; 401 without a session, resets the same context with one); the after-/controls order check is removed as unobservable (prefixes do not overlap; named in the SUMMARY), title renamed in rails-test-edits.json. Test 20 imports the real config with every anti-rug variable unset (no fatal); Tests 19 and 21 find the one private REQUIRED_ENV_VARS by symbol (loadRepoModules) and check its 44 anti-rug entries. antiRugReason Test 1 is a real type-checker query (ts.createProgram with tsconfig.json options over the one src/ file exporting executeFullSell), proven able to fail on a temp-directory source; Tests 2/3/3b/7 drive the real executeFullSell / executePartialSell. src/ unchanged.
+- [Phase 23]: 23-30 RED proofs: groups api-mount (3, reach vite), antirug-config (3) and reason (5), 13 RED-OK lines, three rounds identical; --check-manifest MANIFEST-OK rows 32 files 8 guards 1 (23-26 needs 36/11/1); --check-summaries SUMMARIES-OK red-ok 52 over 23-18/23-31/23-30. antirug-gas-dropped expects Tests 2 and 3b, not 2 alone (measured: the private escalation is gasMultiplier's only consumer in executeFullSell, so a wrong value and an unpassed one are the same behavior; Test 3 stays green). For 23-19: its AC-37 gate must accept loadRepoModules / ts.createProgram over a directory walk, a local walkTs + ts.createSourceFile, and reads of .env.example and tsconfig.json. Keep failure messages short: Vitest prints a long string inside an array as Array(1), which the runner refuses BAD-FAILURE.
+- [Phase 23]: 23-30 gates: full railed npm test on Node 22 (02772f4 tree): 199 files, 1397/1397, wall 165 s, unit 946 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0; slowest new test antiRugReason Test 1 at 9.0 s of 60 s. tsc clean x3; check:realpath-mocks 0, check:vi-mock 598 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS with no re_audit rows needed; test-identity 0 missing, 1 rename honoured. No finding registered or regraded. New deferred item: test/fixtures/api.fixtures.ts fails a strict type check (TS2322, never compiled; AUD-TESTU-008 class, Phase 28).
