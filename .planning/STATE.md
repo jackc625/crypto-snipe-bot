@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-19-PLAN.md
-last_updated: "2026-11-12T15:02:38.742Z"
+stopped_at: Completed 23-20-PLAN.md
+last_updated: "2026-11-12T15:56:44.867Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 1148cb3aeb5f16a3d6758bf34a9408952f06cc9d
+state_head: f0929b72ead4d5b1d2ef94560a0c225f44b88f56
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 53
+  completed_plans: 54
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 20 of 31
+Plan: 21 of 31
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -139,11 +139,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P31 | 52min | 3 tasks | 12 files |
 | Phase 23 P30 | 22min | 3 tasks | 6 files |
 | Phase 23 P19 | 46min | 2 tasks | 9 files |
+| Phase 23 P20 | 42min | 3 tasks | 12 files |
 
 ## Session
 
-**Last session:** 2026-11-12T15:02:38.366Z
-**Stopped at:** Completed 23-19-PLAN.md
+**Last session:** 2026-11-12T15:56:44.426Z
+**Stopped at:** Completed 23-20-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -318,3 +319,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-19 operator ruling (chosen before dispatch; operator's choice "Allow-list it (Recommended)", the "(Recommended)" label was the orchestrator's): the AC-37 gate test/unit/sourceTextGate.test.ts scans every .ts/.tsx/.mts/.cts/.js/.jsx/.cjs/.mjs file under test/, not only *.test.ts, and test/realpath/triage/fixtures/AUD-API-002-restart.ts is on its allow list because it reads src/bot.ts only to hash the private onRestart closure its mirror copies. Phase 24's AUD-API-002 fix makes that hash fail by design ("onRestart changed"); Phase 24 then replaces the mirror with the real path and removes the allow-list entry (deferred-items.md, owner Phase 24).
 - [Phase 23]: 23-19 AC-37 gate contract for later plans: a named-file read is readFileSync/readFile (any receiver)/createReadStream, ts.createSourceFile or ts.createProgram (array, { rootNames: x } or { rootNames }) whose path names a file below TOP-LEVEL src/ or scripts/ (first segment after . and .. is src or scripts, a later segment has an extension); literals are followed through path.join/resolve calls, templates, +, arrays, local consts, for-of bindings and local helper parameters up to 3 levels (one const level, the plan's wording, misses 2 of the 11 phase-start forms, measured); a path containing os.tmpdir/mkdtemp, dashboard/src, .env.example, package.json and tsconfig.json pass. The allow list is only the 3 named dashboard tests and the AUD-API-002 fixture; the path-agnostic scanners and the static proofs pass without entries (asserted). A new hit is a CI failure, not an allow-list addition.
 - [Phase 23]: 23-19 gates: full railed npm test on Node 22 (6904ec6 tree) twice: 200 files, 1401/1401, unit 950 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0 both runs; wall 230 s then 168 s (run 1 load variance: backupState self-check 65.9 s then 52.2 s of 120 s, 55 then 43 percent, not this plan's test; watch it at wave gates). tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS after a reviewed re_audit row for test/unit/rails/dotenvSrcSkip.test.ts (be3c572..1018e79, 6904ec6). New deferred items: the restart fixture's Phase 24 allow-list removal, and a pre-existing strict type error in inclusionReconciliation.test.ts (TS2345 x3, chainPriorityWei, Phase 28). No finding registered or regraded.
+- [Phase 23]: 23-20 golden-master contract for 23-21, 23-22, 23-23 and 23-25: runScenario({ name, tag, chain, dexType, overrides, steps, assertComplete }) in test/realpath/scenarios/driver.ts creates the scenario, runs steps, fails on any stray or capture violation, runs the REQUIRED assertComplete, and only then serializes and calls compareRecording('<name>.jsonl'); driveSlots drives the chain at the 12 s cadence (a bundle lands only in a block it targets; immediate mining made the bot target a sealed block through ethers' 250 ms cache). test/realpath/harness/serializer.ts: header {scenario, tag}, one line per entry in recorded order, the exact line {"submitted":[]} when nothing was submitted, submit lines carry the request decoded by real ethers; normalizeForRecording gives BigInt text and $nonFinite / $unsafeNumber / $error / $class / $circular objects with no paths, line numbers, stacks or ethers version; compareRecording(relPath) takes '<name>.jsonl' or 'env/<VAR>.json' relative to test/realpath/recordings/ and writes only when VITEST_CSB_UPDATE_RECORDINGS is "1" and CI is unset (the rails keep the key, proved by a run). npm run recordings:update -- <file> [-t <name>] (scripts/update-recordings.ts, refuses CI and an empty filter list without --all) is the only setter. The first recording commit is babd7e4: 23-25's commit check judges every commit after it.
+- [Phase 23]: 23-20: five Flashbots V2 recordings committed once each (trailing, partial, stop-loss, urgency, anti-rug), every one SUSPECT, none KEEP (AC-46): trailing, stop-loss and urgency SUSPECT(AUD-ANTIRUG-015,AUD-ANTIRUG-024,AUD-DB-002,AUD-DB-004,AUD-EXIT-001,AUD-EXIT-003,AUD-EXIT-004,AUD-TX-012); partial swaps AUD-ANTIRUG-015 for AUD-EXIT-025 (tier stored as index [0]); anti-rug adds AUD-ANTIRUG-003 (one pull: three confirm gates and three dispatches) and AUD-EXIT-014 (two refused by the held sell lock). recordingsGuard.test.ts (AC-21/22/23/25/26 and field-aware AC-51) gained one rule with its reason: consideredByBuilders / sealedByBuilders entries may be 0x + 96-hex BLS builder keys (the Flashbots stats log). No finding registered or regraded.
+- [Phase 23]: 23-20 gates: full railed npm test on Node 22 (29a4204 tree): 202 files, 1419/1419, unit 950 integration 264 realpath 205, wall 176 s, nonLoopbackAllowed 0, telegramAllowed 0; scenarios at most 2.98 s of 15 s under load; three normal and three full runs left every recording byte-identical. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS with no re_audit row; --stage final 135 FAILs, 12 from this plan (ledger rows for the 11 new files, package.json re_audit), the out-of-scope bookkeeping kind. backupState self-check measured 47.6 / 55.5 / 60.9 s of 120 s (the 23-19 range; watch item, not this plan's).
