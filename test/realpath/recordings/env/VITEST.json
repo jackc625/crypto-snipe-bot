@@ -1,0 +1,47 @@
+{
+  "cases": {
+    "0": {
+      "child": {
+        "dotenvLoaded": false
+      },
+      "env": {
+        "VITEST": "0"
+      }
+    },
+    "abc": {
+      "child": {
+        "dotenvLoaded": false
+      },
+      "env": {
+        "VITEST": "abc"
+      }
+    },
+    "empty": {
+      "child": {
+        "dotenvLoaded": true
+      },
+      "env": {
+        "VITEST": ""
+      }
+    },
+    "unset": {
+      "child": {
+        "dotenvLoaded": true
+      },
+      "env": {
+        "VITEST": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "child": {
+        "dotenvLoaded": false
+      },
+      "env": {
+        "VITEST": "true"
+      }
+    }
+  },
+  "variable": "VITEST"
+}

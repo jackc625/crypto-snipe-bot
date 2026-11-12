@@ -1,0 +1,77 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "honeypotChecker": {
+                "deployedAddress": "0"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_HONEYPOT_CHECKER_ADDRESS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "honeypotChecker": {
+                "deployedAddress": "abc"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_HONEYPOT_CHECKER_ADDRESS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "honeypotChecker": {
+                "deployedAddress": "0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_HONEYPOT_CHECKER_ADDRESS": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "honeypotChecker": {
+                "deployedAddress": "0x8243dBeA5caD296B9e72a6ed557D7E0fEBee13eD"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_HONEYPOT_CHECKER_ADDRESS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_HONEYPOT_CHECKER_ADDRESS": "0x00000000000000000000000000000000000000e1"
+      }
+    }
+  },
+  "variable": "ETH_HONEYPOT_CHECKER_ADDRESS"
+}

@@ -1,0 +1,117 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "0",
+                "validChains": [
+                  "eth",
+                  "bsc",
+                  "base",
+                  "arb"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Unknown chain name in ENABLED_CHAINS"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ENABLED_CHAINS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "abc",
+                "validChains": [
+                  "eth",
+                  "bsc",
+                  "base",
+                  "arb"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Unknown chain name in ENABLED_CHAINS"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ENABLED_CHAINS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "enabled": false
+            },
+            "base": {
+              "enabled": false
+            },
+            "bsc": {
+              "enabled": false
+            }
+          }
+        }
+      },
+      "env": {
+        "ENABLED_CHAINS": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "enabled": false
+            },
+            "base": {
+              "enabled": false
+            },
+            "bsc": {
+              "enabled": false
+            }
+          }
+        }
+      },
+      "env": {
+        "ENABLED_CHAINS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ENABLED_CHAINS": "eth,bsc,base,arb"
+      }
+    }
+  },
+  "variable": "ENABLED_CHAINS"
+}

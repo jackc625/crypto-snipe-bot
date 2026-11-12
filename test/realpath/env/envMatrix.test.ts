@@ -10,12 +10,15 @@
 //
 // One case = one module load (RESEARCH Pattern 7): vi.resetModules(), the env applied, a
 // process.exit spy installed for this case only (mockReset strips a longer-lived one, RESEARCH
-// E6c), then each module evaluated on its own. The three modules import none of each other, so a
-// config exit does not hide what the registry or the risk gate parses from the same env. Each
-// module's result is { kind: 'ok', value, logs }, { kind: 'exit', code, logs } or
-// { kind: 'threw', error, logs } (AC-28: a value that makes parsing exit or throw is recorded as the
-// result, never a test failure). `logs` are the logger calls the module made (the realpath harness
-// logger, test/realpath/harness/setup.ts), so an exit records its fatal reason. The risk gate's
+// E6c), then each module evaluated in its own try, in the order config, registry, risk. The risk
+// gate imports neither of the others, so a config exit does not hide what it parses. The chain
+// registry imports the config module (through the provider module), so a config exit also ends the
+// registry's load; that registry result carries from: 'config' (the same exit, raised again by the
+// import, with no log of its own). Each module's result is { kind: 'ok', value, logs },
+// { kind: 'exit', code, logs, from? } or { kind: 'threw', error, logs, from? } (AC-28: a value that
+// makes parsing exit or throw is recorded as the result, never a test failure). `logs` are the warn,
+// error and fatal logger calls the module made while loading (the realpath harness logger,
+// test/realpath/harness/setup.ts), so an exit records its fatal reason. The risk gate's
 // settings are private (riskConfig), so its value is five probes through the real exported canSnipe,
 // one per setting, each on a database state (real insertTrade rows on the case's :memory: database,
 // or the real recordSnipe) that trips only that setting's rule: canSnipe stops at the first failing
@@ -43,12 +46,14 @@
 // reads are a subset of the _baseline.json env keys, naming the first extra read, so a name read
 // only through a computed key under a varied value cannot surface after that file is committed.
 // VITEST is in the list but never varied in this worker (unsetting it would make the config module
-// load .env from the repo root); its five values run in railed children (test VITEST below).
+// load .env from the repo root); its five values run in railed children (test VITEST below), and
+// VITEST.json records, per case, the env input and the child's { dotenvLoaded } instead of `changes`.
 //
 // The only spy is vi.spyOn(process, 'exit'), the one the AC-02 mock gate permits. Writing happens
 // only through npm run recordings:update (the serializer's switch); a normal run compares bytes.
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import * as ts from 'typescript';
@@ -57,6 +62,7 @@ import { parse as parseDotenv } from 'dotenv';
 import { recordedLogs } from '../harness/capture';
 import { RECORDINGS_DIR, compareRecording, normalizeForRecording } from '../harness/serializer';
 import { REPO_ROOT, loadRepoModules, moduleExporting } from '../../helpers/sourceGraph';
+import { spawnRailedChild } from '../../rails/spawnRailedChild';
 
 const ENV_TEST_FILE = path.join(REPO_ROOT, 'test', '.env.test');
 const BASELINE_REL = 'env/_baseline.json';
@@ -256,8 +262,8 @@ interface LogLine {
 
 type ModuleOutcome =
     | { kind: 'ok'; value: unknown; logs: LogLine[] }
-    | { kind: 'exit'; code: unknown; logs: LogLine[] }
-    | { kind: 'threw'; error: unknown; logs: LogLine[] };
+    | { kind: 'exit'; code: unknown; logs: LogLine[]; from?: ModuleLabel }
+    | { kind: 'threw'; error: unknown; logs: LogLine[]; from?: ModuleLabel };
 
 type CaseOutcome = Record<ModuleLabel, ModuleOutcome>;
 
@@ -268,23 +274,28 @@ const LOGGED_LEVELS: ReadonlySet<string> = new Set(['warn', 'error', 'fatal']);
  * Evaluate one module, turning an exit or a throw into data (AC-28). `load` parses (its warn, error
  * and fatal logs are kept); `observe`, when given, reads the loaded module afterwards (the risk
  * probes, whose own "Risk check failed" lines repeat the probe results and are not kept).
+ * `raised` holds the errors earlier modules of the same case ended with: the same error object
+ * caught again means an import raised that module's failure again, recorded as `from`.
  */
-async function evaluateModule<T>(load: () => Promise<T>, observe?: (loaded: T) => unknown): Promise<ModuleOutcome> {
-    const from = recordedLogs().length;
-    let to: number | null = null;
+async function evaluateModule<T>(label: ModuleLabel, raised: Map<unknown, ModuleLabel>, load: () => Promise<T>, observe?: (loaded: T) => unknown): Promise<ModuleOutcome> {
+    const start = recordedLogs().length;
+    let end: number | null = null;
     const logs = (): LogLine[] =>
         recordedLogs()
-            .slice(from, to ?? undefined)
+            .slice(start, end ?? undefined)
             .filter((l) => LOGGED_LEVELS.has(l.level))
             .map((l) => ({ level: l.level, msg: l.msg, fields: l.obj, bindings: l.bindings }));
     try {
         const loaded = await load();
-        to = recordedLogs().length;
+        end = recordedLogs().length;
         const value = observe ? observe(loaded) : loaded;
         return { kind: 'ok', value, logs: logs() };
     } catch (e) {
-        if (e instanceof ExitCalled) return { kind: 'exit', code: e.code, logs: logs() };
-        return { kind: 'threw', error: e, logs: logs() };
+        const from = raised.get(e);
+        if (from === undefined) raised.set(e, label);
+        const via = from === undefined ? {} : { from };
+        if (e instanceof ExitCalled) return { kind: 'exit', code: e.code, logs: logs(), ...via };
+        return { kind: 'threw', error: e, logs: logs(), ...via };
     }
 }
 
@@ -371,15 +382,18 @@ async function evaluateCase(list: readonly string[], change: EnvCase, found: Dis
             throw new ExitCalled(code);
         }) as never);
         recorder = installRecorder(found.byPath);
-        const config = await evaluateModule(async () => {
+        const raised = new Map<unknown, ModuleLabel>();
+        const config = await evaluateModule('config', raised, async () => {
             const m = await import('../../../src/config');
             return { CONFIG: m.CONFIG };
         });
-        const registry = await evaluateModule(async () => {
+        const registry = await evaluateModule('registry', raised, async () => {
             const m = await import('../../../src/chainRegistry');
             return Object.fromEntries(m.buildChainRegistry());
         });
         const risk = await evaluateModule(
+            'risk',
+            raised,
             async () => {
                 const m = await import('../../../src/riskManager');
                 const d = await import('../../../src/utils/db');
@@ -462,8 +476,53 @@ function committedList(): string[] {
 
 const COMMITTED = committedList();
 
-/** Plan 23-23 Task 1 (tracer): one variable end to end. */
-const VARIED: readonly string[] = ['MAX_TOTAL_EXPOSURE'];
+/**
+ * Every listed variable except VITEST, from the committed baseline (one test per variable, so a
+ * failure names it). Before the baseline exists there is none; npm run recordings:update writes
+ * the baseline first, and a second update run writes the variable files.
+ */
+const VARIED: readonly string[] = COMMITTED.filter((k) => k !== 'VITEST');
+
+// ---------------------------------------------------------------------------------------------
+// VITEST through railed children
+// ---------------------------------------------------------------------------------------------
+
+const TS_NODE_BIN = path.join(REPO_ROOT, 'node_modules', 'ts-node', 'dist', 'bin.js');
+const FLAG_CHILD = path.join(REPO_ROOT, 'test', 'realpath', 'env', 'fixtures', 'vitestFlagChild.ts');
+const LEDGER_ROOT = path.join(os.tmpdir(), 'crypto-snipe-bot-rail-ledger');
+/** The fake .env line the child's temp cwd holds (fixtures/vitestFlagChild.ts compares the same value). */
+const FAKE_ENV_LINE = 'FAKE_ENV_PROBE_KEY=from-fake-env-file\n';
+const CHILD_TIMEOUT_MS = 110_000;
+/** The five values, by the case names the child takes (fixtures/vitestFlagChild.ts FLAG_CASES). */
+const FLAG_CASES: ReadonlyArray<{ key: string; value: string | undefined }> = [
+    { key: 'unset', value: undefined },
+    { key: 'empty', value: '' },
+    { key: '0', value: '0' },
+    { key: 'abc', value: 'abc' },
+    { key: 'valid', value: 'true' },
+];
+
+interface LedgerEntry {
+    kind: string;
+    target?: unknown;
+}
+
+/** Every rail ledger line the child's own case folder holds, then the folder removed. */
+function takeCaseLedger(runId: string): LedgerEntry[] {
+    const dir = path.join(LEDGER_ROOT, runId);
+    const entries: LedgerEntry[] = [];
+    try {
+        for (const file of fs.readdirSync(dir)) {
+            if (!file.endsWith('.jsonl')) continue;
+            for (const line of fs.readFileSync(path.join(dir, file), 'utf8').split('\n')) if (line.trim() !== '') entries.push(JSON.parse(line) as LedgerEntry);
+        }
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+    return entries;
+}
+
+const lastLine = (s: string): string => s.trim().split(/\r?\n/).pop() ?? '';
 
 // ---------------------------------------------------------------------------------------------
 // The matrix
@@ -496,7 +555,9 @@ async function buildBaseline(): Promise<Baseline> {
 }
 
 describe('env matrix (CHAR-03: AC-27, AC-28, AC-29, Amendment A-1)', () => {
-    // Measured (plan 23-23): the src/ walk and the settled baseline take about 2 s alone.
+    // Measured 2026-11-12 (Node 22.16.0): the src/ walk plus the settled baseline took 1.1 s alone
+    // and 2.3 s under the full parallel run, 23 percent of the default 10 s hook limit; 60 s leaves
+    // room for a slower machine.
     beforeAll(async () => {
         baseline = await buildBaseline();
     }, 60_000);
@@ -544,4 +605,58 @@ describe('env matrix (CHAR-03: AC-27, AC-28, AC-29, Amendment A-1)', () => {
             compareRecording(`env/${name}.json`, fileText({ variable: name, cases }));
         });
     }
+
+    it('AC-28 and the non-finite form: an exit and a NaN are recorded as data', async () => {
+        const b = baseline as Baseline;
+        // A value that makes parsing exit is the result, not a failure.
+        const chains = doc((await evaluateCase(b.list, { name: 'ENABLED_CHAINS', value: 'abc' }, b.found)).outcome) as CaseOutcome;
+        expect(chains.registry.kind).toBe('exit');
+        expect((chains.registry as { code: unknown }).code).toBe(1);
+        expect(chains.registry.logs.map((l) => `${l.level} ${String(l.msg)}`)).toContain('fatal Unknown chain name in ENABLED_CHAINS');
+        // A config exit ends the registry's load too (it imports the config module); the risk gate parses on.
+        const key = doc((await evaluateCase(b.list, { name: 'PRIVATE_KEY', value: undefined }, b.found)).outcome) as CaseOutcome;
+        expect(key.config).toMatchObject({ kind: 'exit', code: 1 });
+        expect(key.config.logs.map((l) => `${l.level} ${String(l.msg)}`)).toEqual(['fatal Missing required environment variables']);
+        expect(key.registry).toEqual({ kind: 'exit', code: 1, from: 'config', logs: [] });
+        expect(key.risk.kind).toBe('ok');
+        // A value that parses to NaN is the distinct $nonFinite object (the serializer's form).
+        const trailing = doc((await evaluateCase(b.list, { name: 'TRAILING_STOP_PCT', value: 'abc' }, b.found)).outcome) as CaseOutcome;
+        expect((trailing.config as { value: { CONFIG: { trailingStopPct: unknown } } }).value.CONFIG.trailingStopPct).toEqual({ $nonFinite: 'NaN' });
+        // A risk limit that parses to NaN is a rule that does not fire.
+        const exposure = doc((await evaluateCase(b.list, { name: 'MAX_TOTAL_EXPOSURE', value: 'abc' }, b.found)).outcome) as CaseOutcome;
+        expect((exposure.risk as { value: { probes: Record<string, unknown> } }).value.probes.MAX_TOTAL_EXPOSURE).toEqual({ allowed: true });
+    });
+
+    // Five children in sequence, each ts-node on the config module (about 2 s each). Measured
+    // 2026-11-12: 6.9 to 9.0 s alone, 26.7 s under the full parallel run, of the 120 s the plan sets
+    // (each child may take up to 110 s before spawnRailedChild stops it).
+    it('VITEST: its five values, each in a railed child whose only reachable .env is a fake one in a temp cwd', { timeout: 120_000 }, () => {
+        const cases: Record<string, unknown> = {};
+        for (const c of FLAG_CASES) {
+            const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-env-vitest-'));
+            const runId = `case-env-vitest-${c.key}-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+            try {
+                fs.writeFileSync(path.join(tmp, '.env'), FAKE_ENV_LINE);
+                const r = spawnRailedChild(process.execPath, [TS_NODE_BIN, FLAG_CHILD, c.key], { cwd: tmp, withVitestEnv: false, timeoutMs: CHILD_TIMEOUT_MS, ledgerRunId: runId });
+                const ledger = takeCaseLedger(runId);
+                expect(r.status, `child ${c.key}: status ${String(r.status)}\nstderr:\n${r.stderr.slice(-2000)}`).toBe(0);
+                // The child ran railed (its preload wrote worker-start) and reached no protected
+                // path: dotenv resolves .env against the cwd, the temp folder, so the repo's .env is
+                // never even attempted and no rail had anything to block (no env-read-blocked, no
+                // deny). Measured 2026-11-12: each child's ledger is exactly one worker-start.
+                expect(ledger.map((e) => e.kind), `child ${c.key} ledger`).toEqual(['worker-start']);
+                const out = JSON.parse(lastLine(r.stdout)) as { dotenvLoaded: boolean };
+                // When dotenv loads, it loads the one line of the fake file and nothing else.
+                if (out.dotenvLoaded) expect(r.stdout, `child ${c.key} stdout`).toContain('injecting env (1) from .env');
+                else expect(r.stdout, `child ${c.key} stdout`).not.toContain('injecting env');
+                cases[c.key] = { child: out, env: { VITEST: c.value === undefined ? { $unset: true } : c.value } };
+            } finally {
+                fs.rmSync(tmp, { recursive: true, force: true });
+            }
+        }
+        // The child observes both outcomes: unset loads the fake file, the valid value skips it.
+        expect((cases.unset as { child: { dotenvLoaded: boolean } }).child.dotenvLoaded).toBe(true);
+        expect((cases.valid as { child: { dotenvLoaded: boolean } }).child.dotenvLoaded).toBe(false);
+        compareRecording('env/VITEST.json', fileText({ variable: 'VITEST', cases }));
+    });
 });

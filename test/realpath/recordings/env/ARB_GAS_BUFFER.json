@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "gasBuffer": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_GAS_BUFFER": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "gasBuffer": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_GAS_BUFFER": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ARB_GAS_BUFFER": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ARB_GAS_BUFFER": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ARB_GAS_BUFFER": "0.0005"
+      }
+    }
+  },
+  "variable": "ARB_GAS_BUFFER"
+}

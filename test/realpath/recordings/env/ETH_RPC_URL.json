@@ -1,0 +1,73 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "mainnet": "0",
+                "sepolia": "0"
+              }
+            }
+          }
+        },
+        "registry": {
+          "value": {
+            "eth": {
+              "httpRpcUrl": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_RPC_URL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "mainnet": "abc",
+                "sepolia": "abc"
+              }
+            }
+          }
+        },
+        "registry": {
+          "value": {
+            "eth": {
+              "httpRpcUrl": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_RPC_URL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_RPC_URL": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_RPC_URL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_RPC_URL": "http://127.0.0.1:1"
+      }
+    }
+  },
+  "variable": "ETH_RPC_URL"
+}

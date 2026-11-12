@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "maxCapital": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_MAX_CAPITAL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "maxCapital": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_MAX_CAPITAL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BASE_MAX_CAPITAL": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BASE_MAX_CAPITAL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BASE_MAX_CAPITAL": "0.5"
+      }
+    }
+  },
+  "variable": "BASE_MAX_CAPITAL"
+}

@@ -1,0 +1,95 @@
+{
+  "cases": {
+    "0": {
+      "changes": {},
+      "env": {
+        "DASHBOARD_API_KEY": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "DASHBOARD_API_KEY": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "DASHBOARD_API_KEY: Dashboard login API key (required; dashboard server starts unconditionally)"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "DASHBOARD_API_KEY": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "DASHBOARD_API_KEY: Dashboard login API key (required; dashboard server starts unconditionally)"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "DASHBOARD_API_KEY": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "DASHBOARD_API_KEY": "TEST-SENTINEL"
+      }
+    }
+  },
+  "variable": "DASHBOARD_API_KEY"
+}

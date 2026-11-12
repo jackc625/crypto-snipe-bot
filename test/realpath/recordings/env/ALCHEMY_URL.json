@@ -1,0 +1,95 @@
+{
+  "cases": {
+    "0": {
+      "changes": {},
+      "env": {
+        "ALCHEMY_URL": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "ALCHEMY_URL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "ALCHEMY_URL: Alchemy RPC endpoint URL (legacy, use ETH_RPC_URL instead)"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ALCHEMY_URL": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "ALCHEMY_URL: Alchemy RPC endpoint URL (legacy, use ETH_RPC_URL instead)"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ALCHEMY_URL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ALCHEMY_URL": "http://127.0.0.1:1"
+      }
+    }
+  },
+  "variable": "ALCHEMY_URL"
+}

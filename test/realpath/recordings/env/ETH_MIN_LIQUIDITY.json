@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "minLiquidityThreshold": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MIN_LIQUIDITY": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "minLiquidityThreshold": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MIN_LIQUIDITY": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "minLiquidityThreshold": "0.5"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MIN_LIQUIDITY": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "minLiquidityThreshold": "0.5"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MIN_LIQUIDITY": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_MIN_LIQUIDITY": "0.75"
+      }
+    }
+  },
+  "variable": "ETH_MIN_LIQUIDITY"
+}

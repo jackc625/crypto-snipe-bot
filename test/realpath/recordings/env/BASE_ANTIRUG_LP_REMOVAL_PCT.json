@@ -1,0 +1,105 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "antiRug": {
+                "lpRemovalPct": 0
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_ANTIRUG_LP_REMOVAL_PCT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "bsc",
+                "entryCount": 1,
+                "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "base",
+                "key": "BASE_ANTIRUG_LP_REMOVAL_PCT",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug LP-removal-pct must be a number in [0, 100]"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "BASE_ANTIRUG_LP_REMOVAL_PCT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "antiRug": {
+                "lpRemovalPct": 0
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_ANTIRUG_LP_REMOVAL_PCT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LP_REMOVAL_PCT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LP_REMOVAL_PCT": "50"
+      }
+    }
+  },
+  "variable": "BASE_ANTIRUG_LP_REMOVAL_PCT"
+}

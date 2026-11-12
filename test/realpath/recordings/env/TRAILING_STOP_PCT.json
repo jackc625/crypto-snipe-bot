@@ -1,0 +1,55 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "trailingStopPct": 0
+            }
+          }
+        }
+      },
+      "env": {
+        "TRAILING_STOP_PCT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "trailingStopPct": {
+                "$nonFinite": "NaN"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "TRAILING_STOP_PCT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "TRAILING_STOP_PCT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "TRAILING_STOP_PCT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "TRAILING_STOP_PCT": "15"
+      }
+    }
+  },
+  "variable": "TRAILING_STOP_PCT"
+}

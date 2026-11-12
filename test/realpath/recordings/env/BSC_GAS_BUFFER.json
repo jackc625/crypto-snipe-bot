@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "gasBuffer": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_GAS_BUFFER": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "gasBuffer": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_GAS_BUFFER": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BSC_GAS_BUFFER": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BSC_GAS_BUFFER": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_GAS_BUFFER": "0.003"
+      }
+    }
+  },
+  "variable": "BSC_GAS_BUFFER"
+}

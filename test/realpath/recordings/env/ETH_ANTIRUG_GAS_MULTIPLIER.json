@@ -1,0 +1,103 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_GAS_MULTIPLIER",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug gas multiplier must be a number >= 1.0 (sub-1 is backward)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_GAS_MULTIPLIER": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_GAS_MULTIPLIER",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug gas multiplier must be a number >= 1.0 (sub-1 is backward)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_GAS_MULTIPLIER": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_GAS_MULTIPLIER",
+                "value": ""
+              },
+              "level": "fatal",
+              "msg": "Anti-rug gas multiplier must be a number >= 1.0 (sub-1 is backward)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_GAS_MULTIPLIER": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_GAS_MULTIPLIER": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_GAS_MULTIPLIER": "2.0"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_GAS_MULTIPLIER"
+}

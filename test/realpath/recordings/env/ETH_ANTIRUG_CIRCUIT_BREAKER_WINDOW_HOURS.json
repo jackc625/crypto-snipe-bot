@@ -1,0 +1,103 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker window-hours must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker window-hours must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS",
+                "value": ""
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker window-hours must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "1"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS"
+}

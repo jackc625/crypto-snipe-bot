@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "wsRpcUrl": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_WS_URL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "wsRpcUrl": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_WS_URL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "wsRpcUrl": null
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_WS_URL": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "wsRpcUrl": null
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_WS_URL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_WS_URL": "ws://127.0.0.1:1"
+      }
+    }
+  },
+  "variable": "BSC_WS_URL"
+}

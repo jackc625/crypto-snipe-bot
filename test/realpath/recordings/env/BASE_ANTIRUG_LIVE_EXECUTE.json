@@ -1,0 +1,37 @@
+{
+  "cases": {
+    "0": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LIVE_EXECUTE": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LIVE_EXECUTE": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LIVE_EXECUTE": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LIVE_EXECUTE": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BASE_ANTIRUG_LIVE_EXECUTE": "false"
+      }
+    }
+  },
+  "variable": "BASE_ANTIRUG_LIVE_EXECUTE"
+}

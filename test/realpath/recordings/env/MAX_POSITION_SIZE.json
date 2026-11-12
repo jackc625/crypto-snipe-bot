@@ -1,0 +1,111 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "DAILY_LOSS_PCT": {
+                "details": "Position size 0.01 exceeds max 0",
+                "reason": "position_size"
+              },
+              "MAX_OPEN_POSITIONS": {
+                "details": "Position size 0.01 exceeds max 0",
+                "reason": "position_size"
+              },
+              "MAX_POSITION_SIZE": {
+                "details": "Position size 0.5 exceeds max 0"
+              },
+              "MAX_TOTAL_EXPOSURE": {
+                "details": "Position size 0.01 exceeds max 0",
+                "reason": "position_size"
+              },
+              "SNIPE_COOLDOWN_MS": {
+                "details": "Position size 0.01 exceeds max 0",
+                "reason": "position_size"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_POSITION_SIZE": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_POSITION_SIZE": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_POSITION_SIZE": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_POSITION_SIZE": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_POSITION_SIZE": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_POSITION_SIZE": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_POSITION_SIZE": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "MAX_POSITION_SIZE": "0.1"
+      }
+    }
+  },
+  "variable": "MAX_POSITION_SIZE"
+}

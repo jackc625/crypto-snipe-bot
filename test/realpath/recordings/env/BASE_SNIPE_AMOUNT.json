@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "snipeAmount": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_SNIPE_AMOUNT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "base": {
+              "snipeAmount": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BASE_SNIPE_AMOUNT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BASE_SNIPE_AMOUNT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BASE_SNIPE_AMOUNT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BASE_SNIPE_AMOUNT": "0.005"
+      }
+    }
+  },
+  "variable": "BASE_SNIPE_AMOUNT"
+}

@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "snipeAmount": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_SNIPE_AMOUNT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "snipeAmount": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_SNIPE_AMOUNT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BSC_SNIPE_AMOUNT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BSC_SNIPE_AMOUNT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_SNIPE_AMOUNT": "0.05"
+      }
+    }
+  },
+  "variable": "BSC_SNIPE_AMOUNT"
+}

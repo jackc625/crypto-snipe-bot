@@ -1,0 +1,106 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "backfillCapBlocks": 10,
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug max-backfill-blocks must be an integer >= backfill-cap-blocks"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "backfillCapBlocks": 10,
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug max-backfill-blocks must be an integer >= backfill-cap-blocks"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "backfillCapBlocks": 10,
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS",
+                "value": ""
+              },
+              "level": "fatal",
+              "msg": "Anti-rug max-backfill-blocks must be an integer >= backfill-cap-blocks"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": "7200"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS"
+}

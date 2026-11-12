@@ -1,0 +1,37 @@
+{
+  "cases": {
+    "0": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_LIVE_EXECUTE": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_LIVE_EXECUTE": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_LIVE_EXECUTE": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_LIVE_EXECUTE": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_LIVE_EXECUTE": "false"
+      }
+    }
+  },
+  "variable": "BSC_ANTIRUG_LIVE_EXECUTE"
+}

@@ -1,0 +1,79 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "antiRug": {
+                "lpRemovalPct": 0
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_LP_REMOVAL_PCT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_LP_REMOVAL_PCT",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug LP-removal-pct must be a number in [0, 100]"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_LP_REMOVAL_PCT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "antiRug": {
+                "lpRemovalPct": 0
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_LP_REMOVAL_PCT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LP_REMOVAL_PCT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LP_REMOVAL_PCT": "50"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_LP_REMOVAL_PCT"
+}

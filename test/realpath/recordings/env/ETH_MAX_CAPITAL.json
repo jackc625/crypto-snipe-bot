@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "maxCapital": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MAX_CAPITAL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "maxCapital": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_MAX_CAPITAL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_MAX_CAPITAL": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_MAX_CAPITAL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_MAX_CAPITAL": "1.0"
+      }
+    }
+  },
+  "variable": "ETH_MAX_CAPITAL"
+}

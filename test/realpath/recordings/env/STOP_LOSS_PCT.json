@@ -1,0 +1,45 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "stopLossPercent": 0
+            }
+          }
+        }
+      },
+      "env": {
+        "STOP_LOSS_PCT": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "STOP_LOSS_PCT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "STOP_LOSS_PCT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "STOP_LOSS_PCT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "STOP_LOSS_PCT": "25"
+      }
+    }
+  },
+  "variable": "STOP_LOSS_PCT"
+}

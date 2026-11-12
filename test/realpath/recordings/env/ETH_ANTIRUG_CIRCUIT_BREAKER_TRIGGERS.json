@@ -1,0 +1,103 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker triggers must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker triggers must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS",
+                "value": ""
+              },
+              "level": "fatal",
+              "msg": "Anti-rug circuit-breaker triggers must be an integer >= 1"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "3"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS"
+}

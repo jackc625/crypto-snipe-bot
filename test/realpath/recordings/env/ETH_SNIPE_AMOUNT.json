@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "snipeAmount": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_SNIPE_AMOUNT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "snipeAmount": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_SNIPE_AMOUNT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_SNIPE_AMOUNT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_SNIPE_AMOUNT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_SNIPE_AMOUNT": "0.01"
+      }
+    }
+  },
+  "variable": "ETH_SNIPE_AMOUNT"
+}

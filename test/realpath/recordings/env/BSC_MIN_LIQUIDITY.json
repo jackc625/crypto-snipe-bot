@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "minLiquidityThreshold": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_MIN_LIQUIDITY": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "minLiquidityThreshold": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_MIN_LIQUIDITY": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "minLiquidityThreshold": "1.0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_MIN_LIQUIDITY": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "bsc": {
+              "minLiquidityThreshold": "1.0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_MIN_LIQUIDITY": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_MIN_LIQUIDITY": "1.5"
+      }
+    }
+  },
+  "variable": "BSC_MIN_LIQUIDITY"
+}

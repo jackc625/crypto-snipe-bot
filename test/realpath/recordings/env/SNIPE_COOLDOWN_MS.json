@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "SNIPE_COOLDOWN_MS": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "SNIPE_COOLDOWN_MS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "SNIPE_COOLDOWN_MS": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "SNIPE_COOLDOWN_MS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "SNIPE_COOLDOWN_MS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "SNIPE_COOLDOWN_MS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "SNIPE_COOLDOWN_MS": "30000"
+      }
+    }
+  },
+  "variable": "SNIPE_COOLDOWN_MS"
+}
