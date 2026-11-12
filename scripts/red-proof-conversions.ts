@@ -77,8 +77,9 @@ const OVERLAY_PATH = path.join(REPO_ROOT, 'scripts', 'in-memory-mutant-overlay.c
 const SPEC_ENV = 'CSB_MUTANT_SPEC';
 // A Vitest child that has not finished in this time is a failed proof, never a pass.
 const RUN_TIMEOUT_MS = 30 * 60_000;
-// A failure message holding any of these is not an assertion on the behavior.
-const FORBIDDEN_IN_MESSAGE = ['Test timed out', 'SyntaxError', 'TSError', 'Unable to compile'];
+// A failure message holding any of these is not an assertion on the behavior. Exported for
+// scripts/red-proof-bot-wiring.ts (plan 23-18), which applies the same rule to its wiring rows.
+export const FORBIDDEN_IN_MESSAGE: readonly string[] = ['Test timed out', 'SyntaxError', 'TSError', 'Unable to compile'];
 
 const overlay = require(OVERLAY_PATH) as { applyEdits(text: string, edits: MutantEdit[]): string };
 
@@ -172,10 +173,86 @@ export interface GuardMutantRow {
 }
 
 // The conversion plans fill these tables.
-export const WIRING_MUTANTS: WiringMutantRow[] = [];
+
+// ---- Plan 23-18: test/integration/anti-rug/botWiring.test.ts (run by scripts/red-proof-bot-wiring.ts)
+const BOT_WIRING_TEST = 'test/integration/anti-rug/botWiring.test.ts';
+const BOT_WIRING_GUARDS = 'Phase 19 — bot.ts wiring + resumeAntiRugMonitoring > Source-text wiring guards (Tests 22-26)';
+const BOT_WIRING_RUNTIME = 'Phase 19 — bot.ts wiring + resumeAntiRugMonitoring > resumeAntiRugMonitoring runtime behavior (Tests 27-31)';
+// A swap of two statements is three edits through a marker that occurs nowhere in src/, because
+// each find must occur exactly once in the text the edits before it left.
+const SWAP_MARK = '/*csb-swap*/';
+function swapStatements(a: string, b: string): MutantEdit[] {
+    return [
+        { find: a, replace: SWAP_MARK },
+        { find: b, replace: a },
+        { find: SWAP_MARK, replace: b },
+    ];
+}
+const V2_SNAPSHOT = 'await snapshotLpBaseline(ctx, dex, tradeId, pairAddress, null);';
+const V2_REGISTER = 'await registerAntiRugPosition(ctx, dex, tokenAddress, pairAddress, tradeId, null);';
+const V2_EXIT_MONITOR = 'await startExitMonitor(ctx, dex, tokenAddress, null, buyAmountNative, tradeId, originalTokenAmount);';
+const V3_SNAPSHOT = 'await snapshotLpBaseline(ctx, dex, tradeRow.id, poolAddress, feeTier);';
+const V3_REGISTER = 'await registerAntiRugPosition(ctx, dex, targetToken, poolAddress, tradeRow.id, feeTier);';
+
+export const WIRING_MUTANTS: WiringMutantRow[] = [
+    // armPositionMonitoring, the helper the V2 snipe and the deliberate buy share.
+    { name: 'v2-arm-order', file: 'src/bot.ts', edits: swapStatements(V2_SNAPSHOT, V2_REGISTER), expected: ['22', '25'] },
+    {
+        name: 'v2-exit-monitor-last',
+        file: 'src/bot.ts',
+        edits: [
+            { find: V2_EXIT_MONITOR, replace: '' },
+            { find: V2_REGISTER, replace: `${V2_REGISTER}\n        ${V2_EXIT_MONITOR}` },
+        ],
+        expected: ['22', '23'],
+    },
+    // recordAndArmDeliberateBuy: the deliberate buy no longer arms the position.
+    {
+        name: 'deliberate-not-armed',
+        file: 'src/bot.ts',
+        edits: [{
+            find: '    await armPositionMonitoring(\n        ctx, dex, targetToken, pairAddress, tradeRow.id, originalTokenAmount, ethers.formatEther(amountInWei),\n    );',
+            replace: '',
+        }],
+        expected: ['22'],
+    },
+    // The inline V3 wiring in handleNewV3PoolForChain.
+    { name: 'v3-arm-order', file: 'src/bot.ts', edits: swapStatements(V3_SNAPSHOT, V3_REGISTER), expected: ['24', '25'] },
+    {
+        name: 'v3-fee-tier-dropped',
+        file: 'src/bot.ts',
+        edits: [{ find: V3_SNAPSHOT, replace: 'await snapshotLpBaseline(ctx, dex, tradeRow.id, poolAddress, null);' }],
+        expected: ['24'],
+    },
+    // startMultiChainBot: the anti-rug resume runs before the exit-engine resume.
+    {
+        name: 'boot-resume-order',
+        file: 'src/bot.ts',
+        edits: swapStatements('resumeMultiChainMonitoring(contexts);', 'await resumeAntiRugMonitoring(contexts);'),
+        expected: ['26'],
+    },
+    // The getResumeAntiRugTrades statement keeps positions that have no baseline row.
+    {
+        name: 'resume-query-includes-unbaselined',
+        file: 'src/utils/db.ts',
+        edits: [{ find: 'INNER JOIN lp_baseline b', replace: 'LEFT JOIN lp_baseline b' }],
+        expected: ['31'],
+    },
+];
 export const MUTANTS: MutantRow[] = [];
-export const CONVERTED_TESTS: ConvertedTestRow[] = [];
-export const CONVERTED_COUNTS: Record<string, number> = {};
+export const CONVERTED_TESTS: ConvertedTestRow[] = [
+    ...[
+        { title: `${BOT_WIRING_GUARDS} > Test 22: the shared armPositionMonitoring helper calls snapshotLpBaseline BEFORE registerAntiRugPosition`, mutants: ['v2-arm-order', 'v2-exit-monitor-last', 'deliberate-not-armed'] },
+        { title: `${BOT_WIRING_GUARDS} > Test 23: the shared armPositionMonitoring helper calls registerAntiRugPosition parallel to startExitMonitor`, mutants: ['v2-exit-monitor-last'] },
+        { title: `${BOT_WIRING_GUARDS} > Test 24: V3 buy-success branch calls snapshotLpBaseline + registerAntiRugPosition with feeTier`, mutants: ['v3-arm-order', 'v3-fee-tier-dropped'] },
+        { title: `${BOT_WIRING_GUARDS} > Test 25: snapshot failure handled via try/catch + 'antirug.baseline-snapshot-failed' log`, mutants: ['v2-arm-order', 'v3-arm-order'] },
+        { title: `${BOT_WIRING_GUARDS} > Test 26: startMultiChainBot calls resumeAntiRugMonitoring AFTER resumeMultiChainMonitoring`, mutants: ['boot-resume-order'] },
+        { title: `${BOT_WIRING_RUNTIME} > Test 31: pre-Phase-19 trades (no lp_baseline) are excluded by INNER JOIN`, mutants: ['resume-query-includes-unbaselined'] },
+    ].map((r) => ({ testFile: BOT_WIRING_TEST, baseTitle: r.title, currentTitle: r.title, mutants: r.mutants })),
+];
+export const CONVERTED_COUNTS: Record<string, number> = {
+    [BOT_WIRING_TEST]: 6,
+};
 export const GUARD_MUTANTS: GuardMutantRow[] = [];
 
 // ---------------------------------------------------------------------------
