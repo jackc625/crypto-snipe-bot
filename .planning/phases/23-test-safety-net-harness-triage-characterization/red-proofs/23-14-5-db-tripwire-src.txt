@@ -1,0 +1,58 @@
+RED proof 23-14-5
+Plan 23-14 (AC-13). Recorded 2026-11-12T01:42:07Z at HEAD 09479ec469a4696bc8699a06366cd6870fc4fe3e, Node v22.16.0.
+Neutralised file (working tree only, never committed): src/utils/db.ts
+git blob before: 3f6af283c30b5ac5bb6814519609fd9ac5d42581 (equals HEAD:src/utils/db.ts)
+
+== Neutralising diff (git diff) ==
+medit: applied to src/utils/db.ts
+diff --git a/src/utils/db.ts b/src/utils/db.ts
+index 3f6af28..ebbbc9a 100644
+--- a/src/utils/db.ts
++++ b/src/utils/db.ts
+@@ -17,7 +17,7 @@ const DB_PATH = resolveDbPath(process.env.DB_PATH, repoRoot, { vitest });
+ if (vitest) {
+     // Src-layer tripwire (SAFE-02): under Vitest the live data folder can never be opened from
+     // here, independently of the setup-layer rails.
+-    assertNotProdDbUnderVitest(DB_PATH, repoRoot);
++    // assertNotProdDbUnderVitest(DB_PATH, repoRoot); (RED 23-14-5: the src-layer tripwire removed; the setup layer still refuses the open)
+     // Tests create fresh DBs; a temp folder may not exist yet.
+     const dbDir = path.dirname(DB_PATH);
+     if (!fs.existsSync(dbDir)) {
+
+== RED command (only the named file) ==
+node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/dbTripwireSrc.test.ts
+
+== RED result ==
+vitest exit 1
+     × DB_PATH=./data/bot.db 87ms
+     × the absolute <repo>/data/bot.db 8ms
+     × an upper-cased variant (win32 only; the plain path elsewhere) 7ms
+     × <repo>/data/bot.db-wal 6ms
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db
+AssertionError: expected Error: RAIL_DB_TRIPWIRE: refused to open … { code: '…' } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
+- Expected
++ Received
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > the absolute <repo>/data/bot.db
+AssertionError: expected Error: RAIL_DB_TRIPWIRE: refused to open … { code: '…' } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
+- Expected
++ Received
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > an upper-cased variant (win32 only; the plain path elsewhere)
+AssertionError: expected Error: RAIL_DB_TRIPWIRE: refused to open … { code: '…' } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
+- Expected
++ Received
+ FAIL   unit  test/unit/rails/dbTripwireSrc.test.ts > src tripwire on the live data folder (fires before the setup layer) > <repo>/data/bot.db-wal
+AssertionError: expected Error: RAIL_DATA_TRIPWIRE: refused fs.ope… { …(2) } to match object { code: 'RAIL_DB_TRIPWIRE_SRC' }
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+
+== Restore ==
+git -c core.autocrlf=false checkout -- src/utils/db.ts
+git blob after restore: 3f6af283c30b5ac5bb6814519609fd9ac5d42581 (IDENTICAL to HEAD)
+git status --porcelain -- src test vitest.config.ts: ''
+
+== GREEN rerun ==
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+vitest exit 0

@@ -53,7 +53,7 @@
     }
   ],
   "sibling_sites_checked": "dotenv sites in src at the base SHA (git grep dotenv): src/config.ts:4 and src/utils/notifier.ts:6, both import-time. Import-time writes in src/utils/db.ts after the open: pragmas :20-24, migrateSchema() :235 (user_version :232), the cwd .bot-state.json migration :238-285 (reads and renames a file in the cwd), normalizeLegacyMainnetRows() :316. The candidate's named test files test/unit/db.test.ts and test/unit/bot/twoStageSigint.test.ts are two of the three duration-0 entries in the 2026-11-06 11:21 Vitest cache (AUD-RAIL-001). The test-file side (which of the unit/integration files import src/utils/db unmocked) is for the TESTU/TESTI audit (22-23, 22-24) to enumerate.",
-  "status": "candidate",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-19"
@@ -86,5 +86,12 @@
     "a08d650"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-18, 30",
-  "status_note": "Stays candidate, as its recommendation and NAC-10 say. The rails block every reach the entry lists; Phase 23 triages the candidate on a real-path harness."
+  "status_note": "Stays candidate, as its recommendation and NAC-10 say. The rails block every reach the entry lists; Phase 23 triages the candidate on a real-path harness.",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "Both reaches the entry lists are refused today, each by a RED-proven rail with a marked rail test: opening and migrating the live DB at import (under Vitest src/utils/db.ts refuses the live data folder before any better-sqlite3 call, and the setup layer independently refuses the open and any data/ read; the named rail test) and loading the real .env (workers scrub the env and load only the test/.env.test sentinels, the repo .env read is blocked, the src dotenv sites skip under Vitest; the sentinel-env rail test); status candidate -> fixed; the 2026-11-06 page-1 header writes that showed it happened stay recorded history",
+    "proof": "Rail test src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db (test/unit/rails/dbTripwireSrc.test.ts, marker closes-finding: AUD-RAIL-002); RED proof row 10 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-09-1-db-tripwire-src.txt), re-run on 2026-11-11 by 23-14 because the test file changed after that proof (5378478, ea193b8): .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-5-db-tripwire-src.txt, with the src-layer tripwire removed the four live-data-folder tests fail while each open is still refused by the setup layer (RAIL_DB_TRIPWIRE, RAIL_DATA_TRIPWIRE), so nothing was opened, and src/utils/db.ts was restored byte for byte; the real-.env reach is the marked rail test sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value (RED row 1, re-run as 23-14-4-sentinel-env-unit.txt); the entry's other RED rows: 2 (repo .env read block), 3 and 7 (setup-layer DB tripwire and data/ block), 16 and 17 (src dotenv sites), 30 (Vite env-file path), and 4, 5, 6, 8, 9, 14, 15 and 18 (network, child, notifier and spawn rails)",
+    "rail_test": "src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db"
+  }
 }

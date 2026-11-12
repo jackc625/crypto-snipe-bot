@@ -2094,6 +2094,12 @@
         "to_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
         "findings": "none",
         "note": "Reviewed: The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed."
+      },
+      {
+        "from_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 64bc832 53548e8 -- test/integration/rails/railsIntegration.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
       }
     ]
   },

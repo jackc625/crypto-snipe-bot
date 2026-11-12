@@ -4597,7 +4597,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-RAIL-002: Tests load the real .env and open and migrate the live DB at import (RC-19)
 
-- **Severity / capital impact / status:** S1 / EXPOSURE / candidate
+- **Severity / capital impact / status:** S1 / EXPOSURE / fixed
 - **Slice / origin:** RAIL / research-candidate
 - **Classes:** C13 (SQLite transaction boundaries and crash consistency), C17 (key handling), C18 (env validation)
 - **Research candidates:** RC-19 (research suggested S1)
@@ -4620,7 +4620,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-TESTI-011: RC-19 test-file side for the integration and fork suites: before the rails, preflightCli and pauseCli spawned ts-node children with the parent environment (the real .env), preflightCli's child opened and migrated the live DB and called mainnet RPCs, honeypotDeploy.eth called the operator's mainnet RPC directly, eight integration files loaded src/config unmocked, and four fork replays loaded the real config and notifier (alerts to the operator chat, live safety APIs) while the Hardhat child read the real .env
 
-- **Severity / capital impact / status:** S1 / EXPOSURE / candidate
+- **Severity / capital impact / status:** S1 / EXPOSURE / fixed
 - **Slice / origin:** TESTI / research-candidate
 - **Classes:** C13 (SQLite transaction boundaries and crash consistency), C17 (key handling), C18 (env validation)
 - **Research candidates:** RC-19 (research suggested S1)
@@ -4655,7 +4655,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-TESTU-001: RC-19 test-file side: unit test files that, before the rails, imported src/utils/db, src/config or the notifier unmocked, so they opened and migrated the live DB, read the real .env values or could post to Telegram
 
-- **Severity / capital impact / status:** S1 / EXPOSURE / candidate
+- **Severity / capital impact / status:** S1 / EXPOSURE / fixed
 - **Slice / origin:** TESTU / research-candidate
 - **Classes:** C13 (SQLite transaction boundaries and crash consistency), C17 (key handling), C18 (env validation)
 - **Research candidates:** RC-19 (research suggested S1)
@@ -7212,7 +7212,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 | RC-16 | BUY | AUD-BUY-007 | confirmed |
 | RC-17 | TX | AUD-TX-004 | fixed |
 | RC-18 | TX | AUD-TX-005 | fixed |
-| RC-19 | RAIL | AUD-RAIL-002, AUD-TESTI-011, AUD-TESTU-001 | candidate |
+| RC-19 | RAIL | AUD-RAIL-002, AUD-TESTI-011, AUD-TESTU-001 | fixed |
 | RC-20 | BUY | AUD-BUY-008 | confirmed |
 | RC-21 | EXIT | AUD-EXIT-005 | confirmed |
 | RC-22 | TX | AUD-TX-007 | confirmed |
@@ -7610,19 +7610,19 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/preflight/staleData.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/preflight/walletBalance.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/provider.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
-| test/unit/rails/childRails.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
+| test/unit/rails/childRails.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none; 637c19c..53548e8 none |
 | test/unit/rails/dbTripwireSetup.test.ts | 637c19c | AUD-TESTQ-036 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none; 637c19c..ea193b8 AUD-TESTQ-036 |
-| test/unit/rails/dbTripwireSrc.test.ts | 5378478 | AUD-TESTQ-036 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..ea193b8 AUD-TESTQ-036 |
+| test/unit/rails/dbTripwireSrc.test.ts | 5378478 | AUD-TESTQ-036 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..ea193b8 AUD-TESTQ-036; ea193b8..53548e8 none |
 | test/unit/rails/dotenvSrcSkip.test.ts | be3c572 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..be3c572 none |
 | test/unit/rails/envExampleSync.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
-| test/unit/rails/envSentinel.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
+| test/unit/rails/envSentinel.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none; 069a30c..53548e8 none |
 | test/unit/rails/forkRehearsalParity.test.ts | 64bc832 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=yes, real_state=no; re-audit: 23a6461..64bc832 AUD-REAUDIT-001 |
 | test/unit/rails/forkRpcSource.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
 | test/unit/rails/forkShellOnly.test.ts | 2672559 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..2672559 none; 2672559..3ee5205 none |
 | test/unit/rails/hardhatChildEnv.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
 | test/unit/rails/netDeny.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
-| test/unit/rails/notifierRefusal.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none |
-| test/unit/rails/spawnSites.test.ts | f695363 | AUD-REAUDIT-003 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 AUD-REAUDIT-003 |
+| test/unit/rails/notifierRefusal.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none; ccd1158..53548e8 none |
+| test/unit/rails/spawnSites.test.ts | f695363 | AUD-REAUDIT-003 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 AUD-REAUDIT-003; f695363..53548e8 none |
 | test/unit/rails/vitestEnvFile.test.ts | a08d650 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a08d650 AUD-REAUDIT-001; a08d650..3ee5205 none |
 | test/unit/receiptDecoder.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/riskManager.test.ts | 23a6461 | AUD-TESTU-015, AUD-TESTU-017 | quality: mocks_mechanism=partial, hollow=no, real_state=no |
@@ -7727,7 +7727,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/preflightInvocation.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
 | test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none; a93fd98..3ee5205 none |
 | test/integration/rails/notifierRefusalIntegration.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none |
-| test/integration/rails/railsIntegration.test.ts | 64bc832 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..64bc832 none |
+| test/integration/rails/railsIntegration.test.ts | 64bc832 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..64bc832 none; 64bc832..53548e8 none |
 | test/integration/txManager.test.ts | 23a6461 | AUD-TESTI-002, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=no, real_state=no |
 | test/integration/v2HoneypotIntegration.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
 | test/integration/v3HoneypotIntegration.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |

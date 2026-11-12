@@ -2280,6 +2280,12 @@
         "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
         "findings": "none",
         "note": "Reviewed: A railed child sees sentinels, full rails, VITEST and the denials; the fork entry keeps exactly the two shell keys; every spawn limit refuses before spawning."
+      },
+      {
+        "from_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 637c19c 53548e8 -- test/unit/rails/childRails.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2344,6 +2350,12 @@
           "AUD-TESTQ-036"
         ],
         "note": "Reviewed: the afterAll check now compares whether data/ exists with whether it existed when the file loaded, instead of requiring it to exist. No other case changed."
+      },
+      {
+        "from_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff ea193b8 53548e8 -- test/unit/rails/dbTripwireSrc.test.ts): 2 comment lines added, the closes-finding markers for AUD-RAIL-002 and AUD-TESTU-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2410,6 +2422,12 @@
         "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
         "findings": "none",
         "note": "Reviewed: The rails install before the test file, the sentinel env is in force, a planted protected-root .env is unreadable through fs and dotenv, and the scrub list covers every env read in src/ and scripts/."
+      },
+      {
+        "from_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 069a30c 53548e8 -- test/unit/rails/envSentinel.test.ts): 2 comment lines added, the closes-finding markers for AUD-TESTU-001 and AUD-RAIL-002; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2556,6 +2574,12 @@
         "to_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
         "findings": "none",
         "note": "Reviewed: A Telegram send under Vitest is a recorded refusal, axios is never called, the broadcast still runs, a refused send never rejects, and the missing-token path is unchanged."
+      },
+      {
+        "from_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff ccd1158 53548e8 -- test/unit/rails/notifierRefusal.test.ts): one comment line added, the closes-finding marker for AUD-TESTU-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2582,6 +2606,12 @@
           "AUD-REAUDIT-003"
         ],
         "note": "Reviewed: No script under test/ loads a spawner or spawns outside the allowed files; the scanner flags planted forms; the computed-require allowance relaxes only a plain require."
+      },
+      {
+        "from_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff f695363 53548e8 -- test/unit/rails/spawnSites.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
       }
     ]
   },
