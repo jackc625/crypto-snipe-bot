@@ -226,6 +226,8 @@ const short = (sha: string) => sha.slice(0, 12);
 /** Untrusted text for one output line: JSON-quoted (control characters escaped), capped. */
 const quote = (s: string, max = 100) => JSON.stringify(s.length > max ? `${s.slice(0, max)}...` : s);
 const subjectOf = (message: string) => message.split('\n')[0].replace(/\r$/, '');
+/** Where a cited ID's register record lives (the ID has already matched CITED_ID_RE). */
+const idPath = (id: string) => (id.startsWith('OD-') ? `${DECISIONS_DIR}${id}.json` : `${FINDINGS_DIR}${id}.json`);
 
 /** How one protected entry of a judged commit reads. */
 type EntryKind = 'new' | 'changed' | 'removed' | 're-added' | 'added-on-two-lines';
@@ -291,9 +293,18 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
     if (!first) throw new UsageError(`no commit in HEAD's history adds a file under ${PROTECTED_DIR}; there is no recording to protect, so the check judged nothing. Refusing to pass.`);
 
     const judged = shaList(gitText(root, ['rev-list', '--no-merges', '--reverse', '--topo-order', `${first}..HEAD`], env), 'git rev-list (judged commits)');
-    const mergeShas = shaList(gitText(root, ['rev-list', '--merges', '--reverse', '--topo-order', `${first}..HEAD`], env), 'git rev-list (merges)');
     if (!judged.length)
         throw new UsageError(`no non-merge commit follows the first recording commit ${short(first)}; the check judged nothing. Refusing to pass.`);
+    // The same range from the graph in memory: HEAD's history minus the first recording commit
+    // and its ancestors. Its non-merges must be exactly git's judged list; its merges (two or
+    // more parents) are the merge commits that are not judged.
+    const before = ancestors(first);
+    const inRange = [...graph.keys()].filter((c) => c !== first && !before.has(c));
+    const judgedSet = new Set(judged);
+    const nonMerges = inRange.filter((c) => (graph.get(c) as string[]).length < 2);
+    if (nonMerges.length !== judged.length || nonMerges.some((c) => !judgedSet.has(c)))
+        throw new UsageError(`git disagrees with itself: rev-list --no-merges ${short(first)}..HEAD lists ${judged.length} commit(s), the commit graph ${nonMerges.length}`);
+    const mergeShas = inRange.filter((c) => (graph.get(c) as string[]).length >= 2).sort();
 
     // Every judged commit gets its own diff-tree; the folder history listing must agree with it.
     const touchingSet = new Set(touching);
@@ -324,6 +335,27 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
     };
 
     const messages = readMessages(root, [first, ...judged, ...mergeShas], env);
+    // Every ID a behavior: commit cites, looked up in that commit's own tree in one call.
+    const lookups = new Map<string, boolean>();
+    const want: string[] = [];
+    for (const c of judged) {
+        const msg = messages.get(c) ?? '';
+        if (!BEHAVIOR_SUBJECT_RE.test(subjectOf(msg))) continue;
+        for (const m of msg.matchAll(CITED_ID_RE)) want.push(`${c}:${idPath(m[1])}`);
+    }
+    const uniqueWant = [...new Set(want)];
+    if (uniqueWant.length) {
+        const r = gitRun(root, ['cat-file', '--batch-check'], env, uniqueWant.join('\n') + '\n');
+        if (r.status !== 0) throw new UsageError(`git cat-file --batch-check failed (exit ${r.status}): ${r.stderr.trim()}`);
+        const lines = r.stdout.toString('utf8').split('\n').filter((l, i, a) => l !== '' || i < a.length - 1);
+        if (lines.length !== uniqueWant.length) throw new UsageError(`git cat-file --batch-check answered ${lines.length} line(s) for ${uniqueWant.length} lookup(s)`);
+        uniqueWant.forEach((q, i) => {
+            const l = lines[i].replace(/\r$/, '');
+            if (l === `${q} missing`) lookups.set(q, false);
+            else if (/^[0-9a-f]{40} blob \d+$/.test(l)) lookups.set(q, true);
+            else throw new UsageError(`git cat-file --batch-check printed ${quote(l)} for ${quote(q)}`);
+        });
+    }
     const violations: Violation[] = [];
     let touchingJudged = 0;
     let added = 0;
@@ -366,8 +398,10 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
             if (!ids.length)
                 violations.push({ sha: c, subject, code: 'behavior-without-id', message: 'a behavior: commit must cite an OD-<n> or AUD-<AREA>-<NNN> ID; its message cites none (AC-41)' });
             for (const id of ids) {
-                const rel = id.startsWith('OD-') ? `${DECISIONS_DIR}${id}.json` : `${FINDINGS_DIR}${id}.json`;
-                if (gitRun(root, ['cat-file', '-e', `${c}:${rel}`], env).status !== 0)
+                const rel = idPath(id);
+                const found = lookups.get(`${c}:${rel}`);
+                if (found === undefined) throw new UsageError(`internal: no tree lookup for ${id} in ${short(c)}`);
+                if (!found)
                     violations.push({ sha: c, subject, code: 'behavior-unknown-id', message: `cites ${id}, but ${rel} is not in this commit's own tree (AC-41; an ID registered later does not count)` });
             }
         }
@@ -497,7 +531,6 @@ class Fixture {
     reset(branch: string, at: string): void {
         if (fs.existsSync(path.join(this.dir, '.git', 'MERGE_HEAD'))) this.git('merge', '--abort');
         this.git('checkout', '-q', '-f', '-B', branch, at);
-        this.git('reset', '-q', '--hard');
     }
 
     cleanup(): void {
