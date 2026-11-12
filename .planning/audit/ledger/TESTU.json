@@ -2398,6 +2398,12 @@
         "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
         "findings": "none",
         "note": "Reviewed: The five dotenv sites load no env file under VITEST, and without VITEST the read is attempted and blocked; the production path without VITEST still loads a fake .env and posts."
+      },
+      {
+        "from_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "to_sha": "1018e793fd538ec344e613cf2b1e810dc2141d8c",
+        "findings": "none",
+        "note": "Reviewed by plan 23-19 (git diff be3c572 1018e79 -- test/unit/rails/dotenvSrcSkip.test.ts): case (e) only, the plan's authorized rail-test change. It no longer reads the five dotenv site files by name (CHAR-06); each site (src/config.ts and src/utils/notifier.ts through test/rails/probes/dotenvProbe.ts, scripts/pause.ts, scripts/resume.ts, scripts/preflight.ts) runs as a railed child with VITEST set and its own case ledger must show zero env-read-blocked entries after the child reached the site, at least one worker-start and no outside reach. Title renamed (rails-test-edits.json). Cases (a)-(d), (f), the ledgerRunId test, helpers and imports are unchanged; RED proofs group dotenv-gate (5 mutants, reach child)."
       }
     ]
   },

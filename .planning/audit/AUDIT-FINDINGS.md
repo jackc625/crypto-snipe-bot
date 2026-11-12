@@ -7613,7 +7613,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/rails/childRails.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none; 637c19c..53548e8 none |
 | test/unit/rails/dbTripwireSetup.test.ts | 637c19c | AUD-TESTQ-036 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none; 637c19c..ea193b8 AUD-TESTQ-036 |
 | test/unit/rails/dbTripwireSrc.test.ts | 5378478 | AUD-TESTQ-036 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..ea193b8 AUD-TESTQ-036; ea193b8..53548e8 none |
-| test/unit/rails/dotenvSrcSkip.test.ts | be3c572 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..be3c572 none |
+| test/unit/rails/dotenvSrcSkip.test.ts | be3c572 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..be3c572 none; be3c572..1018e79 none |
 | test/unit/rails/envExampleSync.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
 | test/unit/rails/envSentinel.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none; 069a30c..53548e8 none |
 | test/unit/rails/forkRehearsalParity.test.ts | 64bc832 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=yes, real_state=no; re-audit: 23a6461..64bc832 AUD-REAUDIT-001 |
