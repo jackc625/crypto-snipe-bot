@@ -104,6 +104,12 @@ function expectDuplicate(err: DuplicateError | null, mod: GuardedModule): void {
     expect(err!.canonicalPath).toBe(fs.realpathSync.native(String(err!.secondIdentity)));
 }
 
+// Each test loads a whole scenario graph inside its body; the file's first one pays the cold import
+// of the bot graph. Measured (plan 23-24, Node 22.16.0): first test 1.1 s alone, 0.98 s and 5.19 s
+// in two full railed runs (35 percent of the 15 s default); cold imports in a test body are known
+// to slow 6 to 9x at the full run's peak (deferred-items.md), so every test here gets 60 s.
+const IDENTITY_TEST_TIMEOUT_MS = 60_000;
+
 describe('duplicate-load guard (the real registerSingleton) in a scenario graph', () => {
     it.each(GUARDED)('$name: a second copy in the same epoch is refused with SINGLETON_DUPLICATE', async (mod) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
@@ -115,7 +121,7 @@ describe('duplicate-load guard (the real registerSingleton) in a scenario graph'
         const first = await mod.load();
         if (mod.name in graphCopy) expect(first).toBe(graphCopy[mod.name]);
         expect(await mod.load()).toBe(first);
-    });
+    }, IDENTITY_TEST_TIMEOUT_MS);
 
     it('a whole-graph reset (restartGraph, a new epoch) is allowed, every guarded module loads again, and the guard stays armed in the new epoch', async () => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', db: { file: createTempDbFile() } });
@@ -137,5 +143,5 @@ describe('duplicate-load guard (the real registerSingleton) in a scenario graph'
         // In the new epoch a second copy is still refused, for every guarded module.
         for (const mod of GUARDED) expectDuplicate(await loadSecondCopy(mod), mod);
         expect(await graphEpoch()).toBe(after.epoch);
-    });
+    }, IDENTITY_TEST_TIMEOUT_MS);
 });
