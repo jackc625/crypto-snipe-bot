@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-17-PLAN.md
-last_updated: "2026-11-12T04:31:39.685Z"
+stopped_at: Completed 23-29-PLAN.md
+last_updated: "2026-11-12T05:08:00.763Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: dbd83fd3dec123608255b08f10e11aab5a86b274
+state_head: 383713caf5fa33da1ae7fea7f86cb72f8f9ae015
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 48
+  completed_plans: 49
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 17 of 31
+Plan: 18 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -134,11 +134,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P14 | 71min (wall-clock incl. operator wait; continuation 21min) | 2 tasks | 33 files |
 | Phase 23 P16 | ~40min (wall-clock incl. operator wait; continuation 7min) | 3 tasks | 11 files |
 | Phase 23 P17 | 29min | 3 tasks | 5 files |
+| Phase 23 P29 | 28min | 3 tasks | 3 files |
 
 ## Session
 
-**Last session:** 2026-11-12T04:31:20.070Z
-**Stopped at:** Completed 23-17-PLAN.md
+**Last session:** 2026-11-12T05:07:32.536Z
+**Stopped at:** Completed 23-29-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -296,3 +297,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-17: CHAR-04 standing signing census: npm run check:census (scripts/check-signing-census.ts, the Phase 22 analysis promoted unchanged; original .planning/audit/tools/signing-census.ts untouched) passes on the working tree at 23 tx-signing sites (10 locked, 13 unlocked and listed, 0 unknown; raw N=25 before the 2 auditor exclusions). scripts/signing-census-exceptions.json: floor 23; 9 unlocked rows keyed file|enclosing|call with counts (AUD-SCRIPTS-002 x12 citing ESC-SCRIPTS-01 and OD-68; AUD-BUY-007 x1 citing ESC-CENSUS-01); 2 excluded rows (addLiquidity getPair, bot.ts maybeApproveForChain allowance) citing manual-inventory-head.json. CI test job: fetch-depth 0 and step "Signing census gate (CHAR-04)" running the gate and --check-floor-history. Self-test 54/54 (31 analysis + 23 gate cases), wrapped by test/unit/signingCensusGate.test.ts.
 - [Phase 23]: 23-17 for Phase 24 and 29: the census fails when a listed exception is fixed or removed. When the AUD-BUY-007 fix deletes tokenSafety.simulateSell, that same commit must remove the src/utils/tokenSafety.ts row and lower floor to 22 with AUD-BUY-007 in its message (--check-floor-history refuses a floor drop whose message names no registered AUD- finding, refuses deleting the list, and exits 2 on a shallow clone). The same holds for each AUD-SCRIPTS-002 row when Phase 29 settles card SCRIPTS-01. Every unlocked row needs a decision_ref record (escalations/ or decisions/) that lists its finding; an excluded row may match only a contract call whose ABI mutability the census cannot read. Phase 26 Node upgrade must update the script ABI 127 guard.
 - [Phase 23]: 23-17 timing and gates: the self-test wrapper took 59.7 s under the full parallel run (23 s alone), 54 percent of the planned 110 s child limit, so it has child 240 s / test 250 s. Full railed npm test on Node 22: 199 files, 1396/1396, nonLoopbackAllowed 0, telegramAllowed 0. check.ts partial, consolidation and triage PASS with no re_audit rows needed; --stage final has 109 FAILs, 5 from this plan (ledger rows for the 3 new files, re_audit for package.json and test.yml), the same out-of-scope bookkeeping kinds as earlier Phase 23 plans.
+- [Phase 23]: 23-29: in-memory RED-proof mechanism for CHAR-06 is in place: scripts/vitest.in-memory-mutant.config.ts (vite reach: a pre plugin edits the one target module as Vite loads it), scripts/in-memory-mutant-overlay.cjs (worker and child reach: fs.readFileSync overlaid for one path; the child gets it through an in-memory extra parts.push('--require <childHook>') after `parts.push(...nodeOptions);` in test/rails/spawnRailedChild.ts, so the rails preload stays first) and scripts/red-proof-conversions.ts (runMutant, runGroup, the empty WIRING_MUTANTS / MUTANTS / CONVERTED_TESTS / CONVERTED_COUNTS / GUARD_MUTANTS tables; --self-proof 8 rows: 3 RED-OK, 5 named refusals; --self-test 30 cases; --check-manifest MANIFEST-OK rows 0 files 0 guards 0; --check-summaries). Nothing under src/ or scripts/ is written for a proof; target SHA-256 and git status -- src are checked after every run.
+- [Phase 23]: 23-29 contract for 23-18, 23-31, 23-30 and 23-19: a row's `only` is passed as -t and Vitest reads it with new RegExp, so escape ( ) [ ] . * + ? in titles (for example \(1\) starts the bot); an only that selects nothing is refused STAYED-GREEN with "no test was selected". Each failure message must start with AssertionError, contain messageIncludes, and mention none of Test timed out, SyntaxError, TSError, Unable to compile (else BAD-FAILURE). A file that fails outside any test is reported in failed as "<file error> <test file>". Edits apply in order (a later find sees earlier edits). WIRING_MUTANTS expected accepts '22', 'Test 22' or 'Test 22:'. Summary lines: RED-OK <mutant> :: <testFile> :: <title>, and AC-38 removed: <baseTitle> alone or followed by " — ", " - " or " (" and a reason.
+- [Phase 23]: 23-29 measured: in a Vitest worker require.main is undefined, so a mutant making isDirectEntry(x, undefined) true kills the test file at import (src/guards/directEntry.ts refuses through its own top-level call); mech-vite edits the canonical comparison to !== instead. mech-compile-error uses a type error (TS2352), not broken syntax, because a syntax error would also break Vite's load of the module in the worker and the child would never run (the child's TSError was confirmed outside Vitest). Root test.setupFiles run before each project's rails setup, so in a worker the rails wrap the overlay and still check every path first.
+- [Phase 23]: 23-29 gates: full railed npm test on Node 22 (acc6ccb tree): 199 files, 1396/1396, wall 160 s, nonLoopbackAllowed 0, telegramAllowed 0. tsc clean x3; check:realpath-mocks and check:vi-mock 0 violations; check.ts partial, consolidation and triage PASS with no re_audit rows needed; --stage final 112 FAILs, 3 new (ledger/SCRIPTS.json rows for the three new files, the out-of-scope bookkeeping kind). No finding registered or regraded.
