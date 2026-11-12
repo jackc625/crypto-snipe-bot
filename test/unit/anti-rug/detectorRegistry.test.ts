@@ -213,7 +213,10 @@ describe('Phase 19 — Detector registry + WS skeleton', () => {
     // -----------------------------------------------------------------------
 
     describe('positionRegistry — register / unregister', () => {
-        it('Test 18: registerAntiRugPosition stores entry with loaded baseline; null baseline logs error and skips', async () => {
+        // Own limit (orchestrator, phase 23 wave 13 gate, 2026-11-12): this test pays the cold
+        // import of src/anti-rug/detector in its body. Measured 2.5 s in the full parallel run (51%
+        // of the 5 s unit testTimeout) and 0.8 s alone. Root fix is Phase 28 (deferred-items.md).
+        it('Test 18: registerAntiRugPosition stores entry with loaded baseline; null baseline logs error and skips', { timeout: 20_000 }, async () => {
             const { registerAntiRugPosition, getRegisteredPositions } =
                 await import('../../../src/anti-rug/detector');
 

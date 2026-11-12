@@ -14,7 +14,11 @@ describe('backup-state.ts --self-check (D-11)', () => {
     it(
         'exits 0 and every fixture case passes',
         () => {
-            const result = spawnRailedChild('npx', ['ts-node', 'scripts/backup-state.ts', '--self-check'], { timeoutMs: 110_000 });
+            // Limits raised (orchestrator, phase 23 wave 13 gate, 2026-11-12): the type-checking
+            // npx ts-node child slows about fivefold under the full parallel run's CPU load. Measured
+            // 12.7 s alone; 47.6 to 69.5 s across the full runs of plans 23-19 to 23-24 (67.5 s, 56%
+            // of the old 120 s limit, at the wave 13 gate). Root fix is Phase 28 (deferred-items.md).
+            const result = spawnRailedChild('npx', ['ts-node', 'scripts/backup-state.ts', '--self-check'], { timeoutMs: 230_000 });
             const output = `${result.stdout}\n${result.stderr}`;
 
             expect(result.status, output).toBe(0);
@@ -24,6 +28,6 @@ describe('backup-state.ts --self-check (D-11)', () => {
             expect(result.stdout).not.toMatch(/^FAIL \(/m);
             expect(result.stdout).toMatch(new RegExp(`^SELF-CHECK PASSED: ${CASES.length}/${CASES.length} cases`, 'm'));
         },
-        120_000,
+        240_000,
     );
 });
