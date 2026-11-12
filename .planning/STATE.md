@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-16-PLAN.md
-last_updated: "2026-11-12T03:33:43.909Z"
+stopped_at: Completed 23-17-PLAN.md
+last_updated: "2026-11-12T04:31:39.685Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 13c1a4779b4ce3b7df4aff92d34f1871f3214641
+state_head: dbd83fd3dec123608255b08f10e11aab5a86b274
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 47
+  completed_plans: 48
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 16 of 31
+Plan: 17 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -133,11 +133,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P13 | 39min | 3 tasks | 17 files |
 | Phase 23 P14 | 71min (wall-clock incl. operator wait; continuation 21min) | 2 tasks | 33 files |
 | Phase 23 P16 | ~40min (wall-clock incl. operator wait; continuation 7min) | 3 tasks | 11 files |
+| Phase 23 P17 | 29min | 3 tasks | 5 files |
 
 ## Session
 
-**Last session:** 2026-11-12T03:33:18.172Z
-**Stopped at:** Completed 23-16-PLAN.md
+**Last session:** 2026-11-12T04:31:20.070Z
+**Stopped at:** Completed 23-17-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -292,3 +293,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-16 TRIAGE-REVIEW-01 (.planning/audit/reviews/TRIAGE-REVIEW-01.json): operator reply to the Task 2 checkpoint, verbatim (its five lines shown here separated by " / "; the record keeps the line breaks): "1. acknowledge all 44." / "2. TX-006: keep open" / "3. ANTIRUG-025: option 1" / "4. ANTIRUG-018: that command you sent me only output "eth ETH_WS_URL set"" / "5. fork questions: all go to Phase 25". All 44 confirmed S0/S1 acknowledged (AC-18, incl. AUD-ANTIRUG-025); AUD-TX-006 ruled keep-open (stays candidate/unreproduced, open claim endpoint-still-answers, Phase 29 card TX-03). Item 3 CHANGES the ESC-BUY-01 interim rule for AUD-BUY-001: no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025 (decision TRIAGE-REVIEW-01-D1). Card OD-26 (BUY-01) and ESC-BUY-01 were not edited (no tool writes interim_rule; OPERATOR-DECISIONS.md still matches the Phase 22 seal render hash) and still show the old rule; the review record supersedes them.
 - [Phase 23]: 23-16 AUD-ANTIRUG-018 setup answer (not a ruling, grade stays S1): ENABLED_CHAINS is eth only (or unset, default eth) and ETH_WS_URL is set. From the code the HTTP anti-rug poller never runs on this setup: startChainAntiRugListener falls back to HTTP only when ctx.wsProvider is falsy (detector.ts:590-603), getWsProvider returns null only for an empty URL (provider.ts:33-40, chainRegistry.ts:662/:1066), and every reassignment builds a new WebSocketProvider, never null (detector.ts:923-929, bot.ts:1563-1564, :1605-1606, :1814-1818); no path falls back to HTTP after a WS failure. It becomes reachable once a chain without a WS URL is enabled (same for AUD-BUY-036, bot.ts:1530-1533). The WS-path outage findings AUD-ANTIRUG-005 and AUD-ANTIRUG-002 do apply to this setup.
 - [Phase 23]: 23-16 milestone: check.ts --stage triage RESULT PASS for the first time (fail 0, pending 0; was 49 FAILs); partial and consolidation PASS. All 61 population entries settled: 52 confirmed, 8 fixed, 1 unreproduced (kept open by ruling), 0 NOT-A-BUG; AC-08, AC-10, AC-16, AC-17, AC-18 hold. Fork questions became UFV-06 (AUD-ANTIRUG-003), UFV-07 (AUD-BUY-015), UFV-08 (AUD-BUY-033), UFV-09 (AUD-EXIT-003), owner_phase 25 (number), fork_ref set with set-triage.ts; ROADMAP Phase 25 criterion 6 names only UFV-01..05 and must be widened to UFV-01..09 when Phase 25 is planned. render.ts never renders triage blocks or review records, so AUDIT-FINDINGS.md re-rendered byte-identical (open item in deferred-items.md).
+- [Phase 23]: 23-17: CHAR-04 standing signing census: npm run check:census (scripts/check-signing-census.ts, the Phase 22 analysis promoted unchanged; original .planning/audit/tools/signing-census.ts untouched) passes on the working tree at 23 tx-signing sites (10 locked, 13 unlocked and listed, 0 unknown; raw N=25 before the 2 auditor exclusions). scripts/signing-census-exceptions.json: floor 23; 9 unlocked rows keyed file|enclosing|call with counts (AUD-SCRIPTS-002 x12 citing ESC-SCRIPTS-01 and OD-68; AUD-BUY-007 x1 citing ESC-CENSUS-01); 2 excluded rows (addLiquidity getPair, bot.ts maybeApproveForChain allowance) citing manual-inventory-head.json. CI test job: fetch-depth 0 and step "Signing census gate (CHAR-04)" running the gate and --check-floor-history. Self-test 54/54 (31 analysis + 23 gate cases), wrapped by test/unit/signingCensusGate.test.ts.
+- [Phase 23]: 23-17 for Phase 24 and 29: the census fails when a listed exception is fixed or removed. When the AUD-BUY-007 fix deletes tokenSafety.simulateSell, that same commit must remove the src/utils/tokenSafety.ts row and lower floor to 22 with AUD-BUY-007 in its message (--check-floor-history refuses a floor drop whose message names no registered AUD- finding, refuses deleting the list, and exits 2 on a shallow clone). The same holds for each AUD-SCRIPTS-002 row when Phase 29 settles card SCRIPTS-01. Every unlocked row needs a decision_ref record (escalations/ or decisions/) that lists its finding; an excluded row may match only a contract call whose ABI mutability the census cannot read. Phase 26 Node upgrade must update the script ABI 127 guard.
+- [Phase 23]: 23-17 timing and gates: the self-test wrapper took 59.7 s under the full parallel run (23 s alone), 54 percent of the planned 110 s child limit, so it has child 240 s / test 250 s. Full railed npm test on Node 22: 199 files, 1396/1396, nonLoopbackAllowed 0, telegramAllowed 0. check.ts partial, consolidation and triage PASS with no re_audit rows needed; --stage final has 109 FAILs, 5 from this plan (ledger rows for the 3 new files, re_audit for package.json and test.yml), the same out-of-scope bookkeeping kinds as earlier Phase 23 plans.
