@@ -1,59 +1,247 @@
 {
   "version": "1.0",
-  "timestamp": "2026-11-11T19:06:14.225Z",
+  "timestamp": "2026-11-12T13:48:13.716Z",
   "phase": "23",
   "phase_name": "Test Safety Net (Harness, Triage, Characterization)",
   "phase_dir": ".planning/phases/23-test-safety-net-harness-triage-characterization",
-  "plan": 8,
+  "plan": 19,
   "task": 1,
   "total_tasks": 31,
   "status": "paused",
-  "plans_complete": 10,
+  "plans_complete": 23,
   "plans_total": 31,
   "completed_tasks": [
-    {"id": "23-01", "name": "Real-path harness and tracer buy (wave 1)", "status": "done", "commit": "5b2168f"},
-    {"id": "23-03", "name": "Real migrations in tests (wave 2)", "status": "done", "commit": "cfb4330"},
-    {"id": "23-28", "name": "Simulated node finished (wave 2)", "status": "done", "commit": "badd148"},
-    {"id": "23-02", "name": "Harness instruments: timeline, knownBug, AC-02 mock gate (wave 3)", "status": "done", "commit": "7d1c699"},
-    {"id": "23-04", "name": "Register checker --stage triage and set-triage.ts (wave 4)", "status": "done", "commit": "b9f9c7f"},
-    {"id": "23-27", "name": "Restart, two-process and Telegram harness (wave 4)", "status": "done", "commit": "3ff7a5c"},
-    {"id": "23-15", "name": "AUD-TX-006 Flashbots stats probe (wave 5)", "status": "done", "commit": "b1c3b7c"},
-    {"id": "23-05", "name": "Buy-submission and money-out triage (wave 5)", "status": "done", "commit": "bc58f73"},
-    {"id": "23-06", "name": "Entry-gate and alert triage incl. S0 AUD-BUY-001 (wave 5)", "status": "done", "commit": "616666e"},
-    {"id": "23-07", "name": "Exit monitoring, pricing and min-output triage (wave 5)", "status": "done", "commit": "9adc323"},
-    {"id": "23-07-fix", "name": "Orchestrator fix: own time limits for two slow AUD-EXIT tests", "status": "done", "commit": "aeec076"}
+    {
+      "id": "23-01",
+      "name": "Real-path harness and tracer buy",
+      "status": "done",
+      "commit": "5b2168f"
+    },
+    {
+      "id": "23-03",
+      "name": "Real migrations in tests",
+      "status": "done",
+      "commit": "cfb4330"
+    },
+    {
+      "id": "23-28",
+      "name": "Simulated node finished",
+      "status": "done",
+      "commit": "badd148"
+    },
+    {
+      "id": "23-02",
+      "name": "Timeline, knownBug, AC-02 mock gate",
+      "status": "done",
+      "commit": "7d1c699"
+    },
+    {
+      "id": "23-04",
+      "name": "check.ts --stage triage and set-triage.ts",
+      "status": "done",
+      "commit": "b9f9c7f"
+    },
+    {
+      "id": "23-27",
+      "name": "Restart, two-process and Telegram harness",
+      "status": "done",
+      "commit": "3ff7a5c"
+    },
+    {
+      "id": "23-15",
+      "name": "AUD-TX-006 Flashbots stats probe",
+      "status": "done",
+      "commit": "b1c3b7c"
+    },
+    {
+      "id": "23-05",
+      "name": "Buy-submission and money-out triage",
+      "status": "done",
+      "commit": "bc58f73"
+    },
+    {
+      "id": "23-06",
+      "name": "Entry-gate and alert triage incl. S0 AUD-BUY-001",
+      "status": "done",
+      "commit": "616666e"
+    },
+    {
+      "id": "23-07",
+      "name": "Exit monitoring, pricing and min-output triage",
+      "status": "done",
+      "commit": "9adc323"
+    },
+    {
+      "id": "23-08",
+      "name": "Exit lifecycle and dashboard-sell triage",
+      "status": "done",
+      "commit": "0fdb3aa"
+    },
+    {
+      "id": "23-09",
+      "name": "Nonce-lock and concurrency triage",
+      "status": "done",
+      "commit": "7e4b7b5"
+    },
+    {
+      "id": "23-10",
+      "name": "WS lifecycle and anti-rug triage (+AUD-ANTIRUG-018/-024)",
+      "status": "done",
+      "commit": "28db4c2"
+    },
+    {
+      "id": "23-11",
+      "name": "Risk-limit and database triage",
+      "status": "done",
+      "commit": "a01a0c5"
+    },
+    {
+      "id": "23-12",
+      "name": "Crash class as real process deaths",
+      "status": "done",
+      "commit": "3bb5968"
+    },
+    {
+      "id": "23-13",
+      "name": "Static and import-order triage",
+      "status": "done",
+      "commit": "09479ec"
+    },
+    {
+      "id": "23-14",
+      "name": "Entries a Phase 22 rail fixed (AUD-TESTI-001 fix-now)",
+      "status": "done",
+      "commit": "78b3889"
+    },
+    {
+      "id": "23-16",
+      "name": "Triage report and operator rulings (triage gate PASS)",
+      "status": "done",
+      "commit": "c8d6cf0"
+    },
+    {
+      "id": "23-17",
+      "name": "Standing signing census",
+      "status": "done",
+      "commit": "1d6e43f"
+    },
+    {
+      "id": "23-29",
+      "name": "In-memory mutant mechanism",
+      "status": "done",
+      "commit": "ddadd10"
+    },
+    {
+      "id": "23-18",
+      "name": "Bot wiring conversion",
+      "status": "done",
+      "commit": "ee52acb"
+    },
+    {
+      "id": "23-31",
+      "name": "CLI, lock and entry-point conversions",
+      "status": "done",
+      "commit": "2c95f68"
+    },
+    {
+      "id": "23-30",
+      "name": "Anti-rug and config conversions",
+      "status": "done",
+      "commit": "a2ae0fc"
+    }
   ],
   "remaining_tasks": [
-    {"id": "23-08", "name": "Exit lifecycle and dashboard-sell triage (wave 5)", "status": "not_started"},
-    {"id": "23-09", "name": "Nonce-lock and concurrency triage (wave 5)", "status": "not_started"},
-    {"id": "23-10", "name": "WebSocket lifecycle and anti-rug triage (wave 5)", "status": "not_started"},
-    {"id": "23-11", "name": "Risk-limit and database triage (wave 5)", "status": "not_started"},
-    {"id": "23-12", "name": "Crash-class findings as real process deaths (wave 5)", "status": "not_started"},
-    {"id": "23-13", "name": "Static and import-order findings (wave 5)", "status": "not_started"},
-    {"id": "23-14", "name": "Close entries a Phase 22 rail already fixed (wave 5)", "status": "not_started"},
-    {"id": "wave-5-gate", "name": "Post-wave gate after the last wave 5 plan", "status": "not_started"},
-    {"id": "23-16", "name": "Triage report and operator rulings (wave 6, checkpoint)", "status": "not_started"},
-    {"id": "23-17..23-26, 23-29..23-31", "name": "Waves 7-15: signing census, source-text conversions, golden master, env/ordering pins, commit check, phase close", "status": "not_started"}
+    {
+      "id": "23-19",
+      "name": "Last three source-text conversions + standing AST check (wave 11)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-20",
+      "name": "Golden-master recording, Flashbots V2 family (wave 12)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-21",
+      "name": "Flashbots V3 family (wave 13)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-22",
+      "name": "bloXroute and public routes; base public-v2-buy records the skip (wave 13)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-23",
+      "name": "Settings parse snapshots (wave 13)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-24",
+      "name": "Ordering and identity pins (wave 13)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-25",
+      "name": "Commit check protecting the recording (wave 14)",
+      "status": "not_started"
+    },
+    {
+      "id": "23-26",
+      "name": "Phase close (wave 15)",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-verification",
+      "name": "aggregate_results, verify_phase_goal (code review, regression gate, verifier), update_roadmap, transition",
+      "status": "not_started"
+    }
   ],
   "blockers": [
-    {"description": "AUD-ANTIRUG-025 (new S1, 23-06): every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 stop-gap for AUD-BUY-001 (restart after a deliberate buy) restores the exit monitor only", "type": "technical", "workaround": "Bot is OFF for all of v7.0, no exposure; 23-16 puts it to the operator with the S0/S1 batch; Phase 24 fixes it with or before AUD-BUY-001"},
-    {"description": "AUD-ANTIRUG-018 now S1: unchunked HTTP anti-rug poll fails forever after a few minutes of downtime on a chain with no WS URL; operator does not know whether any chain runs without one", "type": "technical", "workaround": "Bot is OFF; Phase 24 capital fix (card OD-48); a Wave 5 real-path test is owed (plan 23-10 or the plan that triages it)"},
-    {"description": "23-22 public-v2-buy (base) cannot record a buy under today's code (AUD-BUY-016)", "type": "technical", "workaround": "Operator already ruled 'Test today's skip (Recommended)' for the identical base V2 case in 23-28; apply that ruling to 23-22 (record the skip) and report it, instead of a new stop"}
+    {
+      "description": "None block resumption. Phase 24 carries AUD-BUY-001 (S0) with AUD-ANTIRUG-025, the confirmed S1 batch and AUD-TX-028; deliberate buys are suspended by operator ruling until then.",
+      "type": "technical",
+      "workaround": "Bot is OFF for all of v7.0"
+    }
   ],
   "async_jobs": [],
-  "human_actions_pending": [
-    {"action": "Plan 23-16 operator rulings: acknowledge the S0/S1 batch (incl. AUD-ANTIRUG-025, AUD-ANTIRUG-018, AUD-BUY-001/-002/-003/-006/-011/-015/-027/-028/-030/-033, AUD-EXIT-001/-002/-003/-013/-015), rule on unreproduced AUD-TX-006, and any S0/S1 NOT-A-BUG closures", "context": "D-11 batch report at the end of triage; no rulings are needed before then", "blocking": false}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "AUD-ANTIRUG-024 registered as a new S3 (false GAP DETECTED alert on a chain's first start)", "rationale": "Operator ruling 'New finding, S3 (Recommended)', ESC-ANTIRUG-02", "phase": "23"},
-    {"decision": "AUD-ANTIRUG-018 raised S2 -> S1", "rationale": "Operator ruling 'Raise to S1 (Recommended)'; WS coverage 'Not sure'; ESC-ANTIRUG-03", "phase": "23"},
-    {"decision": "No severity stops: executors grade new bugs and grade changes themselves and keep going", "rationale": "Operator 2026-11-11 verbatim: 'All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading'", "phase": "23"},
-    {"decision": "Base/Arb V2 route test records today's skip (AUD-BUY-016), not a faked lock answer", "rationale": "Operator ruling 'Test today's skip (Recommended)'; AC-48 fake fidelity", "phase": "23"},
-    {"decision": "One Flashbots getBundleStatsV2 request sent at block 1 (HTTP 403 'rpc method is not whitelisted'); AUD-TX-006 unreproduced", "rationale": "Operator 'Approve, use block 1'; 403 is inconclusive by the pre-fixed rule", "phase": "23"},
-    {"decision": "Harness change allowed: setRelay can answer a non-200 HTTP status and raw body (65172c9)", "rationale": "Operator 'Allow the change (Recommended)' on the HARNESS GAP; full realpath re-run unchanged 71 -> 76", "phase": "23"},
-    {"decision": "AUD-EXIT-003 zero-entry test 90 s limit, AUD-EXIT-015 resume test 60 s limit (aeec076)", "rationale": "Operator 'Fix now, then stop (Recommended)'; full npm test timed out the first twice at the 15 s default", "phase": "23"}
+    {
+      "decision": "TRIAGE-REVIEW-01: all 44 confirmed S0/S1 acknowledged; AUD-TX-006 keep open; interim rule changed to no deliberate buy until Phase 24 fixes AUD-BUY-001 and AUD-ANTIRUG-025; setup is eth only with ETH_WS_URL set; four fork questions to Phase 25 (UFV-06..09)",
+      "rationale": "Operator reply, verbatim in TRIAGE-REVIEW-01.json",
+      "phase": "23"
+    },
+    {
+      "decision": "AUD-TESTI-001 leftovers fixed in 23-14",
+      "rationale": "Operator \"Fix now (Recommended)\"",
+      "phase": "23"
+    },
+    {
+      "decision": "Run full-suite gates in the foreground",
+      "rationale": "Background gate stopped twice for low memory; operator chose \"Run in foreground (Recommended)\"",
+      "phase": "23"
+    },
+    {
+      "decision": "AUD-ANTIRUG-018/-024 triaged in 23-10 as an orchestrator scope addition",
+      "rationale": "Population entries with no owning plan; triage gate could not pass otherwise",
+      "phase": "23"
+    },
+    {
+      "decision": "Per-test explicit time limits with measured times; cold-import root fix deferred to Phase 28",
+      "rationale": "aeec076 precedent; 00d5ef1, 8b4d3f9",
+      "phase": "23"
+    },
+    {
+      "decision": "Accepted 23-31 spawn-site gate addition (loadedModulesProbe, computed require only); further rail changes are a STOP",
+      "rationale": "Read by the orchestrator: narrow, railed child only, recorded in rails-test-edits.json",
+      "phase": "23"
+    }
   ],
-  "uncommitted_files": [" M .planning/config.json", " M .planning/state.json"],
-  "next_action": "Run /gsd-resume-work, then /gsd-execute-phase 23. Its plan index will show 23-08..23-14 ready (wave 5). Dispatch them one at a time with the same executor prompt shape used this session (see .continue-here.md), then run the wave 5 gate, then 23-16.",
-  "context_notes": "Sequential executors (workflow.use_worktrees=false). Executors read the 5 GSD execution_context files themselves (inlining ~130 KB x 31 plans would exhaust the orchestrator). Every executor prompt carries the operator rules (Node 22 path, never boot the bot, no anomaly dismissal, NO SEVERITY STOPS, still stop for harness gaps / falsified premises / unsafe), plan notes on the triage tools and harness, and lessons learned. Full railed npm test on Node 22 is the gate; the default GSD gate would run Node 24 and fail on better-sqlite3."
+  "uncommitted_files": [
+    " M .planning/config.json",
+    " M .planning/state.json"
+  ],
+  "next_action": "Run /gsd-resume-work, then /gsd-execute-phase 23. Build the 23-19 prompt with node .planning/phases/23-test-safety-net-harness-triage-characterization/orchestrator/build-prompt.js 23-19, add plan_23_19_notes, dispatch, then run orchestrator/wave-gate.sh in the FOREGROUND.",
+  "context_notes": "Sequential executors (use_worktrees false). Orchestrator helpers committed under the phase folder orchestrator/: executor-prompt-template.md, build-prompt.js, root-pin-guard.template.sh, wave-gate.sh, timing-report.js. Every executor prompt carries the operator rules (Node 22, never boot the bot, no anomaly dismissal, NO SEVERITY STOPS, still stop for harness gaps / premise changes / rail changes / unsafe) and the accumulated lessons. Full railed npm test on Node 22 in the FOREGROUND is the gate; machine memory is tight."
 }
