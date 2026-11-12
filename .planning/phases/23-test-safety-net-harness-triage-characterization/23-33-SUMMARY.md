@@ -250,7 +250,7 @@ None - no external service configuration required.
 
 - From Phase 24's first commit, a scenario test cannot quietly stop comparing a committed recording: CI fails right after the realpath step, naming the file.
 - The STATE.md Blockers/Concerns line for the 23-25 gap is marked resolved, and the deferred-items.md entry is closed.
-- Phase 23 has 33 plans; this was the last planned one.
+- Ready for 23-26 (wave 15: successor seal, seal-tool fix, full-suite gate and `src/` diff review), the one Phase 23 plan still without a SUMMARY (32 of 33 done). AUDIT-06 stays unmarked in REQUIREMENTS.md until then, because 23-26 also declares it (the shared-ID gate held it). 23-26's full-suite gate can judge its run with `npm run check:recordings-compared -- --run-log <its log>`.
 
 ## Self-Check: PASSED
 
