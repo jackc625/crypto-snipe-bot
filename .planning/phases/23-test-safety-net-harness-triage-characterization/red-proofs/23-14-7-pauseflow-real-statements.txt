@@ -1,0 +1,172 @@
+RED proof 23-14-7
+Plan 23-14, AUD-TESTI-001 sub-claim 3 (pauseFlow half), operator ruling "Fix now (Recommended)".
+Recorded 2026-11-12T02:23:30Z at HEAD 0ca1e011abc25785eaba3391ac169b2d479331fd, Node v22.16.0.
+New file: test/integration/pauseFlow.test.ts at HEAD (blob 6a08a0b287a4fdc699a8036bee20e8cbad41d83e). Old file: the same path at c2e11c004cae956b51368141def6a9d7dfe9a3c6 (blob 0870dcaa448a6695bb34f4aca3d421145d0380ab), the hand-built v1..v6 copy this plan deleted.
+Every mutation below is in the working tree only and is never committed.
+
+================ Mutation 7a: the finding's escaped regression (AUD-TESTI-001 escaped_regression) ================
+Delete the version 6 INSERT OR IGNORE of the single pause row: a fresh database then has no pause row, so setPauseState updates zero rows and the kill switch silently does nothing.
+src/utils/dbSchema.ts blob before: 25d595417267f46612de69e9d996d39259dcbeb2 (HEAD)
+
+== Mutating diff (git diff) ==
+warning: in the working copy of 'src/utils/dbSchema.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/utils/dbSchema.ts b/src/utils/dbSchema.ts
+index 25d5954..9a26621 100644
+--- a/src/utils/dbSchema.ts
++++ b/src/utils/dbSchema.ts
+@@ -162,7 +162,6 @@ export function migrateSchema(db: Database.Database): void {
+                     reason TEXT
+                 );
+             `);
+-            db.exec(`INSERT OR IGNORE INTO pause_state (id, paused, paused_at, paused_by, reason) VALUES (1, 0, NULL, NULL, NULL)`);
+ 
+             // ALTER guard — clone v3→v4 pattern at db.ts:113-119. If the column already
+             // exists (e.g. partial-rerun after a prior crash mid-transaction), skip the ALTER.
+
+== RED: the rewritten file (HEAD) under mutation 7a ==
+node node_modules/vitest/vitest.mjs run --project integration test/integration/pauseFlow.test.ts --reporter=verbose
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated 74ms
+   → expected +0 to be 1 // Object.is equality
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present 30ms
+   → expected +0 to be 1 // Object.is equality
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns 29ms
+   → expected +0 to be 1 // Object.is equality
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1)) 27ms
+   → expected +0 to be 1 // Object.is equality
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 5: POST /pause with reason+pausedBy writes via setPauseState + broadcasts pause_state_change 58ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 6: POST /resume clears pause via clearPauseState + broadcasts pause_state_change paused=false 8ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 7: GET /pause returns current state JSON shape 5ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 8: POST /pause sanitizes reason (T-20 mitigation): 500-char control-char string → stored ≤120 chars + no control chars 7ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > startMultiChainBot D-PAUSED-RESTART positive observable > D-PAUSED-RESTART: on restart with pause_state.paused=1, chain listeners attached AND dashboard reachable AND exit monitors running AND handleNewPairForChain CP1 fires AND sendTxWithRetry never called 331ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1))
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ Test Files  1 failed (1)
+      Tests  4 failed | 5 passed (9)
+vitest exit 1
+
+== CONTROL: the old hand-built file (c2e11c004cae956b51368141def6a9d7dfe9a3c6) under the same mutation ==
+working-tree test/integration/pauseFlow.test.ts now blob 0870dcaa448a6695bb34f4aca3d421145d0380ab (the old file)
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated 24ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present 19ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns 17ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1)) 18ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 5: POST /pause with reason+pausedBy writes via setPauseState + broadcasts pause_state_change 58ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 6: POST /resume clears pause via clearPauseState + broadcasts pause_state_change paused=false 7ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 7: GET /pause returns current state JSON shape 5ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 8: POST /pause sanitizes reason (T-20 mitigation): 500-char control-char string → stored ≤120 chars + no control chars 5ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > startMultiChainBot D-PAUSED-RESTART positive observable > D-PAUSED-RESTART: on restart with pause_state.paused=1, chain listeners attached AND dashboard reachable AND exit monitors running AND handleNewPairForChain CP1 fires AND sendTxWithRetry never called 325ms
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+vitest exit 0
+restored test/integration/pauseFlow.test.ts: blob 6a08a0b287a4fdc699a8036bee20e8cbad41d83e (HEAD 6a08a0b287a4fdc699a8036bee20e8cbad41d83e)
+
+== Restore ==
+git -c core.autocrlf=false checkout -- src/utils/dbSchema.ts
+src/utils/dbSchema.ts blob after restore: 25d595417267f46612de69e9d996d39259dcbeb2 (IDENTICAL to HEAD)
+
+================ Mutation 7b: the real setPauseState statement targets no row ================
+Change WHERE id = 1 to WHERE id = 2 in setPauseState only: a pause request then writes nothing.
+src/utils/db.ts blob before: 3f6af283c30b5ac5bb6814519609fd9ac5d42581 (HEAD)
+
+== Mutating diff (git diff) ==
+warning: in the working copy of 'src/utils/db.ts', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/utils/db.ts b/src/utils/db.ts
+index 3f6af28..f59d62e 100644
+--- a/src/utils/db.ts
++++ b/src/utils/db.ts
+@@ -490,7 +490,7 @@ const getChainState = db.prepare(`SELECT last_seen_block, last_updated_ts FROM c
+ //                    'dashboard' / 'cli' / 'preflight' / 'manual').
+ //   - clearPauseState: dashboard resume + CLI resume.
+ const getPauseState = db.prepare(`SELECT paused, paused_at, paused_by, reason FROM pause_state WHERE id = 1`);
+-const setPauseState = db.prepare(`UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 1`);
++const setPauseState = db.prepare(`UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 2`);
+ const clearPauseState = db.prepare(`UPDATE pause_state SET paused = 0, paused_at = NULL, paused_by = NULL, reason = NULL WHERE id = 1`);
+ 
+ // --- Anti-Rug Dry-Run Gate (Phase 20 / Plan 20-01 / D-ANTIRUG-LIVE-GATE-CODE) ---
+
+== RED: the rewritten file (HEAD) under mutation 7b ==
+node node_modules/vitest/vitest.mjs run --project integration test/integration/pauseFlow.test.ts --reporter=verbose
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated 76ms
+   → expected +0 to be 1 // Object.is equality
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present 26ms
+   → expected +0 to be 1 // Object.is equality
+ × |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns 28ms
+   → expected +0 to be 1 // Object.is equality
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1)) 26ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 5: POST /pause with reason+pausedBy writes via setPauseState + broadcasts pause_state_change 56ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 6: POST /resume clears pause via clearPauseState + broadcasts pause_state_change paused=false 8ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 7: GET /pause returns current state JSON shape 5ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 8: POST /pause sanitizes reason (T-20 mitigation): 500-char control-char string → stored ≤120 chars + no control chars 6ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > startMultiChainBot D-PAUSED-RESTART positive observable > D-PAUSED-RESTART: on restart with pause_state.paused=1, chain listeners attached AND dashboard reachable AND exit monitors running AND handleNewPairForChain CP1 fires AND sendTxWithRetry never called 340ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ FAIL  |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+- 1
++ 0
+ Test Files  1 failed (1)
+      Tests  3 failed | 6 passed (9)
+vitest exit 1
+
+== CONTROL: the old hand-built file (c2e11c004cae956b51368141def6a9d7dfe9a3c6) under the same mutation ==
+working-tree test/integration/pauseFlow.test.ts now blob 0870dcaa448a6695bb34f4aca3d421145d0380ab (the old file)
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated 27ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present 25ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns 17ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1)) 18ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 5: POST /pause with reason+pausedBy writes via setPauseState + broadcasts pause_state_change 68ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 6: POST /resume clears pause via clearPauseState + broadcasts pause_state_change paused=false 10ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 7: GET /pause returns current state JSON shape 7ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > POST /api/controls/pause + /resume + GET /pause (OPS-LIVE-09 endpoint exercise) > Test 8: POST /pause sanitizes reason (T-20 mitigation): 500-char control-char string → stored ≤120 chars + no control chars 7ms
+ ✓ |integration| test/integration/pauseFlow.test.ts > startMultiChainBot D-PAUSED-RESTART positive observable > D-PAUSED-RESTART: on restart with pause_state.paused=1, chain listeners attached AND dashboard reachable AND exit monitors running AND handleNewPairForChain CP1 fires AND sendTxWithRetry never called 417ms
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+vitest exit 0
+restored test/integration/pauseFlow.test.ts: blob 6a08a0b287a4fdc699a8036bee20e8cbad41d83e (HEAD 6a08a0b287a4fdc699a8036bee20e8cbad41d83e)
+
+== Restore ==
+git -c core.autocrlf=false checkout -- src/utils/db.ts
+src/utils/db.ts blob after restore: 3f6af283c30b5ac5bb6814519609fd9ac5d42581 (IDENTICAL to HEAD)
+
+git status --porcelain -- src scripts test: ''
+
+== GREEN rerun (everything at HEAD) ==
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+vitest exit 0

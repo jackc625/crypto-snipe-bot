@@ -37,7 +37,15 @@
     "findings": [
       "AUD-TESTI-001"
     ],
-    "fixture_provenance": "synthetic"
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 0ca1e01 -- test/fixtures/exitEngine.fixtures.ts): createMockExitStateRow gains the version 7 exit_state columns exit_failure_count 0 and exit_status null in table order (schema-v7.json), and its doc comment names the helpers.smoke test that pins its keys to a table built by the real migrations; no existing key or value changed; its only test user, test/unit/exitEngine.test.ts, reads none of the key set (33/33 pass with and without the new keys, RED proof 23-14-8). No new finding."
+      }
+    ]
   },
   {
     "path": "test/fixtures/mythril/sample-clean.json",
@@ -1382,7 +1390,15 @@
         }
       ],
       "notes": "Tests 1-4 use an os.tmpdir() file DB (not data/). Test 9 imports src/bot without mocking src/config (AUD-TESTI-011). afterEach deletes DB_PATH (AUD-TESTI-015)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 0ca1e01 -- test/integration/pauseFlow.test.ts): the hand-built v1..v6 schema copy (buildV6Db, user_version 6) is deleted and Tests 1-4 now load the real src/utils/db with vi.importActual after vi.resetModules on a temp DB_PATH, so the file is opened and migrated by the real migrateSchema and the tests run the exported setPauseState, getPauseState and clearPauseState; titles and every original assertion kept, with added changes-is-1, user_version and restart-identity checks; DB_PATH is restored after each test instead of deleted; the logger mock gains top-level methods; Tests 5-9 unchanged (AUD-TESTI-014, -015 and the Test 9 hollow claims still stand). This closes the Tests 1-4 case of the quality label (missing observable: the production statements and migration). RED proof 23-14-7. No new finding."
+      }
+    ]
   },
   {
     "path": "test/integration/preflightCli.test.ts",

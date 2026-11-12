@@ -4688,7 +4688,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-TESTI-001: RC-28: the test DB helper hand-writes a two-table schema at user_version 4 and claims it "matches src/utils/db.ts exactly"; production migrates to version 7 with lp_baseline, chain_state, pause_state and the exit_state failed-held columns, and the migration tests (unit and the pauseFlow integration suite) run hand-written replicas instead of migrateSchema
 
-- **Severity / capital impact / status:** S2 / OVERSPEND / confirmed
+- **Severity / capital impact / status:** S2 / OVERSPEND / fixed
 - **Slice / origin:** TESTI / research-candidate
 - **Classes:** C13 (SQLite transaction boundaries and crash consistency)
 - **Research candidates:** RC-28 (research suggested S2)
@@ -7221,7 +7221,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 | RC-25 | DB | AUD-DB-006 | confirmed |
 | RC-26 | TX | AUD-TX-006 | candidate |
 | RC-27 | SCRIPTS | AUD-SCRIPTS-001 | confirmed |
-| RC-28 | TESTI | AUD-TESTI-001 | confirmed |
+| RC-28 | TESTI | AUD-TESTI-001 | fixed |
 
 ## Section-C candidates (research summary, lower priority)
 
@@ -7590,7 +7590,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/exitEngineZeroBalance.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/guards/singleton.test.ts | f695363 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 none; f695363..3ee5205 none |
 | test/unit/guards/tsconfigCasing.test.ts | b3617f6 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..b3617f6 none |
-| test/unit/helpers.smoke.test.ts | 23a6461 | AUD-TESTU-018 | quality: mocks_mechanism=no, hollow=no, real_state=no |
+| test/unit/helpers.smoke.test.ts | 23a6461 | AUD-TESTU-018 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..b6c4de4 none; b6c4de4..0ca1e01 none |
 | test/unit/honeypotDispatch.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/honeypotTaxThreshold.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/honeypotTypes.test.ts | 23a6461 | AUD-TESTU-008 | quality: mocks_mechanism=no, hollow=yes, real_state=no |
@@ -7649,7 +7649,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/fixtures/chainConfig.ts | 23a6461 | AUD-TESTI-016 | fixture: synthetic |
 | test/fixtures/contracts/Honeypot.sol | 23a6461 | AUD-TESTI-023 | fixture: synthetic |
 | test/fixtures/contracts/RugPull.sol | 23a6461 | AUD-TESTI-022 | fixture: synthetic |
-| test/fixtures/exitEngine.fixtures.ts | 23a6461 | AUD-TESTI-001 | fixture: synthetic |
+| test/fixtures/exitEngine.fixtures.ts | 23a6461 | AUD-TESTI-001 | fixture: synthetic; re-audit: 23a6461..0ca1e01 none |
 | test/fixtures/mythril/sample-clean.json | 23a6461 | AUD-TESTI-016 | fixture: synthetic |
 | test/fixtures/mythril/sample-high.json | 23a6461 | AUD-TESTI-016 | fixture: synthetic |
 | test/fixtures/receipt.fixtures.ts | 23a6461 | none | fixture: synthetic |
@@ -7722,7 +7722,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/mevStrategies.test.ts | 23a6461 | AUD-TESTI-002, AUD-TESTI-003 | quality: mocks_mechanism=partial, hollow=no, real_state=no |
 | test/integration/midRunWalletCheck.test.ts | 23a6461 | AUD-TESTI-011, AUD-TESTI-015 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
 | test/integration/pauseCli.test.ts | 23a6461 | AUD-TESTI-011, AUD-TESTI-014, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=yes, real_state=yes; re-audit: 23a6461..be57bff AUD-TESTQ-010 |
-| test/integration/pauseFlow.test.ts | 23a6461 | AUD-TESTI-001, AUD-TESTI-011, AUD-TESTI-014, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=yes, real_state=yes |
+| test/integration/pauseFlow.test.ts | 23a6461 | AUD-TESTI-001, AUD-TESTI-011, AUD-TESTI-014, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=yes, real_state=yes; re-audit: 23a6461..0ca1e01 none |
 | test/integration/preflightCli.test.ts | 23a6461 | AUD-TESTI-011, AUD-TESTI-014 | quality: mocks_mechanism=no, hollow=yes, real_state=yes; re-audit: 23a6461..fec8ee8 AUD-TESTQ-006, AUD-TESTQ-007, AUD-TESTQ-008, AUD-TESTQ-009, AUD-TESTQ-018 |
 | test/integration/preflightInvocation.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
 | test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none; a93fd98..3ee5205 none |

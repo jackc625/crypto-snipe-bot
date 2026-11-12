@@ -1490,7 +1490,21 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "no",
       "notes": "Helper smoke test; it also pins the helper schema at user_version 4 (AUD-TESTU-018)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b6c4de44594fb519f881e8c9dafb0262f651c2b3",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 b6c4de4 -- test/unit/helpers.smoke.test.ts, the plan 23-03 AC-07 edit): createTestDb returns a working in-memory DB now expects user_version CURRENT_SCHEMA_VERSION (imported from src/utils/dbSchema) instead of 4, with its comment updated; title unchanged; RED proof 23-03-ac07-red.txt (expected 4 to be 7 against the old helper). No new finding."
+      },
+      {
+        "from_sha": "b6c4de44594fb519f881e8c9dafb0262f651c2b3",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff b6c4de4 0ca1e01 -- test/unit/helpers.smoke.test.ts): the closes-finding marker for AUD-TESTI-001 beside the AC-07 test (unchanged), and one new test, createMockExitStateRow has exactly the columns of the exit_state table the real migrations build (fixture keys equal PRAGMA table_info(exit_state) of a createTestDb database, and the row inserts and reads back equal), with its own marker; no existing test changed. RED proof 23-14-8. No new finding."
+      }
+    ]
   },
   {
     "path": "test/unit/honeypotDispatch.test.ts",
