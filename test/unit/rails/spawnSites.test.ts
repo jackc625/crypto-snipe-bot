@@ -164,6 +164,7 @@ function relPosix(file: string): string {
 }
 
 describe('spawn-site gate (SAFE-02 D-03)', () => {
+    // closes-finding: AUD-TESTI-011 (rail test, RED proof row 18 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-6-spawn-gate.txt)
     it('no script under test/ loads a spawner or spawns, outside the allowed files', () => {
         const files = walkScripts(path.join(REPO_ROOT, 'test'));
         const scanned = files.map(relPosix);

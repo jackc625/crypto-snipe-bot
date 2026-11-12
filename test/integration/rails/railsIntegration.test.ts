@@ -50,6 +50,7 @@ describe('integration project rails', () => {
         expect(st.netDenyInstalled).toBe(true);
     });
 
+    // closes-finding: AUD-TESTI-011 (rail test for its integration-worker reach; no row in red-proofs/INDEX.md: RED proof 23-14-4b-sentinel-env-integration.txt, the row 1 neutralisation)
     it('module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel (AC-13)', () => {
         expect(sentinels.TELEGRAM_BOT_TOKEN).toMatch(/TEST-SENTINEL/);
         expect(tokenAtImport).toBe(sentinels.TELEGRAM_BOT_TOKEN);
