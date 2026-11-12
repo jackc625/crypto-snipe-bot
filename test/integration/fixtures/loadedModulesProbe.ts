@@ -15,8 +15,9 @@
 //                Without it the probe exits 0 as soon as the load returns, so a module that leaves
 //                a handle open cannot keep the child alive.
 //
-// The probe imports only Node built-ins, so the only repo modules in the record are the probe
-// itself and what <module> loaded. The record is written from the 'exit' event, so it is also
+// The probe imports only Node built-ins, and the record holds only the repo modules that entered
+// require.cache after the probe started: <module> and what its load (and, with --run, its run)
+// pulled in. The record is written from the 'exit' event, so it is also
 // written when the loaded module ends the process. A module whose load threw is removed from
 // require.cache by Node and so is absent from the record; a test that relies on the record also
 // checks the child's exit status.
@@ -45,9 +46,15 @@ function exportNames(value: unknown): string[] {
     return Object.keys(value as Record<string, unknown>).sort();
 }
 
+// Everything already in require.cache before the load (the probe itself and whatever NODE_OPTIONS
+// preloaded: the rails, the env-overrides module, an in-memory mutant's hook) is not "loaded with"
+// <module> and is left out of the record.
+const preloaded = new Set(Object.keys(require.cache));
+
 process.on('exit', () => {
     const loaded: { file: string; exports: string[] }[] = [];
     for (const [file, mod] of Object.entries(require.cache)) {
+        if (preloaded.has(file)) continue;
         const rel = repoRelative(file);
         if (rel === null || mod === undefined) continue;
         loaded.push({ file: rel, exports: exportNames(mod.exports) });

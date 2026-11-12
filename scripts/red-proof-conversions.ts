@@ -259,7 +259,189 @@ const CLI_PREFLIGHT_MUTANTS: MutantRow[] = [
     },
 ];
 
-export const MUTANTS: MutantRow[] = [...CLI_PREFLIGHT_MUTANTS];
+// cli-pause: scripts/pause.ts and scripts/resume.ts, each run by its tests as a railed child.
+const PAUSE_CLI_TEST = 'test/integration/pauseCli.test.ts';
+const PAUSE_T05 = 'T-20-05 mitigation: apiKey never logged in CLI scripts';
+const PAUSE_2009 = '20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT';
+type CliName = 'pause' | 'resume';
+const CLI_NAMES: readonly CliName[] = ['pause', 'resume'];
+const pauseTitles = (cli: CliName) => ({
+    noLog: `${PAUSE_T05} > scripts/${cli}.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login`,
+    noLogBase: `${PAUSE_T05} > scripts/${cli}.ts contains no log call referencing apiKey`,
+    notSet: `${PAUSE_T05} > scripts/${cli}.ts with an empty DASHBOARD_API_KEY exits 1 with "DASHBOARD_API_KEY not set", even when --api-key is passed`,
+    notSetBase: `${PAUSE_T05} > scripts/${cli}.ts contains 1 "DASHBOARD_API_KEY not set" string + 0 CLI-arg references to apiKey`,
+    noHardcode: `${PAUSE_2009} > scripts/${cli}.ts no longer hardcodes the 'http://localhost:3000' default`,
+    derives: `${PAUSE_2009} > scripts/${cli}.ts derives the default from DASHBOARD_PORT with an 8080 fallback`,
+    honors: `${PAUSE_2009} > scripts/${cli}.ts still honors an explicit DASHBOARD_URL override`,
+    connErr: `${PAUSE_2009} > scripts/${cli}.ts connection-error catch references host:port + DASHBOARD_PORT, never apiKey`,
+});
+// The line both scripts share in resolveDashboardUrl.
+const DASHBOARD_URL_RETURN = 'return process.env.DASHBOARD_URL || `http://${host}:${port}`;';
+const PLANTED_KEY_IN_TEST = 'csb-23-31-dashboard-key-5f0c2e9a';
+
+function pauseCliMutants(cli: CliName): MutantRow[] {
+    const t = pauseTitles(cli);
+    // Every test that runs this script, so a mutant failing an unexpected one of them is WRONG-SET.
+    const base = { group: 'cli-pause', project: 'integration', testFile: PAUSE_CLI_TEST, only: `scripts/${cli}\\.ts`, file: `scripts/${cli}.ts`, reach: 'child' as const };
+    return [
+        {
+            ...base,
+            name: `${cli}-logs-key`,
+            edits: [{ find: "log.fatal({ status: loginRes.status, body: loginRes.data }, 'Login failed');", replace: "log.fatal({ status: loginRes.status, body: loginRes.data, apiKey }, 'Login failed');" }],
+            expected: [t.noLog],
+            messageIncludes: `not to contain '${PLANTED_KEY_IN_TEST}'`,
+        },
+        {
+            ...base,
+            name: `${cli}-accepts-argv-key`,
+            edits: [{
+                find: 'const apiKey = process.env.DASHBOARD_API_KEY;',
+                replace: "const apiKey = process.env.DASHBOARD_API_KEY || (process.argv.includes('--api-key') ? process.argv[process.argv.indexOf('--api-key') + 1] : undefined);",
+            }],
+            expected: [t.notSet],
+            messageIncludes: 'expected 2 to be 1',
+        },
+        {
+            ...base,
+            name: `${cli}-old-default`,
+            edits: [{ find: DASHBOARD_URL_RETURN, replace: "return process.env.DASHBOARD_URL || 'http://localhost:3000';" }],
+            expected: [t.noHardcode, t.derives],
+            messageIncludes: "to be 'http://127.0.0.",
+        },
+        {
+            ...base,
+            name: `${cli}-ignores-port`,
+            edits: [{ find: "const port = process.env.DASHBOARD_PORT || '8080';", replace: "const port = '8080';" }],
+            expected: [t.derives],
+            messageIncludes: "to be 'http://127.0.0.2:",
+        },
+        {
+            ...base,
+            name: `${cli}-ignores-url-override`,
+            edits: [{ find: DASHBOARD_URL_RETURN, replace: 'return `http://${host}:${port}`;' }],
+            expected: [t.honors],
+            messageIncludes: "to be 'http://127.0.0.1:",
+        },
+        {
+            ...base,
+            name: `${cli}-conn-error-logs-key`,
+            edits: [{ find: '{ url, code: conn.code, cause: conn.detail },', replace: '{ url, code: conn.code, cause: conn.detail, apiKey: process.env.DASHBOARD_API_KEY },' }],
+            expected: [t.connErr],
+            messageIncludes: `not to contain '${PLANTED_KEY_IN_TEST}'`,
+        },
+    ];
+}
+
+// cli-lock: the import-graph test split out of AC-23d; the program reads each target in the worker.
+const PROCESS_LOCK_TEST = 'test/integration/processLock.test.ts';
+const PROCESS_LOCK_SUITE = 'SAFE-04 single-instance process lock (real holder processes)';
+const LOCK_IMPORT_TITLE = `${PROCESS_LOCK_SUITE} > preflight, pause and resume reach neither the process lock nor the boot entry through their imports (AC-23d)`;
+function lockImportMutant(name: string, file: string, after: string, line: string): MutantRow {
+    return {
+        name,
+        group: 'cli-lock',
+        project: 'integration',
+        testFile: PROCESS_LOCK_TEST,
+        only: 'reach neither the process lock',
+        file,
+        edits: [{ find: after, replace: `${after}\n${line}` }],
+        reach: 'worker',
+        expected: [LOCK_IMPORT_TITLE],
+        messageIncludes: 'to deeply equal []',
+    };
+}
+const CLI_LOCK_MUTANTS: MutantRow[] = [
+    lockImportMutant('lock-import-pause', 'scripts/pause.ts', "import axios from 'axios';", "import '../src/utils/processLock';"),
+    lockImportMutant('lock-import-resume', 'scripts/resume.ts', "import axios from 'axios';", "import '../src/utils/processLock';"),
+    lockImportMutant('lock-import-preflight-cli', 'scripts/preflight.ts', "import * as dotenv from 'dotenv';", "import '../src/utils/processLock';"),
+    lockImportMutant('lock-import-preflight-src', 'src/preflight.ts', "import { sendTelegramAlert } from './utils/notifier';", "import './utils/processLock';"),
+    lockImportMutant('lock-import-main', 'scripts/pause.ts', "import axios from 'axios';", "import '../src/main';"),
+];
+
+// cli-entry: the boot entry, the bot module's guard placement and the guard itself.
+const MAIN_ENTRY_TEST = 'test/unit/mainEntry.test.ts';
+const MAIN_ENTRY_SUITE = 'SAFE-04 boot entry';
+const ENTRY_TEST_1 = `${MAIN_ENTRY_SUITE} > (1) starts the bot exactly once, only after the lock is held`;
+const ENTRY_TEST_4 = `${MAIN_ENTRY_SUITE} > (4) the boot entry imports nothing stateful and loads the bot only inside startBot`;
+const ENTRY_TEST_4_BASE = `${MAIN_ENTRY_SUITE} > (4) src/main.ts imports nothing stateful and loads the bot only inside startBot, after the lock`;
+const ENTRY_TEST_5 = `${MAIN_ENTRY_SUITE} > (5) src/bot.ts: the first statement is the direct-entry guard and require.main refuses`;
+const ENTRY_TEST_6 = `${MAIN_ENTRY_SUITE} > (6) directEntry.ts imports only fs and path; neither boot file calls console`;
+const MAIN_LOCK_IMPORT = "import { acquireProcessLock, defaultLockDir } from './utils/processLock';";
+const entryRow = (row: Omit<MutantRow, 'group' | 'project' | 'testFile'>): MutantRow => ({ group: 'cli-entry', project: 'unit', testFile: MAIN_ENTRY_TEST, ...row });
+const CLI_ENTRY_MUTANTS: MutantRow[] = [
+    ...(['./config', './utils/db', './bot'] as const).map((spec) =>
+        entryRow({
+            name: `main-imports-${spec.split('/').pop()}`,
+            file: 'src/main.ts',
+            edits: [{ find: MAIN_LOCK_IMPORT, replace: `${MAIN_LOCK_IMPORT}\nimport '${spec}';` }],
+            reach: 'child',
+            expected: [ENTRY_TEST_4],
+            messageIncludes: 'to deeply equal [',
+        }),
+    ),
+    // The lock-before-start order (4) used to read from runMain's text, now carried by (1): the bot
+    // starts before the lock, so the real second process (1) starts inside startBot acquires instead
+    // of being refused. A GUARD_MUTANTS row, not a CONVERTED_TESTS one. `only` selects (1): (2) and
+    // (3) also fail under this mutant (startBot runs before their lock error), which is more
+    // protection, but a guard row must expect exactly its guarded test.
+    entryRow({
+        name: 'main-starts-before-lock',
+        only: '\\(1\\) starts the bot',
+        file: 'src/main.ts',
+        edits: [{
+            find: '    const { lockFile } = acquireProcessLock(opts.lockDir, address);\n    opts.startBot();',
+            replace: '    opts.startBot();\n    const { lockFile } = acquireProcessLock(opts.lockDir, address);',
+        }],
+        reach: 'vite',
+        expected: [ENTRY_TEST_1],
+        messageIncludes: "to contain 'REFUSED PROCESS_LOCK_HELD'",
+    }),
+    entryRow({
+        name: 'bot-guard-not-first',
+        file: 'src/bot.ts',
+        edits: [{
+            find: 'import \'./guards/directEntry\';\nimport { ethers, Contract, WebSocketProvider, EventLog } from "ethers";',
+            replace: 'import { ethers, Contract, WebSocketProvider, EventLog } from "ethers";\nimport \'./guards/directEntry\';',
+        }],
+        reach: 'worker',
+        expected: [ENTRY_TEST_5],
+        messageIncludes: 'to be undefined',
+    }),
+    entryRow({
+        name: 'bot-direct-start-does-not-refuse',
+        file: 'src/bot.ts',
+        edits: [{ find: 'if (require.main === module) {', replace: 'if (false as boolean) {' }],
+        reach: 'worker',
+        expected: [ENTRY_TEST_5],
+        messageIncludes: 'to have a length of 1 but got +0',
+    }),
+    entryRow({
+        name: 'guard-imports-config',
+        file: 'src/guards/directEntry.ts',
+        edits: [{ find: "import path from 'path';", replace: "import path from 'path';\nimport '../config';" }],
+        reach: 'child',
+        expected: [ENTRY_TEST_6],
+        messageIncludes: 'to deeply equal [',
+    }),
+    entryRow({
+        name: 'guard-calls-console',
+        file: 'src/guards/directEntry.ts',
+        edits: [{ find: 'process.stderr.write(REFUSAL);', replace: 'console.error(REFUSAL);' }],
+        reach: 'worker',
+        expected: [ENTRY_TEST_6],
+        messageIncludes: 'expected 1 to be +0',
+    }),
+    entryRow({
+        name: 'main-calls-console',
+        file: 'src/main.ts',
+        edits: [{ find: 'process.stderr.write(refusalText(err));', replace: 'console.error(refusalText(err));' }],
+        reach: 'worker',
+        expected: [ENTRY_TEST_6],
+        messageIncludes: 'expected 1 to be +0',
+    }),
+];
+
+export const MUTANTS: MutantRow[] = [...CLI_PREFLIGHT_MUTANTS, ...CLI_NAMES.flatMap(pauseCliMutants), ...CLI_LOCK_MUTANTS, ...CLI_ENTRY_MUTANTS];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
         { title: `${BOT_WIRING_GUARDS} > Test 22: the shared armPositionMonitoring helper calls snapshotLpBaseline BEFORE registerAntiRugPosition`, mutants: ['v2-arm-order', 'v2-exit-monitor-last', 'deliberate-not-armed'] },
@@ -277,12 +459,44 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
         currentTitle: PREFLIGHT_LOAD_TITLE,
         mutants: ['preflight-imports-bot'],
     },
+    ...CLI_NAMES.flatMap((cli) => {
+        const t = pauseTitles(cli);
+        return [
+            { baseTitle: t.noLogBase, currentTitle: t.noLog, mutants: [`${cli}-logs-key`] },
+            { baseTitle: t.notSetBase, currentTitle: t.notSet, mutants: [`${cli}-accepts-argv-key`] },
+            { baseTitle: t.noHardcode, currentTitle: t.noHardcode, mutants: [`${cli}-old-default`] },
+            { baseTitle: t.derives, currentTitle: t.derives, mutants: [`${cli}-old-default`, `${cli}-ignores-port`] },
+            { baseTitle: t.honors, currentTitle: t.honors, mutants: [`${cli}-ignores-url-override`] },
+            { baseTitle: t.connErr, currentTitle: t.connErr, mutants: [`${cli}-conn-error-logs-key`] },
+        ].map((r) => ({ testFile: PAUSE_CLI_TEST, ...r }));
+    }),
+    {
+        // The scan was the last block of the AC-23d test (title unchanged); it is now its own test.
+        testFile: PROCESS_LOCK_TEST,
+        baseTitle: `${PROCESS_LOCK_SUITE} > preflight, pause and resume run while the lock is held and leave it held (AC-23d, E15)`,
+        currentTitle: LOCK_IMPORT_TITLE,
+        mutants: CLI_LOCK_MUTANTS.map((m) => m.name),
+    },
+    { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_4_BASE, currentTitle: ENTRY_TEST_4, mutants: ['main-imports-config', 'main-imports-db', 'main-imports-bot'] },
+    { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_5, currentTitle: ENTRY_TEST_5, mutants: ['bot-guard-not-first', 'bot-direct-start-does-not-refuse'] },
+    { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_6, currentTitle: ENTRY_TEST_6, mutants: ['guard-imports-config', 'guard-calls-console', 'main-calls-console'] },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
     [PREFLIGHT_CLI_TEST]: 1,
+    [PAUSE_CLI_TEST]: 12,
+    [PROCESS_LOCK_TEST]: 1,
+    [MAIN_ENTRY_TEST]: 3,
 };
-export const GUARD_MUTANTS: GuardMutantRow[] = [];
+export const GUARD_MUTANTS: GuardMutantRow[] = [
+    {
+        mutant: 'main-starts-before-lock',
+        guardedTitle: ENTRY_TEST_1,
+        convertedTitle: ENTRY_TEST_4,
+        reason:
+            "Test (4)'s source-text ordering assertion (acquireProcessLock( before opts.startBot() in runMain's text) is now carried by what test (1) observes: a real second process started inside startBot is refused PROCESS_LOCK_HELD, so the lock is already held when the bot starts.",
+    },
+];
 
 // ---------------------------------------------------------------------------
 // runMutant
