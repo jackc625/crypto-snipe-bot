@@ -21,9 +21,12 @@
 // test/unit/guards/singleton.test.ts covers the casing and junction aliases and plain-Node
 // require.cache reloads in railed children; this file pins the guard where the scenarios run.
 //
-// Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything. The query
-// specifiers are built at run time (the module runner resolves them against this file), so no
-// type declaration is needed for a `?query` path.
+// Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything. Every import
+// specifier is a literal (the spawn-site gate, test/unit/rails/spawnSites.test.ts, refuses a
+// computed one); each `?query` copy is a template literal with no substitution, which the module
+// runner resolves against this file (TypeScript has no declaration for it: @ts-expect-error). One fixed query per
+// module is enough: each scenario graph (and restartGraph) starts with vi.resetModules, so the
+// copy is evaluated afresh in every epoch.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -32,16 +35,42 @@ import { createScenario, createTempDbFile, restartGraph } from '../harness/world
 
 interface GuardedModule {
     name: string;
-    /** Import specifier relative to this file. */
-    spec: string;
     fileName: string;
+    /** The graph's own copy of the module (the cached first load). */
+    load: () => Promise<unknown>;
+    /** A second copy: the same file under a `?query` module id, evaluated again. */
+    loadSecond: () => Promise<unknown>;
 }
 
 const GUARDED: GuardedModule[] = [
-    { name: 'nonceAuthority', spec: '../../../src/utils/nonceAuthority', fileName: 'nonceAuthority.ts' },
-    { name: 'exitManager', spec: '../../../src/utils/exitManager', fileName: 'exitManager.ts' },
-    { name: 'exitEngine', spec: '../../../src/exitEngine', fileName: 'exitEngine.ts' },
-    { name: 'antiRugDetector', spec: '../../../src/anti-rug/detector', fileName: 'detector.ts' },
+    {
+        name: 'nonceAuthority',
+        fileName: 'nonceAuthority.ts',
+        load: () => import('../../../src/utils/nonceAuthority'),
+        // @ts-expect-error TS2307: a `?query` module id has no type declaration; it exists only at run time
+        loadSecond: () => import(`../../../src/utils/nonceAuthority?realpath-second-copy`),
+    },
+    {
+        name: 'exitManager',
+        fileName: 'exitManager.ts',
+        load: () => import('../../../src/utils/exitManager'),
+        // @ts-expect-error TS2307: a `?query` module id has no type declaration; it exists only at run time
+        loadSecond: () => import(`../../../src/utils/exitManager?realpath-second-copy`),
+    },
+    {
+        name: 'exitEngine',
+        fileName: 'exitEngine.ts',
+        load: () => import('../../../src/exitEngine'),
+        // @ts-expect-error TS2307: a `?query` module id has no type declaration; it exists only at run time
+        loadSecond: () => import(`../../../src/exitEngine?realpath-second-copy`),
+    },
+    {
+        name: 'antiRugDetector',
+        fileName: 'detector.ts',
+        load: () => import('../../../src/anti-rug/detector'),
+        // @ts-expect-error TS2307: a `?query` module id has no type declaration; it exists only at run time
+        loadSecond: () => import(`../../../src/anti-rug/detector?realpath-second-copy`),
+    },
 ];
 
 interface DuplicateError extends Error {
@@ -51,13 +80,9 @@ interface DuplicateError extends Error {
     secondIdentity?: string;
 }
 
-let copies = 0;
-
 /** Evaluate a second copy of the module in the current graph; resolves to what it threw, or null. */
 async function loadSecondCopy(mod: GuardedModule): Promise<DuplicateError | null> {
-    copies += 1;
-    const spec = `${mod.spec}?realpath-second-copy=${copies}`;
-    return import(/* @vite-ignore */ spec).then(
+    return mod.loadSecond().then(
         () => null,
         (e: unknown) => e as DuplicateError,
     );
@@ -86,8 +111,10 @@ describe('duplicate-load guard (the real registerSingleton) in a scenario graph'
         expectDuplicate(await loadSecondCopy(mod), mod);
         // The refused copy changed nothing: the graph's own module and epoch are the ones it loaded.
         expect(await graphEpoch()).toBe(epoch);
-        const loaded = { nonceAuthority: await import('../../../src/utils/nonceAuthority'), exitManager: sc.graph.exitManager, exitEngine: sc.graph.exitEngine, antiRugDetector: sc.graph.detector } as Record<string, unknown>;
-        expect(await import(/* @vite-ignore */ mod.spec)).toBe(loaded[mod.name]);
+        const graphCopy: Record<string, unknown> = { exitManager: sc.graph.exitManager, exitEngine: sc.graph.exitEngine, antiRugDetector: sc.graph.detector };
+        const first = await mod.load();
+        if (mod.name in graphCopy) expect(first).toBe(graphCopy[mod.name]);
+        expect(await mod.load()).toBe(first);
     });
 
     it('a whole-graph reset (restartGraph, a new epoch) is allowed, every guarded module loads again, and the guard stays armed in the new epoch', async () => {
