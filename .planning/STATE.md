@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-14-PLAN.md
-last_updated: "2026-11-12T02:42:45.100Z"
+stopped_at: Completed 23-16-PLAN.md
+last_updated: "2026-11-12T03:33:43.909Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 8f5163a98634fd3c3e8ffcd6f62929bf10a872d1
+state_head: 13c1a4779b4ce3b7df4aff92d34f1871f3214641
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 46
+  completed_plans: 47
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 15 of 31
+Plan: 16 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -54,17 +54,19 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 ## Blockers / Concerns
 
 - **Phase 23 paused 2026-11-11 after plan 23-07 (10 of 31 plans done, wave 5 partly done):** resume with `/gsd-resume-work`, then `/gsd-execute-phase 23`; the handoff is `.planning/phases/23-test-safety-net-harness-triage-characterization/.continue-here.md`. (The old "merge Phase 22 first" blocker is resolved: PR #2 merged into `main` as 657d27b, and this branch forked from `main`.)
-- **Phase 25 owes the real fork run (UFV-01..UFV-05):** deferred at the Phase 22 UAT on 2026-11-09; Phase 25 success criterion 6 names the five checks. Until then the fork-project halves of the isolation rails are rehearsed only.
+- **Phase 25 owes the real fork run (UFV-01..UFV-05):** deferred at the Phase 22 UAT on 2026-11-09; Phase 25 success criterion 6 names the five checks. Until then the fork-project halves of the isolation rails are rehearsed only. Plan 23-16 added UFV-06..UFV-09 (the fork questions of AUD-ANTIRUG-003, AUD-BUY-015, AUD-BUY-033, AUD-EXIT-003; operator "5. fork questions: all go to Phase 25"), owner Phase 25: criterion 6 must be widened to UFV-01..UFV-09 when Phase 25 is planned.
 - **Phase 24 item (found by the 22 security audit after the seal):** the startup DB probe copies a WAL-mode database to the OS temp folder, and a crash or failed cleanup can leave that copy behind (trade data, no keys). Not in the sealed register; see 22-SECURITY.md.
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
-- **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. The operator does not know whether any chain runs without a WS URL, so exposure on the current setup is unknown.
+- **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. Exposure on the current setup answered at 23-16 (TRIAGE-REVIEW-01, operator "4. ANTIRUG-018: that command you sent me only output "eth ETH_WS_URL set""): eth only with ETH_WS_URL set, so from the code (detector.ts:590-603; no path sets ctx.wsProvider to null while a WS URL is set) the HTTP anti-rug poller never runs and AUD-ANTIRUG-018 is not reachable today; it becomes reachable as soon as a chain without a WS URL is enabled, so fix it (with AUD-BUY-036) before enabling one. Still S1; the WS-path outage findings AUD-ANTIRUG-005 and -002 do apply to this setup.
 - **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected.
-- **AUD-ANTIRUG-025 (new S1, found by 23-06):** every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 interim rule for AUD-BUY-001 ("restart the main bot right after a deliberate buy") restores the exit monitor only, not anti-rug. 23-16 must acknowledge it with the S0/S1 batch and put this to the operator; Phase 24 should fix it with or before AUD-BUY-001. Bot is OFF, so no exposure today.
+- **AUD-ANTIRUG-025 (new S1, found by 23-06):** every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 interim rule for AUD-BUY-001 ("restart the main bot right after a deliberate buy") restores the exit monitor only, not anti-rug. Acknowledged and ruled at 23-16 (TRIAGE-REVIEW-01, operator "3. ANTIRUG-025: option 1"): the interim rule is now "no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025" (decision TRIAGE-REVIEW-01-D1; card OD-26 and ESC-BUY-01 still show the old rule, the review record supersedes them). Phase 24 should fix it with or before AUD-BUY-001. Bot is OFF, so no exposure today.
 
 ## Operating Notes (carry to next session)
 
 - **Bot is OFF for all of v7.0** — no live trading until the milestone's fork rehearsal + live roundtrip re-entry gate passes.
+- **No deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025** (operator ruling at 23-16, TRIAGE-REVIEW-01 decision D1, "3. ANTIRUG-025: option 1"). This replaces the ESC-BUY-01 rule "start the main bot right after any manual buy", which card OD-26 (BUY-01) still shows. No `scripts/deliberate-buy.ts` run or other manual buy until both fixes land.
+- **Phase 23 triage gate is green** (23-16): `check.ts --stage triage` RESULT PASS, all 61 population entries settled, every confirmed S0/S1 acknowledged; Phase 24 can start from it once the remaining Phase 23 plans close.
 - **Phase 22 Node runtime (CONTEXT D-21):** run on Node 22.16.0 by absolute path (`C:\Users\jackc\AppData\Local\nvm\v22.16.0\node.exe`, ABI 127); the global Node 24 cannot load better-sqlite3. No `npm rebuild`.
 - **Phase 22 test ban (CONTEXT D-13):** no `npm test` / `vitest` in the main checkout until the rails land (plan 22-08 is the first sanctioned run; 22-15 the first full-suite run).
 - **Bot start:** `npx ts-node src/main.ts` or `npm start` (the single-instance lock is taken first; `src/bot.ts` refuses to self-start; entry point may change when `ts-node` is replaced this milestone — update this note). **Read-only cold-start check:** `npm run preflight` (there is no dry-run boot mode — never boot src/main.ts or src/bot.ts to "test"). Stop the bot by force-killing the ts-node PID (npx swallows Ctrl+C on Windows+bash).
@@ -130,11 +132,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P12 | 75min | 3 tasks | 17 files |
 | Phase 23 P13 | 39min | 3 tasks | 17 files |
 | Phase 23 P14 | 71min (wall-clock incl. operator wait; continuation 21min) | 2 tasks | 33 files |
+| Phase 23 P16 | ~40min (wall-clock incl. operator wait; continuation 7min) | 3 tasks | 11 files |
 
 ## Session
 
-**Last session:** 2026-11-12T02:42:44.644Z
-**Stopped at:** Completed 23-14-PLAN.md
+**Last session:** 2026-11-12T03:33:18.172Z
+**Stopped at:** Completed 23-16-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -286,3 +289,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-14: AC-13 done. AUD-TX-004, AUD-TX-005, AUD-RAIL-001, AUD-RAIL-002, AUD-TESTU-001, AUD-TESTI-011 and AUD-TESTI-001 closed as fixed through set-triage.ts, each with the exact rail_test title path, a closes-finding marker beside every rail test of one of its reaches, and a RED proof (red-proofs/23-14-1 .. 23-14-8; Phase 22 proofs re-run where the file changed since). AUD-RAIL-001's rail test is forkShellOnly (d), not vitestEnvFile (which does not catch a dotenv call in vitest.config.ts); its note says a recurrence fails the test, not that one is impossible. All 61 population entries now have an outcome (52 confirmed, 8 fixed, 1 unreproduced); the 50 --stage triage FAILs are all 23-16's (44 S0/S1 acknowledgements, 4 fork_refs: AUD-ANTIRUG-003, AUD-BUY-015, AUD-BUY-033, AUD-EXIT-003; the AUD-TX-006 keep-open ruling; the run evidence). For 23-16: rail_test joins title levels with " > " but Vitest JSON fullName joins them with a space, so build the title from ancestorTitles plus title; AUD-TX-005's rail test (processLock.test.ts) and AUD-DB-007's (dbGuards.test.ts) are integration tests that must be in passed_tests. Full railed npm test on Node 22: 1395/1395, nonLoopbackAllowed 0, telegramAllowed 0.
 - [Phase 23]: Wave 5 gate (orchestrator, HEAD 78b3889, Node 22.16.0): tsc --noEmit clean x3; full railed suite 198 files, 1395/1395, wall 136 s, nonLoopbackAllowed 0, telegramAllowed 0, 0 unhandled; check:realpath-mocks and check:vi-mock 0 violations; check.ts partial and consolidation PASS (pending 50); --stage triage 50 FAILs, all owed to 23-16 (44 S0/S1 acknowledgements, 4 fork_refs, the AUD-TX-006 keep-open ruling, the run-evidence file); every one of the 61 population entries has an outcome; verify-schema-drift and ui-safety-gate no block, verify-codebase-drift skipped (no-mapped-commit). Orchestrator scope addition: AUD-ANTIRUG-018 and AUD-ANTIRUG-024 had no owning plan (added to the population by the 23-01 rulings) and were triaged in 23-10.
 - [Phase 23]: Wave 5 timing check: with each test's REAL limit read from its source (per-test/describe options, named constants), no test in the full run is at or over half its limit. The AUD-EXIT-003 file is load-sensitive, not anomalous: alone 1.1 / 9.1 / 1.9 / 0.5 s, full run 2.7 to 6.9x slower; an unrelated unit file (dotenvSrcSkip) slowed up to 3.3x in tests that ran at the run's peak (23-12 crash children). Its tests sit at 13 / 30 / 9 / 13 percent of their limits; no further limit change. Compare hook time with hookTimeout (10 s default), not testTimeout (deferred-items.md).
+- [Phase 23]: 23-16 TRIAGE-REVIEW-01 (.planning/audit/reviews/TRIAGE-REVIEW-01.json): operator reply to the Task 2 checkpoint, verbatim (its five lines shown here separated by " / "; the record keeps the line breaks): "1. acknowledge all 44." / "2. TX-006: keep open" / "3. ANTIRUG-025: option 1" / "4. ANTIRUG-018: that command you sent me only output "eth ETH_WS_URL set"" / "5. fork questions: all go to Phase 25". All 44 confirmed S0/S1 acknowledged (AC-18, incl. AUD-ANTIRUG-025); AUD-TX-006 ruled keep-open (stays candidate/unreproduced, open claim endpoint-still-answers, Phase 29 card TX-03). Item 3 CHANGES the ESC-BUY-01 interim rule for AUD-BUY-001: no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025 (decision TRIAGE-REVIEW-01-D1). Card OD-26 (BUY-01) and ESC-BUY-01 were not edited (no tool writes interim_rule; OPERATOR-DECISIONS.md still matches the Phase 22 seal render hash) and still show the old rule; the review record supersedes them.
+- [Phase 23]: 23-16 AUD-ANTIRUG-018 setup answer (not a ruling, grade stays S1): ENABLED_CHAINS is eth only (or unset, default eth) and ETH_WS_URL is set. From the code the HTTP anti-rug poller never runs on this setup: startChainAntiRugListener falls back to HTTP only when ctx.wsProvider is falsy (detector.ts:590-603), getWsProvider returns null only for an empty URL (provider.ts:33-40, chainRegistry.ts:662/:1066), and every reassignment builds a new WebSocketProvider, never null (detector.ts:923-929, bot.ts:1563-1564, :1605-1606, :1814-1818); no path falls back to HTTP after a WS failure. It becomes reachable once a chain without a WS URL is enabled (same for AUD-BUY-036, bot.ts:1530-1533). The WS-path outage findings AUD-ANTIRUG-005 and AUD-ANTIRUG-002 do apply to this setup.
+- [Phase 23]: 23-16 milestone: check.ts --stage triage RESULT PASS for the first time (fail 0, pending 0; was 49 FAILs); partial and consolidation PASS. All 61 population entries settled: 52 confirmed, 8 fixed, 1 unreproduced (kept open by ruling), 0 NOT-A-BUG; AC-08, AC-10, AC-16, AC-17, AC-18 hold. Fork questions became UFV-06 (AUD-ANTIRUG-003), UFV-07 (AUD-BUY-015), UFV-08 (AUD-BUY-033), UFV-09 (AUD-EXIT-003), owner_phase 25 (number), fork_ref set with set-triage.ts; ROADMAP Phase 25 criterion 6 names only UFV-01..05 and must be widened to UFV-01..09 when Phase 25 is planned. render.ts never renders triage blocks or review records, so AUDIT-FINDINGS.md re-rendered byte-identical (open item in deferred-items.md).
