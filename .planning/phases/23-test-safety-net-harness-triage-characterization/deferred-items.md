@@ -46,3 +46,9 @@
   **Found by:** plan 23-19 (2026-11-12), a strict scratch tsconfig over the files it converted. The same three errors are present in the file at HEAD before 23-19 (checked on a copy of the HEAD version); 23-19 changed none of those lines, and its own new code type-checks clean.
   **What:** no tsconfig compiles test/, so the error never surfaces (the AUD-TESTU-008 class). At run time the missing field is `undefined`, so these tests may exercise a different fee path than their names say; that is for the fixing plan to judge.
   **Why deferred:** outside 23-19's conversion scope (scope boundary rule). A Phase 28 test-hygiene plan that adds a test tsconfig should fix it with the rest of that class (see also the `test/fixtures/api.fixtures.ts` entry above).
+
+- The harness launch helpers `fireNewPair` / `fireNewPool` (`test/realpath/harness/world.ts`, `signLaunch`) sign the deployer's launch by the chain profile (type 2 wherever the profile has a base fee), so a scenario on a legacy-fee node (`node.setFees({ legacy: true })`) cannot launch through them: the node refuses the launch as "transaction type not supported"
+  status: open
+  **Found by:** plan 23-22 (2026-11-12), the `fee-gas-eth-v2-legacy` scenario.
+  **What:** `signLaunch` picks type 0 only when `CHAIN_NODE[chain].baseFeePerGas` is 0 (bsc), not from the node's own fee mode. 23-22 launched its legacy ETH pair with a file-local type-0 launch on the public FakeNode API (`fireLegacyPair` in `test/realpath/scenarios/riskAndFees.test.ts`: same deployer key, router call, reserves and PairCreated log), so no harness change was needed and no Harness Gap was raised (a fixture beside the test could supply it).
+  **Why deferred:** the harness is read-only for scenario plans. A later harness owner can make `signLaunch` follow the node's fee mode and then drop the file-local launch; that would not change any recording (the launch transaction is foreign and is not on the timeline).
