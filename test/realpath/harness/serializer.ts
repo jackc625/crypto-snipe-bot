@@ -41,20 +41,23 @@
 //     checks and before the compare, a call against the real recordings folder appends one line,
 //     the JSON-quoted path relative to that folder with forward slashes (`<name>.jsonl`,
 //     `env/<VAR>.json`), to <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<CSB_RAIL_RUN_ID>/
-//     <pid>-<threadId>.txt, synchronously, so a worker that ends right after cannot lose it. It
-//     records in compare and update runs alike. A call with a `dir` override naming another
+//     <pid>-<token>.txt (token: 8 random hex digits taken when this module loads, so two worker
+//     threads of one process, or two loaded copies of the module, never share a file),
+//     synchronously, so a worker that ends right after cannot lose it. It records in compare and
+//     update runs alike. A call with a `dir` override naming another
 //     folder (the guard's temp-folder cases) is not recorded. CSB_RAIL_RUN_ID is the rails' run id
 //     (test/rails/ledgerRun.ts sets it in the Vitest main process before any worker starts, so
 //     every worker of one invocation shares it; core.cjs keeps it through its env scrub); the
 //     record lives outside the rail ledger folder. Without a valid run id nothing is recorded and
-//     one line says so on stderr. A failed record write is reported once on stderr and never
+//     one line says so on stderr (once per loaded module; Vitest loads it once per test file). A
+//     failed record write is reported once on stderr and never
 //     changes the compare (the check then fails naming the path). Nothing else here changed:
 //     compare and write results are byte-identical to 23-20's.
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { threadId } from 'node:worker_threads';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Transaction, hexlify } from 'ethers';
 import type { TimelineEntry } from './capture';
@@ -322,6 +325,8 @@ function firstDifference(expected: string, actual: string): string {
 export const COMPARED_RECORD_DIRNAME = 'crypto-snipe-bot-recordings-compared';
 // The rails' run-id rule (test/rails/core.cjs RUN_ID_RE, test/rails/ledgerRun.ts).
 const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+// One record file per loaded copy of this module (see the file header).
+const RECORD_TOKEN = randomBytes(4).toString('hex');
 let warnedNoRunId = false;
 let warnedWriteFailed = false;
 
@@ -343,7 +348,7 @@ function recordCompared(file: string, base: string): void {
     try {
         const dir = path.join(os.tmpdir(), COMPARED_RECORD_DIRNAME, runId);
         fs.mkdirSync(dir, { recursive: true });
-        fs.appendFileSync(path.join(dir, `${process.pid}-${threadId}.txt`), `${JSON.stringify(rel)}\n`);
+        fs.appendFileSync(path.join(dir, `${process.pid}-${RECORD_TOKEN}.txt`), `${JSON.stringify(rel)}\n`);
     } catch (e) {
         if (!warnedWriteFailed) {
             warnedWriteFailed = true;

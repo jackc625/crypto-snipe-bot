@@ -18,7 +18,8 @@
 //     operator's Windows checkout it is the same folder, and the serializer could never name it;
 //   - the run's comparison record: compareRecording appends, for every call against the real
 //     recordings folder, the JSON-quoted path relative to that folder to
-//     <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<run id>/<pid>-<threadId>.txt. The run id
+//     <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<run id>/<pid>-<token>.txt (one file per
+//     loaded copy of the serializer, token 8 random hex digits). The run id
 //     is the rails' CSB_RAIL_RUN_ID: test/rails/ledgerRun.ts (the globalSetup of every project)
 //     adopts it from the environment or generates run-<UTC stamp>-<pid>-<6 hex> and sets it in the
 //     Vitest main process before any worker starts, so all workers of ONE vitest invocation share
@@ -81,8 +82,8 @@ export const RECORDINGS_PREFIX = 'test/realpath/recordings/';
 export const RECORD_DIRNAME = 'crypto-snipe-bot-recordings-compared';
 /** The rails' run-id rule (test/rails/core.cjs, test/rails/ledgerRun.ts). */
 const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-/** <pid>-<threadId>.txt, as the serializer names a worker's record file. */
-const RECORD_FILE_RE = /^[0-9]+-[0-9]+\.txt$/;
+/** <pid>-<token>.txt, as the serializer names a record file (token: 8 lower-case hex digits). */
+const RECORD_FILE_RE = /^[0-9]+-[0-9a-f]{8}\.txt$/;
 const RECORDING_EXT_RE = /\.(?:jsonl|json)$/;
 
 const SCOPE_LINE =
@@ -99,7 +100,7 @@ const HELP = [
     '  --run-log <file>  the one run named by a vitest invocation\'s captured output (the realpath',
     '                    project must start and finish in it)',
     '  --sole-run        CI only: the record folder must hold exactly one run',
-    `Records: <os.tmpdir()>/${RECORD_DIRNAME}/<run id>/<pid>-<threadId>.txt.`,
+    `Records: <os.tmpdir()>/${RECORD_DIRNAME}/<run id>/<pid>-<token>.txt.`,
     'Run it after a run that executed every realpath test (CI npm run test:realpath, the wave gate',
     'full suite). A filtered run compares only some recordings and fails here by design.',
     'Exit codes: 0 pass, 1 violation, 2 usage error or broken scan (no record for the run, an empty or',
@@ -218,7 +219,7 @@ export function readRunRecord(root: string, runId: string): RunRecord {
     let files = 0;
     let calls = 0;
     for (const e of names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
-        if (!e.isFile() || !RECORD_FILE_RE.test(e.name)) throw new UsageError(`unexpected entry ${JSON.stringify(e.name)} in the record of run ${runId} (only <pid>-<threadId>.txt files belong there)`);
+        if (!e.isFile() || !RECORD_FILE_RE.test(e.name)) throw new UsageError(`unexpected entry ${JSON.stringify(e.name)} in the record of run ${runId} (only <pid>-<token>.txt files belong there)`);
         const text = fs.readFileSync(path.join(dir, e.name), 'utf8');
         if (text === '') throw new UsageError(`record file ${e.name} of run ${runId} is empty`);
         if (!text.endsWith('\n')) throw new UsageError(`record file ${e.name} of run ${runId} ends in an incomplete line`);
@@ -636,8 +637,9 @@ function selfTestCases(): CaseOutcome[] {
             if (ser.COMPARED_RECORD_DIRNAME !== RECORD_DIRNAME) problems.push(`serializer record folder ${ser.COMPARED_RECORD_DIRNAME} != check ${RECORD_DIRNAME}`);
             const root = path.join(m.tmp, RECORD_DIRNAME);
             const files = fs.existsSync(path.join(root, runId)) ? fs.readdirSync(path.join(root, runId)) : [];
-            const expectFile = `${process.pid}-0.txt`;
-            if (JSON.stringify(files) !== JSON.stringify([expectFile])) problems.push(`record files ${JSON.stringify(files)}, expected [${expectFile}]`);
+            const fileRe = new RegExp(`^${process.pid}-[0-9a-f]{8}\\.txt$`);
+            const expectFile = files.length === 1 && fileRe.test(files[0]) ? files[0] : '';
+            if (!expectFile) problems.push(`record files ${JSON.stringify(files)}, expected one matching ${fileRe}`);
             const lines = files.length ? fs.readFileSync(path.join(root, runId, expectFile), 'utf8') : '';
             const wantLines = ['a.jsonl', 'a.jsonl', 'env/_baseline.json', 'a.jsonl', 'c.jsonl', 'a.jsonl', 'env/NEW.json', 'a.jsonl'].map((l) => `${JSON.stringify(l)}\n`).join('');
             if (lines !== wantLines) problems.push(`record text ${JSON.stringify(lines)}, expected ${JSON.stringify(wantLines)}`);
@@ -721,7 +723,7 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('pass');
         const root = tempRoot('pass-root');
         try {
-            writeRecord(root, 'run-pass', { '101-0.txt': ['a.jsonl', 'env/_baseline.json'], '102-0.txt': ['b.jsonl', 'env/FOO.json', 'a.jsonl'] });
+            writeRecord(root, 'run-pass', { '101-0000000a.txt': ['a.jsonl', 'env/_baseline.json'], '102-0000000b.txt': ['b.jsonl', 'env/FOO.json', 'a.jsonl'] });
             return expectRun('all-tracked-recordings-compared-passes-and-prints-equal-counts', runCase(fx, root, ['--run-id', 'run-pass']), 0, [
                 /^tracked recordings: 4 \(2 scenario \.jsonl, 2 env\/\*\.json\)$/,
                 /^not recordings \(cannot be compared, not judged\): 1 \("\.gitattributes"\)$/,
@@ -739,7 +741,7 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('scen');
         const root = tempRoot('scen-root');
         try {
-            writeRecord(root, 'run-scen', { '101-0.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
+            writeRecord(root, 'run-scen', { '101-0000000a.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
             return expectRun('a-tracked-scenario-never-compared-fails-naming-it', runCase(fx, root, ['--run-id', 'run-scen']), 1, [/^NEVER COMPARED "b\.jsonl": /, /^RESULT FAIL \(1 violation\(s\)\)$/], [/NEVER COMPARED "a\.jsonl"/]);
         } finally {
             fx.cleanup();
@@ -751,7 +753,7 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('env');
         const root = tempRoot('env-root');
         try {
-            writeRecord(root, 'run-env', { '101-0.txt': ['a.jsonl', 'b.jsonl', 'env/FOO.json'] });
+            writeRecord(root, 'run-env', { '101-0000000a.txt': ['a.jsonl', 'b.jsonl', 'env/FOO.json'] });
             return expectRun('an-env-snapshot-file-never-compared-fails-naming-it', runCase(fx, root, ['--run-id', 'run-env']), 1, [/^NEVER COMPARED "env\/_baseline\.json": /, /^RESULT FAIL \(1 violation\(s\)\)$/]);
         } finally {
             fx.cleanup();
@@ -765,7 +767,7 @@ function selfTestCases(): CaseOutcome[] {
         try {
             // c.jsonl is on disk but never added; gone.jsonl exists nowhere.
             fx.put(`${REC}c.jsonl`, '{"scenario":"c","tag":"KEEP"}\n{"submitted":[]}\n');
-            writeRecord(root, 'run-untracked', { '101-0.txt': [...ALL_STANDARD, 'c.jsonl', 'gone.jsonl'] });
+            writeRecord(root, 'run-untracked', { '101-0000000a.txt': [...ALL_STANDARD, 'c.jsonl', 'gone.jsonl'] });
             return expectRun('a-compared-path-that-git-does-not-track-fails-naming-it', runCase(fx, root, ['--run-id', 'run-untracked']), 1, [
                 /^NOT TRACKED "c\.jsonl": compared in run run-untracked \(1 call\(s\)\)/,
                 /^NOT TRACKED "gone\.jsonl": /,
@@ -797,7 +799,7 @@ function selfTestCases(): CaseOutcome[] {
                 return { name, ok: false, detail: `expected the commit check to judge only the swap and pass it, got judged ${JSON.stringify(history.judged)}, ${history.violations.length} violation(s)` };
             }
             // The run after the swap compares only the new name.
-            writeRecord(root, 'run-after-swap', { '101-0.txt': ['flashbots-v2-trailing-b.jsonl'] });
+            writeRecord(root, 'run-after-swap', { '101-0000000a.txt': ['flashbots-v2-trailing-b.jsonl'] });
             const r = expectRun(name, runCase(fx, root, ['--run-id', 'run-after-swap']), 1, [/^NEVER COMPARED "flashbots-v2-trailing\.jsonl": /, /^RESULT FAIL \(1 violation\(s\)\)$/]);
             return r.ok ? { ...r, detail: `commit check passes ${swap.slice(0, 12)} (1 judged, 0 violations); here ${r.detail}` } : r;
         } finally {
@@ -811,11 +813,11 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('stale');
         const root = tempRoot('stale-root');
         try {
-            writeRecord(root, 'run-old', { '101-0.txt': ALL_STANDARD });
+            writeRecord(root, 'run-old', { '101-0000000a.txt': ALL_STANDARD });
             const none = expectRun(name, runCase(fx, root, ['--run-id', 'run-new']), 2, [/no comparison record for run run-new /, /^RESULT BROKEN \(exit 2\)$/], [/RESULT PASS/]);
             if (!none.ok) return none;
             // The new run's partial record is judged alone: the old complete one is not merged in.
-            writeRecord(root, 'run-new', { '201-0.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
+            writeRecord(root, 'run-new', { '201-0000000c.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
             const partial = expectRun(name, runCase(fx, root, ['--run-id', 'run-new']), 1, [/^NEVER COMPARED "b\.jsonl": /], [/RESULT PASS/]);
             return partial.ok ? { name, ok: true, detail: `only run-old recorded: exit 2; run-new partial: exit 1 naming b.jsonl although run-old is complete` } : partial;
         } finally {
@@ -839,8 +841,8 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('log');
         const root = tempRoot('log-root');
         try {
-            writeRecord(root, 'run-old', { '101-0.txt': ALL_STANDARD });
-            writeRecord(root, 'run-20261112T203014-16016-a8301d', { '201-0.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
+            writeRecord(root, 'run-old', { '101-0000000a.txt': ALL_STANDARD });
+            writeRecord(root, 'run-20261112T203014-16016-a8301d', { '201-0000000c.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json'] });
             const log = path.join(root, 'vitest.log');
             fs.writeFileSync(log, LOG_OK('run-20261112T203014-16016-a8301d'));
             const partial = expectRun(name, runCase(fx, root, ['--run-log', log]), 1, [/^check-recordings-compared: run run-20261112T203014-16016-a8301d chosen by --run-log /, /^NEVER COMPARED "b\.jsonl": /]);
@@ -862,8 +864,8 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('badlog');
         const root = tempRoot('badlog-root');
         try {
-            writeRecord(root, 'run-a', { '101-0.txt': ALL_STANDARD });
-            writeRecord(root, 'run-b', { '101-0.txt': ALL_STANDARD });
+            writeRecord(root, 'run-a', { '101-0000000a.txt': ALL_STANDARD });
+            writeRecord(root, 'run-b', { '101-0000000a.txt': ALL_STANDARD });
             const log = path.join(root, 'vitest.log');
             const variants: [string, string, RegExp][] = [
                 ['two runs', `${LOG_OK('run-a')}${LOG_OK('run-b')}`, /names 2 runs \(run-a, run-b\)/],
@@ -894,10 +896,10 @@ function selfTestCases(): CaseOutcome[] {
             const recRoot = path.join(root, RECORD_DIRNAME);
             const missing = expectRun(name, runCase(fx, recRoot, ['--sole-run'], { CI: 'true' }), 2, [/--sole-run: no record folder/]);
             if (!missing.ok) return missing;
-            writeRecord(recRoot, 'run-ci', { '101-0.txt': ALL_STANDARD });
+            writeRecord(recRoot, 'run-ci', { '101-0000000a.txt': ALL_STANDARD });
             const one = expectRun(name, runCase(fx, recRoot, ['--sole-run'], { CI: 'true' }), 0, [/chosen by --sole-run/, /^RESULT PASS \(tracked 4, compared 4\)$/]);
             if (!one.ok) return one;
-            writeRecord(recRoot, 'run-ci-2', { '101-0.txt': ['a.jsonl'] });
+            writeRecord(recRoot, 'run-ci-2', { '101-0000000a.txt': ['a.jsonl'] });
             const two = expectRun(name, runCase(fx, recRoot, ['--sole-run'], { CI: 'true' }), 2, [/--sole-run needs exactly one run in .*, found 2 \(run-ci, run-ci-2\)/], [/RESULT PASS/]);
             return two.ok ? { name, ok: true, detail: 'CI unset: exit 2; no folder: exit 2; one run: exit 0; two runs: exit 2' } : two;
         } finally {
@@ -913,14 +915,15 @@ function selfTestCases(): CaseOutcome[] {
         try {
             const variants: [string, (dir: string) => void, RegExp][] = [
                 ['empty run folder', () => undefined, /holds no comparison/],
-                ['empty file', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), ''), /record file 1-0\.txt of run run-broken is empty/],
-                ['incomplete last line', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '"a.jsonl"\n"b.js'), /ends in an incomplete line/],
-                ['not JSON', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), 'a.jsonl\n'), /line 1: not JSON/],
-                ['not a string', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '{"path":"a.jsonl"}\n'), /is not a recording path/],
-                ['escaping path', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '"../a.jsonl"\n'), /is not a recording path/],
-                ['backslash path', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '"env\\\\FOO.json"\n'), /is not a recording path/],
-                ['wrong extension', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '".gitattributes"\n'), /is not a recording path/],
+                ['empty file', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), ''), /record file 1-0000000d\.txt of run run-broken is empty/],
+                ['incomplete last line', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"a.jsonl"\n"b.js'), /ends in an incomplete line/],
+                ['not JSON', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), 'a.jsonl\n'), /line 1: not JSON/],
+                ['not a string', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"a.jsonl"}\n'), /is not a recording path/],
+                ['escaping path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"../a.jsonl"\n'), /is not a recording path/],
+                ['backslash path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"env\\\\FOO.json"\n'), /is not a recording path/],
+                ['wrong extension', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '".gitattributes"\n'), /is not a recording path/],
                 ['stray file', (d) => fs.writeFileSync(path.join(d, 'notes.md'), 'x\n'), /unexpected entry "notes\.md"/],
+                ['file name not <pid>-<token>.txt', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '"a.jsonl"\n'), /unexpected entry "1-0\.txt"/],
             ];
             for (const [label, make, re] of variants) {
                 const dir = path.join(root, 'run-broken');
@@ -943,7 +946,7 @@ function selfTestCases(): CaseOutcome[] {
         try {
             fx.put('src/app.ts', 'export const a = 1;\n');
             fx.commit('chore: start');
-            writeRecord(root, 'run-norec', { '101-0.txt': ['a.jsonl'] });
+            writeRecord(root, 'run-norec', { '101-0000000a.txt': ['a.jsonl'] });
             return expectRun('no-tracked-recording-exits-2', runCase(fx, root, ['--run-id', 'run-norec']), 2, [/git tracks no recording under test\/realpath\/recordings\//], [/RESULT PASS/]);
         } finally {
             fx.cleanup();
@@ -956,7 +959,7 @@ function selfTestCases(): CaseOutcome[] {
         const fx = standardRepo('noselect');
         const root = tempRoot('noselect-root');
         try {
-            writeRecord(root, 'run-only', { '101-0.txt': ALL_STANDARD });
+            writeRecord(root, 'run-only', { '101-0000000a.txt': ALL_STANDARD });
             for (const [label, argv, re] of [
                 ['no argument', [], /give exactly one of --run-id <id>, --run-log <file>, --sole-run \(got \[\]\); the check never guesses/],
                 ['bad run id', ['--run-id', '../run-only'], /--run-id "\.\.\/run-only" is not a valid run id/],
@@ -980,7 +983,7 @@ function selfTestCases(): CaseOutcome[] {
             const blob = fx.gitInput('{"scenario":"z","tag":"KEEP"}\n{"submitted":[]}\n', 'hash-object', '-w', '--stdin');
             fx.git('update-index', '--add', '--cacheinfo', `100644,${blob},test/realpath/RECORDINGS/z.jsonl`);
             fx.git('commit', '-q', '-m', 'test: a case-variant recording');
-            writeRecord(root, 'run-case', { '101-0.txt': [...ALL_STANDARD, 'z.jsonl'] });
+            writeRecord(root, 'run-case', { '101-0000000a.txt': [...ALL_STANDARD, 'z.jsonl'] });
             return expectRun('a-tracked-path-under-a-letter-case-variant-of-the-folder-fails', runCase(fx, root, ['--run-id', 'run-case']), 1, [
                 /^CASE VARIANT "test\/realpath\/RECORDINGS\/z\.jsonl": /,
                 /^NOT TRACKED "z\.jsonl": /,
