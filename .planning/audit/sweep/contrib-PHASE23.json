@@ -88,6 +88,14 @@
         "AUD-BUY-037"
       ],
       "search": "23-22 real-path fee-gas-eth-v2-reserve-below and -at scenarios (an ETH V2 snipe refused by the affordability clamp at attempt 0, then the buy.snipe.fail-clean line) plus a read of emitSnipeFailClean and both of its callers (git grep -n \"emitSnipeFailClean\" -- src) and of every throw that reaches them through submitWithReconciliation at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-038"
+      ],
+      "search": "23-24 real-path in-process boot (test/realpath/ordering/boot.test.ts: a real V2 snipe, a restart on the same file, then the real startMultiChainBot; resume invocation and completion order read from the logs list and node.callLog on the shared sequence counter) plus a read of startMultiChainBot steps 7 and 7.5, resumeMultiChainMonitoring, resumeAntiRugMonitoring and armPositionMonitoring (git grep -n -e resumeMultiChainMonitoring -e resumeAntiRugMonitoring -- src) at 23a6461 and HEAD"
     }
   ]
 }

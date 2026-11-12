@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-019",
+    "AUD-TX-028",
+    "AUD-ANTIRUG-025"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-24 executor)"
+  ],
+  "found_date": "2026-11-12",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-BUY-038",
+  "title": "The boot does not wait for the exit-monitor resume before it starts the anti-rug resume: startMultiChainBot calls resumeMultiChainMonitoring without awaiting it and that function returns before its balanceOf reads are answered, so the anti-rug resume starts before any exit timer is re-armed, although the comments say exit timers are armed first; today's completion order holds only because the exit side needs one round trip and the allowlist check four (and AUD-TX-028 makes later reads wait)",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1797-1805@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startMultiChainBot calls resumeMultiChainMonitoring(contexts) with no await (it returns void), then awaits resumeAntiRugMonitoring; the comment between them says the lifecycle ordering is intentional, exit-engine first so trailing-stop / stop-loss timers re-arm before the anti-rug detector starts re-evaluating events"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1892-1960@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeMultiChainMonitoring is a synchronous function: for each resumed trade it starts tokenContract.balanceOf(wallet).then(... await resumeExitMonitor ...).catch(...) and neither returns nor collects the promise, so it returns before any exit timer is re-armed"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1985-1987@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "resumeAntiRugMonitoring's doc comment: called AFTER resumeMultiChainMonitoring so the exit-engine timers are armed first before anti-rug events start dispatching; nothing in the code enforces it"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/ordering/boot.test.ts (Node 22.16.0, 2026-11-12, plan 23-24)",
+      "note": "a real in-process startMultiChainBot on the fake ETH chain after a real V2 snipe and a restart on the same file: on the shared sequence counter the anti-rug resume's first allowlist eth_getCode reaches the node before the exit monitor's balanceOf eth_call is even sent and before exit.monitor.resumed is logged (measured C129 getCode, C131 balanceOf, L132 exit.monitor.resumed); the exit timer is still re-armed before 'Anti-rug allowlist verified at startup' (L140) because the allowlist check is four serial getCode round trips, each with the provider's eth_chainId check (AUD-TX-028). The test throws 'AUD-BUY-038 looks fixed' when the first allowlist read comes after exit.monitor.resumed; a scratch src mutation (resumeMultiChainMonitoring async, collecting and awaiting its balance promises, awaited by startMultiChainBot) reads looks fixed alone (restored identical, git hash-object equal to the HEAD blob, git status --porcelain src empty)"
+    }
+  ],
+  "sibling_sites_checked": "The other resume and arm sites at 23a6461 and HEAD: armPositionMonitoring (bot.ts:415-454 at HEAD) awaits startExitMonitor before the baseline and the register, and the V3 snipe and the deliberate buy arm in the same order (pinned on the real path in test/realpath/ordering/boot.test.ts); resumeAntiRugMonitoring (bot.ts:1991-2148 at HEAD) awaits each step; the dashboard onRestart callback re-attaches DEX listeners only (no resume). The exit-worker watchdog is installed after both resumes, the separate finding AUD-EXIT-019. With a held balanceOf the boot never returns under AUD-TX-028 (measured by the first 23-24 executor, 30 virtual seconds still pending), so today a slow exit-side read stalls the anti-rug side too; once AUD-TX-028 is fixed a slow balanceOf no longer holds the allowlist reads, and the anti-rug resume can verify, register and subscribe before any exit timer is re-armed.",
+  "status": "confirmed",
+  "severity_rationale": "S3, capital none, graded by the 23-24 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The boot breaks its own documented ordering: the exit-monitor resume is only invoked first, never completed first, and the order seen today is an accident of round-trip counts and of AUD-TX-028. No capital effect is shown: when both resumes finish every position is exit-monitored and anti-rug-registered, and if the anti-rug side ran first, its escape and the late exit monitor both sell through executeFullSell, which takes the per-token sell lock and reads the wallet balance before it sells (src/exitEngine.ts:834-841 at HEAD). It is misleading behavior that a later fix (AUD-TX-028) or a restructure (Phase 27) can turn into a real boot-time race, so it must be fixed with them.",
+  "recommendation": "Phase 24 (with AUD-TX-028 and AUD-EXIT-019) or Phase 27 (boot restructure): make resumeMultiChainMonitoring return a promise that settles when every balance read and resumeExitMonitor call has finished, and await it in startMultiChainBot before resumeAntiRugMonitoring (installing the exit-worker watchdog before both, AUD-EXIT-019). test/realpath/ordering/boot.test.ts throws 'AUD-BUY-038 looks fixed' and its invocation and completion pins are then updated in a behavior: commit citing this ID. Nothing is fixed in Phase 23."
+}
