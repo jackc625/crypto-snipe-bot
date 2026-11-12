@@ -2206,6 +2206,12 @@
         "to_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
         "findings": "none",
         "note": "Reviewed: Each guarded module is refused on a second load through casing, junction and cache aliases, a whole-graph reset is allowed, and the normal boot shape loads once."
+      },
+      {
+        "from_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff f695363 3ee5205 -- test/unit/guards/singleton.test.ts): one comment line added, the closes-finding marker for AUD-TX-004; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2474,6 +2480,12 @@
         "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
         "findings": "none",
         "note": "Reviewed: Fork files read only the shell and self-assigned values, and the main-process import closure of both Vitest configs loads no env file."
+      },
+      {
+        "from_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 2672559 3ee5205 -- test/unit/rails/forkShellOnly.test.ts): one comment line added, the closes-finding marker for AUD-RAIL-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2596,6 +2608,12 @@
           "AUD-REAUDIT-001"
         ],
         "note": "Reviewed: Real Vitest against a fake .env: no project of either real config exposes it, and a control without extends proves the fake file is readable."
+      },
+      {
+        "from_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff a08d650 3ee5205 -- test/unit/rails/vitestEnvFile.test.ts): one comment line added, the closes-finding marker for AUD-RAIL-001; no test behavior, assertion or mock changed."
       }
     ]
   },

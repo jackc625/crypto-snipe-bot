@@ -4577,7 +4577,7 @@ Escalation tiers (D-16): **immediate** for any S0, any finding tagged `rail` or 
 
 ##### AUD-RAIL-001: Vitest ran in the main checkout on 2026-11-06 at 11:21:39 with the real .env loaded (STL-2)
 
-- **Severity / capital impact / status:** S1 / EXPOSURE / confirmed
+- **Severity / capital impact / status:** S1 / EXPOSURE / fixed
 - **Slice / origin:** RAIL / independent
 - **Classes:** C17 (key handling), C18 (env validation)
 - **Severity rationale:** S1 EXPOSURE: a test run happened with real credentials in reach of non-loopback network code. No capital moved: the bot is OFF and the live DB is unchanged by mtime. Cause per the operator (22-CONTEXT.md D-23 (a)): an automated tool or agent.
@@ -7588,7 +7588,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/exitEngine/sellNonceLock.test.ts | 23a6461 | AUD-TESTU-004 | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/exitEngineSell.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/exitEngineZeroBalance.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
-| test/unit/guards/singleton.test.ts | f695363 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 none |
+| test/unit/guards/singleton.test.ts | f695363 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 none; f695363..3ee5205 none |
 | test/unit/guards/tsconfigCasing.test.ts | b3617f6 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..b3617f6 none |
 | test/unit/helpers.smoke.test.ts | 23a6461 | AUD-TESTU-018 | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/honeypotDispatch.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
@@ -7618,12 +7618,12 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/rails/envSentinel.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
 | test/unit/rails/forkRehearsalParity.test.ts | 64bc832 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=yes, real_state=no; re-audit: 23a6461..64bc832 AUD-REAUDIT-001 |
 | test/unit/rails/forkRpcSource.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
-| test/unit/rails/forkShellOnly.test.ts | 2672559 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..2672559 none |
+| test/unit/rails/forkShellOnly.test.ts | 2672559 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..2672559 none; 2672559..3ee5205 none |
 | test/unit/rails/hardhatChildEnv.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
 | test/unit/rails/netDeny.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
 | test/unit/rails/notifierRefusal.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none |
 | test/unit/rails/spawnSites.test.ts | f695363 | AUD-REAUDIT-003 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 AUD-REAUDIT-003 |
-| test/unit/rails/vitestEnvFile.test.ts | a08d650 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a08d650 AUD-REAUDIT-001 |
+| test/unit/rails/vitestEnvFile.test.ts | a08d650 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a08d650 AUD-REAUDIT-001; a08d650..3ee5205 none |
 | test/unit/receiptDecoder.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/riskManager.test.ts | 23a6461 | AUD-TESTU-015, AUD-TESTU-017 | quality: mocks_mechanism=partial, hollow=no, real_state=no |
 | test/unit/safetyBank/checkHoneypotForChain.test.ts | 23a6461 | AUD-TESTU-001 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
@@ -7725,7 +7725,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/pauseFlow.test.ts | 23a6461 | AUD-TESTI-001, AUD-TESTI-011, AUD-TESTI-014, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=yes, real_state=yes |
 | test/integration/preflightCli.test.ts | 23a6461 | AUD-TESTI-011, AUD-TESTI-014 | quality: mocks_mechanism=no, hollow=yes, real_state=yes; re-audit: 23a6461..fec8ee8 AUD-TESTQ-006, AUD-TESTQ-007, AUD-TESTQ-008, AUD-TESTQ-009, AUD-TESTQ-018 |
 | test/integration/preflightInvocation.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
-| test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none |
+| test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none; a93fd98..3ee5205 none |
 | test/integration/rails/notifierRefusalIntegration.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none |
 | test/integration/rails/railsIntegration.test.ts | 64bc832 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..64bc832 none |
 | test/integration/txManager.test.ts | 23a6461 | AUD-TESTI-002, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=no, real_state=no |

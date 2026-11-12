@@ -2041,6 +2041,12 @@
         "to_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
         "findings": "none",
         "note": "Reviewed: A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed."
+      },
+      {
+        "from_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff a93fd98 3ee5205 -- test/integration/processLock.test.ts): one comment line added, the closes-finding marker for AUD-TX-005; no test behavior, assertion or mock changed."
       }
     ]
   },
