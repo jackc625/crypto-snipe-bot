@@ -237,7 +237,7 @@
     {
       "finding": "AUD-API-002",
       "file": "test/realpath/triage/AUD-API-002.test.ts",
-      "title": "AUD-API-002: dashboard Stop removes the anti-rug subscription and Start does not bring it back > start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the pinned onRestart mirror), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated",
+      "title": "AUD-API-002: dashboard Stop removes the anti-rug subscription and Start does not bring it back > start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the real onRestart of an in-process boot), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated",
       "claim": "start-does-not-rearm-antirug",
       "expected": {
         "antiRugSubscriptionsForPair": 1,

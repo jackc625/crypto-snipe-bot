@@ -54,8 +54,6 @@ const ALLOW_LIST: Record<string, string> = {
         'SPEC Requirement 8 named exception to CHAR-06, as pauseBanner.test.ts (Phase 28, TEST-07).',
     'test/unit/dashboard/anti-rug/interactiveComponents.test.ts':
         'SPEC Requirement 8 named exception to CHAR-06, as pauseBanner.test.ts (Phase 28, TEST-07).',
-    'test/realpath/triage/fixtures/AUD-API-002-restart.ts':
-        'Operator ruling 2026-11-12 (plan 23-19): reads src/bot.ts only to hash the private onRestart closure its mirror copies, which this phase cannot reach without booting the bot; the tests themselves assert behavior. Phase 24 AUD-API-002 fix changes onRestart, the hash then fails by design ("onRestart changed"), and Phase 24 replaces the mirror with the real path and removes this entry (deferred-items.md).',
 };
 
 interface ReadSite {
