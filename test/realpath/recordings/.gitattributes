@@ -1,0 +1,5 @@
+# Golden-master recordings (plan 23-20, D-12, AC-26): keep LF in every checkout.
+# core.autocrlf=true on the operator machine, and the repo-wide .gitattributes pins only
+# .planning/intel, so without this a Windows checkout would write CRLF copies. compareRecording
+# compares raw bytes, so a CRLF checkout would fail every scenario on Windows.
+* text=auto eol=lf
