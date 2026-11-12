@@ -22,7 +22,8 @@
     "db:init": "ts-node scripts/db-init.ts",
     "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts",
     "check:realpath-mocks": "ts-node scripts/check-realpath-mocks.ts",
-    "check:census": "ts-node scripts/check-signing-census.ts"
+    "check:census": "ts-node scripts/check-signing-census.ts",
+    "recordings:update": "ts-node scripts/update-recordings.ts"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",

@@ -54,7 +54,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
 import { Transaction, Wallet, ethers } from 'ethers';
 import type { TimelineEntry } from './harness/capture';
-import { EMPTY_SUBMITTED_LINE, RECORDINGS_DIR, TAG_RE, normalizeForRecording, recordingLine, serializeTimeline, tagIds } from './harness/serializer';
+import {
+    EMPTY_SUBMITTED_LINE,
+    RECORDINGS_DIR,
+    TAG_RE,
+    UPDATE_SWITCH,
+    compareRecording,
+    normalizeForRecording,
+    recordingLine,
+    resolveRecordingPath,
+    serializeTimeline,
+    tagIds,
+    updateAllowed,
+} from './harness/serializer';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const FINDINGS_DIR = path.join(REPO_ROOT, '.planning', 'audit', 'findings');
@@ -549,5 +561,172 @@ describe('serializer (AC-22, AC-26)', () => {
         expect(() => tagIds('SUSPECT(AUD-DB-004,AUD-DB-004)')).toThrow(/twice/);
         expect(() => tagIds('suspect')).toThrow();
         expect(() => serializeTimeline([], { scenario: 'Bad Name', tag: 'KEEP' })).toThrow(/kebab-case/);
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Plan 23-20 Task 3: compare and write (AC-25), order (AC-23)
+// ---------------------------------------------------------------------------------------------
+
+/** Run `fn` with the update switch and CI as given (undefined removes them), restoring both after. */
+function withEnv<T>(env: { update: string | undefined; ci: string | undefined }, fn: () => T): T {
+    const saved = { update: process.env[UPDATE_SWITCH], ci: process.env.CI };
+    const apply = (k: string, v: string | undefined): void => {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+    };
+    apply(UPDATE_SWITCH, env.update);
+    apply('CI', env.ci);
+    try {
+        return fn();
+    } finally {
+        apply(UPDATE_SWITCH, saved.update);
+        apply('CI', saved.ci);
+    }
+}
+
+/** A recording's entry lines: the header and the empty-list line left out. */
+function bodyLines(text: string): string[] {
+    return text.split('\n').filter((l, i) => i > 0 && l !== '' && l !== EMPTY_SUBMITTED_LINE);
+}
+
+describe('compare and write (AC-25), order (AC-23)', () => {
+    it('AC-25: with the update switch unset, a changed input fails naming the first differing line and leaves the temp recording byte-unchanged; an absent one fails and creates nothing', () => {
+        const original = '{"scenario":"x","tag":"KEEP"}\n{"kind":"op","at":1}\n{"submitted":[]}\n';
+        const changed = original.replace('"at":1', '"at":2');
+        const dir = tempRecordings({ 'x.jsonl': original });
+        const file = path.join(dir, 'x.jsonl');
+        const before = fs.readFileSync(file);
+        withEnv({ update: undefined, ci: undefined }, () => {
+            expect(updateAllowed()).toBe(false);
+            expect(compareRecording('x.jsonl', original, { dir })).toBe('match');
+            expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/x\.jsonl differs[\s\S]*first difference at line 2:[\s\S]*"at":1[\s\S]*"at":2/);
+            expect(fs.readFileSync(file).equals(before)).toBe(true);
+            expect(() => compareRecording('y.jsonl', original, { dir })).toThrow(/no recording at y\.jsonl[\s\S]*npm run recordings:update/);
+            expect(fs.existsSync(path.join(dir, 'y.jsonl'))).toBe(false);
+            expect(() => compareRecording('env/SOME_VAR.json', '{}\n', { dir })).toThrow(/no recording at env\/SOME_VAR\.json/);
+            expect(fs.existsSync(path.join(dir, 'env'))).toBe(false);
+            // A carriage return is refused before anything is compared.
+            expect(() => compareRecording('x.jsonl', original.replace('\n', '\r\n'), { dir })).toThrow(/carriage return/);
+        });
+        // CI set: the switch alone never writes.
+        withEnv({ update: '1', ci: 'true' }, () => {
+            expect(updateAllowed()).toBe(false);
+            expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
+            expect(fs.readFileSync(file).equals(before)).toBe(true);
+        });
+        // A switch value other than "1" never writes either.
+        withEnv({ update: 'true', ci: undefined }, () => {
+            expect(updateAllowed()).toBe(false);
+            expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
+            expect(fs.readFileSync(file).equals(before)).toBe(true);
+        });
+        // Only "1" with CI unset writes: what scripts/update-recordings.ts sets up for its one run.
+        withEnv({ update: '1', ci: undefined }, () => {
+            expect(compareRecording('x.jsonl', changed, { dir })).toBe('written');
+            expect(fs.readFileSync(file, 'utf8')).toBe(changed);
+            expect(compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir })).toBe('written');
+            expect(fs.readFileSync(path.join(dir, 'env', 'SOME_VAR.json'), 'utf8')).toBe('{"a":1}\n');
+            expect(compareRecording('x.jsonl', changed, { dir })).toBe('match');
+        });
+    });
+
+    it('a recording path is relative to the recordings folder, carries .jsonl or .json, and cannot leave it', () => {
+        const dir = tempRecordings({});
+        for (const bad of ['../x.jsonl', 'a/../../x.jsonl', path.join(os.tmpdir(), 'x.jsonl'), 'C:/x.jsonl', 'x.txt', 'x', 'a\\x.jsonl', '']) {
+            expect(() => resolveRecordingPath(bad, dir), JSON.stringify(bad)).toThrow();
+        }
+        expect(resolveRecordingPath('env/PRIVATE_KEY.json', dir)).toBe(path.join(dir, 'env', 'PRIVATE_KEY.json'));
+        expect(resolveRecordingPath('flashbots-v2-trailing.jsonl')).toBe(path.join(RECORDINGS_DIR, 'flashbots-v2-trailing.jsonl'));
+    });
+
+    it('AC-25: the update switch is set only by scripts/update-recordings.ts (this file sets it only around its temp-directory cases)', () => {
+        const name = UPDATE_SWITCH;
+        expect(name).toBe('VITEST_CSB_UPDATE_RECORDINGS');
+        const textFile = /\.(?:ts|tsx|js|cjs|mjs|json|yml|yaml|sh)$/;
+        const mentions: string[] = [];
+        const visit = (dir: string): void => {
+            for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (e.name === 'node_modules' || e.name === '.git') continue;
+                const full = path.join(dir, e.name);
+                if (e.isDirectory()) visit(full);
+                else if (textFile.test(e.name) && fs.readFileSync(full, 'utf8').includes(name)) mentions.push(path.relative(REPO_ROOT, full).split(path.sep).join('/'));
+            }
+        };
+        for (const d of ['src', 'scripts', 'test', '.github', 'dashboard']) if (fs.existsSync(path.join(REPO_ROOT, d))) visit(path.join(REPO_ROOT, d));
+        // Top-level files (package.json scripts, vitest.config.ts, ...).
+        for (const e of fs.readdirSync(REPO_ROOT, { withFileTypes: true })) {
+            if (e.isFile() && textFile.test(e.name) && fs.readFileSync(path.join(REPO_ROOT, e.name), 'utf8').includes(name)) mentions.push(e.name);
+        }
+        expect(mentions.sort()).toEqual(['scripts/update-recordings.ts', 'test/realpath/harness/serializer.ts', 'test/realpath/recordingsGuard.test.ts']);
+        // The serializer only reads it: no assignment to process.env anywhere in that file.
+        const serializerText = fs.readFileSync(path.join(REPO_ROOT, 'test', 'realpath', 'harness', 'serializer.ts'), 'utf8');
+        expect(serializerText).not.toMatch(/process\.env(?:\[[^\]]+\]|\.[A-Za-z_]+)\s*=(?!=)/);
+        expect(serializerText).toContain(`'${name}'`);
+    });
+
+    it('AC-23: serializeTimeline keeps the order it was given (same-time entries included), and no committed recording is sorted by content', () => {
+        const entries: TimelineEntry[] = [
+            { kind: 'db', at: 9, table: 'trades', op: 'insert', row: { id: 2n }, inTransaction: false },
+            { kind: 'op', at: 1, level: 'info', op: 'z.last', msg: 'z', fields: { op: 'z.last' }, bindings: {} },
+            { kind: 'relay', at: 5, relay: 'flashbots', url: 'https://relay.flashbots.net', method: 'eth_sendBundle', params: [] },
+            { kind: 'op', at: 5, level: 'info', op: 'a.first', msg: 'a', fields: { op: 'a.first' }, bindings: {} },
+            { kind: 'db', at: 5, table: 'exit_state', op: 'delete', row: { trade_id: 1n }, inTransaction: false },
+        ];
+        const body = bodyLines(serializeTimeline(entries, { scenario: 'order', tag: 'KEEP' })).map((l) => JSON.parse(l) as { kind: string; at: number });
+        expect(body.map((e) => `${e.kind}@${e.at}`)).toEqual(['db@9', 'op@1', 'relay@5', 'op@5', 'db@5']);
+
+        const files = recordingFiles(RECORDINGS_DIR).filter((f) => f.endsWith('.jsonl'));
+        expect(files.length).toBeGreaterThanOrEqual(1);
+        for (const rel of files) {
+            const lines = bodyLines(fs.readFileSync(path.join(RECORDINGS_DIR, rel), 'utf8'));
+            expect(lines.length, rel).toBeGreaterThan(2);
+            expect(lines, `${rel} is in recorded order, not sorted by content`).not.toEqual([...lines].sort());
+            // Never re-ordered by kind either: the kinds interleave as things happened.
+            const kinds = lines.map((l) => (JSON.parse(l) as { kind: string }).kind);
+            expect(kinds, rel).not.toEqual([...kinds].sort());
+        }
+    });
+
+    it('AC-23: the trailing-stop recording holds the known order of a buy and its exit, same-time entries included', () => {
+        type Line = { kind: string; at: number; op?: string; table?: string; route?: string; method?: string; row?: Record<string, unknown>; fields?: Record<string, unknown> };
+        const lines = bodyLines(fs.readFileSync(path.join(RECORDINGS_DIR, 'flashbots-v2-trailing.jsonl'), 'utf8')).map((l) => JSON.parse(l) as Line);
+        const at = (pred: (e: Line) => boolean, what: string): number => {
+            const i = lines.findIndex(pred);
+            expect(i, what).toBeGreaterThanOrEqual(0);
+            return i;
+        };
+        const buyBodies = lines.slice(0, at((e) => e.kind === 'db' && e.table === 'trades' && e.row?.action === 'buy', 'buy row')).filter((e) => e.kind === 'relay' && e.method === 'eth_sendBundle');
+        expect(buyBodies.length).toBeGreaterThanOrEqual(1);
+        const order = [
+            at((e) => e.kind === 'relay' && e.method === 'eth_callBundle', 'buy simulation'),
+            at((e) => e.kind === 'submit' && e.route === 'bundle', 'buy submit'),
+            at((e) => e.kind === 'op' && e.op === 'flashbots.bundle.included', 'buy included'),
+            at((e) => e.kind === 'db' && e.table === 'trades' && e.op === 'insert' && e.row?.action === 'buy', 'buy row (after every relay body: CAP-14)'),
+            at((e) => e.kind === 'db' && e.table === 'exit_state' && e.op === 'insert', 'exit state'),
+            at((e) => e.kind === 'op' && e.op === 'exit.trailing.activated', 'trailing activated'),
+            at((e) => e.kind === 'op' && e.op === 'exit.trigger.trailing-stop', 'trigger'),
+            at((e) => e.kind === 'submit' && e.route === 'public', 'approve'),
+            at((e) => e.kind === 'op' && e.op === 'exit.full.submitted', 'exit submitted'),
+            at((e) => e.kind === 'submit' && e.route === 'bundle' && lines.indexOf(e) > lines.findIndex((x) => x.op === 'exit.full.submitted'), 'sell submit'),
+            at((e) => e.kind === 'op' && e.op === 'exit.full.executed', 'exit executed'),
+            at((e) => e.kind === 'op' && e.op === 'exit.receipt.decoded', 'receipt decoded'),
+            at((e) => e.kind === 'db' && e.table === 'trades' && e.op === 'insert' && e.row?.action === 'sell', 'sell row'),
+            at((e) => e.kind === 'db' && e.table === 'trades' && e.op === 'update' && e.row?.status === 'sold', 'buy row sold'),
+            at((e) => e.kind === 'db' && e.table === 'exit_state' && e.op === 'delete', 'exit state deleted'),
+            at((e) => e.kind === 'op' && e.op === 'antirug.unregister', 'anti-rug unregistered'),
+        ];
+        expect(order).toEqual([...order].sort((a, b) => a - b));
+        expect(new Set(order).size).toBe(order.length);
+        // Same fake-clock time, kept in the order it happened (not sorted by kind): the buy's
+        // inclusion op, its stats relay body, the stats op, then the row.
+        const included = order[2];
+        expect(lines.slice(included, included + 4).map((e) => `${e.kind}:${e.kind === 'db' ? `${e.table}.${e.op}` : e.kind === 'relay' ? e.method : e.op}`)).toEqual([
+            'op:flashbots.bundle.included',
+            'relay:flashbots_getBundleStatsV2',
+            'op:flashbots.bundle.stats',
+            'db:trades.insert',
+        ]);
+        expect(new Set(lines.slice(included, included + 4).map((e) => e.at)).size).toBe(1);
     });
 });
