@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-24-PLAN.md
-last_updated: "2026-11-12T19:05:53.848Z"
+stopped_at: Completed 23-25-PLAN.md
+last_updated: "2026-11-12T19:56:06.297Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 6e374253941a6fd39cde42c4cbd78e8365af115a
+state_head: 2fefcff883a9fcdbdab18e2d3f6e65bb4c62574d
 progress:
   total_phases: 11
   completed_phases: 1
-  total_plans: 60
-  completed_plans: 58
+  total_plans: 61
+  completed_plans: 59
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 25 of 31
+Plan: 26 of 31
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -61,6 +61,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. Exposure on the current setup answered at 23-16 (TRIAGE-REVIEW-01, operator "4. ANTIRUG-018: that command you sent me only output "eth ETH_WS_URL set""): eth only with ETH_WS_URL set, so from the code (detector.ts:590-603; no path sets ctx.wsProvider to null while a WS URL is set) the HTTP anti-rug poller never runs and AUD-ANTIRUG-018 is not reachable today; it becomes reachable as soon as a chain without a WS URL is enabled, so fix it (with AUD-BUY-036) before enabling one. Still S1; the WS-path outage findings AUD-ANTIRUG-005 and -002 do apply to this setup.
 - **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected. **Resolved 2026-11-12 by plan 23-22** under the operator ruling "Record today's skip" (asked by the orchestrator before dispatch): `public-v2-buy.jsonl` records today's skip (header and `{"submitted":[]}`, SUSPECT(AUD-BUY-016)) and its test throws "AUD-BUY-016 looks fixed" when the bot buys; Phase 24's fix re-records it through a behavior: commit citing AUD-BUY-016 (see the 23-22 Decisions line).
 - **AUD-ANTIRUG-025 (new S1, found by 23-06):** every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 interim rule for AUD-BUY-001 ("restart the main bot right after a deliberate buy") restores the exit monitor only, not anti-rug. Acknowledged and ruled at 23-16 (TRIAGE-REVIEW-01, operator "3. ANTIRUG-025: option 1"): the interim rule is now "no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025" (decision TRIAGE-REVIEW-01-D1; card OD-26 and ESC-BUY-01 still show the old rule, the review record supersedes them). Phase 24 should fix it with or before AUD-BUY-001. Bot is OFF, so no exposure today.
+- **23-25 limit raised for an operator ruling (commit taxonomy check):** the check protects recording files, not which file a scenario compares against. A commit that edits a scenario test to compare against a NEW recording name and adds that file passes as a brand-new add, and the old recording stays unchanged and unread (recordingsGuard.test.ts does not fail on an unread recording). Closing it needs a rule about tests (run-level "every recording was compared" record, or a static name check), a design choice outside D-12 and 23-25's files. Recorded in the phase deferred-items.md (status open); candidate owners a Phase 23 follow-up or Phase 28.
 
 ## Operating Notes (carry to next session)
 
@@ -144,11 +145,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P22 | 43min | 2 tasks | 22 files |
 | Phase 23 P23 | 37min | 2 tasks | 110 files |
 | Phase 23 P24 | 43min (continuation; first executor run and operator wait not counted) | 2 tasks | 8 files |
+| Phase 23 P25 | 27min | 2 tasks | 5 files |
 
 ## Session
 
-**Last session:** 2026-11-12T19:05:53.407Z
-**Stopped at:** Completed 23-24-PLAN.md
+**Last session:** 2026-11-12T19:56:05.898Z
+**Stopped at:** Completed 23-25-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -340,3 +342,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-24 operator decision 2A (2026-11-12, operator chose "Pin today's order + log bug (Recommended)"; the label was the executor's and orchestrator's; 2B, holding balanceOf, declined): today's resume order is pinned with no held call, invocation from the plain logs list and node.callLog on the shared sequence counter, completion as the state when startMultiChainBot returns, tagged SUSPECT(AUD-BUY-038, AUD-TX-028). Registered by the 23-24 executor under the standing instruction of 2026-11-11 ("All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading"), no stop: AUD-BUY-038 (S3, capital none, C12, confirmed) the boot does not wait for the exit-monitor resume before the anti-rug resume (bot.ts:1797 and :1892-1960 at 23a6461; the comments at :1799-1804 and :1985-1987 say exit timers come first). Measured: the anti-rug resume's first allowlist eth_getCode reaches the node before the exit monitor's balanceOf is sent; exit.monitor.resumed still precedes "Anti-rug allowlist verified" only because the allowlist check needs four round trips (each with AUD-TX-028's eth_chainId). boot.test.ts throws "AUD-BUY-038 looks fixed" under a fix-shaped mutation (restored identical). Fix with AUD-TX-028 and AUD-EXIT-019 (Phase 24) or in the Phase 27 boot restructure.
 - [Phase 23]: 23-24 contract for later plans (the restart follow-up, Phase 24 and 27): an in-process boot needs only public harness calls: contract code for the HoneypotChecker and every non-dead anti-rug allowlist address, DASHBOARD_API_KEY of 16+ characters (preflight rule 5; test/.env.test's sentinel is 13), DASHBOARD_HOST=127.0.0.1 and DASHBOARD_PORT=0 (a random free port; the bot logs port 0, so read the bound server from Node's tracing:net.server.listen:asyncEnd diagnostics channel). Providers are cached per chain, so the boot shares the scenario context's providers. Before any SIGINT or teardown, settle subscription traffic (no eth_subscribe/eth_unsubscribe for one virtual second), also when the test body failed: a resume boot otherwise leaves AUD-ANTIRUG-025's re-subscribe in flight and teardown cancels it into an unhandled rejection. Realpath tests must import with literal specifiers (test/unit/rails/spawnSites.test.ts refuses a computed import(); a ?query copy is a no-substitution template literal with @ts-expect-error TS2307). Re-confirmed for the restart follow-up: after the in-process boot, real login 200 with a session cookie, POST /api/chains/eth/stop 200 {"ok":true,"chain":"eth","status":"stopped"} (DEX subscriptions 3 to 0), POST /api/chains/eth/start 200 {"ok":true,"chain":"eth","status":"running","warnings":[]} (3 restored through the real onRestart), all 127.0.0.1.
 - [Phase 23]: 23-24 gates: test/realpath/ordering/boot.test.ts (6 tests: fresh boot, resume boot, arm order for a V2 snipe, a V3 snipe and a deliberate buy, and a leak check), sameBlock.test.ts (2: both log orders, first-seen bought, recorded and armed first; AUD-BUY-004 and AUD-BUY-010 kept out by using two tokens under the default limit) and identity.test.ts (5: a same-epoch ?query copy of each guarded module refused with SINGLETON_DUPLICATE, a whole-graph reset allowed and the guard still armed). Full railed npm test on Node 22 (d8a02e0 tree): 209 files, 1558/1558 (unit 950, integration 264, realpath 344), wall 196 s, 0 unhandled, ledger run-20261112T185557-18792-3ea4cb nonLoopbackAllowed 0, telegramAllowed 0; the first full run failed only the spawn-site gate on two computed imports in identity.test.ts (fixed in d8a02e0, gate unchanged). Ordering tests at most 2.19 s of 60 s under load; identity first test 5.19 s, now with an explicit 60 s; backupState self-check 64.8 / 58.5 s of 120 s (not moved by these files). Six JSON-reporter runs identical (13 tests). tsc clean x3 and scratch over test/realpath/**; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS. src/ unchanged.
+- [Phase 23]: 23-25: AUDIT-06 commit taxonomy check in force (npm run check:commits, CI step "Commit taxonomy gate (AUDIT-06)" after the census step; scripts/check-commit-taxonomy.ts). It finds the first recording commit from history (topologically earliest non-merge commit adding a path under test/realpath/recordings/; babd7e4 on this branch) and judges every git rev-list --no-merges <first>..HEAD commit: any non-A status (M, D, T) under the folder (scenarios, env snapshot, .gitattributes; :(icase) pathspec), an A of a lower-case path any ancestor touched (delete and re-add, case variant), or an A that another line of history adds with different content, fails unless the subject begins exactly behavior: or behavior(<scope>):. Every OD-<n> / AUD-<AREA>-<NNN> a behavior: message cites (bounded regex; XAUD-BUY-016, AUD-BUY-0160, OD-05 are not IDs) must exist in that commit's own tree as .planning/audit/findings/<ID>.json or decisions/OD-<n>.json, or the commit fails; no ID fails. Merges are not judged (inner commits are); a merge differing from every parent in the folder prints a WARN line, exit unchanged. Exit 2 on a shallow clone, no recording commit, nothing after it, or any git failure or disagreement. For Phase 24: each re-record (public-v2-buy citing AUD-BUY-016, fee-gas citing AUD-TX-007/AUD-TX-030) is its own behavior: commit, the cited record must be in that commit or earlier, and no unregistered AUD-/OD- ID may appear anywhere in such a message.
+- [Phase 23]: 23-25 gates: self-test 27 of 27 cases on throwaway repos under the OS temp folder (mutation proofs: re-add detection off fails exactly the delete-then-re-add and case-variant cases; parallel-line detection off fails exactly the side-line and unrelated-root cases); real history PASS, 28 commits judged after babd7e4, 129 new paths, 0 changed or removed. test/unit/commitTaxonomyGate.test.ts measured 35.1 s alone and 75.1 s in the full run, child 240 s / test 250 s. Full railed npm test on Node 22 (8b4fbc4 code tree): 210 files, 1559/1559, wall 195 s, nonLoopbackAllowed 0, telegramAllowed 0. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems and --check-floor-history 0; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS with no re_audit row; --stage final 273 FAILs, 4 naming this plan's files (2 new-file ledger rows, package.json and test.yml re_audit), the out-of-scope bookkeeping kind. src/ unchanged. AUDIT-06 left unchecked in REQUIREMENTS.md until 23-26 (which also declares it) has its SUMMARY. No finding registered or regraded.
