@@ -1,0 +1,62 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-029",
+    "AUD-TX-017",
+    "AUD-TX-007"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23",
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-22 executor)"
+  ],
+  "found_date": "2026-11-12",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-BUY-037",
+  "title": "The snipe fail-clean line is fixed text for an exhausted private inclusion whatever ended the snipe: an affordability refusal before any submission is logged as \"hardened private inclusion exhausted\" with attempts 4, a pointer to Flashbots stats lines that do not exist and a remediation to raise the buy fee ceiling or re-buy deliberately",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:360-388@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emitSnipeFailClean logs op buy.snipe.fail-clean with the fixed message 'Snipe FAILED CLEAN: hardened private inclusion exhausted ...', attempts = 4 (the documented budget, :369, not the attempts made), statsRef 'op:flashbots.bundle.stats' on every chain and a remediation to raise MEV_BUY_MAX_PRIORITY_FEE_GWEI or re-attempt as a deliberate buy; only the reason field carries the real cause"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1177-1190@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V2 snipe handler's catch calls it for every error after the buy is built (the V3 handler at :1513 the same), so every strategy throw takes this text: an affordability refusal at attempt 0, a simulation revert, a relay rejection, mined-but-reverted and landed-not-ours as well as a missed inclusion"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:527-543@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the affordability refusal throws before the first submit (op mev.escalation.unaffordable, attempt 0, 'Top up the wallet or lower the snipe amount'), so no bundle, relay call or stats line exists"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/scenarios/riskAndFees.test.ts -t fee-gas-eth-v2-reserve (Node 22.16.0, 2026-11-12, plan 23-22)",
+      "note": "real ETH V2 snipe with the wallet one wei below and exactly at what the affordability clamp needs: mev.escalation.unaffordable at attempt 0, no relay call and no flashbots.bundle.stats line, then buy.snipe.fail-clean with msg 'Snipe FAILED CLEAN: hardened private inclusion exhausted ...', attempts 4 and statsRef op:flashbots.bundle.stats (recordings fee-gas-eth-v2-reserve-below.jsonl and -at.jsonl, line 3). The scenarios throw 'AUD-BUY-037 looks fixed' when the line names its cause; a scratch src mutation of emitSnipeFailClean to a cause-aware message reads looks fixed (restored identical)"
+    }
+  ],
+  "sibling_sites_checked": "Both callers of emitSnipeFailClean at 23a6461 and HEAD (bot.ts:1188 V2, :1513 V3) and every throw that reaches them through the strategies' submitWithReconciliation (reconciliation.ts unaffordable :527-543, mined-but-reverted, landed-not-ours, ceiling-hit, the defensive loop exhaustion; the strategies' simulate and relay throws). The deliberate buy path does not call it. The ceiling-versus-budget confusion inside the reason text is AUD-TX-029; that the helper's own alert never reaches Telegram is AUD-TX-017. On bsc and base the statsRef names a Flashbots op that those routes never log.",
+  "status": "confirmed",
+  "severity_rationale": "S4, capital none, graded by the 23-22 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The bot behaves correctly (nothing is sent, nothing is spent); the operator-facing record misstates what happened. The reason field keeps the real cause and the right remediation ('Top up the wallet or lower the snipe amount'), which is why this is below AUD-TX-029 (S3), whose reason text itself is wrong; but the message, the attempt count, the stats pointer and the remediation all point at a missed inclusion and a fee ceiling that played no part.",
+  "recommendation": "Phase 24 or 29 (with AUD-TX-029): build the fail-clean line from the outcome: name the cause (unaffordable before submit, simulation revert, relay rejection, reverted, landed-not-ours, inclusion budget or ceiling), the attempts actually used, the route's own telemetry op, and a remediation for that cause. test/realpath/scenarios/riskAndFees.test.ts fee-gas-eth-v2-reserve-below and -at throw 'AUD-BUY-037 looks fixed', and the two recordings are re-recorded in a behavior: commit citing this ID. Nothing is fixed in Phase 23."
+}
