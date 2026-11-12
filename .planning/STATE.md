@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-25-PLAN.md
-last_updated: "2026-11-12T19:56:06.297Z"
+stopped_at: Completed 23-32-PLAN.md
+last_updated: "2026-11-12T20:40:44.586Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 2fefcff883a9fcdbdab18e2d3f6e65bb4c62574d
+state_head: d9e632535d7dd59a3645609136cd891829ae704d
 progress:
   total_phases: 11
   completed_phases: 1
-  total_plans: 61
-  completed_plans: 59
+  total_plans: 62
+  completed_plans: 60
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 26 of 33
+Plan: 27 of 33
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -146,11 +146,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P23 | 37min | 2 tasks | 110 files |
 | Phase 23 P24 | 43min (continuation; first executor run and operator wait not counted) | 2 tasks | 8 files |
 | Phase 23 P25 | 27min | 2 tasks | 5 files |
+| Phase 23 P32 | 31min | 2 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-11-12T19:56:05.898Z
-**Stopped at:** Completed 23-25-PLAN.md
+**Last session:** 2026-11-12T20:39:54.151Z
+**Stopped at:** Completed 23-32-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -344,3 +345,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-24 gates: test/realpath/ordering/boot.test.ts (6 tests: fresh boot, resume boot, arm order for a V2 snipe, a V3 snipe and a deliberate buy, and a leak check), sameBlock.test.ts (2: both log orders, first-seen bought, recorded and armed first; AUD-BUY-004 and AUD-BUY-010 kept out by using two tokens under the default limit) and identity.test.ts (5: a same-epoch ?query copy of each guarded module refused with SINGLETON_DUPLICATE, a whole-graph reset allowed and the guard still armed). Full railed npm test on Node 22 (d8a02e0 tree): 209 files, 1558/1558 (unit 950, integration 264, realpath 344), wall 196 s, 0 unhandled, ledger run-20261112T185557-18792-3ea4cb nonLoopbackAllowed 0, telegramAllowed 0; the first full run failed only the spawn-site gate on two computed imports in identity.test.ts (fixed in d8a02e0, gate unchanged). Ordering tests at most 2.19 s of 60 s under load; identity first test 5.19 s, now with an explicit 60 s; backupState self-check 64.8 / 58.5 s of 120 s (not moved by these files). Six JSON-reporter runs identical (13 tests). tsc clean x3 and scratch over test/realpath/**; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS. src/ unchanged.
 - [Phase 23]: 23-25: AUDIT-06 commit taxonomy check in force (npm run check:commits, CI step "Commit taxonomy gate (AUDIT-06)" after the census step; scripts/check-commit-taxonomy.ts). It finds the first recording commit from history (topologically earliest non-merge commit adding a path under test/realpath/recordings/; babd7e4 on this branch) and judges every git rev-list --no-merges <first>..HEAD commit: any non-A status (M, D, T) under the folder (scenarios, env snapshot, .gitattributes; :(icase) pathspec), an A of a lower-case path any ancestor touched (delete and re-add, case variant), or an A that another line of history adds with different content, fails unless the subject begins exactly behavior: or behavior(<scope>):. Every OD-<n> / AUD-<AREA>-<NNN> a behavior: message cites (bounded regex; XAUD-BUY-016, AUD-BUY-0160, OD-05 are not IDs) must exist in that commit's own tree as .planning/audit/findings/<ID>.json or decisions/OD-<n>.json, or the commit fails; no ID fails. Merges are not judged (inner commits are); a merge differing from every parent in the folder prints a WARN line, exit unchanged. Exit 2 on a shallow clone, no recording commit, nothing after it, or any git failure or disagreement. For Phase 24: each re-record (public-v2-buy citing AUD-BUY-016, fee-gas citing AUD-TX-007/AUD-TX-030) is its own behavior: commit, the cited record must be in that commit or earlier, and no unregistered AUD-/OD- ID may appear anywhere in such a message.
 - [Phase 23]: 23-25 gates: self-test 27 of 27 cases on throwaway repos under the OS temp folder (mutation proofs: re-add detection off fails exactly the delete-then-re-add and case-variant cases; parallel-line detection off fails exactly the side-line and unrelated-root cases); real history PASS, 28 commits judged after babd7e4, 129 new paths, 0 changed or removed. test/unit/commitTaxonomyGate.test.ts measured 35.1 s alone and 75.1 s in the full run, child 240 s / test 250 s. Full railed npm test on Node 22 (8b4fbc4 code tree): 210 files, 1559/1559, wall 195 s, nonLoopbackAllowed 0, telegramAllowed 0. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems and --check-floor-history 0; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS with no re_audit row; --stage final 273 FAILs, 4 naming this plan's files (2 new-file ledger rows, package.json and test.yml re_audit), the out-of-scope bookkeeping kind. src/ unchanged. AUDIT-06 left unchecked in REQUIREMENTS.md until 23-26 (which also declares it) has its SUMMARY. No finding registered or regraded.
+- [Phase 23]: 23-32 operator ruling (during wave 13, after the orchestrator corrected its own earlier claim that this phase never boots the bot; the operator chose "Fix it now (Recommended)", the "(Recommended)" label was the orchestrator's): if 23-24's in-process boot works with no harness gap, the restart triage tests move to the real onRestart and the AC-37 allow-list exception goes. Done with no harness gap: test/realpath/triage/fixtures/AUD-API-002-restart.ts withRealBoot (23-24's recipe: deployBootContracts, BOOT_OVERRIDES DASHBOARD_HOST 127.0.0.1 / DASHBOARD_PORT 0 / a 27-character key, the bound port from tracing:net.server.listen, the real login, the end through the boot's own SIGINT listener pinned per operator 1A) now carries every AUD-API-002 and AUD-BUY-008 test, controls included; the dashboard Start route runs the real private onRestart; the mirror, its sha256 and the src/bot.ts read are gone (bootListeners kept for AUD-ANTIRUG-001); test/unit/sourceTextGate.test.ts allows only the 3 named dashboard tests. This supersedes the 23-19 ruling "Allow-list it (Recommended)"; the deferred-items.md entry is resolved.
+- [Phase 23]: 23-32 for Phase 24 and later plans: re-proven on the real boot by fix-shaped src mutations, restored byte for byte. (1) A Stop that removes only the factory listeners reads "AUD-API-002 ... looks fixed" on both claims. (2) An onRestart that also awaits startChainAntiRugListener reads looks fixed on start-does-not-rearm-antirug (the mirror could only say "onRestart changed"). (3) A close handler registered once per DEX and socket reads looks fixed on AUD-BUY-008. (4) A shutdown cleanup that survives its require('./utils/db') reads "TEST-ENVIRONMENT LIMIT LIFTED in test/realpath/triage/fixtures/AUD-API-002-restart.ts". withRealBoot's shutdown pin counts one closed socket rather than naming the provider, because after a reconnect the boot context holds the last writer's provider (AUD-ANTIRUG-001). No position exists at boot, so nothing is resumed (AUD-ANTIRUG-025 kept out), and the boot's only error line is AUD-ANTIRUG-024's gap line (at most once). The AUD-API-002 and AUD-BUY-008 triage notes were refreshed through set-triage.ts (outcome unchanged). triage-evidence.json was regenerated as 23-16 did (3 runs 113/113, 93 tuples; rail run 147/147): its only change is the one title recorded in rails-test-edits.json.
+- [Phase 23]: 23-32 gates: full railed npm test on Node 22 (b59d7f1 tree): 210 files, 1559/1559 (unit 951, integration 264, realpath 344), wall 197 s, 0 unhandled, ledger run-20261112T203014-16016-a8301d nonLoopbackAllowed 0, telegramAllowed 0. The boot tests took at most 5.71 s of 15 s and now have explicit 60 s limits. AC-10: three JSON runs of the restart files identical (7 tests, 6 knownBug records). tsc clean x3 and a scratch tsc over test/realpath/** clean; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check:commits PASS; check.ts partial, consolidation and triage PASS with no re_audit row needed. test-identity 0 missing; AUD-API-002.test.ts postdates its base, so its one rename is recorded but not judged. src/ unchanged; no finding registered or regraded.
