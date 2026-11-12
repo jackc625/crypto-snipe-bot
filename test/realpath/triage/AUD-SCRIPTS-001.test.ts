@@ -33,8 +33,10 @@ import { REPO_ROOT } from '../../rails/spawnRailedChild';
 import { knownBug } from '../harness/knownBug';
 import { buildScriptsProgram, relativeImportSpecifiers, scriptFiles, scriptName, unresolvedRelativeImports } from './fixtures/scriptsStatic';
 
-// Building the program type-loads src/ through the scripts' imports. Measured on Node 22: about 2 s
-// alone (times under the full run are in the plan summary); the realpath default limit is 15 s.
+// Only module resolution is needed here, so the program does not follow imports (noResolve): it parses
+// the walked scripts alone, and each relative specifier is then resolved with ts.resolveModuleName.
+// That keeps this proof light under the full parallel run (measured times are in the plan summary;
+// the realpath default limit is 15 s).
 const PROGRAM_TIMEOUT_MS = 60_000;
 
 // The three artifacts whose Solidity source is gone, so no compile can produce them.
@@ -42,7 +44,7 @@ const NO_SOURCE_ARTIFACTS = ['IWETH.json', 'UniswapV2Factory.json', 'UniswapV2Ro
 
 describe('AUD-SCRIPTS-001: the two legacy scripts import compiled artifacts that do not exist, so neither can load', () => {
     it('legacy-scripts-unresolved-artifact-imports: the compiler cannot resolve relative imports of addLiquidity and deploySepoliaTest', { timeout: PROGRAM_TIMEOUT_MS }, (ctx) => {
-        const run = buildScriptsProgram(REPO_ROOT);
+        const run = buildScriptsProgram(REPO_ROOT, { noResolve: true });
         // The scan itself works (an empty or broken scan must never read as fixed): the walk found
         // scripts, and the compiler resolves relative imports that do exist.
         expect(run.rootNames.length, 'the walk found scripts').toBeGreaterThan(0);
