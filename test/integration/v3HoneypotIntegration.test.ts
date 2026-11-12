@@ -325,7 +325,10 @@ describe('Phase 18 plan 18-10 — bot.ts V3 honeypot gate wiring (HONEY-08 + HON
         quoteExactInputSingleStaticCallMock.mockReset().mockResolvedValue([1000000n]);
     });
 
-    it('Test 3 (iter-2 Blocker #1): V3 honeypot fixture → verdict unsafe → dispatch invoked WITH feeTier + skip', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 1.2 s alone, 10.7 s under the full parallel npm test (wave 6 gate),
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('Test 3 (iter-2 Blocker #1): V3 honeypot fixture → verdict unsafe → dispatch invoked WITH feeTier + skip', { timeout: 45_000 }, async () => {
         simulateHoneypotRoundtripMock.mockResolvedValue({
             verdict: 'unsafe',
             reason: 'V3_SELL_WETH_ZERO',

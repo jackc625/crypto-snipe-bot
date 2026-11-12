@@ -264,7 +264,10 @@ describe('Phase 21.3-06 — deliberate-buy affordability (CR-01 + HI-01) [REAL-P
     // -------------------------------------------------------------------------
     // CR-01: the gate prices the REAL amountInWei, not snipeAmount.
     // -------------------------------------------------------------------------
-    it('CR-01: a deliberate amountInWei (0.05) > snipeAmount (0.01) on a thin wallet is REFUSED at the gate — NO private submit, NO public swap', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 1.6 s alone, 3.3 s under the full parallel npm test (wave 6 gate),
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('CR-01: a deliberate amountInWei (0.05) > snipeAmount (0.01) on a thin wallet is REFUSED at the gate — NO private submit, NO public swap', { timeout: 20_000 }, async () => {
         // Fund the wallet so it covers the DELIBERATE floor priced at the SNIPE
         // amount (what the pre-fix gate prices) but NOT the floor priced at the
         // real 0.05 spend. 1 wei below the real deliberate floor → must refuse.
