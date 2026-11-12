@@ -45,6 +45,12 @@ import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
 import { BOOT_OVERRIDES, chainRoute, deployBootContracts, withRealBoot } from './fixtures/AUD-API-002-restart';
 
+// Each test pays a real boot and, first in the file, the cold import of the bot graph, so each has
+// an explicit limit like test/realpath/ordering/boot.test.ts (a realpath test that times out keeps
+// running into the next test, AUD-TESTI-029). Measured on Node 22.16.0 (plan 23-32): the control
+// 1.21 s and restart-stacks-reconnect-loop 0.12 s alone; 1.39 s and 0.29 s under the full parallel
+// run (210 files).
+const RESTART_TEST_TIMEOUT_MS = 60_000;
 const RECONNECTED = ['WebSocket reconnected, re-subscribed to PairCreated', 'WebSocket reconnected, re-subscribed to V3 PoolCreated'];
 
 /** Reconnect loops that finished for `dex` since log index `from`. */
@@ -67,7 +73,7 @@ async function dropAndWait(sc: Scenario): Promise<number> {
 }
 
 describe('AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX on the same socket', () => {
-    it('control: without a restart, one socket close reconnects each DEX once', async () => {
+    it('control: without a restart, one socket close reconnects each DEX once', { timeout: RESTART_TEST_TIMEOUT_MS }, async () => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
         deployBootContracts(sc);
         await withRealBoot(sc, async () => {
@@ -79,7 +85,7 @@ describe('AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX 
         });
     });
 
-    it('restart-stacks-reconnect-loop: after a dashboard Stop and Start on a connected socket, one socket close runs two reconnect loops for the DEX', async (ctx) => {
+    it('restart-stacks-reconnect-loop: after a dashboard Stop and Start on a connected socket, one socket close runs two reconnect loops for the DEX', { timeout: RESTART_TEST_TIMEOUT_MS }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
         deployBootContracts(sc);
         await withRealBoot(sc, async ({ dash, cookie }) => {

@@ -51,6 +51,12 @@ import { installSellPath } from './fixtures/AUD-EXIT-001-sell-path';
 import { buyAndMine, buyRow, exitQuotes, opEntries, opLogged, waitAntiRugArmed } from './fixtures/AUD-EXIT-002-position';
 import { pullLiquidity } from './fixtures/AUD-EXIT-014-rug';
 
+// Each test pays a real boot and, first in the file, the cold import of the bot graph, so each has
+// an explicit limit like test/realpath/ordering/boot.test.ts (a realpath test that times out keeps
+// running into the next test, AUD-TESTI-029). Measured on Node 22.16.0 (plan 23-32):
+// stop-disarms-antirug 2.25 s and start-does-not-rearm-antirug 0.94 s alone; 5.71 s and 3.36 s
+// under the full parallel run (210 files).
+const RESTART_TEST_TIMEOUT_MS = 60_000;
 const DEAD = '0x000000000000000000000000000000000000dead';
 const V2_PAIR = new Interface(['function transfer(address to, uint256 value) returns (bool)', 'event Transfer(address indexed from, address indexed to, uint256 value)']);
 
@@ -119,7 +125,7 @@ async function rugAfterHeartbeat(sc: Scenario<'v2'>, tradeId: number, fromBroadc
 }
 
 describe('AUD-API-002: dashboard Stop removes the anti-rug subscription and Start does not bring it back', () => {
-    it('stop-disarms-antirug: after the real Stop route, the node holds no anti-rug subscription for the pair, a 95 percent liquidity pull is never evaluated, and the dashboard is still told the chain is connected', async (ctx) => {
+    it('stop-disarms-antirug: after the real Stop route, the node holds no anti-rug subscription for the pair, a 95 percent liquidity pull is never evaluated, and the dashboard is still told the chain is connected', { timeout: RESTART_TEST_TIMEOUT_MS }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
         deployBootContracts(sc);
         await withRealBoot(sc, async ({ dash, cookie }) => {
@@ -156,7 +162,7 @@ describe('AUD-API-002: dashboard Stop removes the anti-rug subscription and Star
         }, { armedToken: sc.token });
     });
 
-    it('start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the real onRestart of an in-process boot), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated', async (ctx) => {
+    it('start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the real onRestart of an in-process boot), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated', { timeout: RESTART_TEST_TIMEOUT_MS }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
         deployBootContracts(sc);
         await withRealBoot(sc, async ({ dash, cookie }) => {
