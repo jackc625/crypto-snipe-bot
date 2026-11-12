@@ -441,7 +441,37 @@ const CLI_ENTRY_MUTANTS: MutantRow[] = [
     }),
 ];
 
-export const MUTANTS: MutantRow[] = [...CLI_PREFLIGHT_MUTANTS, ...CLI_NAMES.flatMap(pauseCliMutants), ...CLI_LOCK_MUTANTS, ...CLI_ENTRY_MUTANTS];
+// Plan 23-30, api-mount: the anti-rug router mount in the real startApiServer.
+const API_ANTIRUG_TEST = 'test/unit/api/antiRug.test.ts';
+const API_MOUNT_SUITE = 'Phase 19 — src/api/server.ts mount';
+const API_MOUNT_TITLE = `${API_MOUNT_SUITE} > Test 6: startApiServer serves antiRugRoutes at /api/anti-rug with its contexts, behind authMiddleware`;
+const API_MOUNT_BASE = `${API_MOUNT_SUITE} > Test 6: mounts antiRugRoutes at /api/anti-rug after the /controls mount`;
+const API_MOUNT_LINE = "apiRouter.use('/anti-rug', antiRugRoutes(contexts));";
+const apiMountRow = (name: string, replace: string): MutantRow => ({
+    name,
+    group: 'api-mount',
+    project: 'unit',
+    testFile: API_ANTIRUG_TEST,
+    only: 'Test 6: startApiServer serves antiRugRoutes',
+    file: 'src/api/server.ts',
+    edits: [{ find: API_MOUNT_LINE, replace }],
+    reach: 'vite',
+    expected: [API_MOUNT_TITLE],
+    messageIncludes: "to deeply equal { ok: true, chain: 'eth' }",
+});
+const API_MOUNT_MUTANTS: MutantRow[] = [
+    apiMountRow('antirug-router-unmounted', ''),
+    apiMountRow('antirug-router-wrong-path', "apiRouter.use('/antirug', antiRugRoutes(contexts));"),
+    apiMountRow('antirug-router-no-contexts', "apiRouter.use('/anti-rug', antiRugRoutes([]));"),
+];
+
+export const MUTANTS: MutantRow[] = [
+    ...CLI_PREFLIGHT_MUTANTS,
+    ...CLI_NAMES.flatMap(pauseCliMutants),
+    ...CLI_LOCK_MUTANTS,
+    ...CLI_ENTRY_MUTANTS,
+    ...API_MOUNT_MUTANTS,
+];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
         { title: `${BOT_WIRING_GUARDS} > Test 22: the shared armPositionMonitoring helper calls snapshotLpBaseline BEFORE registerAntiRugPosition`, mutants: ['v2-arm-order', 'v2-exit-monitor-last', 'deliberate-not-armed'] },
@@ -480,6 +510,8 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
     { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_4_BASE, currentTitle: ENTRY_TEST_4, mutants: ['main-imports-config', 'main-imports-db', 'main-imports-bot'] },
     { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_5, currentTitle: ENTRY_TEST_5, mutants: ['bot-guard-not-first', 'bot-direct-start-does-not-refuse'] },
     { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_6, currentTitle: ENTRY_TEST_6, mutants: ['guard-imports-config', 'guard-calls-console', 'main-calls-console'] },
+    // Plan 23-30.
+    { testFile: API_ANTIRUG_TEST, baseTitle: API_MOUNT_BASE, currentTitle: API_MOUNT_TITLE, mutants: API_MOUNT_MUTANTS.map((m) => m.name) },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
@@ -487,6 +519,7 @@ export const CONVERTED_COUNTS: Record<string, number> = {
     [PAUSE_CLI_TEST]: 12,
     [PROCESS_LOCK_TEST]: 1,
     [MAIN_ENTRY_TEST]: 3,
+    [API_ANTIRUG_TEST]: 1,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [
     {

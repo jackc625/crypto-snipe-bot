@@ -438,6 +438,18 @@
       "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31): the probe loads the module a test found by the symbol it exports, so its path is computed at run time; the gate flagged it in the first full run of the plan (test/integration/fixtures/loadedModulesProbe.ts:66 require with a non-literal specifier).",
       "register_as": "test-quality",
       "found_in_plan": "23-31"
+    },
+    {
+      "file": "test/unit/api/antiRug.test.ts",
+      "test": "Test 6: startApiServer serves antiRugRoutes at /api/anti-rug with its contexts, behind authMiddleware",
+      "it_count_before": 15,
+      "it_count_after": 15,
+      "change": "No longer reads src/api/server.ts. A beforeAll starts the real startApiServer on 127.0.0.1 port 0 with one eth context (its other routers' data sources stubbed as in test/integration/api/wsPush.test.ts); the test sends POST /api/anti-rug/circuit-breaker/eth/reset to the running server: without a session it is 401 Unauthorized and the reset is not called; with a session it returns { ok: true, chain: 'eth' } and resets the same context object startApiServer was given. The old check that this mount comes after the /controls mount is removed: the two prefixes do not overlap, so the order has no effect a request can show (AC-38, named in 23-30-SUMMARY). The describe title is kept (test-identity matches renames on the last title level only).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proofs: mutants antirug-router-unmounted, antirug-router-wrong-path and antirug-router-no-contexts (reach vite), group api-mount.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30",
+      "title_before": "Test 6: mounts antiRugRoutes at /api/anti-rug after the /controls mount",
+      "title_after": "Test 6: startApiServer serves antiRugRoutes at /api/anti-rug with its contexts, behind authMiddleware"
     }
   ]
 }
