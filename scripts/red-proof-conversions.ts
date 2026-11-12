@@ -5,17 +5,36 @@
 // 23-18, 23-31, 23-30 and 23-19 is shown failing under a named mutant of the code it protects.
 //
 // The mutant is applied IN MEMORY: every run passes --config scripts/vitest.in-memory-mutant.config.ts
-// with CSB_MUTANT_SPEC set in that Vitest child's environment only, and the config's plugin edits
-// the module as Vite loads it. Nothing under src/ or scripts/ is written for any proof, so a
-// failure partway cannot leave a production file modified. The SHA-256 of every target file is
-// recorded before the first run and must be equal after the last.
+// with CSB_MUTANT_SPEC set in that Vitest child's environment only. The mutant reaches the code
+// whichever form a conversion took (see the config and scripts/in-memory-mutant-overlay.cjs):
+//   vite    the module as Vite loads it;
+//   worker  a read of the file through fs inside a Vitest worker (a test's own read, or the
+//           TypeScript compiler API);
+//   child   a railed child started through test/rails/spawnRailedChild.ts, whose NODE_OPTIONS gain
+//           one more --require (after the rails preload) that installs the same read overlay.
+// Nothing under src/ or scripts/ is written for any proof, so a failure partway cannot leave a
+// production file modified. The only files written are the runner's own temp folders under
+// os.tmpdir() (the hooks and the reach markers), removed after each run.
 //
 // Usage:
 //   node node_modules/ts-node/dist/bin.js scripts/red-proof-conversions.ts --self-proof
 //
+// runGroup(rows) refuses a proof that is not one, printing one named reason and exiting non-zero:
+//   NOT-APPLIED     a find does not occur exactly once in the file on disk (checked before any run)
+//   NOT-REACHED     the run left no marker for the row's reach
+//   STAYED-GREEN    the run passed
+//   WRONG-SET       the failed tests are not exactly the row's expected titles
+//   BAD-FAILURE     no report, a non-zero exit with no failed test, or a failure that is not an
+//                   assertion carrying messageIncludes, or that mentions a timeout or a compile error
+//   CONTROL-FAILED  a run of the same tests with no mutant did not pass every selected test
+//   HASH-CHANGED    a target file's SHA-256 changed, or git status --porcelain -- src is not empty
+// It prints `RED-OK <mutant> :: <test file> :: <full title>` per failed test only when every row
+// and every control holds.
+//
 // Exports (contracts used by plans 23-18, 23-31, 23-30 and 23-19):
 //   runMutant({ project, testFile, only?, spec? }) -> { status, failed: [{ title, message }], passedCount }
 //     title is the full title path with ' > ' between describe levels; the caller compares.
+//   runGroup(rows), evaluateGroup(rows)
 //   WIRING_MUTANTS, MUTANTS, CONVERTED_TESTS, CONVERTED_COUNTS, GUARD_MUTANTS: empty here, filled
 //     by the conversion plans.
 //
@@ -39,9 +58,14 @@ import * as path from 'path';
 export const REPO_ROOT = path.resolve(__dirname, '..');
 const VITEST_BIN = path.join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs');
 const MUTANT_CONFIG = 'scripts/vitest.in-memory-mutant.config.ts';
+const OVERLAY_PATH = path.join(REPO_ROOT, 'scripts', 'in-memory-mutant-overlay.cjs');
 const SPEC_ENV = 'CSB_MUTANT_SPEC';
 // A Vitest child that has not finished in this time is a failed proof, never a pass.
 const RUN_TIMEOUT_MS = 30 * 60_000;
+// A failure message holding any of these is not an assertion on the behavior.
+const FORBIDDEN_IN_MESSAGE = ['Test timed out', 'SyntaxError', 'TSError', 'Unable to compile'];
+
+const overlay = require(OVERLAY_PATH) as { applyEdits(text: string, edits: MutantEdit[]): string };
 
 // ---------------------------------------------------------------------------
 // Contracts
@@ -52,11 +76,14 @@ export interface MutantEdit {
     replace: string;
 }
 
-/** CSB_MUTANT_SPEC as JSON. */
+/** CSB_MUTANT_SPEC as JSON. root defaults to the repo root in runMutant. */
 export interface MutantSpec {
     file: string;
     edits: MutantEdit[];
     root?: string;
+    ackDir?: string;
+    childHook?: string;
+    workerHook?: string;
 }
 
 export interface MutantRunInput {
@@ -85,6 +112,7 @@ export interface MutantRun {
 }
 
 export type Reach = 'vite' | 'worker' | 'child';
+const REACHES: readonly Reach[] = ['vite', 'worker', 'child'];
 
 /** One mutant row of a conversion group. */
 export interface MutantRow {
@@ -92,11 +120,14 @@ export interface MutantRow {
     group: string;
     project: string;
     testFile: string;
+    /** A -t pattern limiting the run to the tests this row is about. */
     only?: string;
     file: string;
     edits: MutantEdit[];
     reach: Reach;
+    /** The exact full test titles that must fail. */
     expected: string[];
+    /** A substring each failure message must contain, set from the first failing run. */
     messageIncludes: string;
 }
 
@@ -158,6 +189,10 @@ function tail(s: string, n = 4000): string {
     return s.length <= n ? s : s.slice(s.length - n);
 }
 
+function repoRel(p: string): string {
+    return path.relative(REPO_ROOT, p).split(path.sep).join('/');
+}
+
 /** Run one test file through the mutant config. spec absent: CSB_MUTANT_SPEC is removed from the child's env. */
 export function runMutant(input: MutantRunInput): MutantRun {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-red-proof-run-'));
@@ -207,7 +242,7 @@ export function runMutant(input: MutantRunInput): MutantRun {
             }
             // A file that failed with no failed test inside it (a load error, process.exit, a crash).
             if (f.status === 'failed' && !asserts.some((a) => a.status === 'failed')) {
-                const fe = { title: `<file error> ${path.relative(REPO_ROOT, f.name ?? '?').split(path.sep).join('/')}`, message: f.message ?? '' };
+                const fe = { title: `<file error> ${repoRel(f.name ?? '?')}`, message: f.message ?? '' };
                 run.fileErrors.push(fe);
                 run.failed.push(fe);
             }
@@ -219,8 +254,20 @@ export function runMutant(input: MutantRunInput): MutantRun {
 }
 
 // ---------------------------------------------------------------------------
-// Proof checks
+// runGroup
 // ---------------------------------------------------------------------------
+
+export type Refusal = 'NOT-APPLIED' | 'NOT-REACHED' | 'STAYED-GREEN' | 'WRONG-SET' | 'BAD-FAILURE' | 'CONTROL-FAILED' | 'HASH-CHANGED';
+
+export interface GroupResult {
+    ok: boolean;
+    refusal?: Refusal;
+    /** The mutant (or 'group') the refusal is about. */
+    subject?: string;
+    detail?: string;
+    /** RED-OK lines, filled only when ok. */
+    lines: string[];
+}
 
 function sha256(file: string): string {
     return crypto.createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT, file))).digest('hex');
@@ -228,66 +275,212 @@ function sha256(file: string): string {
 
 function gitStatusSrc(): string {
     const r = spawnSync('git', ['status', '--porcelain', '--', 'src'], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true });
-    if (r.status !== 0) return `git status failed: ${r.stderr}`;
+    if (r.status !== 0) return `git status failed (exit ${r.status}): ${r.stderr}`;
     return r.stdout.trim();
 }
 
-function sameSet(a: string[], b: string[]): boolean {
-    const sa = [...new Set(a)].sort();
-    const sb = [...new Set(b)].sort();
-    return sa.length === sb.length && sa.every((x, i) => x === sb[i]) && a.length === sa.length;
+function sameList(actual: string[], expected: string[]): boolean {
+    const a = [...actual].sort();
+    const e = [...expected].sort();
+    return a.length === e.length && a.every((x, i) => x === e[i]);
 }
 
-/** The private rows that prove this plan's mechanism. They name no conversion. */
+function checkRowShape(row: MutantRow): void {
+    const bad = (why: string): never => {
+        throw new Error(`mutant row ${JSON.stringify(row.name)}: ${why}`);
+    };
+    if (typeof row.name !== 'string' || row.name === '') bad('name must be a non-empty string');
+    for (const k of ['group', 'project', 'testFile', 'file', 'messageIncludes'] as const) {
+        if (typeof row[k] !== 'string' || row[k] === '') bad(`${k} must be a non-empty string`);
+    }
+    if (row.only !== undefined && (typeof row.only !== 'string' || row.only === '')) bad('only, when given, must be a non-empty string');
+    if (!REACHES.includes(row.reach)) bad(`reach must be one of ${REACHES.join(', ')}`);
+    if (!Array.isArray(row.edits) || row.edits.length === 0) bad('edits must be a non-empty array');
+    if (!Array.isArray(row.expected) || row.expected.length === 0 || row.expected.some((t) => typeof t !== 'string' || t === '')) {
+        bad('expected must be a non-empty list of full test titles');
+    }
+    if (new Set(row.expected).size !== row.expected.length) bad('expected lists a title twice');
+    if (path.isAbsolute(row.file) || path.isAbsolute(row.testFile)) bad('file and testFile must be repo-relative');
+}
+
+/** The -t pattern selecting every row's tests in one file, or undefined when one row runs the whole file. */
+function controlPattern(rows: MutantRow[]): string | undefined {
+    if (rows.some((r) => r.only === undefined)) return undefined;
+    const pats = [...new Set(rows.map((r) => r.only as string))];
+    return pats.length === 1 ? pats[0] : pats.map((p) => `(?:${p})`).join('|');
+}
+
+/** A one-line hook file that installs the read overlay for this spec. */
+function hookSource(spec: MutantSpec, reach: 'worker' | 'child'): string {
+    return `require(${JSON.stringify(OVERLAY_PATH)}).installOverlay(${JSON.stringify(spec)}, ${JSON.stringify(reach)});\n`;
+}
+
+/** Apply every row and its controls; return the first refusal, or the RED-OK lines. Writes nothing under the repo. */
+export function evaluateGroup(rows: MutantRow[]): GroupResult {
+    if (!Array.isArray(rows) || rows.length === 0) throw new Error('evaluateGroup: no mutant rows');
+    for (const row of rows) checkRowShape(row);
+    const names = rows.map((r) => r.name);
+    if (new Set(names).size !== names.length) throw new Error(`evaluateGroup: a mutant name occurs twice in ${JSON.stringify(names)}`);
+
+    const refuse = (refusal: Refusal, subject: string, detail: string): GroupResult => ({ ok: false, refusal, subject, detail, lines: [] });
+    const files = [...new Set(rows.map((r) => r.file))];
+    const before = new Map(files.map((f) => [f, sha256(f)]));
+    const hashCheck = (subject: string): GroupResult | null => {
+        for (const f of files) if (sha256(f) !== before.get(f)) return refuse('HASH-CHANGED', subject, `SHA-256 of ${f} changed`);
+        const st = gitStatusSrc();
+        if (st !== '') return refuse('HASH-CHANGED', subject, `git status --porcelain -- src is not empty:\n${st}`);
+        return null;
+    };
+    const atStart = hashCheck('group');
+    if (atStart) return atStart;
+
+    // NOT-APPLIED before any run: every find must occur exactly once in the file on disk.
+    for (const row of rows) {
+        try {
+            overlay.applyEdits(fs.readFileSync(path.join(REPO_ROOT, row.file), 'utf8'), row.edits);
+        } catch (e) {
+            return refuse('NOT-APPLIED', row.name, `${row.file}: ${(e as Error).message}`);
+        }
+    }
+
+    const lines: string[] = [];
+    for (const row of rows) {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-red-proof-'));
+        let run: MutantRun;
+        let markers: string[];
+        try {
+            const ackDir = path.join(tmp, 'ack');
+            fs.mkdirSync(ackDir);
+            const spec: MutantSpec = {
+                file: row.file,
+                edits: row.edits,
+                root: REPO_ROOT,
+                ackDir,
+                childHook: path.join(tmp, 'child.cjs'),
+                workerHook: path.join(tmp, 'worker.cjs'),
+            };
+            fs.writeFileSync(spec.childHook as string, hookSource(spec, 'child'));
+            fs.writeFileSync(spec.workerHook as string, hookSource(spec, 'worker'));
+            run = runMutant({ project: row.project, testFile: row.testFile, only: row.only, spec });
+            markers = fs.readdirSync(ackDir);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+        const hashed = hashCheck(row.name);
+        if (hashed) return hashed;
+        if (run.reportError) return refuse('BAD-FAILURE', row.name, `${run.reportError} (exit ${run.status})\n${run.outputTail}`);
+        if (!markers.includes(row.reach)) {
+            return refuse('NOT-REACHED', row.name, `no ${row.reach} marker (markers: ${JSON.stringify(markers.sort())}); exit ${run.status}, failed ${JSON.stringify(run.failed.map((f) => f.title))}`);
+        }
+        if (run.status === 0 && run.failed.length === 0) return refuse('STAYED-GREEN', row.name, `exit 0, ${run.passedCount} passed`);
+        if (run.status === 0 || run.failed.length === 0) {
+            return refuse('BAD-FAILURE', row.name, `exit ${run.status} with ${run.failed.length} failed test(s): not a test failure\n${run.outputTail}`);
+        }
+        const titles = run.failed.map((f) => f.title);
+        if (!sameList(titles, row.expected)) {
+            return refuse('WRONG-SET', row.name, `failed ${JSON.stringify(titles)}, expected ${JSON.stringify(row.expected)}`);
+        }
+        for (const f of run.failed) {
+            const forbidden = FORBIDDEN_IN_MESSAGE.find((s) => f.message.includes(s));
+            if (forbidden !== undefined) return refuse('BAD-FAILURE', row.name, `${f.title}: message mentions ${JSON.stringify(forbidden)}: ${f.message.slice(0, 600)}`);
+            if (!f.message.startsWith('AssertionError')) return refuse('BAD-FAILURE', row.name, `${f.title}: not an assertion failure: ${f.message.slice(0, 600)}`);
+            if (!f.message.includes(row.messageIncludes)) {
+                return refuse('BAD-FAILURE', row.name, `${f.title}: message lacks ${JSON.stringify(row.messageIncludes)}: ${f.message.slice(0, 600)}`);
+            }
+        }
+        for (const t of titles) lines.push(`RED-OK ${row.name} :: ${row.testFile} :: ${t}`);
+    }
+
+    // Controls: each test file once with no mutant; every selected test passes, and each row's expected title is among them.
+    const byFile = new Map<string, MutantRow[]>();
+    for (const row of rows) {
+        const key = `${row.project}\u0000${row.testFile}`;
+        byFile.set(key, [...(byFile.get(key) ?? []), row]);
+    }
+    for (const fileRows of byFile.values()) {
+        const { project, testFile } = fileRows[0];
+        const control = runMutant({ project, testFile, only: controlPattern(fileRows) });
+        const want = [...new Set(fileRows.flatMap((r) => r.expected))];
+        const missing = want.filter((t) => !control.passed.includes(t));
+        if (control.reportError || control.status !== 0 || control.failed.length > 0 || control.passedCount === 0 || missing.length > 0) {
+            const why = control.reportError ?? `exit ${control.status}, failed ${JSON.stringify(control.failed.map((f) => f.title))}, not passed ${JSON.stringify(missing)}`;
+            return refuse('CONTROL-FAILED', `${project}:${testFile}`, `${why}\n${control.outputTail}`);
+        }
+        const hashed = hashCheck(`control ${testFile}`);
+        if (hashed) return hashed;
+    }
+    const atEnd = hashCheck('group');
+    if (atEnd) return atEnd;
+    return { ok: true, lines };
+}
+
+/** Apply each row, print RED-OK lines, and set a non-zero exit code with one named reason on a refusal. */
+export function runGroup(rows: MutantRow[]): GroupResult {
+    const r = evaluateGroup(rows);
+    if (r.ok) {
+        for (const l of r.lines) console.log(l);
+    } else {
+        console.error(`REFUSED ${r.refusal} ${r.subject}: ${r.detail}`);
+        process.exitCode = 1;
+    }
+    return r;
+}
+
+// ---------------------------------------------------------------------------
+// --self-proof: this plan's own mechanism rows. They name no conversion.
+// ---------------------------------------------------------------------------
+
+const DIRECT_ENTRY_TEST = 'test/integration/directEntryGuard.test.ts';
+const GUARD_FILE = 'src/guards/directEntry.ts';
+
 const MECHANISM_MUTANTS: MutantRow[] = [
     {
         name: 'mech-vite',
         group: 'mechanism',
         project: 'integration',
-        testFile: 'test/integration/directEntryGuard.test.ts',
+        testFile: DIRECT_ENTRY_TEST,
         only: 'isDirectEntry compares canonical files',
-        file: 'src/guards/directEntry.ts',
+        file: GUARD_FILE,
         // The plan named `if (mainFile === undefined) return false;` -> `return true;`. Measured:
         // in a Vitest worker require.main is undefined, so the guard's own import-time call refuses
         // and the whole file dies (process.exit) instead of failing this test on an assertion.
         edits: [{ find: 'return canonical(entryFile) === canonical(mainFile);', replace: 'return canonical(entryFile) !== canonical(mainFile);' }],
         reach: 'vite',
         expected: ['direct-entry guard > isDirectEntry compares canonical files'],
-        messageIncludes: 'AssertionError: expected false to be true',
+        messageIncludes: 'expected false to be true',
+    },
+    {
+        name: 'mech-worker',
+        group: 'mechanism',
+        project: 'unit',
+        testFile: 'test/unit/codeQuality.test.ts',
+        only: 'finds zero console.error calls',
+        file: GUARD_FILE,
+        edits: [{ find: 'process.stderr.write(REFUSAL);', replace: 'console.error(REFUSAL);' }],
+        reach: 'worker',
+        expected: ['INFRA-01: no console.log/warn/error in src/ production code > finds zero console.error calls in src/ (excluding scripts/)'],
+        messageIncludes: 'to have a length of +0 but got 1',
+    },
+    {
+        name: 'mech-child',
+        group: 'mechanism',
+        project: 'integration',
+        testFile: DIRECT_ENTRY_TEST,
+        only: 'a direct start refuses before any later import runs',
+        file: GUARD_FILE,
+        edits: [{ find: 'process.stderr.write(REFUSAL);', replace: 'void 0;' }],
+        reach: 'child',
+        expected: ['direct-entry guard > a direct start refuses before any later import runs'],
+        // From the first failing run: the child exits 1 with nothing on stderr. A child that failed
+        // to compile writes its TSError there, so it can never produce an empty stderr.
+        messageIncludes: "expected '' to contain 'Refusing to start'",
     },
 ];
 
 function selfProof(): number {
-    const rows = MECHANISM_MUTANTS;
-    const files = [...new Set(rows.map((r) => r.file))];
-    const before = new Map(files.map((f) => [f, sha256(f)]));
-    const refuse = (name: string, why: string): number => {
-        console.error(`REFUSED ${name}: ${why}`);
-        return 1;
-    };
-    const lines: string[] = [];
-    for (const row of rows) {
-        const run = runMutant({ project: row.project, testFile: row.testFile, only: row.only, spec: { file: row.file, edits: row.edits } });
-        if (run.reportError) return refuse(row.name, `${run.reportError}\n${run.outputTail}`);
-        if (run.status === 0 || run.failed.length === 0) return refuse(row.name, `stayed green (exit ${run.status})`);
-        const titles = run.failed.map((f) => f.title);
-        if (!sameSet(titles, row.expected)) return refuse(row.name, `failed ${JSON.stringify(titles)}, expected ${JSON.stringify(row.expected)}`);
-        for (const f of run.failed) {
-            if (!f.message.startsWith('AssertionError') || !f.message.includes(row.messageIncludes)) {
-                return refuse(row.name, `not an assertion failure carrying ${JSON.stringify(row.messageIncludes)}: ${f.message.slice(0, 400)}`);
-            }
-        }
-        const control = runMutant({ project: row.project, testFile: row.testFile, only: row.only });
-        if (control.reportError || control.status !== 0 || control.failed.length > 0 || !row.expected.every((t) => control.passed.includes(t))) {
-            return refuse(row.name, `no-mutant run did not pass ${JSON.stringify(row.expected)}: exit ${control.status}, failed ${JSON.stringify(control.failed.map((f) => f.title))}\n${control.outputTail}`);
-        }
-        for (const t of titles) lines.push(`RED-OK ${row.name} :: ${row.testFile} :: ${t}`);
-    }
-    for (const f of files) if (sha256(f) !== before.get(f)) return refuse('mechanism', `SHA-256 of ${f} changed`);
-    const st = gitStatusSrc();
-    if (st !== '') return refuse('mechanism', `git status --porcelain -- src is not empty:\n${st}`);
-    for (const l of lines) console.log(l);
-    console.log(`SELF-PROOF-OK rows ${rows.length}`);
+    const r = runGroup(MECHANISM_MUTANTS);
+    if (!r.ok) return 1;
+    console.log(`SELF-PROOF-OK rows ${MECHANISM_MUTANTS.length}`);
     return 0;
 }
 
