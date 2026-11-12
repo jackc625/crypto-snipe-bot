@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-21-PLAN.md
-last_updated: "2026-11-12T16:29:01.828Z"
+stopped_at: Completed 23-22-PLAN.md
+last_updated: "2026-11-12T17:18:41.915Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 1e5f820d978d075d20a990d2808c8ab2aee5c310
+state_head: 4b2455b55a11c5794d364707689e592ceb5c3346
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 55
+  completed_plans: 56
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 22 of 31
+Plan: 23 of 31
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -59,7 +59,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - **ESC-PRE-04 (D-STOP-THE-LINE record, routed to Phase 24):** dashboard emergency-sell/force-sell skip still-held failed-exit positions (traced in 22-04/22-22; fix routed to Phase 24). Recorded at the 2026-11-06 replan; restored here after `state.begin-phase` overwrote Current Position.
 - **Pending decision for Phase 29 (HYG-03), card SCRIPTS-01 (ESC-SCRIPTS-01):** how signing scripts exclude the running bot. The operator answered "Acknowledge. Decide in phase 29" on 2026-11-07. The D-06 premise challenge (try-acquire-then-release leaves a check-then-act race) is open, not resolved, and the D-06 wording is unchanged. Phase 29 must rule on SCRIPTS-01 together with BUY-01 (Phase 24 outcome) before planning HYG-03. hold-lock is recommended.
 - **AUD-ANTIRUG-018 now S1 (23-01, ESC-ANTIRUG-03):** AUD-ANTIRUG-018 is now S1 (HTTP anti-rug poller: a restart does not clear an unchunked over-range poll, about 2 minutes of downtime on ETH triggers it, silent): Phase 24 capital fix (card OD-48), Wave 5 real-path test first. Exposure on the current setup answered at 23-16 (TRIAGE-REVIEW-01, operator "4. ANTIRUG-018: that command you sent me only output "eth ETH_WS_URL set""): eth only with ETH_WS_URL set, so from the code (detector.ts:590-603; no path sets ctx.wsProvider to null while a WS URL is set) the HTTP anti-rug poller never runs and AUD-ANTIRUG-018 is not reachable today; it becomes reachable as soon as a chain without a WS URL is enabled, so fix it (with AUD-BUY-036) before enabling one. Still S1; the WS-path outage findings AUD-ANTIRUG-005 and -002 do apply to this setup.
-- **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected.
+- **23-22 premise (found by 23-28, AUD-BUY-016):** 23-22 Task 1 `public-v2-buy` (chain base) cannot record a buy under today's code: on base and Arbitrum the V2 lock check asks GoPlus about the pair address, reads "not locked" and skips every V2 launch. 23-22's executor must take this to the operator before recording; `public-v3-buy` is unaffected. **Resolved 2026-11-12 by plan 23-22** under the operator ruling "Record today's skip" (asked by the orchestrator before dispatch): `public-v2-buy.jsonl` records today's skip (header and `{"submitted":[]}`, SUSPECT(AUD-BUY-016)) and its test throws "AUD-BUY-016 looks fixed" when the bot buys; Phase 24's fix re-records it through a behavior: commit citing AUD-BUY-016 (see the 23-22 Decisions line).
 - **AUD-ANTIRUG-025 (new S1, found by 23-06):** every boot that resumes an open position drops the anti-rug WebSocket subscription, so the ESC-BUY-01 interim rule for AUD-BUY-001 ("restart the main bot right after a deliberate buy") restores the exit monitor only, not anti-rug. Acknowledged and ruled at 23-16 (TRIAGE-REVIEW-01, operator "3. ANTIRUG-025: option 1"): the interim rule is now "no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025" (decision TRIAGE-REVIEW-01-D1; card OD-26 and ESC-BUY-01 still show the old rule, the review record supersedes them). Phase 24 should fix it with or before AUD-BUY-001. Bot is OFF, so no exposure today.
 
 ## Operating Notes (carry to next session)
@@ -141,11 +141,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P19 | 46min | 2 tasks | 9 files |
 | Phase 23 P20 | 42min | 3 tasks | 12 files |
 | Phase 23 P21 | 22min | 2 tasks | 6 files |
+| Phase 23 P22 | 43min | 2 tasks | 22 files |
 
 ## Session
 
-**Last session:** 2026-11-12T16:29:01.429Z
-**Stopped at:** Completed 23-21-PLAN.md
+**Last session:** 2026-11-12T17:18:41.449Z
+**Stopped at:** Completed 23-22-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -326,3 +327,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-21: five Flashbots V3 recordings committed once each (flashbots-v3-trailing 38d74fd; partial, stop-loss, urgency, anti-rug 294363e), every one SUSPECT, none KEEP (AC-46): trailing, stop-loss, urgency and anti-rug SUSPECT(AUD-ANTIRUG-015,AUD-ANTIRUG-024,AUD-BUY-033,AUD-DB-002,AUD-DB-004,AUD-EXIT-001,AUD-EXIT-003,AUD-EXIT-004,AUD-EXIT-027,AUD-TX-012); partial swaps AUD-ANTIRUG-015 for AUD-EXIT-025. V3 adds AUD-BUY-033 (buy multicall holds only exactInputSingle, no refundETH) and AUD-EXIT-027 (sell pays WETH to the wallet, no unwrap). The V3 anti-rug timeline shows one gate, one dispatch and one exit (the Burn is held in its 5-block grace window and consumed by the Collect), so AUD-ANTIRUG-003 and AUD-EXIT-014 are not cited on V3. No finding registered or regraded; no harness, driver, fixture or guard change.
 - [Phase 23]: 23-21 V3 anti-rug contract for later scenario plans: the rug is the real two-step NPM pull (decreaseLiquidity -> pool Burn(owner NPM), held as antirug.v3-burn-grace-window; one slot later collect -> pool Collect, antirug.v3-burn-collect-paired), file-local burnV3Liquidity/collectV3Liquidity in test/realpath/scenarios/flashbots-v3.test.ts (public FakeNode API only: liquidity() re-served via setRead, virtual reserves moved pro rata). The pull must be deep enough that the held tokens' quote falls below half its pre-pull value (99.9 percent here): at 95 percent it stays near 96 percent and signal 3 trips only through AUD-ANTIRUG-006 sub-claim 1, which would make the recording depend on that bug.
 - [Phase 23]: 23-21 gates: full railed npm test on Node 22 (final tree 294363e): 203 files, 1424/1424, wall 196 s, ledger run-20261112T161922-14976-1e8c4f nonLoopbackAllowed 0, telegramAllowed 0; V3 scenarios at most 3.64 s of 15 s under load; three normal runs and two full runs left every recording byte-identical. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS; --stage final 141 FAILs, 6 from this plan (TESTI ledger rows for the 6 new files). backupState self-check measured 62.3 / 69.5 s of 120 s (52 / 58 percent; watch item, not this plan's).
+- [Phase 23]: 23-22 operator ruling (asked by the orchestrator before dispatch, 2026-11-12; the operator chose "Record today's skip (Recommended)", the label was the orchestrator's): public-v2-buy records today's AUD-BUY-016 skip on base, not a buy. The recording is the header and the exact {"submitted":[]} line, tagged SUSPECT(AUD-BUY-016) (the skip line has no op, so it is not on the timeline); assertComplete proves the skip (locked:false the only failed check, GoPlus asked about the pair only, the checker read, nothing sent, no trades row) and the test throws "AUD-BUY-016 looks fixed" when the bot buys. Phase 24's fix re-records it as the base V2 buy on route public through a behavior: commit citing AUD-BUY-016. This resolves the Blockers/Concerns line "23-22 premise (found by 23-28, AUD-BUY-016)". public-full-sell buys through base V3 (no lock check there).
+- [Phase 23]: 23-22: twelve recordings committed once each (bloxroute-v2-buy, -v3-buy, -full-sell, public-v2-buy, public-v3-buy, public-full-sell in 958f5df; risk-gate-refused, fee-gas-eth-v2, -reserve-below, -reserve-at, -reserve-above, fee-gas-eth-v2-legacy in 77e4175). Only risk-gate-refused is KEEP (two rows seeded through the real insertTrade under MAX_OPEN_POSITIONS 2, refused with max_positions before the safety bank, then {"submitted":[]}). bsc and base run at their own block time in a file-local driveBlocks (BSC 0.75 s, Base 2 s) that lands bloXroute-accepted transactions (driver.ts driveSlots cannot); route proofs: the checker read, the signed tx hash equal to the route's answer and the stored hash, mined in node.history, the receipt read, and on the public route the row only after the three tx.wait(3) confirmations. The reserve trio sits on the real clamp boundary (0.16 ETH at a 30 gwei base, 2 gwei priority and a 1 000 000-gas estimate so the entry gate passes); a moved boundary fails naming AUD-TX-007, -021 and -027. recordingsGuard.test.ts gained one AC-51 rule (bloXroute's bare-hex relayHash.txHash, only equal to the line's signedTxHash) and an AC-23 scope fix (not-sorted needs a submission or 3+ lines of 2+ kinds; every recording keeps time order).
+- [Phase 23]: 23-22 registered two findings under the operator's standing instruction of 2026-11-11 ("All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading"), no stop: AUD-TX-030 (S4, capital none) the Flashbots legacy-fee branch (flashbots.ts:213-216 at 23a6461) sends the raw gasPrice and drops the helper's clamped fee, the CR-01 bypass passthrough and bloXroute removed (unreachable on ETH today); AUD-BUY-037 (S4, capital none) emitSnipeFailClean is fixed inclusion-exhausted text (attempts 4, a Flashbots statsRef, a raise-the-ceiling remediation) whatever ended the snipe, an affordability refusal before any submit included. Both confirmed with real-path recordings (fee-gas-eth-v2-legacy line 4; reserve-below and -at line 3) and named "looks fixed" signals proven by fix-shaped src mutations (restored identical); ledger rows, sweep contribution, AUDIT-FINDINGS.md re-rendered.
+- [Phase 23]: 23-22 gates: full railed npm test on Node 22 twice: Task 1 tree 204 files 1430/1430 wall 181 s (run-20261112T165002-13604-eb67a9), final tree 205 files 1436/1436 wall 192 s (run-20261112T170854-6236-3f9a87), both nonLoopbackAllowed 0, telegramAllowed 0, every recording byte-identical; this plan's slowest test 1.87 s of 15 s; backupState self-check 52.2 / 59.5 s of 120 s (43 / 50 percent, watch item). Three normal runs identical (25 tests, same digest). tsc clean x3 and scratch over test/realpath/**; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS; --stage final 155 FAILs, 14 from this plan (TESTI rows for the 12 recordings and 2 scenario files, the out-of-scope bookkeeping kind). New deferred item: the harness launch helpers cannot launch on a legacy-fee node (23-22 used a file-local type-0 launch).

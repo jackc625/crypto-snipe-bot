@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 26/31 plans executed in 15 execution waves
+**Plans**: 27/31 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -286,7 +286,7 @@ Plans:
 - [x] 23-20-PLAN.md — Recording format and update command; Flashbots V2 with all five exits (AC-20 to AC-26)
 **Wave 13**
 - [x] 23-21-PLAN.md — Flashbots V3 recordings
-- [ ] 23-22-PLAN.md — bloXroute and public routes, risk gate, fee and gas recordings (AC-19, AC-22)
+- [x] 23-22-PLAN.md — bloXroute and public routes, risk gate, fee and gas recordings (AC-19, AC-22)
 - [ ] 23-23-PLAN.md — Env-matrix snapshot across config, chain registry and risk manager (AC-27 to AC-29)
 - [ ] 23-24-PLAN.md — Boot, resume and arm ordering, listener counts, same-block order, singleton identity (AC-30, AC-31)
 **Wave 14**
@@ -602,7 +602,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
-| 23. Test Safety Net (Harness, Triage, Characterization) | 26/31 | In Progress | - |
+| 23. Test Safety Net (Harness, Triage, Characterization) | 27/31 | In Progress | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
 | 26. Toolchain & ESM | 0/TBD | Not started | - |
