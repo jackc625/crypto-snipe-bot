@@ -135,7 +135,7 @@ export interface MutantRow {
     group: string;
     project: string;
     testFile: string;
-    /** A -t pattern limiting the run to the tests this row is about. */
+    /** A -t pattern limiting the run to the tests this row is about. Vitest reads it as a regular expression (new RegExp), so escape ( ) [ ] . * + ? in titles. */
     only?: string;
     file: string;
     edits: MutantEdit[];
@@ -387,7 +387,10 @@ export function evaluateGroup(rows: MutantRow[]): GroupResult {
         if (!markers.includes(row.reach)) {
             return refuse('NOT-REACHED', row.name, `no ${row.reach} marker (markers: ${JSON.stringify(markers.sort())}); exit ${run.status}, failed ${JSON.stringify(run.failed.map((f) => f.title))}`);
         }
-        if (run.status === 0 && run.failed.length === 0) return refuse('STAYED-GREEN', row.name, `exit 0, ${run.passedCount} passed`);
+        if (run.status === 0 && run.failed.length === 0) {
+            const none = run.passedCount === 0 ? ': no test was selected (only is a -t regular expression; escape ( ) [ ] . * + ? in titles)' : '';
+            return refuse('STAYED-GREEN', row.name, `exit 0, ${run.passedCount} passed${none}`);
+        }
         if (run.status === 0 || run.failed.length === 0) {
             return refuse('BAD-FAILURE', row.name, `exit ${run.status} with ${run.failed.length} failed test(s): not a test failure\n${run.outputTail}`);
         }
