@@ -465,12 +465,62 @@ const API_MOUNT_MUTANTS: MutantRow[] = [
     apiMountRow('antirug-router-no-contexts', "apiRouter.use('/anti-rug', antiRugRoutes([]));"),
 ];
 
+// Plan 23-30, antirug-config: the anti-rug entries of the private REQUIRED_ENV_VARS list.
+const ANTIRUG_CONFIG_TEST = 'test/unit/chainRegistry/antiRugConfig.test.ts';
+const ANTIRUG_CONFIG_SUITE = 'Phase 19 plan 19-02 Task 2 — config.ts + .env.example';
+const ANTIRUG_CONFIG_T19 = `${ANTIRUG_CONFIG_SUITE} > Test 19: REQUIRED_ENV_VARS has >= 32 entries matching /^[A-Z]+_ANTIRUG_/`;
+const ANTIRUG_CONFIG_T20 = `${ANTIRUG_CONFIG_SUITE} > Test 20: Every new ANTIRUG entry in REQUIRED_ENV_VARS has required: false`;
+const ANTIRUG_CONFIG_T21 = `${ANTIRUG_CONFIG_SUITE} > Test 21: Every new ANTIRUG entry has a non-empty description`;
+const configRow = (row: Omit<MutantRow, 'group' | 'project' | 'testFile' | 'file'>): MutantRow => ({
+    group: 'antirug-config',
+    project: 'unit',
+    testFile: ANTIRUG_CONFIG_TEST,
+    file: 'src/config.ts',
+    ...row,
+});
+const BASE_ANTIRUG_FIRST = "    { name: 'BASE_ANTIRUG_LIVE_EXECUTE',";
+const GOING_LIVE_HEADER = '    // --- Going-Live Ops Hardening (Phase 20, plan 20-02) ---';
+const ETH_CONFIRM_DESCRIPTION =
+    "{ name: 'ETH_ANTIRUG_CONFIRM_BLOCKS', required: false, description: 'Anti-rug confirm-after-N-blocks delay before exit fires on ETH (default: 1; higher values for reorg-volatile chains)' },";
+const ANTIRUG_CONFIG_MUTANTS: MutantRow[] = [
+    // A block comment over the Base and Arbitrum entries leaves 22 of 44 (one chain alone would
+    // leave 33, which Test 19's floor of 32 still accepts).
+    configRow({
+        name: 'antirug-entries-dropped',
+        only: 'Test 19: REQUIRED_ENV_VARS has',
+        edits: [
+            { find: BASE_ANTIRUG_FIRST, replace: `/*csb-drop\n${BASE_ANTIRUG_FIRST}` },
+            { find: GOING_LIVE_HEADER, replace: `csb-drop*/\n${GOING_LIVE_HEADER}` },
+        ],
+        reach: 'worker',
+        expected: [ANTIRUG_CONFIG_T19],
+        messageIncludes: 'expected 22 to be greater than or equal to 32',
+    }),
+    configRow({
+        name: 'antirug-entry-required',
+        only: 'Test 20: Every new ANTIRUG entry',
+        edits: [{ find: "{ name: 'ETH_ANTIRUG_LP_REMOVAL_PCT', required: false,", replace: "{ name: 'ETH_ANTIRUG_LP_REMOVAL_PCT', required: true," }],
+        reach: 'vite',
+        expected: [ANTIRUG_CONFIG_T20],
+        messageIncludes: "expected [ 'ETH_ANTIRUG_LP_REMOVAL_PCT' ] to deeply equal []",
+    }),
+    configRow({
+        name: 'antirug-entry-empty-description',
+        only: 'Test 21: Every new ANTIRUG entry has',
+        edits: [{ find: ETH_CONFIRM_DESCRIPTION, replace: "{ name: 'ETH_ANTIRUG_CONFIRM_BLOCKS', required: false, description: '' }," }],
+        reach: 'worker',
+        expected: [ANTIRUG_CONFIG_T21],
+        messageIncludes: "expected [ 'ETH_ANTIRUG_CONFIRM_BLOCKS' ] to deeply equal []",
+    }),
+];
+
 export const MUTANTS: MutantRow[] = [
     ...CLI_PREFLIGHT_MUTANTS,
     ...CLI_NAMES.flatMap(pauseCliMutants),
     ...CLI_LOCK_MUTANTS,
     ...CLI_ENTRY_MUTANTS,
     ...API_MOUNT_MUTANTS,
+    ...ANTIRUG_CONFIG_MUTANTS,
 ];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
@@ -512,6 +562,9 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
     { testFile: MAIN_ENTRY_TEST, baseTitle: ENTRY_TEST_6, currentTitle: ENTRY_TEST_6, mutants: ['guard-imports-config', 'guard-calls-console', 'main-calls-console'] },
     // Plan 23-30.
     { testFile: API_ANTIRUG_TEST, baseTitle: API_MOUNT_BASE, currentTitle: API_MOUNT_TITLE, mutants: API_MOUNT_MUTANTS.map((m) => m.name) },
+    { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T19, currentTitle: ANTIRUG_CONFIG_T19, mutants: ['antirug-entries-dropped'] },
+    { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T20, currentTitle: ANTIRUG_CONFIG_T20, mutants: ['antirug-entry-required'] },
+    { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T21, currentTitle: ANTIRUG_CONFIG_T21, mutants: ['antirug-entry-empty-description'] },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
@@ -520,6 +573,7 @@ export const CONVERTED_COUNTS: Record<string, number> = {
     [PROCESS_LOCK_TEST]: 1,
     [MAIN_ENTRY_TEST]: 3,
     [API_ANTIRUG_TEST]: 1,
+    [ANTIRUG_CONFIG_TEST]: 3,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [
     {

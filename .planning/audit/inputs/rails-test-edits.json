@@ -450,6 +450,36 @@
       "found_in_plan": "23-30",
       "title_before": "Test 6: mounts antiRugRoutes at /api/anti-rug after the /controls mount",
       "title_after": "Test 6: startApiServer serves antiRugRoutes at /api/anti-rug with its contexts, behind authMiddleware"
+    },
+    {
+      "file": "test/unit/chainRegistry/antiRugConfig.test.ts",
+      "test": "Phase 19 plan 19-02 Task 2 — config.ts + .env.example > Test 19: REQUIRED_ENV_VARS has >= 32 entries matching /^[A-Z]+_ANTIRUG_/",
+      "it_count_before": 26,
+      "it_count_after": 26,
+      "change": "Title unchanged. No longer reads src/config.ts as text: a directory walk of src/ (test/helpers/sourceGraph.ts loadRepoModules) must find exactly one variable declaration named REQUIRED_ENV_VARS, and at least 32 entries of its array literal must have a name matching ^[A-Z]+_ANTIRUG_ (44 at HEAD). Explicit 60000 ms limit (compiler structures over src/).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). REQUIRED_ENV_VARS is not exported and no runtime code reads these entries' names, so a symbol lookup that names no file replaces the text match; it counts only entries of that array. RED proof: mutant antirug-entries-dropped (reach worker), group antirug-config.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/chainRegistry/antiRugConfig.test.ts",
+      "test": "Phase 19 plan 19-02 Task 2 — config.ts + .env.example > Test 20: Every new ANTIRUG entry in REQUIRED_ENV_VARS has required: false",
+      "it_count_before": 26,
+      "it_count_after": 26,
+      "change": "Title unchanged. Now behavior: every <CHAIN>_ANTIRUG_* name in .env.example (and the file's own ANTIRUG_ENV_KEYS) is deleted from process.env, the module registry is reset and the real src/config is imported with process.exit spied; the import returns, logger.fatal reports no missing variable and is never called, and process.exit is never called.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). validateEnvVars, the only reader of REQUIRED_ENV_VARS, reads `required` at import, so a required anti-rug entry is observable as a fatal exit. RED proof: mutant antirug-entry-required (reach vite), group antirug-config.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/chainRegistry/antiRugConfig.test.ts",
+      "test": "Phase 19 plan 19-02 Task 2 — config.ts + .env.example > Test 21: Every new ANTIRUG entry has a non-empty description",
+      "it_count_before": 26,
+      "it_count_after": 26,
+      "change": "Title unchanged. No longer reads src/config.ts as text: the same one REQUIRED_ENV_VARS declaration found by a directory walk; every anti-rug entry of its array must have a description that is a non-empty string literal. Explicit 60000 ms limit.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). Descriptions of optional entries are never read at runtime, so a symbol lookup replaces the text match. RED proof: mutant antirug-entry-empty-description (reach worker), group antirug-config.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
     }
   ]
 }
