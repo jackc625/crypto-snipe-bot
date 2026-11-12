@@ -25,7 +25,7 @@ function setupError(why: string): never {
 }
 
 async function main(): Promise<void> {
-    const vitest = !!process.env.VITEST;
+    const vitestSet = !!process.env.VITEST;
     try {
         await import('../../../../src/config');
     } catch (err) {
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     } catch (err) {
         setupError(`import of src/utils/logger failed: ${String((err as Error)?.message ?? err)}`);
     }
-    process.stdout.write(`${JSON.stringify({ vitest, levelFromConfigFile, loggerLevel })}\n`);
+    process.stdout.write(`${JSON.stringify({ vitest: vitestSet, levelFromConfigFile, loggerLevel })}\n`);
     process.exit(0);
 }
 
