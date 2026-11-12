@@ -26,6 +26,13 @@
 //     key (0x + 96 hex). src/utils/mevStrategies/flashbots.ts logs these from the relay's
 //     flashbots_getBundleStatsV2 answer (stats.consideredByBuildersAt[].pubkey): public builder
 //     identities, not secrets. Added in plan 23-20 when the first real recording held them.
+//   - bloXroute's answer hash: in an op line whose op is bloxroute.relay.accepted, the txHash of the
+//     fields' relayHash object may be the bare 64 hex (no 0x) of that same line's signedTxHash.
+//     bloXroute answers bsc_private_tx with { txHash } as hex without 0x, and
+//     src/utils/mevStrategies/bloxroute.ts logs that answer whole as relayHash beside the hash it
+//     signed itself; it is the public transaction hash, not a secret. Only that one field of that
+//     one op, and only when it equals the line's own signedTxHash. Added in plan 23-22 when the
+//     first bloXroute recording held it.
 //   - Signed transactions: `raw`, each entry of `signedTransactions` and `txs`, and the bloXroute
 //     body's `transaction` must parse through real Transaction.from, and a `raw` whose hash differs
 //     from its entry's `hash` fails.
@@ -140,8 +147,25 @@ interface WalkCtx {
     /** The timeline entry kind of a .jsonl line (op, submit, relay, db), else null. */
     kind: string | null;
     relay: string | null;
+    /**
+     * In a bloxroute.relay.accepted op line: the fields' relayHash object and the bare lower-case
+     * hex of the line's signedTxHash, the one value its txHash may hold (see the header). Else null.
+     */
+    relayAnswer: { obj: Record<string, unknown>; bare: string } | null;
     sentinels: Sentinels;
     out: string[];
+}
+
+const BARE_HASH = /^[0-9a-fA-F]{64}$/;
+
+/** The relayAnswer of one parsed .jsonl line (see WalkCtx.relayAnswer). */
+function relayAnswerOf(obj: Record<string, unknown>): WalkCtx['relayAnswer'] {
+    if (obj.kind !== 'op' || obj.op !== 'bloxroute.relay.accepted') return null;
+    const fields = obj.fields as Record<string, unknown> | undefined;
+    const relayHash = fields?.relayHash;
+    const signed = fields?.signedTxHash;
+    if (relayHash === null || typeof relayHash !== 'object' || Array.isArray(relayHash) || typeof signed !== 'string' || !HASH_VALUE.test(signed)) return null;
+    return { obj: relayHash as Record<string, unknown>, bare: signed.slice(2).toLowerCase() };
 }
 
 function parseSigned(raw: string): Transaction | null {
@@ -221,6 +245,7 @@ function checkString(value: string, key: string | null, parent: Record<string, u
     if (key !== null && HASH_KEYS.has(key) && HASH_VALUE.test(value)) return;
     if (inArrayOf === 'topics' && HASH_VALUE.test(value)) return;
     if (inArrayOf !== null && BUILDER_KEY_ARRAYS.has(inArrayOf) && BLS_PUBKEY.test(value)) return;
+    if (key === 'txHash' && c.relayAnswer !== null && parent === c.relayAnswer.obj && BARE_HASH.test(value) && value.toLowerCase() === c.relayAnswer.bare) return;
     c.out.push(`${at}: a 64-hex run outside a named hash field`);
 }
 
@@ -259,7 +284,7 @@ export function scanRecordingText(rel: string, raw: Buffer, sentinels: Sentinels
     const out: string[] = [];
     const text = raw.toString('utf8');
     if (text.includes('\r')) out.push(`${rel}: a carriage return (AC-26: LF only)`);
-    const base: Omit<WalkCtx, 'where' | 'kind' | 'relay'> = { file: rel, sentinels, out };
+    const base: Omit<WalkCtx, 'where' | 'kind' | 'relay' | 'relayAnswer'> = { file: rel, sentinels, out };
     if (rel.endsWith('.json')) {
         let doc: unknown;
         try {
@@ -268,7 +293,7 @@ export function scanRecordingText(rel: string, raw: Buffer, sentinels: Sentinels
             out.push(`${rel}: not valid JSON (${e instanceof Error ? e.message : String(e)})`);
             return out;
         }
-        walk(doc, null, null, { ...base, where: 'document', kind: null, relay: null }, null);
+        walk(doc, null, null, { ...base, where: 'document', kind: null, relay: null, relayAnswer: null }, null);
         return out;
     }
     if (!text.endsWith('\n') || text.endsWith('\n\n')) out.push(`${rel}: a recording ends in exactly one LF`);
@@ -305,7 +330,7 @@ export function scanRecordingText(rel: string, raw: Buffer, sentinels: Sentinels
             if (!['op', 'submit', 'relay', 'db'].includes(String(obj.kind))) out.push(`${rel} ${where}: unknown entry kind ${JSON.stringify(obj.kind)}`);
             if (obj.kind === 'submit') submits += 1;
         }
-        walk(entry, null, null, { ...base, where, kind: i === 0 ? null : typeof obj.kind === 'string' ? obj.kind : null, relay: typeof obj.relay === 'string' ? obj.relay : null }, null);
+        walk(entry, null, null, { ...base, where, kind: i === 0 ? null : typeof obj.kind === 'string' ? obj.kind : null, relay: typeof obj.relay === 'string' ? obj.relay : null, relayAnswer: i === 0 ? null : relayAnswerOf(obj) }, null);
     });
     if (submits === 0 && emptyList !== 1) out.push(`${rel}: a recording with no submit entry must end in ${EMPTY_SUBMITTED_LINE} (AC-22)`);
     if (submits > 0 && emptyList > 0) out.push(`${rel}: a recording with a submit entry holds ${EMPTY_SUBMITTED_LINE}`);
@@ -370,6 +395,9 @@ async function signedTx(nonce = 0): Promise<Transaction> {
 
 const header = (name: string, tag = 'KEEP'): string => JSON.stringify({ scenario: name, tag });
 const op = (fields: Record<string, unknown>, msg = 'message'): string => JSON.stringify({ kind: 'op', at: 1, level: 'info', op: 'x.y', msg, fields, bindings: {} });
+/** A bloxroute.relay.accepted op line as src/utils/mevStrategies/bloxroute.ts logs it (plan 23-22 rule). */
+const relayAccepted = (relayHash: unknown, signedTxHash: string, opName = 'bloxroute.relay.accepted', extra: Record<string, unknown> = {}): string =>
+    JSON.stringify({ kind: 'op', at: 1, level: 'info', op: opName, msg: 'accepted', fields: { op: opName, relayHash, signedTxHash, attempt: 1, ...extra }, bindings: { module: 'mev-bloxroute' } });
 /** A one-scenario .jsonl text: header, the given lines, the empty list. */
 const recording = (name: string, ...body: string[]): string => `${[header(name), ...body, EMPTY_SUBMITTED_LINE].join('\n')}\n`;
 
@@ -447,6 +475,11 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
             'unknown-id.jsonl': { text: `${[header('unknown-id', 'SUSPECT(AUD-EXIT-999)'), EMPTY_SUBMITTED_LINE].join('\n')}\n`, rule: /not a finding in the register/ },
             'no-empty-list.jsonl': { text: `${header('no-empty-list')}\n`, rule: /must end in \{"submitted":\[\]\}/ },
             'env/BAD_VAR.json': { text: JSON.stringify({ note: PLANTED_KEY }), rule: /64-hex run outside a named hash field/ },
+            // The plan 23-22 bloXroute answer rule is that one field of that one op, holding that one value.
+            'relay-answer-other-hash.jsonl': { text: recording('relay-answer-other-hash', relayAccepted({ txHash: PLANTED_KEY.slice(2) }, tx.hash!)), rule: /64-hex run outside a named hash field/ },
+            'relay-answer-other-op.jsonl': { text: recording('relay-answer-other-op', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!, 'x.y')), rule: /64-hex run outside a named hash field/ },
+            'relay-answer-other-field.jsonl': { text: recording('relay-answer-other-field', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!, 'bloxroute.relay.accepted', { note: tx.hash!.slice(2) })), rule: /64-hex run outside a named hash field/ },
+            'relay-answer-nested.jsonl': { text: recording('relay-answer-nested', relayAccepted({ txHash: tx.hash!.slice(2), inner: { txHash: tx.hash!.slice(2) } }, tx.hash!)), rule: /64-hex run outside a named hash field/ },
         };
         const dir = tempRecordings(Object.fromEntries(Object.entries(cases).map(([k, v]) => [k, v.text])));
         const findings = knownFindingIds();
@@ -484,6 +517,8 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
                 JSON.stringify({ kind: 'submit', at: 3, route: 'bundle', status: 'accepted', hash: tx.hash, request: { value: '1', gasLimit: '21000', maxFeePerGas: '2', maxPriorityFeePerGas: '1', data: '0x' }, raw: tx.serialized }),
                 op({ txHash: tx.hash, bundleHash: tx2.hash, topics: [tx.hash], consideredByBuilders: [`0x${'ab'.repeat(48)}`], gasMultiplier: 1.2, amountOut: '5' }, 'Reconciled late inclusion — native confirm lied "not included"'),
             ].join('\n')}\n`,
+            // bloXroute's answer (hex without 0x) beside the hash the bot signed (the plan 23-22 rule).
+            'good-relay-answer.jsonl': recording('good-relay-answer', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!), relayAccepted({ txHash: tx2.hash!.slice(2).toUpperCase() }, tx2.hash!)),
             'env/_baseline.json': JSON.stringify({ PRIVATE_KEY: s.byName.get('PRIVATE_KEY'), FLASHBOTS_AUTH_KEY: s.byName.get('FLASHBOTS_AUTH_KEY'), ratio: { $nonFinite: 'Infinity' } }),
         };
         const dir = tempRecordings(files);
@@ -679,11 +714,25 @@ describe('compare and write (AC-25), order (AC-23)', () => {
         const files = recordingFiles(RECORDINGS_DIR).filter((f) => f.endsWith('.jsonl'));
         expect(files.length).toBeGreaterThanOrEqual(1);
         for (const rel of files) {
-            const lines = bodyLines(fs.readFileSync(path.join(RECORDINGS_DIR, rel), 'utf8'));
+            const text = fs.readFileSync(path.join(RECORDINGS_DIR, rel), 'utf8');
+            const lines = bodyLines(text);
+            const entries = lines.map((l) => JSON.parse(l) as { kind: string; at: number });
+            // Recorded order is time order on the fake clock: `at` never goes back.
+            for (let i = 1; i < entries.length; i++) expect(entries[i].at, `${rel} body line ${i + 1} is in recorded (time) order`).toBeGreaterThanOrEqual(entries[i - 1].at);
+            // Plan 23-22: a scenario with no submission (AC-22: it ends in the empty list) can be a
+            // few entries of one kind (a risk-gate refusal seeds db rows only) or none at all
+            // (today's AUD-BUY-016 skip), where "not sorted" cannot tell recorded order from a
+            // sort. Every recording with a submission is a buy and its trail, and keeps the full
+            // check; so does any longer recording whose kinds interleave.
+            const kinds = entries.map((e) => e.kind);
+            const submitted = kinds.includes('submit');
+            if (!submitted && (lines.length < 3 || new Set(kinds).size < 2)) {
+                expect(text.endsWith(`${EMPTY_SUBMITTED_LINE}\n`), `${rel} has no submission and ends in the empty list`).toBe(true);
+                continue;
+            }
             expect(lines.length, rel).toBeGreaterThan(2);
             expect(lines, `${rel} is in recorded order, not sorted by content`).not.toEqual([...lines].sort());
             // Never re-ordered by kind either: the kinds interleave as things happened.
-            const kinds = lines.map((l) => (JSON.parse(l) as { kind: string }).kind);
             expect(kinds, rel).not.toEqual([...kinds].sort());
         }
     });
