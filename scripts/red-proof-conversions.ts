@@ -239,7 +239,27 @@ export const WIRING_MUTANTS: WiringMutantRow[] = [
         expected: ['31'],
     },
 ];
-export const MUTANTS: MutantRow[] = [];
+// ---- Plan 23-31: the CLI, lock and entry-point conversions (run with --group <name>)
+const PREFLIGHT_CLI_TEST = 'test/integration/preflightCli.test.ts';
+const PREFLIGHT_CLI_SUITE = 'npm run preflight CLI (OPS-LIVE-10)';
+const PREFLIGHT_LOAD_TITLE = `${PREFLIGHT_CLI_SUITE} > OPS-LIVE-10 invariant: a real run of scripts/preflight.ts never loads the module that exports startMultiChainBot`;
+
+const CLI_PREFLIGHT_MUTANTS: MutantRow[] = [
+    {
+        // The CLI loads the bot module: the run's require.cache now holds the module exporting startMultiChainBot.
+        name: 'preflight-imports-bot',
+        group: 'cli-preflight',
+        project: 'integration',
+        testFile: PREFLIGHT_CLI_TEST,
+        file: 'scripts/preflight.ts',
+        edits: [{ find: "import { logger } from '../src/utils/logger';", replace: "import { logger } from '../src/utils/logger';\nimport '../src/bot';" }],
+        reach: 'child',
+        expected: [PREFLIGHT_LOAD_TITLE],
+        messageIncludes: 'to deeply equal []',
+    },
+];
+
+export const MUTANTS: MutantRow[] = [...CLI_PREFLIGHT_MUTANTS];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
         { title: `${BOT_WIRING_GUARDS} > Test 22: the shared armPositionMonitoring helper calls snapshotLpBaseline BEFORE registerAntiRugPosition`, mutants: ['v2-arm-order', 'v2-exit-monitor-last', 'deliberate-not-armed'] },
@@ -249,9 +269,18 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
         { title: `${BOT_WIRING_GUARDS} > Test 26: startMultiChainBot calls resumeAntiRugMonitoring AFTER resumeMultiChainMonitoring`, mutants: ['boot-resume-order'] },
         { title: `${BOT_WIRING_RUNTIME} > Test 31: pre-Phase-19 trades (no lp_baseline) are excluded by INNER JOIN`, mutants: ['resume-query-includes-unbaselined'] },
     ].map((r) => ({ testFile: BOT_WIRING_TEST, baseTitle: r.title, currentTitle: r.title, mutants: r.mutants })),
+    // Plan 23-31. baseTitle is the full title at the phase start; a changed title is also in
+    // .planning/audit/inputs/rails-test-edits.json (title_before / title_after).
+    {
+        testFile: PREFLIGHT_CLI_TEST,
+        baseTitle: `${PREFLIGHT_CLI_SUITE} > Static OPS-LIVE-10 invariant: scripts/preflight.ts does not import bot.ts / invoke startMultiChainBot`,
+        currentTitle: PREFLIGHT_LOAD_TITLE,
+        mutants: ['preflight-imports-bot'],
+    },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
+    [PREFLIGHT_CLI_TEST]: 1,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [];
 

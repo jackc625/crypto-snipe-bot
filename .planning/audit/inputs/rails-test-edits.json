@@ -306,6 +306,18 @@
       "found_in_plan": "23-14",
       "related_finding": "AUD-TESTI-001",
       "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-8-exit-state-fixture-shape.txt"
+    },
+    {
+      "file": "test/integration/preflightCli.test.ts",
+      "test": "OPS-LIVE-10 invariant: a real run of scripts/preflight.ts never loads the module that exports startMultiChainBot",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "Source-text read of scripts/preflight.ts (regexes for an import of ../src/bot and a startMultiChainBot call) replaced by a real run: the CLI runs in a railed child under test/integration/fixtures/loadedModulesProbe.ts, which records require.cache at exit; the test asserts the run ended 0 or 1, that the module exporting preflightDryRun was loaded, and that no loaded module exports startMultiChainBot. The bot module is found by the symbol it exports, not by its file name.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31): a text-reading test fails on a file move (Phase 27) and passes when the behavior is gone. RED proof: mutant preflight-imports-bot (scripts/red-proof-conversions.ts group cli-preflight, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "Static OPS-LIVE-10 invariant: scripts/preflight.ts does not import bot.ts / invoke startMultiChainBot",
+      "title_after": "OPS-LIVE-10 invariant: a real run of scripts/preflight.ts never loads the module that exports startMultiChainBot"
     }
   ]
 }
