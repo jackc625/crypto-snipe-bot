@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 16/31 plans executed in 15 execution waves
+**Plans**: 17/31 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -267,7 +267,7 @@ Plans:
 - [x] 23-11-PLAN.md — Risk limits and database: AUD-DB-001, -002, -003, -004, -007, -021
 - [x] 23-12-PLAN.md — Crash-class child processes: AUD-ANTIRUG-002, AUD-API-008, AUD-TX-009, AUD-BUY-005
 - [x] 23-13-PLAN.md — Static and import-order proofs, including AC-14: AUD-SCRIPTS-001, -002, AUD-BUY-007, AUD-DB-005, -006
-- [ ] 23-14-PLAN.md — Closures by rail test (AC-13): AUD-TX-004, -005, AUD-RAIL-001, -002, AUD-TESTI-001, -011, AUD-TESTU-001
+- [x] 23-14-PLAN.md — Closures by rail test (AC-13): AUD-TX-004, -005, AUD-RAIL-001, -002, AUD-TESTI-001, -011, AUD-TESTU-001
 - [x] 23-15-PLAN.md — Candidate 26 manual relay request, after operator approval: AUD-TX-006 (AC-15)
 **Wave 6**
 - [ ] 23-16-PLAN.md — Plain-language operator batch from three identical runs, rulings, and a passing register (AC-08, AC-10, AC-16 to AC-18)
@@ -602,7 +602,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
-| 23. Test Safety Net (Harness, Triage, Characterization) | 16/31 | In Progress | - |
+| 23. Test Safety Net (Harness, Triage, Characterization) | 17/31 | In Progress | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
 | 26. Toolchain & ESM | 0/TBD | Not started | - |

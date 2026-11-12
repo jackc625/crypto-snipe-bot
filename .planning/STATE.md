@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-13-PLAN.md
-last_updated: "2026-11-12T01:27:04.930Z"
+stopped_at: Completed 23-14-PLAN.md
+last_updated: "2026-11-12T02:42:45.100Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 85612e43bfc0501c60b338a0ce2d969b67cb641c
+state_head: 8f5163a98634fd3c3e8ffcd6f62929bf10a872d1
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 45
+  completed_plans: 46
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 14 of 31
+Plan: 15 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -129,11 +129,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P11 | 32min | 3 tasks | 16 files |
 | Phase 23 P12 | 75min | 3 tasks | 17 files |
 | Phase 23 P13 | 39min | 3 tasks | 17 files |
+| Phase 23 P14 | 71min (wall-clock incl. operator wait; continuation 21min) | 2 tasks | 33 files |
 
 ## Session
 
-**Last session:** 2026-11-12T01:27:04.557Z
-**Stopped at:** Completed 23-13-PLAN.md
+**Last session:** 2026-11-12T02:42:44.644Z
+**Stopped at:** Completed 23-14-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -281,3 +282,5 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-13: AUD-DB-006 (open half, AC-14), AUD-SCRIPTS-001, AUD-SCRIPTS-002 (S1), AUD-BUY-007 (S1) and AUD-DB-005 confirmed (test/realpath/triage/<ID>.test.ts, 5 knownBug claims; every claim reads looks fixed under its own fix-shaped src/ or scripts/ mutation and a cross-file batch shows each flips only its own claim). AC-14: a railed child (VITEST unset, temp DB_PATH, throwaway cwd) that only imports src/utils/db commits one WAL frame (the unconditional PRAGMA user_version = 7 at the end of migrateSchema), seen through data_version on a held connection and a main-plus-WAL hash; the main file alone does not change until a checkpoint; a pragmas-only control commits nothing. AUD-SCRIPTS-002: a tryAcquireThenRelease query alone reads "the failure changed", never fixed; card SCRIPTS-01 stays open. 23-16 must acknowledge AUD-SCRIPTS-002 and AUD-BUY-007; 23-17's census exceptions are AUD-BUY-007's one src site and AUD-SCRIPTS-002's 12 script sites.
 - [Phase 23]: 23-13 new finding under the standing instruction (no stop): AUD-TESTI-029 (S3, capital none, confirmed, C12): a realpath test that times out is not stopped; Vitest tears the scenario down while its async body keeps stepping the fake clock, so the body drives its torn-down scenario into the next test of the file (forced-timeout run: the next test failed on a second exit-ratio entry; full run: an unhandled eth_subscribe cancellation attributed to the next test). Fix in Phase 28 or through the Harness Gap Procedure. Until then any realpath test above half its limit under the full run needs an explicit limit (23-13 gave AUD-EXIT-003 probe-is-eth-buy-wei-as-token-amount 60 s: 1.3 to 1.8 s alone, timed out at 15 s under load).
 - [Phase 23]: 23-13 for later plans: test/realpath/triage/fixtures/scriptsStatic.ts builds ts.createProgram from a directory walk (the AC-37 form 23-19 accepts) and mirrors the census's type predicates (its 12 script sites match signing-sites-head.json; it does not trace contracts passed as parameters, so 3 src allowance view calls count) with a lock-lifetime and pause-read classifier proven on 14 temp-directory cases. Child fixtures that run outside Vitest from a throwaway cwd start as process.execPath <ts-node bin> --transpile-only <absolute fixture> (-r ts-node/register does not resolve from a temp cwd). check-realpath-mocks treats any free identifier named vitest as the Vitest global (fail closed): never name a local vitest in test/realpath.
+- [Phase 23]: 23-14 checkpoint ruling on AUD-TESTI-001 (sub-claims 3 and 4 were still open after the 23-03 helper swap): operator "Fix now (Recommended)" (the "(Recommended)" label was the orchestrator's). Done in test files only (0ca1e01): pauseFlow's hand-built v6 schema copy is deleted and its Tests 1-4 run the real src/utils/db setPauseState / getPauseState / clearPauseState on a temp file the real module opens and migrates (vi.resetModules + vi.importActual with DB_PATH set; a second load is a real restart); createMockExitStateRow has the v7 exit_state columns, pinned by a helpers.smoke test to a createTestDb table. RED 23-14-7: the entry's escaped regression (no v6 pause-row insert) fails Tests 1-4 while the old file stays 9/9 green; RED 23-14-8: the old fixture shape or a new migration column fails the smoke test. The real pause code passed, no new bug. AUD-TESTI-001 closed fixed (d45807a), rail_test = the AC-07 test; AUD-TESTU-019 (unit migration replicas) stays open for Phase 28.
+- [Phase 23]: 23-14: AC-13 done. AUD-TX-004, AUD-TX-005, AUD-RAIL-001, AUD-RAIL-002, AUD-TESTU-001, AUD-TESTI-011 and AUD-TESTI-001 closed as fixed through set-triage.ts, each with the exact rail_test title path, a closes-finding marker beside every rail test of one of its reaches, and a RED proof (red-proofs/23-14-1 .. 23-14-8; Phase 22 proofs re-run where the file changed since). AUD-RAIL-001's rail test is forkShellOnly (d), not vitestEnvFile (which does not catch a dotenv call in vitest.config.ts); its note says a recurrence fails the test, not that one is impossible. All 61 population entries now have an outcome (52 confirmed, 8 fixed, 1 unreproduced); the 50 --stage triage FAILs are all 23-16's (44 S0/S1 acknowledgements, 4 fork_refs: AUD-ANTIRUG-003, AUD-BUY-015, AUD-BUY-033, AUD-EXIT-003; the AUD-TX-006 keep-open ruling; the run evidence). For 23-16: rail_test joins title levels with " > " but Vitest JSON fullName joins them with a space, so build the title from ancestorTitles plus title; AUD-TX-005's rail test (processLock.test.ts) and AUD-DB-007's (dbGuards.test.ts) are integration tests that must be in passed_tests. Full railed npm test on Node 22: 1395/1395, nonLoopbackAllowed 0, telegramAllowed 0.
