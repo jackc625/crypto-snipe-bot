@@ -1,0 +1,105 @@
+{
+  "description": "Signing census exceptions (Phase 23 plan 23-17, CHAR-04, D-NONCE-AUTHORITY-ALL). Read by scripts/check-signing-census.ts (npm run check:census). floor: the minimum number of transaction-signing sites in src/ and scripts/; lower it only in a commit whose message names the finding (AUD-...) whose fix removed the site (AC-34, checked by --check-floor-history). unlocked: the known transaction-signing sites outside withNonceLock, one row per file|enclosing|call key with a count; each row names its finding and the operator decision records that cover it (AC-53); a fixed or removed site fails the gate until its row is lowered or removed (AC-35). excluded: sites the census counts but an auditor proved are not signing (view calls whose ABI the type analysis cannot read), each citing the manual inventory entry that excludes it. Entries are sorted by key.",
+  "floor": 23,
+  "unlocked": [
+    {
+      "file": "scripts/addLiquidity.ts",
+      "enclosing": "main",
+      "call": "contract.addLiquidity",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001: its artifact imports do not resolve). Out-of-process signer with its own nonce view; card SCRIPTS-01, decided in Phase 29 (HYG-03)."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "enclosing": "main",
+      "call": "contract.approve",
+      "count": 2,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001), two approves in main(). Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "enclosing": "main",
+      "call": "contract.deposit",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001), WETH deposit. Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/addLiquidity.ts",
+      "enclosing": "main",
+      "call": "contract.mint",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001), fake-token mint. Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "enclosing": "main",
+      "call": "ContractFactory.deploy",
+      "count": 4,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001), four contract deployments in main(). Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/deploySepoliaTest.ts",
+      "enclosing": "main",
+      "call": "contract.createPair",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Legacy script (AUD-SCRIPTS-001), factory createPair. Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/recover-sell-ladys.ts",
+      "enclosing": "main",
+      "call": "contract.approve",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Operator recovery script; runs beside the bot on the same wallet without the process lock or the pause switch. Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "scripts/recover-sell-ladys.ts",
+      "enclosing": "main",
+      "call": "contract.swapExactTokensForETHSupportingFeeOnTransferTokens",
+      "count": 1,
+      "finding_id": "AUD-SCRIPTS-002",
+      "decision_ref": ["ESC-SCRIPTS-01", "OD-68"],
+      "note": "Operator recovery script's sell. Card SCRIPTS-01, Phase 29."
+    },
+    {
+      "file": "src/utils/tokenSafety.ts",
+      "enclosing": "simulateSell",
+      "call": "contract.approve",
+      "count": 1,
+      "finding_id": "AUD-BUY-007",
+      "decision_ref": ["ESC-CENSUS-01"],
+      "note": "The dead tokenSafety.simulateSell sends a real approve outside withNonceLock (operator ruling keep-s1). Phase 24 removes it; then this row must come off the list and the floor drop to 22 in a commit naming AUD-BUY-007."
+    }
+  ],
+  "excluded": [
+    {
+      "file": "scripts/addLiquidity.ts",
+      "enclosing": "main",
+      "call": "contract.getPair",
+      "count": 1,
+      "reason": "getPair is a view function (the Uniswap V2 factory pair getter): an eth_call, no transaction, no nonce. The census cannot read the artifact ABI, so it counts the call.",
+      "evidence_ref": ".planning/audit/census/manual-inventory-head.json"
+    },
+    {
+      "file": "src/bot.ts",
+      "enclosing": "maybeApproveForChain",
+      "call": "contract.allowance",
+      "count": 1,
+      "reason": "allowance is a view function in every ERC-20 ABI in the program, and maybeApproveForChain has no caller, so this line never runs. The census cannot trace the tokenContract parameter, so it counts the call with lock status unknown.",
+      "evidence_ref": ".planning/audit/census/manual-inventory-head.json"
+    }
+  ]
+}
