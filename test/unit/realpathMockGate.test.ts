@@ -41,7 +41,10 @@ function checkSource(source: string): RealpathViolation[] {
 }
 
 describe('AC-02 real-path mock-list gate', () => {
-    it('every self-test case gives exactly its expected violations when checked in-process', () => {
+    // The first test in this file pays the cold load of the checker and the TypeScript compiler API it uses, inside
+    // its body (testTimeout, not hookTimeout). Measured on Node 22: 0.3 s alone, 2.6 s under the full parallel npm test
+    // (wave 9 gate). The explicit limit is headroom.
+    it('every self-test case gives exactly its expected violations when checked in-process', { timeout: 20_000 }, () => {
         const cases = selfTestCases();
         expect(cases.length).toBeGreaterThanOrEqual(20);
         for (const c of cases) {
