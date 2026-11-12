@@ -2063,6 +2063,12 @@
         "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
         "findings": "none",
         "note": "Reviewed by plan 23-14 (git diff a93fd98 3ee5205 -- test/integration/processLock.test.ts): one comment line added, the closes-finding marker for AUD-TX-005; no test behavior, assertion or mock changed."
+      },
+      {
+        "from_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "to_sha": "fd154bd6488583331c02c80da51cfb4f9fd84dec",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 3ee5205 fd154bd -- test/integration/processLock.test.ts): the AC-23d test's last block, a regex over the text of four named files, moved into a new test that builds ts.createProgram over a directory walk of src/ and scripts/ (test/helpers/sourceGraph.ts) and checks that nothing the preflight, pause and resume commands reach through their imports exports acquireProcessLock or runMain. Every existing it() title, assertion and the AUD-TX-005 closes-finding marker are unchanged; 7 it() before, 8 after. RED proof: group cli-lock (5 in-memory mutants)."
       }
     ]
   },

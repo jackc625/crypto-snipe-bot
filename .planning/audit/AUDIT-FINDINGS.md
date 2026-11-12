@@ -7594,7 +7594,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/honeypotDispatch.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/honeypotTaxThreshold.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/honeypotTypes.test.ts | 23a6461 | AUD-TESTU-008 | quality: mocks_mechanism=no, hollow=yes, real_state=no |
-| test/unit/mainEntry.test.ts | 5378478 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none |
+| test/unit/mainEntry.test.ts | 5378478 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..fd154bd none |
 | test/unit/mevStrategies/flashbotsBundleHash.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/mevStrategies/flashbotsMultiBuilder.test.ts | 23a6461 | AUD-TESTU-015 | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/mevStrategies/gasMultiplier.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
@@ -7622,7 +7622,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/unit/rails/hardhatChildEnv.test.ts | 069a30c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..069a30c none |
 | test/unit/rails/netDeny.test.ts | 637c19c | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..637c19c none |
 | test/unit/rails/notifierRefusal.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none; ccd1158..53548e8 none |
-| test/unit/rails/spawnSites.test.ts | f695363 | AUD-REAUDIT-003 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 AUD-REAUDIT-003; f695363..53548e8 none |
+| test/unit/rails/spawnSites.test.ts | f695363 | AUD-REAUDIT-003 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..f695363 AUD-REAUDIT-003; f695363..53548e8 none; 53548e8..bab9121 none |
 | test/unit/rails/vitestEnvFile.test.ts | a08d650 | AUD-REAUDIT-001 | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a08d650 AUD-REAUDIT-001; a08d650..3ee5205 none |
 | test/unit/receiptDecoder.test.ts | 23a6461 | none | quality: mocks_mechanism=no, hollow=no, real_state=no |
 | test/unit/riskManager.test.ts | 23a6461 | AUD-TESTU-015, AUD-TESTU-017 | quality: mocks_mechanism=partial, hollow=no, real_state=no |
@@ -7725,7 +7725,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/pauseFlow.test.ts | 23a6461 | AUD-TESTI-001, AUD-TESTI-011, AUD-TESTI-014, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=yes, real_state=yes; re-audit: 23a6461..0ca1e01 none |
 | test/integration/preflightCli.test.ts | 23a6461 | AUD-TESTI-011, AUD-TESTI-014 | quality: mocks_mechanism=no, hollow=yes, real_state=yes; re-audit: 23a6461..fec8ee8 AUD-TESTQ-006, AUD-TESTQ-007, AUD-TESTQ-008, AUD-TESTQ-009, AUD-TESTQ-018 |
 | test/integration/preflightInvocation.test.ts | 23a6461 | AUD-TESTI-011 | quality: mocks_mechanism=no, hollow=no, real_state=yes |
-| test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none; a93fd98..3ee5205 none |
+| test/integration/processLock.test.ts | a93fd98 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..a93fd98 none; a93fd98..3ee5205 none; 3ee5205..fd154bd none |
 | test/integration/rails/notifierRefusalIntegration.test.ts | ccd1158 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..ccd1158 none |
 | test/integration/rails/railsIntegration.test.ts | 64bc832 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..64bc832 none; 64bc832..53548e8 none |
 | test/integration/txManager.test.ts | 23a6461 | AUD-TESTI-002, AUD-TESTI-015 | quality: mocks_mechanism=partial, hollow=no, real_state=no |

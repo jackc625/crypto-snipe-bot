@@ -2272,6 +2272,12 @@
         "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
         "findings": "none",
         "note": "Reviewed: runMain takes the real lock before starting the bot and refuses on lock failure, VITEST or a bad key without quoting it; readStartEnv reads into a private object; src/main.ts imports nothing stateful (AST)."
+      },
+      {
+        "from_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "to_sha": "fd154bd6488583331c02c80da51cfb4f9fd84dec",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 5378478 fd154bd -- test/unit/mainEntry.test.ts): tests (4), (5) and (6) no longer parse src files by name. The modules are found by the symbols they export in a directory walk of src/; (4) and the guard half of (6) load the module in a railed child (test/integration/fixtures/loadedModulesProbe.ts) and check which repo modules came with it; (5), the startBot placement of the bot require in (4) and the console half of (6) check the modules found by symbol. (4) renamed; its lock-before-start reading is carried by test (1) through the GUARD_MUTANTS row main-starts-before-lock. Tests (1), (2), (3) and the WR tests unchanged; 9 it() before and after. RED proof: group cli-entry (9 in-memory mutants)."
       }
     ]
   },
@@ -2626,6 +2632,12 @@
         "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
         "findings": "none",
         "note": "Reviewed by plan 23-14 (git diff f695363 53548e8 -- test/unit/rails/spawnSites.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
+      },
+      {
+        "from_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "to_sha": "bab91212a4b170a9533fe458a2f67d3bf3a63490",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 53548e8 bab9121 -- test/unit/rails/spawnSites.test.ts): one entry added to COMPUTED_REQUIRE_FILES, test/integration/fixtures/loadedModulesProbe.ts with its reason, beside the SAFE-03 duplicate-load probe. Only a plain require of a computed path is relaxed for it; banned modules and spawn calls in it are still flagged, and the probe refuses any target that is not a .ts module under src/ or scripts/. No test, assertion or the AUD-TESTI-011 closes-finding marker changed."
       }
     ]
   },
