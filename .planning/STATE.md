@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-20-PLAN.md
-last_updated: "2026-11-12T15:56:44.867Z"
+stopped_at: Completed 23-21-PLAN.md
+last_updated: "2026-11-12T16:29:01.828Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: f0929b72ead4d5b1d2ef94560a0c225f44b88f56
+state_head: 1e5f820d978d075d20a990d2808c8ab2aee5c310
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 54
+  completed_plans: 55
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 21 of 31
+Plan: 22 of 31
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -140,11 +140,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P30 | 22min | 3 tasks | 6 files |
 | Phase 23 P19 | 46min | 2 tasks | 9 files |
 | Phase 23 P20 | 42min | 3 tasks | 12 files |
+| Phase 23 P21 | 22min | 2 tasks | 6 files |
 
 ## Session
 
-**Last session:** 2026-11-12T15:56:44.426Z
-**Stopped at:** Completed 23-20-PLAN.md
+**Last session:** 2026-11-12T16:29:01.429Z
+**Stopped at:** Completed 23-21-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -322,3 +323,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-20 golden-master contract for 23-21, 23-22, 23-23 and 23-25: runScenario({ name, tag, chain, dexType, overrides, steps, assertComplete }) in test/realpath/scenarios/driver.ts creates the scenario, runs steps, fails on any stray or capture violation, runs the REQUIRED assertComplete, and only then serializes and calls compareRecording('<name>.jsonl'); driveSlots drives the chain at the 12 s cadence (a bundle lands only in a block it targets; immediate mining made the bot target a sealed block through ethers' 250 ms cache). test/realpath/harness/serializer.ts: header {scenario, tag}, one line per entry in recorded order, the exact line {"submitted":[]} when nothing was submitted, submit lines carry the request decoded by real ethers; normalizeForRecording gives BigInt text and $nonFinite / $unsafeNumber / $error / $class / $circular objects with no paths, line numbers, stacks or ethers version; compareRecording(relPath) takes '<name>.jsonl' or 'env/<VAR>.json' relative to test/realpath/recordings/ and writes only when VITEST_CSB_UPDATE_RECORDINGS is "1" and CI is unset (the rails keep the key, proved by a run). npm run recordings:update -- <file> [-t <name>] (scripts/update-recordings.ts, refuses CI and an empty filter list without --all) is the only setter. The first recording commit is babd7e4: 23-25's commit check judges every commit after it.
 - [Phase 23]: 23-20: five Flashbots V2 recordings committed once each (trailing, partial, stop-loss, urgency, anti-rug), every one SUSPECT, none KEEP (AC-46): trailing, stop-loss and urgency SUSPECT(AUD-ANTIRUG-015,AUD-ANTIRUG-024,AUD-DB-002,AUD-DB-004,AUD-EXIT-001,AUD-EXIT-003,AUD-EXIT-004,AUD-TX-012); partial swaps AUD-ANTIRUG-015 for AUD-EXIT-025 (tier stored as index [0]); anti-rug adds AUD-ANTIRUG-003 (one pull: three confirm gates and three dispatches) and AUD-EXIT-014 (two refused by the held sell lock). recordingsGuard.test.ts (AC-21/22/23/25/26 and field-aware AC-51) gained one rule with its reason: consideredByBuilders / sealedByBuilders entries may be 0x + 96-hex BLS builder keys (the Flashbots stats log). No finding registered or regraded.
 - [Phase 23]: 23-20 gates: full railed npm test on Node 22 (29a4204 tree): 202 files, 1419/1419, unit 950 integration 264 realpath 205, wall 176 s, nonLoopbackAllowed 0, telegramAllowed 0; scenarios at most 2.98 s of 15 s under load; three normal and three full runs left every recording byte-identical. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS with no re_audit row; --stage final 135 FAILs, 12 from this plan (ledger rows for the 11 new files, package.json re_audit), the out-of-scope bookkeeping kind. backupState self-check measured 47.6 / 55.5 / 60.9 s of 120 s (the 23-19 range; watch item, not this plan's).
+- [Phase 23]: 23-21: five Flashbots V3 recordings committed once each (flashbots-v3-trailing 38d74fd; partial, stop-loss, urgency, anti-rug 294363e), every one SUSPECT, none KEEP (AC-46): trailing, stop-loss, urgency and anti-rug SUSPECT(AUD-ANTIRUG-015,AUD-ANTIRUG-024,AUD-BUY-033,AUD-DB-002,AUD-DB-004,AUD-EXIT-001,AUD-EXIT-003,AUD-EXIT-004,AUD-EXIT-027,AUD-TX-012); partial swaps AUD-ANTIRUG-015 for AUD-EXIT-025. V3 adds AUD-BUY-033 (buy multicall holds only exactInputSingle, no refundETH) and AUD-EXIT-027 (sell pays WETH to the wallet, no unwrap). The V3 anti-rug timeline shows one gate, one dispatch and one exit (the Burn is held in its 5-block grace window and consumed by the Collect), so AUD-ANTIRUG-003 and AUD-EXIT-014 are not cited on V3. No finding registered or regraded; no harness, driver, fixture or guard change.
+- [Phase 23]: 23-21 V3 anti-rug contract for later scenario plans: the rug is the real two-step NPM pull (decreaseLiquidity -> pool Burn(owner NPM), held as antirug.v3-burn-grace-window; one slot later collect -> pool Collect, antirug.v3-burn-collect-paired), file-local burnV3Liquidity/collectV3Liquidity in test/realpath/scenarios/flashbots-v3.test.ts (public FakeNode API only: liquidity() re-served via setRead, virtual reserves moved pro rata). The pull must be deep enough that the held tokens' quote falls below half its pre-pull value (99.9 percent here): at 95 percent it stays near 96 percent and signal 3 trips only through AUD-ANTIRUG-006 sub-claim 1, which would make the recording depend on that bug.
+- [Phase 23]: 23-21 gates: full railed npm test on Node 22 (final tree 294363e): 203 files, 1424/1424, wall 196 s, ledger run-20261112T161922-14976-1e8c4f nonLoopbackAllowed 0, telegramAllowed 0; V3 scenarios at most 3.64 s of 15 s under load; three normal runs and two full runs left every recording byte-identical. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS; --stage final 141 FAILs, 6 from this plan (TESTI ledger rows for the 6 new files). backupState self-check measured 62.3 / 69.5 s of 120 s (52 / 58 percent; watch item, not this plan's).
