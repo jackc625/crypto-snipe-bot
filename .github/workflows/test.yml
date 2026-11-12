@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the signing census floor check (CHAR-04 / AC-34) walks every commit
+          # that touches scripts/signing-census-exceptions.json and refuses a shallow clone.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -32,6 +36,19 @@ jobs:
         # vi.spyOn other than vi.spyOn(process, 'exit'), or an alias of vi fails the build. AST and
         # binding-aware, with no exemption inside the folder.
         run: npm run check:realpath-mocks
+      - name: Signing census gate (CHAR-04)
+        # CHAR-04 / D-NONCE-AUTHORITY-ALL: every transaction-signing site in src/ and scripts/ must
+        # run inside withNonceLock, because a nonce race on a signing wallet costs money directly.
+        # The type-aware census fails on a new unlocked signing site, on a listed exception that
+        # was fixed or removed, on an unknown lock status, below the floor of signing sites, or
+        # on an empty scan; each listed exception must name its finding and an operator decision
+        # record that covers it (scripts/signing-census-exceptions.json). The second command
+        # refuses a commit that lowered the floor without naming the finding that removed the
+        # site, and refuses a shallow clone (hence fetch-depth: 0 above). TypeScript only; it
+        # does not load better-sqlite3 or any bot module.
+        run: |
+          npm run check:census
+          npm run check:census -- --check-floor-history
       - name: Ban .todo test stubs
         run: |
           # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.
