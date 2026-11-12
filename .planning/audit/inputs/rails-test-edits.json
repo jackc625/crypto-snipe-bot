@@ -432,8 +432,8 @@
     {
       "file": "test/unit/rails/spawnSites.test.ts",
       "test": "spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files",
-      "it_count_before": 3,
-      "it_count_after": 3,
+      "it_count_before": 5,
+      "it_count_after": 5,
       "change": "Title, assertions and the closes-finding: AUD-TESTI-011 marker unchanged. One entry added to COMPUTED_REQUIRE_FILES: test/integration/fixtures/loadedModulesProbe.ts may make a plain require of a computed path, like the SAFE-03 duplicate-load probe; a literal banned module, any other computed load form and every spawn call in it are still flagged. The probe itself refuses any path that is not a .ts module under src/ or scripts/.",
       "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31): the probe loads the module a test found by the symbol it exports, so its path is computed at run time; the gate flagged it in the first full run of the plan (test/integration/fixtures/loadedModulesProbe.ts:66 require with a non-literal specifier).",
       "register_as": "test-quality",
