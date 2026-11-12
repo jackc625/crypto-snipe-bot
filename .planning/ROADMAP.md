@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 32/33 plans executed in 15 execution waves
+**Plans**: 33/33 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -294,7 +294,7 @@ Plans:
 - [x] 23-32-PLAN.md — Restart triage tests on the real boot and the real onRestart; AC-37 allow list back to the 3 dashboard tests (operator ruling 2026-11-12)
 - [x] 23-33-PLAN.md — Per-run record of compared recordings and a check that every committed recording was compared (closes the 23-25 gap; operator ruling 2026-11-12)
 **Wave 15**
-- [ ] 23-26-PLAN.md — Successor seal, seal-tool fix, full-suite gate and src/ diff review (AC-45, AC-49 to AC-52)
+- [x] 23-26-PLAN.md — Successor seal, seal-tool fix, full-suite gate and src/ diff review (AC-45, AC-49 to AC-52)
 
 ### Phase 24: Capital-Safety Fixes
 **Goal**: Every confirmed capital-safety finding is fixed on the current layout, with RED→GREEN real-path proof. After this phase:
@@ -604,7 +604,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
-| 23. Test Safety Net (Harness, Triage, Characterization) | 32/33 | In Progress | - |
+| 23. Test Safety Net (Harness, Triage, Characterization) | 33/33 | In Progress | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
 | 26. Toolchain & ESM | 0/TBD | Not started | - |

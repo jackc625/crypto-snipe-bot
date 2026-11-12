@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-33-PLAN.md
-last_updated: "2026-11-12T21:29:22.224Z"
+stopped_at: Completed 23-26-PLAN.md
+last_updated: "2026-11-12T23:27:47.512Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 01ec5251aae87a1d4c109ce613e40664558bc3cc
+state_head: 631bbdf79ea734d2ad60cebd310464b522b90823
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 62
-  completed_plans: 61
+  completed_plans: 62
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 28 of 33
+Plan: 33 of 33
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -148,11 +148,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P25 | 27min | 2 tasks | 5 files |
 | Phase 23 P32 | 31min | 2 tasks | 9 files |
 | Phase 23 P33 | 37min | 2 tasks | 7 files |
+| Phase 23 P26 | 1h46m (wall-clock incl. operator wait; continuation 49min) | 3 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-11-12T21:29:21.779Z
-**Stopped at:** Completed 23-33-PLAN.md
+**Last session:** 2026-11-12T23:27:47.071Z
+**Stopped at:** Completed 23-26-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -352,3 +353,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-33 operator ruling (2026-11-12, the operator chose "Fix now, small plan (Recommended)"; the "(Recommended)" label was the orchestrator's), over a cheaper name-literal check, deferring to Phase 28, or review-only: the 23-25 redirect gap (a scenario test pointed at a new recording name with the new file added passes the commit check while the old recording stays unread) is closed in Phase 23. compareRecording (test/realpath/harness/serializer.ts, the one harness change this plan owned) records each comparison against the real recordings folder per run, and scripts/check-recordings-compared.ts (npm run check:recordings-compared) fails naming every tracked recording (scenario .jsonl, env/*.json) not compared in the judged run and every compared path git does not track; no record for the run is exit 2. The STATE Blockers line and the deferred-items.md entry for the gap are marked resolved (kept).
 - [Phase 23]: 23-33 contract for later plans: the record is <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<CSB_RAIL_RUN_ID>/<pid>-<8 hex>.txt, one JSON-quoted relative path per call, written synchronously before the compare in compare and update runs; dir-override calls against another folder are not recorded; no valid run id records nothing and warns once per loaded module. The check judges exactly one run: CI step "Recordings compared gate (AUDIT-06)" directly after npm run test:realpath runs --sole-run (CI only; the folder must hold exactly one run, the one that step made on the job's new machine); the orchestrator wave gate runs --run-log "$OUT/vitest.log" after its full suite (one run id in the log, realpath started and finished); locally --run-id or --run-log, never a newest-folder pick. A recording is a tracked .jsonl/.json under test/realpath/recordings/ (.gitattributes is not); a letter-case variant of the folder is a violation. A filtered run fails the check by design. Phase 24: a deliberately renamed scenario must remove its old recording in the same behavior: commit.
 - [Phase 23]: 23-33 gates: self-test 16 of 16 (the 23-25 gap case: the real judgeHistory passes the swap commit and this check names the old file; a stale run's complete record never counts); 11 mutants (each rule off) each caught by its own cases on the final code. Real-repo demonstration (undone, byte-identical): trailing scenario repointed at a staged new file, full realpath run 344/344 green, check exit 1 naming only flashbots-v2-trailing.jsonl. Full railed suite via wave-gate.sh: 211 files, 1560/1560, wall 185 s, ledger run-20261112T211447-4368-f8d5c6 nonLoopbackAllowed 0, telegramAllowed 0, check PASS tracked 130 = compared 130 (22 scenario, 108 env). Three normal realpath runs (one a CI rehearsal with CI=true, fresh TEMP and --sole-run) byte-identical. Wrapper 19.4 s alone, 67.1 s full run, child 240 s / test 250 s. Record files use a per-module random token because the spawn-site gate refuses node:worker_threads. tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check:commits PASS (40 judged, 0 recording changes); check.ts partial, consolidation and triage PASS, no re_audit row needed; --stage final 275 FAILs, the out-of-scope bookkeeping kind.
+- [Phase 23]: 23-26 operator ruling (2026-11-12, the operator chose "Rule them not secrets (Recommended)"; the label was the executor's and the orchestrator's): the 2 non-public hits of the Phase 23 scan are inert test values, recorded as ESC-SECRET-03 with AUD-SECRET-006 (RFC 6455 sample nonce, hostHeaderCrash.ts:99:28@3a449f5) and AUD-SECRET-007 (planted user:pass placeholder URL, recordingsGuard.test.ts:421:80@babd7e4) closed NOT-A-BUG; seal-verify.ts labels exactly those two locations reviewed-inert and every other non-public hit still blocks a seal
+- [Phase 23]: 23-26 reviewed-inert contract for later seals: REVIEWED_HITS in seal-verify.ts is the only list; an entry is a full location citing an ESC record, --phase-scan refuses the list unless that record (read at --sealed, never the working tree) has the operator's answer and lists the location in resolution.reviewed_hits, and the successor verifier re-checks the scan record (listed locations only, counts equal to hits, no non-public hit, ruling present at sealed_sha); --scan of later commits keeps the plain three-pass classification
+- [Phase 23]: 23-26 SEAL-23.json seals .planning/audit/ at 912b915 (the ruling and render commit): previous_seal SEAL.json (byte-unchanged, no Phase 23 commit touches it), 104 paths changed under the folder since 1d1dd17, scan 7d0b7b3..912b915 0 non-public / 2 reviewed-inert / 959 public-address, final_check pass; any later change under .planning/audit/ other than SEAL-23.json and inputs/phase-scan-23.json invalidates it
+- [Phase 23]: 23-26 AUD-SECRET-008 (S3, capital none, registered under the operator's standing instruction, no stop): the default generic-api-key rule skips any value holding a stop word (feed, dead, added, faded, ceded measured), so a clean scan cannot see a generic credential with a common word in it; EVM private keys are unaffected (evm-private-key 1000 of 1000); seal-verify.ts fixture draws fixed here, fixture-check.ts (frozen) owed to Phase 29
