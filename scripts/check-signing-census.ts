@@ -1177,7 +1177,10 @@ type ProblemCode =
     | 'missing-decision-ref'
     | 'decision-not-found'
     | 'decision-does-not-cover'
-    | 'finding-not-found';
+    | 'finding-not-found'
+    | 'floor-lowered-unnamed'
+    | 'history-bad-version'
+    | 'history-empty';
 
 interface Problem {
     code: ProblemCode;
@@ -1345,15 +1348,52 @@ function runCensus(root: string): GateRun {
     return { census, result: census.run() };
 }
 
-function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: Problem[]; summary: GateSummary } {
+/** A decision record by ID: .planning/audit/escalations/<id>.json or .planning/audit/decisions/<id>.json, whose own id must match. */
+function resolveRecord(root: string, ref: string): { where: string; covers: Set<string> } | { error: string } {
+    if (!/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$/.test(ref)) return { error: `${JSON.stringify(ref)} is not a record ID` };
+    for (const dir of ['escalations', 'decisions']) {
+        const rel = `.planning/audit/${dir}/${ref}.json`;
+        const p = path.join(root, rel);
+        if (!fs.existsSync(p)) continue;
+        const j = readJsonOrNull(p);
+        if (!isObj(j)) return { error: `${rel} is not a JSON object` };
+        if (j.id !== ref) return { error: `${rel} has id ${JSON.stringify(j.id)}, not ${ref}` };
+        const covers = new Set<string>();
+        for (const k of ['items', 'resolved_items', 'findings']) {
+            const v = j[k];
+            if (Array.isArray(v)) for (const x of v) if (typeof x === 'string') covers.add(x);
+        }
+        return { where: rel, covers };
+    }
+    return { error: `no record .planning/audit/escalations/${ref}.json or .planning/audit/decisions/${ref}.json` };
+}
+
+function findingRegistered(root: string, id: string): boolean {
+    const j = readJsonOrNull(path.join(root, '.planning', 'audit', 'findings', `${id}.json`));
+    return isObj(j) && j.id === id;
+}
+
+function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: Problem[]; summary: GateSummary; sites: Site[] } {
     const problems: Problem[] = [];
     const { census, result } = run;
     const prog = result.program;
+    // Work on copies: the census result is never changed, so one run can be evaluated against several lists.
+    const sites = result.sites.map((s) => ({ ...s }));
     const summary: GateSummary = { tx_signing: 0, locked: 0, unlocked: 0, unknown: 0, excluded_by_auditor: 0, excluded_by_census: 0, message_signing: 0, src_files: prog.src_files, script_files: prog.script_files, floor: ex.floor };
+    // AC-53: every listed unlocked site names a registered finding and decision records that cover it.
+    for (const e of ex.unlocked) {
+        const k = entryKey(e);
+        if (!findingRegistered(root, e.finding_id)) problems.push({ code: 'finding-not-found', message: `unlocked ${k}: finding ${e.finding_id} has no record .planning/audit/findings/${e.finding_id}.json` });
+        for (const ref of e.decision_ref) {
+            const rec = resolveRecord(root, ref);
+            if ('error' in rec) problems.push({ code: 'decision-not-found', message: `unlocked ${k}: decision_ref ${ref} does not resolve (${rec.error})` });
+            else if (!rec.covers.has(e.finding_id)) problems.push({ code: 'decision-does-not-cover', message: `unlocked ${k}: decision_ref ${ref} (${rec.where}) does not list ${e.finding_id} in items, resolved_items or findings` });
+        }
+    }
     // AC-36: a scan that checked nothing is a failure, never a pass.
     if (prog.src_files === 0 || prog.script_files === 0) {
         problems.push({ code: 'no-files', message: `the census program has ${prog.src_files} src/ files and ${prog.script_files} scripts/ files; a scan that finds no files checked nothing` });
-        return { problems, summary };
+        return { problems, summary, sites };
     }
     // Every .ts file under src/ and scripts/ must be audited (a narrowed tsconfig include would hide one).
     const audited = new Set(census.auditedFiles().map((sf) => census.rel(sf.fileName)));
@@ -1361,12 +1401,12 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
     walkTs(path.join(census.root, 'src'), onDisk);
     walkTs(path.join(census.root, 'scripts'), onDisk);
     for (const f of onDisk.map((x) => census.rel(x)).sort()) if (!audited.has(f)) problems.push({ code: 'file-not-audited', message: `${f} is not in the census program (tsconfig.json include does not cover it), so its signing sites are not checked` });
-    const counted = result.sites.filter((s) => s.kind === 'tx-signing' && !s.excluded);
-    summary.excluded_by_census = result.sites.filter((s) => s.excluded && s.excluded_by === 'census').length;
-    summary.message_signing = result.sites.filter((s) => s.kind === 'message-signing').length;
+    const counted = sites.filter((s) => s.kind === 'tx-signing' && !s.excluded);
+    summary.excluded_by_census = sites.filter((s) => s.excluded && s.excluded_by === 'census').length;
+    summary.message_signing = sites.filter((s) => s.kind === 'message-signing').length;
     if (counted.length === 0) {
-        problems.push({ code: 'no-sites', message: `the census found ${result.sites.length} sites and no transaction-signing site in ${prog.src_files} src/ and ${prog.script_files} scripts/ files; a scan that finds no signing site checked nothing` });
-        return { problems, summary };
+        problems.push({ code: 'no-sites', message: `the census found ${sites.length} sites and no transaction-signing site in ${prog.src_files} src/ and ${prog.script_files} scripts/ files; a scan that finds no signing site checked nothing` });
+        return { problems, summary, sites };
     }
     // Auditor exclusions (F3): only a contract call whose mutability the census could not read.
     for (const e of ex.excluded) {
@@ -1417,7 +1457,7 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
     // AC-33: the floor.
     if (remaining.length < ex.floor)
         problems.push({ code: 'below-floor', message: `${remaining.length} transaction-signing sites, below the floor of ${ex.floor}; if a finding's fix removed a site, lower the floor in a commit that names that finding (AC-34)` });
-    return { problems, summary };
+    return { problems, summary, sites };
 }
 
 function gateLine(s: GateSummary, problems: Problem[]): string {
@@ -1606,8 +1646,339 @@ function caseFlag7(): CaseOutcome {
     return outcome;
 }
 
+// ---------------------------------------------------------------------------
+// AC-34: the floor drops only in a commit naming the finding that removed the site.
+// Every git call is an argument array (commit messages are untrusted input and are only
+// matched against a regular expression).
+// ---------------------------------------------------------------------------
+
+const SHA_RE = /^[0-9a-f]{40}$/;
+const FINDING_IN_TEXT_RE = /\bAUD-[A-Z0-9]+-\d{3}\b/g;
+
+function git(root: string, args: string[], env?: NodeJS.ProcessEnv): { status: number; stdout: string; stderr: string } {
+    const r = cp.spawnSync('git', ['-C', root, ...args], { encoding: 'utf8', windowsHide: true, maxBuffer: 64 << 20, env: env ?? process.env });
+    if (r.error) throw new UsageError(`git ${args[0]} could not run: ${r.error.message}`);
+    return { status: r.status ?? -1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+}
+
+interface FloorHistory {
+    shallow: boolean;
+    commits: number;
+    trail: string[];
+    problems: Problem[];
+}
+
+/**
+ * Walk every commit that touches the exception file (oldest first, --full-history so no side
+ * branch is simplified away). A commit lowers the floor when its floor is below the floor of
+ * every parent that has the file; such a commit must name, in its message, an AUD- finding ID
+ * registered under .planning/audit/findings/. A commit that deletes the file or holds an
+ * unreadable floor is a problem too (a delete and re-add would otherwise reset the floor).
+ * A shallow clone cannot show the history, so it is reported, never passed.
+ */
+function floorHistory(root: string, env?: NodeJS.ProcessEnv): FloorHistory {
+    const sh = git(root, ['rev-parse', '--is-shallow-repository'], env);
+    if (sh.status !== 0) throw new UsageError(`not a git repository at ${root}: ${sh.stderr.trim()}`);
+    if (sh.stdout.trim() === 'true') return { shallow: true, commits: 0, trail: [], problems: [] };
+    const rl = git(root, ['rev-list', '--full-history', '--reverse', 'HEAD', '--', EXCEPTIONS_REL], env);
+    if (rl.status !== 0) throw new UsageError(`git rev-list failed: ${rl.stderr.trim()}`);
+    const shas = rl.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    for (const s of shas) if (!SHA_RE.test(s)) throw new UsageError(`git rev-list returned ${JSON.stringify(s)}, not a commit SHA`);
+    const problems: Problem[] = [];
+    if (!shas.length) problems.push({ code: 'history-empty', message: `no commit touches ${EXCEPTIONS_REL}; the history check checked nothing` });
+    const cache = new Map<string, number | 'absent' | 'bad'>();
+    const floorAt = (rev: string): number | 'absent' | 'bad' => {
+        const hit = cache.get(rev);
+        if (hit !== undefined) return hit;
+        let v: number | 'absent' | 'bad';
+        if (git(root, ['cat-file', '-e', `${rev}:${EXCEPTIONS_REL}`], env).status !== 0) v = 'absent';
+        else {
+            const shown = git(root, ['show', `${rev}:${EXCEPTIONS_REL}`], env);
+            let raw: unknown = null;
+            try {
+                raw = shown.status === 0 ? JSON.parse(shown.stdout) : null;
+            } catch {
+                raw = null;
+            }
+            v = isObj(raw) && posInt(raw.floor) ? raw.floor : 'bad';
+        }
+        cache.set(rev, v);
+        return v;
+    };
+    const trail: string[] = [];
+    for (const sha of shas) {
+        const short = sha.slice(0, 12);
+        const cur = floorAt(sha);
+        if (cur === 'absent') {
+            problems.push({ code: 'history-bad-version', message: `${short} deletes ${EXCEPTIONS_REL}; the floor cannot be reset by deleting the file` });
+            trail.push(`${short}:deleted`);
+            continue;
+        }
+        if (cur === 'bad') {
+            problems.push({ code: 'history-bad-version', message: `${short}: ${EXCEPTIONS_REL} is not JSON with a positive integer floor` });
+            trail.push(`${short}:unreadable`);
+            continue;
+        }
+        trail.push(`${short}:${cur}`);
+        const pl = git(root, ['rev-list', '--parents', '-n', '1', sha], env);
+        if (pl.status !== 0) throw new UsageError(`git rev-list --parents ${short} failed: ${pl.stderr.trim()}`);
+        const parents = pl.stdout.trim().split(/\s+/).slice(1).filter((p) => SHA_RE.test(p));
+        const before = parents.map(floorAt).filter((v): v is number => typeof v === 'number');
+        if (!before.length) continue; // the file is introduced here
+        const prev = Math.min(...before);
+        if (cur >= prev) continue;
+        const msg = git(root, ['log', '-1', '--format=%B', sha], env).stdout;
+        const ids = [...new Set(msg.match(FINDING_IN_TEXT_RE) ?? [])];
+        const registered = ids.filter((id) => findingRegistered(root, id));
+        if (!registered.length)
+            problems.push({
+                code: 'floor-lowered-unnamed',
+                message: `${short} lowers the floor from ${prev} to ${cur} without naming a registered finding (${ids.length ? `its message names ${ids.join(', ')}, none registered under .planning/audit/findings/` : 'its message names no AUD- finding ID'})`,
+            });
+    }
+    return { shallow: false, commits: shas.length, trail, problems };
+}
+
+/** The --check-floor-history mode: exit 0 pass, 1 a problem, 2 a shallow clone. `say` is console by default (the self-test captures it). */
+function floorHistoryMain(root: string, env?: NodeJS.ProcessEnv, say: { log: (s: string) => void; error: (s: string) => void } = console): number {
+    const h = floorHistory(root, env);
+    if (h.shallow) {
+        say.error(`check-signing-census --check-floor-history: ${root} is a shallow clone; the floor history needs the full history (actions/checkout fetch-depth: 0). Refusing to pass.`);
+        return 2;
+    }
+    for (const p of h.problems) say.error(`PROBLEM [${p.code}] ${p.message}`);
+    say.log(`check-signing-census --check-floor-history: ${h.commits} commit(s) touch ${EXCEPTIONS_REL}; floor ${h.trail.join(' -> ') || '(none)'}; ${h.problems.length} problem(s)`);
+    return h.problems.length ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Gate self-test cases: one deliberate example per failure the census must catch.
+// Each case runs the whole gate on its own fixture and must fail for exactly its own reason
+// (the set of problem codes is compared exactly).
+// ---------------------------------------------------------------------------
+
+/** Run the gate on a fixture and remove it. */
+function fixtureGate(files: Record<string, string | null>): ReturnType<typeof gateOnRoot> {
+    const dir = writeFixture(files);
+    try {
+        return gateOnRoot(dir);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+const GATE_NEW_UNLOCKED_SRC = `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+// A new signing path that skips withNonceLock (AC-32).
+export async function sneakySell(): Promise<void> {
+    await wallet.sendTransaction(tx);
+}
+`;
+
+const GATE_NEW_UNLOCKED_SCRIPT = `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+async function main(): Promise<void> {
+    await wallet.sendTransaction(tx);
+}
+
+void main();
+`;
+
+const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
+import { withNonceLock } from './lock';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+// The listed site after its fix: now inside withNonceLock.
+export async function simulateSell(): Promise<void> {
+    await withNonceLock(wallet.address, async () => {
+        await wallet.sendTransaction(tx);
+    });
+}
+`;
+
+const GATE_UNKNOWN_SRC = `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+declare function runLater(f: () => Promise<void>): void;
+${GATE_TX}
+
+// A callback whose invocation the census cannot follow: lock status unknown (F3).
+export function later(): void {
+    runLater(async () => {
+        await wallet.sendTransaction(tx);
+    });
+}
+`;
+
+function withExceptions(mutate: (ex: Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] }) => void): string {
+    const ex = baseGateExceptions() as Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] };
+    mutate(ex);
+    return JSON.stringify(ex, null, 2);
+}
+
+function codeCase(name: string, files: Record<string, string | null>, expected: ProblemCode[], also?: (res: ReturnType<typeof gateOnRoot>) => string | null): CaseOutcome {
+    const res = fixtureGate(files);
+    const out = expectCodes(name, res.problems, expected);
+    const extra = out.ok && also ? also(res) : null;
+    return extra ? { name, ok: false, detail: extra } : out;
+}
+
+function gateCases(): CaseOutcome[] {
+    const out: CaseOutcome[] = [];
+    // AC-33: exactly 23 passes. The same census run is then evaluated against changed lists.
+    const baseDir = writeFixture(baseGateFiles(20));
+    try {
+        const base = gateOnRoot(baseDir);
+        out.push(
+            expectCodes('AC-33-exactly-23-sites-passes', base.problems, [], `23 sites (locked ${base.summary?.locked}, unlocked ${base.summary?.unlocked}, excluded ${base.summary?.excluded_by_auditor})`),
+        );
+        if (base.summary?.tx_signing !== 23) out[out.length - 1] = { name: 'AC-33-exactly-23-sites-passes', ok: false, detail: `expected 23 counted sites, got ${base.summary?.tx_signing}` };
+        const run = base.run;
+        const listCase = (name: string, text: string, expected: ProblemCode[]): CaseOutcome => {
+            const parsed = parseExceptions(JSON.parse(text), EXCEPTIONS_REL);
+            const problems = [...parsed.problems, ...(parsed.ex && run ? evaluateGate(baseDir, run, parsed.ex).problems : [])];
+            return expectCodes(name, problems, expected);
+        };
+        out.push(listCase('AC-53-missing-decision-ref-fails', withExceptions((ex) => delete ex.unlocked[1].decision_ref), ['missing-decision-ref']));
+        out.push(listCase('AC-53-decision-record-not-covering-finding-fails', withExceptions((ex) => (ex.unlocked[1].decision_ref = ['OD-91'])), ['decision-does-not-cover']));
+        out.push(listCase('AC-53-decision-record-not-found-fails', withExceptions((ex) => (ex.unlocked[1].decision_ref = ['ESC-NOPE-99'])), ['decision-not-found']));
+        out.push(listCase('AC-53-finding-not-registered-fails', withExceptions((ex) => ((ex.unlocked[0].finding_id = 'AUD-FIX-404'), (ex.unlocked[0].decision_ref = ['OD-90']))), ['finding-not-found', 'decision-does-not-cover']));
+        out.push(listCase('F3-stale-exclusion-fails', withExceptions((ex) => (ex.excluded[0].count = 2)), ['stale-excluded']));
+        out.push(
+            listCase(
+                'T-23-22-excluding-a-signing-site-fails',
+                withExceptions((ex) => {
+                    const moved = ex.unlocked.splice(1, 1)[0];
+                    ex.excluded.push({ file: moved.file, enclosing: moved.enclosing, call: moved.call, count: 1, reason: 'claimed to be a read', evidence_ref: MANUAL_INVENTORY_REL });
+                }),
+                ['excluded-state-changing', 'excluded-evidence', 'surplus-unlocked'],
+            ),
+        );
+        out.push(listCase('exceptions-file-unsorted-fails', withExceptions((ex) => ex.unlocked.reverse()), ['bad-exceptions-file']));
+        out.push(listCase('AC-35-listed-count-above-the-code-fails', withExceptions((ex) => (ex.unlocked[0].count = 3)), ['stale-unlocked']));
+    } finally {
+        fs.rmSync(baseDir, { recursive: true, force: true });
+    }
+    out.push(codeCase('AC-33-22-sites-fails', baseGateFiles(19), ['below-floor']));
+    out.push(
+        codeCase('AC-32-new-unlocked-site-in-src-and-scripts-fails', { ...baseGateFiles(20), 'src/newpath.ts': GATE_NEW_UNLOCKED_SRC, 'scripts/newtool.ts': GATE_NEW_UNLOCKED_SCRIPT }, ['surplus-unlocked'], (res) => {
+            const named = ['src/newpath.ts', 'scripts/newtool.ts'].filter((f) => res.problems.some((p) => p.code === 'surplus-unlocked' && p.message.startsWith(`${f}:`)));
+            return named.length === 2 && res.problems.length === 2 ? null : `expected one surplus problem for each of src/newpath.ts and scripts/newtool.ts, got ${res.problems.map((p) => p.message).join(' | ')}`;
+        }),
+    );
+    out.push(codeCase('AC-35-listed-exception-removed-fails', { ...baseGateFiles(21), 'src/legacy.ts': null }, ['stale-unlocked']));
+    out.push(codeCase('AC-35-listed-exception-fixed-fails', { ...baseGateFiles(20), 'src/legacy.ts': GATE_LEGACY_FIXED }, ['stale-unlocked']));
+    out.push(
+        codeCase(
+            'AC-36-no-files-fails',
+            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': null, 'src/legacy.ts': null, 'scripts/tool.ts': null },
+            ['no-files'],
+        ),
+    );
+    out.push(
+        codeCase(
+            'AC-36-no-sites-fails',
+            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': 'export const nothingSigns = 1;\n', 'src/legacy.ts': null, 'scripts/tool.ts': 'export const nothingSignsHere = 2;\n' },
+            ['no-sites'],
+        ),
+    );
+    out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
+    const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
+    narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
+    out.push(codeCase('file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.ts': GATE_NEW_UNLOCKED_SRC }, ['file-not-audited']));
+    out.push(caseFlag7());
+    return out;
+}
+
+/** A throwaway git repo whose commits set the exception file's floor in order; git runs with no system or global config. */
+function historyRepo(steps: { floor: number | null; message: string }[]): { dir: string; env: NodeJS.ProcessEnv; cleanup: () => void } {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'signing-census-history-'));
+    const cfgDir = fs.mkdtempSync(path.join(os.tmpdir(), 'signing-census-gitcfg-'));
+    const cfg = path.join(cfgDir, 'empty.gitconfig');
+    fs.writeFileSync(cfg, '');
+    const env: NodeJS.ProcessEnv = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: cfg, GIT_TERMINAL_PROMPT: '0' };
+    const cleanup = () => {
+        fs.rmSync(dir, { recursive: true, force: true });
+        fs.rmSync(cfgDir, { recursive: true, force: true });
+    };
+    const must = (args: string[]) => {
+        const r = git(dir, args, env);
+        if (r.status !== 0) throw new Error(`self-test git ${args.join(' ')} failed: ${r.stderr.trim()}`);
+    };
+    must(['-c', 'init.defaultBranch=main', 'init', '-q']);
+    fs.mkdirSync(path.join(dir, '.planning', 'audit', 'findings'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.planning', 'audit', 'findings', 'AUD-FIX-001.json'), JSON.stringify({ id: 'AUD-FIX-001' }));
+    fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    for (const s of steps) {
+        const p = path.join(dir, EXCEPTIONS_REL);
+        if (s.floor === null) must(['rm', '-q', '--', EXCEPTIONS_REL]);
+        else {
+            fs.writeFileSync(p, JSON.stringify({ floor: s.floor, unlocked: [], excluded: [] }, null, 2));
+            must(['add', '--', EXCEPTIONS_REL]);
+        }
+        must(['-c', 'user.name=census-selftest', '-c', 'user.email=census-selftest@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', s.message]);
+    }
+    return { dir, env, cleanup };
+}
+
+function historyCase(name: string, steps: { floor: number | null; message: string }[], expected: ProblemCode[], check?: (h: FloorHistory) => string | null): CaseOutcome {
+    const repo = historyRepo(steps);
+    try {
+        const h = floorHistory(repo.dir, repo.env);
+        if (h.shallow) return { name, ok: false, detail: 'the throwaway repo reads as shallow' };
+        const out = expectCodes(name, h.problems, expected, `floor ${h.trail.map((t) => t.split(':')[1]).join(' -> ')}`);
+        const extra = out.ok && check ? check(h) : null;
+        return extra ? { name, ok: false, detail: extra } : out;
+    } finally {
+        repo.cleanup();
+    }
+}
+
+function historyCases(): CaseOutcome[] {
+    const out: CaseOutcome[] = [];
+    const named = [
+        { floor: 23, message: 'feat: census exceptions, floor 23' },
+        { floor: 24, message: 'feat: a new locked signing site raises the floor' },
+        { floor: 23, message: 'fix: remove the dead approve (AUD-FIX-001)' },
+    ];
+    out.push(historyCase('AC-34-floor-drop-naming-its-finding-passes', named, [], (h) => (h.commits === 3 ? null : `expected 3 commits, got ${h.commits}`)));
+    out.push(
+        historyCase('AC-34-floor-drop-without-a-finding-fails', [...named, { floor: 22, message: 'chore: tidy the census list' }], ['floor-lowered-unnamed'], (h) =>
+            h.problems.length === 1 && /from 23 to 22/.test(h.problems[0].message) ? null : `expected one problem for the 23 -> 22 commit, got ${h.problems.map((p) => p.message).join(' | ')}`,
+        ),
+    );
+    out.push(historyCase('AC-34-floor-drop-naming-an-unregistered-finding-fails', [...named, { floor: 22, message: 'fix: removed per AUD-NOPE-999' }], ['floor-lowered-unnamed']));
+    out.push(historyCase('AC-34-deleting-the-exceptions-file-fails', [...named, { floor: null, message: 'chore: drop the list (AUD-FIX-001)' }], ['history-bad-version']));
+    // A shallow clone cannot show the history: the check must refuse, not pass.
+    const repo = historyRepo(named);
+    const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'signing-census-shallow-'));
+    try {
+        const url = IS_WIN ? `file:///${posix(repo.dir)}` : `file://${repo.dir}`;
+        const r = cp.spawnSync('git', ['clone', '-q', '--depth', '1', '--', url, path.join(clone, 'c')], { encoding: 'utf8', windowsHide: true, env: repo.env });
+        if (r.status !== 0) out.push({ name: 'AC-34-shallow-clone-refused', ok: false, detail: `git clone --depth 1 failed: ${r.stderr.trim()}` });
+        else {
+            const said: string[] = [];
+            const code = floorHistoryMain(path.join(clone, 'c'), repo.env, { log: (s) => said.push(s), error: (s) => said.push(s) });
+            const ok = code === 2 && said.some((s) => /is a shallow clone/.test(s));
+            out.push({ name: 'AC-34-shallow-clone-refused', ok, detail: ok ? 'the --check-floor-history mode exits 2 on a --depth 1 clone' : `expected exit 2 with a shallow-clone message, got exit ${code}: ${said.join(' | ')}` });
+        }
+    } finally {
+        fs.rmSync(clone, { recursive: true, force: true });
+        repo.cleanup();
+    }
+    return out;
+}
+
 function gateSelfTestCases(): CaseOutcome[] {
-    return [caseFlag7()];
+    return [...gateCases(), ...historyCases()];
 }
 
 function selfTest(): number {
@@ -1980,7 +2351,7 @@ function printMain(root: string): number {
     const loaded = loadExceptions(root);
     const run = runCensus(root);
     const ev = loaded.ex ? evaluateGate(root, run, loaded.ex) : null;
-    const { out } = assemble(run.census, run.result, null, null);
+    const { out } = assemble(run.census, ev ? { ...run.result, sites: ev.sites } : run.result, null, null);
     out.generated_by = 'scripts/check-signing-census.ts --print';
     out.audited_sha = null;
     out.audited = 'working tree (sites carry ref <file>:<line>@worktree)';
@@ -1994,6 +2365,7 @@ function main(argv: string[]): number {
     const mode = parseGateArgs(argv);
     if (mode === 'self-test') return selfTest();
     if (mode === 'print') return printMain(REPO_ROOT);
+    if (mode === 'check-floor-history') return floorHistoryMain(REPO_ROOT);
     return gateMain(REPO_ROOT);
 }
 
