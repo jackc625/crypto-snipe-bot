@@ -18,6 +18,10 @@ TEST_EXIT=$?
 echo "  exit $TEST_EXIT  wall $(( $(date +%s) - START ))s"
 grep -E "Test Files|Tests |Errors|Unhandled|nonLoopbackAllowed|telegramAllowed" "$OUT/vitest.log" | tail -12
 [ $TEST_EXIT -eq 0 ] || fail=1
+echo "== recordings compared (AUDIT-06, plan 23-33): the run above, named by its own log"
+node node_modules/ts-node/dist/bin.js scripts/check-recordings-compared.ts --run-log "$OUT/vitest.log" > "$OUT/recordings-compared.log" 2>&1; R0=$?
+grep -E "^(check-recordings-compared|tracked recordings|compared paths|NEVER COMPARED|NOT TRACKED|CASE VARIANT|RESULT)" "$OUT/recordings-compared.log" | tail -12; echo "  check:recordings-compared exit $R0"
+[ $R0 -eq 0 ] || fail=1
 echo "== mock gates"
 node node_modules/ts-node/dist/bin.js scripts/check-realpath-mocks.ts > "$OUT/realpath-mocks.log" 2>&1; R1=$?; tail -2 "$OUT/realpath-mocks.log"; echo "  check:realpath-mocks exit $R1"
 node node_modules/ts-node/dist/bin.js scripts/check-vi-mock-paths.ts > "$OUT/vi-mock.log" 2>&1; R2=$?; tail -2 "$OUT/vi-mock.log"; echo "  check:vi-mock exit $R2"

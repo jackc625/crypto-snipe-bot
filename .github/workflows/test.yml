@@ -22,6 +22,16 @@ jobs:
       - run: npm run test:unit
       - run: npm run test:integration
       - run: npm run test:realpath
+      - name: Recordings compared gate (AUDIT-06)
+        # AUDIT-06: the commit taxonomy gate below protects each recording file, but a commit can
+        # point a scenario test at a brand-new recording name and add that file while the old
+        # recording stays, unread. compareRecording records every recording it compares in a run,
+        # and this step fails when a recording git tracks under test/realpath/recordings/ (a
+        # scenario .jsonl or an env/*.json snapshot file) was not compared, or a compared path is
+        # not tracked. It judges the run the step above just made: this job runs on a new machine
+        # and only that step runs the realpath project, so --sole-run (CI only) finds exactly one
+        # run and exits 2 on zero or several. No record for the run is exit 2, never a pass.
+        run: npm run check:recordings-compared -- --sole-run
       - name: vi.mock specifier gate (SAFE-06)
         # SAFE-06: a moved file must not turn a mock into a silent no-op. AST check of
         # vi.mock / vi.doMock / vi.unmock / vi.doUnmock: each specifier must be a literal that
