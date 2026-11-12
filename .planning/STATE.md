@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Paused after 23-30-PLAN.md (wave 10 complete)
-last_updated: "2026-11-12T13:41:40.583Z"
-last_activity: 2026-11-11
+stopped_at: Completed 23-19-PLAN.md
+last_updated: "2026-11-12T15:02:38.742Z"
+last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 9e0a87f158cb3ed8f47fb3efe2c5164aeb267118
+state_head: 1148cb3aeb5f16a3d6758bf34a9408952f06cc9d
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 52
+  completed_plans: 53
   percent: 9
 ---
 
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 21 of 31
+Plan: 20 of 31
 Status: Ready to execute
-Last activity: 2026-11-11 — Phase 23 execution started
+Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
@@ -138,11 +138,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P18 | 16min | 2 tasks | 4 files |
 | Phase 23 P31 | 52min | 3 tasks | 12 files |
 | Phase 23 P30 | 22min | 3 tasks | 6 files |
+| Phase 23 P19 | 46min | 2 tasks | 9 files |
 
 ## Session
 
-**Last session:** 2026-11-12T13:41:40.131Z
-**Stopped at:** Completed 23-30-PLAN.md
+**Last session:** 2026-11-12T15:02:38.366Z
+**Stopped at:** Completed 23-19-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -313,3 +314,7 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-30: test/unit/api/antiRug.test.ts, test/unit/chainRegistry/antiRugConfig.test.ts and test/unit/exitEngine/antiRugReason.test.ts read no named src/ or scripts/ file (CHAR-06). Test 6 sends a real request to the real startApiServer (port read from a spy on http.Server.prototype.listen; 401 without a session, resets the same context with one); the after-/controls order check is removed as unobservable (prefixes do not overlap; named in the SUMMARY), title renamed in rails-test-edits.json. Test 20 imports the real config with every anti-rug variable unset (no fatal); Tests 19 and 21 find the one private REQUIRED_ENV_VARS by symbol (loadRepoModules) and check its 44 anti-rug entries. antiRugReason Test 1 is a real type-checker query (ts.createProgram with tsconfig.json options over the one src/ file exporting executeFullSell), proven able to fail on a temp-directory source; Tests 2/3/3b/7 drive the real executeFullSell / executePartialSell. src/ unchanged.
 - [Phase 23]: 23-30 RED proofs: groups api-mount (3, reach vite), antirug-config (3) and reason (5), 13 RED-OK lines, three rounds identical; --check-manifest MANIFEST-OK rows 32 files 8 guards 1 (23-26 needs 36/11/1); --check-summaries SUMMARIES-OK red-ok 52 over 23-18/23-31/23-30. antirug-gas-dropped expects Tests 2 and 3b, not 2 alone (measured: the private escalation is gasMultiplier's only consumer in executeFullSell, so a wrong value and an unpassed one are the same behavior; Test 3 stays green). For 23-19: its AC-37 gate must accept loadRepoModules / ts.createProgram over a directory walk, a local walkTs + ts.createSourceFile, and reads of .env.example and tsconfig.json. Keep failure messages short: Vitest prints a long string inside an array as Array(1), which the runner refuses BAD-FAILURE.
 - [Phase 23]: 23-30 gates: full railed npm test on Node 22 (02772f4 tree): 199 files, 1397/1397, wall 165 s, unit 946 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0; slowest new test antiRugReason Test 1 at 9.0 s of 60 s. tsc clean x3; check:realpath-mocks 0, check:vi-mock 598 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS with no re_audit rows needed; test-identity 0 missing, 1 rename honoured. No finding registered or regraded. New deferred item: test/fixtures/api.fixtures.ts fails a strict type check (TS2322, never compiled; AUD-TESTU-008 class, Phase 28).
+- [Phase 23]: 23-19: CHAR-06 complete. test/unit/bot/twoStageSigint.test.ts boots the real startMultiChainBot under the midRunWalletCheck mock set (plus a logger recorder) in a describe-level beforeAll and checks exactly one new SIGINT and one SIGTERM listener, a single grace timer that forces exit 1 at SIGINT_GRACE_MS=1234, and exit 130 on a second signal, removing the listeners it added; inclusionReconciliation drives the real V2/V3 buy handlers (rows store the hash submitBuyTx returned), holds the real wallet nonce lock to show the seam waits, proves the removed tax function gone by a real import plus an AST walk of src/, and runs the real simulateSwapForChain against a runner that refuses any sent transaction; dotenvSrcSkip case (e) only runs the five dotenv sites as railed children with VITEST set (zero env-read-blocked). RED proofs: groups sigint (4), inclusion (6), dotenv-gate (5), 16 RED-OK lines, three rounds identical; --check-manifest MANIFEST-OK rows 36 files 11 guards 1; --check-summaries SUMMARIES-OK red-ok 67 over 23-18/23-31/23-30/23-19; no test removed (two not.toContain lines on old handler text removed inside the converted twoStageSigint test, named in the SUMMARY). 4 own-title renames recorded; test-identity 0 missing, 4 renames honoured.
+- [Phase 23]: 23-19 operator ruling (chosen before dispatch; operator's choice "Allow-list it (Recommended)", the "(Recommended)" label was the orchestrator's): the AC-37 gate test/unit/sourceTextGate.test.ts scans every .ts/.tsx/.mts/.cts/.js/.jsx/.cjs/.mjs file under test/, not only *.test.ts, and test/realpath/triage/fixtures/AUD-API-002-restart.ts is on its allow list because it reads src/bot.ts only to hash the private onRestart closure its mirror copies. Phase 24's AUD-API-002 fix makes that hash fail by design ("onRestart changed"); Phase 24 then replaces the mirror with the real path and removes the allow-list entry (deferred-items.md, owner Phase 24).
+- [Phase 23]: 23-19 AC-37 gate contract for later plans: a named-file read is readFileSync/readFile (any receiver)/createReadStream, ts.createSourceFile or ts.createProgram (array, { rootNames: x } or { rootNames }) whose path names a file below TOP-LEVEL src/ or scripts/ (first segment after . and .. is src or scripts, a later segment has an extension); literals are followed through path.join/resolve calls, templates, +, arrays, local consts, for-of bindings and local helper parameters up to 3 levels (one const level, the plan's wording, misses 2 of the 11 phase-start forms, measured); a path containing os.tmpdir/mkdtemp, dashboard/src, .env.example, package.json and tsconfig.json pass. The allow list is only the 3 named dashboard tests and the AUD-API-002 fixture; the path-agnostic scanners and the static proofs pass without entries (asserted). A new hit is a CI failure, not an allow-list addition.
+- [Phase 23]: 23-19 gates: full railed npm test on Node 22 (6904ec6 tree) twice: 200 files, 1401/1401, unit 950 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0 both runs; wall 230 s then 168 s (run 1 load variance: backupState self-check 65.9 s then 52.2 s of 120 s, 55 then 43 percent, not this plan's test; watch it at wave gates). tsc clean x3; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS after a reviewed re_audit row for test/unit/rails/dotenvSrcSkip.test.ts (be3c572..1018e79, 6904ec6). New deferred items: the restart fixture's Phase 24 allow-list removal, and a pre-existing strict type error in inclusionReconciliation.test.ts (TS2345 x3, chainPriorityWei, Phase 28). No finding registered or regraded.
