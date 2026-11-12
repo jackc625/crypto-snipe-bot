@@ -1,0 +1,1333 @@
+{
+  "tuples": [
+    {
+      "finding": "AUD-ANTIRUG-001",
+      "file": "test/realpath/triage/AUD-ANTIRUG-001.test.ts",
+      "title": "AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops each rewrite ctx.wsProvider > reconnect-leaves-subscription-off-ctx-provider: after one socket drop the rug-log subscription exists once but on the anti-rug loop socket, while ctx.wsProvider ends on a DEX loop provider",
+      "claim": "reconnect-leaves-subscription-off-ctx-provider",
+      "expected": {
+        "onCtxWsProvider": true,
+        "rugLogSubscriptions": 1
+      },
+      "actual": {
+        "onCtxWsProvider": false,
+        "rugLogSubscriptions": 1
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-001",
+      "file": "test/realpath/triage/AUD-ANTIRUG-001.test.ts",
+      "title": "AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops each rewrite ctx.wsProvider > replaced-providers-left-alive: after one socket drop, the providers ctx.wsProvider no longer points at are not destroyed and their sockets stay open",
+      "claim": "replaced-providers-left-alive",
+      "expected": {
+        "replacedProvidersStillOpen": 0
+      },
+      "actual": {
+        "replacedProvidersStillOpen": 3
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-001",
+      "file": "test/realpath/triage/AUD-ANTIRUG-001.test.ts",
+      "title": "AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops each rewrite ctx.wsProvider > second-registration-duplicates-dispatch: after one drop, the next buy on the chain adds a second rug-log subscription for the earlier position, so one LP transfer on its pair is evaluated twice",
+      "claim": "second-registration-duplicates-dispatch",
+      "expected": {
+        "evaluationsOfOneLog": 1,
+        "rugLogSubscriptionsForPairA": 1
+      },
+      "actual": {
+        "evaluationsOfOneLog": 2,
+        "rugLogSubscriptionsForPairA": 2
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-002",
+      "file": "test/realpath/triage/AUD-ANTIRUG-002.test.ts",
+      "title": "AUD-ANTIRUG-002: a refused WebSocket connect ends the whole process > boot-refused-connect-exits: the boot WebSocket connect (getWsProvider) meets a refused port and the process exits",
+      "claim": "boot-refused-connect-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "Error: connect ECONNREFUSED"
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-002",
+      "file": "test/realpath/triage/AUD-ANTIRUG-002.test.ts",
+      "title": "AUD-ANTIRUG-002: a refused WebSocket connect ends the whole process > detector-refused-reconnect-exits: the anti-rug reconnect after a socket drop meets a refused port and the process exits",
+      "claim": "detector-refused-reconnect-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "Error: connect ECONNREFUSED"
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-002",
+      "file": "test/realpath/triage/AUD-ANTIRUG-002.test.ts",
+      "title": "AUD-ANTIRUG-002: a refused WebSocket connect ends the whole process > dex-v2-refused-reconnect-exits: the V2 DEX listener reconnect after a socket drop meets a refused port and the process exits",
+      "claim": "dex-v2-refused-reconnect-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "Error: connect ECONNREFUSED"
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-002",
+      "file": "test/realpath/triage/AUD-ANTIRUG-002.test.ts",
+      "title": "AUD-ANTIRUG-002: a refused WebSocket connect ends the whole process > dex-v3-refused-reconnect-exits: the V3 DEX listener reconnect after a socket drop meets a refused port and the process exits",
+      "claim": "dex-v3-refused-reconnect-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "Error: connect ECONNREFUSED"
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-003",
+      "file": "test/realpath/triage/AUD-ANTIRUG-003.test.ts",
+      "title": "AUD-ANTIRUG-003: the anti-rug circuit breaker counts each dispatch of one rug > breaker-counts-dispatches-not-rugs: one 95 percent liquidity pull, with the first anti-rug exit held in flight, counts three triggers and trips the chain breaker",
+      "claim": "breaker-counts-dispatches-not-rugs",
+      "expected": {
+        "breakerTripped": false,
+        "triggersCountedForOneRug": 1
+      },
+      "actual": {
+        "breakerTripped": true,
+        "triggersCountedForOneRug": 3
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-004",
+      "file": "test/realpath/triage/AUD-ANTIRUG-004.test.ts",
+      "title": "AUD-ANTIRUG-004: a failed anti-rug escape is not retried > failed-escape-not-retried: an anti-rug exit whose approval the node refuses is never dispatched again within 2 minutes of fake time while the position is still held",
+      "claim": "failed-escape-not-retried",
+      "expected": {
+        "escapeDispatchedAgain": true
+      },
+      "actual": {
+        "escapeDispatchedAgain": false
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-005",
+      "file": "test/realpath/triage/AUD-ANTIRUG-005.test.ts",
+      "title": "AUD-ANTIRUG-005: the anti-rug backfill does not keep its own contract > backfill-fires-live-exit: a rug mined while the socket was down is replayed by the reconnect backfill, which reaches triggerAntiRugExit and submits an anti-rug sell",
+      "claim": "backfill-fires-live-exit",
+      "expected": {
+        "antiRugSellSubmitted": false,
+        "triggerAntiRugExitReachedFromBackfill": false
+      },
+      "actual": {
+        "antiRugSellSubmitted": true,
+        "triggerAntiRugExitReachedFromBackfill": true
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-005",
+      "file": "test/realpath/triage/AUD-ANTIRUG-005.test.ts",
+      "title": "AUD-ANTIRUG-005: the anti-rug backfill does not keep its own contract > live-dispatch-does-not-advance-cursor: a rug log dispatched live leaves chain_state.last_seen_block at the arming backfill block, behind the log the bot already acted on",
+      "claim": "live-dispatch-does-not-advance-cursor",
+      "expected": {
+        "cursorReachedDispatchedLogBlock": true
+      },
+      "actual": {
+        "cursorReachedDispatchedLogBlock": false
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-018",
+      "file": "test/realpath/triage/AUD-ANTIRUG-018.test.ts",
+      "title": "AUD-ANTIRUG-018: the HTTP anti-rug poller asks for its whole outstanding range and never recovers from a gap wider than the provider limit > restart-gap-blinds-http-poller: after an ordinary restart on a chain without a WebSocket URL, every anti-rug poll is refused by the provider range limit and a 95 percent liquidity pull is never evaluated",
+      "claim": "restart-gap-blinds-http-poller",
+      "expected": {
+        "cursorReachedRugBlock": true,
+        "healthShown": "connected",
+        "rugEvaluated": true
+      },
+      "actual": {
+        "cursorReachedRugBlock": false,
+        "healthShown": "connected",
+        "rugEvaluated": false
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-024",
+      "file": "test/realpath/triage/AUD-ANTIRUG-024.test.ts",
+      "title": "AUD-ANTIRUG-024: the first anti-rug start on a fresh database raises a false GAP DETECTED > first-start-false-gap-alert: boot step 4 on a fresh database alerts that the whole chain history was missed instead of seeding the cursor",
+      "claim": "first-start-false-gap-alert",
+      "expected": {
+        "cursorSeeded": true,
+        "gapAlertSent": false,
+        "gapEventBroadcast": false
+      },
+      "actual": {
+        "cursorSeeded": false,
+        "gapAlertSent": true,
+        "gapEventBroadcast": true
+      }
+    },
+    {
+      "finding": "AUD-ANTIRUG-025",
+      "file": "test/realpath/triage/AUD-ANTIRUG-025.test.ts",
+      "title": "AUD-ANTIRUG-025: a restart drops the anti-rug WebSocket subscription of every resumed position > resume-drops-ws-subscription: after restart and resume, the node holds no subscription for the pair and the restarted bot never sees an LP transfer on it",
+      "claim": "resume-drops-ws-subscription",
+      "expected": {
+        "lpTransferSeenAfterRestart": true,
+        "subscribedAfterRestart": true
+      },
+      "actual": {
+        "lpTransferSeenAfterRestart": false,
+        "subscribedAfterRestart": false
+      }
+    },
+    {
+      "finding": "AUD-API-001",
+      "file": "test/realpath/triage/AUD-API-001.test.ts",
+      "title": "AUD-API-001: dashboard force-sell and emergency-sell skip a still-held position whose exit failed (ESC-PRE-04) > emergency-sell-skips-failed-held: after the catch path marks the position failed while its tokens are still held, emergency-sell answers \"No open positions to sell\" and sends no sell",
+      "claim": "emergency-sell-skips-failed-held",
+      "expected": {
+        "emergencySellReachesPosition": true
+      },
+      "actual": {
+        "emergencySellReachesPosition": false
+      }
+    },
+    {
+      "finding": "AUD-API-001",
+      "file": "test/realpath/triage/AUD-API-001.test.ts",
+      "title": "AUD-API-001: dashboard force-sell and emergency-sell skip a still-held position whose exit failed (ESC-PRE-04) > force-sell-skips-failed-held: after the catch path marks the position failed while its tokens are still held, force-sell answers 404 and sends no sell",
+      "claim": "force-sell-skips-failed-held",
+      "expected": {
+        "operatorSellReachesPosition": true
+      },
+      "actual": {
+        "operatorSellReachesPosition": false
+      }
+    },
+    {
+      "finding": "AUD-API-002",
+      "file": "test/realpath/triage/AUD-API-002.test.ts",
+      "title": "AUD-API-002: dashboard Stop removes the anti-rug subscription and Start does not bring it back > start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the pinned onRestart mirror), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated",
+      "claim": "start-does-not-rearm-antirug",
+      "expected": {
+        "antiRugSubscriptionsForPair": 1,
+        "healthShown": "connected",
+        "rugEvaluated": true
+      },
+      "actual": {
+        "antiRugSubscriptionsForPair": 0,
+        "healthShown": "connected",
+        "rugEvaluated": false
+      }
+    },
+    {
+      "finding": "AUD-API-002",
+      "file": "test/realpath/triage/AUD-API-002.test.ts",
+      "title": "AUD-API-002: dashboard Stop removes the anti-rug subscription and Start does not bring it back > stop-disarms-antirug: after the real Stop route, the node holds no anti-rug subscription for the pair, a 95 percent liquidity pull is never evaluated, and the dashboard is still told the chain is connected",
+      "claim": "stop-disarms-antirug",
+      "expected": {
+        "antiRugSubscriptionsForPair": 1,
+        "healthShown": "connected",
+        "rugEvaluated": true
+      },
+      "actual": {
+        "antiRugSubscriptionsForPair": 0,
+        "healthShown": "connected",
+        "rugEvaluated": false
+      }
+    },
+    {
+      "finding": "AUD-API-008",
+      "file": "test/realpath/triage/AUD-API-008.test.ts",
+      "title": "AUD-API-008: one malformed Host header on an upgrade request ends the whole process > malformed-host-upgrade-exits: GET /ws with Upgrade: websocket and Host \"a b\" ends the process",
+      "claim": "malformed-host-upgrade-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "TypeError: Invalid URL"
+      }
+    },
+    {
+      "finding": "AUD-BUY-001",
+      "file": "test/realpath/triage/AUD-BUY-001.test.ts",
+      "title": "AUD-BUY-001: a landed deliberate buy is armed only in the short-lived script process > monitor-dies-with-script and anti-rug-dies-with-script: the real scripts/deliberate-buy.ts lands a buy and arms both protections in its own process, exits 0, and the running bot on the same database picks up neither",
+      "claim": "anti-rug-dies-with-script",
+      "expected": {
+        "antiRugArmedInScript": true,
+        "antiRugHeldByRunningProcess": true,
+        "baselineVisibleToRunningProcess": true,
+        "scriptExitStatus": 0
+      },
+      "actual": {
+        "antiRugArmedInScript": true,
+        "antiRugHeldByRunningProcess": false,
+        "baselineVisibleToRunningProcess": true,
+        "scriptExitStatus": 0
+      }
+    },
+    {
+      "finding": "AUD-BUY-001",
+      "file": "test/realpath/triage/AUD-BUY-001.test.ts",
+      "title": "AUD-BUY-001: a landed deliberate buy is armed only in the short-lived script process > monitor-dies-with-script and anti-rug-dies-with-script: the real scripts/deliberate-buy.ts lands a buy and arms both protections in its own process, exits 0, and the running bot on the same database picks up neither",
+      "claim": "monitor-dies-with-script",
+      "expected": {
+        "armedInScript": true,
+        "monitoredByRunningProcess": true,
+        "rowVisibleToRunningProcess": true,
+        "scriptExitStatus": 0
+      },
+      "actual": {
+        "armedInScript": true,
+        "monitoredByRunningProcess": false,
+        "rowVisibleToRunningProcess": true,
+        "scriptExitStatus": 0
+      }
+    },
+    {
+      "finding": "AUD-BUY-002",
+      "file": "test/realpath/triage/AUD-BUY-002.test.ts",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: one balanceOf error after the buy mined flips the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
+      "claim": "balanceof-error-flips-landed-buy-to-failed",
+      "expected": {
+        "alertText": null,
+        "monitored": true,
+        "status": "pending"
+      },
+      "actual": {
+        "alertText": "*TX failed* for `RPLT`",
+        "monitored": false,
+        "status": "failed"
+      }
+    },
+    {
+      "finding": "AUD-BUY-002",
+      "file": "test/realpath/triage/AUD-BUY-002.test.ts",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: one balanceOf error after the buy mined flips the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
+      "claim": "failed-row-not-resumed-after-restart",
+      "expected": {
+        "resumedAfterRestart": true
+      },
+      "actual": {
+        "resumedAfterRestart": false
+      }
+    },
+    {
+      "finding": "AUD-BUY-002",
+      "file": "test/realpath/triage/AUD-BUY-002.test.ts",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > earlier-attempt-lands-no-trade-row: attempt 0 is not included at its first target block, attempt 1 signs the same nonce, attempt 0 then lands and the bot records no trade",
+      "claim": "earlier-attempt-lands-no-trade-row",
+      "expected": {
+        "recordedHash": "0x3bef0dce2c277307a036baa816e0d9ff303cfa596ce5e889ef26eae114c2b7c4",
+        "tradeRows": 1
+      },
+      "actual": {
+        "recordedHash": null,
+        "tradeRows": 0
+      }
+    },
+    {
+      "finding": "AUD-BUY-002",
+      "file": "test/realpath/triage/AUD-BUY-002.test.ts",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > fanout-error-after-send-no-trade-row: the relay refuses a later block of the fanout after the bundle for the first block was sent; the bot records nothing and that bundle lands",
+      "claim": "fanout-error-after-send-no-trade-row",
+      "expected": {
+        "recordedHash": "0x3bef0dce2c277307a036baa816e0d9ff303cfa596ce5e889ef26eae114c2b7c4",
+        "tradeRows": 1
+      },
+      "actual": {
+        "recordedHash": null,
+        "tradeRows": 0
+      }
+    },
+    {
+      "finding": "AUD-BUY-003",
+      "file": "test/realpath/triage/AUD-BUY-003.test.ts",
+      "title": "AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-02) > v2-quote-failure-sends-zero-amount-out-min: a failed getAmountsOut leaves minOut 0 and the V2 swap is still sent with amountOutMin 0",
+      "claim": "v2-quote-failure-sends-zero-amount-out-min",
+      "expected": {
+        "unboundedSwapSent": false
+      },
+      "actual": {
+        "unboundedSwapSent": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-003",
+      "file": "test/realpath/triage/AUD-BUY-003.test.ts",
+      "title": "AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-02) > v3-quote-failure-sends-zero-amount-out-minimum: a failed quoteExactInputSingle leaves minOut 0 and the V3 multicall still carries amountOutMinimum 0",
+      "claim": "v3-quote-failure-sends-zero-amount-out-minimum",
+      "expected": {
+        "unboundedSwapSent": false
+      },
+      "actual": {
+        "unboundedSwapSent": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-004",
+      "file": "test/realpath/triage/AUD-BUY-004.test.ts",
+      "title": "AUD-BUY-004: the already-sniped check is read once, long before the row is written, so two handlers for one token both buy > double-buy-same-token: a second handler for the same PairCreated passes the check while the first buy is inside the lock, and both buys land",
+      "claim": "double-buy-same-token",
+      "expected": {
+        "buysLanded": 1
+      },
+      "actual": {
+        "buysLanded": 2
+      }
+    },
+    {
+      "finding": "AUD-BUY-005",
+      "file": "test/realpath/triage/AUD-BUY-005.test.ts",
+      "title": "AUD-BUY-005: a rejection from the un-awaited V3 pool handler ends the whole process > v3-listener-unhandled-rejection-exits: a bad ETH_MIN_LIQUIDITY rejects the un-awaited V3 handler on the first pool and the process exits",
+      "claim": "v3-listener-unhandled-rejection-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "TypeError: invalid FixedNumber string value"
+      }
+    },
+    {
+      "finding": "AUD-BUY-006",
+      "file": "test/realpath/triage/AUD-BUY-006.test.ts",
+      "title": "AUD-BUY-006: the Telegram allowlist accepts every source unless both lists are set > empty-lists-accept-any-source: with neither list set, a message from an unknown sender in an unknown chat routes into the buy pipeline and a buy is sent",
+      "claim": "empty-lists-accept-any-source",
+      "expected": {
+        "buySubmitted": false,
+        "routedToBuyPipeline": false
+      },
+      "actual": {
+        "buySubmitted": true,
+        "routedToBuyPipeline": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-006",
+      "file": "test/realpath/triage/AUD-BUY-006.test.ts",
+      "title": "AUD-BUY-006: the Telegram allowlist accepts every source unless both lists are set > sender-only-list-accepts-any-sender: with only the sender list set, a message from a sender not on it is still accepted (the empty channel list allows every chat) and a buy is sent",
+      "claim": "sender-only-list-accepts-any-sender",
+      "expected": {
+        "buySubmitted": false,
+        "routedToBuyPipeline": false
+      },
+      "actual": {
+        "buySubmitted": true,
+        "routedToBuyPipeline": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-007",
+      "file": "test/realpath/triage/AUD-BUY-007.test.ts",
+      "title": "AUD-BUY-007: the dead simulateSell signs a real approve of the whole balance, outside the nonce lock > simulate-sell-signs-approve-outside-nonce-lock: calling simulateSell on a held token signs one approve while the wallet lock is held",
+      "claim": "simulate-sell-signs-approve-outside-nonce-lock",
+      "expected": {
+        "signed": [],
+        "signedWhileNonceLockHeld": 0
+      },
+      "actual": {
+        "signed": [
+          {
+            "amount": "12345000000000000000000",
+            "call": "approve",
+            "route": "public",
+            "spender": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+            "to": "0x0Fa62a9D7784a029A84e86A546C6b9415Bb875e8"
+          }
+        ],
+        "signedWhileNonceLockHeld": 1
+      }
+    },
+    {
+      "finding": "AUD-BUY-008",
+      "file": "test/realpath/triage/AUD-BUY-008.test.ts",
+      "title": "AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX on the same socket > restart-stacks-reconnect-loop: after a dashboard Stop and Start on a connected socket, one socket close runs two reconnect loops for the DEX",
+      "claim": "restart-stacks-reconnect-loop",
+      "expected": {
+        "reconnectLoopsForOneClose": 1
+      },
+      "actual": {
+        "reconnectLoopsForOneClose": 2
+      }
+    },
+    {
+      "finding": "AUD-BUY-009",
+      "file": "test/realpath/triage/AUD-BUY-009.test.ts",
+      "title": "AUD-BUY-009: the New-Token alert prints a constant honeypot field > v2-alert-honeypot-field-is-constant: an ordinary V2 launch passes the on-chain roundtrip, and the alert prints a bare \"No\" from a constant",
+      "claim": "v2-alert-honeypot-field-is-constant",
+      "expected": {
+        "honeypotFieldIsBareConstant": false,
+        "roundtripCheckRan": true
+      },
+      "actual": {
+        "honeypotFieldIsBareConstant": true,
+        "roundtripCheckRan": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-009",
+      "file": "test/realpath/triage/AUD-BUY-009.test.ts",
+      "title": "AUD-BUY-009: the New-Token alert prints a constant honeypot field > v3-alert-honeypot-field-is-constant: an ordinary V3 launch passes the on-chain roundtrip, and the alert prints a bare \"No\" from a constant",
+      "claim": "v3-alert-honeypot-field-is-constant",
+      "expected": {
+        "honeypotFieldIsBareConstant": false,
+        "roundtripCheckRan": true
+      },
+      "actual": {
+        "honeypotFieldIsBareConstant": true,
+        "roundtripCheckRan": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-010",
+      "file": "test/realpath/triage/AUD-BUY-010.test.ts",
+      "title": "AUD-BUY-010: risk limits are checked long before the snipe is recorded, so concurrent handlers for different tokens all pass > max-open-positions-overspent: with room for exactly one more position, handlers for two different tokens both pass canSnipe and both buys land",
+      "claim": "max-open-positions-overspent",
+      "expected": {
+        "buysLanded": 1
+      },
+      "actual": {
+        "buysLanded": 2
+      }
+    },
+    {
+      "finding": "AUD-BUY-011",
+      "file": "test/realpath/triage/AUD-BUY-011.test.ts",
+      "title": "AUD-BUY-011: dashboard Stop does not stop buying on the chain > http-poller-buys-after-stop: on a chain without a WebSocket URL, after the real stop route the HTTP poller still finds a new pair and the bot buys",
+      "claim": "http-poller-buys-after-stop",
+      "expected": {
+        "buySubmittedAfterStop": false,
+        "chainShownStopped": true
+      },
+      "actual": {
+        "buySubmittedAfterStop": true,
+        "chainShownStopped": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-011",
+      "file": "test/realpath/triage/AUD-BUY-011.test.ts",
+      "title": "AUD-BUY-011: dashboard Stop does not stop buying on the chain > telegram-routes-to-stopped-chain: on a WebSocket chain, the real stop route removes the factory listener, yet a Telegram alpha drop from an allowlisted sender still routes to the stopped chain and the bot buys",
+      "claim": "telegram-routes-to-stopped-chain",
+      "expected": {
+        "buySubmittedAfterStop": false,
+        "chainShownStopped": true
+      },
+      "actual": {
+        "buySubmittedAfterStop": true,
+        "chainShownStopped": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-015",
+      "file": "test/realpath/triage/AUD-BUY-015.test.ts",
+      "title": "AUD-BUY-015: the V3 minimum-liquidity gate only proves the quoter did not revert > thin-pool-passes-min-liquidity-gate: a pool with 0.001 ETH of depth against a 0.5 ETH threshold passes the gate and the bot buys",
+      "claim": "thin-pool-passes-min-liquidity-gate",
+      "expected": {
+        "thinPoolRefused": true
+      },
+      "actual": {
+        "thinPoolRefused": false
+      }
+    },
+    {
+      "finding": "AUD-BUY-025",
+      "file": "test/realpath/triage/AUD-TX-002.test.ts",
+      "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > deliberate-public-wait-holds-wallet-lock: a deliberate buy whose public transaction is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
+      "claim": "deliberate-public-wait-holds-wallet-lock",
+      "expected": {
+        "laterOperationStartedInWindow": true
+      },
+      "actual": {
+        "laterOperationStartedInWindow": false
+      }
+    },
+    {
+      "finding": "AUD-BUY-027",
+      "file": "test/realpath/triage/AUD-BUY-027.test.ts",
+      "title": "AUD-BUY-027: factory events are not filtered to wrapped-native pairs > non-native-pair-checked-and-bought: a PairCreated for an A/B pair is processed as a snipe, its B reserve is read as native, and the bot buys A through WETH",
+      "claim": "non-native-pair-checked-and-bought",
+      "expected": {
+        "buySubmitted": false,
+        "processedAsSnipe": false
+      },
+      "actual": {
+        "buySubmitted": true,
+        "processedAsSnipe": true
+      }
+    },
+    {
+      "finding": "AUD-BUY-028",
+      "file": "test/realpath/triage/AUD-BUY-028.test.ts",
+      "title": "AUD-BUY-028: the lock gate passes on any active lock, whatever share of the LP it covers > mudra-one-percent-lock-passes: on BSC, a Mudra lock of 1 percent of the LP supply passes the lock gate and the bot buys",
+      "claim": "mudra-one-percent-lock-passes",
+      "expected": {
+        "buySubmitted": false,
+        "lockedShareOfLpPct": 1
+      },
+      "actual": {
+        "buySubmitted": true,
+        "lockedShareOfLpPct": 1
+      }
+    },
+    {
+      "finding": "AUD-BUY-028",
+      "file": "test/realpath/triage/AUD-BUY-028.test.ts",
+      "title": "AUD-BUY-028: the lock gate passes on any active lock, whatever share of the LP it covers > unicrypt-one-percent-lock-passes: on ETH, a Unicrypt lock of 1 percent of the LP supply passes the lock gate and the bot buys",
+      "claim": "unicrypt-one-percent-lock-passes",
+      "expected": {
+        "buySubmitted": false,
+        "lockedShareOfLpPct": 1
+      },
+      "actual": {
+        "buySubmitted": true,
+        "lockedShareOfLpPct": 1
+      }
+    },
+    {
+      "finding": "AUD-BUY-030",
+      "file": "test/realpath/triage/AUD-BUY-030.test.ts",
+      "title": "AUD-BUY-030: the deliberate public buy is not pinned to the private attempt nonce > public-buy-not-pinned-to-private-nonce: the last private attempt lands after the guard read the nonce, and the public buy takes the next nonce and lands as a second buy",
+      "claim": "public-buy-not-pinned-to-private-nonce",
+      "expected": {
+        "buysLanded": 1
+      },
+      "actual": {
+        "buysLanded": 2
+      }
+    },
+    {
+      "finding": "AUD-BUY-033",
+      "file": "test/realpath/triage/AUD-BUY-033.test.ts",
+      "title": "AUD-BUY-033: a V3 snipe sends the whole amount as ETH value and never refunds it > v3-multicall-has-no-refund: the V3 snipe batch is multicall(deadline, [exactInputSingle]) with value the whole snipe amount and no refundETH",
+      "claim": "v3-multicall-has-no-refund",
+      "expected": {
+        "refundsUnspentEth": true
+      },
+      "actual": {
+        "refundsUnspentEth": false
+      }
+    },
+    {
+      "finding": "AUD-BUY-036",
+      "file": "test/realpath/triage/AUD-BUY-036.test.ts",
+      "title": "AUD-BUY-036: the HTTP DEX poller never recovers from an outage longer than the provider log-range limit > outage-blinds-http-dex-poller: after a 12-block RPC outage while the bot runs, every factory poll is refused and a new pair is never found",
+      "claim": "outage-blinds-http-dex-poller",
+      "expected": {
+        "newPairFound": true
+      },
+      "actual": {
+        "newPairFound": false
+      }
+    },
+    {
+      "finding": "AUD-DB-001",
+      "file": "test/realpath/triage/AUD-DB-001.test.ts",
+      "title": "AUD-DB-001: a non-numeric risk setting switches its limit off (RC-06) > daily-loss-pct-unparsed: after a near-total loss, DAILY_LOSS_PCT 0.5 refuses the next snipe and DAILY_LOSS_PCT=abc allows it",
+      "claim": "daily-loss-pct-unparsed",
+      "expected": {
+        "limitEnforced": true
+      },
+      "actual": {
+        "limitEnforced": false
+      }
+    },
+    {
+      "finding": "AUD-DB-001",
+      "file": "test/realpath/triage/AUD-DB-001.test.ts",
+      "title": "AUD-DB-001: a non-numeric risk setting switches its limit off (RC-06) > max-open-positions-unparsed: with one open position, MAX_OPEN_POSITIONS 1 refuses the next snipe and MAX_OPEN_POSITIONS=abc allows it",
+      "claim": "max-open-positions-unparsed",
+      "expected": {
+        "limitEnforced": true
+      },
+      "actual": {
+        "limitEnforced": false
+      }
+    },
+    {
+      "finding": "AUD-DB-001",
+      "file": "test/realpath/triage/AUD-DB-001.test.ts",
+      "title": "AUD-DB-001: a non-numeric risk setting switches its limit off (RC-06) > max-position-size-unparsed: for the 0.01 ETH snipe amount, MAX_POSITION_SIZE 0.005 refuses the snipe and MAX_POSITION_SIZE=abc allows it",
+      "claim": "max-position-size-unparsed",
+      "expected": {
+        "limitEnforced": true
+      },
+      "actual": {
+        "limitEnforced": false
+      }
+    },
+    {
+      "finding": "AUD-DB-001",
+      "file": "test/realpath/triage/AUD-DB-001.test.ts",
+      "title": "AUD-DB-001: a non-numeric risk setting switches its limit off (RC-06) > max-total-exposure-unparsed: with one open 0.01 ETH position, MAX_TOTAL_EXPOSURE 0.015 refuses the next 0.01 ETH snipe and MAX_TOTAL_EXPOSURE=abc allows it",
+      "claim": "max-total-exposure-unparsed",
+      "expected": {
+        "limitEnforced": true
+      },
+      "actual": {
+        "limitEnforced": false
+      }
+    },
+    {
+      "finding": "AUD-DB-001",
+      "file": "test/realpath/triage/AUD-DB-001.test.ts",
+      "title": "AUD-DB-001: a non-numeric risk setting switches its limit off (RC-06) > snipe-cooldown-unparsed: right after a recorded snipe, SNIPE_COOLDOWN_MS 60000 refuses the next snipe and SNIPE_COOLDOWN_MS=abc allows it",
+      "claim": "snipe-cooldown-unparsed",
+      "expected": {
+        "limitEnforced": true
+      },
+      "actual": {
+        "limitEnforced": false
+      }
+    },
+    {
+      "finding": "AUD-DB-002",
+      "file": "test/realpath/triage/AUD-DB-002.test.ts",
+      "title": "AUD-DB-002: the daily-loss breaker and the exposure cap mix decimal ETH with wei > ordinary-loss-not-counted: after a real buy and a real stop-loss sell at a loss above the daily limit, the loss is not counted and canSnipe still allows the next snipe",
+      "claim": "ordinary-loss-not-counted",
+      "expected": {
+        "breakerTrips": true,
+        "lossCounted": true
+      },
+      "actual": {
+        "breakerTrips": false,
+        "lossCounted": false
+      }
+    },
+    {
+      "finding": "AUD-DB-002",
+      "file": "test/realpath/triage/AUD-DB-002.test.ts",
+      "title": "AUD-DB-002: the daily-loss breaker and the exposure cap mix decimal ETH with wei > partial-sell-makes-exposure-negative: after a real buy and a real 2x partial sell of a quarter, total exposure is hugely negative and canSnipe allows a snipe the exposure cap should refuse",
+      "claim": "partial-sell-makes-exposure-negative",
+      "expected": {
+        "exposureCapRefuses": true,
+        "exposurePositive": true
+      },
+      "actual": {
+        "exposureCapRefuses": false,
+        "exposurePositive": false
+      }
+    },
+    {
+      "finding": "AUD-DB-003",
+      "file": "test/realpath/triage/AUD-DB-003.test.ts",
+      "title": "AUD-DB-003: a still-held position whose exit failed drops out of the risk limits > failed-held-not-counted-in-exposure: with one still-held failed-exit 0.01 ETH position and MAX_TOTAL_EXPOSURE 0.015, canSnipe allows the next 0.01 ETH snipe",
+      "claim": "failed-held-not-counted-in-exposure",
+      "expected": {
+        "exposureCapRefuses": true
+      },
+      "actual": {
+        "exposureCapRefuses": false
+      }
+    },
+    {
+      "finding": "AUD-DB-003",
+      "file": "test/realpath/triage/AUD-DB-003.test.ts",
+      "title": "AUD-DB-003: a still-held position whose exit failed drops out of the risk limits > failed-held-not-counted-open: with one still-held failed-exit position and MAX_OPEN_POSITIONS 1, canSnipe allows the next snipe",
+      "claim": "failed-held-not-counted-open",
+      "expected": {
+        "openLimitRefuses": true
+      },
+      "actual": {
+        "openLimitRefuses": false
+      }
+    },
+    {
+      "finding": "AUD-DB-004",
+      "file": "test/realpath/triage/AUD-DB-004.test.ts",
+      "title": "AUD-DB-004 and AUD-DB-021: a landed buy has no durable record until its submission returns, on a connection at synchronous NORMAL (RC-14) > row-written-after-submit: a buy that lands in its third target block had no database record at its first submission or when it was mined",
+      "claim": "row-written-after-submit",
+      "expected": {
+        "recordBeforeFirstSubmit": true,
+        "recordWhenLanded": true
+      },
+      "actual": {
+        "recordBeforeFirstSubmit": false,
+        "recordWhenLanded": false
+      }
+    },
+    {
+      "finding": "AUD-DB-005",
+      "file": "test/realpath/triage/AUD-DB-005.test.ts",
+      "title": "AUD-DB-005: LOG_LEVEL in .env is never applied, because the logger is created before .env is loaded > log-level-from-env-file-not-applied: with VITEST unset and LOG_LEVEL=debug in .env, the logger runs at info",
+      "claim": "log-level-from-env-file-not-applied",
+      "expected": {
+        "loggerLevel": "debug"
+      },
+      "actual": {
+        "loggerLevel": "info"
+      }
+    },
+    {
+      "finding": "AUD-DB-006",
+      "file": "test/realpath/triage/AUD-DB-006.test.ts",
+      "title": "AUD-DB-006 (open half): every import of src/utils/db.ts writes to the database > import-writes-database: importing src/utils/db on an up-to-date WAL database commits a write (one WAL frame)",
+      "claim": "import-writes-database",
+      "expected": {
+        "committedWrite": false,
+        "databaseBytesChanged": false,
+        "walFrames": 0
+      },
+      "actual": {
+        "committedWrite": true,
+        "databaseBytesChanged": true,
+        "walFrames": 1
+      }
+    },
+    {
+      "finding": "AUD-DB-021",
+      "file": "test/realpath/triage/AUD-DB-004.test.ts",
+      "title": "AUD-DB-004 and AUD-DB-021: a landed buy has no durable record until its submission returns, on a connection at synchronous NORMAL (RC-14) > synchronous-normal: the connection that wrote a real buy's position record runs at PRAGMA synchronous NORMAL in WAL mode",
+      "claim": "synchronous-normal",
+      "expected": {
+        "atLeastFull": true
+      },
+      "actual": {
+        "atLeastFull": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-001",
+      "file": "test/realpath/triage/AUD-EXIT-001.test.ts",
+      "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v2-full-private-sell-no-output-floor: a V2 stop-loss sell is sent privately with amountOutMin 0",
+      "claim": "v2-full-private-sell-no-output-floor",
+      "expected": {
+        "outputFloorAboveZero": {
+          "relayBody": true,
+          "submitted": true
+        }
+      },
+      "actual": {
+        "outputFloorAboveZero": {
+          "relayBody": false,
+          "submitted": false
+        }
+      }
+    },
+    {
+      "finding": "AUD-EXIT-001",
+      "file": "test/realpath/triage/AUD-EXIT-001.test.ts",
+      "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v2-partial-private-sell-no-output-floor: a V2 take-profit partial sell is sent privately with amountOutMin 0",
+      "claim": "v2-partial-private-sell-no-output-floor",
+      "expected": {
+        "outputFloorAboveZero": {
+          "relayBody": true,
+          "submitted": true
+        }
+      },
+      "actual": {
+        "outputFloorAboveZero": {
+          "relayBody": false,
+          "submitted": false
+        }
+      }
+    },
+    {
+      "finding": "AUD-EXIT-001",
+      "file": "test/realpath/triage/AUD-EXIT-001.test.ts",
+      "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v3-full-private-sell-no-output-floor: a V3 stop-loss sell is sent privately with amountOutMinimum 0",
+      "claim": "v3-full-private-sell-no-output-floor",
+      "expected": {
+        "outputFloorAboveZero": {
+          "relayBody": true,
+          "submitted": true
+        }
+      },
+      "actual": {
+        "outputFloorAboveZero": {
+          "relayBody": false,
+          "submitted": false
+        }
+      }
+    },
+    {
+      "finding": "AUD-EXIT-001",
+      "file": "test/realpath/triage/AUD-EXIT-001.test.ts",
+      "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v3-partial-private-sell-no-output-floor: a V3 take-profit partial sell is sent privately with amountOutMinimum 0",
+      "claim": "v3-partial-private-sell-no-output-floor",
+      "expected": {
+        "outputFloorAboveZero": {
+          "relayBody": true,
+          "submitted": true
+        }
+      },
+      "actual": {
+        "outputFloorAboveZero": {
+          "relayBody": false,
+          "submitted": false
+        }
+      }
+    },
+    {
+      "finding": "AUD-EXIT-002",
+      "file": "test/realpath/triage/AUD-EXIT-002.test.ts",
+      "title": "AUD-EXIT-002: a failed first quote leaves a held position with no exit monitor (RC-07) > first-quote-failure-leaves-position-unmonitored: one failed getAmountsOut at monitor start leaves no timer, no exit_state row and no alert, and nothing recovers over six poll intervals",
+      "claim": "first-quote-failure-leaves-position-unmonitored",
+      "expected": {
+        "protectedOrOperatorTold": true
+      },
+      "actual": {
+        "protectedOrOperatorTold": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-003",
+      "file": "test/realpath/triage/AUD-EXIT-003.test.ts",
+      "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > null-quote-suppresses-urgency-exit: with every exit quote failing for 31 minutes after the buy, the 30-minute urgency exit never fires",
+      "claim": "null-quote-suppresses-urgency-exit",
+      "expected": {
+        "urgencyExitFired": true
+      },
+      "actual": {
+        "urgencyExitFired": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-003",
+      "file": "test/realpath/triage/AUD-EXIT-003.test.ts",
+      "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > probe-is-eth-buy-wei-as-token-amount: for a 9-decimal token every exit quote sells parseEther(snipe amount) raw token units",
+      "claim": "probe-is-eth-buy-wei-as-token-amount",
+      "expected": {
+        "probeIsEthBuyAmountInWei": false
+      },
+      "actual": {
+        "probeIsEthBuyAmountInWei": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-003",
+      "file": "test/realpath/triage/AUD-EXIT-003.test.ts",
+      "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > zero-entry-infinite-ratio-fires-every-partial-tier: a 0 first quote is kept as the entry, a 1 percent price rise reads Infinity and both partial tiers sell at once",
+      "claim": "zero-entry-infinite-ratio-fires-every-partial-tier",
+      "expected": {
+        "soldAtA1PercentRise": []
+      },
+      "actual": {
+        "soldAtA1PercentRise": [
+          "50%"
+        ]
+      }
+    },
+    {
+      "finding": "AUD-EXIT-003",
+      "file": "test/realpath/triage/AUD-EXIT-003.test.ts",
+      "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > zero-entry-nan-ratio-fires-stop-loss: a 0 first quote and an unchanged pool read NaN, and the stop-loss sells the whole position on the first tick",
+      "claim": "zero-entry-nan-ratio-fires-stop-loss",
+      "expected": {
+        "exitTriggeredWithNoPriceMove": false
+      },
+      "actual": {
+        "exitTriggeredWithNoPriceMove": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-004",
+      "file": "test/realpath/triage/AUD-EXIT-004.test.ts",
+      "title": "AUD-EXIT-004: sell approvals go public with default fees, outside the sell ceiling, one per exit (RC-15) > approve-sent-public-before-private-sell: each exit first sends an exact-amount approve to the public mempool at the provider default fee, above the sell ceiling",
+      "claim": "approve-fees-outside-sell-ceiling",
+      "expected": {
+        "approvePriorityAboveSellCeiling": false
+      },
+      "actual": {
+        "approvePriorityAboveSellCeiling": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-004",
+      "file": "test/realpath/triage/AUD-EXIT-004.test.ts",
+      "title": "AUD-EXIT-004: sell approvals go public with default fees, outside the sell ceiling, one per exit (RC-15) > approve-sent-public-before-private-sell: each exit first sends an exact-amount approve to the public mempool at the provider default fee, above the sell ceiling",
+      "claim": "approve-sent-public-before-private-sell",
+      "expected": {
+        "publicApproveBeforePrivateSell": false
+      },
+      "actual": {
+        "publicApproveBeforePrivateSell": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-004",
+      "file": "test/realpath/triage/AUD-EXIT-004.test.ts",
+      "title": "AUD-EXIT-004: sell approvals go public with default fees, outside the sell ceiling, one per exit (RC-15) > approve-sent-public-before-private-sell: each exit first sends an exact-amount approve to the public mempool at the provider default fee, above the sell ceiling",
+      "claim": "second-exit-needs-new-public-approve",
+      "expected": {
+        "secondExitSentPublicApprove": false
+      },
+      "actual": {
+        "secondExitSentPublicApprove": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-005",
+      "file": "test/realpath/triage/AUD-EXIT-005.test.ts",
+      "title": "AUD-EXIT-005: overlapping exit-poll cycles on one shared state (RC-21) > poll-cycles-overlap-on-slow-quote: while one exit quote is held, the next poll tick starts a second cycle on the same position",
+      "claim": "poll-cycles-overlap-on-slow-quote",
+      "expected": {
+        "cyclesInFlightTogether": 1
+      },
+      "actual": {
+        "cyclesInFlightTogether": 2
+      }
+    },
+    {
+      "finding": "AUD-EXIT-007",
+      "file": "test/realpath/triage/AUD-EXIT-007.test.ts",
+      "title": "AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer > unknown-dex-leaves-no-poll: a dashboard force-sell that reaches the unknown-dex return (a V3 row with no fee tier) returns false and the position is never polled again",
+      "claim": "unknown-dex-leaves-no-poll",
+      "expected": {
+        "stillPolled": true
+      },
+      "actual": {
+        "stillPolled": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-007",
+      "file": "test/realpath/triage/AUD-EXIT-007.test.ts",
+      "title": "AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer > v3-private-not-landed-leaves-no-poll: a dashboard force-sell of a V3 position whose private sell does not land returns false and the position is never polled again",
+      "claim": "v3-private-not-landed-leaves-no-poll",
+      "expected": {
+        "stillPolled": true
+      },
+      "actual": {
+        "stillPolled": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-008",
+      "file": "test/realpath/triage/AUD-EXIT-008.test.ts",
+      "title": "AUD-EXIT-008: dashboard sells are refused once routine retries are paused > operator-sell-refused-while-routine-paused: after the routine retries of a still-held position pause, the dashboard force-sell answers 409 and sends no sell",
+      "claim": "operator-sell-refused-while-routine-paused",
+      "expected": {
+        "operatorSellRuns": true
+      },
+      "actual": {
+        "operatorSellRuns": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-009",
+      "file": "test/realpath/triage/AUD-TX-002.test.ts",
+      "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > approval-wait-holds-wallet-lock: an exit whose approval is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
+      "claim": "approval-wait-holds-wallet-lock",
+      "expected": {
+        "laterOperationStartedInWindow": true
+      },
+      "actual": {
+        "laterOperationStartedInWindow": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-013",
+      "file": "test/realpath/triage/AUD-EXIT-013.test.ts",
+      "title": "AUD-EXIT-013: after a restart a position bought on a second dex is quoted and anti-rug-routed through the first dex of its type > resume-quotes-first-v2-dex: a sushiswap-v2 position resumes quoting the uniswap-v2 router, and anti-rug re-registers it on uniswap-v2",
+      "claim": "antirug-resume-registers-first-v2-dex",
+      "expected": {
+        "antiRugDex": "sushiswap-v2"
+      },
+      "actual": {
+        "antiRugDex": "uniswap-v2"
+      }
+    },
+    {
+      "finding": "AUD-EXIT-013",
+      "file": "test/realpath/triage/AUD-EXIT-013.test.ts",
+      "title": "AUD-EXIT-013: after a restart a position bought on a second dex is quoted and anti-rug-routed through the first dex of its type > resume-quotes-first-v2-dex: a sushiswap-v2 position resumes quoting the uniswap-v2 router, and anti-rug re-registers it on uniswap-v2",
+      "claim": "resume-quotes-first-v2-dex",
+      "expected": {
+        "routersQuoted": [
+          "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+        ]
+      },
+      "actual": {
+        "routersQuoted": [
+          "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+        ]
+      }
+    },
+    {
+      "finding": "AUD-EXIT-014",
+      "file": "test/realpath/triage/AUD-EXIT-014.test.ts",
+      "title": "AUD-EXIT-014: an anti-rug exit is refused while another exit of the token holds the sell lock > antirug-exit-refused-while-sell-lock-held: a rug detected while a routine stop-loss exit holds the sell lock gets an anti-rug exit that returns false at once",
+      "claim": "antirug-exit-refused-while-sell-lock-held",
+      "expected": {
+        "antiRugExitRefusedAtOnce": false
+      },
+      "actual": {
+        "antiRugExitRefusedAtOnce": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-015",
+      "file": "test/realpath/triage/AUD-EXIT-015.test.ts",
+      "title": "AUD-EXIT-015: resume quotes with the current snipe amount, not the probe behind the stored entry price > resume-probes-with-current-snipe-amount: after a restart with ETH_SNIPE_AMOUNT 0.01 -> 0.002 the resumed monitor probes 0.002 against an entry measured at 0.01, and the stop-loss fires with no price change",
+      "claim": "resume-probes-with-current-snipe-amount",
+      "expected": {
+        "probes": [
+          "10000000000000000"
+        ]
+      },
+      "actual": {
+        "probes": [
+          "2000000000000000"
+        ]
+      }
+    },
+    {
+      "finding": "AUD-EXIT-015",
+      "file": "test/realpath/triage/AUD-EXIT-015.test.ts",
+      "title": "AUD-EXIT-015: resume quotes with the current snipe amount, not the probe behind the stored entry price > resume-probes-with-current-snipe-amount: after a restart with ETH_SNIPE_AMOUNT 0.01 -> 0.002 the resumed monitor probes 0.002 against an entry measured at 0.01, and the stop-loss fires with no price change",
+      "claim": "stop-loss-fires-without-price-change",
+      "expected": {
+        "exitTriggered": false
+      },
+      "actual": {
+        "exitTriggered": true
+      }
+    },
+    {
+      "finding": "AUD-EXIT-027",
+      "file": "test/realpath/triage/AUD-EXIT-027.test.ts",
+      "title": "AUD-EXIT-027: a V3 exit leaves its proceeds as WETH that the bot never unwraps > v3-exit-proceeds-stay-weth: the V3 stop-loss sell pays WETH to the wallet with no unwrap in the batch and no later WETH withdraw",
+      "claim": "v3-exit-proceeds-stay-weth",
+      "expected": {
+        "proceedsTurnedIntoEth": true
+      },
+      "actual": {
+        "proceedsTurnedIntoEth": false
+      }
+    },
+    {
+      "finding": "AUD-SCRIPTS-001",
+      "file": "test/realpath/triage/AUD-SCRIPTS-001.test.ts",
+      "title": "AUD-SCRIPTS-001: the two legacy scripts import compiled artifacts that do not exist, so neither can load > legacy-scripts-unresolved-artifact-imports: the compiler cannot resolve relative imports of addLiquidity and deploySepoliaTest",
+      "claim": "legacy-scripts-unresolved-artifact-imports",
+      "expected": [],
+      "actual": [
+        "addLiquidity",
+        "deploySepoliaTest"
+      ]
+    },
+    {
+      "finding": "AUD-SCRIPTS-002",
+      "file": "test/realpath/triage/AUD-SCRIPTS-002.test.ts",
+      "title": "AUD-SCRIPTS-002: the operator scripts that sign with the bot wallet hold no process lock and read no pause switch > signing-scripts-outside-process-lock: every script that signs runs with no held process lock and no pause read",
+      "claim": "signing-scripts-outside-process-lock",
+      "expected": [
+        {
+          "lock": "holds-lock",
+          "pauseRead": true,
+          "script": "addLiquidity"
+        },
+        {
+          "lock": "holds-lock",
+          "pauseRead": true,
+          "script": "deliberate-buy"
+        },
+        {
+          "lock": "holds-lock",
+          "pauseRead": true,
+          "script": "deploySepoliaTest"
+        },
+        {
+          "lock": "holds-lock",
+          "pauseRead": true,
+          "script": "recover-sell-ladys"
+        }
+      ],
+      "actual": [
+        {
+          "lock": "none",
+          "pauseRead": false,
+          "script": "addLiquidity"
+        },
+        {
+          "lock": "none",
+          "pauseRead": false,
+          "script": "deliberate-buy"
+        },
+        {
+          "lock": "none",
+          "pauseRead": false,
+          "script": "deploySepoliaTest"
+        },
+        {
+          "lock": "none",
+          "pauseRead": false,
+          "script": "recover-sell-ladys"
+        }
+      ]
+    },
+    {
+      "finding": "AUD-TX-001",
+      "file": "test/realpath/triage/AUD-TX-001.test.ts",
+      "title": "AUD-TX-001: withNonceLock has no owner tracking, so a nested same-wallet acquire never settles (RC-10 re-entrancy) > nested-acquire-never-settles: a same-wallet acquire inside a withNonceLock op leaves the outer call unsettled and a later op for the wallet unstarted within a 30-minute fake-time window",
+      "claim": "nested-acquire-never-settles",
+      "expected": {
+        "laterOperationStarted": true,
+        "outerCallSettled": true
+      },
+      "actual": {
+        "laterOperationStarted": false,
+        "outerCallSettled": false
+      }
+    },
+    {
+      "finding": "AUD-TX-002",
+      "file": "test/realpath/triage/AUD-TX-002.test.ts",
+      "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > passthrough-wait-holds-wallet-lock: a base V3 snipe whose transaction is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
+      "claim": "passthrough-wait-holds-wallet-lock",
+      "expected": {
+        "laterOperationStartedInWindow": true
+      },
+      "actual": {
+        "laterOperationStartedInWindow": false
+      }
+    },
+    {
+      "finding": "AUD-TX-003",
+      "file": "test/realpath/triage/AUD-TX-003.test.ts",
+      "title": "AUD-TX-003: a snipe buy holds the wallet nonce lock through its private attempts, so an anti-rug exit of another position cannot start (RC-11) > antirug-exit-queued-behind-buy: a rug of position A while a snipe of token B escalates privately gets an emergency sell that does not start within its 60 s budget and runs only after the buy lets go",
+      "claim": "antirug-exit-queued-behind-buy",
+      "expected": {
+        "emergencySellStartedWithinBudget": true
+      },
+      "actual": {
+        "emergencySellStartedWithinBudget": false
+      }
+    },
+    {
+      "finding": "AUD-TX-006",
+      "file": "test/realpath/triage/AUD-TX-006.test.ts",
+      "title": "AUD-TX-006: Flashbots per-builder telemetry runs inside the wallet nonce lock (candidate 26, RC-26) > stats-call-inside-lock: while the bot's flashbots_getBundleStatsV2 request is held, a second operation for the same wallet cannot start; it starts only after the answer is released",
+      "claim": "stats-call-inside-lock",
+      "expected": {
+        "secondOperationWaitedForTelemetry": false
+      },
+      "actual": {
+        "secondOperationWaitedForTelemetry": true
+      }
+    },
+    {
+      "finding": "AUD-TX-007",
+      "file": "test/realpath/triage/AUD-TX-007.test.ts",
+      "title": "AUD-TX-007: the base fee is doubled in the affordability and reserve math (RC-22) > entry-gate-uses-doubled-base-fee: a buy the wallet can afford at the real base fee is refused by the entry gate, which priced the exit at twice the base fee",
+      "claim": "entry-gate-uses-doubled-base-fee",
+      "expected": {
+        "gateBaseFeeWei": null,
+        "refused": false
+      },
+      "actual": {
+        "gateBaseFeeWei": "40000000000",
+        "refused": true
+      }
+    },
+    {
+      "finding": "AUD-TX-007",
+      "file": "test/realpath/triage/AUD-TX-007.test.ts",
+      "title": "AUD-TX-007: the base fee is doubled in the affordability and reserve math (RC-22) > strategy-reserve-uses-doubled-base-fee: the Flashbots strategy refuses as unaffordable a buy whose headroom is positive at the real base fee, because its reserve and gas terms use twice the base fee",
+      "claim": "strategy-reserve-uses-doubled-base-fee",
+      "expected": {
+        "buySubmitted": true,
+        "refusedAsUnaffordable": false
+      },
+      "actual": {
+        "buySubmitted": false,
+        "refusedAsUnaffordable": true
+      }
+    },
+    {
+      "finding": "AUD-TX-009",
+      "file": "test/realpath/triage/AUD-TX-009.test.ts",
+      "title": "AUD-TX-009: an RPC hiccup during the Flashbots bundle wait ends the whole process > bundle-wait-null-block-exits: the target block answering null once during bundle.wait() ends the process",
+      "claim": "bundle-wait-null-block-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "Error: Unable to get block: 101"
+      }
+    },
+    {
+      "finding": "AUD-TX-028",
+      "file": "test/realpath/triage/AUD-TX-028.test.ts",
+      "title": "AUD-TX-028: one stalled HTTP call stalls every later call of the provider > stalled-call-stalls-antirug-evaluation: while one exit quote is held, the anti-rug evaluation of a liquidity pull gets its reads answered but cannot finish",
+      "claim": "stalled-call-stalls-antirug-evaluation",
+      "expected": {
+        "antiRugEvaluationFinishedWhileQuoteHeld": true
+      },
+      "actual": {
+        "antiRugEvaluationFinishedWhileQuoteHeld": false
+      }
+    },
+    {
+      "finding": "AUD-TX-029",
+      "file": "test/realpath/triage/AUD-TX-029.test.ts",
+      "title": "AUD-TX-029: an escalation that ends on its attempt budget is reported as a priority-fee ceiling hit > attempt-budget-reported-as-ceiling-hit: a snipe whose four private attempts all miss at 1 to 4 gwei is reported as having reached the 25 gwei ceiling",
+      "claim": "attempt-budget-reported-as-ceiling-hit",
+      "expected": {
+        "reportedCeilingReachedBelowCeiling": false
+      },
+      "actual": {
+        "reportedCeilingReachedBelowCeiling": true
+      }
+    }
+  ],
+  "passed_tests": [
+    "AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing",
+    "SAFE-04 single-instance process lock (real holder processes) > a second acquire for the same wallet is refused while the holder lives (AC-23a)",
+    "duplicate-load guard: 'nonceAuthority' > plain Node: delete require.cache and reload is refused",
+    "fork project reads only the shell and itself (AC-17) > (d) the Vitest main-process closure of both configs loads no .env",
+    "helpers smoke test > createTestDb returns a working in-memory DB",
+    "sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value",
+    "spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files",
+    "src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db"
+  ]
+}
