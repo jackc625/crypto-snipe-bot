@@ -480,6 +480,56 @@
       "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). Descriptions of optional entries are never read at runtime, so a symbol lookup replaces the text match. RED proof: mutant antirug-entry-empty-description (reach worker), group antirug-config.",
       "register_as": "test-quality",
       "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/exitEngine/antiRugReason.test.ts",
+      "test": "Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup > Reason union + gas-multiplier source assertions (Tests 1-3) > Test 1: the reason parameter type includes 'anti-rug'",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Title unchanged. No longer reads src/exitEngine.ts as text: a real type-checker query. A directory walk of src/ must find exactly one file declaring the exported function executeFullSell; ts.createProgram over it with tsconfig.json's options resolves its `reason` parameter's type, whose string-literal members must include anti-rug, trailing-stop, stop-loss and urgency-market-sell. The same query on a temp-directory source whose union omits anti-rug reports exactly anti-rug missing. Explicit 60000 ms limit. The describe title (\"source assertions\") is kept because test-identity matches renames on the last title level only.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30); addresses Codex 23-19 HIGH (confirmed: tsconfig.json and tsconfig.bot.json include src/**/* and exclude tests, so a compile-time assertion inside a test is never type-checked). RED proof: mutant reason-union-drops-antirug (reach worker), group reason.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/exitEngine/antiRugReason.test.ts",
+      "test": "Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup > Reason union + gas-multiplier source assertions (Tests 1-3) > Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Title unchanged. Now drives the real executeFullSell twice with reason anti-rug and ctx.chain.antiRug.gasMultiplier 2.0 then 3.5 (gas.multiplier 1.2); the mocked private escalation must receive 2.0 then 3.5 as its final argument. A file-level beforeAll does the first import of the exit engine (hookTimeout).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proofs: mutants antirug-gas-dropped and multiplier-not-threaded (reach vite), group reason.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/exitEngine/antiRugReason.test.ts",
+      "test": "Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup > Reason union + gas-multiplier source assertions (Tests 1-3) > Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Title unchanged. Now drives the real executeFullSell with reasons trailing-stop, stop-loss and urgency-market-sell (anti-rug multiplier 3.5 configured); the mocked private escalation must receive undefined as its final argument each time.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proof: mutant gas-on-every-reason (reach vite), group reason.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/exitEngine/antiRugReason.test.ts",
+      "test": "Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup > Reason union + gas-multiplier source assertions (Tests 1-3) > Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Title unchanged. Now drives one real anti-rug executeFullSell with multiplier 3.5; the private escalation is called once with four arguments (a txBuilder function, the same ctx, a numeric attempt budget, 3.5). The text checks (no `void gasMultiplier`; escalatePrivateSell(txBuilder, ctx, ..., gasMultiplier)) are carried by that call.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proofs: mutants multiplier-not-threaded and antirug-gas-dropped (reach vite), group reason.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/exitEngine/antiRugReason.test.ts",
+      "test": "Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup > unsubscribeAntiRug call sites (Tests 4-7) > Test 7: executePartialSell does NOT call unsubscribeAntiRug",
+      "it_count_before": 10,
+      "it_count_after": 10,
+      "change": "Title unchanged. No longer scans the executePartialSell body text: drives a real successful executePartialSell through the file's mocks; it returns true, records one partial_sell row with status sold, never calls the detector's unregisterAntiRugPosition and never deletes the exit state. Complements Test 8's failure path.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proof: mutant partial-unsubscribes (reach vite), group reason.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-30"
     }
   ]
 }

@@ -514,6 +514,79 @@ const ANTIRUG_CONFIG_MUTANTS: MutantRow[] = [
     }),
 ];
 
+// Plan 23-30, reason: executeFullSell's reason union, its anti-rug gas multiplier, and the
+// partial sell leaving anti-rug registered.
+const REASON_TEST = 'test/unit/exitEngine/antiRugReason.test.ts';
+const REASON_SUITE = 'Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup';
+const REASON_GAS = `${REASON_SUITE} > Reason union + gas-multiplier source assertions (Tests 1-3)`;
+const REASON_T1 = `${REASON_GAS} > Test 1: the reason parameter type includes 'anti-rug'`;
+const REASON_T2 = `${REASON_GAS} > Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier`;
+const REASON_T3 = `${REASON_GAS} > Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)`;
+const REASON_T3B = `${REASON_GAS} > Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)`;
+const REASON_T7 = `${REASON_SUITE} > unsubscribeAntiRug call sites (Tests 4-7) > Test 7: executePartialSell does NOT call unsubscribeAntiRug`;
+const reasonRow = (row: Omit<MutantRow, 'group' | 'project' | 'testFile' | 'file'>): MutantRow => ({
+    group: 'reason',
+    project: 'unit',
+    testFile: REASON_TEST,
+    file: 'src/exitEngine.ts',
+    ...row,
+});
+const GAS_LINE = "const gasMultiplier = reason === 'anti-rug' ? ctx.chain.antiRug.gasMultiplier : undefined;";
+const PRIV_LINE = 'const priv = await submitPrivateSell(ctx, txBuilder, attempts, gasMultiplier);';
+const PARTIAL_D10 = '// D-10: Record each partial sell as separate trade row';
+// Tests 2, 3 and 3b each select themselves (Test 3 alone would also match Test 3b).
+const ONLY_T2_T3_T3B = 'Test (2: when reason=|3: when reason !==|3b: gasMultiplier is threaded)';
+const REASON_MUTANTS: MutantRow[] = [
+    reasonRow({
+        name: 'reason-union-drops-antirug',
+        only: "Test 1: the reason parameter type includes 'anti-rug'",
+        edits: [
+            {
+                find: "    reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug',",
+                replace: "    reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell',",
+            },
+        ],
+        reach: 'worker',
+        expected: [REASON_T1],
+        messageIncludes: "expected [ 'anti-rug' ] to deeply equal []",
+    }),
+    // The plan named Test 2 alone. Measured: Test 3b fails too, because the private escalation
+    // is gasMultiplier's only consumer in executeFullSell, so "computed as undefined" and "not
+    // passed" (multiplier-not-threaded) are the same behavior at every observable point.
+    reasonRow({
+        name: 'antirug-gas-dropped',
+        only: ONLY_T2_T3_T3B,
+        edits: [{ find: GAS_LINE, replace: "const gasMultiplier = reason === 'anti-rug' ? undefined : undefined;" }],
+        reach: 'vite',
+        expected: [REASON_T2, REASON_T3B],
+        messageIncludes: 'undefined',
+    }),
+    reasonRow({
+        name: 'gas-on-every-reason',
+        only: ONLY_T2_T3_T3B,
+        edits: [{ find: GAS_LINE, replace: 'const gasMultiplier = ctx.chain.antiRug.gasMultiplier;' }],
+        reach: 'vite',
+        expected: [REASON_T3],
+        messageIncludes: 'expected [ 3.5, 3.5, 3.5 ] to deeply equal [ undefined, undefined, undefined ]',
+    }),
+    reasonRow({
+        name: 'multiplier-not-threaded',
+        only: ONLY_T2_T3_T3B,
+        edits: [{ find: PRIV_LINE, replace: 'const priv = await submitPrivateSell(ctx, txBuilder, attempts, undefined);' }],
+        reach: 'vite',
+        expected: [REASON_T2, REASON_T3B],
+        messageIncludes: 'undefined',
+    }),
+    reasonRow({
+        name: 'partial-unsubscribes',
+        only: 'Test 7: executePartialSell does NOT call',
+        edits: [{ find: PARTIAL_D10, replace: `unsubscribeAntiRug(ctx.chain.name, state.tradeId);\n        ${PARTIAL_D10}` }],
+        reach: 'vite',
+        expected: [REASON_T7],
+        messageIncludes: "expected [ [ 'eth', 70 ] ] to deeply equal []",
+    }),
+];
+
 export const MUTANTS: MutantRow[] = [
     ...CLI_PREFLIGHT_MUTANTS,
     ...CLI_NAMES.flatMap(pauseCliMutants),
@@ -521,6 +594,7 @@ export const MUTANTS: MutantRow[] = [
     ...CLI_ENTRY_MUTANTS,
     ...API_MOUNT_MUTANTS,
     ...ANTIRUG_CONFIG_MUTANTS,
+    ...REASON_MUTANTS,
 ];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
@@ -565,6 +639,13 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
     { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T19, currentTitle: ANTIRUG_CONFIG_T19, mutants: ['antirug-entries-dropped'] },
     { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T20, currentTitle: ANTIRUG_CONFIG_T20, mutants: ['antirug-entry-required'] },
     { testFile: ANTIRUG_CONFIG_TEST, baseTitle: ANTIRUG_CONFIG_T21, currentTitle: ANTIRUG_CONFIG_T21, mutants: ['antirug-entry-empty-description'] },
+    ...[
+        { title: REASON_T1, mutants: ['reason-union-drops-antirug'] },
+        { title: REASON_T2, mutants: ['antirug-gas-dropped', 'multiplier-not-threaded'] },
+        { title: REASON_T3, mutants: ['gas-on-every-reason'] },
+        { title: REASON_T3B, mutants: ['antirug-gas-dropped', 'multiplier-not-threaded'] },
+        { title: REASON_T7, mutants: ['partial-unsubscribes'] },
+    ].map((r) => ({ testFile: REASON_TEST, baseTitle: r.title, currentTitle: r.title, mutants: r.mutants })),
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
@@ -574,6 +655,7 @@ export const CONVERTED_COUNTS: Record<string, number> = {
     [MAIN_ENTRY_TEST]: 3,
     [API_ANTIRUG_TEST]: 1,
     [ANTIRUG_CONFIG_TEST]: 3,
+    [REASON_TEST]: 5,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [
     {
