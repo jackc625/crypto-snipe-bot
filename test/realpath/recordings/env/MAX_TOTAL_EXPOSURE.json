@@ -1,0 +1,63 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_TOTAL_EXPOSURE": {
+                "details": "Total exposure (9.9950 + 0.01) would exceed cap (0)"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_TOTAL_EXPOSURE": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_TOTAL_EXPOSURE": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_TOTAL_EXPOSURE": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "MAX_TOTAL_EXPOSURE": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "MAX_TOTAL_EXPOSURE": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "MAX_TOTAL_EXPOSURE": "10.0"
+      }
+    }
+  },
+  "variable": "MAX_TOTAL_EXPOSURE"
+}
