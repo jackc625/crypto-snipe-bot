@@ -28,3 +28,9 @@
   **What:** `compareFile` (test-identity.ts:212-221) matches a rails-test-edits.json `title_before` against the last title level only and keeps every describe level unchanged. A describe rename, such as botWiring's `Source-text wiring guards (Tests 22-26)`, which now names tests that read no source, would report every test under it as `missing`. 23-26 would then need an `AC-38 removed:` line for tests that were not removed.
   **What 23-18 did:** kept that describe title, with a comment in the test file saying why. No test title changed.
   **Why deferred:** test-identity.ts is a Phase 22 audit tool. Changing what it matches is outside a test-conversion plan and would need re_audit ledger rows. Plans 23-31, 23-30 and 23-19 hit the same limit if a describe title of theirs states "source-text". A later test-hygiene plan (Phase 28) can add full-path renames (for example a `title_path_before` field) and then rename that describe.
+
+- `test/fixtures/api.fixtures.ts` fails a strict type check (TS2322 at line 12: `honeypotChecker` is optional in the fixture but required by `ChainConfig`)
+  status: open
+  **Found by:** plan 23-30 (2026-11-12), a strict scratch tsconfig over its three converted test files and scripts/red-proof-conversions.ts; those four files are clean, and the error comes from the fixture they import.
+  **What:** no tsconfig compiles test/ (tsconfig.json and tsconfig.bot.json include src/**/* only), so this fixture's type error never surfaces in CI. Same class as AUD-TESTU-008 (unit type gates never run).
+  **Why deferred:** the fixture is outside plan 23-30's files and changes no test result. A Phase 28 test-hygiene plan that adds a test tsconfig should fix it with the rest of that class.
