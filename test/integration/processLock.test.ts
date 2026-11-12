@@ -110,6 +110,7 @@ afterEach(async () => {
 });
 
 describe('SAFE-04 single-instance process lock (real holder processes)', () => {
+    // closes-finding: AUD-TX-005 (rail test, RED proof row 25 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-2-lock-refusal.txt)
     it(
         'a second acquire for the same wallet is refused while the holder lives (AC-23a)',
         async () => {

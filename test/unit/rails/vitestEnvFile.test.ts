@@ -75,6 +75,7 @@ function exposedByProject(config: ConfigLike): Record<string, string> {
 }
 
 describe('no Vitest config reads the .env files of its root', () => {
+    // closes-finding: AUD-RAIL-001 (rail test, RED proof row 30 of red-proofs/INDEX.md: the Vite env-file path of the same event)
     it.each([
         ['vitest.config.ts', mainConfig],
         ['test/rails/vitest.fork-rehearsal.config.ts', rehearsalConfig],
