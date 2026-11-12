@@ -70,6 +70,12 @@ export interface DriveSlotsOptions {
     maxVirtualMs?: number;
     /** Fake-clock ms of the last block; the next one is mined SLOT_MS later. Default: now. */
     lastBlockAt?: number;
+    /**
+     * Fake ms per step (default 50). A long quiet wait (the 30-minute urgency window) may use a
+     * larger step: every timer still fires at its own scheduled fake time, and blocks are still
+     * mined at the first step at or past each slot.
+     */
+    stepMs?: number;
 }
 
 /**
@@ -100,10 +106,11 @@ export async function driveSlots(sc: Scenario, opts: DriveSlotsOptions): Promise
     };
     const maxVirtualMs = opts.maxVirtualMs ?? 600_000;
     const end = Date.now() + maxVirtualMs;
+    const stepMs = opts.stepMs ?? 50;
     let lastBlockAt = opts.lastBlockAt ?? Date.now();
     while (!opts.until()) {
         if (Date.now() >= end) throw new Error(`driveSlots: ${opts.what} did not happen within ${maxVirtualMs} virtual ms`);
-        await stepFor(50, 50);
+        await stepFor(stepMs, stepMs);
         if (Date.now() - lastBlockAt < SLOT_MS) continue;
         const next = node.head + 1;
         const waiting = node.submitted.filter((s) => s.status === 'accepted' && fromWallet(s));
