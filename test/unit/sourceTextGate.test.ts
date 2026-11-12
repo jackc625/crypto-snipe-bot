@@ -38,8 +38,10 @@ const MAX_ALTERNATIVES = 64;
 // Measured on the 11 CHAR-06 files as they were at the phase start (23-19-SUMMARY.md): following
 // local consts one level (the plan's wording) finds 9 of them; following a local helper's
 // parameter to its call sites adds mainEntry (parse('src/main.ts')), and dotenvSrcSkip case (e)
-// needs a second level (a for-of binding over a const array). Levels 1, 2 and 4 report the same
-// single hit on the whole current tree (the allow-listed fixture); 3 keeps one level of margin.
+// needs a second level (a for-of binding over a const array). When 23-19 measured it, levels 1, 2
+// and 4 reported the same single hit on the whole tree (the AUD-API-002 restart fixture, then
+// allow-listed); plan 23-32 removed that read, so the tree outside the allow list has none. 3
+// keeps one level of margin.
 const FOLLOW_LEVELS = 3;
 
 /**
