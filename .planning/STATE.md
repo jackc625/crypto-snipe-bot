@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-11-PLAN.md
-last_updated: "2026-11-11T23:02:08.671Z"
+stopped_at: Completed 23-12-PLAN.md
+last_updated: "2026-11-12T00:32:55.799Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: b8ce37fe5388cf988818fc066a07a09cfc30be9c
+state_head: 99e29839c57543bad8543a7d0187be125fd66711
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 43
+  completed_plans: 44
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 12 of 31
+Plan: 13 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -127,11 +127,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P09 | 41min | 3 tasks | 19 files |
 | Phase 23 P10 | 46min | 3 tasks | 24 files |
 | Phase 23 P11 | 32min | 3 tasks | 16 files |
+| Phase 23 P12 | 75min | 3 tasks | 17 files |
 
 ## Session
 
-**Last session:** 2026-11-11T23:02:08.353Z
-**Stopped at:** Completed 23-11-PLAN.md
+**Last session:** 2026-11-12T00:32:54.932Z
+**Stopped at:** Completed 23-12-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -273,3 +274,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-10 for later triage plans: fixtures/AUD-API-002-restart.ts gives bootListeners (every DEX listener, as boot step 4) and the dashboard Start callback as a line-for-line mirror of the private src/bot.ts onRestart, pinned by a sha256 of the closure text (any edit fails with "onRestart changed"; re-point mirror and hash with a Phase 24 onRestart fix). fixtures/AUD-ANTIRUG-018-range-limit.ts limitLogRange refuses eth_getLogs wider than 10 blocks (Alchemy free tier, repo evidence 19-RESEARCH CRITICAL #1 and the 21-03 README) through the public FakeNode.failNext, deciding each request from its own range via the last node.callLog entry (no harness gap). fixtures/AUD-ANTIRUG-003-live.ts gives live anti-rug gates (ETH_ANTIRUG_LIVE_EXECUTE/CONFIRM_BLOCKS/CIRCUIT_BREAKER_TRIGGERS overrides), the graph's circuitBreaker module and driveFor (one bundle-slot map for the whole window; an empty block only while no bundle waits, else bundles miss their targets). A pro-rata liquidity pull leaves the price unchanged, so the routine stop-loss does not fire on it.
 - [Phase 23]: 23-11: AUD-DB-002, -001, -003, -004 (S1) and AUD-DB-021 (S2) confirmed on the real path (test/realpath/triage/<ID>.test.ts; AUD-DB-021 in AUD-DB-004.test.ts), 11 knownBug claims. Every row comes from the real buy and sell insert sites and the real receipt decoder (never written by a test), and every claim reads looks fixed under its own fix-shaped src mutation; a cross-file batch shows each flips only its own claims. AUD-DB-007 re-measured on the real db.ts outside Vitest (railed children) from another working folder and closed as fixed: nothing remains after the 22-09 rail; its marker sits beside "AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing" (RED proof row 12), status confirmed -> fixed. AUD-DB-001 nuance: the boot preflight refuses MAX_OPEN_POSITIONS=abc, so in the running bot only the other four limits are off. 23-16 must acknowledge AUD-DB-001, -002, -003 and -004, and its run evidence must include an integration run so AUD-DB-007's rail_test is in passed_tests. No new finding, no severity change.
 - [Phase 23]: 23-11 for later triage plans: fixtures/AUD-DB-001-limits.ts checks a limit parsed at import twice on one temp database through whole-graph reloads (restartGraph), at a valid value and at abc; a failed reload (a fix that refuses to start) is returned as { loaded: false } with the failed load's DB connection closed so teardown can remove the folder, and facts needed from the database are read on the valid graph before the abc reload (limitPair facts). fixtures/AUD-DB-002-risk.ts gives the graph's own canSnipe and risk statements. Editing a Phase 22 test file that has a ledger row (added after audit_base_sha) needs a reviewed re_audit entry ending at the edit's commit or --stage partial fails, so commit the edit alone first (23-11: dbGuards.test.ts marker 29c13f9, entry in ledger/TESTI.json).
+- [Phase 23]: 23-12: AUD-ANTIRUG-002, AUD-API-008, AUD-TX-009 and AUD-BUY-005 (all S1) confirmed as real process deaths: each fixture is a railed child (spawnRailedChild 'node -r ts-node/register/transpile-only') that loads src/main and src/bot, builds the context with the real buildChainRegistry and createChainContext, and reaches the fault only through the src path the finding names, on its own loopback chain (test/realpath/triage/fixtures/loopbackChain.ts). 7 knownBug claims; every claim reads looks fixed under its own fix-shaped src mutation and a cross-file batch shows each flips only its own claims. 23-16 must acknowledge all four.
+- [Phase 23]: 23-12 Phase 24 readings (measured contained cases): a process-level handler alone keeps the process up but is not a fix for AUD-ANTIRUG-002 (the failed socket never emits 'close', stuck CLOSING, and each reconnect loop has already logged success, so anti-rug and the DEX listeners stay silently disconnected after the endpoint returns) or AUD-API-008 (the malformed request is never answered or closed, one leaked socket per request); for AUD-TX-009 and AUD-BUY-005 it does recover (the Flashbots library re-checks on the next block; the listener keeps dispatching). AUD-BUY-005 is proven at one trigger (the V3 WS listener with ETH_MIN_LIQUIDITY=abc); its other un-awaited sites are not separately exercised.
+- [Phase 23]: 23-12 for later plans: test/realpath/triage/fixtures/loopbackChain.ts is a standalone loopback node + Flashbots relay (HTTP) and a separately closable real ws port for railed children (unknown method or unanswered eth_call = FIXTURE_SETUP_ERROR exit 3; dropSockets/reopenWs; nonce = mined txs), with the shared crash-fixture contract (installContainment, finishAlive heartbeat, markers); fixtures/crashRun.ts classifies a child into survived, survived-work-pending, process-exited, signal-terminated, timeout or setup-error and checks its case ledger loopback-only. A WebSocketProvider given its chain ID sends nothing until asked, so a reconnect is judged by an open connection, not an answered request.
