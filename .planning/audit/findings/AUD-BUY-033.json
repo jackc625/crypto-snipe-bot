@@ -87,6 +87,7 @@
     "note": "Calldata half reproduced on the real path (plan 23-05): the V3 snipe batch is multicall(deadline, [exactInputSingle]) with value the whole snipe amount, no price limit and no refundETH. The unspent-ETH-in-the-router half is router and pool contract behavior, flagged for the Phase 25 fork run. Status candidate -> confirmed.",
     "test_id": "AUD-BUY-033",
     "needs_fork": true,
-    "fork_question": "On a mainnet fork, when a V3 snipe sends SwapRouter02 multicall(deadline, [exactInputSingle(amountIn = the snipe amount, sqrtPriceLimitX96 0)]) with value = amountIn into a pool whose in-range liquidity fills only part of amountIn, does the router keep the unspent ETH, and does refundETH() called by an unrelated address receive it?"
+    "fork_question": "On a mainnet fork, when a V3 snipe sends SwapRouter02 multicall(deadline, [exactInputSingle(amountIn = the snipe amount, sqrtPriceLimitX96 0)]) with value = amountIn into a pool whose in-range liquidity fills only part of amountIn, does the router keep the unspent ETH, and does refundETH() called by an unrelated address receive it?",
+    "fork_ref": "UFV-08"
   }
 }

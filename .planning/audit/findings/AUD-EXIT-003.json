@@ -134,6 +134,7 @@
     "note": "Sub-claims 1 and 4 reproduced on the real path (plan 23-07): for a 9-decimal token every exit quote's amountIn is parseEther(snipe) (1e16 raw = 10,000,000 tokens); on a 1-quadrillion-token 1 ETH pool with a 0.001 snipe the 1e15 probe quotes 0 and 0 is kept as the entry, so a 1 percent price rise reads Infinity and sells both partial tiers (50 percent) at once, and an unchanged pool reads NaN and the stop-loss sells everything on the first tick; with every exit quote refused for 31 minutes the urgency exit never fires. Sub-claims 2 and 3 need real tokens (fork).",
     "test_id": "AUD-EXIT-003",
     "needs_fork": true,
-    "fork_question": "On real tokens and pools (low-decimal tokens, very high supply 18-decimal tokens, thin pools, fee-on-transfer tokens), how far does the fixed-probe output ratio drift from the real price ratio: does the quote saturate so the ratio tracks about the square root of the price (sub-claim 2, a 25 percent stop-loss firing only near a 44 percent drop), and how coarse are few-wei quotes (sub-claim 3)?"
+    "fork_question": "On real tokens and pools (low-decimal tokens, very high supply 18-decimal tokens, thin pools, fee-on-transfer tokens), how far does the fixed-probe output ratio drift from the real price ratio: does the quote saturate so the ratio tracks about the square root of the price (sub-claim 2, a 25 percent stop-loss firing only near a 44 percent drop), and how coarse are few-wei quotes (sub-claim 3)?",
+    "fork_ref": "UFV-09"
   }
 }

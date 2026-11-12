@@ -81,6 +81,7 @@
     "note": "Gate half reproduced on the real path (plan 23-05): a V3 pool holding 0.001 ETH (same price as the ordinary pool) passes the 0.5 ETH minimum-liquidity check because the check ignores the quoted amounts, and the bot buys. Whether the real QuoterV2 answers such a quote without reverting is flagged for the Phase 25 fork run. Status candidate -> confirmed.",
     "test_id": "AUD-BUY-015",
     "needs_fork": true,
-    "fork_question": "On a mainnet fork, does QuoterV2 quoteExactInputSingle(WETH to token, amountIn = the 0.5 ETH threshold, sqrtPriceLimitX96 0) on a V3 pool holding far less than 0.5 ETH of in-range liquidity answer without reverting, so checkMinLiquidity passes?"
+    "fork_question": "On a mainnet fork, does QuoterV2 quoteExactInputSingle(WETH to token, amountIn = the 0.5 ETH threshold, sqrtPriceLimitX96 0) on a V3 pool holding far less than 0.5 ETH of in-range liquidity answer without reverting, so checkMinLiquidity passes?",
+    "fork_ref": "UFV-07"
   }
 }
