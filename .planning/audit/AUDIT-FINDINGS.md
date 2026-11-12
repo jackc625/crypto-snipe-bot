@@ -7763,7 +7763,7 @@ Cells list finding IDs, `checked, none` (searched, nothing found), or `pending` 
 | test/integration/api/risk.test.ts | 23a6461 | AUD-TESTI-012 | quality: mocks_mechanism=yes, hollow=no, real_state=no |
 | test/integration/api/trades.test.ts | 23a6461 | AUD-TESTI-012 | quality: mocks_mechanism=yes, hollow=no, real_state=no |
 | test/integration/api/wsPush.test.ts | 23a6461 | AUD-TESTI-015, AUD-TESTI-016 | quality: mocks_mechanism=partial, hollow=yes, real_state=no |
-| test/integration/backupState.test.ts | d3555d9 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..d3555d9 none |
+| test/integration/backupState.test.ts | d3555d9 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..d3555d9 none; d3555d9..f0e9ed9 none |
 | test/integration/dbGuards.test.ts | 5378478 | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..5378478 none; 5378478..29c13f9 none |
 | test/integration/dbInit.test.ts | fe4649e | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..fe4649e none |
 | test/integration/directEntryGuard.test.ts | 3786e2e | none | quality: mocks_mechanism=no, hollow=no, real_state=no; re-audit: 23a6461..3786e2e none |

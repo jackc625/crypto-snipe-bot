@@ -1865,6 +1865,12 @@
         "to_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
         "findings": "none",
         "note": "Reviewed: backup-state.ts --self-check exits 0."
+      },
+      {
+        "from_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+        "to_sha": "f0e9ed9d847c26915dd99cd3ecf69d59b9e44788",
+        "findings": "none",
+        "note": "Reviewed by the phase 23 orchestrator (git diff d3555d9 f0e9ed9 -- test/integration/backupState.test.ts): only the two time limits changed, the test's limit 120 s to 240 s and the railed child's timeoutMs 110 s to 230 s, with a comment giving the measured times (12.7 s alone; 47.6 to 69.5 s in the full parallel runs of plans 23-19 to 23-24, 67.5 s at the wave 13 gate). The command, the twelve case assertions and the SELF-CHECK PASSED assertion are unchanged."
       }
     ]
   },
