@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 29/31 plans executed in 15 execution waves
+**Plans**: 29/32 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -291,6 +291,7 @@ Plans:
 - [x] 23-24-PLAN.md — Boot, resume and arm ordering, listener counts, same-block order, singleton identity (AC-30, AC-31)
 **Wave 14**
 - [ ] 23-25-PLAN.md — Commit check protecting the recordings and the env snapshot (AC-39 to AC-44)
+- [ ] 23-32-PLAN.md — Restart triage tests on the real boot and the real onRestart; AC-37 allow list back to the 3 dashboard tests (operator ruling 2026-11-12)
 **Wave 15**
 - [ ] 23-26-PLAN.md — Successor seal, seal-tool fix, full-suite gate and src/ diff review (AC-45, AC-49 to AC-52)
 
