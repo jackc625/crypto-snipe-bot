@@ -530,6 +530,18 @@
       "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-30). RED proof: mutant partial-unsubscribes (reach vite), group reason.",
       "register_as": "test-quality",
       "found_in_plan": "23-30"
+    },
+    {
+      "file": "test/unit/bot/twoStageSigint.test.ts",
+      "test": "startMultiChainBot registers exactly one SIGINT and one SIGTERM listener that run the two stages with SIGINT_GRACE_MS",
+      "it_count_before": 5,
+      "it_count_after": 5,
+      "change": "No longer reads src/bot.ts. A beforeAll does vi.resetModules(), installs the boot mock set of test/integration/midRunWalletCheck.test.ts (preflight, chain registry, database, anti-rug detector and allowlist, API server, notifier, Telegram listener, broadcaster, providers, tx manager; plus a logger recorder) and imports src/bot. The test calls the real startMultiChainBot with SIGINT_GRACE_MS=1234 and asserts it added exactly one SIGINT and one SIGTERM listener; the SIGINT listener runs the cleanup (closes the API server once), forces no exit and arms exactly one more timer, which forces exit 1 at 1234 ms of fake time and not at 1233; a second SIGINT, then SIGTERM, each force exit 130 at once with no new timer. A finally removes exactly the listeners the boot added and clears the boot's fake intervals. The two not.toContain lines on the old single-stage handler's text (function gracefulShutdown, 'Force exit after 5s timeout') are removed: the absence of old text has no behavior to observe (AC-38, named in 23-19-SUMMARY). The describe title is kept (test-identity matches renames on the last title level only).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-19); review concern Codex 23-19 MEDIUM (signal registration, not only the state machine). RED proofs: mutants sigint-not-registered, sigterm-not-registered, grace-knob-ignored and second-signal-no-force (reach vite), group sigint.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-19",
+      "title_before": "bot.ts no longer contains the old single-stage gracefulShutdown / 5s force-exit timer",
+      "title_after": "startMultiChainBot registers exactly one SIGINT and one SIGTERM listener that run the two stages with SIGINT_GRACE_MS"
     }
   ]
 }

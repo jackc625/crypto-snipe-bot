@@ -587,6 +587,49 @@ const REASON_MUTANTS: MutantRow[] = [
     }),
 ];
 
+// Plan 23-19, sigint: the signal listeners the real startMultiChainBot registers, and the
+// two-stage handler they run. The whole file runs for each row (no `only`), so each mutant is
+// shown to fail exactly its expected tests and no other test of the file.
+const SIGINT_TEST = 'test/unit/bot/twoStageSigint.test.ts';
+const SIGINT_T2 = 'Two-stage SIGINT — second signal forces immediate exit (Test 2) > a second signal while shutting down calls process.exit(130) and does not re-run cleanup';
+const SIGINT_T4 = 'Two-stage SIGINT — single force-exit path (Test 4)';
+const SIGINT_LISTENERS = `${SIGINT_T4} > startMultiChainBot registers exactly one SIGINT and one SIGTERM listener that run the two stages with SIGINT_GRACE_MS`;
+const SIGINT_BASE = `${SIGINT_T4} > bot.ts no longer contains the old single-stage gracefulShutdown / 5s force-exit timer`;
+const sigintRow = (row: Omit<MutantRow, 'group' | 'project' | 'testFile' | 'file' | 'reach'>): MutantRow => ({
+    group: 'sigint',
+    project: 'unit',
+    testFile: SIGINT_TEST,
+    file: 'src/bot.ts',
+    reach: 'vite',
+    ...row,
+});
+const SIGINT_MUTANTS: MutantRow[] = [
+    sigintRow({
+        name: 'sigint-not-registered',
+        edits: [{ find: "process.on('SIGINT', () => stage('SIGINT'));", replace: '' }],
+        expected: [SIGINT_LISTENERS],
+        messageIncludes: 'new SIGINT listeners: expected +0 to be 1',
+    }),
+    sigintRow({
+        name: 'sigterm-not-registered',
+        edits: [{ find: "process.on('SIGTERM', () => stage('SIGTERM'));", replace: '' }],
+        expected: [SIGINT_LISTENERS],
+        messageIncludes: 'new SIGTERM listeners: expected +0 to be 1',
+    }),
+    sigintRow({
+        name: 'grace-knob-ignored',
+        edits: [{ find: 'const graceRaw = process.env.SIGINT_GRACE_MS;', replace: 'const graceRaw = undefined;' }],
+        expected: [SIGINT_LISTENERS],
+        messageIncludes: 'exit calls at 1234 ms: expected [] to deeply equal [ [ 1 ] ]',
+    }),
+    sigintRow({
+        name: 'second-signal-no-force',
+        edits: [{ find: 'process.exit(130);', replace: 'void 0;' }],
+        expected: [SIGINT_T2, SIGINT_LISTENERS],
+        messageIncludes: 'to be called 1 times, but got 0 times',
+    }),
+];
+
 export const MUTANTS: MutantRow[] = [
     ...CLI_PREFLIGHT_MUTANTS,
     ...CLI_NAMES.flatMap(pauseCliMutants),
@@ -595,6 +638,7 @@ export const MUTANTS: MutantRow[] = [
     ...API_MOUNT_MUTANTS,
     ...ANTIRUG_CONFIG_MUTANTS,
     ...REASON_MUTANTS,
+    ...SIGINT_MUTANTS,
 ];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
@@ -646,6 +690,9 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
         { title: REASON_T3B, mutants: ['antirug-gas-dropped', 'multiplier-not-threaded'] },
         { title: REASON_T7, mutants: ['partial-unsubscribes'] },
     ].map((r) => ({ testFile: REASON_TEST, baseTitle: r.title, currentTitle: r.title, mutants: r.mutants })),
+    // Plan 23-19. The test's two `not.toContain` lines on the old single-stage handler's text are
+    // removed inside the converted test (no behavior to observe; named in 23-19-SUMMARY.md).
+    { testFile: SIGINT_TEST, baseTitle: SIGINT_BASE, currentTitle: SIGINT_LISTENERS, mutants: SIGINT_MUTANTS.map((m) => m.name) },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
@@ -656,6 +703,7 @@ export const CONVERTED_COUNTS: Record<string, number> = {
     [API_ANTIRUG_TEST]: 1,
     [ANTIRUG_CONFIG_TEST]: 3,
     [REASON_TEST]: 5,
+    [SIGINT_TEST]: 1,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [
     {
