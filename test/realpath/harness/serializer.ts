@@ -33,9 +33,28 @@
 //     line. It writes only when VITEST_CSB_UPDATE_RECORDINGS is "1" and CI is not set (AC-25), and
 //     the only code that sets that switch is scripts/update-recordings.ts (npm run
 //     recordings:update). In a normal run an absent recording is a failure naming that command.
+//   - Plan 23-33 (AUDIT-06, the gap plan 23-25 recorded; operator ruling 2026-11-12 "Fix now,
+//     small plan (Recommended)"): compareRecording also records, for the current run, which
+//     recording it compared, so scripts/check-recordings-compared.ts (npm run
+//     check:recordings-compared) can fail when a committed recording was never compared in a full
+//     run (a test pointed at a new recording name while the old file stays). After the path
+//     checks and before the compare, a call against the real recordings folder appends one line,
+//     the JSON-quoted path relative to that folder with forward slashes (`<name>.jsonl`,
+//     `env/<VAR>.json`), to <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<CSB_RAIL_RUN_ID>/
+//     <pid>-<threadId>.txt, synchronously, so a worker that ends right after cannot lose it. It
+//     records in compare and update runs alike. A call with a `dir` override naming another
+//     folder (the guard's temp-folder cases) is not recorded. CSB_RAIL_RUN_ID is the rails' run id
+//     (test/rails/ledgerRun.ts sets it in the Vitest main process before any worker starts, so
+//     every worker of one invocation shares it; core.cjs keeps it through its env scrub); the
+//     record lives outside the rail ledger folder. Without a valid run id nothing is recorded and
+//     one line says so on stderr. A failed record write is reported once on stderr and never
+//     changes the compare (the check then fails naming the path). Nothing else here changed:
+//     compare and write results are byte-identical to 23-20's.
 
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { threadId } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { Transaction, hexlify } from 'ethers';
 import type { TimelineEntry } from './capture';
@@ -295,13 +314,53 @@ function firstDifference(expected: string, actual: string): string {
     return 'the bytes differ but every line is equal (line endings or encoding)';
 }
 
+// ---------------------------------------------------------------------------------------------
+// The per-run comparison record (plan 23-33; read by scripts/check-recordings-compared.ts)
+// ---------------------------------------------------------------------------------------------
+
+/** The folder under os.tmpdir() that holds one sub-folder per run id. Outside the rail ledger. */
+export const COMPARED_RECORD_DIRNAME = 'crypto-snipe-bot-recordings-compared';
+// The rails' run-id rule (test/rails/core.cjs RUN_ID_RE, test/rails/ledgerRun.ts).
+const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+let warnedNoRunId = false;
+let warnedWriteFailed = false;
+
+function recordCompared(file: string, base: string): void {
+    // Only the real recordings folder (a `dir` override naming it counts as the real folder).
+    if (path.relative(RECORDINGS_DIR, base) !== '') return;
+    const runId = process.env.CSB_RAIL_RUN_ID;
+    if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
+        if (!warnedNoRunId) {
+            warnedNoRunId = true;
+            process.stderr.write(
+                `[AUDIT-06 recordings-compared] CSB_RAIL_RUN_ID is ${runId === undefined || runId === '' ? 'unset' : 'not a valid run id'} in process ${process.pid}; ` +
+                    'compareRecording calls here are not recorded, so npm run check:recordings-compared cannot judge this run\n',
+            );
+        }
+        return;
+    }
+    const rel = path.relative(RECORDINGS_DIR, file).split(path.sep).join('/');
+    try {
+        const dir = path.join(os.tmpdir(), COMPARED_RECORD_DIRNAME, runId);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.appendFileSync(path.join(dir, `${process.pid}-${threadId}.txt`), `${JSON.stringify(rel)}\n`);
+    } catch (e) {
+        if (!warnedWriteFailed) {
+            warnedWriteFailed = true;
+            process.stderr.write(`[AUDIT-06 recordings-compared] could not record the comparison of ${rel} for run ${runId}: ${e instanceof Error ? e.message : String(e)}\n`);
+        }
+    }
+}
+
 /**
  * Compare `text` with the recording at `relPath`, byte for byte. Throws on a difference or an
  * absent file, unless writing is allowed (updateAllowed), in which case it writes and returns
- * 'written'. Returns 'match' when the bytes are equal (nothing is written).
+ * 'written'. Returns 'match' when the bytes are equal (nothing is written). A call against the
+ * real recordings folder is recorded for the current run first (see the file header).
  */
 export function compareRecording(relPath: string, text: string, opts: CompareOptions = {}): CompareResult {
     const file = resolveRecordingPath(relPath, opts.dir);
+    recordCompared(file, path.resolve(opts.dir ?? RECORDINGS_DIR));
     if (text.includes('\r')) throw new Error(`compareRecording: the text for ${relPath} holds a carriage return (AC-26: LF only)`);
     const now = Buffer.from(text, 'utf8');
     const exists = fs.existsSync(file);
