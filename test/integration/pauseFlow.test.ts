@@ -2,9 +2,9 @@
 // live + adds 4 new endpoint-exercise tests for src/api/routes/controls.ts POST
 // /pause + POST /resume + GET /pause routes.
 //
-// Tests 1-4 (persistence + restart-survival per D-PAUSED-RESTART) use in-memory
-// SQLite with the production-replica migration so each test constructs a fresh
-// starting state.
+// Tests 1-4 (persistence + restart-survival per D-PAUSED-RESTART) run the real
+// src/utils/db.ts pause statements on a fresh temp database file migrated by the
+// real migrateSchema (Phase 23 plan 23-14, AUD-TESTI-001; see the block below).
 //
 // Tests 5-8 (endpoint exercise) mount controlRoutes() against a minimal express
 // app via raw http (matching test/integration/api/controls.test.ts pattern;
@@ -19,240 +19,147 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import Database from 'better-sqlite3';
 import express from 'express';
+import { CURRENT_SCHEMA_VERSION } from '../../src/utils/dbSchema';
 
 // ---------------------------------------------------------------------------
-// Migration helpers (mirror test/unit/db/pauseStateMigration.test.ts so this
-// integration suite is self-contained and exercises the SAME migration shape
-// as production src/utils/db.ts).
+// Tests 1-4 run the bot's REAL pause statements: getPauseState, setPauseState and
+// clearPauseState as src/utils/db.ts prepares them, on a temp database file that the real
+// module opens (openGuardedDb, its pragmas) and migrates with the real migrateSchema
+// (src/utils/dbSchema.ts). This file mocks src/utils/db for Tests 5-9, so Tests 1-4 load the
+// real module with vi.importActual after vi.resetModules, with DB_PATH pointing at the temp
+// file; a second load on the same file is a real restart of the module. There is no
+// hand-written schema here any more (AUD-TESTI-001, plan 23-14): the shape of the migrated
+// pause_state table itself (CHECK(id = 1), the default unpaused row) is pinned against the
+// recorded version 7 schema by test/realpath/migrations/migrations.golden.test.ts (AC-04 from
+// version 0, AC-05 from the frozen version 4 fixture, AC-06 re-run with a paused row).
 // ---------------------------------------------------------------------------
 
-function applyV1Migration(db: Database.Database): void {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS trades (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            token TEXT NOT NULL COLLATE NOCASE,
-            chain TEXT NOT NULL DEFAULT 'eth',
-            action TEXT NOT NULL CHECK(action IN ('buy', 'sell', 'fail')),
-            tx_hash TEXT,
-            block INTEGER,
-            timestamp INTEGER NOT NULL DEFAULT (unixepoch()),
-            amount_in TEXT,
-            amount_out TEXT,
-            gas_cost TEXT,
-            price_at_action TEXT,
-            status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'sold', 'failed'))
-        );
-    `);
+type RealDbModule = typeof import('../../src/utils/db');
+
+/** Load a fresh instance of the real src/utils/db bound to dbPath (the file is created and migrated). */
+async function loadRealDb(dbPath: string): Promise<RealDbModule> {
+    process.env.DB_PATH = dbPath;
+    vi.resetModules();
+    return vi.importActual<RealDbModule>('../../src/utils/db');
 }
 
-function applyV2Migration(db: Database.Database): void {
-    db.exec(`
-        ALTER TABLE trades ADD COLUMN pool_type TEXT DEFAULT 'v2' CHECK(pool_type IN ('v2', 'v3'));
-        ALTER TABLE trades ADD COLUMN fee_tier INTEGER;
-    `);
-}
-
-function applyV3Migration(db: Database.Database): void {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS exit_state (
-            trade_id INTEGER PRIMARY KEY,
-            entry_price REAL NOT NULL,
-            high_water_mark REAL NOT NULL,
-            trailing_activated INTEGER NOT NULL DEFAULT 0,
-            partial_tiers_completed TEXT NOT NULL DEFAULT '[]',
-            original_token_amount TEXT NOT NULL,
-            urgency_start_ts INTEGER NOT NULL,
-            volatility_samples TEXT NOT NULL DEFAULT '[]',
-            FOREIGN KEY (trade_id) REFERENCES trades(id)
-        );
-    `);
-}
-
-function applyV4Migration(db: Database.Database): void {
-    const columns = db.prepare("PRAGMA table_info('trades')").all() as Array<{ name: string }>;
-    if (!columns.some(c => c.name === 'dex_name')) {
-        db.exec(`ALTER TABLE trades ADD COLUMN dex_name TEXT DEFAULT NULL`);
-    }
-}
-
-function applyV5Migration(db: Database.Database): void {
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS lp_baseline (
-            trade_id INTEGER PRIMARY KEY,
-            pool_type TEXT NOT NULL CHECK(pool_type IN ('v2', 'v3')),
-            pair_or_pool_address TEXT NOT NULL COLLATE NOCASE,
-            v2_token0_reserve TEXT,
-            v2_token1_reserve TEXT,
-            v2_lp_total_supply TEXT,
-            v3_active_liquidity TEXT,
-            v3_tick_at_snapshot INTEGER,
-            v3_position_nft_id TEXT,
-            v3_fee_tier INTEGER,
-            snapshot_block INTEGER NOT NULL,
-            snapshot_ts INTEGER NOT NULL,
-            FOREIGN KEY (trade_id) REFERENCES trades(id)
-        );
-        CREATE TABLE IF NOT EXISTS chain_state (
-            chain TEXT PRIMARY KEY,
-            last_seen_block INTEGER NOT NULL,
-            last_updated_ts INTEGER NOT NULL
-        );
-    `);
-}
-
-function applyV6Migration(db: Database.Database): void {
-    db.transaction(() => {
-        db.exec(`
-            CREATE TABLE IF NOT EXISTS pause_state (
-                id INTEGER PRIMARY KEY CHECK(id = 1),
-                paused INTEGER NOT NULL DEFAULT 0,
-                paused_at INTEGER,
-                paused_by TEXT,
-                reason TEXT
-            );
-        `);
-        db.exec(`INSERT OR IGNORE INTO pause_state (id, paused, paused_at, paused_by, reason) VALUES (1, 0, NULL, NULL, NULL)`);
-
-        const columns = db.prepare("PRAGMA table_info('chain_state')").all() as Array<{ name: string }>;
-        if (!columns.some(c => c.name === 'antirug_dry_run_started')) {
-            db.exec(`ALTER TABLE chain_state ADD COLUMN antirug_dry_run_started INTEGER`);
-        }
-    })();
-}
-
-function buildV6Db(dbPath: string): Database.Database {
-    const db = new Database(dbPath);
-    db.pragma('journal_mode = WAL');
-    applyV1Migration(db);
-    applyV2Migration(db);
-    applyV3Migration(db);
-    applyV4Migration(db);
-    applyV5Migration(db);
-    applyV6Migration(db);
-    db.pragma(`user_version = 6`);
-    return db;
+interface PauseRow {
+    paused: number;
+    paused_at: number | null;
+    paused_by: string | null;
+    reason: string | null;
 }
 
 // ---------------------------------------------------------------------------
 // Tests 1-4: pause_state persistence + restart-survival (OPS-LIVE-09 / D-PAUSED-RESTART)
 // ---------------------------------------------------------------------------
 
+// closes-finding: AUD-TESTI-001 (pauseFlow half: Tests 1-4 run the real pause statements on the real migrations; RED proof 23-14-7-pauseflow-real-statements.txt)
 describe('pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART)', () => {
     let tmpDir: string;
     let tmpDbPath: string;
+    let savedDbPath: string | undefined;
 
     beforeEach(() => {
+        savedDbPath = process.env.DB_PATH;
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pause-flow-'));
         tmpDbPath = path.join(tmpDir, 'test.db');
     });
 
     afterEach(() => {
+        // Restore the rails' value (test/.env.test sets DB_PATH empty), never leave a temp path behind.
+        if (savedDbPath === undefined) delete process.env.DB_PATH;
+        else process.env.DB_PATH = savedDbPath;
         try {
             fs.rmSync(tmpDir, { recursive: true, force: true });
         } catch {
             /* ignore — Windows may hold the WAL file briefly */
         }
-        delete process.env.DB_PATH;
     });
 
-    it('Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated', () => {
-        const db = buildV6Db(tmpDbPath);
+    it('Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated', async () => {
+        const real = await loadRealDb(tmpDbPath);
         try {
-            const setStmt = db.prepare(
-                `UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 1`,
-            );
-            const getStmt = db.prepare(`SELECT paused, paused_at, paused_by, reason FROM pause_state WHERE id = 1`);
+            // The real module bound this test's file and migrated it to the current version.
+            expect(real.getDbFilePath()).toBe(path.resolve(tmpDbPath));
+            expect(real.db.pragma('user_version', { simple: true })).toBe(CURRENT_SCHEMA_VERSION);
 
             const ts = 1700000000;
-            setStmt.run(ts, 'manual', 'test reason');
+            const info = real.setPauseState.run(ts, 'manual', 'test reason');
+            // The migration's single pause row is what the UPDATE writes to.
+            expect(info.changes).toBe(1);
 
-            const row = getStmt.get() as {
-                paused: number;
-                paused_at: number;
-                paused_by: string;
-                reason: string;
-            };
+            const row = real.getPauseState.get() as PauseRow;
             expect(row.paused).toBe(1);
             expect(row.paused_at).toBe(ts);
             expect(row.paused_by).toBe('manual');
             expect(row.reason).toBe('test reason');
         } finally {
-            db.close();
+            real.closeDb();
         }
     });
 
-    it('Test 2: restart simulation — setPauseState → db.close() → reopen → row still present', () => {
-        // First open: write row, close.
-        const db1 = buildV6Db(tmpDbPath);
+    it('Test 2: restart simulation — setPauseState → db.close() → reopen → row still present', async () => {
+        // First load of the real module: write the row with the real statement, close.
+        const first = await loadRealDb(tmpDbPath);
         try {
-            const setStmt = db1.prepare(
-                `UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 1`,
-            );
-            setStmt.run(1700000000, 'manual', 'survives-restart');
+            expect(first.setPauseState.run(1700000000, 'manual', 'survives-restart').changes).toBe(1);
         } finally {
-            db1.close();
+            first.closeDb();
         }
+        expect(first.db.open).toBe(false);
 
-        // Second open at same DB_PATH (restart sim): row must still be there.
-        const db2 = new Database(tmpDbPath);
+        // Second load at the same DB_PATH (restart): a new module instance on a new connection,
+        // which re-runs the real migrations on the existing file; the row must still be there.
+        const second = await loadRealDb(tmpDbPath);
         try {
-            const row = db2.prepare(`SELECT paused, paused_at, paused_by, reason FROM pause_state WHERE id = 1`).get() as {
-                paused: number;
-                paused_at: number;
-                paused_by: string;
-                reason: string;
-            };
+            expect(second).not.toBe(first);
+            expect(second.db).not.toBe(first.db);
+            expect(second.db.open).toBe(true);
+            expect(second.getDbFilePath()).toBe(path.resolve(tmpDbPath));
+
+            const row = second.getPauseState.get() as PauseRow;
             expect(row.paused).toBe(1);
             expect(row.paused_at).toBe(1700000000);
             expect(row.paused_by).toBe('manual');
             expect(row.reason).toBe('survives-restart');
         } finally {
-            db2.close();
+            second.closeDb();
         }
     });
 
-    it('Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns', () => {
-        const db = buildV6Db(tmpDbPath);
+    it('Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns', async () => {
+        const real = await loadRealDb(tmpDbPath);
         try {
-            const setStmt = db.prepare(
-                `UPDATE pause_state SET paused = 1, paused_at = ?, paused_by = ?, reason = ? WHERE id = 1`,
-            );
-            const clearStmt = db.prepare(
-                `UPDATE pause_state SET paused = 0, paused_at = NULL, paused_by = NULL, reason = NULL WHERE id = 1`,
-            );
-            const getStmt = db.prepare(`SELECT paused, paused_at, paused_by, reason FROM pause_state WHERE id = 1`);
+            expect(real.setPauseState.run(1700000000, 'manual', 'before-clear').changes).toBe(1);
+            expect((real.getPauseState.get() as PauseRow).paused).toBe(1);
 
-            setStmt.run(1700000000, 'manual', 'before-clear');
-            clearStmt.run();
-            const row = getStmt.get() as {
-                paused: number;
-                paused_at: number | null;
-                paused_by: string | null;
-                reason: string | null;
-            };
+            expect(real.clearPauseState.run().changes).toBe(1);
+            const row = real.getPauseState.get() as PauseRow;
             expect(row.paused).toBe(0);
             expect(row.paused_at).toBeNull();
             expect(row.paused_by).toBeNull();
             expect(row.reason).toBeNull();
         } finally {
-            db.close();
+            real.closeDb();
         }
     });
 
-    it('Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1))', () => {
-        const db = buildV6Db(tmpDbPath);
+    it('Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1))', async () => {
+        // On the table the real migrations created (no bot statement inserts a pause row; the
+        // migration's own INSERT OR IGNORE is the only writer of id 1).
+        const real = await loadRealDb(tmpDbPath);
         try {
             expect(() => {
-                db.prepare(`INSERT INTO pause_state (id, paused, paused_at, paused_by, reason) VALUES (2, 0, NULL, NULL, NULL)`).run();
+                real.db.prepare(`INSERT INTO pause_state (id, paused, paused_at, paused_by, reason) VALUES (2, 0, NULL, NULL, NULL)`).run();
             }).toThrow(/CHECK constraint failed|constraint/i);
 
             // Single row only.
-            const count = db.prepare(`SELECT COUNT(*) as n FROM pause_state`).get() as { n: number };
+            const count = real.db.prepare(`SELECT COUNT(*) as n FROM pause_state`).get() as { n: number };
             expect(count.n).toBe(1);
         } finally {
-            db.close();
+            real.closeDb();
         }
     });
 });
@@ -314,6 +221,13 @@ vi.mock('../../src/exitEngine', () => ({
 
 vi.mock('../../src/utils/logger', () => ({
     logger: {
+        // Top-level methods: the real src/utils/db and src/utils/dbSchema that Tests 1-4 load call
+        // logger.info directly (migration steps, closeDb).
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        fatal: vi.fn(),
         child: () => ({
             info: vi.fn(),
             warn: vi.fn(),

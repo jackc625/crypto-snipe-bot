@@ -54,7 +54,12 @@ export const priceSequences = {
     lowVolatility: [1000, 1010, 990, 1005, 995, 1002, 998, 1001],
 };
 
-/** ExitStateRow shape for DB round-trip tests */
+/**
+ * exit_state row shape for DB round-trip tests: every column of the version 7 table, in table
+ * order (test/realpath/migrations/fixtures/schema-v7.json, the recording of the real migrations).
+ * test/unit/helpers.smoke.test.ts checks these keys against a table built by the real migrateSchema,
+ * so a migration that adds or drops a column fails there (Phase 23 plan 23-14, AUD-TESTI-001).
+ */
 export function createMockExitStateRow() {
     return {
         trade_id: 1,
@@ -65,5 +70,7 @@ export function createMockExitStateRow() {
         original_token_amount: '1000000000000000000',
         urgency_start_ts: Date.now() - 10 * 60 * 1000, // 10 min ago
         volatility_samples: JSON.stringify([1000, 1200, 1800, 2200, 2500]),
+        exit_failure_count: 0, // version 7: INTEGER NOT NULL DEFAULT 0
+        exit_status: null as string | null, // version 7: NULL, or 'exit_failed_held'
     };
 }

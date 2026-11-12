@@ -234,6 +234,78 @@
       "found_in_plan": "23-03",
       "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-03-ac07-red.txt",
       "related_finding": "AUD-TESTI-001"
+    },
+    {
+      "file": "test/integration/pauseFlow.test.ts",
+      "test": "pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 1: setPauseState writes a row visible to getPauseState with paused=1 + audit columns populated",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Body rewritten: the real src/utils/db module (vi.importActual after vi.resetModules, DB_PATH a temp file) opens and migrates the file with the real migrateSchema, and the test runs its exported setPauseState and getPauseState instead of a hand-built v6 schema and its own UPDATE/SELECT text. The four row assertions are unchanged; added: the module bound the temp file, user_version is CURRENT_SCHEMA_VERSION, and the UPDATE changed exactly 1 row. Title unchanged; the test is now async.",
+      "reason": "AUD-TESTI-001 sub-claim 3 (operator ruling Fix now, 23-14): the test ran a hand-built v6 schema copy and its own SQL, not the bot statements",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-7-pauseflow-real-statements.txt"
+    },
+    {
+      "file": "test/integration/pauseFlow.test.ts",
+      "test": "pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 2: restart simulation — setPauseState → db.close() → reopen → row still present",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Body rewritten: the first load of the real module writes with its setPauseState and closes with closeDb; the second load (a new module instance on a new connection, which re-runs the real migrations on the file) reads with its getPauseState. The four row assertions are unchanged; added: changes is 1, the first connection is closed, the second load is a different module and connection on the same file. Title unchanged; the test is now async.",
+      "reason": "AUD-TESTI-001 sub-claim 3 (operator ruling Fix now, 23-14): the test ran a hand-built v6 schema copy and its own SQL, not the bot statements",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-7-pauseflow-real-statements.txt"
+    },
+    {
+      "file": "test/integration/pauseFlow.test.ts",
+      "test": "pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 3: clearPauseState flips paused 1 → 0 AND nulls all audit columns",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Body rewritten: runs the real module setPauseState, getPauseState and clearPauseState instead of its own SQL copies. The four row assertions are unchanged; added: both UPDATEs change exactly 1 row and the row reads paused 1 before the clear. Title unchanged; the test is now async.",
+      "reason": "AUD-TESTI-001 sub-claim 3 (operator ruling Fix now, 23-14): the test ran a hand-built v6 schema copy and its own SQL, not the bot statements",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-7-pauseflow-real-statements.txt"
+    },
+    {
+      "file": "test/integration/pauseFlow.test.ts",
+      "test": "pause state restart survival (OPS-LIVE-09 / D-PAUSED-RESTART) > Test 4: single-row constraint enforced — cannot INSERT id=2 (CHECK(id=1))",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Body rewritten: the INSERT of id 2 and the row count run on the real module connection to the file the real migrations built, instead of a hand-built v6 schema. Both assertions are unchanged. Title unchanged; the test is now async.",
+      "reason": "AUD-TESTI-001 sub-claim 3 (operator ruling Fix now, 23-14): the test ran a hand-built v6 schema copy and its own SQL, not the bot statements",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-7-pauseflow-real-statements.txt"
+    },
+    {
+      "file": "test/unit/helpers.smoke.test.ts",
+      "test": "helpers smoke test > createMockExitStateRow has exactly the columns of the exit_state table the real migrations build",
+      "it_count_before": 10,
+      "it_count_after": 11,
+      "change": "New test (no existing test changed): the fixture keys equal PRAGMA table_info(exit_state) of a createTestDb database (built by the real migrateSchema), and the fixture row inserts into that table and reads back equal.",
+      "reason": "AUD-TESTI-001 sub-claim 4 (operator ruling Fix now, 23-14): the fixture had the pre-v7 shape and nothing compared it with the real table",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-8-exit-state-fixture-shape.txt"
+    },
+    {
+      "file": "test/fixtures/exitEngine.fixtures.ts",
+      "test": "(fixture) createMockExitStateRow, used by test/unit/exitEngine.test.ts (4 tests) and helpers.smoke.test.ts",
+      "it_count_before": 0,
+      "it_count_after": 0,
+      "change": "Two keys added in table order, exit_failure_count 0 and exit_status null (the version 7 columns recorded in test/realpath/migrations/fixtures/schema-v7.json); no existing key or value changed. No exitEngine.test.ts assertion reads the key set (deserializeExitState reads only the 8 older columns).",
+      "reason": "AUD-TESTI-001 sub-claim 4 (operator ruling Fix now, 23-14)",
+      "register_as": "test-quality",
+      "found_in_plan": "23-14",
+      "related_finding": "AUD-TESTI-001",
+      "red_proof": ".planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-8-exit-state-fixture-shape.txt"
     }
   ]
 }
