@@ -110,7 +110,11 @@ function exitTriggers(fromLog: number): string[] {
 }
 
 describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08)', () => {
-    it('probe-is-eth-buy-wei-as-token-amount: for a 9-decimal token every exit quote sells parseEther(snipe amount) raw token units', async (ctx) => {
+    // Measured on Node 22 (plan 23-13): 1.3 to 1.8 s alone; under the full parallel npm test it timed
+    // out at the 15 s realpath default once 23-13's compiler-API proofs joined the run, and its still-
+    // running body then leaked into the next test (AUD-TESTI-029). The explicit limit is headroom;
+    // nothing in the test changed.
+    it('probe-is-eth-buy-wei-as-token-amount: for a 9-decimal token every exit quote sells parseEther(snipe amount) raw token units', { timeout: 60_000 }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         const pollMs = sc.graph.exitEngine.exitConfig.pollIntervalMs;
         sc.node.setRead(sc.token, 'decimals()', encodeResult(['uint8'], [9]));

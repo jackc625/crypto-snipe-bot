@@ -64,6 +64,14 @@
         "AUD-BUY-036"
       ],
       "search": "23-10 real-path AUD-BUY-036 proof (an ETH chain without a WebSocket URL, the real HTTP DEX poller, a provider refusing eth_getLogs wider than 10 blocks, a 12-block eth_blockNumber outage while the bot runs) found while proving AUD-ANTIRUG-018, plus a read of every eth_getLogs and queryFilter caller in src (git grep -n -e \"queryFilter(\" -e \"getLogs(\" -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "test",
+      "ids": [
+        "AUD-TESTI-029"
+      ],
+      "search": "23-13 full railed run (AUD-EXIT-003 timed out under load, then an unhandled eth_subscribe cancellation at teardown attributed to the next test) and a forced-timeout run of AUD-EXIT-003.test.ts (scratch { timeout: 700 }, restored), plus a read of every stepping helper in test/realpath/harness/world.ts and every fixture loop built on them, and of setup.ts afterEach, at a593efebfd8b17b5583257bd6db3ff46738995ee"
     }
   ]
 }
