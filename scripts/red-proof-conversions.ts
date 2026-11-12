@@ -630,6 +630,114 @@ const SIGINT_MUTANTS: MutantRow[] = [
     }),
 ];
 
+// Plan 23-19, inclusion: the buy rows' real hash and the nonce-locked buy seam (D-RECORD-REAL-HASH),
+// and the removed V2 tax function plus the read-only swap simulation (STOP-THE-LINE-03). The whole
+// file runs for each row (no `only`).
+const INCLUSION_TEST = 'test/unit/mevStrategies/inclusionReconciliation.test.ts';
+// Built from two strings, as the test builds it, so this file never names the removed function.
+const REMOVED_TAX_FN = ['hasHighTransfer', 'TaxForChain'].join('');
+const D_RECORD_SUITE = 'D-RECORD-REAL-HASH — buy row records the real hash';
+const D_RECORD_TITLE = `${D_RECORD_SUITE} > D-RECORD-REAL-HASH: the real V2 and V3 buy handlers store the hash the submitBuyTx seam returned, and the seam submits under the wallet nonce lock`;
+const D_RECORD_BASE = `${D_RECORD_SUITE} > D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)`;
+const V2_UNSAFE_SUITE = 'STOP-THE-LINE-03 — V2 safety bank fires no real buy (V2-unsafe-real-buy harm #6)';
+const V2_UNSAFE_TITLE = `${V2_UNSAFE_SUITE} > V2-unsafe-real-buy (STOP-THE-LINE-03): ${REMOVED_TAX_FN} is not exported and named by no src/ code, and the real simulateSwapForChain calls swapExactETHForTokens only through staticCall (VALIDATION harm-prevention #6)`;
+const V2_UNSAFE_BASE = `${V2_UNSAFE_SUITE} > V2-unsafe-real-buy (STOP-THE-LINE-03): the V2 safety bank no longer references ${REMOVED_TAX_FN}; the function is deleted and unexported (source/behavior assertion, VALIDATION harm-prevention #6)`;
+// The real-hash line occurs twice in src/bot.ts, so each find starts at its own comment, which
+// differs between the V2 and the V3 insert.
+const REAL_HASH_LINE = "            txHash: realHash ?? 'mev_bundle',";
+const V2_REAL_HASH_COMMENT =
+    "            // `?? 'mev_bundle'` is a belt-and-suspenders null-guard; with the\n            // Promise<string> return from 21.1-05 this is always the real hash.\n";
+const V3_REAL_HASH_COMMENT =
+    "            // `?? 'mev_bundle'` null-guard is belt-and-suspenders; with the\n            // Promise<string> return from 21.1-05 this is always the real hash.\n";
+const PLACEHOLDER_LINE = "            txHash: 'mev_bundle',";
+const GAS_IMPORT = 'import { getGasOptions } from "./utils/gasManager";';
+const UNICRYPT_LINE = 'const UNICRYPT_API = "https://api.unicrypt.network/api/v2/locker/pair/";';
+const STATIC_SWAP_CALL = '        await router.swapExactETHForTokens.staticCall(\n            amountOutMin,\n            path,\n            ctx.wallet.address,';
+const inclusionRow = (row: Omit<MutantRow, 'group' | 'project' | 'testFile'>): MutantRow => ({
+    group: 'inclusion',
+    project: 'unit',
+    testFile: INCLUSION_TEST,
+    ...row,
+});
+const INCLUSION_MUTANTS: MutantRow[] = [
+    inclusionRow({
+        name: 'v2-row-placeholder-hash',
+        file: 'src/bot.ts',
+        edits: [{ find: V2_REAL_HASH_COMMENT + REAL_HASH_LINE, replace: V2_REAL_HASH_COMMENT + PLACEHOLDER_LINE }],
+        reach: 'vite',
+        expected: [D_RECORD_TITLE],
+        messageIncludes: "v2 buy row tx hash: expected 'mev_bundle' to be",
+    }),
+    inclusionRow({
+        name: 'v3-row-placeholder-hash',
+        file: 'src/bot.ts',
+        edits: [{ find: V3_REAL_HASH_COMMENT + REAL_HASH_LINE, replace: V3_REAL_HASH_COMMENT + PLACEHOLDER_LINE }],
+        reach: 'vite',
+        expected: [D_RECORD_TITLE],
+        messageIncludes: "v3 buy row tx hash: expected 'mev_bundle' to be",
+    }),
+    inclusionRow({
+        name: 'buy-submit-outside-lock',
+        file: 'src/bot.ts',
+        edits: [{ find: 'return withNonceLock(ctx.wallet.address, () => sendTxWithRetry(txBuilder, ctx));', replace: 'return sendTxWithRetry(txBuilder, ctx);' }],
+        reach: 'vite',
+        expected: [D_RECORD_TITLE],
+        messageIncludes: 'buy submits while the wallet lock is held: expected "vi.fn()" to not be called at all, but actually been called 1 times',
+    }),
+    inclusionRow({
+        name: 'bot-references-removed-fn',
+        file: 'src/bot.ts',
+        edits: [{ find: GAS_IMPORT, replace: `${GAS_IMPORT}\ndeclare function ${REMOVED_TAX_FN}(): Promise<boolean>;` }],
+        reach: 'worker',
+        expected: [V2_UNSAFE_TITLE],
+        messageIncludes: "src code naming the removed function: expected [ 'src/bot.ts:6' ] to deeply equal []",
+    }),
+    inclusionRow({
+        name: 'removed-fn-restored',
+        file: 'src/utils/tokenSafety.ts',
+        edits: [{ find: UNICRYPT_LINE, replace: `${UNICRYPT_LINE}\nexport async function ${REMOVED_TAX_FN}(): Promise<boolean> { return false; }` }],
+        reach: 'vite',
+        expected: [V2_UNSAFE_TITLE],
+        messageIncludes: `tokenSafety exports: expected [ '${REMOVED_TAX_FN}' ] to deeply equal []`,
+    }),
+    inclusionRow({
+        name: 'safety-sim-sends-real-swap',
+        file: 'src/utils/tokenSafety.ts',
+        edits: [{ find: STATIC_SWAP_CALL, replace: STATIC_SWAP_CALL.replace('swapExactETHForTokens.staticCall(', 'swapExactETHForTokens(') }],
+        reach: 'vite',
+        expected: [V2_UNSAFE_TITLE],
+        messageIncludes: 'swap transactions sent by the safety simulation: expected 1 to be +0',
+    }),
+];
+
+// Plan 23-19, dotenv-gate: case (e) of the dotenv rail test. Each mutant drops the VITEST gate at
+// one of the five sites; the railed child then attempts the .env read, the setup layer refuses it
+// and records env-read-blocked in that case's ledger (the real file is never opened).
+const DOTENV_TEST = 'test/unit/rails/dotenvSrcSkip.test.ts';
+const DOTENV_SUITE = 'dotenv gate at the reachable sites (SAFE-02 src layer, D-01)';
+const DOTENV_E_TITLE = `${DOTENV_SUITE} > (e) each of the five sites loads dotenv only under the VITEST gate: run as a railed child with VITEST set, each makes zero .env read attempts`;
+const DOTENV_E_BASE = `${DOTENV_SUITE} > (e) static: each of the five sites loads dotenv only under the VITEST gate`;
+const GATED_DOTENV = 'if (!process.env.VITEST) dotenv.config();';
+const dotenvRow = (name: string, file: string): MutantRow => ({
+    name,
+    group: 'dotenv-gate',
+    project: 'unit',
+    testFile: DOTENV_TEST,
+    only: '\\(e\\) each of the five sites loads dotenv',
+    file,
+    edits: [{ find: GATED_DOTENV, replace: 'dotenv.config();' }],
+    reach: 'child',
+    expected: [DOTENV_E_TITLE],
+    messageIncludes: `${file} env-read-blocked: expected 1 to be +0`,
+});
+const DOTENV_GATE_MUTANTS: MutantRow[] = [
+    dotenvRow('dotenv-unguarded-config', 'src/config.ts'),
+    dotenvRow('dotenv-unguarded-notifier', 'src/utils/notifier.ts'),
+    dotenvRow('dotenv-unguarded-pause', 'scripts/pause.ts'),
+    dotenvRow('dotenv-unguarded-resume', 'scripts/resume.ts'),
+    dotenvRow('dotenv-unguarded-preflight', 'scripts/preflight.ts'),
+];
+
 export const MUTANTS: MutantRow[] = [
     ...CLI_PREFLIGHT_MUTANTS,
     ...CLI_NAMES.flatMap(pauseCliMutants),
@@ -639,6 +747,8 @@ export const MUTANTS: MutantRow[] = [
     ...ANTIRUG_CONFIG_MUTANTS,
     ...REASON_MUTANTS,
     ...SIGINT_MUTANTS,
+    ...INCLUSION_MUTANTS,
+    ...DOTENV_GATE_MUTANTS,
 ];
 export const CONVERTED_TESTS: ConvertedTestRow[] = [
     ...[
@@ -693,6 +803,19 @@ export const CONVERTED_TESTS: ConvertedTestRow[] = [
     // Plan 23-19. The test's two `not.toContain` lines on the old single-stage handler's text are
     // removed inside the converted test (no behavior to observe; named in 23-19-SUMMARY.md).
     { testFile: SIGINT_TEST, baseTitle: SIGINT_BASE, currentTitle: SIGINT_LISTENERS, mutants: SIGINT_MUTANTS.map((m) => m.name) },
+    {
+        testFile: INCLUSION_TEST,
+        baseTitle: D_RECORD_BASE,
+        currentTitle: D_RECORD_TITLE,
+        mutants: ['v2-row-placeholder-hash', 'v3-row-placeholder-hash', 'buy-submit-outside-lock'],
+    },
+    {
+        testFile: INCLUSION_TEST,
+        baseTitle: V2_UNSAFE_BASE,
+        currentTitle: V2_UNSAFE_TITLE,
+        mutants: ['bot-references-removed-fn', 'removed-fn-restored', 'safety-sim-sends-real-swap'],
+    },
+    { testFile: DOTENV_TEST, baseTitle: DOTENV_E_BASE, currentTitle: DOTENV_E_TITLE, mutants: DOTENV_GATE_MUTANTS.map((m) => m.name) },
 ];
 export const CONVERTED_COUNTS: Record<string, number> = {
     [BOT_WIRING_TEST]: 6,
@@ -704,6 +827,8 @@ export const CONVERTED_COUNTS: Record<string, number> = {
     [ANTIRUG_CONFIG_TEST]: 3,
     [REASON_TEST]: 5,
     [SIGINT_TEST]: 1,
+    [INCLUSION_TEST]: 2,
+    [DOTENV_TEST]: 1,
 };
 export const GUARD_MUTANTS: GuardMutantRow[] = [
     {

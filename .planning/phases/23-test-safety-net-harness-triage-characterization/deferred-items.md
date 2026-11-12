@@ -34,3 +34,15 @@
   **Found by:** plan 23-30 (2026-11-12), a strict scratch tsconfig over its three converted test files and scripts/red-proof-conversions.ts; those four files are clean, and the error comes from the fixture they import.
   **What:** no tsconfig compiles test/ (tsconfig.json and tsconfig.bot.json include src/**/* only), so this fixture's type error never surfaces in CI. Same class as AUD-TESTU-008 (unit type gates never run).
   **Why deferred:** the fixture is outside plan 23-30's files and changes no test result. A Phase 28 test-hygiene plan that adds a test tsconfig should fix it with the rest of that class.
+
+- `test/realpath/triage/fixtures/AUD-API-002-restart.ts` is on the AC-37 source-text gate's allow list (it reads src/bot.ts by name)
+  status: open (owner Phase 24)
+  **Found by:** plan 23-19 (2026-11-12). The standing gate `test/unit/sourceTextGate.test.ts` scans every source file under test/ (operator ruling: helpers and fixtures too, not only `*.test.ts`), and this fixture's `onRestartSource()` (line 43) reads `src/bot.ts` to hash the private `onRestart` closure its mirror copies.
+  **Ruling:** operator, before 23-19 was dispatched, chose "Allow-list it (Recommended)" (the "(Recommended)" label was the orchestrator's). The hash only pins the mirror to the real private closure, which Phase 23 cannot reach without booting the bot; the AUD-API-002 tests themselves assert behavior.
+  **What Phase 24 must do:** the AUD-API-002 fix changes `onRestart`, so the fixture's hash check then fails by design ("onRestart changed"). Phase 24 replaces the mirror with the real path (the dashboard Start callback reached without a mirror) and removes the fixture's entry from `ALLOW_LIST` in `test/unit/sourceTextGate.test.ts` in the same change.
+
+- `test/unit/mevStrategies/inclusionReconciliation.test.ts` fails a strict type check in three helper-logic tests it already had (TS2345: `affordableFeeInputs()` lacks the now-required `chainPriorityWei` of `computeAffordablePriorityFee`'s input)
+  status: open
+  **Found by:** plan 23-19 (2026-11-12), a strict scratch tsconfig over the files it converted. The same three errors are present in the file at HEAD before 23-19 (checked on a copy of the HEAD version); 23-19 changed none of those lines, and its own new code type-checks clean.
+  **What:** no tsconfig compiles test/, so the error never surfaces (the AUD-TESTU-008 class). At run time the missing field is `undefined`, so these tests may exercise a different fee path than their names say; that is for the fixing plan to judge.
+  **Why deferred:** outside 23-19's conversion scope (scope boundary rule). A Phase 28 test-hygiene plan that adds a test tsconfig should fix it with the rest of that class (see also the `test/fixtures/api.fixtures.ts` entry above).

@@ -48,12 +48,13 @@
 //   - test/helpers/mockProvider.ts — `createMockProvider` (defaults
 //     `getTransactionReceipt→{status:1}`, `getTransactionCount→42`).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseEther, parseUnits, keccak256 } from 'ethers';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { parseEther, parseUnits, keccak256, Interface } from 'ethers';
 import type { JsonRpcProvider, Wallet, TransactionRequest } from 'ethers';
 import { createMockProvider } from '../../helpers/mockProvider';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as ts from 'typescript';
+import { loadRepoModules } from '../../helpers/sourceGraph';
+import type { ChainContext, DexConfigV2, DexConfigV3 } from '../../../src/chainRegistry';
 // TYPE-ONLY import: erased at runtime, so it does NOT eagerly evaluate
 // reconciliation.ts (whose top-level `logger.child(...)` would trip the hoisted
 // `vi.mock('../../../src/utils/logger')` factory before the logInfo let is
@@ -97,30 +98,35 @@ vi.mock('@flashbots/ethers-provider-bundle', () => ({
 // drops the `builders` field). Mock ONLY FetchRequest so these tests stay
 // hermetic (no real relay call); importActual keeps Wallet/JsonRpcProvider/id/
 // parseUnits/keccak256/parseEther real so the auth signing + hash math still run.
-vi.mock('ethers', async () => {
-    const actual = await vi.importActual<typeof import('ethers')>('ethers');
-    class MockFetchRequest {
-        url: string;
-        body: string | Uint8Array | null = null;
-        private headers: Record<string, string> = {};
-        constructor(url: string) {
-            this.url = url;
+// Plan 23-19: the factory is shared through vi.hoisted so the D-RECORD-REAL-HASH describe can
+// register the same mock plus a stub Contract for its bot import, then put this one back.
+const { ethersWithMockFetch } = vi.hoisted(() => ({
+    ethersWithMockFetch: async (extra: Record<string, unknown> = {}): Promise<Record<string, unknown>> => {
+        const actual = await vi.importActual<typeof import('ethers')>('ethers');
+        class MockFetchRequest {
+            url: string;
+            body: string | Uint8Array | null = null;
+            private headers: Record<string, string> = {};
+            constructor(url: string) {
+                this.url = url;
+            }
+            setHeader(key: string, value: string): void {
+                this.headers[key.toLowerCase()] = value;
+            }
+            async send(): Promise<unknown> {
+                return {
+                    statusCode: 200,
+                    assertOk(): void {
+                        /* ok */
+                    },
+                    bodyJson: { result: { bundleHash: STUB_BUNDLE_HASH } },
+                };
+            }
         }
-        setHeader(key: string, value: string): void {
-            this.headers[key.toLowerCase()] = value;
-        }
-        async send(): Promise<unknown> {
-            return {
-                statusCode: 200,
-                assertOk(): void {
-                    /* ok */
-                },
-                bodyJson: { result: { bundleHash: STUB_BUNDLE_HASH } },
-            };
-        }
-    }
-    return { ...actual, FetchRequest: MockFetchRequest };
-});
+        return { ...actual, FetchRequest: MockFetchRequest, ...extra };
+    },
+}));
+vi.mock('ethers', () => ethersWithMockFetch());
 
 // Capture the module child-logger's calls so GREEN waves can assert the
 // reconciliation op: fields (e.g. op:'mev.reconcile.included').
@@ -868,7 +874,6 @@ describe('D-RECORD-REAL-HASH — buy row records the real hash', () => {
     // success path must persist THIS onto trades.tx_hash, not the 'mev_bundle'
     // placeholder that left the LADYS position untracked.
     const REAL_HASH = '0xfeedface00000000000000000000000000000000000000000000000000000001';
-    const BOT_SRC = path.resolve(__dirname, '../../../src/bot.ts');
 
     it("D-RECORD-REAL-HASH: buy success path records trades.tx_hash === real hash, not 'mev_bundle' (insert-wiring observable)", async () => {
         // OBSERVABLE (D-04): the value flowing into trades.tx_hash is the real hash
@@ -917,88 +922,367 @@ describe('D-RECORD-REAL-HASH — buy row records the real hash', () => {
         }
     });
 
-    it('D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)', () => {
-        // Defense-in-depth source assertion (mirrors the STOP-THE-LINE-03 source
-        // grep gate in this file): binds the behavioral observable above to the
-        // TERRITORY so a regression that reverts the wiring back to a bare
-        // 'mev_bundle' literal fails here. Proves (1) realHash is captured off
-        // sendTxWithRetry and (2) at least two `txHash: realHash` insert sites
-        // exist (V2 + V3), with (3) zero bare `txHash: 'mev_bundle'` literals
-        // surviving on a success path.
-        const botSrc = fs.readFileSync(BOT_SRC, 'utf8');
+    // Plan 23-19 (CHAR-06): this test used to read src/bot.ts as text. It now drives the real
+    // exported buy handlers (handleNewPairForChain, handleNewV3PoolForChain) and the real
+    // submitBuyTx seam, imported once in the beforeAll below under the mock set of
+    // test/integration/anti-rug/botWiring.test.ts (every safety check, the database, the
+    // detector, the exit engine and the tx manager mocked; ethers' Contract stubbed). The real
+    // nonce authority is NOT mocked: the lock check holds the real per-wallet lock.
+    beforeAll(async () => {
+        vi.resetModules();
+        installBotMocks();
+        bot = await import('../../../src/bot');
+        nonceAuthority = await import('../../../src/utils/nonceAuthority');
+    });
 
-        // (1) realHash is captured off the buy submit. Post-WR-01 (21.2-13) the call
-        // site is the `submitBuyTx` nonce-locked seam (which wraps withNonceLock(...
-        // => sendTxWithRetry(...))); accept either the seam or a direct call so the
-        // assertion binds the OBSERVABLE (realHash captured off the buy submit).
-        expect(/const\s+realHash\s*=\s*await\s+(submitBuyTx|sendTxWithRetry)\(/.test(botSrc)).toBe(true);
-        // WR-01: the seam routes the buy submit through the per-wallet nonce authority.
-        expect(/withNonceLock\(ctx\.wallet\.address,\s*\(\)\s*=>\s*sendTxWithRetry\(/.test(botSrc)).toBe(true);
+    afterAll(() => {
+        uninstallBotMocks();
+        vi.resetModules();
+    });
 
-        // (2) >=2 inserts persist realHash (V2 + V3).
-        const realHashInserts = (botSrc.match(/txHash:\s*realHash\s*\?\?\s*'mev_bundle'/g) || []).length;
-        expect(realHashInserts).toBeGreaterThanOrEqual(2);
+    it('D-RECORD-REAL-HASH: the real V2 and V3 buy handlers store the hash the submitBuyTx seam returned, and the seam submits under the wallet nonce lock', async () => {
+        sendTxWithRetrySpy.mockResolvedValue(REAL_HASH);
 
-        // (3) No bare placeholder literal remains on a success path (strip whole-
-        // line `//` comments first — tombstone comments intentionally name it).
-        const botBody = botSrc
-            .split(/\r?\n/)
-            .filter((l) => !l.trim().startsWith('//'))
-            .join('\n');
-        expect(/txHash:\s*'mev_bundle'/.test(botBody)).toBe(false);
+        // (1) The V2 snipe and (2) the V3 snipe, each run to its buy-success insert.
+        const v2 = botCtx();
+        await bot.handleNewPairForChain(asCtx(v2), v2.chain.dexes[0] as unknown as DexConfigV2, V2_TOKEN, BOT_WETH, V2_PAIR);
+        const v3 = botCtx();
+        await bot.handleNewV3PoolForChain(asCtx(v3), v3.chain.dexes[1] as unknown as DexConfigV3, V3_TOKEN, BOT_WETH, FEE_TIER, V3_POOL, 100);
+        const rows = insertTradeRunSpy.mock.calls.map((c) => c[0] as { poolType: string; txHash: string; status: string });
+        expect(rows.map((r) => r.poolType), 'buy rows').toEqual(['v2', 'v3']);
+        expect(rows[0].txHash, 'v2 buy row tx hash').toBe(REAL_HASH);
+        expect(rows[1].txHash, 'v3 buy row tx hash').toBe(REAL_HASH);
+        expect(rows.map((r) => r.status)).toEqual(['pending', 'pending']);
+        expect(sendTxWithRetrySpy).toHaveBeenCalledTimes(2);
+
+        // (3) The seam: while another holder has the wallet's real nonce lock (taken with the
+        // address in lower case, so the lock is keyed by the wallet's own address), a submit
+        // through submitBuyTx waits; it runs once the holder releases, with the same builder
+        // and context, and returns the hash. One real event-loop turn drains every queued
+        // microtask, so "not called yet" is not a race.
+        sendTxWithRetrySpy.mockClear();
+        const ctx = botCtx();
+        const txBuilder = async (): Promise<TransactionRequest> => ({});
+        let release: () => void = () => undefined;
+        const held = nonceAuthority.withNonceLock(BOT_WALLET.toLowerCase(), () => new Promise<void>((r) => { release = r; }));
+        try {
+            await eventLoopTurn();
+            const submitted = bot.submitBuyTx(asCtx(ctx), txBuilder);
+            await eventLoopTurn();
+            expect(sendTxWithRetrySpy, 'buy submits while the wallet lock is held').not.toHaveBeenCalled();
+            release();
+            await held;
+            await expect(submitted).resolves.toBe(REAL_HASH);
+            expect(sendTxWithRetrySpy).toHaveBeenCalledTimes(1);
+            expect(sendTxWithRetrySpy.mock.calls[0][0]).toBe(txBuilder);
+            expect(sendTxWithRetrySpy.mock.calls[0][1]).toBe(ctx);
+        } finally {
+            release();
+            await held;
+        }
     });
 });
+
+// -----------------------------------------------------------------------------
+// The bot import for the D-RECORD-REAL-HASH test (plan 23-19), modelled on
+// test/integration/anti-rug/botWiring.test.ts: plain functions in the factories
+// (mockReset: true would wipe a vi.fn implementation between the beforeAll import
+// and the test), spies only where the test reads the calls.
+// -----------------------------------------------------------------------------
+
+const BOT_WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
+// Mixed case on purpose: the lock check above holds the lower-case form.
+const BOT_WALLET = '0x1111111111111111111111111111111111111aBc';
+const V2_TOKEN = '0x00000000000000000000000000000000000000a2';
+const V2_PAIR = '0x2222222222222222222222222222222222222222';
+const V3_TOKEN = '0x00000000000000000000000000000000000000a3';
+const V3_POOL = '0x3333333333333333333333333333333333333333';
+const FEE_TIER = 3000;
+const TRADE_ID = 41;
+
+const insertTradeRunSpy = vi.fn();
+const sendTxWithRetrySpy = vi.fn();
+let bot: typeof import('../../../src/bot');
+let nonceAuthority: typeof import('../../../src/utils/nonceAuthority');
+
+/** One real event-loop turn: every microtask queued before it has run when it resolves. */
+function eventLoopTurn(): Promise<void> {
+    return new Promise((resolve) => setImmediate(resolve));
+}
+
+// ethers Contract stub (botWiring.test.ts): every read the two buy paths make answers the happy
+// path. A V3 pool already has a Mint, so waitForLiquidity returns at once.
+class StubContract {
+    readonly target: string;
+    constructor(target: string) {
+        this.target = target;
+    }
+    symbol = async (): Promise<string> => 'WIRE';
+    name = async (): Promise<string> => 'Wiring Token';
+    decimals = async (): Promise<number> => 18;
+    balanceOf = async (): Promise<bigint> => 1_000_000n;
+    token0 = async (): Promise<string> => BOT_WETH;
+    getReserves = async (): Promise<{ reserve0: bigint; reserve1: bigint }> => ({ reserve0: 10n ** 18n, reserve1: 10n ** 18n });
+    getAmountsOut = async (amountIn: bigint): Promise<bigint[]> => [amountIn, 1_000_000n];
+    filters = { Mint: (): Record<string, never> => ({}) };
+    queryFilter = async (): Promise<unknown[]> => [{}];
+    quoteExactInputSingle = { staticCall: async (): Promise<bigint[]> => [1_000_000n] };
+    interface = { encodeFunctionData: (): string => '0x' };
+}
+
+function botCtx() {
+    const noop = (): void => undefined;
+    return {
+        chain: {
+            name: 'eth',
+            displayName: '[ETH]',
+            chainId: 1,
+            wethAddress: BOT_WETH,
+            nativeCurrency: 'ETH',
+            explorerUrl: 'https://etherscan.io',
+            mevStrategy: 'flashbots',
+            snipeAmount: '0.01',
+            maxCapital: '1.0',
+            minLiquidityThreshold: '0.5',
+            dexes: [
+                {
+                    dexType: 'v2',
+                    name: 'uniswap-v2',
+                    factoryAddress: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+                    routerAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+                },
+                {
+                    dexType: 'v3',
+                    name: 'uniswap-v3',
+                    factoryAddress: '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+                    quoterAddress: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+                    swapRouterAddress: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+                },
+            ],
+            antiRug: {
+                liveExecute: false,
+                lpRemovalPct: 50,
+                confirmBlocks: 1,
+                circuitBreakerTriggers: 3,
+                circuitBreakerWindowHours: 1,
+                gasMultiplier: 2.0,
+                backfillCapBlocks: 10,
+                maxBackfillBlocks: 7200,
+                allowlistV2: [],
+                allowlistV3: [],
+            },
+        },
+        httpProvider: {},
+        wsProvider: null,
+        wallet: { address: BOT_WALLET, populateTransaction: async () => ({}) },
+        log: { info: noop, warn: noop, error: noop, fatal: noop, debug: noop },
+    };
+}
+
+const asCtx = (f: ReturnType<typeof botCtx>): ChainContext => f as unknown as ChainContext;
+
+// Literal targets, one call each (the vi.mock path gate, scripts/check-vi-mock-paths.ts, accepts
+// only a string literal).
+function installBotMocks(): void {
+    const noop = (): void => undefined;
+    const resolved = async (): Promise<undefined> => undefined;
+    vi.doMock('ethers', () => ethersWithMockFetch({ Contract: StubContract }));
+    vi.doMock('../../../src/anti-rug/detector', () => ({
+        registerAntiRugPosition: resolved,
+        startChainAntiRugListener: resolved,
+        unregisterAntiRugPosition: noop,
+    }));
+    vi.doMock('../../../src/anti-rug/allowlist', () => ({
+        verifyAllowlistAtStartup: resolved,
+        mergeAllowlist: () => [],
+        isAddressAllowlisted: () => ({ verdict: 'unknown' }),
+    }));
+    vi.doMock('../../../src/anti-rug/lpBaseline', () => ({
+        snapshotLpBaseline: resolved,
+        loadLpBaseline: noop,
+        clearLpBaseline: noop,
+    }));
+    vi.doMock('../../../src/utils/db', () => ({
+        db: { prepare: () => ({ all: () => [], get: noop, run: noop }) },
+        insertTrade: { run: insertTradeRunSpy },
+        isTokenSniped: { get: () => undefined },
+        updateTradeStatus: { run: noop },
+        getTradeIdForPendingToken: { get: () => ({ id: TRADE_ID }) },
+        getResumeAntiRugTrades: { all: () => [] },
+        getResumeExitMonitorTrades: { all: () => [] },
+        closeDb: noop,
+        getOpenPositionCount: { get: noop },
+        getTotalExposure: { get: noop },
+        getDailyRealizedLoss: { get: noop },
+        upsertExitState: { run: noop },
+        getExitState: { get: noop },
+        deleteExitState: { run: noop },
+        upsertLpBaseline: { run: noop },
+        getLpBaseline: { get: noop },
+        deleteLpBaseline: { run: noop },
+        upsertChainState: { run: noop },
+        getChainState: { get: noop },
+        setAntirugDryRunStarted: { run: noop },
+        getAntirugDryRunStarted: { get: () => undefined },
+        getPauseState: { get: () => ({ paused: 0 }) },
+        setPauseState: { run: noop },
+        clearPauseState: { run: noop },
+        forceWalCheckpoint: noop,
+    }));
+    vi.doMock('../../../src/utils/tokenSafety', () => ({
+        isLiquidityLockedForChain: async () => true,
+        simulateSwapForChain: async () => true,
+        isLiquiditySufficientForChain: async () => true,
+        isKnownBadTokenForChain: async () => false,
+        checkTokenMetadataForChain: async () => true,
+        hasMaxWalletOrTxLimitsForChain: async () => false,
+        isBlacklistedTokenForChain: async () => false,
+    }));
+    vi.doMock('../../../src/utils/honeypot', () => ({
+        simulateHoneypotRoundtrip: async () => ({
+            verdict: 'safe',
+            reason: 'roundtrip ok',
+            evidence: { buyTaxBps: 0, sellTaxBps: 0, method: 'test', dexType: 'v2' },
+        }),
+    }));
+    vi.doMock('../../../src/utils/honeypot/bytecodeScan', () => ({
+        isMutableTokenForChain: async () => ({ isMutable: false, hits: [] }),
+    }));
+    vi.doMock('../../../src/utils/honeypot/sanitize', () => ({ sanitizeReason: () => 'sanitized' }));
+    vi.doMock('../../../src/utils/blocklist', () => ({
+        BLOCKLIST: { tokens: new Set<string>(), pairs: new Set<string>() },
+    }));
+    vi.doMock('../../../src/utils/notifier', () => ({ sendTelegramAlert: resolved, sendCtxAlert: resolved }));
+    vi.doMock('../../../src/utils/provider', () => ({
+        getProvider: noop,
+        getWallet: noop,
+        getWsProvider: noop,
+        removeWsProvider: noop,
+    }));
+    vi.doMock('../../../src/utils/txManager', () => ({
+        sendTxWithRetry: sendTxWithRetrySpy,
+        createMevStrategy: () => ({ healthCheck: async () => true }),
+        escalatePrivateBuy: async () => ({ landed: false }),
+    }));
+    vi.doMock('../../../src/preflight', () => ({
+        preflight: resolved,
+        checkWalletBalance: async () => ({ chain: 'eth', check: 'wallet-balance', passed: true }),
+        checkEntryExitAffordability: async () => ({ passed: true }),
+    }));
+    vi.doMock('../../../src/exitEngine', () => ({
+        startExitMonitor: resolved,
+        resumeExitMonitor: resolved,
+        executeFullSell: noop,
+        setExitWorkerWatchdog: noop,
+        computePublicMinOut: () => 0n,
+    }));
+    vi.doMock('../../../src/riskManager', () => ({
+        canSnipe: () => ({ allowed: true }),
+        recordSnipe: noop,
+    }));
+    vi.doMock('../../../src/api/server', () => ({ startApiServer: () => ({ close: noop }) }));
+    vi.doMock('../../../src/telegramListener', () => ({
+        startTelegramListener: async () => ({ client: null, connected: false }),
+    }));
+    vi.doMock('../../../src/utils/gasManager', () => ({ getGasOptions: noop }));
+}
+
+function uninstallBotMocks(): void {
+    // ethers goes back to this file's own mock (FetchRequest only), not to the real module.
+    vi.doMock('ethers', () => ethersWithMockFetch());
+    vi.doUnmock('../../../src/anti-rug/detector');
+    vi.doUnmock('../../../src/anti-rug/allowlist');
+    vi.doUnmock('../../../src/anti-rug/lpBaseline');
+    vi.doUnmock('../../../src/utils/db');
+    vi.doUnmock('../../../src/utils/tokenSafety');
+    vi.doUnmock('../../../src/utils/honeypot');
+    vi.doUnmock('../../../src/utils/honeypot/bytecodeScan');
+    vi.doUnmock('../../../src/utils/honeypot/sanitize');
+    vi.doUnmock('../../../src/utils/blocklist');
+    vi.doUnmock('../../../src/utils/notifier');
+    vi.doUnmock('../../../src/utils/provider');
+    vi.doUnmock('../../../src/utils/txManager');
+    vi.doUnmock('../../../src/preflight');
+    vi.doUnmock('../../../src/exitEngine');
+    vi.doUnmock('../../../src/riskManager');
+    vi.doUnmock('../../../src/api/server');
+    vi.doUnmock('../../../src/telegramListener');
+    vi.doUnmock('../../../src/utils/gasManager');
+}
 
 // =============================================================================
 // Harm-prevention assertion #6 — V2-unsafe-real-buy (STOP-THE-LINE-03).
 // The V2 safety bank no longer references hasHighTransferTaxForChain; no real
-// swapExactETHForTokens fires inside a safety check. Source/behavior assertion.
-// GREEN form owned by plan 21.1-03 (the V2 removal). This is the Nyquist
-// placeholder bound to VALIDATION harm-prevention #6 — its existence here is
-// what guarantees the V2 anomaly is tracked, not silently dropped.
+// swapExactETHForTokens fires inside a safety check. GREEN form owned by plan
+// 21.1-03 (the V2 removal). This is the Nyquist placeholder bound to VALIDATION
+// harm-prevention #6 — its existence here is what guarantees the V2 anomaly is
+// tracked, not silently dropped.
 // =============================================================================
 
 describe('STOP-THE-LINE-03 — V2 safety bank fires no real buy (V2-unsafe-real-buy harm #6)', () => {
     // The literal function name as a runtime-built string so THIS test file's own
     // source does not contain a grep-matchable bare occurrence in the assertions.
     const FN = ['hasHighTransfer', 'TaxForChain'].join('');
-    const SRC_DIR = path.resolve(__dirname, '../../../src');
 
-    it('V2-unsafe-real-buy (STOP-THE-LINE-03): the V2 safety bank no longer references hasHighTransferTaxForChain; the function is deleted and unexported (source/behavior assertion, VALIDATION harm-prevention #6)', async () => {
-        // GREEN (21.1-03): the live Nyquist mirror of the source grep gate. Proves
-        // BOTH STOP-THE-LINE-03 observables — (1) the tokenSafety module no longer
-        // exports the broken tax function (deleted, zero callers, D-ROLLBACK), and
-        // (2) src/bot.ts has zero NON-COMMENT references (both the V2 :303 and V3
-        // :610 call sites AND the import removed). The authoritative buy+sell-tax
-        // gate is the on-chain simulateHoneypotRoundtrip (bot.ts:253 V2 / :566 V3,
-        // HONEY-07/09, fail-closed) — unchanged — so no real swapExactETHForTokens
-        // fires inside a safety check anymore.
+    // Plan 23-19 (CHAR-06): no src/ file is read by name. (1) a real import, (2) a TypeScript AST
+    // walk of every src/ module found by a directory walk (test/helpers/sourceGraph.ts), (3) the
+    // real simulateSwapForChain against a fake router. Explicit limit: (2) builds one program over
+    // src/ (measured in 23-19-SUMMARY.md).
+    it('V2-unsafe-real-buy (STOP-THE-LINE-03): hasHighTransferTaxForChain is not exported and named by no src/ code, and the real simulateSwapForChain calls swapExactETHForTokens only through staticCall (VALIDATION harm-prevention #6)', { timeout: 60_000 }, async () => {
+        // GREEN (21.1-03): STOP-THE-LINE-03's observables. The authoritative buy+sell-tax gate
+        // is the on-chain simulateHoneypotRoundtrip (HONEY-07/09, fail-closed), unchanged.
 
-        // (1) The tokenSafety module no longer exports the function. Lazy import
-        // (matches this file's convention) — the named export is simply gone, so
-        // this holds regardless of the module-level ethers mock.
-        const ts = await import('../../../src/utils/tokenSafety') as Record<string, unknown>;
-        expect(ts[FN]).toBeUndefined();
+        // (1) The tokenSafety module does not export the removed function.
+        const tokenSafety = (await import('../../../src/utils/tokenSafety')) as Record<string, unknown>;
+        expect(Object.keys(tokenSafety).filter((k) => k === FN), 'tokenSafety exports').toEqual([]);
 
-        // (1b) Defense-in-depth source assertion: the function definition is gone
-        // from tokenSafety.ts (a deleted export can never be re-imported/miscalled).
-        const tokenSafetySrc = fs.readFileSync(path.join(SRC_DIR, 'utils', 'tokenSafety.ts'), 'utf8');
-        expect(new RegExp(`export\\s+async\\s+function\\s+${FN}\\b`).test(tokenSafetySrc)).toBe(false);
+        // (2) No src/ code names it: every identifier and string literal of every src/ module
+        // (comments are not nodes, so the tombstone comments that name it do not count).
+        const offenders = [...loadRepoModules(['src']).values()].flatMap((m) => linesNaming(m.sf, FN).map((line) => `${m.file}:${line}`));
+        expect(offenders, 'src code naming the removed function').toEqual([]);
 
-        // (2) src/bot.ts has zero NON-COMMENT references — strip whole-line `//`
-        // comments (the tombstone/rationale comments intentionally name the removed
-        // function) before matching, mirroring the source grep gate in the plan's
-        // <verify> block.
-        const botSrc = fs.readFileSync(path.join(SRC_DIR, 'bot.ts'), 'utf8');
-        const botBody = botSrc
-            .split(/\r?\n/)
-            .filter((l) => !l.trim().startsWith('//'))
-            .join('\n');
-        expect(botBody.includes(FN)).toBe(false);
-
-        // (2b) And no signer-connected swapExactETHForTokens fires inside a safety
-        // check: the clean read-only sibling simulateSwapForChain uses .staticCall
-        // (audited 21.1-03), which the source still proves present.
-        expect(tokenSafetySrc.includes('swapExactETHForTokens.staticCall')).toBe(true);
+        // (3) The kept read-only sibling: the real simulateSwapForChain against a router whose
+        // runner answers eth_call and refuses (and records) any sent transaction. It must return
+        // true from one swapExactETHForTokens call and send nothing.
+        const { ROUTER_ABI } = await import('../../../src/utils/abis');
+        const routerIface = new Interface(ROUTER_ABI);
+        const calls: string[] = [];
+        const sent: unknown[] = [];
+        const runner = {
+            provider: null,
+            call: async (tx: { data?: string }): Promise<string> => {
+                calls.push(routerIface.parseTransaction({ data: String(tx.data) })?.name ?? 'unknown');
+                return routerIface.encodeFunctionResult('swapExactETHForTokens', [[parseEther('0.01'), 1_000_000n]]);
+            },
+            sendTransaction: async (tx: unknown): Promise<never> => {
+                sent.push(tx);
+                throw new Error('a real swap transaction was sent');
+            },
+        };
+        const noop = (): void => undefined;
+        const ctx = {
+            chain: { wethAddress: BOT_WETH, snipeAmount: '0.01' },
+            httpProvider: runner,
+            wallet: { address: '0x1111111111111111111111111111111111111111' },
+            log: { info: noop, warn: noop, error: noop, debug: noop },
+        };
+        const simulateSwapForChain = tokenSafety.simulateSwapForChain as (c: unknown, router: string, token: string) => Promise<boolean>;
+        const ok = await simulateSwapForChain(ctx, '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D', V2_TOKEN);
+        expect(sent.length, 'swap transactions sent by the safety simulation').toBe(0);
+        expect(calls).toEqual(['swapExactETHForTokens']);
+        expect(ok).toBe(true);
     });
 });
+
+/** Line numbers (1-based) of identifiers and string literals in sf whose text is exactly name. */
+function linesNaming(sf: ts.SourceFile, name: string): number[] {
+    const lines: number[] = [];
+    const visit = (n: ts.Node): void => {
+        if ((ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && n.text === name) {
+            lines.push(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1);
+        }
+        ts.forEachChild(n, visit);
+    };
+    visit(sf);
+    return lines;
+}

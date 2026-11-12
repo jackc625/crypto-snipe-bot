@@ -542,6 +542,42 @@
       "found_in_plan": "23-19",
       "title_before": "bot.ts no longer contains the old single-stage gracefulShutdown / 5s force-exit timer",
       "title_after": "startMultiChainBot registers exactly one SIGINT and one SIGTERM listener that run the two stages with SIGINT_GRACE_MS"
+    },
+    {
+      "file": "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+      "test": "D-RECORD-REAL-HASH: the real V2 and V3 buy handlers store the hash the submitBuyTx seam returned, and the seam submits under the wallet nonce lock",
+      "it_count_before": 18,
+      "it_count_after": 18,
+      "change": "No longer reads src/bot.ts. A describe-level beforeAll does vi.resetModules(), registers the mock set of test/integration/anti-rug/botWiring.test.ts (safety checks, database with an insertTrade.run spy, detector, exit engine, tx manager with a sendTxWithRetry spy; ethers Contract stubbed through the file's own ethers mock, now shared through vi.hoisted) and imports src/bot and the real src/utils/nonceAuthority; an afterAll restores the file's own ethers mock and unmocks the rest. The test drives the real handleNewPairForChain (V2) and handleNewV3PoolForChain (V3) to their buy-success inserts: the v2 and v3 rows store the hash the seam returned, status pending. Then, with the real per-wallet nonce lock held (wallet address in lower case), a submitBuyTx call does not reach sendTxWithRetry after a full event-loop turn; after release it runs once with the same builder and context and returns the hash. The text checks (realHash captured off the submit, the seam inside withNonceLock, two realHash inserts, no bare 'mev_bundle' literal) are carried by these behaviors.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-19). RED proofs: mutants v2-row-placeholder-hash, v3-row-placeholder-hash and buy-submit-outside-lock (reach vite), group inclusion.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-19",
+      "title_before": "D-RECORD-REAL-HASH: src/bot.ts wires realHash into BOTH the V2 and V3 buy inserts (source/behavior coupling)",
+      "title_after": "D-RECORD-REAL-HASH: the real V2 and V3 buy handlers store the hash the submitBuyTx seam returned, and the seam submits under the wallet nonce lock"
+    },
+    {
+      "file": "test/unit/mevStrategies/inclusionReconciliation.test.ts",
+      "test": "V2-unsafe-real-buy (STOP-THE-LINE-03): hasHighTransferTaxForChain is not exported and named by no src/ code, and the real simulateSwapForChain calls swapExactETHForTokens only through staticCall (VALIDATION harm-prevention #6)",
+      "it_count_before": 18,
+      "it_count_after": 18,
+      "change": "No longer reads src/utils/tokenSafety.ts or src/bot.ts. (1) A real import of src/utils/tokenSafety: no export of the removed function. (2) A TypeScript AST walk of every src/ module found by a directory walk (test/helpers/sourceGraph.ts loadRepoModules): no identifier or string literal names it (comments are not nodes, so the tombstone comments do not count; the old check stripped only whole-line // comments, and only in bot.ts). (3) The real simulateSwapForChain against a router whose runner answers eth_call and refuses and records any sent transaction: it returns true from exactly one swapExactETHForTokens call and sends nothing (the old check was the text 'swapExactETHForTokens.staticCall'). Explicit 60 s limit for the program build.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-19). RED proofs: mutants bot-references-removed-fn (reach worker), removed-fn-restored and safety-sim-sends-real-swap (reach vite), group inclusion.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-19",
+      "title_before": "V2-unsafe-real-buy (STOP-THE-LINE-03): the V2 safety bank no longer references hasHighTransferTaxForChain; the function is deleted and unexported (source/behavior assertion, VALIDATION harm-prevention #6)",
+      "title_after": "V2-unsafe-real-buy (STOP-THE-LINE-03): hasHighTransferTaxForChain is not exported and named by no src/ code, and the real simulateSwapForChain calls swapExactETHForTokens only through staticCall (VALIDATION harm-prevention #6)"
+    },
+    {
+      "file": "test/unit/rails/dotenvSrcSkip.test.ts",
+      "test": "(e) each of the five sites loads dotenv only under the VITEST gate: run as a railed child with VITEST set, each makes zero .env read attempts",
+      "it_count_before": 12,
+      "it_count_after": 12,
+      "change": "Rail test, case (e) only (the plan's authorized change; no other case, helper or import changed). No longer reads the five files. Each site (src/config.ts and src/utils/notifier.ts through test/rails/probes/dotenvProbe.ts, scripts/pause.ts, scripts/resume.ts, scripts/preflight.ts) runs as a railed child with VITEST set (ts-node transpile-only register), each with its own case ledger: zero env-read-blocked entries, the child reached the site (probe exit 0 printing 0; pause and resume exit 1 at the DASHBOARD_API_KEY check; preflight exit 0 or 1), at least one worker-start, no outside reach. A call that loads dotenv outside the gate is attempted, refused by the setup layer and recorded, so the real .env is never opened. The without-VITEST half stays in (b) and (c).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-19). RED proofs: mutants dotenv-unguarded-config, -notifier, -pause, -resume and -preflight (reach child), group dotenv-gate.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-19",
+      "title_before": "(e) static: each of the five sites loads dotenv only under the VITEST gate",
+      "title_after": "(e) each of the five sites loads dotenv only under the VITEST gate: run as a railed child with VITEST set, each makes zero .env read attempts"
     }
   ]
 }

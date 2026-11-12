@@ -152,12 +152,57 @@ describe('dotenv gate at the reachable sites (SAFE-02 src layer, D-01)', () => {
         expectNoOutsideReach(entries);
     });
 
-    it('(e) static: each of the five sites loads dotenv only under the VITEST gate', () => {
-        const sites = ['src/config.ts', 'src/utils/notifier.ts', 'scripts/pause.ts', 'scripts/resume.ts', 'scripts/preflight.ts'];
-        for (const rel of sites) {
-            const lines = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8').split(/\r?\n/);
-            const calls = lines.filter((l) => l.includes('dotenv.config('));
-            expect(calls, rel).toEqual(['if (!process.env.VITEST) dotenv.config();']);
+    // Plan 23-19 (CHAR-06): no longer reads the five files. Each site is loaded in a railed child
+    // with VITEST set, through the probe or script (a)-(d) use, started with ts-node's
+    // transpile-only register (0.4 to 1 s per child instead of a type-checking npx ts-node start),
+    // and its own case ledger must hold zero env-read-blocked entries after the child really
+    // reached the site. A call that loads dotenv outside the gate is attempted, refused by the
+    // setup layer and recorded, so the real .env is never opened. The other half of the gate
+    // (without VITEST the read is attempted) is (b) and (c); scripts/preflight.ts never runs
+    // without VITEST here because it reaches the DB layer.
+    it('(e) each of the five sites loads dotenv only under the VITEST gate: run as a railed child with VITEST set, each makes zero .env read attempts', { timeout: TEST_TIMEOUT_MS }, () => {
+        const sites: Array<{ site: string; args: string[]; reached: (r: CliResult) => void; envOverrides?: Record<string, string> }> = [
+            {
+                site: 'src/config.ts',
+                args: ['test/rails/probes/dotenvProbe.ts', 'config'],
+                reached: (r) => expect([r.status, lastLine(r.stdout)], 'src/config.ts probe (exit, attempts)').toEqual([0, '0']),
+            },
+            {
+                site: 'src/utils/notifier.ts',
+                args: ['test/rails/probes/dotenvProbe.ts', 'notifier'],
+                reached: (r) => expect([r.status, lastLine(r.stdout)], 'src/utils/notifier.ts probe (exit, attempts)').toEqual([0, '0']),
+            },
+            {
+                site: 'scripts/pause.ts',
+                args: ['scripts/pause.ts', '--reason', 'probe'],
+                envOverrides: { DASHBOARD_API_KEY: '' },
+                reached: (r) => expect([r.status, (r.stdout + r.stderr).includes('DASHBOARD_API_KEY not set')], 'scripts/pause.ts (exit, key check)').toEqual([1, true]),
+            },
+            {
+                site: 'scripts/resume.ts',
+                args: ['scripts/resume.ts'],
+                envOverrides: { DASHBOARD_API_KEY: '' },
+                reached: (r) => expect([r.status, (r.stdout + r.stderr).includes('DASHBOARD_API_KEY not set')], 'scripts/resume.ts (exit, key check)').toEqual([1, true]),
+            },
+            {
+                site: 'scripts/preflight.ts',
+                args: ['scripts/preflight.ts'],
+                // 0 or 1 is a finished preflight report; 2 is an uncaught throw and null a timeout.
+                reached: (r) => expect([0, 1], 'scripts/preflight.ts exit').toContain(r.status),
+            },
+        ];
+        for (const { site, args, reached, envOverrides } of sites) {
+            const ledgerRunId = newCaseId('site');
+            const result = spawnRailedChild(process.execPath, ['-r', 'ts-node/register/transpile-only', ...args], {
+                envOverrides,
+                ledgerRunId,
+                timeoutMs: CHILD_TIMEOUT_MS,
+            });
+            const entries = takeCaseLedger(ledgerRunId);
+            expect(count(entries, 'env-read-blocked'), `${site} env-read-blocked`).toBe(0);
+            reached(result);
+            expect(count(entries, 'worker-start'), `${site} worker-start`).toBeGreaterThanOrEqual(1);
+            expectNoOutsideReach(entries);
         }
     });
 
