@@ -19,17 +19,17 @@
 //   * Test 4 (missing DASHBOARD_API_KEY → exit 1): direct subprocess spawn —
 //     this test is fast because the script exits IMMEDIATELY on env check,
 //     before any network call. Single subprocess invocation stays within budget.
-//   * Static grep tests: read scripts/{pause,resume}.ts source and assert no
-//     `log.<level>([^)]*apiKey)` patterns (T-20-05 mitigation — apiKey must
-//     never appear inside a log call).
+//   * T-20-05 and 20-09 (plan 23-31, CHAR-06): each script runs as a railed
+//     child against a closed loopback port or a loopback dashboard that refuses
+//     the login; the tests check the key value never reaches either output
+//     stream, an empty key refuses even with --api-key on the command line, and
+//     the address the script dials. These used to be greps of the scripts' text.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import * as http from 'node:http';
+import * as net from 'node:net';
 import axios from 'axios';
-import { spawnRailedChild } from '../rails/spawnRailedChild';
-
-const repoRoot = path.resolve(__dirname, '..', '..');
+import { spawnRailedChild, spawnRailedChildAsync } from '../rails/spawnRailedChild';
 
 // Hoisted module-scope spies. vitest.config.ts has mockReset:true which wipes
 // vi.fn() impls between tests — Plan 20-04 cascade-fix precedent.
@@ -279,93 +279,219 @@ describe('npm run pause CLI subprocess invariants (OPS-LIVE-11)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// T-20-05 mitigation: static grep — apiKey must NEVER appear inside a log call
-// in either scripts/pause.ts or scripts/resume.ts.
+// Plan 23-31 (CHAR-06): the T-20-05 and 20-09 tests below used to read scripts/pause.ts and
+// scripts/resume.ts as text. Each now runs the real script as a railed child (the async spawner,
+// so a loopback server in this process can answer it) and checks what the script does: what it
+// dials, what it prints and how it exits. No source file is read. The children are started with
+// ts-node's transpile-only register, as the lock fixtures are; the default npx ts-node type-check
+// still runs in Test 4 above and in processLock.test.ts (AC-23d).
 // ---------------------------------------------------------------------------
 
+type CliScript = 'pause.ts' | 'resume.ts';
+
+// A unique key value: if any part of it reaches either output stream, the test sees it.
+const PLANTED_KEY = 'csb-23-31-dashboard-key-5f0c2e9a';
+// Each child is one cold transpile-only ts-node start (0.4 to 1.0 s alone); the limits leave room
+// for the full parallel run.
+const CLI_CHILD_LIMIT_MS = 110_000;
+const CLI_TEST_TIMEOUT_MS = 120_000;
+
+interface CliRun {
+    status: number | null;
+    output: string;
+}
+
+function runCliScript(script: CliScript, envOverrides: Record<string, string>, extraArgs: string[] = []): Promise<CliRun> {
+    const child = spawnRailedChildAsync(process.execPath, ['-r', 'ts-node/register/transpile-only', `scripts/${script}`, ...extraArgs], {
+        envOverrides,
+        timeoutMs: CLI_CHILD_LIMIT_MS,
+    });
+    let output = '';
+    child.stdout?.on('data', (c: Buffer) => {
+        output += c.toString('utf8');
+    });
+    child.stderr?.on('data', (c: Buffer) => {
+        output += c.toString('utf8');
+    });
+    return new Promise((resolve) => child.once('close', (status) => resolve({ status, output })));
+}
+
+/** A loopback port with nothing listening on it (bound, read, closed). */
+async function closedPort(): Promise<number> {
+    const srv = net.createServer();
+    await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = srv.address() as net.AddressInfo;
+    await new Promise<void>((resolve) => srv.close(() => resolve()));
+    return port;
+}
+
+interface LoginRefuser {
+    url: string;
+    port: number;
+    logins: unknown[];
+    close(): Promise<void>;
+}
+
+/** A loopback dashboard that answers every login with 401 and records what it was sent. */
+async function loginRefuser(): Promise<LoginRefuser> {
+    const logins: unknown[] = [];
+    const srv = http.createServer((req, res) => {
+        let body = '';
+        req.on('data', (c: Buffer) => {
+            body += c.toString('utf8');
+        });
+        req.on('end', () => {
+            if (req.method === 'POST' && req.url === '/api/auth/login') {
+                logins.push(JSON.parse(body));
+                res.writeHead(401, { 'content-type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid API key' }));
+                return;
+            }
+            res.writeHead(404, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'not found' }));
+        });
+    });
+    await new Promise<void>((resolve) => srv.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = srv.address() as net.AddressInfo;
+    return {
+        url: `http://127.0.0.1:${port}`,
+        port,
+        logins,
+        close: () => new Promise<void>((resolve) => srv.close(() => resolve())),
+    };
+}
+
+/** The failed login is logged, the key was really sent, and its value is in neither stream. */
+async function expectKeyNeverPrintedOnRefusedLogin(script: CliScript): Promise<void> {
+    const dashboard = await loginRefuser();
+    try {
+        const r = await runCliScript(script, {
+            DASHBOARD_API_KEY: PLANTED_KEY,
+            DASHBOARD_URL: dashboard.url,
+            DASHBOARD_HOST: '127.0.0.1',
+            DASHBOARD_PORT: String(dashboard.port),
+        });
+        expect(r.status, r.output).toBe(1);
+        expect(r.output).toContain('Login failed');
+        // The script held the key and sent it in the login body, so it had the value to leak.
+        expect(dashboard.logins).toEqual([{ apiKey: PLANTED_KEY }]);
+        expect(r.output).not.toContain(PLANTED_KEY);
+    } finally {
+        await dashboard.close();
+    }
+}
+
+/** An empty key refuses before any request; a key on the command line is never a substitute. */
+async function expectEmptyKeyRefusedDespiteArgv(script: CliScript): Promise<void> {
+    const port = await closedPort();
+    const r = await runCliScript(
+        script,
+        { DASHBOARD_API_KEY: '', DASHBOARD_URL: `http://127.0.0.1:${port}`, DASHBOARD_PORT: String(port) },
+        ['--api-key', PLANTED_KEY],
+    );
+    expect(r.status, r.output).toBe(1);
+    expect(r.output).toMatch(/DASHBOARD_API_KEY not set/);
+    expect(r.output).not.toContain('Could not reach the dashboard API');
+}
+
 describe('T-20-05 mitigation: apiKey never logged in CLI scripts', () => {
-    it('scripts/pause.ts contains no log call referencing apiKey', () => {
-        const src = fs.readFileSync(path.join(repoRoot, 'scripts', 'pause.ts'), 'utf8');
-        const violations = src.match(/log\.(info|warn|error|fatal|debug)\s*\([^)]*apiKey/g);
-        expect(violations).toBeNull();
-    });
+    // Plan 23-31: was "scripts/pause.ts contains no log call referencing apiKey" (a regex over the text).
+    it(
+        'scripts/pause.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login',
+        () => expectKeyNeverPrintedOnRefusedLogin('pause.ts'),
+        CLI_TEST_TIMEOUT_MS,
+    );
 
-    it('scripts/resume.ts contains no log call referencing apiKey', () => {
-        const src = fs.readFileSync(path.join(repoRoot, 'scripts', 'resume.ts'), 'utf8');
-        const violations = src.match(/log\.(info|warn|error|fatal|debug)\s*\([^)]*apiKey/g);
-        expect(violations).toBeNull();
-    });
+    // Plan 23-31: was "scripts/resume.ts contains no log call referencing apiKey".
+    it(
+        'scripts/resume.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login',
+        () => expectKeyNeverPrintedOnRefusedLogin('resume.ts'),
+        CLI_TEST_TIMEOUT_MS,
+    );
 
-    it('scripts/pause.ts contains 1 "DASHBOARD_API_KEY not set" string + 0 CLI-arg references to apiKey', () => {
-        const src = fs.readFileSync(path.join(repoRoot, 'scripts', 'pause.ts'), 'utf8');
-        // Must reference the env-var name at the env-check site.
-        expect(src.match(/DASHBOARD_API_KEY not set/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
-        // Must NOT pass apiKey as a CLI argument (process.argv lookup).
-        expect(src).not.toMatch(/process\.argv\.indexOf\(['"]--api-key/);
-        // Must NOT read apiKey from any positional argv index.
-        expect(src).not.toMatch(/argv\[[0-9]+\]\s*as\s+apiKey/);
-    });
+    // Plan 23-31: was 'scripts/pause.ts contains 1 "DASHBOARD_API_KEY not set" string + 0 CLI-arg references to apiKey'.
+    it(
+        'scripts/pause.ts with an empty DASHBOARD_API_KEY exits 1 with "DASHBOARD_API_KEY not set", even when --api-key is passed',
+        () => expectEmptyKeyRefusedDespiteArgv('pause.ts'),
+        CLI_TEST_TIMEOUT_MS,
+    );
 
-    it('scripts/resume.ts contains 1 "DASHBOARD_API_KEY not set" string + 0 CLI-arg references to apiKey', () => {
-        const src = fs.readFileSync(path.join(repoRoot, 'scripts', 'resume.ts'), 'utf8');
-        expect(src.match(/DASHBOARD_API_KEY not set/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
-        expect(src).not.toMatch(/process\.argv\.indexOf\(['"]--api-key/);
-    });
+    // Plan 23-31: was 'scripts/resume.ts contains 1 "DASHBOARD_API_KEY not set" string + 0 CLI-arg references to apiKey'.
+    it(
+        'scripts/resume.ts with an empty DASHBOARD_API_KEY exits 1 with "DASHBOARD_API_KEY not set", even when --api-key is passed',
+        () => expectEmptyKeyRefusedDespiteArgv('resume.ts'),
+        CLI_TEST_TIMEOUT_MS,
+    );
 });
 
 // ---------------------------------------------------------------------------
-// 20-09: CLI default URL derived from DASHBOARD_HOST/DASHBOARD_PORT (the server
-// bind), NOT the old hardcoded http://localhost:3000. Source-grep guard —
-// matches the established static-grep idiom above and is deterministic (the
-// in-process harness binds an ephemeral listen(0) port and does not expose it
-// to process.env.DASHBOARD_PORT, and the CLI scripts are not invoked in-process,
-// so a behavioral assertion would not actually exercise the scripts' default).
+// 20-09: CLI default URL derived from DASHBOARD_HOST/DASHBOARD_PORT (the server bind), NOT the old
+// hardcoded http://localhost:3000. Each test runs the script against a closed loopback port and
+// reads the address it reports from its connection-error message, which names the URL it dialed.
+// (127.0.0.1:8080 itself must have nothing listening for the default case; the assertion message
+// shows the output if it does.)
 // ---------------------------------------------------------------------------
 
+function dialed(output: string): string | null {
+    const m = /Could not reach the dashboard API at (\S+) \(/.exec(output);
+    return m ? m[1] : null;
+}
+
 describe('20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT', () => {
-    const readScript = (name: 'pause.ts' | 'resume.ts'): string =>
-        fs.readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
-
     for (const script of ['pause.ts', 'resume.ts'] as const) {
-        it(`scripts/${script} no longer hardcodes the 'http://localhost:3000' default`, () => {
-            const src = readScript(script);
-            // The literal default string must be gone from both scripts entirely
-            // (the bug was dialing the SPA dev :3000 instead of the API bind).
-            expect(src).not.toContain('localhost:3000');
-            expect(src).not.toContain("'http://localhost:3000'");
-        });
+        it(
+            `scripts/${script} no longer hardcodes the 'http://localhost:3000' default`,
+            async () => {
+                const r = await runCliScript(script, { DASHBOARD_URL: '', DASHBOARD_HOST: '', DASHBOARD_PORT: '' });
+                expect(r.status, r.output).toBe(2);
+                expect(dialed(r.output), r.output).toBe('http://127.0.0.1:8080');
+                expect(r.output).not.toContain(':3000');
+            },
+            CLI_TEST_TIMEOUT_MS,
+        );
 
-        it(`scripts/${script} derives the default from DASHBOARD_PORT with an 8080 fallback`, () => {
-            const src = readScript(script);
-            // Reads DASHBOARD_PORT (mirrors src/api/server.ts:161-162 bind)…
-            expect(src).toMatch(/process\.env\.DASHBOARD_PORT/);
-            // …with the 8080 server-bind fallback…
-            expect(src).toMatch(/DASHBOARD_PORT\s*\|\|\s*['"]8080['"]/);
-            // …and DASHBOARD_HOST defaulting to the IPv4 127.0.0.1 (NOT localhost,
-            // to avoid the ::1 IPv6 refusal from the live UAT).
-            expect(src).toMatch(/DASHBOARD_HOST\s*\|\|\s*['"]127\.0\.0\.1['"]/);
-            // The composed default is http://<host>:<port>.
-            expect(src).toMatch(/http:\/\/\$\{host\}:\$\{port\}/);
-        });
+        it(
+            `scripts/${script} derives the default from DASHBOARD_PORT with an 8080 fallback`,
+            async () => {
+                // 8080 when DASHBOARD_PORT is empty is the test above; here both parts are set.
+                const port = await closedPort();
+                const r = await runCliScript(script, { DASHBOARD_URL: '', DASHBOARD_HOST: '127.0.0.2', DASHBOARD_PORT: String(port) });
+                expect(r.status, r.output).toBe(2);
+                expect(dialed(r.output), r.output).toBe(`http://127.0.0.2:${port}`);
+            },
+            CLI_TEST_TIMEOUT_MS,
+        );
 
-        it(`scripts/${script} still honors an explicit DASHBOARD_URL override`, () => {
-            const src = readScript(script);
-            // process.env.DASHBOARD_URL || <derived default> — operator override
-            // is unchanged; only the fallback side of the || moved off :3000.
-            expect(src).toMatch(/process\.env\.DASHBOARD_URL\s*\|\|/);
-        });
+        it(
+            `scripts/${script} still honors an explicit DASHBOARD_URL override`,
+            async () => {
+                const urlPort = await closedPort();
+                const otherPort = await closedPort();
+                const r = await runCliScript(script, { DASHBOARD_URL: `http://127.0.0.1:${urlPort}`, DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(otherPort) });
+                expect(r.status, r.output).toBe(2);
+                expect(dialed(r.output), r.output).toBe(`http://127.0.0.1:${urlPort}`);
+            },
+            CLI_TEST_TIMEOUT_MS,
+        );
 
-        it(`scripts/${script} connection-error catch references host:port + DASHBOARD_PORT, never apiKey`, () => {
-            const src = readScript(script);
-            // The crash handler must surface a clear message (no empty err:'').
-            expect(src).toMatch(/Could not reach the dashboard API/);
-            expect(src).toMatch(/DASHBOARD_PORT/);
-            // T-20-05: apiKey must not appear inside the new connection-error
-            // log call (re-assert the static guard against the new catch block).
-            const fatalCalls = src.match(/log\.fatal\s*\([^;]*?\)/gs) ?? [];
-            for (const call of fatalCalls) {
-                expect(call).not.toContain('apiKey');
-            }
-        });
+        it(
+            `scripts/${script} connection-error catch references host:port + DASHBOARD_PORT, never apiKey`,
+            async () => {
+                const port = await closedPort();
+                const r = await runCliScript(script, {
+                    DASHBOARD_API_KEY: PLANTED_KEY,
+                    DASHBOARD_URL: `http://127.0.0.1:${port}`,
+                    DASHBOARD_HOST: '127.0.0.1',
+                    DASHBOARD_PORT: String(port),
+                });
+                // The defined "could not reach" path: exit 2, a clear message naming the address
+                // and the variables to check, and the key value nowhere in either stream.
+                expect(r.status, r.output).toBe(2);
+                expect(r.output).toContain(`Could not reach the dashboard API at http://127.0.0.1:${port} (ECONNREFUSED)`);
+                expect(r.output).toContain('DASHBOARD_PORT');
+                expect(r.output).not.toContain(PLANTED_KEY);
+            },
+            CLI_TEST_TIMEOUT_MS,
+        );
     }
 });

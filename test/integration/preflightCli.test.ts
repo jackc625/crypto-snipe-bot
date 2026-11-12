@@ -128,7 +128,8 @@ describe('npm run preflight CLI (OPS-LIVE-10)', { timeout: 150_000 }, () => {
         expect(r.status, output).not.toBeNull();
         expect(r.status, output).toBeLessThan(2);
         expect(fs.existsSync(out), `no load record was written: ${output}`).toBe(true);
-        const record = JSON.parse(fs.readFileSync(out, 'utf8')) as LoadRecord;        // The record covers the real run: the preflight checks themselves were loaded ...
+        const record = JSON.parse(fs.readFileSync(out, 'utf8')) as LoadRecord;
+        // The record covers the real run: the preflight checks themselves were loaded ...
         expect(record.loaded.some((m) => m.exports.includes('preflightDryRun')), JSON.stringify(record.loaded.map((m) => m.file))).toBe(true);
         // ... and nothing that can start the bot was.
         expect(record.loaded.filter((m) => m.exports.includes('startMultiChainBot')).map((m) => m.file)).toEqual([]);

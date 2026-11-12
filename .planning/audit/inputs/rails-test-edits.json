@@ -318,6 +318,116 @@
       "found_in_plan": "23-31",
       "title_before": "Static OPS-LIVE-10 invariant: scripts/preflight.ts does not import bot.ts / invoke startMultiChainBot",
       "title_after": "OPS-LIVE-10 invariant: a real run of scripts/preflight.ts never loads the module that exports startMultiChainBot"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "T-20-05 mitigation: apiKey never logged in CLI scripts > scripts/pause.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "Regex over the text of scripts/pause.ts (no log.<level>( call mentioning apiKey) replaced by a run: the real script runs as a railed child (spawnRailedChildAsync) against a loopback dashboard in the test process that answers the login with 401; the test asserts exit 1, 'Login failed', that the login body carried the planted key, and that the key value is in neither output stream.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31): a text-reading test fails on a file move and passes when the behavior is gone. RED proof: mutant pause-logs-key (group cli-pause, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "scripts/pause.ts contains no log call referencing apiKey",
+      "title_after": "scripts/pause.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "T-20-05 mitigation: apiKey never logged in CLI scripts > scripts/resume.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "As for the pause test: the real scripts/resume.ts runs as a railed child against a loopback dashboard answering the login with 401; exit 1, 'Login failed', the login body carried the planted key, and the key value is in neither output stream.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proof: mutant resume-logs-key (group cli-pause, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "scripts/resume.ts contains no log call referencing apiKey",
+      "title_after": "scripts/resume.ts never prints the DASHBOARD_API_KEY value when the dashboard refuses the login"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "T-20-05 mitigation: apiKey never logged in CLI scripts > scripts/pause.ts with an empty DASHBOARD_API_KEY exits 1 with \"DASHBOARD_API_KEY not set\", even when --api-key is passed",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "Text checks of scripts/pause.ts (the 'DASHBOARD_API_KEY not set' string is present; no process.argv lookup of --api-key; no positional argv as apiKey) replaced by a run: the real script runs as a railed child with DASHBOARD_API_KEY empty and '--api-key <value>' on its command line, and must exit 1 with 'DASHBOARD_API_KEY not set' without dialing the dashboard.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proof: mutant pause-accepts-argv-key (group cli-pause, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "scripts/pause.ts contains 1 \"DASHBOARD_API_KEY not set\" string + 0 CLI-arg references to apiKey",
+      "title_after": "scripts/pause.ts with an empty DASHBOARD_API_KEY exits 1 with \"DASHBOARD_API_KEY not set\", even when --api-key is passed"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "T-20-05 mitigation: apiKey never logged in CLI scripts > scripts/resume.ts with an empty DASHBOARD_API_KEY exits 1 with \"DASHBOARD_API_KEY not set\", even when --api-key is passed",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "As for the pause test: the real scripts/resume.ts runs as a railed child with DASHBOARD_API_KEY empty and '--api-key <value>' passed, and must exit 1 with 'DASHBOARD_API_KEY not set' without dialing the dashboard.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proof: mutant resume-accepts-argv-key (group cli-pause, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "scripts/resume.ts contains 1 \"DASHBOARD_API_KEY not set\" string + 0 CLI-arg references to apiKey",
+      "title_after": "scripts/resume.ts with an empty DASHBOARD_API_KEY exits 1 with \"DASHBOARD_API_KEY not set\", even when --api-key is passed"
+    },
+    {
+      "file": "test/integration/pauseCli.test.ts",
+      "test": "20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT > the four tests of the for loop over pause.ts and resume.ts (8 at run time)",
+      "it_count_before": 13,
+      "it_count_after": 13,
+      "change": "Titles unchanged (template literals, compared by count). Each test now runs the real script as a railed child against closed loopback ports instead of reading its text, and reads the address it dialed from its connection-error message: with URL, host and port empty it dials http://127.0.0.1:8080 and nothing on port 3000; with DASHBOARD_HOST and DASHBOARD_PORT set it dials that host and port; with DASHBOARD_URL set it dials that URL over a different DASHBOARD_PORT; the connection-error path exits 2 naming the address and DASHBOARD_PORT, with the planted key value in neither stream.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proofs: mutants pause-/resume-old-default, -ignores-port, -ignores-url-override and -conn-error-logs-key (group cli-pause, reach child).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31"
+    },
+    {
+      "file": "test/integration/processLock.test.ts",
+      "test": "SAFE-04 single-instance process lock (real holder processes) > preflight, pause and resume run while the lock is held and leave it held (AC-23d, E15)",
+      "it_count_before": 7,
+      "it_count_after": 8,
+      "change": "Title unchanged. Its last block, a regex over the text of scripts/preflight.ts, pause.ts, resume.ts and src/preflight.ts (no import or require of processLock or of /main), moved into the new test below; every other assertion is unchanged.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). The move keeps the scan's RED proof from starting the lock children again; this test's title and AUD-TX-005's rail test title are unchanged.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31"
+    },
+    {
+      "file": "test/integration/processLock.test.ts",
+      "test": "SAFE-04 single-instance process lock (real holder processes) > preflight, pause and resume reach neither the process lock nor the boot entry through their imports (AC-23d)",
+      "it_count_before": 7,
+      "it_count_after": 8,
+      "change": "New test holding the moved check: ts.createProgram over a directory walk of src/ and scripts/ (test/helpers/sourceGraph.ts); the commands are the files package.json's preflight, pause and resume scripts run; no module reached through their imports at any depth (import, export from, require and import() of literals) may export acquireProcessLock or runMain.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proofs: mutants lock-import-pause, lock-import-resume, lock-import-preflight-cli, lock-import-preflight-src and lock-import-main (group cli-lock, reach worker).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31"
+    },
+    {
+      "file": "test/unit/mainEntry.test.ts",
+      "test": "SAFE-04 boot entry > (4) the boot entry imports nothing stateful and loads the bot only inside startBot",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Parse of src/main.ts by name replaced: the boot entry, the lock and the bot are found by the symbols they export in a directory walk of src/; a railed child loads the entry (test/integration/fixtures/loadedModulesProbe.ts) and the repo modules loaded with it must be exactly the entry and the lock; the entry's one require() resolves to the module exporting startMultiChainBot and sits inside the function given as startBot. The lock-before-start order it read from runMain's text is carried by test (1).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proofs: mutants main-imports-config, main-imports-db, main-imports-bot (group cli-entry); the moved order is kept by GUARD_MUTANTS row main-starts-before-lock on test (1).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31",
+      "title_before": "(4) src/main.ts imports nothing stateful and loads the bot only inside startBot, after the lock",
+      "title_after": "(4) the boot entry imports nothing stateful and loads the bot only inside startBot"
+    },
+    {
+      "file": "test/unit/mainEntry.test.ts",
+      "test": "SAFE-04 boot entry > (5) src/bot.ts: the first statement is the direct-entry guard and require.main refuses",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Title unchanged. src/bot.ts is no longer parsed by name: the module exporting startMultiChainBot is found in a directory walk of src/; its first statement must be a side-effect-only import resolving to the module exporting refuseIfDirectEntry, and its one require.main === module block must call process.exit(1), call no startMultiChainBot and name the boot entry's path (the module exporting runMain).",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31): a direct start would run the program, so the parsed module stays, found by symbol. RED proofs: mutants bot-guard-not-first and bot-direct-start-does-not-refuse (group cli-entry, reach worker).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31"
+    },
+    {
+      "file": "test/unit/mainEntry.test.ts",
+      "test": "SAFE-04 boot entry > (6) directEntry.ts imports only fs and path; neither boot file calls console",
+      "it_count_before": 9,
+      "it_count_after": 9,
+      "change": "Title unchanged. A railed child loads the module exporting refuseIfDirectEntry (found by symbol) and no other repo module may load with it; its import specifiers must all be Node built-ins; the modules exporting refuseIfDirectEntry and runMain, found by symbol, make no console call.",
+      "reason": "CHAR-06 / SPEC Requirement 8 (plan 23-31). RED proofs: mutants guard-imports-config (reach child), guard-calls-console and main-calls-console (reach worker), group cli-entry.",
+      "register_as": "test-quality",
+      "found_in_plan": "23-31"
     }
   ]
 }

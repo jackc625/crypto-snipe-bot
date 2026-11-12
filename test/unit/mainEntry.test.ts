@@ -10,14 +10,17 @@ import { computeAddress } from 'ethers';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { isBuiltin } from 'node:module';
 import * as ts from 'typescript';
-import { killProcessTree, readSentinels, REPO_ROOT, spawnRailedChild, spawnRailedChildAsync } from '../rails/spawnRailedChild';
+import { killProcessTree, readSentinels, spawnRailedChild, spawnRailedChildAsync } from '../rails/spawnRailedChild';
+import { consoleCallCount, loadRepoModules, moduleExporting, resolveSpecifier, type RepoModule } from '../helpers/sourceGraph';
 import { readStartEnv, runMain } from '../../src/main';
 import { acquireProcessLock, tryAcquireThenRelease } from '../../src/utils/processLock';
 
 const CHILD_TEST_TIMEOUT_MS = 120_000;
 const FIXTURE = 'test/integration/fixtures/lockHolder.ts';
-const CHILD_ARGS = ['-r', 'ts-node/register/transpile-only', FIXTURE];
+const TS_NODE = ['-r', 'ts-node/register/transpile-only'];
+const CHILD_ARGS = [...TS_NODE, FIXTURE];
 const PIN = Symbol.for('crypto-snipe-bot.processLock');
 
 const KEY = readSentinels().PRIVATE_KEY;
@@ -48,12 +51,26 @@ function failure(fn: () => unknown): Error & { code?: string } {
     throw new Error('expected the call to throw');
 }
 
-function parse(rel: string): ts.SourceFile {
-    return ts.createSourceFile(rel, fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8'), ts.ScriptTarget.Latest, true);
+// Plan 23-31 (CHAR-06): tests (4), (5) and (6) used to parse src/main.ts, src/bot.ts and
+// src/guards/directEntry.ts by name. They now find each module by the symbol it exports, in a
+// directory walk of src/ (test/helpers/sourceGraph.ts), and check what a real load does where a
+// load can show it: a railed child loads the module and test/integration/fixtures/
+// loadedModulesProbe.ts records which repo modules came with it. What only a start of the program
+// could show (the guard placement in the bot module and its direct-start block, and that the boot
+// files write no console output) stays a check of the parsed module, still found by symbol.
+const PROBE = 'test/integration/fixtures/loadedModulesProbe.ts';
+
+interface LoadRecord {
+    loaded: { file: string; exports: string[] }[];
 }
 
-function imports(sf: ts.SourceFile): string[] {
-    return sf.statements.filter(ts.isImportDeclaration).map((s) => (s.moduleSpecifier as ts.StringLiteral).text);
+/** The repo modules a railed child loads with `file`, besides the probe and the rails themselves. */
+function loadedWith(file: string): { status: number | null; output: string; loaded: LoadRecord['loaded'] } {
+    const out = path.join(tempDir(), 'loaded.json');
+    const r = spawnRailedChild(process.execPath, [...TS_NODE, PROBE, out, file], { timeoutMs: 110_000 });
+    const output = r.stdout + r.stderr;
+    const loaded = fs.existsSync(out) ? (JSON.parse(fs.readFileSync(out, 'utf8')) as LoadRecord).loaded : [];
+    return { status: r.status, output, loaded: loaded.filter((m) => m.file !== PROBE && !m.file.startsWith('test/rails/')) };
 }
 
 function walk(node: ts.Node, visit: (n: ts.Node) => void): void {
@@ -65,12 +82,10 @@ function isIdentifierCall(node: ts.Node, name: string): node is ts.CallExpressio
     return ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name;
 }
 
-function consoleCalls(sf: ts.SourceFile): number {
-    let count = 0;
-    walk(sf, (n) => {
-        if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && ts.isIdentifier(n.expression.expression) && n.expression.expression.text === 'console') count += 1;
-    });
-    return count;
+let srcModules: Map<string, RepoModule> | undefined;
+function src(): Map<string, RepoModule> {
+    srcModules ??= loadRepoModules(['src']);
+    return srcModules;
 }
 
 describe('SAFE-04 boot entry', () => {
@@ -185,55 +200,98 @@ describe('SAFE-04 boot entry', () => {
         expect(fs.readdirSync(dir)).toEqual([]);
     });
 
-    it('(4) src/main.ts imports nothing stateful and loads the bot only inside startBot, after the lock', () => {
-        const sf = parse('src/main.ts');
-        const allowed = new Set(['dotenv', 'ethers', './utils/processLock']);
-        for (const spec of imports(sf)) expect(allowed.has(spec), spec).toBe(true);
+    // Plan 23-31: was "(4) src/main.ts imports nothing stateful and loads the bot only inside
+    // startBot, after the lock", a parse of src/main.ts by name. "After the lock" is now carried by
+    // test (1), which watches a real second process being refused while the bot starts (GUARD_MUTANTS
+    // row main-starts-before-lock in scripts/red-proof-conversions.ts).
+    it(
+        '(4) the boot entry imports nothing stateful and loads the bot only inside startBot',
+        () => {
+            const mods = src();
+            const entry = moduleExporting(mods, 'runMain');
+            const lock = moduleExporting(mods, 'acquireProcessLock');
+            const bot = moduleExporting(mods, 'startMultiChainBot');
 
-        const requires: ts.CallExpression[] = [];
-        walk(sf, (n) => {
-            if (isIdentifierCall(n, 'require')) requires.push(n);
-        });
-        expect(requires.map((c) => (c.arguments[0] as ts.StringLiteral).text)).toEqual(['./bot']);
-        let scope: ts.Node = requires[0];
-        while (!ts.isArrowFunction(scope)) scope = scope.parent;
-        const property = scope.parent;
-        expect(ts.isPropertyAssignment(property) && property.name.getText(sf)).toBe('startBot');
+            // A real load of the boot entry brings in exactly one other repo module, the lock: no
+            // config, database, notifier or logger, and not the bot.
+            const run = loadedWith(entry.file);
+            expect(run.status, run.output).toBe(0);
+            expect(run.loaded.map((m) => m.file).sort()).toEqual([entry.file, lock.file].sort());
 
-        const forbidden = ['./config', './utils/db', './utils/notifier', './utils/logger'];
-        walk(sf, (n) => {
-            if (ts.isStringLiteralLike(n)) expect(forbidden.includes(n.text), n.text).toBe(false);
-        });
+            // Only a start of the program reaches startBot, so where the bot is loaded is checked
+            // on the parsed entry: its one require() is inside the function given as startBot, and
+            // it names the module that exports startMultiChainBot.
+            const requires: ts.CallExpression[] = [];
+            walk(entry.sf, (n) => {
+                if (isIdentifierCall(n, 'require')) requires.push(n);
+            });
+            expect(requires.map((c) => resolveSpecifier(entry.file, (c.arguments[0] as ts.StringLiteral).text))).toEqual([bot.file]);
+            let scope: ts.Node = requires[0];
+            while (!ts.isArrowFunction(scope) && !ts.isFunctionExpression(scope)) scope = scope.parent;
+            const property = scope.parent;
+            expect(ts.isPropertyAssignment(property) && property.name.getText(entry.sf)).toBe('startBot');
+        },
+        CHILD_TEST_TIMEOUT_MS,
+    );
 
-        const runMainFn = sf.statements.find((s): s is ts.FunctionDeclaration => ts.isFunctionDeclaration(s) && s.name?.text === 'runMain');
-        expect(runMainFn).toBeDefined();
-        const text = (runMainFn as ts.FunctionDeclaration).getText(sf);
-        expect(text.indexOf('acquireProcessLock(')).toBeGreaterThan(-1);
-        expect(text.indexOf('acquireProcessLock(')).toBeLessThan(text.indexOf('opts.startBot()'));
-    });
+    // A direct start is the one thing this cannot run (it would start the program), so the bot
+    // module, found by the symbol it exports, is checked as parsed.
+    it(
+        '(5) src/bot.ts: the first statement is the direct-entry guard and require.main refuses',
+        () => {
+            const mods = src();
+            const bot = moduleExporting(mods, 'startMultiChainBot');
+            const guard = moduleExporting(mods, 'refuseIfDirectEntry');
+            const entry = moduleExporting(mods, 'runMain');
+            const sf = bot.sf;
 
-    it('(5) src/bot.ts: the first statement is the direct-entry guard and require.main refuses', () => {
-        const sf = parse('src/bot.ts');
-        const first = sf.statements[0];
-        expect(ts.isImportDeclaration(first)).toBe(true);
-        const decl = first as ts.ImportDeclaration;
-        expect((decl.moduleSpecifier as ts.StringLiteral).text).toBe('./guards/directEntry');
-        expect(decl.importClause).toBeUndefined();
+            // The first statement is a side-effect-only import of the guard module.
+            const first = sf.statements[0];
+            expect(ts.isImportDeclaration(first), first.getText(sf)).toBe(true);
+            const decl = first as ts.ImportDeclaration;
+            expect(decl.importClause, first.getText(sf)).toBeUndefined();
+            expect(resolveSpecifier(bot.file, (decl.moduleSpecifier as ts.StringLiteral).text), first.getText(sf)).toBe(guard.file);
 
-        const blocks = sf.statements.filter((s): s is ts.IfStatement => ts.isIfStatement(s) && s.expression.getText(sf) === 'require.main === module');
-        expect(blocks).toHaveLength(1);
-        const body = blocks[0].thenStatement.getText(sf);
-        expect(body).toContain('src/main.ts');
-        expect(body).toContain('process.exit(1)');
-        expect(body).not.toContain('startMultiChainBot(');
-    });
+            // One require.main block: it ends the process with 1, names the boot entry to use, and
+            // never starts the bot.
+            const blocks = sf.statements.filter((s): s is ts.IfStatement => ts.isIfStatement(s) && s.expression.getText(sf) === 'require.main === module');
+            expect(blocks).toHaveLength(1);
+            const calls: string[] = [];
+            const strings: string[] = [];
+            walk(blocks[0].thenStatement, (n) => {
+                if (ts.isCallExpression(n)) calls.push(n.getText(sf));
+                if (ts.isStringLiteralLike(n)) strings.push(n.text);
+            });
+            expect(calls).toContain('process.exit(1)');
+            expect(calls.filter((c) => /\bstartMultiChainBot\s*\(/.test(c))).toEqual([]);
+            expect(strings.some((s) => s.includes(entry.file)), JSON.stringify(strings)).toBe(true);
+        },
+        // The walk builds one program over src/ once per file run (whichever of (4)-(6) runs first):
+        // 0.5 to 0.6 s alone; an explicit limit because the unit default is 5 s.
+        60_000,
+    );
 
-    it('(6) directEntry.ts imports only fs and path; neither boot file calls console', () => {
-        const guard = parse('src/guards/directEntry.ts');
-        expect(imports(guard).sort()).toEqual(['fs', 'path']);
-        expect(consoleCalls(guard)).toBe(0);
-        expect(consoleCalls(parse('src/main.ts'))).toBe(0);
-    });
+    it(
+        '(6) directEntry.ts imports only fs and path; neither boot file calls console',
+        () => {
+            const mods = src();
+            const guard = moduleExporting(mods, 'refuseIfDirectEntry');
+            const entry = moduleExporting(mods, 'runMain');
+
+            // A real load of the guard brings in no other repo module ...
+            const run = loadedWith(guard.file);
+            expect(run.status, run.output).toBe(0);
+            expect(run.loaded.map((m) => m.file)).toEqual([guard.file]);
+            // ... and it names only Node built-ins, which a record of repo modules cannot show.
+            expect(guard.specifiers.filter((s) => !isBuiltin(s))).toEqual([]);
+
+            // Writing to the console would need the program to run its refusal path, so the two boot
+            // files, found by symbol, are checked as parsed.
+            expect(consoleCallCount(guard.sf)).toBe(0);
+            expect(consoleCallCount(entry.sf)).toBe(0);
+        },
+        CHILD_TEST_TIMEOUT_MS,
+    );
 
     it(
         '(1) starts the bot exactly once, only after the lock is held',
