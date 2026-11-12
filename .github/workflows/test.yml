@@ -49,6 +49,17 @@ jobs:
         run: |
           npm run check:census
           npm run check:census -- --check-floor-history
+      - name: Commit taxonomy gate (AUDIT-06)
+        # AUDIT-06 / D-17 / D-18: protects the golden-master recording, so a re-record cannot
+        # launder a behavior change. Every non-merge commit after the first recording commit is
+        # judged: a commit that changes, removes or re-adds anything under
+        # test/realpath/recordings/ (the scenario recordings and the env snapshot) fails unless
+        # its subject is behavior: or behavior(<scope>): and every OD-<n> / AUD-<AREA>-<NNN> it
+        # cites exists in that commit's own tree; adding a brand-new scenario or env variable
+        # passes. Merge commits are not judged (their inner commits are) and a merge that changes
+        # the folder on its own prints a WARN line. Needs the full history (fetch-depth: 0
+        # above): a shallow clone exits 2.
+        run: npm run check:commits
       - name: Ban .todo test stubs
         run: |
           # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.

@@ -23,6 +23,7 @@
     "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts",
     "check:realpath-mocks": "ts-node scripts/check-realpath-mocks.ts",
     "check:census": "ts-node scripts/check-signing-census.ts",
+    "check:commits": "ts-node scripts/check-commit-taxonomy.ts",
     "recordings:update": "ts-node scripts/update-recordings.ts"
   },
   "dependencies": {
