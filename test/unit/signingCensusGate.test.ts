@@ -37,11 +37,18 @@ const GATE_CASES = [
 ];
 const ANALYSIS_CASES = 31;
 
+// Limits (measured on Node 22.16.0, 2026-11-12): the self-test builds 11 census programs over the
+// ethers types plus 6 throwaway git repos. Alone: 23 s through Vitest (30 s run directly). Under
+// the full parallel npm test: 59.7 s, which is 54 percent of the 110 s child limit first planned,
+// so the child gets 240 s and the test 250 s (the full-run time is 25 percent of the child limit).
+const CHILD_TIMEOUT_MS = 240_000;
+const TEST_TIMEOUT_MS = 250_000;
+
 describe('check-signing-census.ts --self-test (CHAR-04)', () => {
     it(
         'exits 0, the 31 Phase 22 analysis cases pass and every gate case passes',
         () => {
-            const result = spawnRailedChild('npx', ['ts-node', 'scripts/check-signing-census.ts', '--self-test'], { timeoutMs: 110_000 });
+            const result = spawnRailedChild('npx', ['ts-node', 'scripts/check-signing-census.ts', '--self-test'], { timeoutMs: CHILD_TIMEOUT_MS });
             const output = `${result.stdout}\n${result.stderr}`;
 
             expect(result.status, output).toBe(0);
@@ -53,6 +60,6 @@ describe('check-signing-census.ts --self-test (CHAR-04)', () => {
             const total = ANALYSIS_CASES + GATE_CASES.length;
             expect(result.stdout, output).toMatch(new RegExp(`^SELF-TEST PASS ${total} of ${total} cases \\(${ANALYSIS_CASES} census analysis \\+ ${GATE_CASES.length} gate\\)`, 'm'));
         },
-        120_000,
+        TEST_TIMEOUT_MS,
     );
 });
