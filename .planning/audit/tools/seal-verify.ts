@@ -19,8 +19,8 @@
 //       .planning/baselines/phase-start.json (Phase 22). Writes metadata only, never a seal
 //       record. Exit 0 clean, 1 any non-public hit, 2 refusal or crash.
 //   seal-verify.ts --self-test
-//       Throwaway repos under os.tmpdir(): the exempt-pattern, tamper, merge and successor
-//       cases, and a range-scan fixture run through the real scanner. Exit 0 pass, 1 fail.
+//       Throwaway repos under os.tmpdir(): the exempt-pattern, tamper, merge, successor and
+//       reviewed-hit cases, and a range-scan fixture run through the real scanner. Exit 0 pass, 1 fail.
 //
 // Exempt paths are patterns: `*` matches any run of characters except `/`, everything
 // else is literal, and the pattern must match the whole path. A path on the list is
@@ -45,7 +45,14 @@
 //     at the successor's sealed_sha) and be an ancestor of sealed_sha
 //   - changed_since_previous must equal the paths under `covers` changed from
 //     previous_sealed_sha to sealed_sha, found the same way as later changes
+//   - a hit labelled reviewed-inert in the scan record must sit at a REVIEWED_HITS location
+//     whose ruling record is committed at sealed_sha, and the counts must match the hits
 // SEAL.json itself is only ever read; no code path in this tool writes it.
+//
+// Reviewed hits (Phase 23 plan 23-26, operator ruling ESC-SECRET-03). --phase-scan labels a
+// non-public hit reviewed-inert only when its rule id, file, commit, line and column equal one
+// REVIEWED_HITS entry and that entry's ruling record, read at --sealed, has the operator's answer
+// and lists the same location. Anything else stays non-public. --scan does not use the list.
 //
 // The scanner rules are those of fixture-check.ts --git-scan (22-26): the verified
 // binary, the fixture-proven configs, the proxy belt, --redact, three-pass
@@ -344,6 +351,102 @@ function classify(p1: Finding[], p2: Finding[], p3: Finding[]): { hits: { findin
     return { hits, pass2Only, pass3Only };
 }
 
+// ---------------------------------------------------------------------------
+// Reviewed hits (Phase 23 plan 23-26, operator ruling ESC-SECRET-03)
+// ---------------------------------------------------------------------------
+//
+// One rule, and only for --phase-scan: a hit the three passes call non-public is labelled
+// reviewed-inert instead when its rule id, file, commit, line and column all equal one entry
+// below, and that entry cites an operator ruling record that has the operator's answer and lists
+// the same location. The same text in another file, another commit, on another line or column,
+// or under another rule is still non-public and still blocks a seal. --scan (the commits after a
+// seal) keeps the plain three-pass classification.
+
+const REVIEWED_INERT = 'reviewed-inert';
+const RULING_RE = /^ESC-[A-Z0-9]+-\d{2}$/;
+const ESCALATIONS_REL = '.planning/audit/escalations';
+
+interface HitLocation {
+    rule_id: string;
+    file: string;
+    commit: string;
+    line: number;
+    column: number;
+}
+
+export interface ReviewedHit extends HitLocation {
+    /** The escalation record that holds the operator's ruling on this exact location. */
+    ruling: string;
+    why: string;
+}
+
+export const REVIEWED_HITS: ReviewedHit[] = [
+    {
+        rule_id: 'generic-api-key',
+        file: 'test/realpath/triage/fixtures/hostHeaderCrash.ts',
+        commit: '3a449f54f89786b446c0f6e6e15cc2cdeb1e0390',
+        line: 99,
+        column: 28,
+        ruling: 'ESC-SECRET-03',
+        why: 'the RFC 6455 handshake sample nonce sent on a WebSocket upgrade request (AUD-SECRET-006)',
+    },
+    {
+        rule_id: 'generic-credential-uri',
+        file: 'test/realpath/recordingsGuard.test.ts',
+        commit: 'babd7e40f002f0efa42810ed59990822ddc2f20a',
+        line: 421,
+        column: 80,
+        ruling: 'ESC-SECRET-03',
+        why: 'the planted placeholder URL the recordings guard test uses to prove a URL with a user name and password is refused (AUD-SECRET-007)',
+    },
+];
+
+export function sameLocation(a: HitLocation, b: HitLocation): boolean {
+    return (
+        a.rule_id === b.rule_id &&
+        a.file === b.file &&
+        a.commit === b.commit &&
+        a.line === b.line &&
+        a.column === b.column
+    );
+}
+
+const where = (e: HitLocation): string => `${e.rule_id} ${e.file}:${e.line}:${e.column}@${String(e.commit).slice(0, 8)}`;
+
+/** Refuses the list unless every entry is a full location citing a ruling record that has the operator's answer and lists that exact location. */
+export function checkReviewedList(list: ReviewedHit[], readRuling: (id: string) => any): void {
+    const seen: HitLocation[] = [];
+    for (const e of list) {
+        const full = typeof e.rule_id === 'string' && e.rule_id !== '' && isPlainRel(e.file) && SHA40.test(e.commit) && Number.isInteger(e.line) && e.line >= 1 && Number.isInteger(e.column) && e.column >= 1;
+        if (!full) throw new Refusal(`reviewed hit ${where(e)} is not a full location (rule id, file, 40-hex commit, line, column)`);
+        if (typeof e.ruling !== 'string' || !RULING_RE.test(e.ruling)) throw new Refusal(`reviewed hit ${where(e)} cites no ruling record`);
+        const rec = readRuling(e.ruling);
+        if (!rec || typeof rec !== 'object') throw new Refusal(`reviewed hit ${where(e)}: ruling ${e.ruling} is missing`);
+        if (typeof rec.operator_response !== 'string' || rec.operator_response.trim() === '') throw new Refusal(`reviewed hit ${where(e)}: ruling ${e.ruling} has no operator response`);
+        const listed = Array.isArray(rec.resolution?.reviewed_hits) && rec.resolution.reviewed_hits.some((r: HitLocation) => sameLocation(r, e));
+        if (!listed) throw new Refusal(`reviewed hit ${where(e)}: ruling ${e.ruling} does not list this exact location`);
+        if (seen.some((s) => sameLocation(s, e))) throw new Refusal(`reviewed hit ${where(e)} is listed twice`);
+        seen.push(e);
+    }
+}
+
+/** Labels a non-public hit reviewed-inert only when one entry names its exact location; every other hit is returned unchanged. */
+export function applyReviewed(hits: Hit[], list: ReviewedHit[]): Hit[] {
+    return hits.map((h) => (h.classification === NON_PUBLIC && list.some((e) => sameLocation(e, h)) ? { ...h, classification: REVIEWED_INERT } : h));
+}
+
+/** A ruling record as committed at `rev` (never the working tree), or null. */
+function rulingAt(repo: string, rev: string): (id: string) => any {
+    return (id: string) => {
+        if (!RULING_RE.test(id)) return null;
+        try {
+            return JSON.parse(gitText(repo, ['cat-file', '-p', `${rev}:${ESCALATIONS_REL}/${id}.json`]));
+        } catch {
+            return null;
+        }
+    };
+}
+
 function tempLeftovers(): string[] {
     return fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith(BL_GIT_TEMP_PREFIX)).sort();
 }
@@ -425,11 +528,19 @@ function shannon(s: string): number {
  * values about 1 percent of runs planted an address the default rule skips, failing
  * range-public-address by chance (measured), and a low-entropy "before" key would let
  * range-excludes-earlier-commit pass without proving anything.
+ *
+ * It also holds no run of four or more letters a-f (23-26 continuation, measured): such a run
+ * can spell a stop word (feed, dead, added, faded, ceded seen), and the default generic-api-key
+ * rule skips any value containing one. Of 3000 entropy-qualified addresses the scanner missed 8,
+ * every one holding such a word, and missed the same 8 again alone; that was the residual
+ * intermittent range-public-address failure. The project's evm-private-key rule has no stop
+ * words (1000 of 1000 keys with a word inside were reported). AUD-SECRET-008.
  */
+const STOPWORD_RUN = /[a-f]{4}/;
 export function randomHexStrong(bytes: number): string {
     for (let i = 0; i < 1000; i++) {
         const h = randomHex(bytes);
-        if (shannon(h) >= 3.65 && shannon(`0x${h}`) >= 3.65) return h;
+        if (shannon(h) >= 3.65 && shannon(`0x${h}`) >= 3.65 && !STOPWORD_RUN.test(h)) return h;
     }
     throw new Error('could not draw a high-entropy fixture value');
 }
@@ -622,6 +733,20 @@ export function verifySeal(repo: string, opts: { scan: boolean; scan_fn?: (from:
                 if (doc.phase_start_sha !== scanStart) reasons.push(`${scanRel} phase_start_sha is not the record's scan_start_sha`);
                 if (doc.range !== wantRange) reasons.push(`${scanRel} range is not ${wantRange}`);
                 if (doc.hit_counts?.['non-public'] !== 0) reasons.push(`${scanRel} hit_counts non-public is not 0`);
+                // The reviewed-inert label holds only at a listed location, with its ruling at sealed_sha.
+                const docHits: any[] = Array.isArray(doc.hits) ? doc.hits : [];
+                if (docHits.some((h) => h?.classification === NON_PUBLIC)) reasons.push(`${scanRel} holds a non-public hit`);
+                const reviewed = docHits.filter((h) => h?.classification === REVIEWED_INERT);
+                const unlisted = reviewed.filter((h) => !REVIEWED_HITS.some((e) => sameLocation(e, h)));
+                if (unlisted.length) reasons.push(`${scanRel} labels ${unlisted.length} hit(s) reviewed-inert that no reviewed entry names: ${unlisted.slice(0, 5).map(where).join(', ')}`);
+                if ((doc.hit_counts?.[REVIEWED_INERT] ?? 0) !== reviewed.length) reasons.push(`${scanRel} hit_counts ${REVIEWED_INERT} is not the number of ${REVIEWED_INERT} hits (${reviewed.length})`);
+                if (reviewed.length) {
+                    try {
+                        checkReviewedList(REVIEWED_HITS.filter((e) => reviewed.some((h) => sameLocation(e, h))), rulingAt(repo, sealed));
+                    } catch (e) {
+                        reasons.push(`${scanRel} reviewed hits: ${(e as Error).message}`);
+                    }
+                }
             }
         }
 
@@ -716,6 +841,61 @@ function selfTest(repoRoot: string): number {
     ok(P('.planning/phases/22-safety-rails-audit/22-REVIEW-FIX.md', '.planning/phases/22-safety-rails-audit/*-REVIEW*.md'), 'two stars in one pattern');
     const draws = Array.from({ length: 500 }, (_, i) => randomHexStrong(i % 2 ? 20 : 32));
     ok(draws.every((h) => shannon(h) >= 3.65 && shannon(`0x${h}`) >= 3.65), 'planted fixture values clear the scanner entropy floor (500 draws, bare and 0x forms at least 3.65)');
+    ok(draws.every((h) => !/[a-f]{4}/.test(h)), 'planted fixture values hold no run of four letters a-f that could spell a scanner stop word (500 draws)');
+
+    // Reviewed hits (ESC-SECRET-03): the label holds at an exact listed location only.
+    const asHit = (e: HitLocation, classification = NON_PUBLIC): Hit => ({ rule_id: e.rule_id, file: e.file, commit: e.commit, line: e.line, column: e.column, type: e.rule_id, classification });
+    const label = (h: Hit) => applyReviewed([h], REVIEWED_HITS)[0].classification;
+    ok(REVIEWED_HITS.length === 2 && REVIEWED_HITS.every((e) => e.ruling === 'ESC-SECRET-03'), `reviewed: the list holds the two ESC-SECRET-03 locations and nothing else (${REVIEWED_HITS.length} entries)`);
+    for (const e of REVIEWED_HITS) {
+        ok(label(asHit(e)) === REVIEWED_INERT, `reviewed: the listed hit ${where(e)} is reviewed-inert`);
+        const otherRule = e.rule_id === 'generic-api-key' ? 'generic-credential-uri' : 'generic-api-key';
+        const variants: [string, Partial<HitLocation>][] = [
+            ['another rule', { rule_id: otherRule }],
+            ['another file', { file: e.file.replace(/\.ts$/, '.copy.ts') }],
+            ['a letter-case variant of the file', { file: e.file.toUpperCase() }],
+            ['another commit', { commit: (e.commit[0] === '0' ? '1' : '0') + e.commit.slice(1) }],
+            ['another line', { line: e.line + 1 }],
+            ['another column', { column: e.column + 1 }],
+        ];
+        for (const [what, d] of variants) {
+            const h = asHit({ ...e, ...d });
+            ok(label(h) === NON_PUBLIC, `reviewed: the same hit at ${what} (${where(h)}) is still non-public`);
+        }
+        ok(label(asHit(e, PUBLIC_ADDRESS)) === PUBLIC_ADDRESS, `reviewed: a public-address hit at ${where(e)} keeps its own label`);
+    }
+    const locs = (list: HitLocation[]) => list.map(({ rule_id, file, commit, line, column }) => ({ rule_id, file, commit, line, column }));
+    const rulingRec = (o: Record<string, unknown> = {}, hits: HitLocation[] = locs(REVIEWED_HITS)) => ({ id: 'ESC-SECRET-03', operator_response: 'fixture operator words', resolution: { status: 'closed', reviewed_hits: hits }, ...o });
+    const reader = (rec: unknown) => (id: string) => (id === 'ESC-SECRET-03' ? rec : null);
+    const refusedWith = (f: () => void, what: string): string => {
+        try {
+            f();
+            return 'not refused';
+        } catch (err) {
+            return err instanceof Refusal && (err as Error).message.includes(what) ? 'refused' : `wrong error: ${(err as Error).message}`;
+        }
+    };
+    let rr = refusedWith(() => checkReviewedList(REVIEWED_HITS, reader(rulingRec())), '');
+    ok(rr === 'not refused', `reviewed: the list is accepted when its ruling record has the operator's answer and lists each location (${rr})`);
+    const e0 = REVIEWED_HITS[0];
+    const noRuling: Record<string, unknown> = { ...e0 };
+    delete noRuling.ruling;
+    rr = refusedWith(() => checkReviewedList([noRuling as unknown as ReviewedHit], reader(rulingRec())), 'cites no ruling record');
+    ok(rr === 'refused', `reviewed: an entry without a ruling reference is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([{ ...e0, ruling: '' }], reader(rulingRec())), 'cites no ruling record');
+    ok(rr === 'refused', `reviewed: an entry with an empty ruling reference is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([{ ...e0, ruling: 'operator said so' }], reader(rulingRec())), 'cites no ruling record');
+    ok(rr === 'refused', `reviewed: a ruling reference that is not an escalation id is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([e0], () => null), 'is missing');
+    ok(rr === 'refused', `reviewed: an entry whose ruling record is missing is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([e0], reader(rulingRec({ operator_response: null }))), 'has no operator response');
+    ok(rr === 'refused', `reviewed: an entry whose ruling record has no operator response is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([e0], reader(rulingRec({}, locs([{ ...e0, column: e0.column + 1 }, REVIEWED_HITS[1]])))), 'does not list this exact location');
+    ok(rr === 'refused', `reviewed: an entry whose ruling record lists another location is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([{ ...e0, commit: e0.commit.slice(0, 8) }], reader(rulingRec())), 'not a full location');
+    ok(rr === 'refused', `reviewed: an entry with a short commit is refused (${rr})`);
+    rr = refusedWith(() => checkReviewedList([e0, { ...e0 }], reader(rulingRec())), 'listed twice');
+    ok(rr === 'refused', `reviewed: an entry listed twice is refused (${rr})`);
 
     const dir = mkTemp('csb-seal-st-');
     const hooks = mkTemp('csb-seal-st-hooks-');
@@ -1012,6 +1192,48 @@ function selfTest(repoRoot: string): number {
             put(SUCC_REL, JSON.stringify(succ(scan23(), { render_sha256: { findings: sha256('findings\n'), decisions: sha256('decisions 23\n') } }), null, 2) + '\n');
             commit('c');
         }, false, 'render_sha256.findings');
+
+        // --- Reviewed hits in a successor's scan record (ESC-SECRET-03) ------------------------
+        // At sealed2 there is no ruling record, so a scan record labelling a listed hit reviewed-inert is INVALID there.
+        const reviewedHits = REVIEWED_HITS.map((e) => asHit(e, REVIEWED_INERT));
+        const withHits = (hits: Hit[], counts: Record<string, number> = {}) => ({ hits, hit_counts: { 'non-public': 0, [REVIEWED_INERT]: hits.filter((h) => h.classification === REVIEWED_INERT).length, ...counts } });
+        runS('successor: reviewed hits whose ruling record is not committed at sealed_sha are INVALID', () => {
+            writeSucc(scan23(withHits(reviewedHits)));
+            commit('c');
+        }, false, 'ruling ESC-SECRET-03 is missing');
+        // sealed4 commits the ruling record; base4 adds a successor whose scan record holds both listed hits.
+        reset2();
+        const ESC_REL = `${ESCALATIONS_REL}/ESC-SECRET-03.json`;
+        put(ESC_REL, JSON.stringify(rulingRec(), null, 2) + '\n');
+        commit('the ruling record');
+        const sealed4 = g('rev-parse', 'HEAD');
+        const CHANGED4 = [...CHANGED_SINCE, SCAN23_REL, SUCC_REL, ESC_REL].sort();
+        const scan4 = (o: Record<string, unknown> = {}) => scan23({ range: `${base}..${sealed4}`, sealed_sha: sealed4, ...o });
+        const writeSucc4 = (t: string) => {
+            put(SCAN23_REL, t);
+            put(SUCC_REL, JSON.stringify(succ(t, { sealed_sha: sealed4, changed_since_previous: CHANGED4, scan: { ...succ(t).scan, range: `${base}..${sealed4}` } }), null, 2) + '\n');
+        };
+        writeSucc4(scan4(withHits([...reviewedHits, asHit({ ...REVIEWED_HITS[0], line: 7 }, PUBLIC_ADDRESS)], { 'public-address': 1 })));
+        commit('successor with reviewed hits');
+        const base4 = g('rev-parse', 'HEAD');
+        const R4 = { seal_rel: SUCC_REL, from: () => g('checkout', '-q', '-B', 'case4', base4) };
+        run('successor: a scan record whose reviewed-inert hits are the listed locations, with the ruling at sealed_sha, is VALID', () => {}, true, undefined, { ...R4, changed: [SCAN23_REL, SUCC_REL] });
+        run('successor: a scan record labelling an unlisted location reviewed-inert (another line) is INVALID', () => {
+            writeSucc4(scan4(withHits([reviewedHits[0], asHit({ ...REVIEWED_HITS[1], line: REVIEWED_HITS[1].line + 1 }, REVIEWED_INERT)])));
+            commit('c');
+        }, false, 'no reviewed entry names', R4);
+        run('successor: a scan record labelling the listed text in another file reviewed-inert is INVALID', () => {
+            writeSucc4(scan4(withHits([reviewedHits[0], asHit({ ...REVIEWED_HITS[0], file: 'test/other.ts' }, REVIEWED_INERT)])));
+            commit('c');
+        }, false, 'no reviewed entry names', R4);
+        run('successor: a scan record whose reviewed-inert count differs from its hits is INVALID', () => {
+            writeSucc4(scan4(withHits(reviewedHits, { [REVIEWED_INERT]: 1 })));
+            commit('c');
+        }, false, `hit_counts ${REVIEWED_INERT} is not the number`, R4);
+        run('successor: a scan record holding a non-public hit while its counts say 0 is INVALID', () => {
+            writeSucc4(scan4(withHits([...reviewedHits, asHit({ ...REVIEWED_HITS[0], line: 5 })])));
+            commit('c');
+        }, false, 'holds a non-public hit', R4);
         {
             reset2();
             const r = verifySeal(dir, { scan: false, seal_rel: '../SEAL-23.json' });
@@ -1063,6 +1285,55 @@ function selfTest(repoRoot: string): number {
             commit('c');
             const dirty = verifySeal(dir, { scan: true, scan_fn: scanFn });
             ok(!dirty.valid && dirty.reasons.join(' ').includes('non-public'), `--scan over a later key in an exempt file: ${dirty.valid ? 'VALID' : 'INVALID, non-public hit reported'}`);
+            // The reviewed rule on real scanner output: one planted key in two files, one exact location listed.
+            reset();
+            const plantedKey = `PRIVATE_KEY=0x${randomHexStrong(32)}\n`;
+            put('src/r1.ts', plantedKey);
+            put('src/r2.ts', plantedKey);
+            commit('one key in two files');
+            const realHits = scanFn(base, g('rev-parse', 'HEAD'));
+            const inR = (hs: Hit[], n: string) => hs.filter((h) => h.file === n || h.file.endsWith(`/${n}`));
+            const first = inR(realHits, 'src/r1.ts')[0];
+            const entry: ReviewedHit | null = first ? { rule_id: first.rule_id, file: first.file, commit: first.commit, line: first.line, column: first.column, ruling: 'ESC-SECRET-03', why: 'fixture' } : null;
+            const relabelled = entry ? applyReviewed(realHits, [entry]) : [];
+            const atEntry = relabelled.filter((h) => entry && sameLocation(h, entry));
+            const others = relabelled.filter((h) => !(entry && sameLocation(h, entry)));
+            const r2 = inR(relabelled, 'src/r2.ts');
+            ok(
+                !!entry && atEntry.length > 0 && atEntry.every((h) => h.classification === REVIEWED_INERT) && r2.length > 0 && others.every((h) => h.classification === NON_PUBLIC),
+                `reviewed on real scanner output: the listed location is reviewed-inert (${atEntry.length}) and the same key elsewhere stays non-public (${others.filter((h) => h.classification === NON_PUBLIC).length} of ${others.length}, ${r2.length} in src/r2.ts)`,
+            );
+            // The same through the real --phase-scan path: the list is checked against a ruling committed at --sealed, applied, counted and recorded.
+            if (entry) {
+                put(`${ESCALATIONS_REL}/ESC-SECRET-03.json`, JSON.stringify(rulingRec({}, locs([entry])), null, 2) + '\n');
+                commit('fixture ruling record');
+                const sealedW = g('rev-parse', 'HEAD');
+                const outW = path.join(raw, 'phase-scan-wiring.json');
+                let code = -1;
+                let why = '';
+                // phaseScan's range fixture reads the Hardhat #0 literal from the scanned repo: an untracked copy, never committed or scanned.
+                const hardhatRel = path.join('test', 'fork', 'helpers', 'realMainnetGate.ts');
+                fs.mkdirSync(path.dirname(path.join(dir, hardhatRel)), { recursive: true });
+                fs.copyFileSync(path.join(repoRoot, hardhatRel), path.join(dir, hardhatRel));
+                try {
+                    code = phaseScan(dir, sealedW, path.join(raw, 'wiring-raw'), outW, base, { phase: 'self-test', plan: 'self-test', requirement: 'self-test' }, [entry]);
+                } catch (err) {
+                    why = (err as Error).message;
+                } finally {
+                    fs.rmSync(path.join(dir, 'test'), { recursive: true, force: true });
+                }
+                const doc = fs.existsSync(outW) ? JSON.parse(fs.readFileSync(outW, 'utf8')) : null;
+                const docHits: Hit[] = doc ? doc.hits : [];
+                const wired =
+                    !!doc &&
+                    code === 1 &&
+                    doc.hit_counts[REVIEWED_INERT] === atEntry.length &&
+                    doc.hit_counts[NON_PUBLIC] === others.length &&
+                    docHits.filter((h) => sameLocation(h, entry)).every((h) => h.classification === REVIEWED_INERT) &&
+                    doc.reviewed_hits.length === 1 &&
+                    doc.reviewed_hits[0].matched === true;
+                ok(wired, `reviewed through --phase-scan: exit ${code}${why ? ` (${why})` : ''}, reviewed-inert ${doc?.hit_counts?.[REVIEWED_INERT]}, non-public ${doc?.hit_counts?.[NON_PUBLIC]}, entry matched ${doc?.reviewed_hits?.[0]?.matched}`);
+            } else ok(false, 'reviewed through --phase-scan: the planted key produced no hit to list');
         } finally {
             rmTree(raw);
         }
@@ -1123,7 +1394,8 @@ export function refuseSealOut(repo: string, outArg: string): void {
     if (/^\.planning\/audit\/seal[^/]*\.json$/.test(rel)) throw new Refusal('--out names a seal record; the phase scan never writes one');
 }
 
-function phaseScan(repo: string, sealedArg: string, rawDirArg: string, outArg: string, startArg?: string, labels: ScanLabels = PHASE22_LABELS): number {
+/** `reviewed` is always REVIEWED_HITS from the command line; the self-test passes a fixture list to drive this path end to end. */
+function phaseScan(repo: string, sealedArg: string, rawDirArg: string, outArg: string, startArg?: string, labels: ScanLabels = PHASE22_LABELS, reviewed: ReviewedHit[] = REVIEWED_HITS): number {
     const { start, sealed, start_source } = scanBounds(repo, sealedArg, startArg);
     refuseSealOut(repo, outArg);
     const raw = path.resolve(rawDirArg);
@@ -1137,12 +1409,16 @@ function phaseScan(repo: string, sealedArg: string, rawDirArg: string, outArg: s
     const fixture = rangeFixture(v.bin, repo);
     for (const c of fixture.cases) console.log(`${c.pass ? 'PASS' : 'FAIL'} ${c.id}: ${c.observed}`);
     if (!fixture.pass) throw new Refusal('the range fixture failed; the log-opts do not cover what NAC-11 needs');
+    // Every reviewed entry must cite a ruling committed at the sealed revision that lists its exact location.
+    checkReviewedList(reviewed, rulingAt(repo, sealed));
 
     const set = scanRange(v.bin, repo, start, sealed, raw);
     const inRange = new Set(gitText(repo, ['rev-list', `${start}..${sealed}`]).split(/\r?\n/).filter(Boolean));
     const outside = set.hits.filter((h) => !inRange.has(h.commit)).length;
     if (outside) throw new Error(`${outside} hit(s) fall outside the commit range`);
-    const count = (c: string) => set.hits.filter((h) => h.classification === c).length;
+    const hits = applyReviewed(set.hits, reviewed);
+    const matched = reviewed.filter((e) => hits.some((h) => h.classification === REVIEWED_INERT && sameLocation(e, h)));
+    const count = (c: string) => hits.filter((h) => h.classification === c).length;
     const nonPublic = count(NON_PUBLIC);
     const doc = {
         tool: 'betterleaks',
@@ -1175,18 +1451,20 @@ function phaseScan(repo: string, sealedArg: string, rawDirArg: string, outArg: s
             [NON_PUBLIC]: 'reported by all three passes',
             [KNOWN_PUBLIC]: 'reported by pass 1, removed by the pass-2 Hardhat #0 allowlist',
             [PUBLIC_ADDRESS]: 'reported by passes 1 and 2, removed by the pass-3 allowlist: the flagged secret is exactly 0x + 40 hex (operator ruling "classify-addresses", ESC-SECRET-01)',
+            [REVIEWED_INERT]: 'reported by all three passes at a location the operator ruled not a secret: rule id, file, commit, line and column equal one entry of seal-verify.ts REVIEWED_HITS, whose ruling record (committed at sealed_sha) lists the same location',
         },
         classification_key: ['rule id', 'file', 'commit', 'line', 'start column', 'end column'],
-        hit_counts: { total: set.hits.length, [NON_PUBLIC]: nonPublic, [KNOWN_PUBLIC]: count(KNOWN_PUBLIC), [PUBLIC_ADDRESS]: count(PUBLIC_ADDRESS) },
-        hits: set.hits,
-        value_policy: 'hits hold rule id, file, commit, line, column, type and classification only; raw redacted reports stay in raw_report_dir outside the repo',
+        hit_counts: { total: hits.length, [NON_PUBLIC]: nonPublic, [KNOWN_PUBLIC]: count(KNOWN_PUBLIC), [PUBLIC_ADDRESS]: count(PUBLIC_ADDRESS), [REVIEWED_INERT]: count(REVIEWED_INERT) },
+        reviewed_hits: reviewed.map((e) => ({ ...e, matched: matched.includes(e) })),
+        hits,
+        value_policy: 'hits and reviewed_hits hold rule id, file, commit, line, column, type, classification and the ruling reference only; raw redacted reports stay in raw_report_dir outside the repo',
         phase: labels.phase,
         plan: labels.plan,
         requirement: labels.requirement,
     };
     fs.mkdirSync(path.dirname(path.resolve(outArg)), { recursive: true });
     fs.writeFileSync(path.resolve(outArg), JSON.stringify(doc, null, 2) + '\n');
-    console.log(`PHASE-SCAN range=${set.range} commits=${inRange.size} hits=${set.hits.length} non-public=${nonPublic} known-public=${count(KNOWN_PUBLIC)} public-address=${count(PUBLIC_ADDRESS)}`);
+    console.log(`PHASE-SCAN range=${set.range} commits=${inRange.size} hits=${hits.length} non-public=${nonPublic} known-public=${count(KNOWN_PUBLIC)} public-address=${count(PUBLIC_ADDRESS)} reviewed-inert=${count(REVIEWED_INERT)} (reviewed entries matched ${matched.length} of ${reviewed.length})`);
     console.log(`RESULT ${nonPublic === 0 ? 'CLEAN (zero non-public hits)' : `NON-PUBLIC HITS: ${nonPublic}`}`);
     return nonPublic === 0 ? 0 : 1;
 }
