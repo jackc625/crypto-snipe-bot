@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-12-PLAN.md
-last_updated: "2026-11-12T00:32:55.799Z"
+stopped_at: Completed 23-13-PLAN.md
+last_updated: "2026-11-12T01:27:04.930Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 99e29839c57543bad8543a7d0187be125fd66711
+state_head: 85612e43bfc0501c60b338a0ce2d969b67cb641c
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 44
+  completed_plans: 45
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 13 of 31
+Plan: 14 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -128,11 +128,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P10 | 46min | 3 tasks | 24 files |
 | Phase 23 P11 | 32min | 3 tasks | 16 files |
 | Phase 23 P12 | 75min | 3 tasks | 17 files |
+| Phase 23 P13 | 39min | 3 tasks | 17 files |
 
 ## Session
 
-**Last session:** 2026-11-12T00:32:54.932Z
-**Stopped at:** Completed 23-12-PLAN.md
+**Last session:** 2026-11-12T01:27:04.557Z
+**Stopped at:** Completed 23-13-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -277,3 +278,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-12: AUD-ANTIRUG-002, AUD-API-008, AUD-TX-009 and AUD-BUY-005 (all S1) confirmed as real process deaths: each fixture is a railed child (spawnRailedChild 'node -r ts-node/register/transpile-only') that loads src/main and src/bot, builds the context with the real buildChainRegistry and createChainContext, and reaches the fault only through the src path the finding names, on its own loopback chain (test/realpath/triage/fixtures/loopbackChain.ts). 7 knownBug claims; every claim reads looks fixed under its own fix-shaped src mutation and a cross-file batch shows each flips only its own claims. 23-16 must acknowledge all four.
 - [Phase 23]: 23-12 Phase 24 readings (measured contained cases): a process-level handler alone keeps the process up but is not a fix for AUD-ANTIRUG-002 (the failed socket never emits 'close', stuck CLOSING, and each reconnect loop has already logged success, so anti-rug and the DEX listeners stay silently disconnected after the endpoint returns) or AUD-API-008 (the malformed request is never answered or closed, one leaked socket per request); for AUD-TX-009 and AUD-BUY-005 it does recover (the Flashbots library re-checks on the next block; the listener keeps dispatching). AUD-BUY-005 is proven at one trigger (the V3 WS listener with ETH_MIN_LIQUIDITY=abc); its other un-awaited sites are not separately exercised.
 - [Phase 23]: 23-12 for later plans: test/realpath/triage/fixtures/loopbackChain.ts is a standalone loopback node + Flashbots relay (HTTP) and a separately closable real ws port for railed children (unknown method or unanswered eth_call = FIXTURE_SETUP_ERROR exit 3; dropSockets/reopenWs; nonce = mined txs), with the shared crash-fixture contract (installContainment, finishAlive heartbeat, markers); fixtures/crashRun.ts classifies a child into survived, survived-work-pending, process-exited, signal-terminated, timeout or setup-error and checks its case ledger loopback-only. A WebSocketProvider given its chain ID sends nothing until asked, so a reconnect is judged by an open connection, not an answered request.
+- [Phase 23]: 23-13: AUD-DB-006 (open half, AC-14), AUD-SCRIPTS-001, AUD-SCRIPTS-002 (S1), AUD-BUY-007 (S1) and AUD-DB-005 confirmed (test/realpath/triage/<ID>.test.ts, 5 knownBug claims; every claim reads looks fixed under its own fix-shaped src/ or scripts/ mutation and a cross-file batch shows each flips only its own claim). AC-14: a railed child (VITEST unset, temp DB_PATH, throwaway cwd) that only imports src/utils/db commits one WAL frame (the unconditional PRAGMA user_version = 7 at the end of migrateSchema), seen through data_version on a held connection and a main-plus-WAL hash; the main file alone does not change until a checkpoint; a pragmas-only control commits nothing. AUD-SCRIPTS-002: a tryAcquireThenRelease query alone reads "the failure changed", never fixed; card SCRIPTS-01 stays open. 23-16 must acknowledge AUD-SCRIPTS-002 and AUD-BUY-007; 23-17's census exceptions are AUD-BUY-007's one src site and AUD-SCRIPTS-002's 12 script sites.
+- [Phase 23]: 23-13 new finding under the standing instruction (no stop): AUD-TESTI-029 (S3, capital none, confirmed, C12): a realpath test that times out is not stopped; Vitest tears the scenario down while its async body keeps stepping the fake clock, so the body drives its torn-down scenario into the next test of the file (forced-timeout run: the next test failed on a second exit-ratio entry; full run: an unhandled eth_subscribe cancellation attributed to the next test). Fix in Phase 28 or through the Harness Gap Procedure. Until then any realpath test above half its limit under the full run needs an explicit limit (23-13 gave AUD-EXIT-003 probe-is-eth-buy-wei-as-token-amount 60 s: 1.3 to 1.8 s alone, timed out at 15 s under load).
+- [Phase 23]: 23-13 for later plans: test/realpath/triage/fixtures/scriptsStatic.ts builds ts.createProgram from a directory walk (the AC-37 form 23-19 accepts) and mirrors the census's type predicates (its 12 script sites match signing-sites-head.json; it does not trace contracts passed as parameters, so 3 src allowance view calls count) with a lock-lifetime and pause-read classifier proven on 14 temp-directory cases. Child fixtures that run outside Vitest from a throwaway cwd start as process.execPath <ts-node bin> --transpile-only <absolute fixture> (-r ts-node/register does not resolve from a temp cwd). check-realpath-mocks treats any free identifier named vitest as the Vitest global (fail closed): never name a local vitest in test/realpath.
