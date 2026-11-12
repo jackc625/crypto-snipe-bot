@@ -74,15 +74,23 @@ describe('AC-02 real-path mock-list gate', () => {
         for (const file of allow.byPath.keys()) expect(fs.statSync(file).isFile()).toBe(true);
     });
 
-    it('passes the real test/realpath folder, and the scan saw the harness mocks in setup.ts', () => {
-        const files = collectRealpathFiles(REALPATH_ROOT);
-        expect(files.map((f) => posix(path.relative(REPO_ROOT, f)))).toContain('test/realpath/harness/setup.ts');
-        const result = checkRealpathMocks(files);
-        expect(result.violations).toEqual([]);
-        // logger, notifier, broadcaster, axios, telegram, telegram/sessions, telegram/events.
-        expect(result.mockCalls).toBeGreaterThanOrEqual(7);
-        expect(result.viUses).toBeGreaterThan(result.mockCalls);
-    });
+    // The scan type-checks every file under test/realpath, so its time grows with that folder.
+    // Measured on Node 22 (plan 23-12, 84 files): 1.3 to 1.5 s alone, 5.5 s under the full
+    // parallel npm test (over the unit project's 5 s default once 23-12's crash fixtures joined
+    // the folder and its child processes loaded the run). The explicit limit is headroom.
+    it(
+        'passes the real test/realpath folder, and the scan saw the harness mocks in setup.ts',
+        () => {
+            const files = collectRealpathFiles(REALPATH_ROOT);
+            expect(files.map((f) => posix(path.relative(REPO_ROOT, f)))).toContain('test/realpath/harness/setup.ts');
+            const result = checkRealpathMocks(files);
+            expect(result.violations).toEqual([]);
+            // logger, notifier, broadcaster, axios, telegram, telegram/sessions, telegram/events.
+            expect(result.mockCalls).toBeGreaterThanOrEqual(7);
+            expect(result.viUses).toBeGreaterThan(result.mockCalls);
+        },
+        20_000,
+    );
 
     it('exits 2 on bad arguments and on an empty folder, never 0', () => {
         const quiet = { out: (): void => {}, err: (): void => {} };

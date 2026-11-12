@@ -189,7 +189,10 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         expect(exitTriggers(fromLog)).toEqual([]);
     });
 
-    it('zero-entry-nan-ratio-fires-stop-loss: a 0 first quote and an unchanged pool read NaN, and the stop-loss sells the whole position on the first tick', async (ctx) => {
+    // Measured on Node 22 (plan 23-12): 2.1 s alone, 10.2 s under the full parallel npm test once
+    // 23-12's crash-fixture child processes joined the run (the realpath default is 15 s). The
+    // explicit limit is headroom; nothing in the test changed.
+    it('zero-entry-nan-ratio-fires-stop-loss: a 0 first quote and an unchanged pool read NaN, and the stop-loss sells the whole position on the first tick', { timeout: 60_000 }, async (ctx) => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_SNIPE_AMOUNT: '0.001' } });
         const pollMs = sc.graph.exitEngine.exitConfig.pollIntervalMs;
         highSupplyPool(sc);
