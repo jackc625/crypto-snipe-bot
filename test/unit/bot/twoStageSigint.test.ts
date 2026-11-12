@@ -182,7 +182,7 @@ describe('Two-stage SIGINT — single force-exit path (Test 4)', () => {
             const timersBefore = vi.getTimerCount();
             addedSigint[0]('SIGINT');
             expect(apiServerCloseSpy).toHaveBeenCalledTimes(1);
-            expect(exitSpy.mock.calls.filter(([code]) => code !== 0), 'forced exits on the first signal').toEqual([]);
+            expect(exitSpy.mock.calls.filter((call: unknown[]) => call[0] !== 0), 'forced exits on the first signal').toEqual([]);
             expect(vi.getTimerCount(), 'timers after the first signal').toBe(timersBefore + 1);
 
             // The armed timer fires at SIGINT_GRACE_MS (1234 ms), not before.
