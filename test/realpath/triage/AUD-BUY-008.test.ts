@@ -1,6 +1,7 @@
 // test/realpath/triage/AUD-BUY-008.test.ts
 // Phase 23 plan 23-10 Task 2 (AUDIT-02, AC-12): AUD-BUY-008 (RC-20), a dashboard restart stacks a
-// second reconnect loop per DEX on the chain's WebSocket.
+// second reconnect loop per DEX on the chain's WebSocket. Plan 23-32 moved both tests to a real
+// in-process boot, so Start runs the bot's real onRestart.
 //
 // The sites (src/bot.ts startDexListener): each call subscribes the DEX's factory listener and adds
 // its own close handler on the provider's raw socket (handleWsClose for V2, handleWsCloseV3 for
@@ -10,15 +11,22 @@
 // raw-socket close handlers, and Start runs onRestart, which keeps the live provider and calls
 // startDexListener again for every DEX: one more close handler each, on the same socket.
 //
-// Proof on the real path, with the order forced by a real socket drop and fake time (AC-12): the
-// real listeners for every DEX of the ETH chain, as boot step 4 starts them
-// (fixtures/AUD-API-002-restart.ts bootListeners); the real dashboard (real login, real Stop and
-// Start routes over loopback, the Start callback a source-pinned mirror of the private src/bot.ts
-// onRestart, which fails by name if that closure changes); then the fake node closes the socket
-// from its side (node.dropSocket(), code 1006) and the fake clock runs 10 s, ten times the 1 s
-// reconnect delay. Measured: how many reconnect loops ran for the uniswap-v2 DEX (each logs
-// "WebSocket reconnected, re-subscribed to PairCreated" with its DEX name). The control shows the
-// same drop without a restart reconnecting each DEX once.
+// Proof on the real path, with the order forced by a real socket drop and fake time (AC-12): a
+// real in-process startMultiChainBot on the fake chain (fixtures/AUD-API-002-restart.ts
+// withRealBoot, plan 23-24's recipe), which starts the real listeners for every DEX of the ETH
+// chain (boot step 4) and the real dashboard API with the bot's own onRestart; the booted bot's
+// dashboard (real login, real Stop and Start routes over loopback; Start runs the real onRestart,
+// the private closure inside startMultiChainBot); then the fake node closes the socket from its
+// side (node.dropSocket(), code 1006) and the fake clock runs 10 s, ten times the 1 s reconnect
+// delay. Measured: how many reconnect loops ran for the uniswap-v2 DEX (each logs "WebSocket
+// reconnected, re-subscribed to PairCreated" with its DEX name). The control boots the same way
+// and shows the same drop without a restart reconnecting each DEX once. Each test ends through
+// the real SIGINT listener the boot added (operator decision 1A, plan 23-24).
+//
+// The boot also arms the anti-rug WebSocket lifecycle with no position (its own close handler on
+// the same socket), so the drop also runs the anti-rug reconnect loop. Its lines carry no DEX name
+// and its alert has another text, so it is in neither count below; where its provider ends up is
+// AUD-ANTIRUG-001's claim.
 //
 // What two loops do next (each re-subscribes the factory listener, so every later PairCreated
 // reaches the handler twice and AUD-BUY-004 lets both handlers buy) is not asserted here: the
@@ -35,8 +43,7 @@ import { describe, expect, it } from 'vitest';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
-import { dashboardOverrides } from './fixtures/AUD-API-001-dashboard-sell';
-import { bootListeners, chainRoute, openDashboardWithRestart } from './fixtures/AUD-API-002-restart';
+import { BOOT_OVERRIDES, chainRoute, deployBootContracts, withRealBoot } from './fixtures/AUD-API-002-restart';
 
 const RECONNECTED = ['WebSocket reconnected, re-subscribed to PairCreated', 'WebSocket reconnected, re-subscribed to V3 PoolCreated'];
 
@@ -61,42 +68,45 @@ async function dropAndWait(sc: Scenario): Promise<number> {
 
 describe('AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX on the same socket', () => {
     it('control: without a restart, one socket close reconnects each DEX once', async () => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
-        await bootListeners(sc);
-        const from = await dropAndWait(sc);
-        for (const dex of sc.ctx.chain.dexes) {
-            expect(reconnects(dex.name, from)).toBe(1);
-            expect(factorySubscriptions(sc, dex.factoryAddress)).toBe(1);
-        }
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
+        deployBootContracts(sc);
+        await withRealBoot(sc, async () => {
+            const from = await dropAndWait(sc);
+            for (const dex of sc.ctx.chain.dexes) {
+                expect(reconnects(dex.name, from)).toBe(1);
+                expect(factorySubscriptions(sc, dex.factoryAddress)).toBe(1);
+            }
+        });
     });
 
     it('restart-stacks-reconnect-loop: after a dashboard Stop and Start on a connected socket, one socket close runs two reconnect loops for the DEX', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: await dashboardOverrides() });
-        await bootListeners(sc);
-        const { dash, cookie } = await openDashboardWithRestart(sc);
-        expect(await chainRoute(dash, cookie, 'eth', 'stop')).toEqual({ ok: true, chain: 'eth', status: 'stopped' });
-        expect(await chainRoute(dash, cookie, 'eth', 'start')).toEqual({ ok: true, chain: 'eth', status: 'running', warnings: [] });
-        // Start re-attached each factory listener on the still-connected socket (bug and fix alike).
-        for (const dex of sc.ctx.chain.dexes) await stepUntilTrue(() => factorySubscriptions(sc, dex.factoryAddress) === 1, { what: `the ${dex.name} factory listener after Start` });
-        const alertsBefore = recordedAlerts().length;
-        const from = await dropAndWait(sc);
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: BOOT_OVERRIDES });
+        deployBootContracts(sc);
+        await withRealBoot(sc, async ({ dash, cookie }) => {
+            expect(await chainRoute(dash, cookie, 'eth', 'stop')).toEqual({ ok: true, chain: 'eth', status: 'stopped' });
+            expect(await chainRoute(dash, cookie, 'eth', 'start')).toEqual({ ok: true, chain: 'eth', status: 'running', warnings: [] });
+            // Start re-attached each factory listener on the still-connected socket (bug and fix alike).
+            for (const dex of sc.ctx.chain.dexes) await stepUntilTrue(() => factorySubscriptions(sc, dex.factoryAddress) === 1, { what: `the ${dex.name} factory listener after Start` });
+            const alertsBefore = recordedAlerts().length;
+            const from = await dropAndWait(sc);
 
-        knownBug(ctx, 'AUD-BUY-008', {
-            claim: 'restart-stacks-reconnect-loop',
-            correct: { reconnectLoopsForOneClose: 1 },
-            observed: { reconnectLoopsForOneClose: 2 },
-            actual: { reconnectLoopsForOneClose: reconnects(sc.dex.name, from) },
-            expectedPlain: 'After a dashboard Stop and Start, one WebSocket close reconnects each DEX listener once.',
-            actualPlain: 'After a dashboard Stop and Start, one WebSocket close ran two reconnect loops for the DEX, each building its own provider and re-subscribing the factory listener there.',
+            knownBug(ctx, 'AUD-BUY-008', {
+                claim: 'restart-stacks-reconnect-loop',
+                correct: { reconnectLoopsForOneClose: 1 },
+                observed: { reconnectLoopsForOneClose: 2 },
+                actual: { reconnectLoopsForOneClose: reconnects(sc.dex.name, from) },
+                expectedPlain: 'After a dashboard Stop and Start, one WebSocket close reconnects each DEX listener once.',
+                actualPlain: 'After a dashboard Stop and Start, one WebSocket close ran two reconnect loops for the DEX, each building its own provider and re-subscribing the factory listener there.',
+            });
+            // Bug details, after the marker: every DEX of the chain got the second loop, and each loop
+            // sent its own disconnect alert. (Where the two loops put the listener is not asserted: today
+            // each builds its own provider, so the node holds two factory subscriptions; under the
+            // single-provider shape of AUD-ANTIRUG-001's fix both would sit on one provider, still twice.)
+            for (const dex of sc.ctx.chain.dexes) expect(reconnects(dex.name, from)).toBe(2);
+            const disconnectAlerts = recordedAlerts()
+                .slice(alertsBefore)
+                .filter((a) => a.message === `WebSocket disconnected for ${sc.dex.name}, reconnecting...`);
+            expect(disconnectAlerts).toHaveLength(2);
         });
-        // Bug details, after the marker: every DEX of the chain got the second loop, and each loop
-        // sent its own disconnect alert. (Where the two loops put the listener is not asserted: today
-        // each builds its own provider, so the node holds two factory subscriptions; under the
-        // single-provider shape of AUD-ANTIRUG-001's fix both would sit on one provider, still twice.)
-        for (const dex of sc.ctx.chain.dexes) expect(reconnects(dex.name, from)).toBe(2);
-        const disconnectAlerts = recordedAlerts()
-            .slice(alertsBefore)
-            .filter((a) => a.message === `WebSocket disconnected for ${sc.dex.name}, reconnecting...`);
-        expect(disconnectAlerts).toHaveLength(2);
     });
 });

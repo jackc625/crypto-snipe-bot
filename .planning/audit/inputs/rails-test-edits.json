@@ -578,6 +578,18 @@
       "found_in_plan": "23-19",
       "title_before": "(e) static: each of the five sites loads dotenv only under the VITEST gate",
       "title_after": "(e) each of the five sites loads dotenv only under the VITEST gate: run as a railed child with VITEST set, each makes zero .env read attempts"
+    },
+    {
+      "file": "test/realpath/triage/AUD-API-002.test.ts",
+      "test": "start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the real onRestart of an in-process boot), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated",
+      "it_count_before": 2,
+      "it_count_after": 2,
+      "change": "Title names the real path instead of the mirror (the last title level only; the describe title is unchanged). Both tests of the file now run on a real in-process startMultiChainBot on the fake chain (test/realpath/triage/fixtures/AUD-API-002-restart.ts withRealBoot, plan 23-24's boot recipe): the bot's own dashboard API, the real login and the real Stop and Start routes, so Start runs the bot's real onRestart, the private closure inside startMultiChainBot, instead of the source-pinned mirror (onRestartMirror, assertOnRestartUnchanged and ON_RESTART_SHA256 are removed). Claim, knownBug ID, correct and observed values, and every assertion are unchanged; each test also ends through the boot's real SIGINT listener, pinned to how far the cleanup gets today (operator decision 1A at 23-24).",
+      "reason": "Operator ruling 2026-11-12 (\"Fix it now\", plan 23-32): plan 23-24 showed the real bot boots in a test on the fake chain, so the restart triage tests reach the real onRestart and the AC-37 allow-list exception for the fixture is removed. Re-proven: a Stop that keeps anti-rug reads looks fixed on both claims, an onRestart that re-arms anti-rug reads looks fixed on this one (fix-shaped src mutations, restored byte for byte).",
+      "register_as": "test-quality",
+      "found_in_plan": "23-32",
+      "title_before": "start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the pinned onRestart mirror), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated",
+      "title_after": "start-does-not-rearm-antirug: after the real Stop and Start routes (Start running the real onRestart of an in-process boot), the node still holds no anti-rug subscription for the pair and a liquidity pull is never evaluated"
     }
   ]
 }
