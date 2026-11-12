@@ -19,8 +19,9 @@
 //                 marker) is not a class: it throws, naming what is wrong.
 //   actualOf(r, signalText)  the knownBug `actual`: { outcome, exited, code, stderrSignal }, where
 //                 exited is true when FIXTURE_SURVIVED is absent, code is the child's status, and
-//                 stderrSignal is `signalText` when a stderr line contains it, else '' (cut to that
-//                 text, so ports and library versions cannot change it).
+//                 stderrSignal is `signalText` when the process ended and a stderr line contains it,
+//                 else '' (cut to that text, so ports and library versions cannot change it; a
+//                 surviving process's stderr is logging, not a death report).
 //   CORRECT       { outcome 'survived', exited false, code 0, stderrSignal '' } for every finding.
 //   expectRailedLoopbackOnly(runId)  the child's own case ledger: the rails started, every
 //                 network use was loopback, nothing was denied or tripped.
@@ -84,7 +85,11 @@ export function stderrSignal(r: CliResult, signalText: string): string {
 }
 
 export function actualOf(r: CliResult, signalText: string): CrashActual {
-    return { outcome: classify(r), exited: !hasMarker(r, 'FIXTURE_SURVIVED'), code: r.status, stderrSignal: stderrSignal(r, signalText) };
+    const exited = !hasMarker(r, 'FIXTURE_SURVIVED');
+    // The signal is the death report, so it is read only when the process ended: a process that
+    // survived may log the same error text to stderr (a fix that catches and logs it), and that is
+    // not a crash (measured: a handler printing the caught error made a surviving run "changed").
+    return { outcome: classify(r), exited, code: r.status, stderrSignal: exited ? stderrSignal(r, signalText) : '' };
 }
 
 export function describeRun(r: CliResult): string {
