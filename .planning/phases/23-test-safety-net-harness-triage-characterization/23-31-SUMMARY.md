@@ -405,7 +405,7 @@ None.
 
 - **Files found:** test/integration/fixtures/loadedModulesProbe.ts, test/helpers/sourceGraph.ts, the four converted test files, scripts/red-proof-conversions.ts.
 - **Commits on this branch:** 61e51da, fd154bd, 12445c4, bab9121, da3cfa2, a0811f0. `git rev-list --count ee52acb..HEAD` = 6 before this SUMMARY.
-- **`--check-summaries` on this SUMMARY and 23-18's:** run before the commit; result below.
+- **`--check-summaries` on this SUMMARY and 23-18's:** SUMMARIES-OK red-ok 39 removed 0 (23-18's 10 lines and this plan's 29), run before the SUMMARY commit.
 - **Clean tree:** only the operator's own `.planning/config.json` and `.planning/state.json` changes remain, modified and unstaged.
 
 ---

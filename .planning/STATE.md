@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-18-PLAN.md
-last_updated: "2026-11-12T05:40:40.954Z"
+stopped_at: Completed 23-31-PLAN.md
+last_updated: "2026-11-12T06:46:49.465Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 6be6d7960ca7dbf1763c21bc4cbc97746fdbc86b
+state_head: 7eb5e5645ef58ba2ca852af155cd30185089715c
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 50
+  completed_plans: 51
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 19 of 31
+Plan: 20 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -136,11 +136,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P17 | 29min | 3 tasks | 5 files |
 | Phase 23 P29 | 28min | 3 tasks | 3 files |
 | Phase 23 P18 | 16min | 2 tasks | 4 files |
+| Phase 23 P31 | 52min | 3 tasks | 12 files |
 
 ## Session
 
-**Last session:** 2026-11-12T05:40:40.598Z
-**Stopped at:** Completed 23-18-PLAN.md
+**Last session:** 2026-11-12T06:46:49.067Z
+**Stopped at:** Completed 23-31-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -305,3 +306,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-18: test/integration/anti-rug/botWiring.test.ts converted (CHAR-06), no source file read: Tests 22-26 drive the real exported handleNewPairForChain, executeDeliberateBuy, handleNewV3PoolForChain and startMultiChainBot separately and read the arming order (startExitMonitor, snapshotLpBaseline, registerAntiRugPosition) from mock.invocationCallOrder; the private armPositionMonitoring is reached through its two real callers (no export added, src unchanged). Test 31 runs the real getResumeAntiRugTrades on its real connection through vi.importActual on a seeded temp DB. RED proof scripts/red-proof-bot-wiring.ts: the 7 WIRING_MUTANTS (v2-arm-order, v2-exit-monitor-last, deliberate-not-armed, v3-arm-order, v3-fee-tier-dropped, boot-resume-order, resume-query-includes-unbaselined) each fail exactly the planned Test NN set with assertion failures, control 10/10, src hashes unchanged; --check-manifest MANIFEST-OK rows 6 files 1 guards 0.
 - [Phase 23]: 23-18 for 23-31, 23-30, 23-19 and 23-26: .planning/audit/tools/test-identity.ts honours a rails-test-edits.json rename of the last title level only (compareFile keeps every describe level), so renaming a describe reports every test under it as missing. 23-18 kept the describe 'Source-text wiring guards (Tests 22-26)' (comment in the test file; open deferred-items.md entry for Phase 28). No title changed, no test removed (10 it() before and after), rails-test-edits.json unchanged. FORBIDDEN_IN_MESSAGE is now exported from scripts/red-proof-conversions.ts; the wiring script also requires the vite reach marker and that every test of the file ran.
 - [Phase 23]: 23-18 gates: full railed npm test on Node 22 (54e293b tree): 199 files, 1396/1396, wall 166 s, nonLoopbackAllowed 0, telegramAllowed 0; slowest botWiring test 131 ms of 15 s (its first src/bot import now runs in beforeAll, off the deferred cold-import list). tsc clean x3; check:realpath-mocks 0, check:vi-mock 593 calls 0 violations, check:census 0 problems; check.ts partial, consolidation and triage PASS with no re_audit rows needed; no new finding, no severity change.
+- [Phase 23]: 23-31: test/integration/preflightCli.test.ts, pauseCli.test.ts, processLock.test.ts and test/unit/mainEntry.test.ts read no named src/ or scripts/ file (CHAR-06). Modules are found by the symbol they export in a directory walk (startMultiChainBot, runMain, acquireProcessLock, refuseIfDirectEntry; test/helpers/sourceGraph.ts, ts.createProgram) and loaded in railed children under test/integration/fixtures/loadedModulesProbe.ts, which records only the repo modules a load added to require.cache. pauseCli runs pause.ts and resume.ts as railed children against closed loopback ports or a loopback dashboard answering 401; the AC-23d scan is its own import-graph test (processLock 7 it() to 8; every existing title, AUD-TX-005's rail test and marker unchanged). 5 own-title renames recorded in rails-test-edits.json, test-identity 0 missing; no test removed (no AC-38 removed line).
+- [Phase 23]: 23-31 RED proofs: groups cli-preflight (1), cli-pause (12, reach child), cli-lock (5, reach worker), cli-entry (9) all RED-OK, three rounds byte-identical; GUARD_MUTANTS row main-starts-before-lock keeps test (4)'s old lock-before-start reading on test (1) (only = (1); it also fails (2) and (3), measured). --check-manifest MANIFEST-OK rows 23 files 5 guards 1 (23-30 needs 32/8/1, 23-26 36/11/1). The probe's computed require is on spawnSites.test.ts COMPUTED_REQUIRE_FILES beside the SAFE-03 probe, and the probe refuses any target that is not a .ts module under src/ or scripts/; 23-19's AST gate must accept ts.createProgram over a directory walk and reads of a temp load record or package.json.
+- [Phase 23]: 23-31 gates: full railed npm test on Node 22 (da3cfa2 tree): 199 files, 1397/1397, wall 178 s, unit 946 integration 264 realpath 187, nonLoopbackAllowed 0, telegramAllowed 0 (the first run failed only the spawn-site gate on the probe's computed require, fixed in bab9121). No test near half its limit (AC-23d 42 s of 300 s). tsc clean x3; check:realpath-mocks 0, check:vi-mock 593 calls 0, check:census 0 problems; check.ts partial, consolidation and triage PASS after reviewed re_audit rows for processLock.test.ts, mainEntry.test.ts and spawnSites.test.ts (a0811f0); --stage final 118 FAILs, 4 new (ledger rows for the 2 new test files, re_audit for pauseCli and preflightCli), the out-of-scope bookkeeping kind. No new finding, no severity change.

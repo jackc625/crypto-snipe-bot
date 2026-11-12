@@ -225,7 +225,7 @@ Plans:
 **Conventions**: D-STOP-THE-LINE (confirmed S0/S1 is re-surfaced immediately, and so is any confirmation that falsifies a scoping premise; characterization that exposes a new one is tagged `SUSPECT`); D-NONCE-AUTHORITY-ALL (nonce candidates #10, #11, and #17 are triaged on the real `withNonceLock`; the census becomes the standing proof); D-TEST-BOTH (no hollow REDs).
 **Operator decisions**: None needed to start. Triage evidence informs the OD-6, OD-11, and OD-14 to OD-18 rulings. The intent-row half of OD-18 depends on whether candidate #14 is confirmed.
 **Research flag**: Yes (fake JSON-RPC transport harness design, env-matrix snapshot design, AST tooling for the signing census).
-**Plans**: 21/31 plans executed in 15 execution waves
+**Plans**: 22/31 plans executed in 15 execution waves
 
 Plans:
 **Wave 1**
@@ -277,7 +277,7 @@ Plans:
 **Wave 8**
 - [x] 23-18-PLAN.md — Source-text conversion, part 1 of 4: bot wiring test
 **Wave 9**
-- [ ] 23-31-PLAN.md — Source-text conversion, part 2 of 4: CLI, lock and entry-point tests
+- [x] 23-31-PLAN.md — Source-text conversion, part 2 of 4: CLI, lock and entry-point tests
 **Wave 10**
 - [ ] 23-30-PLAN.md — Source-text conversion, part 3 of 4: anti-rug and config tests
 **Wave 11**
@@ -602,7 +602,7 @@ Undecided behavior-changing items default to "keep current behavior", per the mi
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 22. Safety Rails & Audit | 29/29 | Complete | 2026-11-09 |
-| 23. Test Safety Net (Harness, Triage, Characterization) | 21/31 | In Progress | - |
+| 23. Test Safety Net (Harness, Triage, Characterization) | 22/31 | In Progress | - |
 | 24. Capital-Safety Fixes | 0/TBD | Not started | - |
 | 25. Behavior-Neutral Cleanup & Dependencies | 0/TBD | Not started | - |
 | 26. Toolchain & ESM | 0/TBD | Not started | - |
