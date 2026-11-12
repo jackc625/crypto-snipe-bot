@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-22-PLAN.md
-last_updated: "2026-11-12T17:18:41.915Z"
+stopped_at: Completed 23-23-PLAN.md
+last_updated: "2026-11-12T18:01:07.260Z"
 last_activity: 2026-11-12
 last_activity_desc: Phase 23 execution started
-state_head: 4b2455b55a11c5794d364707689e592ceb5c3346
+state_head: ad9961bcd5dbec57877c004cf4ecf6269f1fbc1c
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 56
+  completed_plans: 57
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 23 of 31
+Plan: 24 of 31
 Status: Ready to execute
 Last activity: 2026-11-12 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -142,11 +142,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P20 | 42min | 3 tasks | 12 files |
 | Phase 23 P21 | 22min | 2 tasks | 6 files |
 | Phase 23 P22 | 43min | 2 tasks | 22 files |
+| Phase 23 P23 | 37min | 2 tasks | 110 files |
 
 ## Session
 
-**Last session:** 2026-11-12T17:18:41.449Z
-**Stopped at:** Completed 23-22-PLAN.md
+**Last session:** 2026-11-12T18:01:06.893Z
+**Stopped at:** Completed 23-23-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -331,3 +332,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-22: twelve recordings committed once each (bloxroute-v2-buy, -v3-buy, -full-sell, public-v2-buy, public-v3-buy, public-full-sell in 958f5df; risk-gate-refused, fee-gas-eth-v2, -reserve-below, -reserve-at, -reserve-above, fee-gas-eth-v2-legacy in 77e4175). Only risk-gate-refused is KEEP (two rows seeded through the real insertTrade under MAX_OPEN_POSITIONS 2, refused with max_positions before the safety bank, then {"submitted":[]}). bsc and base run at their own block time in a file-local driveBlocks (BSC 0.75 s, Base 2 s) that lands bloXroute-accepted transactions (driver.ts driveSlots cannot); route proofs: the checker read, the signed tx hash equal to the route's answer and the stored hash, mined in node.history, the receipt read, and on the public route the row only after the three tx.wait(3) confirmations. The reserve trio sits on the real clamp boundary (0.16 ETH at a 30 gwei base, 2 gwei priority and a 1 000 000-gas estimate so the entry gate passes); a moved boundary fails naming AUD-TX-007, -021 and -027. recordingsGuard.test.ts gained one AC-51 rule (bloXroute's bare-hex relayHash.txHash, only equal to the line's signedTxHash) and an AC-23 scope fix (not-sorted needs a submission or 3+ lines of 2+ kinds; every recording keeps time order).
 - [Phase 23]: 23-22 registered two findings under the operator's standing instruction of 2026-11-11 ("All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading"), no stop: AUD-TX-030 (S4, capital none) the Flashbots legacy-fee branch (flashbots.ts:213-216 at 23a6461) sends the raw gasPrice and drops the helper's clamped fee, the CR-01 bypass passthrough and bloXroute removed (unreachable on ETH today); AUD-BUY-037 (S4, capital none) emitSnipeFailClean is fixed inclusion-exhausted text (attempts 4, a Flashbots statsRef, a raise-the-ceiling remediation) whatever ended the snipe, an affordability refusal before any submit included. Both confirmed with real-path recordings (fee-gas-eth-v2-legacy line 4; reserve-below and -at line 3) and named "looks fixed" signals proven by fix-shaped src mutations (restored identical); ledger rows, sweep contribution, AUDIT-FINDINGS.md re-rendered.
 - [Phase 23]: 23-22 gates: full railed npm test on Node 22 twice: Task 1 tree 204 files 1430/1430 wall 181 s (run-20261112T165002-13604-eb67a9), final tree 205 files 1436/1436 wall 192 s (run-20261112T170854-6236-3f9a87), both nonLoopbackAllowed 0, telegramAllowed 0, every recording byte-identical; this plan's slowest test 1.87 s of 15 s; backupState self-check 52.2 / 59.5 s of 120 s (43 / 50 percent, watch item). Three normal runs identical (25 tests, same digest). tsc clean x3 and scratch over test/realpath/**; check:realpath-mocks 0, check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS; --stage final 155 FAILs, 14 from this plan (TESTI rows for the 12 recordings and 2 scenario files, the out-of-scope bookkeeping kind). New deferred item: the harness launch helpers cannot launch on a legacy-fee node (23-22 used a file-local type-0 launch).
+- [Phase 23]: 23-23 env-matrix contract (CHAR-03, AC-27..29, Amendment A-1): test/realpath/env/envMatrix.test.ts finds the config module, the chain registry and the risk gate by exported symbol (CONFIG, buildChainRegistry, canSnipe) in a src/ walk; the variable list (107 names: 106 varied in the worker plus VITEST) is the AST inventory of process.env literals unioned with a caller-frame-filtered process.env Proxy recorder, settled in rounds, and a full in-memory pass of all five values of every variable added no name before _baseline.json was first committed (e6d73b5). Each case resets modules, installs vi.spyOn(process, 'exit') for that case, evaluates config, registry and risk in their own try (the registry imports config through src/utils/provider.ts, so a config exit is re-raised there and recorded from: 'config'), restores env, spy and closeDb in a finally, and asserts its reads are a subset of the baseline env keys. The five risk limits are five real canSnipe probes, one tripping state each (MAX_OPEN_POSITIONS uses ten pending buys, not the plan's three, because test/.env.test's valid limit is 10). Files: _baseline.json {about, env, outcome} plus one <VAR>.json per variable holding only the fields that differ from the live baseline at the same path ({"$absent":true}, arrays whole, {} unchanged), keys sorted, pretty LF JSON; 108 files, each committed once (e6d73b5 and 392d317). Re-record with npm run recordings:update -- test/realpath/env/envMatrix.test.ts and commit a changed file as a behavior: commit citing a register ID (D-18); a first-time generation needs two update runs (baseline, then variable files).
+- [Phase 23]: 23-23 VITEST cases and the rails: VITEST's five values run as railed children (test/realpath/env/fixtures/vitestFlagChild.ts via spawnRailedChild, withVitestEnv false, cwd a new temp folder whose only .env is the one-line FAKE_ENV_PROBE_KEY file). dotenv resolves .env against the cwd, so the repo's .env is never attempted: each child's own case ledger is exactly [worker-start] (no env-read-blocked, no deny), and the test fails on any other entry. unset and '' load the fake file (dotenv "injecting env (1)"), 0, abc and true skip it. The orchestrator note expecting an env-read-blocked entry does not apply to this design (no read of a protected path happens); a blocked-read demonstration would need a child with cwd = repo root and VITEST unset, which was not run (SUMMARY section "Orchestrator Note Reconciled").
+- [Phase 23]: 23-23 gates: full railed npm test on Node 22 twice: Task 2 tree with a temporary beforeAll timing line 206 files 1545/1545 wall 185 s (run-20261112T174528-17736-71952c), committed tree 392d317 206 files 1545/1545 (unit 950, integration 264, realpath 331) wall 231 s (run-20261112T175357-8148-b619dd), both nonLoopbackAllowed 0, telegramAllowed 0, 0 unhandled, every env file byte-identical. Matrix file 15.4-17.6 s alone, 55.1 / 67.5 s under load; VITEST test 26.7 / 31.2 s of 120 s; beforeAll 1.1 s alone, 2.3 s under load (explicit 60 s); per-variable tests at most 0.70 s of 15 s. backupState self-check 59.0 / 69.5 s of 120 s (49 / 58 percent, within 23-21's range; the matrix adds a 55-68 s worker to the parallel run, watch item). Three normal runs identical (122 tests, digest f7a2096a). tsc clean x3 and scratch over test/realpath/**; check:realpath-mocks 0 (37 vi uses, 101 files), check:vi-mock 660 calls 0, check:census 23 sites 0 problems; MANIFEST-OK rows 36 files 11 guards 1; check.ts partial, consolidation and triage PASS; --stage final 265 FAILs, 110 from this plan (TESTI rows for the 110 new files, the out-of-scope bookkeeping kind). No finding registered or regraded.
