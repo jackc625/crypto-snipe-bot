@@ -5,16 +5,16 @@ milestone_name: Full Audit & Modernization
 current_phase: 23
 current_phase_name: Test Safety Net (Harness, Triage, Characterization)
 status: executing
-stopped_at: Completed 23-29-PLAN.md
-last_updated: "2026-11-12T05:08:00.763Z"
+stopped_at: Completed 23-18-PLAN.md
+last_updated: "2026-11-12T05:40:40.954Z"
 last_activity: 2026-11-11
 last_activity_desc: Phase 23 execution started
-state_head: 383713caf5fa33da1ae7fea7f86cb72f8f9ae015
+state_head: 6be6d7960ca7dbf1763c21bc4cbc97746fdbc86b
 progress:
   total_phases: 11
   completed_phases: 1
   total_plans: 60
-  completed_plans: 49
+  completed_plans: 50
   percent: 9
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 ## Current Position
 
 Phase: 23 (Test Safety Net (Harness, Triage, Characterization)) — EXECUTING
-Plan: 18 of 31
+Plan: 19 of 31
 Status: Ready to execute
 Last activity: 2026-11-11 — Phase 23 execution started
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
@@ -135,11 +135,12 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 | Phase 23 P16 | ~40min (wall-clock incl. operator wait; continuation 7min) | 3 tasks | 11 files |
 | Phase 23 P17 | 29min | 3 tasks | 5 files |
 | Phase 23 P29 | 28min | 3 tasks | 3 files |
+| Phase 23 P18 | 16min | 2 tasks | 4 files |
 
 ## Session
 
-**Last session:** 2026-11-12T05:07:32.536Z
-**Stopped at:** Completed 23-29-PLAN.md
+**Last session:** 2026-11-12T05:40:40.598Z
+**Stopped at:** Completed 23-18-PLAN.md
 **Resume file:** None
 
 ## Decisions
@@ -301,3 +302,6 @@ Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requi
 - [Phase 23]: 23-29 contract for 23-18, 23-31, 23-30 and 23-19: a row's `only` is passed as -t and Vitest reads it with new RegExp, so escape ( ) [ ] . * + ? in titles (for example \(1\) starts the bot); an only that selects nothing is refused STAYED-GREEN with "no test was selected". Each failure message must start with AssertionError, contain messageIncludes, and mention none of Test timed out, SyntaxError, TSError, Unable to compile (else BAD-FAILURE). A file that fails outside any test is reported in failed as "<file error> <test file>". Edits apply in order (a later find sees earlier edits). WIRING_MUTANTS expected accepts '22', 'Test 22' or 'Test 22:'. Summary lines: RED-OK <mutant> :: <testFile> :: <title>, and AC-38 removed: <baseTitle> alone or followed by " — ", " - " or " (" and a reason.
 - [Phase 23]: 23-29 measured: in a Vitest worker require.main is undefined, so a mutant making isDirectEntry(x, undefined) true kills the test file at import (src/guards/directEntry.ts refuses through its own top-level call); mech-vite edits the canonical comparison to !== instead. mech-compile-error uses a type error (TS2352), not broken syntax, because a syntax error would also break Vite's load of the module in the worker and the child would never run (the child's TSError was confirmed outside Vitest). Root test.setupFiles run before each project's rails setup, so in a worker the rails wrap the overlay and still check every path first.
 - [Phase 23]: 23-29 gates: full railed npm test on Node 22 (acc6ccb tree): 199 files, 1396/1396, wall 160 s, nonLoopbackAllowed 0, telegramAllowed 0. tsc clean x3; check:realpath-mocks and check:vi-mock 0 violations; check.ts partial, consolidation and triage PASS with no re_audit rows needed; --stage final 112 FAILs, 3 new (ledger/SCRIPTS.json rows for the three new files, the out-of-scope bookkeeping kind). No finding registered or regraded.
+- [Phase 23]: 23-18: test/integration/anti-rug/botWiring.test.ts converted (CHAR-06), no source file read: Tests 22-26 drive the real exported handleNewPairForChain, executeDeliberateBuy, handleNewV3PoolForChain and startMultiChainBot separately and read the arming order (startExitMonitor, snapshotLpBaseline, registerAntiRugPosition) from mock.invocationCallOrder; the private armPositionMonitoring is reached through its two real callers (no export added, src unchanged). Test 31 runs the real getResumeAntiRugTrades on its real connection through vi.importActual on a seeded temp DB. RED proof scripts/red-proof-bot-wiring.ts: the 7 WIRING_MUTANTS (v2-arm-order, v2-exit-monitor-last, deliberate-not-armed, v3-arm-order, v3-fee-tier-dropped, boot-resume-order, resume-query-includes-unbaselined) each fail exactly the planned Test NN set with assertion failures, control 10/10, src hashes unchanged; --check-manifest MANIFEST-OK rows 6 files 1 guards 0.
+- [Phase 23]: 23-18 for 23-31, 23-30, 23-19 and 23-26: .planning/audit/tools/test-identity.ts honours a rails-test-edits.json rename of the last title level only (compareFile keeps every describe level), so renaming a describe reports every test under it as missing. 23-18 kept the describe 'Source-text wiring guards (Tests 22-26)' (comment in the test file; open deferred-items.md entry for Phase 28). No title changed, no test removed (10 it() before and after), rails-test-edits.json unchanged. FORBIDDEN_IN_MESSAGE is now exported from scripts/red-proof-conversions.ts; the wiring script also requires the vite reach marker and that every test of the file ran.
+- [Phase 23]: 23-18 gates: full railed npm test on Node 22 (54e293b tree): 199 files, 1396/1396, wall 166 s, nonLoopbackAllowed 0, telegramAllowed 0; slowest botWiring test 131 ms of 15 s (its first src/bot import now runs in beforeAll, off the deferred cold-import list). tsc clean x3; check:realpath-mocks 0, check:vi-mock 593 calls 0 violations, check:census 0 problems; check.ts partial, consolidation and triage PASS with no re_audit rows needed; no new finding, no severity change.
