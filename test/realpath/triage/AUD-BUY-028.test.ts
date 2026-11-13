@@ -9,11 +9,17 @@
 // Proof on the real path: an ordinary V2 launch through the real listener and safety bank, with
 // the lock API answering in the provider's own shape, for this pair, an active lock of 1 percent
 // of the pair's LP supply (the scenario's own answer, its amount divided by 100; the rest stays
-// with the deployer). ETH asks Unicrypt, BSC asks Mudra; each is its own claim. Measured: whether
-// the bot bought. Correct: the gate refuses a lock that covers a sliver of the LP.
+// with the deployer). ETH asks Unicrypt, BSC asks Mudra; each is its own claim. Measured: the lock
+// gate's own decision (checks.locked on the bot's "Safety checks failed, skipping" line, or passed
+// when the bot bought, since a buy means every gate passed), whether every OTHER gate on that line
+// passed, and whether the bot bought. Correct: the lock gate refuses a lock that covers a sliver of
+// the LP, and it is the only gate that refuses. Reading only "did the bot buy" (review WR-14) let
+// any other gate refusing this ordinary launch read "looks fixed": a change to another check, or a
+// new read the scenario lacks that a gate treats fail-closed.
 //
 // Fix signal (D-08): requiring the active locks to cover at least half of the pair's LP supply
-// reads "looks fixed" for each provider (fix-shaped src mutations, restored).
+// reads "looks fixed" for each provider; another gate refusing (in-memory mutant: the max-tx /
+// max-wallet gate failing closed) reads "the failure changed" (in-memory mutants, review WR-14).
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
@@ -62,8 +68,16 @@ async function lockOnePercent(sc: Scenario<'v2'>, prefix: string, locksOf: (data
     return { full: fullAmount, answered: BigInt(String(after[0].amount)) };
 }
 
-/** Launch, let the bank decide, and return whether the bot bought. */
-async function launchAndDecide(sc: Scenario<'v2'>, lockUrl: string): Promise<{ buySubmitted: boolean }> {
+interface Decision {
+    /** The lock gate's decision: checks.locked on the refusal line, true when the bot bought, null when neither happened. */
+    lockGatePassed: boolean | null;
+    /** True when a refusal line exists and every gate on it other than the lock passed. */
+    otherGatesPassed: boolean | null;
+    buySubmitted: boolean;
+}
+
+/** Launch, let the bank decide, and return the lock gate's decision, the other gates' and whether the bot bought. */
+async function launchAndDecide(sc: Scenario<'v2'>, lockUrl: string): Promise<Decision> {
     const { node, dex } = sc;
     await sc.graph.bot.startDexListener(sc.ctx, dex, sc.registry);
     await stepUntilTrue(() => node.subscriptions.some((s) => s.kind === 'logs' && String((s.filter as { address?: string }).address).toLowerCase() === dex.factoryAddress.toLowerCase()), { what: 'the factory subscription' });
@@ -71,7 +85,13 @@ async function launchAndDecide(sc: Scenario<'v2'>, lockUrl: string): Promise<{ b
     await stepUntilOrFor(() => node.submitted.length > 0 || logged('Safety checks failed, skipping').length > 0, 60_000);
     // The lock API was asked about this pair (holds for the bug and for a fix).
     expect(harnessState().httpLog.some((h) => h.url.toLowerCase().startsWith(lockUrl))).toBe(true);
-    return { buySubmitted: node.submitted.length > 0 };
+    const buySubmitted = node.submitted.length > 0;
+    const failed = logged('Safety checks failed, skipping')[0] as { checks?: Record<string, unknown> } | undefined;
+    if (failed?.checks === undefined) return { lockGatePassed: buySubmitted ? true : null, otherGatesPassed: buySubmitted ? true : null, buySubmitted };
+    const c = failed.checks;
+    const otherGatesPassed =
+        c.isHoneypot === false && c.isBlacklisted === false && c.sufficientLiquidity === true && c.validMetadata === true && c.canSwap === true && c.hasLimits === false && c.mutable === false;
+    return { lockGatePassed: c.locked === true, otherGatesPassed, buySubmitted };
 }
 
 /** Land the buy and wait until it is armed, so teardown cancels nothing. */
@@ -96,9 +116,9 @@ describe('AUD-BUY-028: the lock gate passes on any active lock, whatever share o
         const result = await launchAndDecide(sc, `${UNICRYPT}${sc.pair.toLowerCase()}`);
         knownBug(ctx, 'AUD-BUY-028', {
             claim: 'unicrypt-one-percent-lock-passes',
-            correct: { lockedShareOfLpPct: 1, buySubmitted: false },
-            observed: { lockedShareOfLpPct: 1, buySubmitted: true },
-            actual: { lockedShareOfLpPct: 1, buySubmitted: result.buySubmitted },
+            correct: { lockedShareOfLpPct: 1, lockGatePassed: false, otherGatesPassed: true, buySubmitted: false },
+            observed: { lockedShareOfLpPct: 1, lockGatePassed: true, otherGatesPassed: true, buySubmitted: true },
+            actual: { lockedShareOfLpPct: 1, ...result },
             expectedPlain: 'A pair whose locked LP is only 1 percent of its supply fails the liquidity-lock gate: the other 99 percent can be pulled at any time.',
             actualPlain: 'Unicrypt reported one active lock covering 1 percent of the LP; the gate counted any active lock as locked, so every check passed and the bot bought.',
         });
@@ -114,9 +134,9 @@ describe('AUD-BUY-028: the lock gate passes on any active lock, whatever share o
         const result = await launchAndDecide(sc, `${MUDRA}${sc.pair.toLowerCase()}`);
         knownBug(ctx, 'AUD-BUY-028', {
             claim: 'mudra-one-percent-lock-passes',
-            correct: { lockedShareOfLpPct: 1, buySubmitted: false },
-            observed: { lockedShareOfLpPct: 1, buySubmitted: true },
-            actual: { lockedShareOfLpPct: 1, buySubmitted: result.buySubmitted },
+            correct: { lockedShareOfLpPct: 1, lockGatePassed: false, otherGatesPassed: true, buySubmitted: false },
+            observed: { lockedShareOfLpPct: 1, lockGatePassed: true, otherGatesPassed: true, buySubmitted: true },
+            actual: { lockedShareOfLpPct: 1, ...result },
             expectedPlain: 'A pair whose locked LP is only 1 percent of its supply fails the liquidity-lock gate on BSC too.',
             actualPlain: 'Mudra reported one active lock covering 1 percent of the LP; the gate counted any active lock as locked, so every check passed and the bot bought.',
         });
