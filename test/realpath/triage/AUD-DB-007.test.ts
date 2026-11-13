@@ -15,13 +15,16 @@
 // false, so the production branch runs), from a throwaway working directory that is not the repo
 // root, with a relative DB_PATH and throwaway temp folders only:
 //   - relative-db-path-opens-the-anchored-database: a real version-7 database in temp folder A,
-//     paused (pause_state.paused 1) and holding one open buy. The child starts in temp folder B with
-//     DB_PATH set to A's database relative to the repo root. It opens A's database (the operator's
-//     database, paused, with its open position), and creates nothing in B or at the path the same
-//     text would name relative to B.
+//     paused (pause_state.paused 1) and holding one open buy. The child starts in a folder nested
+//     inside temp folder B (see childCwdFor) with DB_PATH set to A's database relative to the repo
+//     root. It opens A's database (the operator's database, paused, with its open position), and
+//     creates nothing in B or at the path the same text would name relative to the child's folder.
 //   - missing-database-is-refused-and-nothing-created: the same, with no database at that path. The
 //     child refuses with DB_REFUSED_MISSING naming the repo-anchored absolute path and creates
 //     nothing anywhere.
+// Both tests first check that the relative text, read from the child's folder, names a different
+// file than the repo-anchored reading. Without that, a cwd-relative resolver would open the same
+// file and pass.
 //   - unset-and-shipped-db-path-resolve-under-the-repo-root: from folder B the real resolveDbPath,
 //     with the repo root db.ts uses, maps an unset DB_PATH and the shipped ./data/bot.db to
 //     <repo root>/data/bot.db (text only; nothing is opened).
@@ -133,43 +136,78 @@ function resultOf(r: ChildRun): Record<string, unknown> {
 
 const same = (a: string, b: string): boolean => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
+/**
+ * The child's working folder for a relative DB_PATH `rel`: a fresh temp folder `base` with one
+ * nested folder per leading `..` of `rel`. Read from there, `rel` climbs back exactly to `base` and
+ * names a path inside it (`cwdTarget`), never the repo-anchored file.
+ *
+ * Starting the child straight in a temp folder is not enough: a `..` at the filesystem root stays
+ * at the root. On CI the repo is five folders deep and the temp folder is /tmp, so from
+ * /tmp/<folder> the five `..` of `rel` stop at / and the cwd-relative reading is the anchored file
+ * again. Then a cwd-relative resolver opens the operator database too and the test proves nothing.
+ *
+ * `chain` lists the nested folders, relative to `base` and sorted as tree() lists them, so a test can
+ * require tree(base) to be exactly that: nothing created in base, the cwd-relative target included.
+ */
+function childCwdFor(rel: string): { base: string; cwd: string; chain: string[]; cwdTarget: string } {
+    const base = tempFolder('b');
+    const segments = rel.split(path.sep);
+    let ups = 0;
+    while (ups < segments.length && segments[ups] === '..') ups += 1;
+    const chain: string[] = [];
+    let cwd = base;
+    for (let i = 0; i < ups; i += 1) {
+        cwd = path.join(cwd, `d${i}`);
+        chain.push(path.relative(base, cwd));
+    }
+    fs.mkdirSync(cwd, { recursive: true });
+    const cwdTarget = path.resolve(cwd, rel);
+    return { base, cwd, chain: chain.sort(), cwdTarget };
+}
+
+/** `rel` read from the child's folder names a file inside `base`, and not `file`. */
+function expectCwdReadingDiffers(rel: string, file: string, base: string, cwdTarget: string): void {
+    expect(path.isAbsolute(rel)).toBe(false);
+    expect(same(cwdTarget, file)).toBe(false);
+    const inside = path.relative(base, cwdTarget);
+    expect(inside !== '' && !inside.startsWith('..') && !path.isAbsolute(inside)).toBe(true);
+}
+
 describe('AUD-DB-007 re-measured: a start from another directory opens the anchored database or refuses, never a fresh one', () => {
     it('relative-db-path-opens-the-anchored-database: from another folder, a relative DB_PATH opens the operator database (paused, one open buy) and creates nothing', { timeout: CHILD_TIMEOUT }, async () => {
         const a = tempFolder('a');
-        const b = tempFolder('b');
         const file = path.join(a, 'bot.db');
         seedOperatorDatabase(file);
         const rel = path.relative(REAL_ROOT, file);
-        const cwdTarget = path.resolve(b, rel);
-        expect(path.isAbsolute(rel)).toBe(false);
-        expect(same(cwdTarget, file)).toBe(false);
-        expect(tree(b)).toEqual([]);
+        const { base, cwd, chain, cwdTarget } = childCwdFor(rel);
+        expectCwdReadingDiffers(rel, file, base, cwdTarget);
+        expect(tree(base)).toEqual(chain);
 
         const ledgerRunId = newCaseId('open');
-        const run = await runRailedChildToEnd(process.execPath, ['-e', childScript(OPEN_DB)], { cwd: b, withVitestEnv: false, envOverrides: { DB_PATH: rel }, ledgerRunId, timeoutMs: CHILD_TIMEOUT });
+        const run = await runRailedChildToEnd(process.execPath, ['-e', childScript(OPEN_DB)], { cwd, withVitestEnv: false, envOverrides: { DB_PATH: rel }, ledgerRunId, timeoutMs: CHILD_TIMEOUT });
         const res = resultOf(run);
         expect(run.status, JSON.stringify(res)).toBe(0);
         expect(same(String(res.opened), file)).toBe(true);
         expect(res).toMatchObject({ version: CURRENT_SCHEMA_VERSION, paused: 1, openBuys: 1 });
-        expect(tree(b)).toEqual([]);
+        expect(tree(base)).toEqual(chain);
         expect(fs.existsSync(cwdTarget)).toBe(false);
         expectRailedNoNetwork(ledgerRunId);
     });
 
     it('missing-database-is-refused-and-nothing-created: from another folder, a relative DB_PATH naming no database is refused with the anchored absolute path, and nothing is created', { timeout: CHILD_TIMEOUT }, async () => {
         const a = tempFolder('a');
-        const b = tempFolder('b');
         const file = path.join(a, 'missing.db');
         const rel = path.relative(REAL_ROOT, file);
-        const cwdTarget = path.resolve(b, rel);
-        expect(path.isAbsolute(rel)).toBe(false);
+        const { base, cwd, chain, cwdTarget } = childCwdFor(rel);
+        expectCwdReadingDiffers(rel, file, base, cwdTarget);
+        expect(tree(base)).toEqual(chain);
 
         const ledgerRunId = newCaseId('missing');
-        const run = await runRailedChildToEnd(process.execPath, ['-e', childScript(OPEN_DB)], { cwd: b, withVitestEnv: false, envOverrides: { DB_PATH: rel }, ledgerRunId, timeoutMs: CHILD_TIMEOUT });
+        const run = await runRailedChildToEnd(process.execPath, ['-e', childScript(OPEN_DB)], { cwd, withVitestEnv: false, envOverrides: { DB_PATH: rel }, ledgerRunId, timeoutMs: CHILD_TIMEOUT });
         const res = resultOf(run);
         // Checked first: nothing may be created, whatever the child printed.
         expect(tree(a)).toEqual([]);
-        expect(tree(b)).toEqual([]);
+        expect(tree(base)).toEqual(chain);
         expect(fs.existsSync(cwdTarget)).toBe(false);
         expect(run.status).toBe(1);
         expect(res.refused).toBe('DB_REFUSED_MISSING');
