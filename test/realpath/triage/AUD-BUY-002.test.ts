@@ -177,17 +177,22 @@ describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', (
             .slice(fromLog)
             .filter((l) => l.msg === 'Resuming exit monitor for pending token' && l.obj?.tradeId === tradeId);
         await stepFor(5_000);
-        expect(opLogged('exit.monitor.resumed', fromLog)).toBe(false);
-        expect(opLogged('exit.monitor.started', fromLog)).toBe(false);
 
+        // The resume is read two ways, so a fix that resumes failed-but-held buys reads "looks fixed"
+        // whichever line it logs (review WR-11): the resume selection's line, or the exit monitor's
+        // own exit.monitor.resumed op.
         knownBug(ctx, 'AUD-BUY-002', {
             claim: 'failed-row-not-resumed-after-restart',
             correct: { resumedAfterRestart: true },
             observed: { resumedAfterRestart: false },
-            actual: { resumedAfterRestart: resumedAt.length > 0 },
+            actual: { resumedAfterRestart: resumedAt.length > 0 || opLogged('exit.monitor.resumed', fromLog) },
             expectedPlain: 'After a restart the bot resumes monitoring every position it still holds.',
             actualPlain: 'After a restart the held position whose trade was marked failed is not in the resume set, so it gets no exit monitor.',
         });
+        // Bug details, after the marker (review WR-11: they describe the bug, so before the marker
+        // they turned a resume fix into a plain failure instead of "looks fixed").
+        expect(opLogged('exit.monitor.resumed', fromLog)).toBe(false);
+        expect(opLogged('exit.monitor.started', fromLog)).toBe(false);
     });
 
     it('earlier-attempt-lands-no-trade-row: attempt 0 is not included at its first target block, attempt 1 signs the same nonce, attempt 0 then lands and the bot records no trade', async (ctx) => {
