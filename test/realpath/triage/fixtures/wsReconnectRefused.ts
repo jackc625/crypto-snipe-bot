@@ -30,12 +30,16 @@
 // rather than "work pending". Today's first reconnect attempt is due 1 s after the trigger, so
 // the 4 s reopen leaves a 3 s margin before a refusal could be missed.
 //
-// Work under test. Reconnect sites: the bot connected again over a WebSocket. WORK_SETTLED when, at
-// the end of the window, a WebSocket connection the chain accepted after the trigger is open, and
-// for the two DEX sites also carries the listener's re-made `logs` subscription (the anti-rug
-// listener with no registered position sends nothing until asked, so for it the open connection
-// is the whole result). Boot: the boot connect finished, either connected or failed with the
-// bot's socket cleanly CLOSED (nothing at boot re-attempts a WebSocket). WORK_PENDING otherwise.
+// Work under test: the bot connected again over a WebSocket. WORK_SETTLED when, at the end of the
+// window, a WebSocket connection the chain accepted after the trigger is open, and for the two DEX
+// sites also carries the listener's re-made `logs` subscription (the anti-rug listener with no
+// registered position sends nothing until asked, so for it the open connection is the whole
+// result). Boot is held to the same outcome (review WR-07): the boot connect is refused, the port
+// reopens 4 s later, and the bot must hold an open connection by the end of the window, as the
+// finding's recommendation asks ("a failed connect stays in the backoff loop"). A boot connect that
+// fails cleanly (socket CLOSED, process alive) and is never retried leaves the chain with no
+// WebSocket for the whole session, so it is WORK_PENDING: the claim then reads "the failure
+// changed", never "looks fixed". WORK_PENDING otherwise.
 // BOT_WS_STATE <readyState> is printed for every run that is still alive. Survival window:
 // WINDOW_MS of real time after the trigger (D-02: real ws on loopback, real time, never part of
 // the recording).
@@ -124,12 +128,10 @@ async function main(): Promise<void> {
         state = 'destroyed';
     }
     mark(`BOT_WS_STATE ${state}`);
-    // Reconnect sites: settled only when the bot is connected again (the DEX listeners also
-    // re-subscribed). Boot: the operation is the boot connect itself, and nothing at boot re-attempts
-    // a WebSocket, so it is settled when that attempt finished: connected, or failed and cleanly
-    // CLOSED. A connect stuck CONNECTING or CLOSING is pending.
-    const settled =
-        chain.wsConnectedAfter(markAt, { subscribed: site === 'dex-v3' || site === 'dex-v2' }) || (site === 'boot' && state === '3');
+    // Settled only when the bot is connected again (the DEX listeners also re-subscribed). At boot
+    // that means a connection accepted after the boot attempt is open: in fault mode only a bot that
+    // kept retrying after the refusal holds one once the port reopened (review WR-07).
+    const settled = chain.wsConnectedAfter(markAt, { subscribed: site === 'dex-v3' || site === 'dex-v2' });
     // The independent heartbeat call goes through the bot's own HTTP provider for this chain.
     const { getProvider } = await import('../../../../src/utils/provider');
     await finishAlive(ticker.current!, () => getProvider(cfg.name, cfg.httpRpcUrl).getBlockNumber(), settled);
