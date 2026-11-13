@@ -24,10 +24,14 @@
 //     "looks fixed".
 //
 // What is measured: whether the held position ends up protected or the operator is told it is
-// not. Correct is either: a monitor exists (an exit-monitor timer in the bot's real registry, or
-// an exit_state row), or an alert says the position is unprotected. Both fix shapes read "looks
-// fixed" (D-08). The details of today's failure (no timer, no row, no such alert, the error line,
-// anti-rug armed) are asserted after the marker.
+// not. Correct is either: a live monitor exists (an exit-monitor timer in the bot's real
+// registry), or an alert about THIS position (naming its token address or symbol, sent since the
+// buy) says it is unprotected. Both fix shapes read "looks fixed" (D-08). An exit_state row alone
+// is not protection (review WR-15): a fix that persists the row above the null return but keeps the
+// return has no poll in the running process, and reads "the failure changed". An alert about
+// something else (for example the anti-rug "positions on this chain are UNMONITORED" WS-health
+// alert) does not count either. The details of today's failure (no timer, no row, no such alert,
+// the error line, anti-rug armed) are asserted after the marker.
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
@@ -56,6 +60,7 @@ async function firstQuoteFailure(ctx: Ctx, persistent: boolean): Promise<void> {
 
     let monitorQuote: ReturnType<typeof node.failNext> | undefined;
     let faultWindow = true;
+    const fromAlertBuy = recordedAlerts().length;
     const { buy } = await buyAndMine(sc, {
         beforeMine: (b) => {
             expect(b.route).toBe('bundle');
@@ -87,9 +92,13 @@ async function firstQuoteFailure(ctx: Ctx, persistent: boolean): Promise<void> {
     expect(row?.status).toBe('pending');
     const heldStateRow = row ? exitStateRow(sc, row.id) : undefined;
     const timer = sc.graph.exitManager.hasExitMonitorTimer('eth', token);
-    const unprotectedAlert = recordedAlerts().some((a) => UNPROTECTED.test(String(a.message)));
+    // An unprotected-position alert counts only when it is about this position (review WR-15).
+    const aboutThisPosition = (m: string): boolean => m.toLowerCase().includes(token.toLowerCase()) || m.includes('RPLT');
+    const unprotectedAlert = recordedAlerts()
+        .slice(fromAlertBuy)
+        .some((a) => UNPROTECTED.test(String(a.message)) && aboutThisPosition(String(a.message)));
 
-    const protectedOrOperatorTold = timer || heldStateRow !== undefined || unprotectedAlert;
+    const protectedOrOperatorTold = timer || unprotectedAlert;
     if (persistent) {
         knownBug(ctx, 'AUD-EXIT-002', {
             claim: 'first-quote-failure-leaves-position-unmonitored',

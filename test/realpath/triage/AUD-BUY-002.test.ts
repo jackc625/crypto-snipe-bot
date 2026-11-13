@@ -49,6 +49,7 @@ import { harnessState, type Submitted } from '../harness/chain';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, createTempDbFile, restartGraph, stepFor, stepUntil, stepUntilTrue, type Scenario } from '../harness/world';
+import { stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 
 const V2_ROUTER = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
 const ERC20 = new Interface(['function balanceOf(address) view returns (uint256)']);
@@ -134,8 +135,10 @@ describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', (
         await stepUntilTrue(() => balanceRead.fired >= 1, { what: 'the post-mine balanceOf read failing', maxSteps: 20_000 });
         await stepFor(BALANCE_FAULT_WINDOW_MS);
         decisionWindow = false;
-        // The handler finishes either way: the catch sends its alert, or the monitor starts.
-        await stepUntilTrue(() => failAlertAfterBuySent() !== null || opLogged('exit.monitor.started'), { what: 'the snipe handler finishing after the mined buy', maxSteps: 20_000 });
+        // The handler finishes: the catch sends its alert, or the monitor starts. Bounded rather than
+        // required, so a fix that ends some other way (no alert, no monitor) is measured as the
+        // failure changing instead of stalling here.
+        await stepUntilOrFor(() => failAlertAfterBuySent() !== null || opLogged('exit.monitor.started'), 60_000);
         await stepFor(1_000);
 
         // Setup facts, true whether or not the bug is fixed: the fault fired, after the buy was
@@ -146,8 +149,9 @@ describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', (
         const rows = tradeRows(sc);
         expect(rows).toHaveLength(1);
         expect(rows[0].tx_hash).toBe(buy.hash);
-        const exitStateRows = (sc.graph.db.prepare('SELECT count(*) AS n FROM exit_state WHERE trade_id = ?').get(rows[0].id) as { n: number }).n;
-        const actual = { status: rows[0].status, monitored: opLogged('exit.monitor.started') || exitStateRows > 0, alertText: failAlertAfterBuySent() };
+        // Monitored means a live exit-monitor timer in the bot's real registry (review WR-15): an
+        // exit_state row alone protects nothing in the running process.
+        const actual = { status: rows[0].status, monitored: sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token), alertText: failAlertAfterBuySent() };
 
         knownBug(ctx, 'AUD-BUY-002', {
             claim: 'balanceof-error-flips-landed-buy-to-failed',
