@@ -15,6 +15,8 @@ const CASES = [
     'WR-35-a-failed-vitest-run-is-scanned-and-never-reported-done',
     'WR-35-a-vitest-run-ended-by-a-signal-is-still-scanned',
     'refuses-under-CI-and-without-a-filter-and-never-starts-vitest',
+    'WR-36-the-vitest-run-gets-a-one-run-token-whose-file-exists-only-during-the-run',
+    'WR-36-the-token-file-is-removed-when-vitest-fails-or-cannot-run',
 ];
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

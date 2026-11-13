@@ -9,6 +9,12 @@
 // Windows, so a shell assignment inside an npm script would not carry. This wrapper sets the switch
 // in the environment of one Vitest run it starts itself, with an argument-array spawn (no shell).
 //
+// Phase 23 review WR-36: the switch holds a one-run token, not "1". Before the run the wrapper
+// writes <os.tmpdir()>/csb-recordings-update-<32 hex> naming the token and this process, and it
+// removes the file when Vitest exits. The serializer writes only while that file exists and names a
+// running process, so a value left exported in a shell (copied from the line this prints, or an old
+// "1") never re-records on a later run.
+//
 // Usage (Node 22.16.0, ABI 127):
 //   npm run recordings:update -- <vitest filters...>     e.g. test/realpath/scenarios/flashbots-v2.test.ts -t flashbots-v2-partial
 //   npm run recordings:update -- --all                   every realpath recording
@@ -39,6 +45,8 @@ import * as path from 'path';
 import { scanRepoRecordings } from '../test/realpath/recordingsScan';
 
 const SWITCH = 'VITEST_CSB_UPDATE_RECORDINGS';
+/** Must equal UPDATE_TOKEN_PREFIX in test/realpath/harness/serializer.ts (recordingsGuard.test.ts checks). */
+const UPDATE_TOKEN_PREFIX = 'csb-recordings-update-';
 const REPO_ROOT = path.resolve(__dirname, '..');
 const VITEST_BIN = path.join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs');
 
@@ -53,6 +61,10 @@ export interface UpdateDeps {
     /** The repo whose recordings are re-recorded. */
     repoRoot: string;
     env: NodeJS.ProcessEnv;
+    /** Where the update-token file goes: os.tmpdir() in a real run, the folder the serializer looks in. */
+    tmpdir: string;
+    /** The process the token file names (this wrapper's pid in a real run). */
+    pid: number;
     /** Start Vitest with these arguments (after the vitest entry point) and this environment, and wait. */
     runVitest(args: string[], env: NodeJS.ProcessEnv): VitestRun;
     log(s: string): void;
@@ -72,8 +84,19 @@ export function runUpdate(argv: string[], deps: UpdateDeps): number {
         return 2;
     }
     const args = ['run', '--project', 'realpath', ...filters];
-    deps.log(`update-recordings: ${SWITCH}=1 vitest ${args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`);
-    const r = deps.runVitest(args, { ...deps.env, [SWITCH]: '1' });
+    // WR-36: the switch is a one-run token, not a value a shell can keep. Its file names this
+    // process; the serializer writes only while that file exists and this process runs, and the file
+    // is removed when Vitest exits (any status, a signal, a start failure or a throw).
+    const token = crypto.randomBytes(16).toString('hex');
+    const tokenFile = path.join(deps.tmpdir, `${UPDATE_TOKEN_PREFIX}${token}`);
+    fs.writeFileSync(tokenFile, JSON.stringify({ pid: deps.pid, token }), { flag: 'wx' });
+    deps.log(`update-recordings: ${SWITCH}=<one-run token> vitest ${args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}`);
+    let r: VitestRun;
+    try {
+        r = deps.runVitest(args, { ...deps.env, [SWITCH]: token });
+    } finally {
+        fs.rmSync(tokenFile, { force: true });
+    }
     if (r.error) {
         deps.error(`update-recordings: could not start Vitest: ${r.error.message}`);
         return 2;
@@ -130,22 +153,30 @@ const cleanRecording = (name: string): string => `${JSON.stringify({ scenario: n
 const plantedRecording = (name: string): string =>
     `${JSON.stringify({ scenario: name, tag: 'KEEP' })}\n${JSON.stringify({ kind: 'op', at: 1, level: 'info', op: 'x.y', msg: 'm', fields: { note: `0x${crypto.randomBytes(32).toString('hex')}` }, bindings: {} })}\n{"submitted":[]}\n`;
 
-function runCase(argv: string[], env: NodeJS.ProcessEnv, child: (root: string, args: string[], env: NodeJS.ProcessEnv) => VitestRun): { code: number; out: string[]; calls: number; root: string } {
+function runCase(argv: string[], env: NodeJS.ProcessEnv, child: (root: string, args: string[], env: NodeJS.ProcessEnv, tmp: string) => VitestRun): { code: number; out: string[]; calls: number; root: string; tmp: string } {
     const root = tempRepo();
+    // The token folder of this case (the real run uses os.tmpdir(), as the serializer does).
+    const tmp = path.join(root, 'tmp');
+    fs.mkdirSync(tmp);
     const out: string[] = [];
     let calls = 0;
     const code = runUpdate(argv, {
         repoRoot: root,
         env,
+        tmpdir: tmp,
+        pid: process.pid,
         runVitest: (args, childEnv) => {
             calls += 1;
-            return child(root, args, childEnv);
+            return child(root, args, childEnv, tmp);
         },
         log: (s) => out.push(s),
         error: (s) => out.push(s),
     });
-    return { code, out, calls, root };
+    return { code, out, calls, root, tmp };
 }
+
+/** The update-token files left in a case's token folder. */
+const tokenFiles = (tmp: string): string[] => fs.readdirSync(tmp).filter((n) => n.startsWith(UPDATE_TOKEN_PREFIX));
 
 function expectCase(name: string, r: { code: number; out: string[]; calls: number }, code: number, must: RegExp[], mustNot: RegExp[] = [], calls = 1): CaseOutcome {
     const text = r.out.join(' | ');
@@ -220,6 +251,55 @@ function selfTestCases(): CaseOutcome[] {
         return b.ok ? { ...b, detail: 'CI set: exit 2; no filter: exit 2; Vitest never started' } : b;
     }, roots);
 
+    caseRun('WR-36-the-vitest-run-gets-a-one-run-token-whose-file-exists-only-during-the-run', () => {
+        const name = 'WR-36-the-vitest-run-gets-a-one-run-token-whose-file-exists-only-during-the-run';
+        let seen = { token: '', fileOk: false, record: '' };
+        const r = runCase(['--all'], {}, (root, _args, env, tmp) => {
+            const token = String(env[SWITCH] ?? '');
+            const file = path.join(tmp, `${UPDATE_TOKEN_PREFIX}${token}`);
+            const fileOk = /^[0-9a-f]{32}$/.test(token) && fs.existsSync(file);
+            seen = { token, fileOk, record: fileOk ? fs.readFileSync(file, 'utf8') : '' };
+            fs.writeFileSync(path.join(recordingsOf(root), 'a.jsonl'), cleanRecording('a'));
+            return { status: 0, signal: null };
+        });
+        roots.push(r.root);
+        const problems: string[] = [];
+        if (!/^[0-9a-f]{32}$/.test(seen.token)) problems.push(`the switch was ${JSON.stringify(seen.token)}, not a 32-hex token`);
+        if (!seen.fileOk) problems.push('no token file during the run');
+        let rec: { pid?: unknown; token?: unknown } = {};
+        try {
+            rec = JSON.parse(seen.record) as typeof rec;
+        } catch {
+            problems.push(`the token file is not JSON: ${JSON.stringify(seen.record.slice(0, 80))}`);
+        }
+        if (rec.pid !== process.pid || rec.token !== seen.token) problems.push(`the token file names pid ${String(rec.pid)} and token ${String(rec.token)}`);
+        if (tokenFiles(r.tmp).length) problems.push(`token file(s) left after the run: ${tokenFiles(r.tmp).join(', ')}`);
+        if (seen.token && r.out.some((l) => l.includes(seen.token))) problems.push('the token value was printed');
+        if (r.code !== 0) problems.push(`exit ${r.code}`);
+        return { name, ok: problems.length === 0, detail: problems.length ? `${problems.join('; ')}: ${r.out.join(' | ')}` : 'a 32-hex switch, its file naming this pid during the run, removed after, never printed' };
+    }, roots);
+
+    caseRun('WR-36-the-token-file-is-removed-when-vitest-fails-or-cannot-run', () => {
+        const name = 'WR-36-the-token-file-is-removed-when-vitest-fails-or-cannot-run';
+        const failed = runCase(['--all'], {}, () => ({ status: 1, signal: null }));
+        roots.push(failed.root);
+        const notStarted = runCase(['--all'], {}, () => ({ status: null, signal: null, error: new Error('spawn failed') }));
+        roots.push(notStarted.root);
+        let threw = '';
+        const root = tempRepo();
+        roots.push(root);
+        const tmp = path.join(root, 'tmp');
+        fs.mkdirSync(tmp);
+        try {
+            runUpdate(['--all'], { repoRoot: root, env: {}, tmpdir: tmp, pid: process.pid, runVitest: () => { throw new Error('the child crashed'); }, log: () => undefined, error: () => undefined });
+        } catch (e) {
+            threw = e instanceof Error ? e.message : String(e);
+        }
+        const left = [...tokenFiles(failed.tmp), ...tokenFiles(notStarted.tmp), ...tokenFiles(tmp)];
+        const ok = failed.code === 1 && notStarted.code === 2 && threw === 'the child crashed' && left.length === 0;
+        return { name, ok, detail: `status 1: exit ${failed.code}; not started: exit ${notStarted.code}; a throw: ${JSON.stringify(threw)}; token files left: ${left.length}` };
+    }, roots);
+
     return out;
 }
 
@@ -235,6 +315,8 @@ function realDeps(): UpdateDeps {
     return {
         repoRoot: REPO_ROOT,
         env: process.env,
+        tmpdir: os.tmpdir(),
+        pid: process.pid,
         runVitest: (args, env) => {
             const r = spawnSync(process.execPath, [VITEST_BIN, ...args], { cwd: REPO_ROOT, stdio: 'inherit', env });
             return { status: r.status, signal: r.signal, error: r.error };

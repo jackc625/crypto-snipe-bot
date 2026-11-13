@@ -71,6 +71,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as cp from 'child_process';
+import * as crypto from 'crypto';
 
 /** A bad argument, or a run or repository the check cannot judge. Exit 2. */
 class UsageError extends Error {}
@@ -496,6 +497,7 @@ function expectRun(name: string, r: { code: number; out: string[] }, code: numbe
 interface SerializerModule {
     RECORDINGS_DIR: string;
     UPDATE_SWITCH: string;
+    UPDATE_TOKEN_PREFIX: string;
     COMPARED_RECORD_DIRNAME: string;
     compareRecording(relPath: string, text: string, opts?: { dir?: string }): 'match' | 'written';
 }
@@ -583,6 +585,17 @@ function mirror(prefix: string): { base: string; repo: string; rec: string; tmp:
     return { base, repo, rec, tmp };
 }
 
+/**
+ * WR-36: a live update token for the serializer under test, as scripts/update-recordings.ts makes one:
+ * 32 hex digits and <os.tmpdir()>/<prefix><token> naming this process. Called inside withProcess, so
+ * os.tmpdir() is the case's own temp folder (removed with it).
+ */
+function liveUpdateToken(ser: SerializerModule): string {
+    const token = crypto.randomBytes(16).toString('hex');
+    fs.writeFileSync(path.join(os.tmpdir(), `${ser.UPDATE_TOKEN_PREFIX}${token}`), JSON.stringify({ pid: process.pid, token }));
+    return token;
+}
+
 function throwsWith(fn: () => unknown, re: RegExp): boolean {
     try {
         fn();
@@ -623,11 +636,13 @@ function selfTestCases(): CaseOutcome[] {
                 r.push(throwsWith(() => ser.compareRecording('a.jsonl', `${a}{"changed":true}\n`), /a\.jsonl differs/));
                 r.push(throwsWith(() => ser.compareRecording('c.jsonl', a), /no recording at c\.jsonl/));
                 r.push(ser.compareRecording('a.jsonl', a, { dir: ser.RECORDINGS_DIR }));
-                process.env[ser.UPDATE_SWITCH] = '1';
+                process.env[ser.UPDATE_SWITCH] = liveUpdateToken(ser);
                 r.push(ser.compareRecording('env/NEW.json', '{"new":true}\n'));
                 process.env.CI = 'true';
                 r.push(throwsWith(() => ser.compareRecording('a.jsonl', `${a}{"ci":true}\n`), /a\.jsonl differs/));
-                if (stderr.length) problems.push(`stderr: ${stderr.join('')}`);
+                const wrote = stderr.join('');
+                // The one write says so on stderr (WR-36), and nothing else is written there.
+                if (wrote !== '[recordings] WROTE env/NEW.json (update run)\n') problems.push(`stderr: ${wrote}`);
                 return r;
             });
             const want = ['match', 'match', 'match', true, true, 'match', 'written', true];
@@ -669,7 +684,7 @@ function selfTestCases(): CaseOutcome[] {
                 r.push(ser.compareRecording('x.jsonl', text, { dir: other }));
                 r.push(throwsWith(() => ser.compareRecording('x.jsonl', `${text}{"c":1}\n`, { dir: other }), /x\.jsonl differs/));
                 r.push(throwsWith(() => ser.compareRecording('y.jsonl', text, { dir: other }), /no recording at y\.jsonl/));
-                process.env[ser.UPDATE_SWITCH] = '1';
+                process.env[ser.UPDATE_SWITCH] = liveUpdateToken(ser);
                 r.push(ser.compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir: other }));
                 return r;
             });

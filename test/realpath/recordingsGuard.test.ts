@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
@@ -37,6 +38,7 @@ import {
     RECORDINGS_DIR,
     TAG_RE,
     UPDATE_SWITCH,
+    UPDATE_TOKEN_PREFIX,
     compareRecording,
     normalizeForRecording,
     recordingLine,
@@ -407,6 +409,50 @@ function withEnv<T>(env: { update: string | undefined; ci: string | undefined },
     }
 }
 
+/**
+ * WR-36: run `fn` with a live update token, as scripts/update-recordings.ts makes one for its single
+ * Vitest run: 32 random hex digits and the file <os.tmpdir()>/<UPDATE_TOKEN_PREFIX><token> naming the
+ * process (`pid`) that owns it. The file is removed after.
+ */
+function withLiveToken<T>(fn: (token: string) => T, pid: number = process.pid): T {
+    const token = randomBytes(16).toString('hex');
+    const tokenFile = path.join(os.tmpdir(), `${UPDATE_TOKEN_PREFIX}${token}`);
+    fs.writeFileSync(tokenFile, JSON.stringify({ pid, token }));
+    try {
+        return fn(token);
+    } finally {
+        fs.rmSync(tokenFile, { force: true });
+    }
+}
+
+/** A process id that names no running process (process.kill(pid, 0) fails with ESRCH). */
+function deadPid(): number {
+    for (let pid = 4_000_000 + (process.pid % 1000); pid < 4_100_000; pid += 7) {
+        try {
+            process.kill(pid, 0);
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === 'ESRCH') return pid;
+        }
+    }
+    throw new Error('no free process id found');
+}
+
+/** Run `fn` with process.stderr captured; returns the lines written. */
+function captureStderr(fn: () => void): string[] {
+    const chunks: string[] = [];
+    const orig = process.stderr.write;
+    process.stderr.write = ((chunk: unknown) => {
+        chunks.push(String(chunk));
+        return true;
+    }) as typeof process.stderr.write;
+    try {
+        fn();
+    } finally {
+        process.stderr.write = orig;
+    }
+    return chunks.join('').split('\n').filter(Boolean);
+}
+
 /** A recording's entry lines: the header and the empty-list line left out. */
 function bodyLines(text: string): string[] {
     return text.split('\n').filter((l, i) => i > 0 && l !== '' && l !== EMPTY_SUBMITTED_LINE);
@@ -431,26 +477,45 @@ describe('compare and write (AC-25), order (AC-23)', () => {
             // A carriage return is refused before anything is compared.
             expect(() => compareRecording('x.jsonl', original.replace('\n', '\r\n'), { dir })).toThrow(/carriage return/);
         });
-        // CI set: the switch alone never writes.
-        withEnv({ update: '1', ci: 'true' }, () => {
-            expect(updateAllowed()).toBe(false);
+        // WR-36: the switch writes only with a live update token, the one scripts/update-recordings.ts
+        // makes for its one Vitest run. Every other value, a lingering "1" included, only compares.
+        const unchanged = (): void => {
             expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
             expect(fs.readFileSync(file).equals(before)).toBe(true);
-        });
-        // A switch value other than "1" never writes either.
-        withEnv({ update: 'true', ci: undefined }, () => {
+        };
+        withLiveToken((token) => withEnv({ update: token, ci: 'true' }, () => {
             expect(updateAllowed()).toBe(false);
-            expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
-            expect(fs.readFileSync(file).equals(before)).toBe(true);
-        });
-        // Only "1" with CI unset writes: what scripts/update-recordings.ts sets up for its one run.
-        withEnv({ update: '1', ci: undefined }, () => {
-            expect(compareRecording('x.jsonl', changed, { dir })).toBe('written');
+            unchanged();
+        }));
+        for (const value of ['1', 'true', randomBytes(16).toString('hex'), 'A'.repeat(32)]) {
+            withEnv({ update: value, ci: undefined }, () => {
+                expect(updateAllowed(), `switch ${JSON.stringify(value)}`).toBe(false);
+                unchanged();
+            });
+        }
+        // A token whose file names a process that is not running (the wrapper was killed) never writes.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            expect(updateAllowed()).toBe(false);
+            unchanged();
+        }), deadPid());
+        // A token file that is not the wrapper's record never writes either.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            fs.writeFileSync(path.join(os.tmpdir(), `${UPDATE_TOKEN_PREFIX}${token}`), 'not a record');
+            expect(updateAllowed()).toBe(false);
+            unchanged();
+        }));
+        // A live token with CI unset writes, and says so on stderr for every write.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            expect(updateAllowed()).toBe(true);
+            const stderr = captureStderr(() => {
+                expect(compareRecording('x.jsonl', changed, { dir })).toBe('written');
+                expect(compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir })).toBe('written');
+                expect(compareRecording('x.jsonl', changed, { dir })).toBe('match');
+            });
             expect(fs.readFileSync(file, 'utf8')).toBe(changed);
-            expect(compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir })).toBe('written');
             expect(fs.readFileSync(path.join(dir, 'env', 'SOME_VAR.json'), 'utf8')).toBe('{"a":1}\n');
-            expect(compareRecording('x.jsonl', changed, { dir })).toBe('match');
-        });
+            expect(stderr.filter((l) => /^\[recordings\] WROTE /.test(l))).toEqual(['[recordings] WROTE x.jsonl (update run)', '[recordings] WROTE env/SOME_VAR.json (update run)']);
+        }));
     });
 
     it('a recording path is relative to the recordings folder, carries .jsonl or .json, and cannot leave it', () => {
@@ -467,12 +532,19 @@ describe('compare and write (AC-25), order (AC-23)', () => {
         expect(name).toBe('VITEST_CSB_UPDATE_RECORDINGS');
         const textFile = /\.(?:ts|tsx|js|cjs|mjs|json|yml|yaml|sh)$/;
         const mentions: string[] = [];
+        const textOf = new Map<string, string>();
         const visit = (dir: string): void => {
             for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
                 if (e.name === 'node_modules' || e.name === '.git') continue;
                 const full = path.join(dir, e.name);
                 if (e.isDirectory()) visit(full);
-                else if (textFile.test(e.name) && fs.readFileSync(full, 'utf8').includes(name)) mentions.push(path.relative(REPO_ROOT, full).split(path.sep).join('/'));
+                else if (textFile.test(e.name)) {
+                    const text = fs.readFileSync(full, 'utf8');
+                    if (!text.includes(name)) continue;
+                    const rel = path.relative(REPO_ROOT, full).split(path.sep).join('/');
+                    mentions.push(rel);
+                    textOf.set(rel, text);
+                }
             }
         };
         for (const d of ['src', 'scripts', 'test', '.github', 'dashboard']) if (fs.existsSync(path.join(REPO_ROOT, d))) visit(path.join(REPO_ROOT, d));
@@ -485,6 +557,12 @@ describe('compare and write (AC-25), order (AC-23)', () => {
         const serializerText = fs.readFileSync(path.join(REPO_ROOT, 'test', 'realpath', 'harness', 'serializer.ts'), 'utf8');
         expect(serializerText).not.toMatch(/process\.env(?:\[[^\]]+\]|\.[A-Za-z_]+)\s*=(?!=)/);
         expect(serializerText).toContain(`'${name}'`);
+        // WR-36: the switch carries a one-run token, and the update command (the one file that sets
+        // the switch, found by the walk above) makes the token file under the serializer's own prefix.
+        expect(UPDATE_TOKEN_PREFIX).toBe('csb-recordings-update-');
+        const updater = [...textOf.entries()].find(([rel]) => rel.startsWith('scripts/'));
+        expect(updater?.[1]).toContain(`'${UPDATE_TOKEN_PREFIX}'`);
+        expect(updater?.[1]).not.toMatch(new RegExp(`\\[SWITCH\\]: '1'`));
     });
 
     it('AC-23: serializeTimeline keeps the order it was given (same-time entries included), and no committed recording is sorted by content', () => {

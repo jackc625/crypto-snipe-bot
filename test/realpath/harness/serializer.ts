@@ -30,9 +30,14 @@
 //     test/realpath/recordings/ and carries its extension: `<name>.jsonl` for a scenario,
 //     `env/<VAR>.json` for an env-snapshot case (plan 23-23). A path that resolves outside the
 //     folder is refused. It compares raw bytes; a difference throws naming the first differing
-//     line. It writes only when VITEST_CSB_UPDATE_RECORDINGS is "1" and CI is not set (AC-25), and
-//     the only code that sets that switch is scripts/update-recordings.ts (npm run
-//     recordings:update). In a normal run an absent recording is a failure naming that command.
+//     line. It writes only when CI is not set and VITEST_CSB_UPDATE_RECORDINGS holds a live update
+//     token (AC-25; Phase 23 review WR-36): 32 hex digits whose file
+//     <os.tmpdir()>/csb-recordings-update-<token> names that token and a running process. The only
+//     code that sets the switch is scripts/update-recordings.ts (npm run recordings:update), which
+//     makes the token and its file for its one Vitest run and removes the file when Vitest exits, so
+//     a value left exported in a shell ("1", or an old token) only compares. Every write prints one
+//     "[recordings] WROTE <path>" line on stderr. In a normal run an absent recording is a failure
+//     naming that command.
 //   - Plan 23-33 (AUDIT-06, the gap plan 23-25 recorded; operator ruling 2026-11-12 "Fix now,
 //     small plan (Recommended)"): compareRecording also records, for the current run, which
 //     recording it compared, so scripts/check-recordings-compared.ts (npm run
@@ -287,10 +292,53 @@ export interface CompareOptions {
 
 export type CompareResult = 'match' | 'written';
 
-/** Whether this process may write recordings: the switch is "1" and CI is not set. */
+/**
+ * WR-36: the update token file under os.tmpdir(). scripts/update-recordings.ts writes
+ * <UPDATE_TOKEN_PREFIX><token> (JSON {pid, token}) before its one Vitest run, sets the switch to the
+ * token, and removes the file when Vitest exits.
+ */
+export const UPDATE_TOKEN_PREFIX = 'csb-recordings-update-';
+const UPDATE_TOKEN_RE = /^[0-9a-f]{32}$/;
+let warnedDeadSwitch = false;
+
+/** Whether `token` has its file under os.tmpdir(), naming itself and a running process (the wrapper). */
+function liveUpdateToken(token: string): boolean {
+    let rec: unknown;
+    try {
+        rec = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), `${UPDATE_TOKEN_PREFIX}${token}`), 'utf8'));
+    } catch {
+        return false;
+    }
+    const r = rec as { pid?: unknown; token?: unknown } | null;
+    if (r === null || typeof r !== 'object' || r.token !== token || typeof r.pid !== 'number' || !Number.isSafeInteger(r.pid) || r.pid <= 0) return false;
+    try {
+        process.kill(r.pid, 0);
+        return true;
+    } catch (e) {
+        return (e as NodeJS.ErrnoException).code === 'EPERM';
+    }
+}
+
+/**
+ * Whether this process may write recordings: CI is not set, and the switch holds a live update token
+ * (WR-36): 32 hex digits whose file under os.tmpdir() names that token and a running process. Any
+ * other value (a "1" left exported in a shell, a token whose run has ended) only compares, and says
+ * so once on stderr.
+ */
 export function updateAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
     const ci = env.CI;
-    return env[UPDATE_SWITCH] === '1' && (ci === undefined || ci === '');
+    if (ci !== undefined && ci !== '') return false;
+    const token = env[UPDATE_SWITCH];
+    if (token === undefined || token === '') return false;
+    if (UPDATE_TOKEN_RE.test(token) && liveUpdateToken(token)) return true;
+    if (!warnedDeadSwitch) {
+        warnedDeadSwitch = true;
+        process.stderr.write(
+            `[recordings] ${UPDATE_SWITCH} is set but is not a live update token (only npm run recordings:update makes one, for its own run); ` +
+                'recordings are compared, not written\n',
+        );
+    }
+    return false;
 }
 
 /** The absolute file a relative recording path names, refusing anything outside `dir`. */
@@ -374,6 +422,8 @@ export function compareRecording(relPath: string, text: string, opts: CompareOpt
     if (updateAllowed()) {
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, now);
+        // WR-36: every write is said out loud, so a re-record is never silent.
+        process.stderr.write(`[recordings] WROTE ${relPath} (update run)\n`);
         return 'written';
     }
     if (recorded === null) {
