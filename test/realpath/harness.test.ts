@@ -1254,6 +1254,9 @@ describe('FakeWebSocket matches ws 8.17.1 when the socket is not OPEN (Phase 23 
         expect(replies.map((r) => JSON.parse(r) as { result: string })).toEqual([{ jsonrpc: '2.0', id: 1, result: '0x1' }]);
 
         node.dropSocket();
+        // The server's close arrives after the call, as from socket I/O; until then it reads OPEN.
+        expect(ws.readyState).toBe(FakeWebSocket.OPEN);
+        for (let i = 0; i < 3; i++) await Promise.resolve();
         expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
         const callsBefore = node.callLog.length;
         // No callback: the frame is dropped silently.
@@ -1296,6 +1299,22 @@ describe('FakeWebSocket matches ws 8.17.1 when the socket is not OPEN (Phase 23 
         // A socket closed during its handshake never opens.
         for (let i = 0; i < 5; i++) await Promise.resolve();
         expect(node.socketsOpened).toBe(0);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('a subscription push from mine() reaches the client after mine() returns, never inside it', async () => {
+        const { node } = bareNode();
+        const ws = new FakeWebSocket(BARE_WS);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        const messages: Array<{ id?: number; method?: string }> = [];
+        ws.on('message', (m: Buffer) => messages.push(JSON.parse(m.toString('utf8')) as { id?: number; method?: string }));
+        ws.send(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'eth_subscribe', params: ['newHeads'] }));
+        for (let i = 0; i < 10 && messages.length === 0; i++) await Promise.resolve();
+        expect(messages.map((m) => m.id)).toEqual([7]);
+        node.mine({ include: [] });
+        expect(messages).toHaveLength(1);
+        await Promise.resolve();
+        expect(messages.map((m) => m.method ?? m.id)).toEqual([7, 'eth_subscription']);
         FakeWebSocket.instances.length = 0;
     });
 

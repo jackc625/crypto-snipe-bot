@@ -365,9 +365,10 @@ const CLOSED = 3;
  *     (ws abortHandshake). With no 'error' listener and no onerror, that 'error' throws, as an
  *     EventEmitter does in ws: the uncaught exception behind AUD-ANTIRUG-002.
  *   - FakeNode.hangSocketOpens(true) keeps new sockets CONNECTING (a stalled handshake).
- * Timing: the handshake completes, and a reply to send() arrives, on the microtask queue. Pushes
- * the node makes (subscription messages from mine() or emitLogs(), dropSocket()'s close) are
- * delivered synchronously, inside the call that made them; on ws they arrive from socket I/O.
+ * Timing: the handshake, a reply to send(), every push the node makes (subscription messages
+ * from mine() or emitLogs()) and a server close (dropSocket()) arrive on the microtask queue,
+ * never inside the call that caused them, as on ws, where they come from socket I/O. Until a
+ * server close arrives the socket still reads OPEN, as ws's does until its 'close' event.
  */
 export class FakeWebSocket extends EventEmitter {
     static readonly CONNECTING = CONNECTING;
@@ -395,7 +396,8 @@ export class FakeWebSocket extends EventEmitter {
         const self = this;
         this.connection = {
             send(text: string): void {
-                self.#deliver(text);
+                // A push reaches the client after the call that made it, as socket I/O does.
+                queueMicrotask(() => self.#deliver(text));
             },
             socket: this,
         };
@@ -520,10 +522,10 @@ export class FakeWebSocket extends EventEmitter {
         queueMicrotask(() => this.#closeNow(code, reason));
     }
 
-    /** Server-initiated close (FakeNode.dropSocket). */
+    /** Server-initiated close (FakeNode.dropSocket), delivered after the call, as socket I/O is. */
     serverClose(code = 1006, reason = ''): void {
         if (this.#state === CLOSED) return;
-        this.#closeNow(code, reason);
+        queueMicrotask(() => this.#closeNow(code, reason));
     }
 
     #closeNow(code: number, reason: string): void {
