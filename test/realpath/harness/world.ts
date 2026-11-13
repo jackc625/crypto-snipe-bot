@@ -533,6 +533,42 @@ function checkerInterface(): Interface {
     return new Interface(artifact.abi);
 }
 
+/** The sell calls a router can receive, written here independently of src/utils/abis.ts. */
+const SELL_CALLS = new Interface([
+    'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+    'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+    'function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params)',
+    'function multicall(uint256 deadline, bytes[] data)',
+    'function multicall(bytes[] data)',
+]);
+
+/** How many of `token` a router call sells (0 for anything that is not a sell of it). */
+function tokensSoldIn(data: string, token: string): bigint {
+    let call: ethers.TransactionDescription | null;
+    try {
+        call = SELL_CALLS.parseTransaction({ data });
+    } catch {
+        return 0n;
+    }
+    if (!call) return 0n;
+    const t = token.toLowerCase();
+    switch (call.name) {
+        case 'swapExactTokensForETH':
+        case 'swapExactTokensForETHSupportingFeeOnTransferTokens':
+            return String((call.args[2] as string[])[0]).toLowerCase() === t ? (call.args[0] as bigint) : 0n;
+        case 'exactInputSingle': {
+            const p = call.args[0] as unknown as { tokenIn: string; amountIn: bigint };
+            return String(p.tokenIn).toLowerCase() === t ? p.amountIn : 0n;
+        }
+        case 'multicall': {
+            const inner = call.args[call.args.length - 1] as string[];
+            return inner.reduce((a, d) => a + tokensSoldIn(d, token), 0n);
+        }
+        default:
+            return 0n;
+    }
+}
+
 /** Uniswap V2 getAmountOut with the 0.3% fee. */
 export function v2AmountOut(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
     const withFee = amountIn * 997n;
@@ -857,16 +893,21 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         node.setRead(token, 'tradingEnabled()', encodeResult(['bool'], [true]));
         // A token with no wallet or transaction limit has none of these functions: a real node reverts.
         for (const sig of ['maxWalletAmount()', 'maxWallet()', 'maxTxAmount()', 'maxTransactionAmount()']) node.setRead(token, sig, REVERT_EMPTY);
-        // The bot's token balance: what each of its mined buys bought, at the scenario price. A buy
-        // that reverted on chain bought nothing (WR-01).
-        const boughtBy = (who: string): bigint =>
-            node.submitted
-                .filter((s) => s.status === 'mined' && node.succeeded(s.hash) && s.tx.to?.toLowerCase() === swapTarget.toLowerCase() && s.tx.from?.toLowerCase() === who)
-                .reduce((a, s) => a + (quoteOut(s.tx.value, weth, token) ?? 0n), 0n);
+        // The bot's token balance (Phase 23 review WR-02): what each of its buys through the
+        // scenario's swap target bought, fixed at the price when that buy was mined, less the
+        // amountIn of each of its sells through the same target. A later price move does not
+        // re-price tokens already held, and a mined sell leaves only the rest. A transaction that
+        // reverted (under enforceReverts, WR-01) moves nothing.
+        const heldByWallet = { bought: 0n, sold: 0n };
+        node.onMined((tx, executed) => {
+            if (!executed || tx.from?.toLowerCase() !== wallet.address.toLowerCase() || tx.to?.toLowerCase() !== swapTarget.toLowerCase()) return;
+            if (tx.value > 0n) heldByWallet.bought += quoteOut(tx.value, weth, token) ?? 0n;
+            else heldByWallet.sold += tokensSoldIn(tx.data, token);
+        });
         node.setRead(token, 'balanceOf(address)', ({ args }) => {
             const who = String(args[0]).toLowerCase();
             if (who === pair.toLowerCase()) return encodeResult(['uint256'], [reserves.token]);
-            if (who === wallet.address.toLowerCase()) return encodeResult(['uint256'], [boughtBy(who)]);
+            if (who === wallet.address.toLowerCase()) return encodeResult(['uint256'], [heldByWallet.bought > heldByWallet.sold ? heldByWallet.bought - heldByWallet.sold : 0n]);
             return encodeResult(['uint256'], [0n]);
         });
 

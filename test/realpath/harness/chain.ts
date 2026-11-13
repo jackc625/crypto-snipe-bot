@@ -827,6 +827,8 @@ export class FakeNode {
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
+    /** onMined listeners, called per mined transaction in block order (WR-02). */
+    readonly #minedListeners: Array<(tx: Transaction, executed: boolean) => void> = [];
     /** enforceReverts: the read table decides mining, estimateGas and callBundle too (WR-01). */
     #enforceReverts = false;
     /** hangSocketOpens: new sockets wait in CONNECTING while true (WR-03). */
@@ -996,6 +998,15 @@ export class FakeNode {
     enforceReverts(on: boolean): void {
         if (typeof on !== 'boolean') throw new Error('enforceReverts: on must be a boolean');
         this.#enforceReverts = on;
+    }
+
+    /**
+     * Call `fn` for every transaction mine() includes, in block order, once its receipt is
+     * stored, with whether it executed (false: it reverted under enforceReverts). A scenario uses
+     * it to fix what a transaction did at the moment it was mined (WR-02).
+     */
+    onMined(fn: (tx: Transaction, executed: boolean) => void): void {
+        this.#minedListeners.push(fn);
     }
 
     /** True once mine() has included `hash` and it did not revert (receipt status 1). */
@@ -1262,6 +1273,7 @@ export class FakeNode {
             const key = lc(t.from);
             this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - (ok ? t.tx.value : 0n));
             this.history.push({ seq: nextSeq(), event: 'mined', hash: t.hash, from: t.from, nonce: t.tx.nonce, route: t.route, block: number });
+            for (const fn of this.#minedListeners) fn(t.tx, ok);
         });
         // Every other transaction at a nonce this block consumed is dropped, on every route.
         const senders = new Set(picked.map((p) => lc(p.t.from)));

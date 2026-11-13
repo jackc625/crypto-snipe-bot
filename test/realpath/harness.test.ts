@@ -1435,3 +1435,34 @@ describe('simulated node: reverts on chain, in estimateGas and in bundle simulat
         expect(expired.result).toBe(toQuantity(150_000n));
     });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-02: the scenario's default balanceOf for the bot wallet is what its mined
+// buys bought at the price when each was mined, less what its mined sells spent.
+// ---------------------------------------------------------------------------------------------
+
+const V2_SELL = new Interface(['function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)']);
+
+describe("scenario balanceOf: frozen at each buy's mining, less mined sells (Phase 23 review WR-02)", () => {
+    it('a later price move does not re-price tokens already bought, and a mined sell through the router subtracts its amountIn', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const { node, wallet } = sc;
+        const tokenBalance = async (): Promise<bigint> => BigInt(((await rpc(sc, 'eth_call', [{ to: sc.token, data: ERC20.encodeFunctionData('balanceOf', [wallet.address]) }, 'latest'])).result as string));
+        const buy = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        node.mine({ include: [(await rpc(sc, 'eth_sendRawTransaction', [buy])).result as string] });
+        const bought = await tokenBalance();
+        expect(bought).toBeGreaterThan(0n);
+
+        // Liquidity is pulled: both reserves shrink to 5 percent. Tokens already held do not change.
+        sc.reserves.weth = sc.reserves.weth / 20n;
+        sc.reserves.token = sc.reserves.token / 20n;
+        expect(await tokenBalance()).toBe(bought);
+
+        // A sell of half the position, mined: the balance drops by exactly what it spent.
+        const half = bought / 2n;
+        const data = V2_SELL.encodeFunctionData('swapExactTokensForETHSupportingFeeOnTransferTokens', [half, 0n, [sc.token, sc.weth], wallet.address, Math.floor(Date.now() / 1000) + 60]);
+        const sell = await wallet.signTransaction({ chainId: 1, nonce: node.pendingCount(wallet.address), to: sc.dex.routerAddress, data, value: 0n, gasLimit: 300_000n, type: 2, maxFeePerGas: 40n * GWEI, maxPriorityFeePerGas: GWEI });
+        node.mine({ include: [(await rpc(sc, 'eth_sendRawTransaction', [sell])).result as string] });
+        expect(await tokenBalance()).toBe(bought - half);
+    });
+});
