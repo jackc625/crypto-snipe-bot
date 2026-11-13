@@ -1,0 +1,101 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "network": "0",
+                "validNetworks": [
+                  "sepolia",
+                  "mainnet",
+                  "bsc"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Unsupported network"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "NETWORK": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "network": "abc",
+                "validNetworks": [
+                  "sepolia",
+                  "mainnet",
+                  "bsc"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Unsupported network"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "NETWORK": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "NETWORK": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "NETWORK": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "NETWORK": "sepolia"
+      }
+    }
+  },
+  "variable": "NETWORK"
+}

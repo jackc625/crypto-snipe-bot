@@ -1,9 +1,22 @@
 {
   "_meta": {
-    "updated_at": "2026-11-06T18:52:13.186Z",
-    "version": 3
+    "updated_at": "2026-11-09T14:59:19.360Z",
+    "version": 4
   },
   "entries": {
+    "src/main.ts": {
+      "exports": [
+        "readStartEnv",
+        "runMain"
+      ],
+      "imports": [
+        "dotenv",
+        "ethers",
+        "./utils/processLock",
+        "./bot (lazy require after lock)"
+      ],
+      "type": "entry-point"
+    },
     "src/bot.ts": {
       "exports": [
         "waitForLiquidity",
@@ -19,15 +32,43 @@
         "makeExitWatchdog"
       ],
       "imports": [
-        "./anti-rug/detector",
-        "./anti-rug/allowlist",
-        "./anti-rug/lpBaseline",
-        "./api/server",
+        "./guards/directEntry",
+        "./config",
+        "./chainRegistry",
+        "./preflight",
         "./exitEngine",
-        "./telegramListener",
-        "./utils/exitWatchdog"
+        "./anti-rug/detector",
+        "./api/server",
+        "./telegramListener"
       ],
-      "type": "entry-point"
+      "type": "module"
+    },
+    "src/guards/directEntry.ts": {
+      "exports": [
+        "isDirectEntry",
+        "refuseIfDirectEntry"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "type": "module"
+    },
+    "src/guards/singleton.ts": {
+      "exports": [
+        "registerSingleton"
+      ],
+      "imports": [
+        "fs"
+      ],
+      "type": "module"
+    },
+    "src/guards/epoch.ts": {
+      "exports": [
+        "EPOCH"
+      ],
+      "imports": [],
+      "type": "module"
     },
     "src/config.ts": {
       "exports": [
@@ -35,6 +76,7 @@
         "CONFIG"
       ],
       "imports": [
+        "dotenv",
         "./utils/logger"
       ],
       "type": "config"
@@ -81,15 +123,27 @@
         "deserializeExitState",
         "queryPrice",
         "privateAttemptBudget",
-        "fallbackSlippagePct"
+        "fallbackSlippagePct",
+        "computePublicMinOut",
+        "isRoutinePaused",
+        "submitPrivateSell",
+        "executeFullSell",
+        "enqueueExit",
+        "setExitWorkerWatchdog",
+        "executePartialSell",
+        "dispatchPartialSell",
+        "formatExitReason",
+        "startExitMonitor",
+        "resumeExitMonitor",
+        "exitConfig",
+        "VolatilityTracker"
       ],
       "imports": [
+        "./guards/singleton",
         "./utils/txManager",
         "./utils/nonceAuthority",
         "./utils/exitManager",
         "./utils/db",
-        "./utils/receiptDecoder",
-        "./utils/mevStrategies/reconciliation",
         "./anti-rug/detector"
       ],
       "type": "module"
@@ -101,7 +155,7 @@
       "imports": [
         "./chainRegistry",
         "./utils/notifier",
-        "ethers"
+        "./bot (dynamic import)"
       ],
       "type": "module"
     },
@@ -127,7 +181,8 @@
         "checkAntiRugLiveGate",
         "validateCrossEnvRules",
         "checkStaleData",
-        "preflightDryRun"
+        "preflightDryRun",
+        "preflight"
       ],
       "imports": [
         "./chainRegistry",
@@ -145,9 +200,8 @@
         "helmet",
         "cors",
         "cookie-parser",
+        "ws",
         "./middleware/auth",
-        "./routes/*",
-        "./ws/broadcaster",
         "./ws/handler"
       ],
       "type": "module"
@@ -168,6 +222,16 @@
       ],
       "type": "module"
     },
+    "src/api/ws/handler.ts": {
+      "exports": [
+        "handleUpgrade"
+      ],
+      "imports": [
+        "./broadcaster",
+        "../middleware/auth"
+      ],
+      "type": "module"
+    },
     "src/api/ws/broadcaster.ts": {
       "exports": [
         "addClient",
@@ -180,6 +244,18 @@
       ],
       "type": "module"
     },
+    "src/api/routes/controls.ts": {
+      "exports": [
+        "controlRoutes"
+      ],
+      "imports": [
+        "../../exitEngine",
+        "../../utils/db",
+        "../../utils/exitManager",
+        "express"
+      ],
+      "type": "module"
+    },
     "src/utils/db.ts": {
       "exports": [
         "db",
@@ -189,16 +265,91 @@
         "getOpenPositionCount",
         "getTotalExposure",
         "getDailyRealizedLoss",
+        "upsertExitState",
+        "getExitState",
+        "markExitFailedHeld",
+        "deleteExitState",
+        "getTradeIdForPendingToken",
+        "getStaleTradesQuery",
+        "getResumeExitMonitorTrades",
+        "getResumeAntiRugTrades",
+        "upsertLpBaseline",
+        "getLpBaseline",
+        "deleteLpBaseline",
+        "upsertChainState",
+        "getChainState",
+        "getPauseState",
+        "setPauseState",
+        "clearPauseState",
+        "setAntirugDryRunStarted",
+        "getAntirugDryRunStarted",
         "getPnL",
         "getPnLChartData",
         "closeDb",
+        "getDbFilePath",
         "forceWalCheckpoint",
         "normalizeLegacyMainnetRows",
         "makeIsTokenSnipedStmt"
       ],
       "imports": [
         "better-sqlite3",
+        "./dbPath",
+        "./dbSchema",
+        "./repoRoot",
         "./logger"
+      ],
+      "type": "module"
+    },
+    "src/utils/dbPath.ts": {
+      "exports": [
+        "resolveDbPath",
+        "canonicalDbPath",
+        "assertNotProdDbUnderVitest",
+        "probeExistingDb",
+        "assertDbOpenable",
+        "openGuardedDb"
+      ],
+      "imports": [
+        "better-sqlite3",
+        "fs",
+        "os",
+        "path"
+      ],
+      "type": "module"
+    },
+    "src/utils/dbSchema.ts": {
+      "exports": [
+        "CURRENT_SCHEMA_VERSION",
+        "migrateSchema"
+      ],
+      "imports": [
+        "better-sqlite3",
+        "./logger"
+      ],
+      "type": "module"
+    },
+    "src/utils/processLock.ts": {
+      "exports": [
+        "ProcessLockError",
+        "defaultLockDir",
+        "acquireProcessLock",
+        "tryAcquireThenRelease"
+      ],
+      "imports": [
+        "better-sqlite3",
+        "fs",
+        "os",
+        "path"
+      ],
+      "type": "module"
+    },
+    "src/utils/repoRoot.ts": {
+      "exports": [
+        "findRepoRoot"
+      ],
+      "imports": [
+        "fs",
+        "path"
       ],
       "type": "module"
     },
@@ -252,6 +403,16 @@
       ],
       "type": "module"
     },
+    "src/utils/mevStrategies/passthrough.ts": {
+      "exports": [
+        "PassthroughMevStrategy"
+      ],
+      "imports": [
+        "ethers",
+        "./reconciliation"
+      ],
+      "type": "module"
+    },
     "src/utils/exitManager.ts": {
       "exports": [
         "tryAcquireSellLock",
@@ -263,9 +424,13 @@
         "registerTimedSell",
         "registerExitMonitor",
         "hasExitMonitorTimer",
-        "clearAllTimersForToken"
+        "clearAllTimersForToken",
+        "clearAllTimers"
       ],
-      "imports": [],
+      "imports": [
+        "../guards/singleton",
+        "./logger"
+      ],
       "type": "module"
     },
     "src/utils/exitWatchdog.ts": {
@@ -278,19 +443,30 @@
       ],
       "type": "module"
     },
+    "src/utils/nonceAuthority.ts": {
+      "exports": [
+        "withNonceLock",
+        "_resetNonceChainsForTesting"
+      ],
+      "imports": [
+        "../guards/epoch",
+        "../guards/singleton"
+      ],
+      "type": "module"
+    },
     "src/utils/tokenSafety.ts": {
       "exports": [
-        "checkHoneypot",
-        "isBlacklistedToken",
-        "isLiquidityLocked",
-        "checkTokenMetadata",
-        "simulateSwap",
-        "isLiquiditySufficient",
-        "isKnownBadToken",
-        "hasMaxWalletOrTxLimits",
-        "simulateSell",
         "checkHoneypotForChain",
-        "isLiquidityLockedForChain"
+        "isLiquidityLockedForChain",
+        "isBlacklistedTokenForChain",
+        "checkTokenMetadataForChain",
+        "simulateSwapForChain",
+        "isLiquiditySufficientForChain",
+        "isKnownBadTokenForChain",
+        "hasMaxWalletOrTxLimitsForChain",
+        "checkHoneypot",
+        "isLiquidityLocked",
+        "simulateSell"
       ],
       "imports": [
         "./safetyProviders/goplus",
@@ -330,36 +506,10 @@
         "sendCtxAlert"
       ],
       "imports": [
+        "axios",
+        "dotenv",
         "../api/ws/broadcaster"
       ],
-      "type": "module"
-    },
-    "src/utils/gasManager.ts": {
-      "exports": [
-        "getGasOptionsForChain",
-        "getGasOptions"
-      ],
-      "imports": [
-        "../chainRegistry"
-      ],
-      "type": "module"
-    },
-    "src/utils/receiptDecoder.ts": {
-      "exports": [
-        "decodeReceipt"
-      ],
-      "imports": [
-        "./abis",
-        "ethers"
-      ],
-      "type": "module"
-    },
-    "src/utils/nonceAuthority.ts": {
-      "exports": [
-        "withNonceLock",
-        "_resetNonceChainsForTesting"
-      ],
-      "imports": [],
       "type": "module"
     },
     "src/utils/logger.ts": {
@@ -371,20 +521,12 @@
       ],
       "type": "module"
     },
-    "src/utils/abis.ts": {
+    "src/utils/withTimeout.ts": {
       "exports": [
-        "FACTORY_ABI",
-        "ROUTER_ABI",
-        "ERC20_ABI",
-        "PAIR_ABI",
-        "V3_FACTORY_ABI",
-        "V3_POOL_ABI",
-        "V3_SWAP_ROUTER_ABI",
-        "V3_QUOTER_V2_ABI",
-        "WETH_ABI"
+        "withTimeout"
       ],
       "imports": [],
-      "type": "data"
+      "type": "module"
     },
     "src/anti-rug/detector.ts": {
       "exports": [
@@ -392,9 +534,11 @@
         "unregisterAntiRugPosition",
         "getRegisteredPositions",
         "startChainAntiRugListener",
-        "getLogsForBackfill"
+        "getLogsForBackfill",
+        "evaluateRugSignals"
       ],
       "imports": [
+        "../guards/singleton",
         "./exitTrigger",
         "./lpBaseline",
         "./allowlist",
@@ -421,37 +565,50 @@
         "getRecentTriggers"
       ],
       "imports": [
-        "../utils/notifier"
+        "../utils/notifier",
+        "../api/ws/broadcaster"
       ],
       "type": "module"
     },
     "scripts/preflight.ts": {
       "exports": [],
       "imports": [
-        "../src/preflight"
+        "../src/preflight",
+        "../src/chainRegistry",
+        "../src/utils/provider"
+      ],
+      "type": "script"
+    },
+    "scripts/db-init.ts": {
+      "exports": [],
+      "imports": [
+        "better-sqlite3",
+        "../src/utils/dbPath",
+        "../src/utils/dbSchema",
+        "../src/utils/repoRoot"
+      ],
+      "type": "script"
+    },
+    "scripts/deliberate-buy.ts": {
+      "exports": [],
+      "imports": [
+        "../src/bot"
+      ],
+      "type": "script"
+    },
+    "scripts/check-vi-mock-paths.ts": {
+      "exports": [],
+      "imports": [
+        "typescript"
       ],
       "type": "script"
     },
     "contracts/honeypot/HoneypotChecker.sol": {
       "exports": [],
-      "imports": [],
-      "type": "module"
-    },
-    "src/utils/retry.ts": {
-      "exports": [
-        "retry"
-      ],
       "imports": [
-        "./logger"
+        "@openzeppelin/contracts"
       ],
-      "type": "util"
-    },
-    "src/utils/withTimeout.ts": {
-      "exports": [
-        "withTimeout"
-      ],
-      "imports": [],
-      "type": "util"
+      "type": "module"
     }
   }
 }

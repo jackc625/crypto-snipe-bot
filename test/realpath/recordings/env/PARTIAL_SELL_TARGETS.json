@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "partialSellTargets": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "PARTIAL_SELL_TARGETS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "partialSellTargets": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "PARTIAL_SELL_TARGETS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "partialSellTargets": ""
+            }
+          }
+        }
+      },
+      "env": {
+        "PARTIAL_SELL_TARGETS": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "partialSellTargets": ""
+            }
+          }
+        }
+      },
+      "env": {
+        "PARTIAL_SELL_TARGETS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "PARTIAL_SELL_TARGETS": "2x:50,5x:25"
+      }
+    }
+  },
+  "variable": "PARTIAL_SELL_TARGETS"
+}

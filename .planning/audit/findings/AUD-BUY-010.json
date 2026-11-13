@@ -76,5 +76,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with the order forced (plan 23-09, AC-12): MAX_OPEN_POSITIONS=1 and no open position; token A's real uniswap-v2 snipe passes canSnipe and is parked inside the wallet lock at its Flashbots simulation (held on the relay, not a provider read, AUD-TX-028); token B launches on sushiswap-v2 on the same chain and wallet and the bot's real sushiswap handler passes canSnipe and its gates while A's row is unwritten; released, both buys land: two swaps decoded with real ethers (A through the uniswap router, B through the sushiswap router, consecutive nonces) and two open trades rows against a limit of one (claim max-open-positions-overspent). A synchronous reservation taken when canSnipe passes reads looks fixed. Exposure and cooldown share the mechanism (code-read).",
+    "test_id": "AUD-BUY-010"
+  }
 }

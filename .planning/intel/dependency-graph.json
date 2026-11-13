@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "updated_at": "2026-11-06T18:51:04.222Z",
-    "version": 2
+    "updated_at": "2026-11-09T14:59:20.018Z",
+    "version": 3
   },
   "entries": {
     "ethers": {
@@ -9,10 +9,14 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
+        "src/main.ts",
+        "src/bot.ts",
         "src/chainRegistry.ts",
         "src/exitEngine.ts",
-        "src/utils/provider.ts",
-        "src/anti-rug/detector.ts"
+        "src/preflight.ts",
+        "src/anti-rug/",
+        "src/utils/",
+        "scripts/"
       ]
     },
     "@flashbots/ethers-provider-bundle": {
@@ -29,7 +33,11 @@
       "invocation": "require",
       "used_by": [
         "src/utils/mevStrategies/bloxroute.ts",
-        "src/utils/safetyProviders/"
+        "src/utils/notifier.ts",
+        "src/utils/tokenSafety.ts",
+        "src/utils/safetyProviders/",
+        "scripts/pause.ts",
+        "scripts/resume.ts"
       ]
     },
     "better-sqlite3": {
@@ -37,7 +45,13 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
-        "src/utils/db.ts"
+        "src/utils/db.ts",
+        "src/utils/dbPath.ts",
+        "src/utils/dbSchema.ts",
+        "src/utils/processLock.ts",
+        "scripts/db-init.ts",
+        "scripts/forensic-db.ts",
+        "scripts/nac01-exact-value-check.ts"
       ]
     },
     "express": {
@@ -46,7 +60,8 @@
       "invocation": "require",
       "used_by": [
         "src/api/server.ts",
-        "src/api/routes/"
+        "src/api/routes/",
+        "src/api/middleware/"
       ]
     },
     "helmet": {
@@ -78,8 +93,8 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
-        "src/api/ws/broadcaster.ts",
-        "src/api/ws/handler.ts"
+        "src/api/server.ts",
+        "src/api/ws/"
       ]
     },
     "uuid": {
@@ -95,7 +110,8 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
-        "src/utils/logger.ts"
+        "src/utils/logger.ts",
+        "src/chainRegistry.ts"
       ]
     },
     "telegram": {
@@ -103,7 +119,8 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
-        "src/telegramListener.ts"
+        "src/telegramListener.ts",
+        "scripts/telegram-login.ts"
       ]
     },
     "dotenv": {
@@ -111,7 +128,11 @@
       "type": "production",
       "invocation": "require",
       "used_by": [
-        "src/config.ts"
+        "src/main.ts",
+        "src/config.ts",
+        "src/utils/notifier.ts",
+        "hardhat.config.ts",
+        "scripts/"
       ]
     },
     "@openzeppelin/contracts": {
@@ -119,7 +140,8 @@
       "type": "production",
       "invocation": "implicit",
       "used_by": [
-        "contracts/"
+        "contracts/FakeToken.sol",
+        "contracts/honeypot/HoneypotChecker.sol"
       ]
     },
     "vitest": {
@@ -131,6 +153,15 @@
         "test:unit",
         "test:integration",
         "test:fork",
+        "test:all",
+        "test:coverage"
+      ]
+    },
+    "@vitest/coverage-v8": {
+      "version": "^4.1.2",
+      "type": "development",
+      "invocation": "npm run test:coverage",
+      "used_by": [
         "test:coverage"
       ]
     },
@@ -142,22 +173,44 @@
         "hardhat.config.ts"
       ]
     },
+    "@nomicfoundation/hardhat-toolbox": {
+      "version": "^6.1.0",
+      "type": "development",
+      "invocation": "implicit",
+      "used_by": [
+        "hardhat.config.ts"
+      ]
+    },
+    "@nomicfoundation/hardhat-ignition-ethers": {
+      "version": "^0.15.14",
+      "type": "development",
+      "invocation": "implicit",
+      "used_by": [
+        "hardhat.config.ts"
+      ]
+    },
     "typescript": {
       "version": "5.8.3",
       "type": "development",
       "invocation": "npm run build",
       "used_by": [
-        "build"
+        "build",
+        "check:vi-mock"
       ]
     },
     "ts-node": {
       "version": "10.9.2",
       "type": "development",
-      "invocation": "npm run preflight",
+      "invocation": "npm start",
       "used_by": [
+        "start",
         "preflight",
         "pause",
-        "resume"
+        "resume",
+        "db:init",
+        "backup:state",
+        "baselines:capture",
+        "check:vi-mock"
       ]
     },
     "eslint": {

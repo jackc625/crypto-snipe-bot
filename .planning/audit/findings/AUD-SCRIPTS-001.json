@@ -240,5 +240,11 @@
       ],
       "outcome": "mainnet gas spent from the trading wallet for test contracts; a failure part-way leaves deployed contracts recorded only in the console output"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Proven statically (plan 23-13): the directory walk of scripts/ goes to ts.createProgram (options mirroring tsconfig.json, resolveJsonModule) and each script's relative imports are resolved with the compiler's module resolution; exactly addLiquidity and deploySepoliaTest have unresolved imports (claim legacy-scripts-unresolved-artifact-imports, observed ['addLiquidity','deploySepoliaTest'], correct []), every unresolved specifier is a compiled artifact under ../artifacts/contracts/, and each script misses the three artifacts whose Solidity source does not exist (IWETH, UniswapV2Factory, UniswapV2Router02), so neither can load and nothing is signed (FakeToken's artifact varies by machine and changes no row). Sub-claims 2 to 5 (mainnet ALCHEMY_URL with the bot key, the FakeToken constructor mismatch, the zero-minimum liquidity, the partial addresses.json writes) stay code-read. Deleting both scripts, the recommendation (card SCRIPTS-03, HYG-03), flips the claim to looks fixed and flips no other test (fix-shaped mutation, restored from git). Feeds the census exception list in plan 23-17 (the legacy scripts hold 10 of the 12 script exceptions under AUD-SCRIPTS-002); card SCRIPTS-01 stays open (operator, Phase 22).",
+    "test_id": "AUD-SCRIPTS-001"
+  }
 }

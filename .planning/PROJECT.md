@@ -75,6 +75,11 @@ verification items closed with real-mainnet artifacts. Multi-chain deploy
 
 ## Requirements
 
+### Validated (v7.0, in progress)
+
+- ✓ AUDIT-01..06 — full audit: findings register, bug-class sweep, thresholds inventory, operator decision cards (Phase 22); every candidate triaged on the real path (52 confirmed with committed RED tests, 8 already fixed, 1 kept open as unreproduced by operator ruling, 0 NOT-A-BUG; all 44 confirmed S0/S1 acknowledged in TRIAGE-REVIEW-01) and the commit taxonomy enforced in CI (Phase 23) — Phases 22–23
+- ✓ CHAR-01..06 — behavior locked before the restructure: real-path harness, golden-master decision-trace recordings (21 scenarios, known bugs tagged `SUSPECT(<id>)`), env-matrix snapshots, boot/resume/arm ordering and signing census (23 sites, floor 23), migration goldens on the real migrations, source-text tests converted; test-only, `src/` unchanged — Phase 23
+
 ### Validated (v6.17)
 
 68/70 v6.17 requirements shipped (ETH-first) and archived in [milestones/v6.17-REQUIREMENTS.md](milestones/v6.17-REQUIREMENTS.md). HONEY-04 + ANTIRUG-15 (multi-chain) carried forward.
@@ -105,8 +110,6 @@ All 48 v1 requirements shipped and archived in [milestones/v6.16-REQUIREMENTS.md
 
 _Scoped requirements with REQ-IDs live in [REQUIREMENTS.md](REQUIREMENTS.md)._
 
-- [ ] Full adversarial audit of the codebase with a findings register (correctness + design)
-- [ ] Behavior locked by characterization tests before any structural change
 - [ ] Deep restructure: oversized files split, `src/` organized by domain, `utils/` dissolved
 - [ ] Zero ESLint errors under type-checked rules; no floating/misused promises
 - [ ] All confirmed bugs fixed; capital-safety findings RED-proven on the real path
@@ -222,6 +225,11 @@ _v6.16 reference: shipped 2026-04-14 after 26 days; 379 files, +87,015 / −71 a
 | Convert the bot to ESM; contracts in their own package | Node type stripping needs `.ts` specifiers anyway (one codemod, before the restructure); isolating contracts keeps Hardhat 3's ESM requirement from coupling to the bot | — Pending (operator decision 2026-11-06) |
 | TS 7 for `tsc` + TS 6 alias for typescript-eslint | TS 7.0 has no compiler API until 7.1; typescript-eslint peer `<6.1` (issue #12518); collapse when supported | — Pending (research-verified 2026-11-06) |
 | Replace `@flashbots/ethers-provider-bundle` with an in-repo relay client | Unmaintained, sole cause of `--legacy-peer-deps`, loads a second ethers copy under ESM; late isolated money-path step with fork + live re-proof | — Pending (operator decision 2026-11-06) |
+| Real-path test harness: real ethers and real migrations against an in-process fake JSON-RPC node (real loopback HTTP/WS for child processes), fixed clock; only logger, notifier, broadcaster, relay HTTP and clock may be mocked | Mocking the mechanism under test let money-path bugs pass; the fake node fails any unknown method, read or URL, so a test cannot pass vacuously | ✓ Good (Phase 23; realpath 70 files 344/344; mock-list gate in CI) |
+| Golden-master decision-trace recordings lock current behavior; any commit that changes a recording must be a `behavior:` commit citing an existing `AUD-`/`OD-` ID, and CI fails if a committed recording went uncompared in a run | Makes refactor/lint/fmt/deps commits provably behavior-neutral and every behavior change traceable to a decision; known bugs are tagged `SUSPECT`, never locked in as `KEEP` | ✓ Good (Phase 23; `check:commits` + `check:recordings-compared` in CI) |
+| Standing AC-37 gate: no test reads a named `src/` or `scripts/` file | Source-text tests break or go silently stale when the restructure moves files; tests find modules by exported symbol instead | ✓ Good (Phase 23; unit-suite AST gate, 3 dashboard tests allow-listed) |
+| Successor seals over `.planning/audit/` (SEAL-23 points back to the untouched Phase 22 SEAL.json; a sealed record is never edited) | Keeps the register tamper-evident while later phases extend it | ✓ Good (Phase 23; SEAL VALID at 912b915) |
+| No deliberate (manual) buy until Phase 24 fixes AUD-BUY-001 and AUD-ANTIRUG-025 | Triage proved the running bot does not monitor a manual buy until a restart (S0), and that restart drops the anti-rug subscription (S1), so the old "restart after a manual buy" rule no longer protects the position | — In force (operator ruling TRIAGE-REVIEW-01-D1, 2026-11-12; supersedes ESC-BUY-01) |
 
 ## Evolution
 
@@ -241,4 +249,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-06 at v7.0 milestone start (Full Audit & Modernization)*
+*Last updated: 2026-11-12 after Phase 23*

@@ -65,5 +65,11 @@
   "recommendation": "Require that exactly one side of the pair is the chain wrapped-native token before any check runs, and drop the event otherwise. Phase 24 (capital). Nothing is fixed in Phase 22 (NAC-13).",
   "external_sources": [
     "codex-BUY-10"
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path, V2 (claim non-native-pair-checked-and-bought): a real addLiquidity(A, B) with its PairCreated (A/B pair at its CREATE2 address, 2 B, LP 95 percent burned) through the real listener: the bot processes it as a snipe, reads B's reserve as 2.0 ETH of liquidity, passes the Unicrypt-404 burn fallback, buys A through WETH (a pool no check read) and arms anti-rug on the A/B pair. V3 (claim non-native-v3-pool-processed; added in the Phase 23 code-review fix run, WR-22, and registered by operator ruling 2026-11-12, PN-002): an A/B pool launched by a real signed position-manager multicall(createAndInitializePoolIfNecessary, mint) at its real CREATE2 address, mined with the factory's PoolCreated and the pool's Mint in one block, reaches the real V3 listener; the bot logs 'New V3 pool detected' for it and sends a buy of A through its WETH pool, a pool the launch event never named. A 'no WETH side, skip' guard in both handlers flips both claims; a V2-only guard leaves the V3 claim recorded.",
+    "test_id": "AUD-BUY-027"
+  }
 }

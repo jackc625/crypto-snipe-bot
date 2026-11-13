@@ -1,0 +1,47 @@
+RED proof 23-14-3
+Plan 23-14 (AC-13). Recorded 2026-11-12T01:41:36Z at HEAD 09479ec469a4696bc8699a06366cd6870fc4fe3e, Node v22.16.0.
+Neutralised file (working tree only, never committed): vitest.config.ts
+git blob before: 5b5c8799438465623b47f2924a3d12f911a06681 (equals HEAD:vitest.config.ts)
+
+== Neutralising diff (git diff) ==
+medit: applied to vitest.config.ts
+diff --git a/vitest.config.ts b/vitest.config.ts
+index 5b5c879..5e25156 100644
+--- a/vitest.config.ts
++++ b/vitest.config.ts
+@@ -1,5 +1,9 @@
+ import path from 'path';
+ import { defineConfig } from 'vitest/config';
++// RED 23-14-3: the 2026-11-06 event shape (a dotenv config call in this file), never executed:
++// the branch needs an env value nothing sets, and the path is a temp file that does not exist.
++import { config } from 'dotenv';
++if (process.env.CSB_RED_23_14_NEVER_SET === 'never-set') config({ path: path.join('C:/csb-red-23-14-no-such-dir', 'no-such.env'), quiet: true });
+ 
+ // SAFE-02 (Phase 22 plan 22-05): the Vitest main process loads NO .env file. No env-file
+ // loader is imported here, and `envDir: false` stops Vite reading .env / .env.local /
+
+== RED command (only the named file) ==
+node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/forkShellOnly.test.ts
+
+== RED result ==
+vitest exit 1
+     × (d) the Vitest main-process closure of both configs loads no .env 63ms
+ FAIL   unit  test/unit/rails/forkShellOnly.test.ts > fork project reads only the shell and itself (AC-17) > (d) the Vitest main-process closure of both configs loads no .env
+AssertionError: expected { closure: [ …(7) ], …(1) } to deeply equal { closure: [ …(7) ], findings: [] }
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+
+The finding the scanner reported (from the full output):
++     "vitest.config.ts:6 calls dotenv config()",
+
+== Restore ==
+git -c core.autocrlf=false checkout -- vitest.config.ts
+git blob after restore: 5b5c8799438465623b47f2924a3d12f911a06681 (IDENTICAL to HEAD)
+git status --porcelain -- src test vitest.config.ts: ''
+
+== GREEN rerun ==
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+vitest exit 0

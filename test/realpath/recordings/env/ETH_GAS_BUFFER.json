@@ -1,0 +1,53 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "gasBuffer": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_GAS_BUFFER": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "gasBuffer": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_GAS_BUFFER": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_GAS_BUFFER": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_GAS_BUFFER": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_GAS_BUFFER": "0.005"
+      }
+    }
+  },
+  "variable": "ETH_GAS_BUFFER"
+}

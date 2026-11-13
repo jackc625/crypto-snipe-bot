@@ -1,0 +1,79 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "EXIT",
+  "duplicate_of": null,
+  "related": [
+    "AUD-EXIT-001",
+    "AUD-BUY-033",
+    "AUD-TX-015"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-07 executor)"
+  ],
+  "found_date": "2026-11-11",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-EXIT-027",
+  "title": "A V3 exit leaves its proceeds as WETH in the wallet and nothing ever unwraps them, while the bot buys, pays gas and checks its wallet floor in native ETH only",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C04"
+  ],
+  "files": [
+    "src/exitEngine.ts",
+    "src/utils/receiptDecoder.ts",
+    "src/preflight.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/exitEngine.ts:378-407@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buildV3SellTx: exactInputSingle with tokenOut wethAddress (:391) and recipient walletAddress (:393), wrapped alone in multicall(deadline, [swapData]) (:400); no unwrapWETH9 in the batch, so SwapRouter02 pays WETH to the wallet"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/receiptDecoder.ts:88@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the decoder reads the V3 proceeds as \"WETH Transfer to wallet (V3 path -- WETH sent directly without unwrap)\": the WETH result is known to the code, but nothing converts it"
+    },
+    {
+      "type": "code",
+      "ref": "src/preflight.ts:199@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "checkWalletBalance reads httpProvider.getBalance (native ETH only); :387 the entry gate the same; WETH in the wallet counts for neither"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:548@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "buys send native ETH as value (also :748), so WETH proceeds cannot fund the next buy or any gas"
+    },
+    {
+      "type": "command",
+      "ref": "git grep -n -i -e \"unwrapWETH9\" -e \".withdraw(\" -e \"WETH_ABI\" -- src scripts (at 23a6461 and HEAD)",
+      "note": "WETH_ABI is used only by the receipt decoder; there is no WETH withdraw or unwrapWETH9 call anywhere in src or scripts"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-EXIT-027.test.ts (Node 22.16.0, 2026-11-11)",
+      "note": "real ETH V3 snipe, stop-loss sell landed through the Flashbots bundle: the decoded multicall holds one exactInputSingle paying WETH to the wallet, no unwrapWETH9, and the wallet sends nothing in the minute after (claim v3-exit-proceeds-stay-weth); an unwrap in the batch and a WETH withdraw after the sell each read looks fixed (scratch src mutations, restored identical)"
+    }
+  ],
+  "sibling_sites_checked": "Every sell builder: buildV2SellTx (swapExactTokensForETH, the router unwraps and pays native ETH: not affected), executePublicFallbackSell (V2 swapExactTokensForETHSupportingFeeOnTransferTokens: native ETH, not affected), buildV3SellTx (affected; V3 has no public fallback, AUD-EXIT-007). The V3 snipe buy (bot.ts multicall with exactInputSingle, recipient the wallet, tokenOut the token) is not affected: it receives the token. scripts/ hold no unwrap. Affected chains: every chain with a V3 dex in its template (ETH uniswap-v3, BSC pancakeswap-v3 and uniswap-v3, Base and Arbitrum uniswap-v3), on every private route (Flashbots, bloXroute, passthrough), full and partial exits, anti-rug exits included.",
+  "status": "confirmed",
+  "severity_rationale": "S3 (misleading behavior and ops friction), capital none, graded by the 23-07 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. No funds are lost (WETH is redeemable 1:1) and the recorded proceeds are right, but every V3 exit moves trading capital out of the native balance the bot spends: buys, gas for later exits and the wallet-floor checks see less than the wallet holds, so the bot can pause or refuse buys early, and the operator must unwrap by hand. Not S2: the wallet floor keeps native gas in reserve for exits, so no exit is left without gas by this alone (code read, not run).",
+  "recommendation": "Phase 29: make the V3 exit pay native ETH (exactInputSingle with recipient the router, then unwrapWETH9(minOut, wallet) in the same multicall; the minimum ties to AUD-EXIT-001), or unwrap WETH after each V3 exit; until then count WETH in the balance and floor checks. test/realpath/triage/AUD-EXIT-027.test.ts reads looks fixed for both shapes. Nothing is fixed in Phase 23.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Found by 23-07 while proving AUD-EXIT-001: a real ETH V3 stop-loss sell landed through the Flashbots bundle decodes as multicall([exactInputSingle(tokenOut WETH, recipient the wallet)]) with no unwrapWETH9, and the wallet sends nothing in the minute after, so the proceeds stay WETH (claim v3-exit-proceeds-stay-weth); an unwrap in the batch and a WETH withdraw after each read looks fixed. Not in the frozen population; recorded so check.ts can locate its claim.",
+    "test_id": "AUD-EXIT-027"
+  }
+}

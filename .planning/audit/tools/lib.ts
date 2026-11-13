@@ -88,6 +88,22 @@ export const CAPITAL_TEXT: { id: string; text: string }[] = [
 export const LIFECYCLE_TEXT =
     'candidate -> confirmed -> decided -> fixed -> verified, or NOT-A-BUG (never for a research candidate in Phase 22).';
 
+// Phase 23 triage record (D-21). Shared by check.ts (the rules) and
+// set-triage.ts (the one writer), so the two can never disagree; the written
+// contract is PROTOCOL.md "Phase 23 triage record".
+export const TRIAGE_OUTCOMES = ['confirmed', 'NOT-A-BUG', 'fixed', 'unreproduced'];
+/** Every key a triage block may carry, in the order set-triage.ts writes them. */
+export const TRIAGE_KEYS = [
+    'outcome', 'phase', 'note', 'test_id', 'proof', 'rail_test', 'ruling_ref', 'needs_fork', 'fork_question',
+    'fork_ref', 'manual_evidence', 'proven_claims', 'open_claims', 'evidence',
+];
+/** Same claim shape the marker enforces (test/realpath/harness/knownBug.ts CLAIM_RE). */
+export const CLAIM_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Operator review records: reviews/<ID>.json, for example TRIAGE-REVIEW-01. */
+export const REVIEW_ID_RE = /^[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-\d{2,}$/;
+/** Unrun fork verification entries in inputs/unrun-fork-verifications.json. */
+export const UFV_ID_RE = /^UFV-\d{2,}$/;
+
 export const ID_RE = {
     finding: /^AUD-([A-Z][A-Z0-9]*)-(\d{3})$/,
     escalation: /^ESC-([A-Z][A-Z0-9]*)-(\d{2,})$/,

@@ -6,8 +6,13 @@
   "slice": "RAIL",
   "severity": "S1",
   "capital_impact": "EXPOSURE",
-  "classes": ["C17", "C18"],
-  "files": ["vitest.config.ts"],
+  "classes": [
+    "C17",
+    "C18"
+  ],
+  "files": [
+    "vitest.config.ts"
+  ],
   "evidence": [
     {
       "type": "command",
@@ -31,18 +36,32 @@
     }
   ],
   "sibling_sites_checked": "Other sites that load the real .env in a test or tool process at the base SHA: git grep dotenv in src shows src/config.ts:4 and src/utils/notifier.ts:6 (import-time dotenv.config()), so any test process importing either also reaches the real credentials. src/utils/notifier.ts:10 builds the api.telegram.org URL from TELEGRAM_BOT_TOKEN and posts with axios at :44 and :80 with no VITEST guard. The fork project spawns Hardhat from .env (test/fork/setup.ts), and the cache cannot show whether the 11:21 run included it. Only one Vitest cache folder exists. Whether any non-DB test made a network or Telegram call at 11:21 cannot be determined from disk.",
-  "status": "confirmed",
+  "status": "fixed",
   "origin": "independent",
   "rc": [],
   "research_suggested_severity": null,
   "severity_rationale": "S1 EXPOSURE: a test run happened with real credentials in reach of non-loopback network code. No capital moved: the bot is OFF and the live DB is unchanged by mtime. Cause per the operator (22-CONTEXT.md D-23 (a)): an automated tool or agent.",
   "duplicate_of": null,
-  "related": ["AUD-RAIL-002"],
-  "tags": ["rail"],
+  "related": [
+    "AUD-RAIL-002"
+  ],
+  "tags": [
+    "rail"
+  ],
   "escalation_ref": "ESC-PRE-01",
   "od_ref": null,
   "recommendation": "The SAFE-02 rails (22-05, 22-07..22-10) close this class: scrub-then-replace env, a blocked .env read, the DB tripwire, the network deny and the notifier refusal, at both layers. Until they land, no Vitest command runs in the main checkout (D-13). The operator may check the bot's Telegram chat around 11:21 on 2026-11-06 for an unexpected message. Nothing is fixed in Phase 22 beyond the planned rails (NAC-13).",
-  "reported_by": ["claude (22-04 executor)", "claude (22 phase researcher, STL-2)"],
+  "reported_by": [
+    "claude (22-04 executor)",
+    "claude (22 phase researcher, STL-2)"
+  ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "A past event: on 2026-11-06 a Vitest run in the main checkout loaded the real .env because vitest.config.ts called dotenv config(); the rails now refuse every way a Vitest run can load it (no dotenv in either Vitest config's main-process closure, envDir false reaching each project through extends true, the worker .env read block with scrub-then-sentinel env, the VITEST-gated src dotenv sites), and a recurrence of the event's own shape fails the named rail test (RED proof 23-14-3); this does not undo the event: whether the bot's Telegram chat got a message around 11:21 that day stays unchecked, as the original recommendation says",
+    "proof": "Rail test fork project reads only the shell and itself (AC-17) > (d) the Vitest main-process closure of both configs loads no .env (test/unit/rails/forkShellOnly.test.ts, marker closes-finding: AUD-RAIL-001); it has no row in .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md, so 23-14 recorded its RED proof .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-3-vitest-config-dotenv.txt: the event's own cause, a dotenv config call in vitest.config.ts (written so it never runs: a branch on an env value nothing sets, and a temp path that does not exist), makes only this test fail, naming vitest.config.ts:6 calls dotenv config(), and vitest.config.ts was restored byte for byte; the other ways a Vitest run could load the real .env each have a RED-proven rail test: the Vite env-file path (row 30, no Vitest config reads the .env files of its root in test/unit/rails/vitestEnvFile.test.ts, also marked), a worker read of the repo .env (row 2, envSentinel env block) and the src dotenv sites (rows 16 and 17, dotenvSrcSkip)",
+    "rail_test": "fork project reads only the shell and itself (AC-17) > (d) the Vitest main-process closure of both configs loads no .env"
+  }
 }

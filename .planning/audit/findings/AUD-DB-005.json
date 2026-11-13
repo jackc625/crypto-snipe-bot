@@ -57,5 +57,11 @@
   ],
   "tags": [],
   "od_ref": "OD-10",
-  "recommendation": "Load .env before the logger is first imported (or make the logger read the level lazily), after redaction is in place for err objects. Card OD-10. Phase 29 unless the card says otherwise."
+  "recommendation": "Load .env before the logger is first imported (or make the logger read the level lazily), after redaction is in place for err objects. Card OD-10. Phase 29 unless the card says otherwise.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced as production behavior (plan 23-13): fixtures/logLevelOrder.ts runs as a railed child with VITEST unset (so src/config.ts:5 calls dotenv.config(); the review concern that a VITEST child proves nothing is closed), from a throwaway folder whose inert .env sets LOG_LEVEL=debug; it deletes the sentinel LOG_LEVEL first, imports src/config (bot.ts's first project module), then src/utils/logger. The child reports vitest false and LOG_LEVEL 'debug' loaded from the file, and the logger's level 'info' (claim log-level-from-env-file-not-applied, observed {loggerLevel info}, correct {loggerLevel debug}): logger.ts reads LOG_LEVEL during its import, which config.ts runs before dotenv.config(). src/main.ts keeps that order on purpose (it reads .env into a private object, src/main.ts:39-42), so a real start behaves the same. Phase 29 reading (card OD-10): loading .env before the logger's first import, or a lazy level, flips the claim to looks fixed (fix-shaped mutation of src/utils/logger.ts, restored byte for byte); per the finding, land it after redaction, because debug output carries ethers error objects with RPC URLs (AUD-TX-014).",
+    "test_id": "AUD-DB-005"
+  }
 }

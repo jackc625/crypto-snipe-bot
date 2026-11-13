@@ -1,0 +1,69 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "wsRpcUrl": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_WS_URL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "wsRpcUrl": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_WS_URL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "wsRpcUrl": null
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_WS_URL": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "arb": {
+              "wsRpcUrl": null
+            }
+          }
+        }
+      },
+      "env": {
+        "ARB_WS_URL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ARB_WS_URL": "ws://127.0.0.1:1"
+      }
+    }
+  },
+  "variable": "ARB_WS_URL"
+}

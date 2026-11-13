@@ -1,0 +1,183 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "bsc": "0"
+              }
+            }
+          }
+        },
+        "registry": {
+          "value": {
+            "bsc": {
+              "httpRpcUrl": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_RPC_URL": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "bsc": "abc"
+              }
+            }
+          }
+        },
+        "registry": {
+          "value": {
+            "bsc": {
+              "httpRpcUrl": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_RPC_URL": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "bsc": "https://bsc-dataseed.binance.org/"
+              }
+            }
+          }
+        },
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "bsc",
+                "entryCount": 1,
+                "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "bsc",
+                "envVar": "BSC_RPC_URL"
+              },
+              "level": "fatal",
+              "msg": "Missing HTTP RPC URL for enabled chain"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "BSC_RPC_URL": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "rpc": {
+                "bsc": "https://bsc-dataseed.binance.org/"
+              }
+            }
+          }
+        },
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "bsc",
+                "entryCount": 1,
+                "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "bsc",
+                "envVar": "BSC_RPC_URL"
+              },
+              "level": "fatal",
+              "msg": "Missing HTTP RPC URL for enabled chain"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "BSC_RPC_URL": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_RPC_URL": "http://127.0.0.1:1"
+      }
+    }
+  },
+  "variable": "BSC_RPC_URL"
+}

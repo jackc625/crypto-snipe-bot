@@ -39,7 +39,10 @@
   },
   "hooks": {
     "context_warnings": true,
-    "workflow_guard": true
+    "workflow_guard": true,
+    "secret_read_exempt": [
+      "test/.env.test"
+    ]
   },
   "intel": {
     "enabled": true
@@ -65,6 +68,12 @@
     },
     "effort": {
       "codex": "xhigh"
+    },
+    "context_window_tokens": {
+      "codex": 500000
+    },
+    "timeouts": {
+      "codex": 3600
     }
   }
 }

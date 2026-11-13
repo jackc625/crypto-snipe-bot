@@ -48,6 +48,7 @@ function probe(opts: SpawnRailedOptions = {}, flags: string[] = []): ProbeOut {
 }
 
 describe('railed child processes (D-03)', () => {
+    // closes-finding: AUD-TESTI-011 (rail test for its railed-child reach, RED proof row 5 of red-proofs/INDEX.md)
     it('a child sees the sentinel token, full rails, VITEST, the 192.0.2.1 deny, the data deny and the parent run id', () => {
         const saved = process.env.TELEGRAM_BOT_TOKEN;
         let out: ProbeOut;

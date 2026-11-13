@@ -8,8 +8,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # WR-31: a hung self-test child or a git prompt must not hold the runner for GitHub's 6-hour
+    # default. Measured on the operator's machine (Node 22.16.0, 2026-11-12): npm run test:unit
+    # 71 s; the four railed self-test children allow 240 s each. 45 minutes covers the install,
+    # the three suites, the gates, the dashboard install and the three type checks with headroom.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the signing census floor check (CHAR-04 / AC-34) walks every commit
+          # that touches scripts/signing-census-exceptions.json and refuses a shallow clone.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -17,12 +26,59 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run test:unit
       - run: npm run test:integration
+      - run: npm run test:realpath
+      - name: Recordings compared gate (AUDIT-06)
+        # AUDIT-06: the commit taxonomy gate below protects each recording file, but a commit can
+        # point a scenario test at a brand-new recording name and add that file while the old
+        # recording stays, unread. compareRecording records every recording it compares in a run,
+        # and this step fails when a recording git tracks under test/realpath/recordings/ (a
+        # scenario .jsonl or an env/*.json snapshot file) was not compared, or a compared path is
+        # not tracked. It judges the run the step above just made: this job runs on a new machine
+        # and only that step runs the realpath project, so --sole-run (CI only) finds exactly one
+        # run and exits 2 on zero or several. No record for the run is exit 2, never a pass.
+        run: npm run check:recordings-compared -- --sole-run
       - name: vi.mock specifier gate (SAFE-06)
         # SAFE-06: a moved file must not turn a mock into a silent no-op. AST check of
         # vi.mock / vi.doMock / vi.unmock / vi.doUnmock: each specifier must be a literal that
         # resolves to a real module from the file that contains the call. The deliberately
         # broken fixtures under test/fixtures/viMockGate are excluded from the suite scan.
         run: npm run check:vi-mock
+      - name: Real-path mock-list gate (CHAR-01)
+        # CHAR-01 / AC-02: a real-path test proves the real mechanism, so under test/realpath/ only
+        # the logger, notifier, dashboard broadcaster, relay HTTP (axios) and the Telegram client
+        # library may be mocked, compared by resolved file; the clock is vi.useFakeTimers. A mock
+        # of anything else (the database, ethers, a bot module), vi.stubGlobal, vi.importMock, a
+        # vi.spyOn other than vi.spyOn(process, 'exit'), or an alias of vi fails the build. AST and
+        # binding-aware, with no exemption inside the folder. The scan also covers every module
+        # those files and the realpath setupFiles import outside src/ (helpers, rails), and reads
+        # vitest.config.ts: the realpath project may carry only the ethers CommonJS alias (WR-26).
+        run: npm run check:realpath-mocks
+      - name: Signing census gate (CHAR-04)
+        # CHAR-04 / D-NONCE-AUTHORITY-ALL: every transaction-signing site in src/ and scripts/ must
+        # run inside withNonceLock, because a nonce race on a signing wallet costs money directly.
+        # The type-aware census fails on a new unlocked signing site, on a listed exception that
+        # was fixed or removed, on an unknown lock status, below the floor of signing sites, or
+        # on an empty scan; each listed exception must name its finding and an operator decision
+        # record that covers it (scripts/signing-census-exceptions.json). The second command
+        # refuses a commit that lowered the floor without naming the finding that removed the
+        # site, and refuses a shallow clone (hence fetch-depth: 0 above). It reads type information
+        # only (every .ts .tsx .mts .cts .js .jsx .mjs .cjs file under src/ and scripts/, WR-25);
+        # it does not load better-sqlite3 or any bot module.
+        run: |
+          npm run check:census
+          npm run check:census -- --check-floor-history
+      - name: Commit taxonomy gate (AUDIT-06)
+        # AUDIT-06 / D-17 / D-18: protects the golden-master recording, so a re-record cannot
+        # launder a behavior change. Every non-merge commit after the first recording commit is
+        # judged: a commit that changes, removes or re-adds anything under
+        # test/realpath/recordings/ (the scenario recordings and the env snapshot) fails unless
+        # its subject is behavior: or behavior(<scope>): and every OD-<n> / AUD-<AREA>-<NNN> it
+        # cites exists in that commit's own tree; adding a brand-new scenario or env variable
+        # passes. A clean merge is not judged (its inner commits are); a merge whose own result
+        # changes the folder (a conflict resolution, an edit during the merge) is judged like any
+        # commit for those paths (WR-27). Needs the full history (fetch-depth: 0 above): a
+        # shallow clone exits 2.
+        run: npm run check:commits
       - name: Ban .todo test stubs
         run: |
           # D-09: Strict ban (NOT allowlist-with-reason). Use it.skip('reason: ...') instead.
@@ -78,6 +134,7 @@ jobs:
 
   detect-contract-changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
     steps:
@@ -120,9 +177,12 @@ jobs:
           python-version: '3.11'
       - run: npm ci --legacy-peer-deps
       - name: Install slither-analyzer + solc-select
+        # WR-31: exact versions (confirmed on PyPI 2026-11-12), so a re-run cannot pick up a newer
+        # analyzer that changes the --fail-medium result for the same commit. slither-analyzer
+        # 0.11.6 needs Python >= 3.10 (3.11 above); its crytic-compile needs solc-select >= 1.0.4.
         run: |
           pip install --upgrade pip
-          pip install slither-analyzer
+          pip install slither-analyzer==0.11.6 solc-select==1.2.0
           solc-select install 0.8.28
           solc-select use 0.8.28
       - name: Prepare reports directory
@@ -153,9 +213,11 @@ jobs:
           python-version: '3.11'
       - run: npm ci --legacy-peer-deps
       - name: Install mythril
+        # WR-31: an exact version (confirmed on PyPI 2026-11-12; the latest release, which the
+        # unpinned install resolved to).
         run: |
           pip install --upgrade pip
-          pip install mythril
+          pip install mythril==0.24.8
       - name: Prepare reports directory + solc-settings
         run: |
           mkdir -p reports

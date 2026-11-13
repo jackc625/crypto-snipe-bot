@@ -1,0 +1,75 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "DAILY_LOSS_PCT": {
+                "details": "Daily loss on probe-daily-loss: 0.5000 exceeds 0% of 1.0"
+              },
+              "MAX_OPEN_POSITIONS": {
+                "details": "Daily loss on probe-open-positions-next: 0.0000 exceeds 0% of 1.0",
+                "reason": "daily_loss_limit"
+              },
+              "MAX_TOTAL_EXPOSURE": {
+                "details": "Daily loss on probe-exposure-next: 0.0000 exceeds 0% of 1.0",
+                "reason": "daily_loss_limit"
+              },
+              "SNIPE_COOLDOWN_MS": {
+                "details": "Daily loss on probe-cooldown: 0.0000 exceeds 0% of 1.0",
+                "reason": "daily_loss_limit"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "DAILY_LOSS_PCT": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "DAILY_LOSS_PCT": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "DAILY_LOSS_PCT": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "DAILY_LOSS_PCT": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "DAILY_LOSS_PCT": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "DAILY_LOSS_PCT": "10"
+      }
+    }
+  },
+  "variable": "DAILY_LOSS_PCT"
+}

@@ -1,0 +1,134 @@
+{
+  "name": "PHASE23",
+  "contributions": [
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-ANTIRUG-024"
+      ],
+      "search": "23-01 real-path harness run (AC-01 scenario) plus a read of every chain_state writer and reader in src (git grep chain_state, upsertChainState, getChainState, setAntirugDryRunStarted) at 23a6461 and 05c1665"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-TX-027"
+      ],
+      "search": "23-05 real-path AUD-TX-007 strategy test (eth_estimateGas 1 000 000, mev.escalation.unaffordable fields) plus a read of every buyGasLimit/sellGasLimit/maxGasLimit site in src/utils/mevStrategies, src/preflight.ts and the tx builders in src/bot.ts at 23a6461 and HEAD"
+    },
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-ANTIRUG-025"
+      ],
+      "search": "23-06 real-path AUD-BUY-001 restart and AUD-ANTIRUG-025 proof (node.subscriptions, eth_subscribe/eth_unsubscribe in callLog) plus a read of every startChainAntiRugListener caller and every wsProvider.on/off site in src (git grep startChainAntiRugListener, wsProvider.on, wsProvider.off) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider on/off/#getSub/#hasSub"
+    },
+    {
+      "class": "C04",
+      "area": "src",
+      "ids": [
+        "AUD-EXIT-027"
+      ],
+      "search": "23-07 real-path AUD-EXIT-001 and AUD-EXIT-027 V3 sell proofs (decoded SwapRouter02 multicall, wallet transactions after the sell) plus a read of every sell builder in src/exitEngine.ts, the receipt decoder and every getBalance/WETH reference in src and scripts (git grep unwrapWETH9, withdraw(, WETH_ABI, getBalance) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "test",
+      "ids": [
+        "AUD-TESTI-028"
+      ],
+      "search": "23-07 scratch probe (a throwing test-file afterEach, then harnessState() read in the next test) and scratch copies of the plan 23-07 triage files with a throwing afterEach, plus a read of every teardown path in test/realpath/harness (git grep -n afterEach -- test/realpath; disposers, disposeScenarios, restartGraph, createTempDbFile) at 384be2f and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "src",
+      "ids": [
+        "AUD-TX-028"
+      ],
+      "search": "23-08 real-path AUD-EXIT-005 and AUD-TX-028 proofs (an exit quote held on the node, ethers debug sendRpcPayload/receiveRpcResult traces of the bot's HTTP provider, the detector's pair reads answered while the quote was held) plus a read of every provider construction in src (git grep -n -e \"JsonRpcProvider(\" -e \"WebSocketProvider(\" -- src) at 23a6461 and HEAD, and of ethers 6.16.0 abstract-provider getNetwork/#checkNetwork and provider-jsonrpc _detectNetwork/#scheduleDrain"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-TX-029"
+      ],
+      "search": "23-09 real-path AUD-TX-029 proof (a real ETH V2 snipe whose four private attempts are never included, every attempt's maxPriorityFeePerGas decoded with real ethers) and the warn/error lines of the AUD-TX-003 run, plus a read of every throw of the escalation loop in src/utils/mevStrategies/reconciliation.ts and of every emitter of op mev.escalation.ceiling-hit (git grep -n \"ceiling-hit\" -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C10",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-036"
+      ],
+      "search": "23-10 real-path AUD-BUY-036 proof (an ETH chain without a WebSocket URL, the real HTTP DEX poller, a provider refusing eth_getLogs wider than 10 blocks, a 12-block eth_blockNumber outage while the bot runs) found while proving AUD-ANTIRUG-018, plus a read of every eth_getLogs and queryFilter caller in src (git grep -n -e \"queryFilter(\" -e \"getLogs(\" -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "test",
+      "ids": [
+        "AUD-TESTI-029"
+      ],
+      "search": "23-13 full railed run (AUD-EXIT-003 timed out under load, then an unhandled eth_subscribe cancellation at teardown attributed to the next test) and a forced-timeout run of AUD-EXIT-003.test.ts (scratch { timeout: 700 }, restored), plus a read of every stepping helper in test/realpath/harness/world.ts and every fixture loop built on them, and of setup.ts afterEach, at a593efebfd8b17b5583257bd6db3ff46738995ee"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-TX-030"
+      ],
+      "search": "23-22 real-path fee-gas-eth-v2-legacy scenario (a real ETH V2 snipe on a legacy-fee node, the Flashbots buy decoded with real ethers from node.submitted and the eth_sendBundle body, the helper clamp computed with the real computeAffordablePriorityFee) plus a read of the legacy-fee branch of all three strategies (git grep -n \"gasPrice\" -- src/utils/mevStrategies) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-037"
+      ],
+      "search": "23-22 real-path fee-gas-eth-v2-reserve-below and -at scenarios (an ETH V2 snipe refused by the affordability clamp at attempt 0, then the buy.snipe.fail-clean line) plus a read of emitSnipeFailClean and both of its callers (git grep -n \"emitSnipeFailClean\" -- src) and of every throw that reaches them through submitWithReconciliation at 23a6461 and HEAD"
+    },
+    {
+      "class": "C12",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-038"
+      ],
+      "search": "23-24 real-path in-process boot (test/realpath/ordering/boot.test.ts: a real V2 snipe, a restart on the same file, then the real startMultiChainBot; resume invocation and completion order read from the logs list and node.callLog on the shared sequence counter) plus a read of startMultiChainBot steps 7 and 7.5, resumeMultiChainMonitoring, resumeAntiRugMonitoring and armPositionMonitoring (git grep -n -e resumeMultiChainMonitoring -e resumeAntiRugMonitoring -- src) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C17",
+      "area": "test",
+      "ids": [
+        "AUD-SECRET-006",
+        "AUD-SECRET-007"
+      ],
+      "search": "23-26 betterleaks 1.10.0 three-pass git-mode phase scan of 7d0b7b38ce229b019953d6f9f355dc8dbf655ba5..597d6db59dad4c3ec0d4a636adee86403e534178 (seal-verify.ts --phase-scan --start 7d0b7b3, 209 commits: 959 public-address, 2 non-public), then a read of each non-public hit line at its commit, and git grep at 597d6db of every hand-written WebSocket handshake nonce (Sec-WebSocket-Key) and every http(s) URL carrying a user name and password in src, test, scripts and dashboard"
+    },
+    {
+      "class": "C17",
+      "area": "test",
+      "ids": [
+        "AUD-SECRET-008"
+      ],
+      "search": "23-26 continuation diagnosis of an intermittent seal-verify.ts self-test failure: 3000 entropy-qualified addresses, 1000 64-hex keys with a hex-letter word inside, and 20000 addresses under the no-four-letter-run rule, each scanned in git mode by the verified betterleaks 1.10.0 binary with extended.toml and the pass-1 flags, plus a read of every random-value fixture under .planning/audit/tools (randomHexStrong and randomAlnumLower in seal-verify.ts and fixture-check.ts) at 597d6db"
+    },
+    {
+      "class": "C05",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-039"
+      ],
+      "search": "Phase 23 code-review fix run, WR-01 re-triage of AUD-TX-003 and AUD-TX-029 on the realistic chain (the decoded deadline of each signed bundle against the time of the refused eth_callBundle), plus a read of every swap deadline in src (git grep -n deadline -- src/bot.ts src/exitEngine.ts) and of how sendTxWithRetry and the three strategies reuse one built transaction for every attempt (src/utils/txManager.ts, src/utils/mevStrategies/flashbots.ts, bloxroute.ts, passthrough.ts) at 23a6461 and HEAD"
+    },
+    {
+      "class": "C16",
+      "area": "src",
+      "ids": [
+        "AUD-BUY-039"
+      ],
+      "search": "the same runs and read, plus the priority fees actually bid (each attempt's maxPriorityFeePerGas decoded with real ethers) against reconciliation.ts's step x (attempt + 1) schedule and the 25 gwei buy ceiling, and the fail-clean reason and remediation in emitSnipeFailClean (src/bot.ts) at 23a6461 and HEAD"
+    }
+  ]
+}

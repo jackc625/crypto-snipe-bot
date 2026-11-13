@@ -37,7 +37,15 @@
     "findings": [
       "AUD-TESTI-001"
     ],
-    "fixture_provenance": "synthetic"
+    "fixture_provenance": "synthetic",
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 0ca1e01 -- test/fixtures/exitEngine.fixtures.ts): createMockExitStateRow gains the version 7 exit_state columns exit_failure_count 0 and exit_status null in table order (schema-v7.json), and its doc comment names the helpers.smoke test that pins its keys to a table built by the real migrations; no existing key or value changed; its only test user, test/unit/exitEngine.test.ts, reads none of the key set (33/33 pass with and without the new keys, RED proof 23-14-8). No new finding."
+      }
+    ]
   },
   {
     "path": "test/fixtures/mythril/sample-clean.json",
@@ -1382,7 +1390,15 @@
         }
       ],
       "notes": "Tests 1-4 use an os.tmpdir() file DB (not data/). Test 9 imports src/bot without mocking src/config (AUD-TESTI-011). afterEach deletes DB_PATH (AUD-TESTI-015)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 0ca1e01 -- test/integration/pauseFlow.test.ts): the hand-built v1..v6 schema copy (buildV6Db, user_version 6) is deleted and Tests 1-4 now load the real src/utils/db with vi.importActual after vi.resetModules on a temp DB_PATH, so the file is opened and migrated by the real migrateSchema and the tests run the exported setPauseState, getPauseState and clearPauseState; titles and every original assertion kept, with added changes-is-1, user_version and restart-identity checks; DB_PATH is restored after each test instead of deleted; the logger mock gains top-level methods; Tests 5-9 unchanged (AUD-TESTI-014, -015 and the Test 9 hollow claims still stand). This closes the Tests 1-4 case of the quality label (missing observable: the production statements and migration). RED proof 23-14-7. No new finding."
+      }
+    ]
   },
   {
     "path": "test/integration/preflightCli.test.ts",
@@ -1849,6 +1865,12 @@
         "to_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
         "findings": "none",
         "note": "Reviewed: backup-state.ts --self-check exits 0."
+      },
+      {
+        "from_sha": "d3555d9f8555021169b349b7f574f2b6fdf59b44",
+        "to_sha": "f0e9ed9d847c26915dd99cd3ecf69d59b9e44788",
+        "findings": "none",
+        "note": "Reviewed by the phase 23 orchestrator (git diff d3555d9 f0e9ed9 -- test/integration/backupState.test.ts): only the two time limits changed, the test's limit 120 s to 240 s and the railed child's timeoutMs 110 s to 230 s, with a comment giving the measured times (12.7 s alone; 47.6 to 69.5 s in the full parallel runs of plans 23-19 to 23-24, 67.5 s at the wave 13 gate). The command, the twelve case assertions and the SELF-CHECK PASSED assertion are unchanged."
       }
     ]
   },
@@ -1871,6 +1893,12 @@
         "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
         "findings": "none",
         "note": "Reviewed: Real file databases: the version guard, refuse-to-create, write-boundary races, repo-root anchoring and the no-trace probe, through the production path."
+      },
+      {
+        "from_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "to_sha": "29c13f9cbb343d4645e593a3271758dd1713bd87",
+        "findings": "none",
+        "note": "Reviewed by plan 23-11 (git diff 5378478 29c13f9 -- test/integration/dbGuards.test.ts): one comment line added, the closes-finding marker for AUD-DB-007 next to the AC-26 rail test \"a missing path refuses, names the absolute path and creates nothing\"; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2035,6 +2063,18 @@
         "to_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
         "findings": "none",
         "note": "Reviewed: A second process is refused while the real lock is held; a killed holder releases it; GC does not release it; the simultaneous-start race gives one winner; a lock-file error fails closed."
+      },
+      {
+        "from_sha": "a93fd988e1c86f065e71409c085ad834ecf3c380",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff a93fd98 3ee5205 -- test/integration/processLock.test.ts): one comment line added, the closes-finding marker for AUD-TX-005; no test behavior, assertion or mock changed."
+      },
+      {
+        "from_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "to_sha": "fd154bd6488583331c02c80da51cfb4f9fd84dec",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 3ee5205 fd154bd -- test/integration/processLock.test.ts): the AC-23d test's last block, a regex over the text of four named files, moved into a new test that builds ts.createProgram over a directory walk of src/ and scripts/ (test/helpers/sourceGraph.ts) and checks that nothing the preflight, pause and resume commands reach through their imports exports acquireProcessLock or runMain. Every existing it() title, assertion and the AUD-TX-005 closes-finding marker are unchanged; 7 it() before, 8 after. RED proof: group cli-lock (5 in-memory mutants)."
       }
     ]
   },
@@ -2082,6 +2122,12 @@
         "to_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
         "findings": "none",
         "note": "Reviewed: The rails are installed in the integration project: sentinels, .env block, data block, non-loopback deny and loopback allowed."
+      },
+      {
+        "from_sha": "64bc83235844077c7975ae0e0c0275cf31b73cb3",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 64bc832 53548e8 -- test/integration/rails/railsIntegration.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
       }
     ]
   },

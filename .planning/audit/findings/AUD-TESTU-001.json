@@ -104,7 +104,7 @@
     }
   ],
   "sibling_sites_checked": "All 84 test/unit files at the base SHA, by static import graph (reach.js) plus reading every vi.mock / vi.doMock factory. db unmocked: bot/buyNonceLock, bot/twoStageSigint, configEnvVar, db.test, db/exitFailedHeldMigration, db/lpBaselineMigration, db/pauseStateMigration (the four db files point DB_PATH at a temp or :memory: path, see their rows). notifier unmocked: anti-rug/detectorEvaluator, anti-rug/detectorRegistry, bot/twoStageSigint, configEnvVar. config unmocked (real .env values in CONFIG): the rest of the rows marked yes. watchdog.test.ts loads the real notifier through vi.importActual but replaces both send functions, so it cannot post (labelled no). No unit test spawns a process, opens a non-loopback socket, uses worker_threads or dgram, or hard-codes a contacted real host (git grep over the snapshot for child_process, spawn, exec, fork, worker_threads, dgram, http.request, fetch(, new WebSocket, new JsonRpcProvider: the only hit is api/antiRug.test.ts:81-90, a 127.0.0.1 listener), so there is no new rail-class reach (D-16).",
-  "status": "candidate",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-19"
@@ -141,5 +141,12 @@
     "be3c572"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-18",
-  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files."
+  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files.",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "The 24 unit files the entry lists still import src/utils/db, src/config or the notifier unmocked, but each reach they had is refused under the rails: src/config and the notifier see only test/.env.test sentinels (every .env.example key; the named rail test), the src/utils/db import opens a per-worker temp database and never the live data folder (src and setup layers), and a Telegram send is refused before the network and blocked again by the network deny; status candidate -> fixed; removing the unmocked imports from those files stays Phase 28 hygiene, not a reach",
+    "proof": "Rail test sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value (test/unit/rails/envSentinel.test.ts, marker closes-finding: AUD-TESTU-001); RED proof row 1 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-08-1-sentinel-env.txt), re-run on 2026-11-11 by 23-14 because the test file changed after that proof (069a30c): .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-4-sentinel-env-unit.txt, with the sentinel values not loaded both sentinel tests fail, and test/rails/core.cjs was restored byte for byte; the live-DB reach is the marked rail test src tripwire on the live data folder (fires before the setup layer) > DB_PATH=./data/bot.db (RED row 10, re-run as 23-14-5-db-tripwire-src.txt); the Telegram reach is the marked rail test notifier refusal under Vitest (SAFE-02 src layer, D-04 amended) > sendTelegramAlert is refused through its catch path: no post, broadcast runs, ledger entry (RED row 14, 22-10-1-notifier-telegram.txt; src/utils/notifier.ts and that test file are byte-unchanged since the proof, and it was not re-run because removing the refusal would let the notifier attempt a real send); the entry's other RED rows: 2 to 9, 15 to 18",
+    "rail_test": "sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value"
+  }
 }

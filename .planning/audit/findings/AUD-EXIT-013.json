@@ -124,5 +124,11 @@
       ],
       "outcome": "State written: exit_state restored or created (urgency_start_ts and entry price are never updated by the upsert, db.ts:505-513); buy row unchanged, or marked failed when the balance is 0. The dex and probe used from here on can differ from the ones the position was bought and baselined with."
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-07): a real ETH snipe on sushiswap-v2 (dex_name stored) is restarted on its temp-file database; the real resumeMultiChainMonitoring quotes only the uniswap-v2 router (no pair for the token, every quote reverts, no tick completes) and the real resumeAntiRugMonitoring re-registers the position with uniswap-v2. Claims resume-quotes-first-v2-dex and antirug-resume-registers-first-v2-dex; each reads looks fixed under its own dex_name fix. The dashboard findDex sells and the failed-sell re-arm stay code-read.",
+    "test_id": "AUD-EXIT-013"
+  }
 }

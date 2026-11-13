@@ -1,0 +1,37 @@
+{
+  "cases": {
+    "0": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LIVE_EXECUTE": "0"
+      }
+    },
+    "abc": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LIVE_EXECUTE": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LIVE_EXECUTE": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LIVE_EXECUTE": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_LIVE_EXECUTE": "false"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_LIVE_EXECUTE"
+}

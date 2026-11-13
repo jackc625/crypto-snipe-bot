@@ -58,6 +58,8 @@ describe('sentinel env (D-02, AC-13)', () => {
         expect(tokenAtImport).toBe(sentinels.TELEGRAM_BOT_TOKEN);
     });
 
+    // closes-finding: AUD-TESTU-001 (rail test, RED proof row 1 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-4-sentinel-env-unit.txt)
+    // closes-finding: AUD-RAIL-002 (rail test for its real-.env reach, RED proof row 1 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-4-sentinel-env-unit.txt)
     it('every .env.example key in process.env equals its test/.env.test value', () => {
         expect(exampleKeys.length).toBeGreaterThan(100);
         const wrong: string[] = [];

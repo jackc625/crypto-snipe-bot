@@ -1,0 +1,81 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_BLOCK_AGE_TOLERANCE_SEC",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Block-age tolerance must be a positive number (seconds)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_BLOCK_AGE_TOLERANCE_SEC": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_BLOCK_AGE_TOLERANCE_SEC",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Block-age tolerance must be a positive number (seconds)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_BLOCK_AGE_TOLERANCE_SEC": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "ETH_BLOCK_AGE_TOLERANCE_SEC": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_BLOCK_AGE_TOLERANCE_SEC": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_BLOCK_AGE_TOLERANCE_SEC": "300"
+      }
+    }
+  },
+  "variable": "ETH_BLOCK_AGE_TOLERANCE_SEC"
+}

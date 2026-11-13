@@ -74,6 +74,62 @@
       "owner_reason": "ROADMAP Phase 25 success criterion 3 (the fork suite passes with the updated harness and artifact paths) is the first v7.0 criterion that runs the fork suite; whichever phase first runs npm run test:fork must check this test by name, with the operator's real fork URL in the shell",
       "registered": "2026-11-09",
       "registered_by_plan": "22-15"
+    },
+    {
+      "id": "UFV-06",
+      "ac": "Phase 23 AC-16 (finding AUD-ANTIRUG-003, sub-claim 2)",
+      "finding": "AUD-ANTIRUG-003",
+      "test_file": "test/realpath/triage/AUD-ANTIRUG-003.test.ts",
+      "assertion": "Sub-claim 2: how many logs that the anti-rug filter matches (V2 Burn and the pair's V2 Transfer; V3 Burn and Collect for a pool) does one real removeLiquidityETH through the Uniswap V2 router emit on mainnet, and in what order? The real-path test replays UniswapV2Pair's own event order written from the contract (Transfer remover->pair, Transfer pair->0, Sync, Burn), which gives three matched logs, three dispatches and a tripped breaker at the default threshold 3; a fork replay of a complete real removal transaction must count the dispatched logs.",
+      "why_unrun": "The answer depends on the logs a real mainnet liquidity removal emits through the real Uniswap V2 router and pair contracts; the Phase 23 simulated chain has no real contracts, and Phase 23 runs no Hardhat command.",
+      "proven_meanwhile_by": "test/realpath/triage/AUD-ANTIRUG-003.test.ts claim breaker-counts-dispatches-not-rugs (the bot's own counting on the contract-faithful event order; confirmed in plan 23-10)",
+      "rehearsed_by": "none (needs a mainnet fork)",
+      "owner_phase": 25,
+      "owner_reason": "Operator ruling at plan 23-16 Task 2 (reviews/TRIAGE-REVIEW-01.json, verbatim \"5. fork questions: all go to Phase 25\"); Phase 25 runs the first real npm run test:fork of v7.0 (ROADMAP Phase 25 success criteria 3 and 6), which must answer this question by name",
+      "registered": "2026-11-12",
+      "registered_by_plan": "23-16"
+    },
+    {
+      "id": "UFV-07",
+      "ac": "Phase 23 AC-16 (finding AUD-BUY-015)",
+      "finding": "AUD-BUY-015",
+      "test_file": "test/realpath/triage/AUD-BUY-015.test.ts",
+      "assertion": "On a mainnet fork, does QuoterV2 quoteExactInputSingle(WETH to token, amountIn = the 0.5 ETH threshold, sqrtPriceLimitX96 0) on a V3 pool holding far less than 0.5 ETH of in-range liquidity answer without reverting, so checkMinLiquidity passes?",
+      "why_unrun": "The answer depends on the real QuoterV2 and V3 pool contracts on a thin pool; the Phase 23 simulated chain has no real contracts, and Phase 23 runs no Hardhat command.",
+      "proven_meanwhile_by": "test/realpath/triage/AUD-BUY-015.test.ts claim thin-pool-passes-min-liquidity-gate (the gate ignores the quoted amounts; confirmed in plan 23-05)",
+      "rehearsed_by": "none (needs a mainnet fork)",
+      "owner_phase": 25,
+      "owner_reason": "Operator ruling at plan 23-16 Task 2 (reviews/TRIAGE-REVIEW-01.json, verbatim \"5. fork questions: all go to Phase 25\"); Phase 25 runs the first real npm run test:fork of v7.0 (ROADMAP Phase 25 success criteria 3 and 6), which must answer this question by name",
+      "registered": "2026-11-12",
+      "registered_by_plan": "23-16"
+    },
+    {
+      "id": "UFV-08",
+      "ac": "Phase 23 AC-16 (finding AUD-BUY-033)",
+      "finding": "AUD-BUY-033",
+      "test_file": "test/realpath/triage/AUD-BUY-033.test.ts",
+      "assertion": "On a mainnet fork, when a V3 snipe sends SwapRouter02 multicall(deadline, [exactInputSingle(amountIn = the snipe amount, sqrtPriceLimitX96 0)]) with value = amountIn into a pool whose in-range liquidity fills only part of amountIn, does the router keep the unspent ETH, and does refundETH() called by an unrelated address receive it?",
+      "why_unrun": "The answer depends on the real SwapRouter02 and V3 pool contracts (partial fill, refundETH); the Phase 23 simulated chain has no real contracts, and Phase 23 runs no Hardhat command.",
+      "proven_meanwhile_by": "test/realpath/triage/AUD-BUY-033.test.ts claim v3-multicall-has-no-refund (the V3 snipe batch sends the whole amount as value with no price limit and no refundETH; confirmed in plan 23-05)",
+      "rehearsed_by": "none (needs a mainnet fork)",
+      "owner_phase": 25,
+      "owner_reason": "Operator ruling at plan 23-16 Task 2 (reviews/TRIAGE-REVIEW-01.json, verbatim \"5. fork questions: all go to Phase 25\"); Phase 25 runs the first real npm run test:fork of v7.0 (ROADMAP Phase 25 success criteria 3 and 6), which must answer this question by name",
+      "registered": "2026-11-12",
+      "registered_by_plan": "23-16"
+    },
+    {
+      "id": "UFV-09",
+      "ac": "Phase 23 AC-16 (finding AUD-EXIT-003, sub-claims 2 and 3)",
+      "finding": "AUD-EXIT-003",
+      "test_file": "test/realpath/triage/AUD-EXIT-003.test.ts",
+      "assertion": "On real tokens and pools (low-decimal tokens, very high supply 18-decimal tokens, thin pools, fee-on-transfer tokens), how far does the fixed-probe output ratio drift from the real price ratio: does the quote saturate so the ratio tracks about the square root of the price (sub-claim 2, a 25 percent stop-loss firing only near a 44 percent drop), and how coarse are few-wei quotes (sub-claim 3)?",
+      "why_unrun": "The answer depends on real tokens and pools on mainnet; the Phase 23 simulated chain has no real tokens, and Phase 23 runs no Hardhat command.",
+      "proven_meanwhile_by": "test/realpath/triage/AUD-EXIT-003.test.ts claims probe-is-eth-buy-wei-as-token-amount, zero-entry-infinite-ratio-fires-every-partial-tier, zero-entry-nan-ratio-fires-stop-loss and null-quote-suppresses-urgency-exit (sub-claims 1 and 4; confirmed in plan 23-07)",
+      "rehearsed_by": "none (needs a mainnet fork)",
+      "owner_phase": 25,
+      "owner_reason": "Operator ruling at plan 23-16 Task 2 (reviews/TRIAGE-REVIEW-01.json, verbatim \"5. fork questions: all go to Phase 25\"); Phase 25 runs the first real npm run test:fork of v7.0 (ROADMAP Phase 25 success criteria 3 and 6), which must answer this question by name",
+      "registered": "2026-11-12",
+      "registered_by_plan": "23-16"
     }
   ]
 }

@@ -331,6 +331,7 @@ describe('fork project reads only the shell and itself (AC-17)', () => {
         for (const key of [...SHELL_READS_ALLOWED, FORK_URL_VARIABLE]) expect(FORK_SHELL_KEYS).toContain(key);
     });
 
+    // closes-finding: AUD-RAIL-001 (rail test; no row in red-proofs/INDEX.md: RED proof 23-14-3-vitest-config-dotenv.txt, the 2026-11-06 dotenv call in vitest.config.ts)
     it('(d) the Vitest main-process closure of both configs loads no .env', () => {
         const entries = [
             path.join(REPO_ROOT, 'vitest.config.ts'),

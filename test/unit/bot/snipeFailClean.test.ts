@@ -233,7 +233,10 @@ describe('Phase 21.3 — snipe fail-clean (STOP-THE-LINE-05-D) [REAL-PATH]', () 
         rearm();
     });
 
-    it('a snipe ceiling-hit throws -> ZERO ETH spent, NO trades row inserted (insertTrade.run never called)', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 1.2 s alone, 2.6 s under the full parallel npm test (wave 6 gate),
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('a snipe ceiling-hit throws -> ZERO ETH spent, NO trades row inserted (insertTrade.run never called)', { timeout: 20_000 }, async () => {
         const bot = await import('../../../src/bot');
         const ctx = makeCtx();
         const dex = makeV2Dex();

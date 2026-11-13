@@ -94,7 +94,10 @@ describe('Phase 5 harm-prevention: V3-02 liquidity wait drops snipe on Mint time
         vi.useRealTimers();
     });
 
-    it('waitForLiquidity resolves to false AND logs "Mint timeout (30s), dropping opportunity" when no Mint event arrives within 30s', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 1.8 s alone, 2.7 s (wave 5 gate) and 10.7 s (wave 6 gate) under the full parallel npm test,
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('waitForLiquidity resolves to false AND logs "Mint timeout (30s), dropping opportunity" when no Mint event arrives within 30s', { timeout: 45_000 }, async () => {
         // Re-import bot.ts AFTER mocks are registered (option (a) — waitForLiquidity must be export-marked at src/bot.ts:86).
         const bot = await import('../../src/bot');
 

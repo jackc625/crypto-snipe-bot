@@ -91,6 +91,8 @@ async function importDbExpectRefused(dbPath: string): Promise<void> {
 }
 
 describe('src tripwire on the live data folder (fires before the setup layer)', () => {
+    // closes-finding: AUD-RAIL-002 (rail test, RED proof row 10 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-5-db-tripwire-src.txt)
+    // closes-finding: AUD-TESTU-001 (rail test for its live-DB reach, RED proof row 10 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-5-db-tripwire-src.txt)
     it('DB_PATH=./data/bot.db', async () => {
         await importDbExpectRefused('./data/bot.db');
     });

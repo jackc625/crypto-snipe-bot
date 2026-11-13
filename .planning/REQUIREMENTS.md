@@ -20,21 +20,21 @@
 ### Audit (AUDIT)
 
 - [x] **AUDIT-01**: A findings register (`AUDIT-FINDINGS.md`) covers `src/`, `dashboard/`, `test/`, `scripts/`, and contracts tooling; every entry has severity (S0–S4), capital-impact class, evidence, a mandatory "sibling sites checked" field, and lifecycle status (candidate → confirmed → decided → fixed → verified, or NOT-A-BUG).
-- [ ] **AUDIT-02**: All 28 research-surfaced candidates (SUMMARY.md §Audit Candidates) are triaged to confirmed (RED real-path test or fork script) or NOT-A-BUG (with evidence).
+- [x] **AUDIT-02**: All 28 research-surfaced candidates (SUMMARY.md §Audit Candidates) are triaged to confirmed (RED real-path test or fork script) or NOT-A-BUG (with evidence).
 - [x] **AUDIT-03**: The EVM trading-bot bug-class sweep is completed and recorded: BigInt/Number mixing, `||` vs `??` with 0n/''/0, token decimals, slippage/minOut, deadlines, approvals, nonce management, reorgs, receipt status, WS reconnect/backfill, unhandled rejections, timer leaks, SQLite transaction boundaries and crash consistency, idempotent exits, TOCTOU, gas/fee ceilings, key handling, env validation, API auth/CORS, Telegram trust.
 - [x] **AUDIT-04**: A thresholds/magic-number inventory lists every trading parameter with current value, source, and rationale; questionable design (thresholds, race windows, fragile patterns) is flagged with a recommendation.
 - [x] **AUDIT-05**: Every behavior-changing recommendation is an operator decision card in `OPERATOR-DECISIONS.md`, decided before implementation; no trading-behavior change lands without a cited decision ID.
-- [ ] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
+- [x] **AUDIT-06**: Commit taxonomy is enforced: `refactor:` / `lint:` / `fmt:` / `deps:` commits produce zero decision-trace diff; `behavior:` commits cite a decision ID.
 - [ ] **AUDIT-07**: Every confirmed S2–S4 finding in the register is fixed with a RED-then-GREEN test (real-path for money-path code) or closed by an explicit operator won't-fix decision before the re-entry gate — none deferred automatically (covers e.g. base-fee derivation, DEX-listener backfill/heartbeat, stale buy deadline, fee-on-transfer sell variant, reorg handling, `.wait()` error classification, non-transactional state changes, symbol/name injection, key/log redaction, when confirmed below S1).
 
 ### Characterization (CHAR)
 
-- [ ] **CHAR-01**: A real-path test harness exists: real ethers, fake JSON-RPC transport, real in-memory SQLite running the real migrations, fixed clock; only logger, notifier, broadcaster, relay HTTP, and clock are mocked.
-- [ ] **CHAR-02**: A golden-master decision trace (`op` logs, submitted tx requests/calldata, DB writes) is captured for V2 and V3 buys, every exit type (trailing, partial, stop-loss, urgency, anti-rug), the risk gate, and fee/gas computation; existing suspected bugs are tagged `SUSPECT(<finding-id>)`, not silently locked in.
-- [ ] **CHAR-03**: An env-matrix snapshot covers config and chain-registry parsing for `{unset, '', '0', 'abc', valid}`.
-- [ ] **CHAR-04**: Tests pin boot/resume/arm ordering, listener counts, same-block ordering, singleton identity, and a signing-site census proving every signing path goes through `withNonceLock` (with a positive `>= N` count assertion).
-- [ ] **CHAR-05**: DB migration golden tests run the real migrations v0→v7 and v4→v7; the test DB helper uses the real migrations (no hand-duplicated schema at `user_version = 4`).
-- [ ] **CHAR-06**: Source-text (grep-the-file) tests are converted to path-agnostic behavioral checks.
+- [x] **CHAR-01**: A real-path test harness exists: real ethers, fake JSON-RPC transport, real in-memory SQLite running the real migrations, fixed clock; only logger, notifier, broadcaster, relay HTTP, and clock are mocked.
+- [x] **CHAR-02**: A golden-master decision trace (`op` logs, submitted tx requests/calldata, DB writes) is captured for V2 and V3 buys, every exit type (trailing, partial, stop-loss, urgency, anti-rug), the risk gate, and fee/gas computation; existing suspected bugs are tagged `SUSPECT(<finding-id>)`, not silently locked in.
+- [x] **CHAR-03**: An env-matrix snapshot covers config and chain-registry parsing for `{unset, '', '0', 'abc', valid}`.
+- [x] **CHAR-04**: Tests pin boot/resume/arm ordering, listener counts, same-block ordering, singleton identity, and a signing-site census proving every signing path goes through `withNonceLock` (with a positive `>= N` count assertion).
+- [x] **CHAR-05**: DB migration golden tests run the real migrations v0→v7 and v4→v7; the test DB helper uses the real migrations (no hand-duplicated schema at `user_version = 4`).
+- [x] **CHAR-06**: Source-text (grep-the-file) tests are converted to path-agnostic behavioral checks.
 
 ### Capital-Safety Fixes (CAP)
 
@@ -203,18 +203,18 @@ Which phases cover which requirements. Populated during roadmap creation (2026-1
 | SAFE-06 | Phase 22 | Complete |
 | SAFE-07 | Phase 22 | Complete |
 | AUDIT-01 | Phase 22 | Complete |
-| AUDIT-02 | Phase 23 | Pending |
+| AUDIT-02 | Phase 23 | Complete |
 | AUDIT-03 | Phase 22 | Complete |
 | AUDIT-04 | Phase 22 | Complete |
 | AUDIT-05 | Phase 22 | Complete |
-| AUDIT-06 | Phase 23 | Pending |
+| AUDIT-06 | Phase 23 | Complete |
 | AUDIT-07 | Phase 29 | Pending |
-| CHAR-01 | Phase 23 | Pending |
-| CHAR-02 | Phase 23 | Pending |
-| CHAR-03 | Phase 23 | Pending |
-| CHAR-04 | Phase 23 | Pending |
-| CHAR-05 | Phase 23 | Pending |
-| CHAR-06 | Phase 23 | Pending |
+| CHAR-01 | Phase 23 | Complete |
+| CHAR-02 | Phase 23 | Complete |
+| CHAR-03 | Phase 23 | Complete |
+| CHAR-04 | Phase 23 | Complete |
+| CHAR-05 | Phase 23 | Complete |
+| CHAR-06 | Phase 23 | Complete |
 | CAP-01 | Phase 24 | Pending |
 | CAP-02 | Phase 24 | Pending |
 | CAP-03 | Phase 24 | Pending |

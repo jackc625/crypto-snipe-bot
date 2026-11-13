@@ -1,0 +1,4 @@
+{"scenario":"risk-gate-refused","tag":"KEEP"}
+{"kind":"db","at":1767225600000,"table":"trades","op":"insert","inTransaction":false,"row":{"id":"1","token":"0x676461ed890346f51dffb6de6f2a9609be09df18","chain":"eth","action":"buy","tx_hash":"0xd602225e966a5e0dd0a8c765362c555709cb2ea69576087a0caeb380eb31bca6","block":null,"timestamp":"1767225600","amount_in":"0.01","amount_out":null,"gas_cost":null,"price_at_action":null,"status":"pending","pool_type":"v2","fee_tier":null,"dex_name":"uniswap-v2"}}
+{"kind":"db","at":1767225600000,"table":"trades","op":"insert","inTransaction":false,"row":{"id":"2","token":"0x78afd918a7d20189461b7f0af555653eafe43649","chain":"eth","action":"buy","tx_hash":"0x92d9bf98011dfd98e4700c53e9bc1b98153ff2d30d8bdb8d0949ebb761c686c8","block":null,"timestamp":"1767225600","amount_in":"0.01","amount_out":null,"gas_cost":null,"price_at_action":null,"status":"pending","pool_type":"v2","fee_tier":null,"dex_name":"uniswap-v2"}}
+{"submitted":[]}

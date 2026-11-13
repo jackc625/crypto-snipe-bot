@@ -1,0 +1,104 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "ANTIRUG",
+  "duplicate_of": null,
+  "related": [
+    "AUD-ANTIRUG-005",
+    "AUD-ANTIRUG-009",
+    "AUD-ANTIRUG-018",
+    "AUD-ANTIRUG-007"
+  ],
+  "tags": [
+    "false-alert",
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": "ESC-ANTIRUG-02",
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-01 executor)"
+  ],
+  "found_date": "2026-11-10",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-ANTIRUG-024",
+  "title": "On a chain's first anti-rug start with a fresh database, the dry-run stamp creates the chain_state row with last_seen_block 0 before the backfill reads it, so the backfill never takes its seed branch and instead raises a false GAP DETECTED (error log, Telegram alert, dashboard event) for the whole chain history",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C10"
+  ],
+  "files": [
+    "src/anti-rug/detector.ts",
+    "src/utils/db.ts",
+    "src/bot.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:585@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "startChainAntiRugListener runs setAntirugDryRunStarted on every call, before the WS/HTTP split (:587) and before the backfill (:718) in the same call"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:702-707@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "INSERT INTO chain_state (chain, last_seen_block, last_updated_ts, antirug_dry_run_started) VALUES (?, 0, ?, ?): on a fresh database this creates the row with last_seen_block 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/db.ts:700-701@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the comment assumes the detector overwrites last_seen_block on the first event; on the WS path it is the backfill that reads it first, and it reads the 0"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1015-1032@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the documented no-prior-state path (seed with the current block, op antirug.backfill.seed) runs only when there is no row, which the stamp above has already ruled out; backfillSinceLastSeen has one caller (:718), so this branch is unreachable in production"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1035-1085@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "gapBlocks = currentBlock - 0 exceeds maxBackfillBlocks (7200) on any real chain, so the gap branch logs at error, sends the [GAP DETECTED] Telegram alert, broadcasts antirug_event kind gap-detected, then moves the cursor to the current block; no getLogs, no evaluation, no exit"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2130-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "boot step 4 arms the listener on every verified chain whether or not positions exist, so every WS chain alerts on its first boot after npm run db:init (and on the first start of any newly enabled chain); a first start through a buy registration (detector.ts:447) does the same"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:588@05c166529fe736ecfbf21c0407acf74db82e6f14",
+      "note": "same code at the Phase 23 HEAD (src unchanged in Phase 23): stamp :588, backfill call :721, seed branch :1018-1035, gap branch :1051-1088; src/utils/db.ts:509-514"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath <transient probe of the AC-01 scenario> (Node 22.16.0, 2026-11-10; probe file deleted after the run, never committed)",
+      "note": "real-path harness, real migrations on :memory:: chain_state had 0 rows before the listener; op trail antirug.lp-baseline.snapshot > antirug.register > antirug.listener.subscribed > antirug.backfill.gap-detected (no antirug.backfill.seed); error log {gapBlocks: 21000002, lastSeen: 0, currentBlock: 21000002, maxBackfillBlocks: 7200}; sendCtxAlert \"*[GAP DETECTED]* eth missed 21000002 blocks (0-21000002); backfill skipped per D-BACKFILL fail-closed; review anti-rug events manually\"; one antirug_event broadcast kind gap-detected fromBlock 0"
+    }
+  ],
+  "sibling_sites_checked": "Every writer of chain_state: db.ts upsertChainState (:662-668) and setAntirugDryRunStarted (:702-707); detector.ts backfill writes (seed, no-gap, gap and within-cap branches) and the HTTP poller writes (:1235, :1271, :1302); nothing else in src writes the table (git grep chain_state / upsertChainState over src). Every reader of last_seen_block: backfillSinceLastSeen (:1009) and startHttpPollingAntiRug (:1228-1232). The only caller of backfillSinceLastSeen is detector.ts:718, always after the stamp at :585 in the same call. HTTP path (no WS URL): the poller seeds lastBlock from the same 0 row (:1232); at boot the first tick with no registered positions sets lastBlock to the head (:1269-1278), which clears the zero within one 2 s tick; if a position is registered before that first tick (a chain skipped at boot by CR-04, or a registration within 2 s), the first poll asks getLogs from block 1 to the head, which is the unchunked-range mechanism of AUD-ANTIRUG-018. That HTTP case is from code reading only, not reproduced. The live database already has chain_state rows, so only a fresh database or a newly enabled chain reaches this.",
+  "status": "confirmed",
+  "severity_rationale": "S3 (misleading behavior and telemetry), capital_impact none, by operator ruling at the 23-01 Task 1 checkpoint (ESC-ANTIRUG-02, \"New finding, S3 (Recommended)\"). The gap branch takes no capital action, and on a fresh database there is no earlier window to replay, so the outcome apart from the alert matches the seed branch: cursor at the head, nothing replayed. The harm is a false error-level alert on Telegram and the dashboard telling the operator that the whole chain history was missed and needs manual review, on every first start, which trains the operator to ignore a real GAP DETECTED (AUD-ANTIRUG-005 sub-claim 3).",
+  "traces": [
+    {
+      "scenario": "Fresh database (npm run db:init or the harness :memory: database), first anti-rug start on a WS chain",
+      "steps": [
+        "startChainAntiRugListener(ctx) runs setAntirugDryRunStarted.run (detector.ts:585). No chain_state row exists, so the INSERT creates (chain, last_seen_block 0, now, now) (db.ts:702-707).",
+        "ctx.wsProvider is set, so the WS branch subscribes and then awaits backfillSinceLastSeen (detector.ts:718).",
+        "getChainState returns the new row, so the no-row seed branch (:1015-1032) is skipped.",
+        "gapBlocks = currentBlock - 0 > maxBackfillBlocks 7200 (:1035, :1048).",
+        "The gap branch logs error antirug.backfill.gap-detected, sends the [GAP DETECTED] alert, broadcasts antirug_event gap-detected, and upserts the cursor to currentBlock (:1049-1085)."
+      ],
+      "outcome": "A false GAP DETECTED alert and dashboard event for the entire chain history; cursor ends at the head; no logs replayed or evaluated; no exit attempted."
+    }
+  ],
+  "recommendation": "Make a chain's first start take the seed path: for example the dry-run stamp does not create the row with a fake block (NULL, or the current block), or the backfill treats a row it has never written as no prior state; correct the db.ts:700-701 comment. Phase 23 triage (Wave 5) adds a real-path test that fails on this today; the fix is Phase 29 (S2-S4). Nothing is fixed in Phase 23 (src unchanged).",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10, orchestrator scope addition): a fresh database built by the real migrations, no chain_state row, an ETH chain with a WebSocket URL, and boot step 4 as startMultiChainBot runs it (the real resumeAntiRugMonitoring with no open positions, the allowlist verified against served locker code); the dry-run stamp creates the row with last_seen_block 0, the backfill skips its seed branch, and the start logs an error, sends '[GAP DETECTED] eth missed <head> blocks (0-<head>) ... review anti-rug events manually' and broadcasts a gap-detected event from block 0, then moves the cursor to the head (claim first-start-false-gap-alert). A backfill that treats a row it never wrote as no prior state reads looks fixed.",
+    "test_id": "AUD-ANTIRUG-024"
+  }
+}

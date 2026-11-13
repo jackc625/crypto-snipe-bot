@@ -87,7 +87,8 @@
   "related": [
     "AUD-TX-005",
     "AUD-BUY-002",
-    "AUD-BUY-025"
+    "AUD-BUY-025",
+    "AUD-ANTIRUG-025"
   ],
   "tags": [
     "capital",
@@ -100,5 +101,11 @@
     "claude (22-17 executor)"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path, two OS processes on one temp SQLite file: the real scripts/deliberate-buy.ts (railed child, sentinel key, loopback base node) lands a buy, logs exit.monitor.started, antirug.lp-baseline.snapshot and antirug.register, exits 0; the running bot on the same file sees the pending row in both resume queries yet after 10 exit-poll intervals has no exit-monitor timer and no anti-rug registration for it (claims monitor-dies-with-script, anti-rug-dies-with-script); only restartGraph + resume re-arms it; controls: the same deliberate buy in-process and a base V3 snipe arm both; a running-bot re-scan fix (OD-26 option a) reads looks fixed on each claim",
+    "test_id": "AUD-BUY-001"
+  }
 }

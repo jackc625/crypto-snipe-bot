@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { createTestDb } from '../helpers/testDb';
 import { normalizeLegacyMainnetRows, makeIsTokenSnipedStmt } from '../../src/utils/db';
+import { CURRENT_SCHEMA_VERSION } from '../../src/utils/dbSchema';
 
 describe('SQLite storage (TEST-02)', () => {
     describe('concurrent writes', () => {
@@ -73,10 +74,12 @@ describe('SQLite storage (TEST-02)', () => {
             db.close();
         });
 
-        it('Schema v4: user_version pragma returns 4', () => {
+        it('Current schema version: user_version pragma returns CURRENT_SCHEMA_VERSION', () => {
+            // Phase 23 plan 23-03 (AC-07): createTestDb is built by the real migrations, so it
+            // returns the production schema version, not the old hand-written 4.
             const db = createTestDb();
             const version = db.pragma('user_version', { simple: true });
-            expect(version).toBe(4);
+            expect(version).toBe(CURRENT_SCHEMA_VERSION);
             db.close();
         });
     });

@@ -49,6 +49,12 @@
         "to_sha": "ce3851efbf001e1b9995e3e3013d7a12d24c386a",
         "findings": "none",
         "note": "Negations for test/.env.test (one path) and ignition/deployments artifacts (OD-21). Reviewed; no secret-bearing path un-ignored."
+      },
+      {
+        "from_sha": "ce3851efbf001e1b9995e3e3013d7a12d24c386a",
+        "to_sha": "7d0b7b38ce229b019953d6f9f355dc8dbf655ba5",
+        "findings": "none",
+        "note": "Reviewed by plan 23-04 (git diff ce3851e 7d0b7b3 -- .gitignore): one rule added, .review-diagnostics/, which only ignores the local GSD code-review diagnostics folders; no tracked file lives there and no secret-bearing path is un-ignored."
       }
     ]
   },
@@ -152,6 +158,12 @@
         "to_sha": "e095ab5385a66355f0c2263fdb0a9a0ca25cd940",
         "findings": "none",
         "note": "Scripts only: start via src/main.ts, npm test scoped to unit and integration, db:init, backup:state, baselines:capture, check:vi-mock. No dependency changed. Reviewed."
+      },
+      {
+        "from_sha": "e095ab5385a66355f0c2263fdb0a9a0ca25cd940",
+        "to_sha": "1669fa5771408421c198073100aa498bd058b02d",
+        "findings": "none",
+        "note": "Reviewed by plan 23-04 (git diff e095ab5 1669fa5 -- package.json): npm test adds --project realpath (the railed real-path project); new scripts test:realpath and check:realpath-mocks. No dependency changed. test:coverage still runs unit and integration only; no gate reads coverage."
       }
     ]
   },
@@ -204,6 +216,12 @@
         "to_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
         "findings": "none",
         "note": "Reviewed. dotenv removed, envDir: false at the root, setup entries added per project, each project already had extends: true since d5f65b1. Not affected by AUD-REAUDIT-001; that finding's evidence shows why."
+      },
+      {
+        "from_sha": "31b7854d0c1c049166bfc9e43457be115f50d94c",
+        "to_sha": "05c166529fe736ecfbf21c0407acf74db82e6f14",
+        "findings": "none",
+        "note": "Reviewed by plan 23-04 (git diff 31b7854 05c1665 -- vitest.config.ts): adds the realpath project with extends: true, the rails setup file test/rails/setup.cjs before the harness setup, the ledgerRun globalSetup and CSB_RAIL_PROJECT realpath, like the other railed projects. The ethers alias selects the CommonJS build of the real library (what production loads under ts-node); it mocks nothing. No rail is removed or bypassed."
       }
     ]
   }

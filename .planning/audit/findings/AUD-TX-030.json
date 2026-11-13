@@ -1,0 +1,61 @@
+{
+  "kind": "finding",
+  "area": "src",
+  "slice": "TX",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-019",
+    "AUD-TX-007",
+    "AUD-TX-016"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "reported_by": [
+    "claude (23-22 executor)"
+  ],
+  "found_date": "2026-11-12",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "rc": [],
+  "research_suggested_severity": null,
+  "origin": "independent",
+  "id": "AUD-TX-030",
+  "title": "The Flashbots strategy's legacy-fee branch still sends the raw (multiplier-scaled) gasPrice and drops the helper's clamped fee, so on a node with no EIP-1559 fields every attempt bids the same price: no escalation, no priority-fee ceiling and no affordability clamp on the submitted fee (the CR-01 bypass the bloXroute and passthrough legacy branches removed)",
+  "severity": "S4",
+  "capital_impact": "none",
+  "classes": [
+    "C16"
+  ],
+  "files": [
+    "src/utils/mevStrategies/flashbots.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:213-216@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the else branch (feeData.maxFeePerGas null) sets populatedTx.gasPrice = applyGasMultiplier(feeData.gasPrice, gasMultiplier); a.priorityFeeWei, the helper's escalated and clamped fee for this attempt, is not used"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:198-212@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the EIP-1559 branch uses a.priorityFeeWei directly; its comment names an unclamped chain rate in the submitted fee as the CR-01 bypass"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/passthrough.ts:112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the passthrough legacy branch sends gasPrice = baseFeeWei + a.priorityFeeWei, and its comment calls an unclamped applyGasMultiplier(gasPrice) a bypass of the affordability and ceiling bound; bloxroute.ts:115 does the same"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/scenarios/riskAndFees.test.ts -t fee-gas-eth-v2-legacy (Node 22.16.0, 2026-11-12, plan 23-22)",
+      "note": "real ETH V2 snipe on a legacy-fee node (gasPrice 25 gwei, no baseFeePerGas): the Flashbots buy is a type-0 transaction at gasPrice 25000000000, decoded with real ethers from node.submitted and the eth_sendBundle body, while the helper's clamped fee for that attempt is 1 gwei (real computeAffordablePriorityFee), so base + the clamped fee would be 26 gwei as the passthrough and bloXroute legacy branches send. The scenario throws 'AUD-TX-030 looks fixed' when the bid is not the raw gasPrice; a scratch src mutation of the branch to baseFeeWei + a.priorityFeeWei reads looks fixed (restored identical). Recording: test/realpath/recordings/fee-gas-eth-v2-legacy.jsonl"
+    }
+  ],
+  "sibling_sites_checked": "The three strategies' legacy-fee branches at 23a6461 and HEAD: flashbots.ts:213-216 (raw scaled gasPrice, this entry), passthrough.ts:106-113 and bloxroute.ts:115 (baseFeeWei + the clamped fee, correct). The deliberate public buy and the public fallback sell send with ethers' default fees and are outside the helper (AUD-BUY-029, AUD-EXIT-004). Reachability: the Flashbots strategy serves only ETH (src/chainRegistry.ts mevStrategy), and ethers getFeeData returns no maxFeePerGas only when the latest block carries no baseFeePerGas, which Ethereum blocks always do since London; the branch runs only on an RPC that omits it.",
+  "status": "confirmed",
+  "severity_rationale": "S4, capital none, graded by the 23-22 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The code breaks its own CR-01 contract (the clamp is the final authority on the submitted fee) on one branch: retries resend at the same price, the priority-fee ceiling and the affordability bound never cap the bid, and the anti-rug gas multiplier scales the raw gasPrice unclamped. It is not reachable on today's chains: the strategy runs only on ETH, whose blocks always carry a base fee, so no position is exposed; a provider that omits baseFeePerGas would reach it, and the node still refuses a bid the wallet cannot pay.",
+  "recommendation": "Phase 24 (with the CR-01 family, card TX-02 area): send populatedTx.gasPrice = baseFeeWei + a.priorityFeeWei in the legacy branch, as passthrough.ts and bloxroute.ts do, so the clamp, the escalation and the ceiling hold on every branch. test/realpath/scenarios/riskAndFees.test.ts fee-gas-eth-v2-legacy throws 'AUD-TX-030 looks fixed' and the recording is re-recorded in a behavior: commit citing this ID. Nothing is fixed in Phase 23."
+}

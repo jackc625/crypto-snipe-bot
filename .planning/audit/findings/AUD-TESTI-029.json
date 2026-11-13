@@ -1,0 +1,65 @@
+{
+  "id": "AUD-TESTI-029",
+  "title": "A real-path test that times out is not stopped: Vitest runs the harness teardown while the test's own async body is still stepping the fake clock, so the body keeps driving its torn-down scenario into the next test of the file, where it causes failures and unhandled rejections that are reported against the wrong test",
+  "kind": "finding",
+  "area": "test",
+  "slice": "TESTI",
+  "severity": "S3",
+  "capital_impact": "none",
+  "classes": [
+    "C12"
+  ],
+  "files": [
+    "test/realpath/harness/setup.ts",
+    "test/realpath/harness/world.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "test/realpath/harness/setup.ts:214-239@a593efebfd8b17b5583257bd6db3ff46738995ee",
+      "note": "the only teardown: the setup file's afterEach disposes every scenario (providers destroyed, database closed, timers cleared) and resets per-test state; Vitest runs it when a test times out, without waiting for or cancelling that test's still-running body"
+    },
+    {
+      "type": "code",
+      "ref": "test/realpath/harness/world.ts:81-100@a593efebfd8b17b5583257bd6db3ff46738995ee",
+      "note": "stepUntil (like stepUntilTrue, stepFor and expectStillPending) keeps calling vi.advanceTimersByTimeAsync with no check that its scenario is still alive or that its test is still the current one, so a timed-out body goes on advancing the shared fake clock after teardown and into the next test"
+    },
+    {
+      "type": "command",
+      "ref": "export PATH=/c/Users/jackc/AppData/Local/nvm/v22.16.0:$PATH; npm test (full railed run run-20261112T010708-12056-8ce123 at a593efebfd8b17b5583257bd6db3ff46738995ee, Node 22.16.0, 2026-11-12)",
+      "note": "AUD-EXIT-003 'probe-is-eth-buy-wei-as-token-amount' timed out at 15032 ms under full-run load (1.3 to 1.8 s alone) and the run then reported one unhandled rejection, 'provider destroyed; cancelled request (operation=\"eth_subscribe\")' from WebSocketProvider.destroy in world.ts dispose at teardown, attributed by Vitest to the next test, 'zero-entry-infinite-ratio-fires-every-partial-tier'; two runs of the file alone (both tests passing) report no unhandled error"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-EXIT-003.test.ts with probe-is-eth-buy-wei-as-token-amount given a scratch { timeout: 700 } (two runs, Node 22.16.0, 2026-11-12; the edit restored byte for byte, git hash-object equal to HEAD)",
+      "note": "forced timeout: the timed-out test fails 'Test timed out in 700ms', and the next test, which passes on its own, fails too ('expected [ Infinity, Infinity ] to deeply equal [ Infinity ]': it saw a second exit-ratio entry), because the first test's body kept running its exit monitor on the shared clock after teardown"
+    }
+  ],
+  "sibling_sites_checked": "Every stepping helper in test/realpath/harness/world.ts (stepUntil, stepUntilTrue, stepFor, expectStillPending) and every triage fixture loop built on them (fixtures/*.ts driveChain, driveFor, driveExits, landNextSell, pendingWindow, missBundlesUntil, stepUntilOrFor): none checks for a disposed scenario or a changed test, so the leak is the same for every realpath test that times out. The setup-file afterEach is the only teardown (AUD-TESTI-028 is the related case where that hook is skipped). Child-process tests (spawnRailedChild, runRailedChildToEnd) are not affected the same way: their disposer kills a still-running child. Today a timeout is the only trigger; no committed test times out alone.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S3 (misleading behavior), capital none, graded by the 23-13 executor under the operator's standing instruction of 2026-11-11 (\"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\"), without a stop. The trigger is a test timing out, which already fails the run, so the leak cannot hide a failure behind a green run (not S2); the harm is that the extra failures and unhandled rejections are reported against tests that are not at fault, which misleads whoever diagnoses the run.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TESTI-028"
+  ],
+  "tags": [
+    "test-quality",
+    "found-by-realpath-harness",
+    "phase-23"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Stop a timed-out body from touching the next test: have the scenario carry its test (or a generation counter set by the setup file), and make every stepping helper throw at its next step once its scenario is disposed or the current test changed, so the leaked body ends with a named error instead of driving shared fake time; add a harness self-test with a deliberately timed-out test followed by one that must stay clean. A harness change, so in Phase 23 only through the Harness Gap Procedure (23-27-PLAN.md); otherwise Phase 28 test hygiene. Until then, give every realpath test whose full-run time passes half its limit an explicit limit, as plans 23-07, 23-12 and 23-13 did.",
+  "reported_by": [
+    "claude (23-13 executor)"
+  ],
+  "found_date": "2026-11-12",
+  "audited_sha": "a593efebfd8b17b5583257bd6db3ff46738995ee",
+  "affected_cases": [
+    "the tests that follow, in the same file, a realpath test that timed out"
+  ],
+  "escaped_regression": "A later test in the same file fails (or, in principle, passes) on state from the timed-out test, and an unhandled rejection from the leaked body is attributed to it, which misleads diagnosis; the run stays red because the timeout itself is reported."
+}

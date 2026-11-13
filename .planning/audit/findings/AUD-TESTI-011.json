@@ -119,7 +119,7 @@
     }
   ],
   "sibling_sites_checked": "All 27 integration and 23 fork files at the base SHA. Integration: spawn sites only preflightCli.test.ts:23,38 and pauseCli.test.ts:27,286; honeypotDeploy.eth.test.ts is the only integration file that constructs a provider on a real URL; every express/http server listens on 127.0.0.1:0; no integration file imports src/utils/db unmocked in-process (the preflightCli child does). Fork: the four replays (captureRehearsal, deliberateBuyReplay, exitStatePersistence, realLaunchReplay) import src unmocked with a temp DB_PATH; antiRugDetector mocks every state-reaching dependency; honeypotChecker / honeypotMultiAmount import only checkerContract and the ABI; snipeLifecycle and realMainnetGate.fork.test import no src. No fork path signs with PRIVATE_KEY or DEPLOY_PRIVATE_KEY or targets anything but 127.0.0.1:8545 for transactions (AUD-TESTI-017 trace), so there is no new rail-class reach (D-16).",
-  "status": "candidate",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-19"
@@ -158,5 +158,15 @@
     "d66d8d0"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 1-10, 14-21",
-  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files. Fork-side items are the unrun obligations AUD-TESTQ-030 to AUD-TESTQ-035."
+  "status_note": "Stays candidate (its recommendation): the rails are the guard and Phase 28 cleans the test files. Fork-side items are the unrun obligations AUD-TESTQ-030 to AUD-TESTQ-035.",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "Fixed for the unit and integration projects: a test can start a process only through spawnRailedChild (the named rail test), which gives every child the rails (sentinel env, network deny, data/ deny), so preflightCli's and pauseCli's children no longer get the parent environment, the live DB or a mainnet RPC; integration workers get the same rails, so the eight files that load src/config unmocked see sentinels; honeypotDeploy.eth's live mainnet call moved to the fork project by operator ruling ESC-RAILS-01 (UFV-05); status candidate -> fixed; the fork-replay and Hardhat-child half has its rails and RED-proven unit tests but has never run under the real fork project, so needs_fork is true until Phase 25 (Phase 22 ruling accept-rehearsal-plus-obligation)",
+    "proof": "Rail test spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files (test/unit/rails/spawnSites.test.ts, marker closes-finding: AUD-TESTI-011); RED proof row 18 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-11-1-spawn-gate.txt: a spawnSync added to test/integration/pauseCli.test.ts, one of this entry's files), re-run on 2026-11-11 by 23-14 because the test file changed after that proof (f695363): .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-6-spawn-gate.txt, the gate names pauseCli.test.ts:373 import of child_process and :374 call to spawnSync(), and pauseCli.test.ts was restored byte for byte; the railed child itself is the marked rail test railed child processes (D-03) > a child sees the sentinel token, full rails, VITEST, the 192.0.2.1 deny, the data deny and the parent run id (RED row 5, 22-08-5-child-preload.txt; that test file is unchanged since the proof and test/rails/spawnRailedChild.ts changed only by the unrelated ledgerRunId option, be3c572; not re-run because a child without its rails would attempt the 192.0.2.1 connect and the data/ read); the integration-worker reach is the marked rail test integration project rails > module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel (AC-13), RED proof 23-14-4b-sentinel-env-integration.txt (the row 1 neutralisation, recorded by 23-14 because no Phase 22 row names that file); the fork reach is rehearsed only: RED rows 19, 20 and 21 (fork RPC source, Hardhat child env, fork in-worker reads)",
+    "rail_test": "spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files",
+    "needs_fork": true,
+    "fork_question": "On the first real fork run (npm run test:fork, which starts Hardhat), do the four fork replays this entry names see only the test/.env.test sentinels plus the two fork shell keys, does a notifier send become a recorded refusal, and does the Hardhat child start with the sanitized env and record a blocked .env read (UFV-01, UFV-03 and UFV-04)?",
+    "fork_ref": "UFV-04"
+  }
 }

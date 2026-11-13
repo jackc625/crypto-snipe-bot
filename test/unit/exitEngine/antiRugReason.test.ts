@@ -42,9 +42,12 @@
 // Tests 4-7 are mock-based runtime assertions of unsubscribeAntiRug call
 // sites.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as ts from 'typescript';
+import { REPO_ROOT } from '../../helpers/sourceGraph';
 
 // -----------------------------------------------------------------------------
 // Mocks: db, logger, notifier, txManager, receiptDecoder, exitManager, detector
@@ -262,59 +265,164 @@ beforeEach(() => {
 // Tests
 // -----------------------------------------------------------------------------
 
-const exitEngineSource = readFileSync(
-    resolve(__dirname, '../../../src/exitEngine.ts'),
-    'utf8',
-);
+// -----------------------------------------------------------------------------
+// Test 1 helper (plan 23-30, CHAR-06): a real type-checker query, not a text match.
+// tsconfig.json and tsconfig.bot.json include src/**/* and exclude tests, so a
+// compile-time assertion written inside this file would never be type-checked.
+// Instead: walk a source root for the one file declaring the exported function
+// executeFullSell, build a ts.createProgram for it with the repo's compiler
+// options, and read the string-literal members of its `reason` parameter's type.
+// -----------------------------------------------------------------------------
+
+const REQUIRED_REASONS = ['anti-rug', 'trailing-stop', 'stop-loss', 'urgency-market-sell'] as const;
+type ExitReason = 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug';
+
+function walkTs(dir: string, out: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walkTs(full, out);
+        else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) out.push(full);
+    }
+    return out;
+}
+
+function exportedFunction(sf: ts.SourceFile, name: string): ts.FunctionDeclaration | undefined {
+    return sf.statements.find(
+        (s): s is ts.FunctionDeclaration =>
+            ts.isFunctionDeclaration(s) &&
+            s.name?.text === name &&
+            (ts.getCombinedModifierFlags(s) & ts.ModifierFlags.Export) !== 0,
+    );
+}
+
+function repoCompilerOptions(): ts.CompilerOptions {
+    const read = ts.readConfigFile(path.join(REPO_ROOT, 'tsconfig.json'), ts.sys.readFile);
+    if (read.error) throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'));
+    return { ...ts.parseJsonConfigFileContent(read.config, ts.sys, REPO_ROOT).options, noEmit: true };
+}
+
+/** The string-literal members of executeFullSell's `reason` type, found under `root` by symbol. */
+function reasonLiteralMembers(root: string): { files: string[]; members: string[] } {
+    const files = walkTs(root).filter((file) => {
+        const sf = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+        return exportedFunction(sf, 'executeFullSell') !== undefined;
+    });
+    if (files.length !== 1) return { files, members: [] };
+    const program = ts.createProgram([files[0]], repoCompilerOptions());
+    const checker = program.getTypeChecker();
+    const sf = program.getSourceFile(files[0]);
+    const fn = sf && exportedFunction(sf, 'executeFullSell');
+    const param = fn?.parameters.find((p) => ts.isIdentifier(p.name) && p.name.text === 'reason');
+    if (!param) return { files, members: [] };
+    const type = checker.getTypeAtLocation(param.name);
+    const parts = type.isUnion() ? type.types : [type];
+    const members = parts.filter((t): t is ts.StringLiteralType => t.isStringLiteral()).map((t) => t.value);
+    return { files, members };
+}
+
+/** For each run, the final argument the real executeFullSell passes to the private escalation. */
+async function escalationMultipliers(runs: { reason: ExitReason; gasMultiplier: number }[]): Promise<unknown[]> {
+    const { executeFullSell } = await import('../../../src/exitEngine');
+    const finals: unknown[] = [];
+    for (const [i, run] of runs.entries()) {
+        escalatePrivateSellMock.mockClear();
+        const ctx = buildCtx({ gasMultiplier: run.gasMultiplier });
+        const result = await executeFullSell(
+            ctx,
+            V2_DEX as unknown as Parameters<typeof executeFullSell>[1],
+            `0xToken0000000000000000000000000000000G${String(i).padStart(2, '0')}`,
+            null,
+            run.reason,
+            70 + i,
+            `gas multiplier run ${run.reason}`,
+        );
+        expect(result).toBe(true);
+        expect(escalatePrivateSellMock).toHaveBeenCalledTimes(1);
+        finals.push(escalatePrivateSellMock.mock.calls[0][3]);
+    }
+    return finals;
+}
 
 describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsubscribeAntiRug cleanup', () => {
+    // The first import of the exit engine runs here, against hookTimeout, not
+    // inside the first test's body (deferred-items.md, cold imports).
+    beforeAll(async () => {
+        await import('../../../src/exitEngine');
+    });
+
+    // The describe title still says "source assertions": test-identity honours a
+    // rename of a test's own title only (deferred-items.md, plan 23-18). Since plan
+    // 23-30 these tests read no source text: Test 1 queries the type checker and
+    // Tests 2-3b drive the real executeFullSell through this file's mocks.
     describe('Reason union + gas-multiplier source assertions (Tests 1-3)', () => {
-        it("Test 1: the reason parameter type includes 'anti-rug'", () => {
-            // Match the union declaration: reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell' | 'anti-rug',
-            // Allow whitespace/newlines between members.
-            const unionMatch = /reason:\s*['"]trailing-stop['"]\s*\|\s*['"]stop-loss['"]\s*\|\s*['"]urgency-market-sell['"]\s*\|\s*['"]anti-rug['"]/;
-            expect(exitEngineSource).toMatch(unionMatch);
+        // 60 s: builds a TypeScript program over src/; the unit default is 5 s.
+        it("Test 1: the reason parameter type includes 'anti-rug'", { timeout: 60_000 }, () => {
+            // The query can fail: a temp-directory source whose union omits
+            // 'anti-rug' is reported as missing it (not as a missing symbol).
+            const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-23-30-reason-'));
+            try {
+                fs.mkdirSync(path.join(tmp, 'nested'));
+                fs.writeFileSync(
+                    path.join(tmp, 'nested', 'engine.ts'),
+                    "export async function executeFullSell(reason: 'trailing-stop' | 'stop-loss' | 'urgency-market-sell'): Promise<boolean> {\n    return reason.length > 0;\n}\n",
+                );
+                fs.writeFileSync(path.join(tmp, 'other.ts'), 'export const unrelated = 1;\n');
+                const omitted = reasonLiteralMembers(tmp);
+                expect(omitted.files).toHaveLength(1);
+                expect([...omitted.members].sort()).toEqual(['stop-loss', 'trailing-stop', 'urgency-market-sell']);
+                expect(REQUIRED_REASONS.filter((r) => !omitted.members.includes(r))).toEqual(['anti-rug']);
+            } finally {
+                fs.rmSync(tmp, { recursive: true, force: true });
+            }
+
+            // The real source: exactly one file under src/ declares it.
+            const real = reasonLiteralMembers(path.join(REPO_ROOT, 'src'));
+            expect(real.files).toHaveLength(1);
+            expect(REQUIRED_REASONS.filter((r) => !real.members.includes(r))).toEqual([]);
         });
 
-        it("Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier", () => {
-            // The implementation should contain a conditional that picks
-            // ctx.chain.antiRug.gasMultiplier for the anti-rug branch.
-            // We accept either an explicit ternary or a conditional assignment
-            // — and allow the two halves to span multiple lines.
-            const antiRugBranch = /reason\s*===\s*['"]anti-rug['"][\s\S]{0,80}ctx\.chain\.antiRug\.gasMultiplier/;
-            const altBranch = /ctx\.chain\.antiRug\.gasMultiplier[\s\S]{0,80}reason\s*===\s*['"]anti-rug['"]/;
-            expect(
-                antiRugBranch.test(exitEngineSource) || altBranch.test(exitEngineSource),
-            ).toBe(true);
+        it("Test 2: when reason='anti-rug', gasMultiplier is derived from ctx.chain.antiRug.gasMultiplier", async () => {
+            // Two different anti-rug multipliers; the chain's routine gas.multiplier
+            // (1.2 in buildCtx) must not be what arrives.
+            const finals = await escalationMultipliers([
+                { reason: 'anti-rug', gasMultiplier: 2.0 },
+                { reason: 'anti-rug', gasMultiplier: 3.5 },
+            ]);
+            expect(finals).toEqual([2.0, 3.5]);
         });
 
-        it("Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)", () => {
-            // Phase 19 Gap-1 closure (2026-05-24): the original PLAN.md design
-            // attempted to swap-in ctx.chain.gas.multiplier on non-anti-rug
-            // branches, but the value was being discarded via `void` and never
-            // reached the MEV-strategy fee-data layer (MEV strategies have
-            // always consumed raw feeData). The Gap-1 fix replaces the
-            // discard with a real threading through sendTxWithRetry's
-            // gasMultiplier slot. For non-anti-rug reasons (trailing-stop /
-            // stop-loss / urgency-market-sell), we pass `undefined` —
-            // preserving exact prior behavior at the MEV layer (raw feeData,
-            // no elevation).
-            const undefinedBranch = /reason\s*===\s*['"]anti-rug['"][\s\S]{0,80}:\s*undefined/;
-            expect(undefinedBranch.test(exitEngineSource)).toBe(true);
+        it("Test 3: when reason !== 'anti-rug', gasMultiplier is undefined (raw feeData; prior behavior preserved)", async () => {
+            const finals = await escalationMultipliers([
+                { reason: 'trailing-stop', gasMultiplier: 3.5 },
+                { reason: 'stop-loss', gasMultiplier: 3.5 },
+                { reason: 'urgency-market-sell', gasMultiplier: 3.5 },
+            ]);
+            expect(finals).toEqual([undefined, undefined, undefined]);
         });
 
-        it("Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)", () => {
-            // Phase 19 Gap-1 closure: the multiplier MUST actually reach the MEV
-            // strategy. The pre-Gap-1 code discarded gasMultiplier via `void` —
-            // this guard prevents that regression from creeping back in.
-            expect(exitEngineSource).not.toContain('void gasMultiplier');
-            // Phase 21.2-06 (Finding A inclusion ladder): the full-sell private leg
-            // is now escalatePrivateSell(txBuilder, ctx, attempts, gasMultiplier) —
-            // the multiplier remains threaded through to the MEV strategy (escalate
-            // PrivateSell forwards it to sendTxWithRetry). Assert the gasMultiplier
-            // reaches the private escalation as its final positional arg.
-            const escalateWithGasMultiplier = /escalatePrivateSell\(\s*txBuilder\s*,\s*ctx\s*,[\s\S]{0,80}gasMultiplier\s*\)/;
-            expect(escalateWithGasMultiplier.test(exitEngineSource)).toBe(true);
+        it("Test 3b: gasMultiplier is threaded into the private escalation (Gap-1 closure + Finding A)", async () => {
+            // Phase 21.2-06: the private leg is escalatePrivateSell(txBuilder, ctx,
+            // attempts, gasMultiplier); the multiplier is its final positional arg
+            // (the pre-Gap-1 code discarded it with `void gasMultiplier`).
+            const { executeFullSell } = await import('../../../src/exitEngine');
+            const ctx = buildCtx({ gasMultiplier: 3.5 });
+            const result = await executeFullSell(
+                ctx,
+                V2_DEX as unknown as Parameters<typeof executeFullSell>[1],
+                '0xToken000000000000000000000000000000003B',
+                null,
+                'anti-rug',
+                79,
+                'gas multiplier threading',
+            );
+            expect(result).toBe(true);
+            expect(escalatePrivateSellMock).toHaveBeenCalledTimes(1);
+            const call = escalatePrivateSellMock.mock.calls[0];
+            expect(call).toHaveLength(4);
+            expect(typeof call[0]).toBe('function');
+            expect(call[1]).toBe(ctx);
+            expect(typeof call[2]).toBe('number');
+            expect(call[3]).toBe(3.5);
         });
     });
 
@@ -425,22 +533,39 @@ describe('Phase 19 — executeFullSell reason union + elevated-gas branch + unsu
         });
 
         it('Test 7: executePartialSell does NOT call unsubscribeAntiRug', async () => {
-            // Partial sells leave position open per D-TERMINATION. Source-text
-            // assertion is the cleanest guard: the executePartialSell function
-            // body (between its declaration and the next exported function /
-            // function-closer) must contain ZERO unsubscribeAntiRug or
-            // unregisterAntiRugPosition references.
-            //
-            // Source file may use CRLF or LF endings — normalize to LF before
-            // matching the function body to keep this assertion portable.
-            const normalized = exitEngineSource.replace(/\r\n/g, '\n');
-            const partialSellMatch = normalized.match(
-                /export async function executePartialSell[\s\S]*?\n}\n/,
+            // Partial sells leave the position open (D-TERMINATION). A real
+            // SUCCESSFUL partial sell through this file's mocks must record its
+            // partial_sell row and leave anti-rug registered (Test 8 covers the
+            // failure path).
+            const { executePartialSell, VolatilityTracker } = await import('../../../src/exitEngine');
+            const ctx = buildCtx();
+            const state = {
+                tradeId: 70,
+                entryPrice: 1,
+                highWaterMark: 2,
+                trailingActivated: true,
+                completedTierIndices: new Set<number>(),
+                originalTokenAmount: 1_000n,
+                urgencyStartTs: Date.now(),
+                volatilityTracker: new VolatilityTracker(),
+            };
+
+            const result = await executePartialSell(
+                ctx,
+                V2_DEX as unknown as Parameters<typeof executePartialSell>[1],
+                '0xToken00000000000000000000000000000000T07',
+                null,
+                500n,
+                [{ tier: { multiple: 2, percent: 50 }, index: 0 }],
+                state,
+                2.0,
             );
-            expect(partialSellMatch).toBeTruthy();
-            const partialSellBody = partialSellMatch![0];
-            expect(partialSellBody).not.toContain('unsubscribeAntiRug');
-            expect(partialSellBody).not.toContain('unregisterAntiRugPosition');
+
+            expect(result).toBe(true);
+            expect(insertTradeRun).toHaveBeenCalledTimes(1);
+            expect(insertTradeRun.mock.calls[0][0]).toMatchObject({ action: 'partial_sell', status: 'sold' });
+            expect(unregisterAntiRugPositionMock.mock.calls).toEqual([]);
+            expect(deleteExitStateRun).not.toHaveBeenCalled();
         });
 
         it('Test 8 (Finding D verification): a FAILED executePartialSell leaves the position open — no double-sell teardown, anti-rug NOT torn down', async () => {

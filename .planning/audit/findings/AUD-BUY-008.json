@@ -58,7 +58,7 @@
     }
   ],
   "sibling_sites_checked": "V2 and V3 reconnect loops both checked (identical shape). provider.ts getWsProvider/removeWsProvider read. onRestart (:1808-1852) and the dashboard stop/start routes (chains.ts:121-190) read for listener stacking. No PairCreated/PoolCreated backfill exists anywhere in bot.ts (searched queryFilter: only the HTTP pollers use it). No ping/heartbeat in the DEX listener path. The anti-rug detector has its own reconnect (detector.ts ~918-926, ANTIRUG slice, RC-13); not edited here.",
-  "status": "candidate",
+  "status": "confirmed",
   "origin": "research-candidate",
   "rc": [
     "RC-20"
@@ -82,5 +82,11 @@
     "codex"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path with a real socket drop and fake time (plan 23-10, AC-12; moved to a real in-process boot by plan 23-32): a real in-process startMultiChainBot on the fake ETH chain starts the real listeners for every DEX, then the booted bot's dashboard Stop and Start routes run on the connected socket (Start runs the real onRestart); one server-side socket close then runs two reconnect loops per DEX within 10 s of fake time, each with its own disconnect alert and its own provider (claim restart-stacks-reconnect-loop); the control, booted the same way without a restart, reconnects each DEX once. A startDexListener that registers its close handler once per DEX and socket reads looks fixed. Status candidate -> confirmed. The doubled PairCreated's double buy is AUD-BUY-004's test; the missing backfill, missing heartbeat and missing shutdown check stay code-read.",
+    "test_id": "AUD-BUY-008"
+  }
 }

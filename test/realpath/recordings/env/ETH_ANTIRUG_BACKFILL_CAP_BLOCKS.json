@@ -1,0 +1,103 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS",
+                "value": "0"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug backfill-cap-blocks must be an integer in [1, 100000]"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS",
+                "value": "abc"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug backfill-cap-blocks must be an integer in [1, 100000]"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "key": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS",
+                "value": ""
+              },
+              "level": "fatal",
+              "msg": "Anti-rug backfill-cap-blocks must be an integer in [1, 100000]"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": "10"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS"
+}

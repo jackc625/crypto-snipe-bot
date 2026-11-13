@@ -1,0 +1,248 @@
+// test/realpath/harness/setup.ts
+// Phase 23 plan 23-01 (CHAR-01, AC-02, AC-03): the realpath project's second setup file, after
+// test/rails/setup.cjs. It holds the ONLY vi.mock calls of the real-path harness: the logger,
+// the notifier, the dashboard broadcaster, axios (relay HTTP and the safety APIs, routed by URL)
+// and the Telegram client library. Everything else is real; the fake chain is a transport seam
+// (chain.ts installSeams), not a mock.
+//
+// Factories use plain functions, never Vitest mock functions: the project's mockReset: true wipes
+// a mock function's implementation before each test, so logger.child() would return undefined.
+// Factories read the shared state on globalThis at call time, because vi.resetModules() re-runs
+// them.
+//
+// Plan 23-02 feeds: the logger keeps every call on the plain `logs` list, and a call whose fields
+// carry `op` also goes on the ordered timeline (capture.ts). The notifier keeps every alert, with
+// its exact text, on the `alerts` list (read through capture.ts recordedAlerts); alerts never go
+// on the timeline.
+//
+// Phase 23 review WR-06: while world.ts restartGraph stops the old graph
+// (harnessState().stoppingGraph), the logger, the notifier and the broadcaster drop every call:
+// only the old graph runs then, and a killed process logs, alerts and broadcasts nothing.
+
+import { afterEach, vi } from 'vitest';
+import { harnessState } from './chain';
+import { assertNoViolations } from './capture';
+import { assertAllFaultsFired, assertNoStrays, disposeScenarios, resetTestState } from './world';
+
+harnessState();
+
+vi.mock('../../../src/utils/logger', () => {
+    const KEY = Symbol.for('csb.realpath.harness');
+    type Sink = {
+        seq: number;
+        stoppingGraph: boolean;
+        logs: Array<{ seq: number; level: string; bindings: Record<string, unknown>; obj: Record<string, unknown> | undefined; msg: string | undefined }>;
+        timeline: { record(entry: { kind: 'op'; level: string; op: string; msg: string | undefined; fields: Record<string, unknown>; bindings: Record<string, unknown> }): unknown } | null;
+    };
+    const sink = (): Sink => {
+        const s = (globalThis as unknown as Record<symbol, Sink | undefined>)[KEY];
+        if (!s) throw new Error('realpath harness: state missing when the logger was called (setup.ts did not run first)');
+        return s;
+    };
+    const make = (bindings: Record<string, unknown>): Record<string, unknown> => {
+        const emit =
+            (level: string) =>
+            (...args: unknown[]): void => {
+                const s = sink();
+                if (s.stoppingGraph) return;
+                s.seq += 1;
+                const first = args[0];
+                const isObj = typeof first === 'object' && first !== null;
+                const obj = isObj ? (first as Record<string, unknown>) : undefined;
+                const msg = isObj ? (typeof args[1] === 'string' ? args[1] : undefined) : typeof first === 'string' ? first : undefined;
+                s.logs.push({ seq: s.seq, level, bindings, obj, msg });
+                // Only op-carrying calls feed the recording (AC-20 names `op` logs).
+                if (obj !== undefined && obj.op !== undefined) {
+                    if (!s.timeline) throw new Error('realpath harness: no timeline when an op log arrived (world.ts did not load)');
+                    s.timeline.record({ kind: 'op', level, op: String(obj.op), msg, fields: obj, bindings });
+                }
+            };
+        return {
+            level: 'info',
+            trace: emit('trace'),
+            debug: emit('debug'),
+            info: emit('info'),
+            warn: emit('warn'),
+            error: emit('error'),
+            fatal: emit('fatal'),
+            silent: (): void => {},
+            child: (more: Record<string, unknown>) => make({ ...bindings, ...more }),
+            isLevelEnabled: (): boolean => true,
+            flush: (): void => {},
+        };
+    };
+    return { logger: make({}) };
+});
+
+// The real module's three functions, as plain functions with the real signatures
+// (src/utils/notifier.ts:59, :89, :98). Each records one { via, chain, message } in call order.
+vi.mock('../../../src/utils/notifier', () => {
+    const KEY = Symbol.for('csb.realpath.harness');
+    type Alert = { via: 'telegram' | 'chain' | 'ctx'; chain: string | null; message: unknown };
+    const record = (via: Alert['via'], chain: string | null, message: unknown): Promise<void> => {
+        const s = (globalThis as unknown as Record<symbol, { alerts: Alert[]; stoppingGraph: boolean } | undefined>)[KEY];
+        if (!s) throw new Error('realpath harness: state missing when the notifier was called');
+        if (s.stoppingGraph) return Promise.resolve();
+        s.alerts.push({ via, chain, message });
+        return Promise.resolve();
+    };
+    return {
+        sendTelegramAlert: (message: string) => record('telegram', null, message),
+        sendChainAlert: (chainDisplayName: string, message: string) => record('chain', chainDisplayName, message),
+        sendCtxAlert: (ctx: { chain?: { name?: string } }, message: string) => record('ctx', ctx?.chain?.name ?? null, message),
+    };
+});
+
+vi.mock('../../../src/api/ws/broadcaster', () => {
+    const KEY = Symbol.for('csb.realpath.harness');
+    type BroadcastState = { seq: number; broadcasts: Array<{ seq: number; type: string; data: unknown }>; stoppingGraph: boolean };
+    const state = (): BroadcastState => {
+        const s = (globalThis as unknown as Record<symbol, BroadcastState | undefined>)[KEY];
+        if (!s) throw new Error('realpath harness: state missing when the broadcaster was called');
+        return s;
+    };
+    let clients = 0;
+    return {
+        addClient: (): void => {
+            clients += 1;
+        },
+        removeClient: (): void => {
+            clients = Math.max(0, clients - 1);
+        },
+        getClientCount: (): number => clients,
+        broadcast: (type: string, data: unknown): void => {
+            const s = state();
+            if (s.stoppingGraph) return;
+            s.seq += 1;
+            s.broadcasts.push({ seq: s.seq, type, data });
+        },
+    };
+});
+
+vi.mock('axios', () => {
+    const KEY = Symbol.for('csb.realpath.harness');
+    type Router = (method: string, url: string, data: unknown, config: unknown) => Promise<unknown>;
+    const route = (method: string, url: string, data: unknown, config: unknown): Promise<unknown> => {
+        const s = (globalThis as unknown as Record<symbol, { routeAxios: Router | null } | undefined>)[KEY];
+        if (!s?.routeAxios) throw new Error(`realpath harness: axios ${method.toUpperCase()} ${url} with no router installed`);
+        return s.routeAxios(method, url, data, config);
+    };
+    const axios: Record<string, unknown> = {
+        get: (url: string, config?: unknown) => route('get', url, undefined, config),
+        delete: (url: string, config?: unknown) => route('delete', url, undefined, config),
+        head: (url: string, config?: unknown) => route('head', url, undefined, config),
+        post: (url: string, data?: unknown, config?: unknown) => route('post', url, data, config),
+        put: (url: string, data?: unknown, config?: unknown) => route('put', url, data, config),
+        patch: (url: string, data?: unknown, config?: unknown) => route('patch', url, data, config),
+        request: (config: { method?: string; url: string; data?: unknown }) => route((config.method ?? 'get').toLowerCase(), config.url, config.data, config),
+        isAxiosError: (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { isAxiosError?: unknown }).isAxiosError === true,
+        defaults: { headers: { common: {} } },
+    };
+    axios.create = () => axios;
+    return { default: axios, ...axios };
+});
+
+// The Telegram client fake (plan 23-27): the real allowlist handler is an inline function inside
+// src/telegramListener.ts startTelegramListener, so a fake client that keeps what the listener
+// registers is the only way a test can reach it (SPEC Background). The client keeps its
+// constructor arguments; connect, disconnect and destroy resolve, with the real signatures
+// (gramjs TelegramClient.d.ts: connect(): Promise<boolean>); addEventHandler(handler, builder)
+// appends { handler, builder, client } to telegram.handlers on the shared harness state, which
+// test/realpath/harness/telegram.ts delivers to. Nothing here ever opens a connection.
+vi.mock('telegram', () => {
+    const KEY = Symbol.for('csb.realpath.harness');
+    type TelegramRecord = { clients: unknown[]; handlers: Array<{ handler: unknown; builder: unknown; client: unknown }> };
+    const record = (): TelegramRecord => {
+        const s = (globalThis as unknown as Record<symbol, { telegram: TelegramRecord } | undefined>)[KEY];
+        if (!s) throw new Error('realpath harness: state missing when the Telegram client fake was used');
+        return s.telegram;
+    };
+    class TelegramClient {
+        readonly session: unknown;
+        readonly apiId: unknown;
+        readonly apiHash: unknown;
+        readonly options: unknown;
+        connected = false;
+        constructor(session: unknown, apiId: unknown, apiHash: unknown, options: unknown) {
+            this.session = session;
+            this.apiId = apiId;
+            this.apiHash = apiHash;
+            this.options = options;
+            record().clients.push(this);
+        }
+        async connect(): Promise<boolean> {
+            this.connected = true;
+            return true;
+        }
+        async disconnect(): Promise<void> {
+            this.connected = false;
+        }
+        async destroy(): Promise<void> {
+            this.connected = false;
+        }
+        addEventHandler(handler: unknown, builder?: unknown): void {
+            record().handlers.push({ handler, builder, client: this });
+        }
+        removeEventHandler(handler: unknown, builder?: unknown): void {
+            const list = record().handlers;
+            const i = list.findIndex((h) => h.handler === handler && h.client === this && (builder === undefined || h.builder === builder));
+            if (i >= 0) list.splice(i, 1);
+        }
+    }
+    return { TelegramClient };
+});
+
+vi.mock('telegram/sessions', () => {
+    class StringSession {
+        readonly value: unknown;
+        constructor(value: unknown) {
+            this.value = value;
+        }
+        save(): string {
+            return String(this.value ?? '');
+        }
+    }
+    return { StringSession };
+});
+
+vi.mock('telegram/events', () => {
+    class NewMessage {
+        readonly params: unknown;
+        constructor(params: unknown) {
+            this.params = params;
+        }
+    }
+    return { NewMessage };
+});
+
+// One awaited hook, in this order: tear every scenario down, then fail on any stray call
+// (AC-03: a caller's catch can swallow the error the fake returned, so the record decides),
+// then on any fault or hold that never fired, then on any DB capture violation (plan 23-02: the
+// recording function never throws into SQLite, where a production catch would hide it). Per-test
+// state is cleared whatever happened.
+afterEach(async () => {
+    const errors: unknown[] = [];
+    try {
+        await disposeScenarios();
+    } catch (e) {
+        errors.push(e);
+    }
+    try {
+        assertNoStrays();
+    } catch (e) {
+        errors.push(e);
+    }
+    try {
+        assertAllFaultsFired();
+    } catch (e) {
+        errors.push(e);
+    }
+    try {
+        assertNoViolations();
+    } catch (e) {
+        errors.push(e);
+    }
+    resetTestState();
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, `realpath afterEach: ${errors.length} checks failed`);
+});

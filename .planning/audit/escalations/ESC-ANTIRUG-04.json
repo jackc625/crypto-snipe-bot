@@ -1,0 +1,22 @@
+{
+  "id": "ESC-ANTIRUG-04",
+  "date": "2026-11-11",
+  "tier": "area-batch",
+  "tags": [
+    "phase-23",
+    "new-finding",
+    "standing-instruction",
+    "capital",
+    "23-06-task-1"
+  ],
+  "items": [
+    "AUD-ANTIRUG-025"
+  ],
+  "resolved_items": [],
+  "summary": "New S1 found by the 23-06 executor while proving AUD-BUY-001 on the real path: every boot that resumes an open position drops the anti-rug WebSocket subscription (resumeAntiRugMonitoring registers the position, then re-arms the chain listener, whose un-awaited off() and on() of the same filter race inside ethers; the new dispatcher lands on a stopped subscriber and no eth_subscribe is sent). Proven by test/realpath/triage/AUD-ANTIRUG-025.test.ts with two fix-shaped mutations reading looks fixed. It also weakens the interim operator rule on AUD-BUY-001 (ESC-BUY-01: restart the main bot right after a deliberate buy), because that restart re-arms the exit monitor but not the anti-rug subscription. Graded S1 STRAND by the executor under the standing instruction; no stop.",
+  "presented_at": "2026-11-11: in the 23-06 SUMMARY (New findings and grade/status changes) and the 23-06 executor's return to the execute-phase orchestrator; to be put to the operator in the 23-16 D-11 batch report",
+  "operator_response": null,
+  "acknowledgement_evidence": "No operator words exist for this item yet, and none are invented here. The operator's standing instruction of 2026-11-11 (STATE.md Decisions, verbatim: \"All the bugs are going to get fixed. The S1, 2 or whatever doesn't matter. Don't interrupt sessions to ask me about upgrading or downgrading\") is the operator's acknowledgement that executors register and grade new findings themselves without stopping; this item was registered under it. The per-item acknowledgement is owed in the 23-16 D-11 batch report (operator review record), where this S1 must be listed with AUD-BUY-001.",
+  "ruling": "none",
+  "phase_continued": true
+}

@@ -41,6 +41,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ethers } from 'ethers';
+import * as ts from 'typescript';
+import { loadRepoModules } from '../../helpers/sourceGraph';
 
 vi.mock('../../../src/utils/logger', () => ({
     logger: {
@@ -353,42 +355,111 @@ describe('Phase 19 plan 19-02 Task 1 — ChainConfig.antiRug field', () => {
 // Task 2: src/config.ts REQUIRED_ENV_VARS + .env.example
 // ---------------------------------------------------------------------------
 
+// Tests 19 to 21 (plan 23-30, CHAR-06) read no named source file. REQUIRED_ENV_VARS is
+// private to the config module and its only reader, validateEnvVars, reads only the
+// `required` and `description` of required entries:
+//   - Test 20 is behavior: with every <CHAIN>_ANTIRUG_* variable unset, the real config
+//     module loads with no fatal exit, so no anti-rug variable is required.
+//   - Tests 19 and 21 protect list contents no runtime code reads, so they find the one
+//     REQUIRED_ENV_VARS declaration by a directory walk of src/ (test/helpers/sourceGraph.ts)
+//     and read its array literal. None or more than one declaration fails, so a rename or a
+//     second list fails loudly. Only entries of that array count.
+
+interface EnvSpecEntry {
+    name: string;
+    /** The description literal's text, or null when it is not a plain string literal. */
+    description: string | null;
+}
+
+function literalText(node: ts.Expression | undefined): string | null {
+    if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) return node.text;
+    return null;
+}
+
+let envSpecCache: { files: string[]; entries: EnvSpecEntry[] } | undefined;
+/** The entries of the one REQUIRED_ENV_VARS array declared under src/, found by symbol. */
+function requiredEnvVarEntries(): { files: string[]; entries: EnvSpecEntry[] } {
+    if (envSpecCache) return envSpecCache;
+    const decls: { file: string; decl: ts.VariableDeclaration }[] = [];
+    for (const mod of loadRepoModules(['src']).values()) {
+        const visit = (node: ts.Node): void => {
+            if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'REQUIRED_ENV_VARS') {
+                decls.push({ file: mod.file, decl: node });
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(mod.sf);
+    }
+    const entries: EnvSpecEntry[] = [];
+    if (decls.length === 1) {
+        const init = decls[0].decl.initializer;
+        if (init && ts.isArrayLiteralExpression(init)) {
+            for (const el of init.elements) {
+                if (!ts.isObjectLiteralExpression(el)) continue;
+                const prop = (key: string) =>
+                    el.properties.find(
+                        (p): p is ts.PropertyAssignment =>
+                            ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === key,
+                    )?.initializer;
+                const name = literalText(prop('name'));
+                if (name !== null) entries.push({ name, description: literalText(prop('description')) });
+            }
+        }
+    }
+    envSpecCache = { files: decls.map((d) => d.file), entries };
+    return envSpecCache;
+}
+
+const ANTIRUG_NAME = /^[A-Z]+_ANTIRUG_/;
+
+// The describe title still names config.ts: test-identity honours a rename of a test's own
+// title only (deferred-items.md, plan 23-18), so the describe is kept.
 describe('Phase 19 plan 19-02 Task 2 — config.ts + .env.example', () => {
-    it('Test 19: REQUIRED_ENV_VARS has >= 32 entries matching /^[A-Z]+_ANTIRUG_/', async () => {
-        const configSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/config.ts'), 'utf-8');
-        // Count distinct env var names matching the prefix.
-        // Match a `name: '<CHAIN>_ANTIRUG_*'` entry.
-        const matches = configSrc.match(/name:\s*['"][A-Z]+_ANTIRUG_[A-Z_]+['"]/g) || [];
-        expect(matches.length).toBeGreaterThanOrEqual(32);
+    // 60 s: the directory walk builds compiler structures over src/; the unit default is 5 s.
+    it('Test 19: REQUIRED_ENV_VARS has >= 32 entries matching /^[A-Z]+_ANTIRUG_/', { timeout: 60_000 }, () => {
+        const { files, entries } = requiredEnvVarEntries();
+        expect(files).toHaveLength(1);
+        const antiRug = entries.filter((e) => ANTIRUG_NAME.test(e.name));
+        expect(antiRug.length).toBeGreaterThanOrEqual(32);
     });
 
     it('Test 20: Every new ANTIRUG entry in REQUIRED_ENV_VARS has required: false', async () => {
-        // Read the config.ts file, scan for ANTIRUG entries, assert required: false on each
-        const configSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/config.ts'), 'utf-8');
-        // Capture each `{ name: '..._ANTIRUG_...', required: <bool>, description: '...' }` line/block.
-        // EnvVarSpec entries are typically on a single line in this codebase.
-        const entryRe = /\{\s*name:\s*['"]([A-Z]+_ANTIRUG_[A-Z_]+)['"]\s*,\s*required:\s*(true|false)/g;
-        let match;
-        const offenders: string[] = [];
-        while ((match = entryRe.exec(configSrc)) !== null) {
-            if (match[2] !== 'false') {
-                offenders.push(`${match[1]} (required=${match[2]})`);
-            }
+        // Every <CHAIN>_ANTIRUG_* name the operator template documents, all unset.
+        const envExample = fs.readFileSync(path.resolve(process.cwd(), '.env.example'), 'utf-8');
+        const names = [...new Set(envExample.match(/^[A-Z]+_ANTIRUG_[A-Z_]+(?==)/gm) ?? [])];
+        expect(names.length).toBeGreaterThanOrEqual(32);
+        for (const name of [...names, ...ANTIRUG_ENV_KEYS]) delete process.env[name];
+
+        vi.resetModules();
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+        try {
+            await import('../../../src/config');
+            const { logger } = await import('../../../src/utils/logger');
+            const fatal = vi.mocked(logger.fatal);
+            const missing = fatal.mock.calls
+                .filter((call) => call[1] === 'Missing required environment variables')
+                .flatMap((call) => (call[0] as { missing: string[] }).missing)
+                // Each entry reads "NAME: description"; the names keep the failure message short.
+                .map((entry) => entry.split(':')[0].trim());
+            expect(missing).toEqual([]);
+            expect(fatal).not.toHaveBeenCalled();
+            expect(exitSpy).not.toHaveBeenCalled();
+        } finally {
+            exitSpy.mockRestore();
         }
-        expect(offenders).toEqual([]);
     });
 
-    it('Test 21: Every new ANTIRUG entry has a non-empty description', async () => {
-        const configSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/config.ts'), 'utf-8');
-        const entryRe = /\{\s*name:\s*['"]([A-Z]+_ANTIRUG_[A-Z_]+)['"]\s*,\s*required:\s*(?:true|false)\s*,\s*description:\s*['"]([^'"]*)['"]\s*\}/g;
-        let match;
-        const offenders: string[] = [];
-        while ((match = entryRe.exec(configSrc)) !== null) {
-            if (!match[2] || match[2].trim().length === 0) {
-                offenders.push(`${match[1]} (empty description)`);
-            }
-        }
-        expect(offenders).toEqual([]);
+    // 60 s: see Test 19 (the walk is cached, but this test can run alone).
+    it('Test 21: Every new ANTIRUG entry has a non-empty description', { timeout: 60_000 }, () => {
+        const { files, entries } = requiredEnvVarEntries();
+        expect(files).toHaveLength(1);
+        const antiRug = entries.filter((e) => ANTIRUG_NAME.test(e.name));
+        expect(antiRug.length).toBeGreaterThan(0);
+        const offenders = antiRug
+            .filter((e) => e.description === null || e.description.trim().length === 0)
+            .map((e) => e.name);
+        // Names only: Vitest shortens a longer string in an array to Array(1) in the message.
+        expect(offenders, 'anti-rug entries whose description is empty or not a string literal').toEqual([]);
     });
 
     it('Test 22: .env.example contains Phase 19 Anti-Rug section header', async () => {

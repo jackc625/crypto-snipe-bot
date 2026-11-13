@@ -1,0 +1,167 @@
+{
+  "id": "AUD-BUY-039",
+  "title": "A snipe's private escalation outlives its own 60 s swap deadline: the deadline is set once when the swap is built and every attempt re-signs the same calldata, while each attempt takes about 52 to 64 s, so at default settings a snipe that does not land gets 1 or 2 real attempts of its budget of 4, its fee never escalates to the planned 3 and 4 gwei, and it fails clean on a relay simulation refused as UniswapV2Router: EXPIRED, with a reason that does not mention the deadline and a remediation telling the operator to raise MEV_BUY_MAX_PRIORITY_FEE_GWEI",
+  "kind": "finding",
+  "area": "src",
+  "slice": "BUY",
+  "severity": "S2",
+  "capital_impact": "none",
+  "classes": [
+    "C05",
+    "C16"
+  ],
+  "files": [
+    "src/bot.ts",
+    "src/utils/txManager.ts",
+    "src/utils/mevStrategies/flashbots.ts",
+    "src/exitEngine.ts"
+  ],
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1043@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V2 snipe (handleNewPairForChain): deadline = now + 60 s, computed once before the buy is submitted"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1100-1112@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the V2 txBuilder handed to submitBuyTx closes over that one deadline"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:1382@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "V3 snipe (handleNewV3PoolForChain): the same now + 60 s, the SwapRouter02 multicall deadline at :1435"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:263-268@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "submitBuyTx = withNonceLock(wallet, () => sendTxWithRetry(txBuilder, ctx)) with no explicit budget, so 4 attempts (src/utils/txManager.ts:107-108)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/txManager.ts:113@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "sendTxWithRetry calls txBuilder() once and hands that one transaction to the strategy, which runs every attempt with it"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:187-196@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each attempt's populatedTx is ...txRequest with only the gas limit, nonce and fees set, so the calldata and its deadline never change (bloxroute.ts:118 and passthrough.ts:87 do the same)"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/flashbots.ts:235-244@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each attempt is simulated first (eth_callBundle); a revert throws 'Flashbots simulate: tx would revert (' + (firstRevert.error || firstRevert.revert) + ')', so the reason says 'execution reverted' and the revert data naming EXPIRED is not decoded"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:55-57@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "each attempt waits a 45 s confirm window (poll 4 s) after its first target block, so one attempt takes about 52 to 64 s, about the whole deadline"
+    },
+    {
+      "type": "code",
+      "ref": "src/utils/mevStrategies/reconciliation.ts:502@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "escalated fee = step x (attempt + 1): 1, 2, 3 and 4 gwei planned for a snipe; at default settings only the 1 and 2 gwei attempts are ever sent"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:360-385@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "emitSnipeFailClean: reason = the thrown message; attempts is the constant 4 (:369) whatever was sent; the remediation names MEV_BUY_MAX_PRIORITY_FEE_GWEI (:382), a ceiling that never binds here (the fixed wording is AUD-BUY-037)"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-003.test.ts (Node 22.16.0, 2026-11-12; realistic reverts are the simulated chain default since 780d67d; three runs of the triage folder at 150bb1e)",
+      "note": "asserted after the AUD-TX-003 marker: the non-landing V2 snipe (token B) sends 2 bundles at one nonce carrying one decoded deadline; attempt 2's eth_callBundle is refused (flashbots.simulate.revert attempt 2) at the time of buy.snipe.fail-clean; the decoded deadline is earlier than that simulation and not earlier than attempt 0's not-landed; the fail-clean reason is 'Flashbots simulate: tx would revert (execution reverted)'; the fail-clean comes 90 to 120 s after B's first submission (104.6 s measured by fixer A)"
+    },
+    {
+      "type": "command",
+      "ref": "Phase 23 code-review fixer A measurement (worktree fix23-A, Node 22.16.0, 2026-11-12; a temporary probe, removed before commit): the 2026-11-11 AUD-TX-029 snipe flow with realistic reverts, bundles never included, each target block 12 s after its bundle",
+      "note": "the snipe sent 1 bundle (1 gwei); attempt 0 not-landed at 64 520 fake ms; attempt 1's eth_callBundle at 64 540 ms was past the swap deadline (launch + about 60 s) and refused (UniswapV2Router: EXPIRED, flashbots.simulate.revert attempt 1); buy.snipe.fail-clean at 64 540 ms with reason 'Flashbots simulate: tx would revert (execution reverted)'; no mev.escalation.ceiling-hit line"
+    },
+    {
+      "type": "command",
+      "ref": "Phase 23 code-review fixer A measurement (worktree fix23-A, Node 22.16.0, 2026-11-12; a temporary probe, removed before commit): a V2 stop-loss private sell (MEV_SELL_FALLBACK_ATTEMPTS default 2) with a router sell read that enforces the deadline, each target block 12 s after its bundle",
+      "note": "attempt 0 ends at about 64 s and attempt 1's simulation is refused as expired, so the sell gets one real private attempt before the public fallback; with the target block 2 s after its bundle both attempts fit inside the deadline (AUD-TX-029's test)"
+    }
+  ],
+  "sibling_sites_checked": "Every swap built for a private escalation, at 23a6461 and at HEAD 150bb1e (src unchanged at these sites except a two-line shift in bot.ts and exitEngine.ts). (1) The V3 snipe (bot.ts:1382, multicall deadline now + 60 s, the same submitBuyTx budget of 4): the same mechanism, a code read, not measured. (2) The deliberate buy's private leg (bot.ts:544 privDeadline now + 60 s, DELIBERATE_BUY_PRIVATE_ATTEMPTS default 2 at :557, escalatePrivateBuy under the nonce lock at :558): the same mechanism with a budget of 2; its second attempt is refused when the first ends past 60 s, and the leg then goes to the no-double-buy guard and the public leg (a code read). The deliberate public leg (bot.ts:731, deadline now + 600 s) is one public transaction built just before it is sent: not affected. (3) Private sells: buildV2SellTx and buildV3SellTx compute now + 60 s inside the builder (exitEngine.ts:362, :399), but sendTxWithRetry calls the builder once, so they are the same. Routine sells (MEV_SELL_FALLBACK_ATTEMPTS default 2, exitEngine.ts:453-456, via :788) lose their second attempt when the first ends past 60 s (measured by fixer A on V2); a V2 sell then goes to the public fallback with a fresh 600 s deadline (exitEngine.ts:551) and completes, while a V3 sell has no public fallback and takes the no-fallback return of AUD-EXIT-007 after one real private attempt instead of two (a code read). Anti-rug sells make one private attempt (privateAttemptBudget 'anti-rug' = 1), built and sent at once: not affected. Partial sells (exitEngine.ts:1531, sendTxWithRetry's default budget of 4) are like the snipe (a code read). (4) Other strategies: bloxroute.ts:118 and passthrough.ts:87 also reuse the built transaction for every attempt and simulate each one with provider.call (bloxroute.ts:137, passthrough.ts:121), so an attempt past the deadline is refused there too (a code read); on BSC every bloXroute attempt waits the full 45 s confirm window. (5) The fail-clean line: its fixed wording and attempts 4 for any cause are AUD-BUY-037; the ceiling-versus-budget wording is AUD-TX-029; the wrong knob name is AUD-TX-010.",
+  "status": "confirmed",
+  "origin": "independent",
+  "rc": [],
+  "research_suggested_severity": null,
+  "severity_rationale": "S2 by operator ruling of 2026-11-12 (process note PN-002); capital_impact none. A correctness and robustness defect in the snipe's main inclusion lever: each private attempt (first target block, stats call, 45 s confirm window) takes about as long as the whole 60 s deadline, so the escalation and its fee steps are mostly dead weight at default settings. A snipe that does not land gets 1 or 2 real attempts of 4 and bids no more than 2 gwei, then fails clean with a reason that names neither the deadline nor EXPIRED and a remediation (raise MEV_BUY_MAX_PRIORITY_FEE_GWEI) that cannot help, because the fee ceiling never binds. No capital is lost, stranded, overspent or exposed by this defect itself: the snipe spends nothing, and a V2 private sell falls through to the public fallback with a fresh deadline. The indirect effect is on V3 exits: a routine V3 private sell whose first attempt runs past 60 s gets no second attempt before the no-fallback return that strands the position (AUD-EXIT-007 is that strand's own finding; a code read here). That indirect effect and the misleading remediation are why it is S2 rather than S3.",
+  "duplicate_of": null,
+  "related": [
+    "AUD-TX-003",
+    "AUD-TX-029",
+    "AUD-TX-010",
+    "AUD-BUY-037",
+    "AUD-EXIT-007"
+  ],
+  "tags": [
+    "found-by-realpath-harness",
+    "phase-23",
+    "cross-class",
+    "telemetry"
+  ],
+  "escalation_ref": null,
+  "od_ref": null,
+  "recommendation": "Phase 29 (S2). Make the deadline fit the escalation: rebuild the swap (a fresh deadline and, for a buy, a fresh quote and minimum output) for each attempt by passing the builder into the strategy instead of one built transaction; or keep one deadline and end the escalation cleanly before an attempt that cannot be included in time, sizing the attempts and the confirm window to fit it; and decide whether a snipe should keep retrying at all once its launch window has passed. Decode the relay's revert data so a refusal names EXPIRED, and have the fail-clean line report the attempts actually sent and a remediation for the actual cause (with AUD-BUY-037, AUD-TX-029 and AUD-TX-010). The AUD-TX-003 lock-hold time depends on this (about 105 s today); re-measure it with the fix. Behavior-changing, so Phase 29 decides the shape (no decision card exists yet). No triage test of its own: the mechanism is asserted after the AUD-TX-003 marker. Nothing is fixed in Phase 23.",
+  "reported_by": [
+    "claude (Phase 23 code-review fixer A, WR-01 re-triage)",
+    "claude (Phase 23 register update, 2026-11-12)"
+  ],
+  "found_date": "2026-11-12",
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "traces": [
+    {
+      "scenario": "A V2 snipe on ETH whose bundles are never included (default settings; a relay that refuses an expired swap; the AUD-TX-003 test's token B, times from B's first submission)",
+      "steps": [
+        "t=0: handleNewPairForChain builds swapExactETHForTokens with deadline = now + 60 s (bot.ts:1043) and calls submitBuyTx; sendTxWithRetry builds the transaction once (txManager.ts:113)",
+        "attempt 0 (1 gwei): simulated (accepted), sent, first target block, stats call, 45 s confirm window: not-landed at about t=52 s",
+        "attempt 1 (2 gwei): the same calldata, simulated just inside the deadline, sent, not-landed at about t=105 s",
+        "attempt 2 (3 gwei planned): the relay's eth_callBundle refuses the same calldata (UniswapV2Router: EXPIRED, the deadline passed at about t=60 s); flashbots.simulate.revert attempt 2; the strategy throws",
+        "buy.snipe.fail-clean: reason 'Flashbots simulate: tx would revert (execution reverted)', attempts 4 (a constant), remediation 'raise MEV_BUY_MAX_PRIORITY_FEE_GWEI ...'; zero ETH spent; the wallet lock was held about 105 s (AUD-TX-003)"
+      ],
+      "outcome": "2 of 4 attempts sent, at 1 and 2 gwei of the planned 1 to 4; the operator is told the snipe exhausted its inclusion and to raise a fee ceiling that never bound, with no word of the deadline. With the first target block 12 s after its bundle, attempt 0 ends at about 64 s and only 1 bundle is sent."
+    }
+  ],
+  "sub_claims": [
+    {
+      "claim": "The swap deadline is fixed once when the swap is built (now + 60 s) and every attempt re-signs the same calldata",
+      "evidence": [
+        "src/bot.ts:1043@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:1382@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/txManager.ts:113@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/utils/mevStrategies/flashbots.ts:187-196@23a64617dca167976adc4645fed0e2c69e384820",
+        "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-003.test.ts (Node 22.16.0, 2026-11-12; realistic reverts are the simulated chain default since 780d67d; three runs of the triage folder at 150bb1e)"
+      ],
+      "status": "confirmed (code; one decoded deadline across B's signed bundles in the AUD-TX-003 test)"
+    },
+    {
+      "claim": "At default settings a non-landing snipe gets 1 or 2 real attempts of its budget of 4 and never bids the planned 3 or 4 gwei",
+      "evidence": [
+        "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-003.test.ts (Node 22.16.0, 2026-11-12; realistic reverts are the simulated chain default since 780d67d; three runs of the triage folder at 150bb1e)",
+        "Phase 23 code-review fixer A measurement (worktree fix23-A, Node 22.16.0, 2026-11-12; a temporary probe, removed before commit): 1 bundle with each target block 12 s after its bundle"
+      ],
+      "status": "confirmed (real path, V2 snipe); the V3 snipe is a code read"
+    },
+    {
+      "claim": "The fail-clean reason does not mention the deadline or EXPIRED, and its remediation tells the operator to raise MEV_BUY_MAX_PRIORITY_FEE_GWEI",
+      "evidence": [
+        "src/utils/mevStrategies/flashbots.ts:235-244@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:360-385@23a64617dca167976adc4645fed0e2c69e384820",
+        "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-TX-003.test.ts (Node 22.16.0, 2026-11-12; realistic reverts are the simulated chain default since 780d67d; three runs of the triage folder at 150bb1e)"
+      ],
+      "status": "confirmed (real path); the fixed wording and attempts 4 for any cause are AUD-BUY-037"
+    },
+    {
+      "claim": "The two-attempt legs (routine private sell, the deliberate buy's private leg) lose their second attempt the same way when the first attempt runs past 60 s",
+      "evidence": [
+        "src/exitEngine.ts:362@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:544@23a64617dca167976adc4645fed0e2c69e384820",
+        "Phase 23 code-review fixer A measurement (worktree fix23-A, Node 22.16.0, 2026-11-12; a temporary probe, removed before commit): V2 stop-loss sell, each target block 12 s after its bundle, attempt 1's simulation refused as expired"
+      ],
+      "status": "confirmed for the V2 routine sell (fixer A measurement); the deliberate leg and V3 sells are a code read"
+    }
+  ]
+}

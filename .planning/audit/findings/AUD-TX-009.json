@@ -63,5 +63,11 @@
     "claude (22-20 executor)"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced as a real process death (plan 23-12): fixtures/bundleWaitCrash.ts runs as a railed child, loads src/main and src/bot, builds the context with the real buildChainRegistry and createChainContext and calls the real FlashbotsMevStrategy.sendTransaction (relayUrl on a loopback relay, the inert FLASHBOTS_AUTH_KEY sentinel, a plain transfer, ctx.wallet, ctx.httpProvider, maxRetries 1); the strategy simulates, sends the library bundle and its raw builders fanout and reaches its own bundle.wait(). Block 101 is mined with the transaction 2 s after the first eth_sendBundle and block 102 one slot later; the first eth_getBlockByNumber(101) answers null, as a load-balanced node whose backend has not yet seen the block does (AC-48). The process exits with code 1 and stderr 'Error: Unable to get block: 101' about 4 to 8 s after the send (claim bundle-wait-null-block-exits). Healthy control (block answered) survives and sendTransaction returns the broadcast hash. Contained (process handlers first): the process survives and the work settles, because the library's handler stays registered after its throw, runs again on block 102, gets block 101 and resolves included; so a process-level handler alone recovers this wait on the next block. Phase 24 reading: replacing bundle.wait() with the slice's own bounded receipt+nonce reconcile, or wrapping it so no listener rejection escapes (card OD-6), flips the claim to looks fixed (shown by a fix-shaped mutation that flips only this claim); so does a process-level unhandledRejection handler installed when src/main or src/bot loads; a handler installed only inside runMain or startMultiChainBot is out of reach, so the proof stays failing rather than reporting a false fix.",
+    "test_id": "AUD-TX-009"
+  }
 }

@@ -9,12 +9,15 @@
   ],
   "tags": [
     "external-only",
-    "capital"
+    "capital",
+    "phase-23",
+    "regraded"
   ],
-  "escalation_ref": null,
+  "escalation_ref": "ESC-ANTIRUG-03",
   "od_ref": "OD-48",
   "reported_by": [
-    "codex"
+    "codex",
+    "claude (23-01 executor and execute-phase orchestrator, code re-read 2026-11-11)"
   ],
   "found_date": "2026-11-09",
   "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
@@ -22,8 +25,8 @@
   "research_suggested_severity": null,
   "origin": "external",
   "id": "AUD-ANTIRUG-018",
-  "title": "HTTP anti-rug polling requests the whole outstanding range unchunked, so a gap larger than the provider log-range limit fails every poll from then on",
-  "severity": "S2",
+  "title": "HTTP anti-rug polling requests the whole outstanding range unchunked and resumes from the stored chain_state block after a restart, so a gap larger than the provider log-range limit (an ordinary few-minute outage or restart) fails every poll from then on while the chain reports connected",
+  "severity": "S1",
   "capital_impact": "STRAND",
   "classes": [
     "C10"
@@ -46,13 +49,86 @@
       "type": "command",
       "ref": "sed -n 1279,1300p of the base snapshot (22-27 merge)",
       "note": "Claude verification: lines re-read. A failed poll leaves lastBlock unchanged, so the range only grows. Not reproduced against a provider."
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1228-1232@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the poller seeds lastBlock from the chain_state row when one exists (HEAD :1231-1235), so a restart resumes from the stuck block"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1269-1276@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "the row also advances on a tick with no registered positions (HEAD :1272-1279); with a held position it does not"
+    },
+    {
+      "type": "code",
+      "ref": "src/bot.ts:2120-2144@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "restart re-registers held positions (Step 3) before startChainAntiRugListener starts the poller (Step 4) (HEAD :2122-2146)"
+    },
+    {
+      "type": "code",
+      "ref": "src/chainRegistry.ts:223-230@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "defaultAntiRugBackfillCapBlocks 10 on ETH, \"Alchemy free-tier safe\"; 500 on the other chains (:294, :351, :408)"
+    },
+    {
+      "type": "code",
+      "ref": "src/anti-rug/detector.ts:1242@23a64617dca167976adc4645fed0e2c69e384820",
+      "note": "HTTP polling sets healthState connected (HEAD :1245); a failed tick only logs antirug.http-polling.error (:1312, HEAD :1315)"
+    },
+    {
+      "type": "command",
+      "ref": "git show 23a64617dca167976adc4645fed0e2c69e384820:src/anti-rug/detector.ts | grep -n (2026-11-11, 23-01 continuation executor)",
+      "note": "line refs re-measured at the audit base and at HEAD; the 23-01 checkpoint cited bot.ts :2120-2144 as HEAD, which is the base range (HEAD is :2122-2146). Not reproduced against a provider."
     }
   ],
-  "sibling_sites_checked": "Backfill uses a chunked helper (getLogsForBackfill) and TH-ANTIRUG-06 holds that cap. The HTTP poller does not use it.",
+  "sibling_sites_checked": "Backfill uses a chunked helper (getLogsForBackfill) and TH-ANTIRUG-06 holds that cap. The HTTP poller does not use it. Re-read 2026-11-11: the first anti-rug start stamps the dry-run row before the poller seeds (detector.ts:585 at base, :588 at HEAD; AUD-ANTIRUG-024), so the poller's no-row seed branch is not taken after the stamp and its start block on a chain's first start is 0; this is harmless while no position is registered (the no-positions tick moves it to the head) and is noted here, not graded separately.",
   "status": "confirmed",
-  "severity_rationale": "S2: only chains running without a WebSocket URL, after an outage larger than the provider range limit. Same grade as the related HTTP poller defect AUD-ANTIRUG-007. Protection then stays off until restart.",
-  "recommendation": "Use the chunked helper in the poller; decide the outage handling in card ANTIRUG-02. Phase 29 (S2-S4). Nothing is fixed in Phase 22 (NAC-13).",
+  "severity_rationale": "S1 (raised from S2 on 2026-11-11 by operator ruling ESC-ANTIRUG-03). Capital can be stranded under a plausible condition: on a chain running without a WebSocket URL, a held position loses rug protection, silently, after an ordinary outage or restart. The S2 rationale rested on two sub-claims that a code re-read falsified. (a) \"Protection then stays off until restart\" is wrong: a restart does not clear it. The poller re-reads its start block from the chain_state row (src/anti-rug/detector.ts:1228-1232@23a64617dca167976adc4645fed0e2c69e384820, :1231-1235 at HEAD), the row advances only after a successful poll (:1300-1306 at base, :1303-1309 at HEAD) or a tick with no registered positions (:1269-1276 at base, :1272-1279 at HEAD), and on restart the held positions are re-registered before the poller starts (src/bot.ts:2120-2144 at base, :2122-2146 at HEAD), so the first poll after a restart requests the whole downtime range again and fails the same way. (b) \"after an outage larger than the provider range limit\" understated how ordinary the condition is: getLogs asks for lastBlock+1..currentBlock in one call (:1279-1291 at base, :1282-1294 at HEAD), and the repo's own range assumption is 10 blocks on ETH (\"Alchemy free-tier safe\", src/chainRegistry.ts:223-230, unchanged at HEAD) and 500 on the other chains (:294, :351, :408), so about two minutes of downtime on ETH (10 blocks of 12 s) is enough. It is silent: the dashboard shows the chain connected (detector.ts:1242 at base, :1245 at HEAD; AUD-ANTIRUG-007) and the only signal is a repeating antirug.http-polling.error log line (:1312 at base, :1315 at HEAD). Not reproduced yet; whether the operator's provider refuses these ranges is unmeasured, and the operator does not know whether any chain runs without a WebSocket URL. The grade does not depend on that exposure. Phase 23 Wave 5 gives it a real-path test that fails today; the fix is a Phase 24 capital fix (card OD-48).",
+  "recommendation": "Use the chunked helper in the poller and bound the catch-up so a long gap is replayed in provider-sized windows; surface a failed poll as a health change instead of reporting connected; decide the outage handling in card OD-48. Phase 24 (capital fix, S1 since ESC-ANTIRUG-03), after a Phase 23 Wave 5 real-path test that fails today. Nothing is fixed in Phase 22 or 23.",
   "external_sources": [
     "codex-ANTIRUG-04"
-  ]
+  ],
+  "sub_claims": [
+    {
+      "claim": "(1) A restart does not clear the stuck range: the poller resumes from the stored chain_state block, which only advances after a successful poll or a no-positions tick, and held positions are registered before the poller starts.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1228-1232@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1269-1276@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1300-1306@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/bot.ts:2120-2144@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    },
+    {
+      "claim": "(2) Ordinary downtime triggers it: getLogs requests lastBlock+1..currentBlock unchunked, and the repo assumes a 10-block range on ETH (about two minutes) and 500 blocks elsewhere.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1279-1291@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/chainRegistry.ts:223-230@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed (code reading); provider refusal of these ranges not measured"
+    },
+    {
+      "claim": "(3) It is silent: HTTP polling reports the chain connected and a failed tick only logs antirug.http-polling.error and retries the same range.",
+      "evidence": [
+        "src/anti-rug/detector.ts:1242@23a64617dca167976adc4645fed0e2c69e384820",
+        "src/anti-rug/detector.ts:1307-1316@23a64617dca167976adc4645fed0e2c69e384820"
+      ],
+      "status": "confirmed"
+    }
+  ],
+  "severity_history": [
+    {
+      "from": "S2",
+      "to": "S1",
+      "date": "2026-11-11",
+      "by": "operator ruling at the 23-01 blocking checkpoint",
+      "escalation_ref": "ESC-ANTIRUG-03"
+    }
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-10, orchestrator scope addition) against a provider that refuses an over-range eth_getLogs as Alchemy's free tier does (10 blocks inclusive per request; repo evidence 19-RESEARCH CRITICAL #1 and the 21-03 measurement on the configured key; no live request): a temp-file database, an ETH chain without a WebSocket URL booted as startMultiChainBot does (HTTP DEX poller, both resumes), a real snipe bought and armed with its anti-rug poll following the head; after 6 minutes of downtime (30 blocks) and a boot on the same file, every anti-rug poll asks stored+1..head in one request and is refused, the cursor never moves, a real 95 percent router pull is never evaluated within 2 minutes of fake time, and the dashboard was told connected (claim restart-gap-blinds-http-poller). A poller using the chunked getLogsForBackfill reads looks fixed.",
+    "test_id": "AUD-ANTIRUG-018"
+  }
 }

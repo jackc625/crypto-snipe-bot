@@ -1,0 +1,181 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "badAddress": "0",
+                "chain": "eth",
+                "err": "invalid address (argument=\"address\", value=\"0\", code=INVALID_ARGUMENT)",
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug allowlist-extra contains invalid address (checksum fail)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "badAddress": "abc",
+                "chain": "eth",
+                "err": "invalid address (argument=\"address\", value=\"abc\", code=INVALID_ARGUMENT)",
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug allowlist-extra contains invalid address (checksum fail)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "antiRug": {
+                "allowlistV2": [
+                  {
+                    "address": "0x59d7D55DdC58494FbBbca29904f108ece82Ac7FB",
+                    "lockerName": "Unicrypt UniLockerV2 ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0xE2fE530C047f2d85298b07D9333C05737f1435fB",
+                    "lockerName": "TeamFinance / TrustSwap Lock ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x71B5759d73262FBb223956913ecF4ecC51057641",
+                    "lockerName": "PinkLock V2 ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x000000000000000000000000000000000000dEaD",
+                    "lockerName": "0xdEaD burn address (universal)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000E10",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "value": {
+            "eth": {
+              "antiRug": {
+                "allowlistV2": [
+                  {
+                    "address": "0x59d7D55DdC58494FbBbca29904f108ece82Ac7FB",
+                    "lockerName": "Unicrypt UniLockerV2 ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0xE2fE530C047f2d85298b07D9333C05737f1435fB",
+                    "lockerName": "TeamFinance / TrustSwap Lock ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x71B5759d73262FBb223956913ecF4ecC51057641",
+                    "lockerName": "PinkLock V2 ETH",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x000000000000000000000000000000000000dEaD",
+                    "lockerName": "0xdEaD burn address (universal)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000E10",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": "0x0000000000000000000000000000000000000e12"
+      }
+    }
+  },
+  "variable": "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2"
+}

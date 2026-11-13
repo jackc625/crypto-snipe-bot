@@ -1,3 +1,4 @@
+import path from 'path';
 import { defineConfig } from 'vitest/config';
 
 // SAFE-02 (Phase 22 plan 22-05): the Vitest main process loads NO .env file. No env-file
@@ -34,6 +35,28 @@ export default defineConfig({
                     setupFiles: ['test/rails/setup.cjs'],
                     globalSetup: ['test/rails/ledgerRun.ts'],
                     env: { CSB_RAIL_PROJECT: 'integration' },
+                },
+            },
+            {
+                // Phase 23 plan 23-01 (CHAR-01, D-09, SPEC Amendment A-4): the real-path harness.
+                // The alias makes the bare `ethers` specifier load ethers' CommonJS build, which is
+                // what production loads under ts-node and what @flashbots/ethers-provider-bundle
+                // requires; without it src/ gets the ESM build and the fake transport cannot attach.
+                // It selects which build of the real library loads; it is not a mock.
+                // test/realpath/harness/chain.ts installSeams() proves the seams attached.
+                extends: true,
+                resolve: {
+                    alias: [{ find: /^ethers$/, replacement: path.resolve(__dirname, 'node_modules/ethers/lib.commonjs/index.js') }],
+                },
+                test: {
+                    name: 'realpath',
+                    include: ['test/realpath/**/*.test.ts'],
+                    testTimeout: 15000,
+                    environment: 'node',
+                    mockReset: true,
+                    setupFiles: ['test/rails/setup.cjs', 'test/realpath/harness/setup.ts'],
+                    globalSetup: ['test/rails/ledgerRun.ts'],
+                    env: { CSB_RAIL_PROJECT: 'realpath' },
                 },
             },
             {

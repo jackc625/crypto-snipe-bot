@@ -239,7 +239,10 @@ function buildCtx(chainName: string): StubChainCtx {
 // ===========================================================================
 
 describe("dry-run timestamp record — Phase 20 / Plan 20-03 / D-ANTIRUG-LIVE-GATE-CODE", () => {
-    it('Test 1: first call to startChainAntiRugListener records antirug_dry_run_started near current unix ts', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 0.9 s alone, 3.4 s under the full parallel npm test (wave 6 gate),
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('Test 1: first call to startChainAntiRugListener records antirug_dry_run_started near current unix ts', { timeout: 20_000 }, async () => {
         const { startChainAntiRugListener } = await import('../../../src/anti-rug/detector');
 
         const ctx = buildCtx('eth');

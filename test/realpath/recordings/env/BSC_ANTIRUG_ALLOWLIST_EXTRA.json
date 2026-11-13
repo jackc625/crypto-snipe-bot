@@ -1,0 +1,277 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "badAddress": "0",
+                "chain": "bsc",
+                "err": "invalid address (argument=\"address\", value=\"0\", code=INVALID_ARGUMENT)",
+                "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug allowlist-extra contains invalid address (checksum fail)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "BSC_ANTIRUG_ALLOWLIST_EXTRA": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "registry": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "badAddress": "abc",
+                "chain": "bsc",
+                "err": "invalid address (argument=\"address\", value=\"abc\", code=INVALID_ARGUMENT)",
+                "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA"
+              },
+              "level": "fatal",
+              "msg": "Anti-rug allowlist-extra contains invalid address (checksum fail)"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "BSC_ANTIRUG_ALLOWLIST_EXTRA": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "registry": {
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "base",
+                "entryCount": 1,
+                "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "arb",
+                "entryCount": 1,
+                "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            }
+          ],
+          "value": {
+            "bsc": {
+              "antiRug": {
+                "allowlistV2": [
+                  {
+                    "address": "0xC765bddB93b0D1c1A88282BA0fa6B2d00E3e0c83",
+                    "lockerName": "UNCX UniLockerV2 BSC (PancakeSwap V2)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x407993575c91ce7643a4d4cCACc9A98c36eE1BBE",
+                    "lockerName": "PinkLock V2 BSC",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x000000000000000000000000000000000000dEaD",
+                    "lockerName": "0xdEaD burn address (universal)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000B12",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ],
+                "allowlistV3": [
+                  {
+                    "address": "0xfe88DAB083964C56429baa01F37eC2265AbF1557",
+                    "lockerName": "UNCX V3 Locker BSC",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000b13",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_ANTIRUG_ALLOWLIST_EXTRA": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "registry": {
+          "logs": [
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "eth",
+                "entryCount": 1,
+                "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "base",
+                "entryCount": 1,
+                "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            },
+            {
+              "bindings": {
+                "module": "chainRegistry"
+              },
+              "fields": {
+                "chain": "arb",
+                "entryCount": 1,
+                "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA",
+                "op": "antirug.allowlist.deprecated-unified-extra"
+              },
+              "level": "warn",
+              "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+            }
+          ],
+          "value": {
+            "bsc": {
+              "antiRug": {
+                "allowlistV2": [
+                  {
+                    "address": "0xC765bddB93b0D1c1A88282BA0fa6B2d00E3e0c83",
+                    "lockerName": "UNCX UniLockerV2 BSC (PancakeSwap V2)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x407993575c91ce7643a4d4cCACc9A98c36eE1BBE",
+                    "lockerName": "PinkLock V2 BSC",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x000000000000000000000000000000000000dEaD",
+                    "lockerName": "0xdEaD burn address (universal)",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000B12",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ],
+                "allowlistV3": [
+                  {
+                    "address": "0xfe88DAB083964C56429baa01F37eC2265AbF1557",
+                    "lockerName": "UNCX V3 Locker BSC",
+                    "provenance": "hardcoded"
+                  },
+                  {
+                    "address": "0x0000000000000000000000000000000000000b13",
+                    "lockerName": "Operator overlay",
+                    "provenance": "env-overlay"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "BSC_ANTIRUG_ALLOWLIST_EXTRA": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "BSC_ANTIRUG_ALLOWLIST_EXTRA": "0x0000000000000000000000000000000000000B10"
+      }
+    }
+  },
+  "variable": "BSC_ANTIRUG_ALLOWLIST_EXTRA"
+}

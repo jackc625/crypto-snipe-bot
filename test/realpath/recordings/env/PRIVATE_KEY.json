@@ -1,0 +1,111 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "walletPrivateKey": "0"
+            }
+          }
+        }
+      },
+      "env": {
+        "PRIVATE_KEY": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "config": {
+          "value": {
+            "CONFIG": {
+              "walletPrivateKey": "abc"
+            }
+          }
+        }
+      },
+      "env": {
+        "PRIVATE_KEY": "abc"
+      }
+    },
+    "empty": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "PRIVATE_KEY: Wallet private key for signing transactions"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "PRIVATE_KEY": ""
+      }
+    },
+    "unset": {
+      "changes": {
+        "config": {
+          "code": 1,
+          "kind": "exit",
+          "logs": [
+            {
+              "bindings": {},
+              "fields": {
+                "missing": [
+                  "PRIVATE_KEY: Wallet private key for signing transactions"
+                ]
+              },
+              "level": "fatal",
+              "msg": "Missing required environment variables"
+            }
+          ],
+          "value": {
+            "$absent": true
+          }
+        },
+        "registry": {
+          "code": 1,
+          "from": "config",
+          "kind": "exit",
+          "logs": [],
+          "value": {
+            "$absent": true
+          }
+        }
+      },
+      "env": {
+        "PRIVATE_KEY": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "PRIVATE_KEY": "0x0000000000000000000000000000000000000000000000000000000000000001"
+      }
+    }
+  },
+  "variable": "PRIVATE_KEY"
+}

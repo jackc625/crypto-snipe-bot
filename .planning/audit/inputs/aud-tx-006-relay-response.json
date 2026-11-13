@@ -1,0 +1,65 @@
+{
+  "finding": "AUD-TX-006",
+  "candidate": 26,
+  "purpose": "AC-15: does the public Flashbots relay still answer flashbots_getBundleStatsV2? One request, signed by a throwaway unfunded key, sent after operator approval (plan 23-15 Task 2).",
+  "throwaway_address": "0xebE2a24e436f85A2f0509Af24B7960fb6643818d",
+  "key_source": "Wallet.createRandom() inside this process; holds no funds; never written anywhere; discarded on exit. Not the bot key.",
+  "request": {
+    "url": "https://relay.flashbots.net",
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Flashbots-Signature": "0xebE2a24e436f85A2f0509Af24B7960fb6643818d:0x7c73e005583fee34bf77274b77960b4f1f0f3fe8569187c7ac0f4013852734ce264e17f9699a7cc19dc1d5849d8c681a052173ab4495fae3e3a7181521b3d3431b"
+    },
+    "body": "{\"method\":\"flashbots_getBundleStatsV2\",\"params\":[{\"bundleHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"blockNumber\":\"0x1\"}],\"id\":1,\"jsonrpc\":\"2.0\"}"
+  },
+  "probe": {
+    "file": ".planning/audit/tools/relay-probe-tx006.ts",
+    "sha256": "36ff5f4b47b0e49bcb6af56a60cd8643119d454f68c54721702bab42028d980a",
+    "node": "v22.16.0",
+    "ethers": "6.16.0",
+    "timeout_ms": 30000
+  },
+  "classifier_rules": [
+    "endpoint-missing: HTTP 200 or 404, a JSON-RPC body whose error code is -32601, or whose error message says the method is not found or not supported (after the method name itself is ignored).",
+    "endpoint-answers: HTTP 200 with a JSON-RPC result (any value, null included) and no error; or HTTP 200, 400 or 404 with a JSON-RPC error that names the bundle or its parameters as the problem (code -32602, or a message such as \"bundle not found\", \"invalid params\", \"unknown bundle\", \"missing parameter\", \"bundleHash\", \"blockNumber\"), because a method that validates its input exists. A message that says the method is deprecated never counts as answering.",
+    "inconclusive: everything else, including HTTP 401, 403, 429 and 5xx whatever the body says, any other status, a body that is not one JSON-RPC object, an object with neither result nor error, and no HTTP response at all (network error or timeout).",
+    "Only endpoint-missing and endpoint-answers settle the question; inconclusive never closes the candidate."
+  ],
+  "sent_at_utc": "2026-11-11T15:57:34.946Z",
+  "received_at_utc": "2026-11-11T15:57:35.184Z",
+  "state": "answered",
+  "response": {
+    "status": 403,
+    "status_text": "Forbidden",
+    "headers": {
+      "content-type": "application/json",
+      "content-length": "91",
+      "date": "Wed, 11 Nov 2026 15:57:36 GMT"
+    },
+    "header_names": [
+      "connection",
+      "content-length",
+      "content-type",
+      "date",
+      "vary",
+      "x-proxyd-cache-status"
+    ],
+    "body_text": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32601,\"message\":\"rpc method is not whitelisted\"},\"id\":1}\n",
+    "body_truncated": false,
+    "body_length": 91,
+    "body_json": {
+      "jsonrpc": "2.0",
+      "error": {
+        "code": -32601,
+        "message": "rpc method is not whitelisted"
+      },
+      "id": 1
+    }
+  },
+  "network_error": null,
+  "classification": {
+    "class": "inconclusive",
+    "reason": "HTTP 403: an auth, rate-limit or server refusal does not show whether the method exists"
+  }
+}

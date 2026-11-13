@@ -16,7 +16,8 @@
       "AUD-TX-010",
       "AUD-TX-014",
       "AUD-TX-016",
-      "AUD-TX-017"
+      "AUD-TX-017",
+      "AUD-TX-027"
     ]
   },
   {
@@ -24,6 +25,7 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-BUY-002",
+      "AUD-BUY-039",
       "AUD-TX-003",
       "AUD-TX-006",
       "AUD-TX-007",
@@ -33,7 +35,9 @@
       "AUD-TX-012",
       "AUD-TX-014",
       "AUD-TX-017",
-      "AUD-TX-020"
+      "AUD-TX-020",
+      "AUD-TX-027",
+      "AUD-TX-030"
     ]
   },
   {
@@ -50,7 +54,8 @@
       "AUD-TX-016",
       "AUD-TX-017",
       "AUD-TX-022",
-      "AUD-TX-023"
+      "AUD-TX-023",
+      "AUD-TX-027"
     ]
   },
   {
@@ -71,7 +76,8 @@
       "AUD-TX-019",
       "AUD-TX-020",
       "AUD-TX-021",
-      "AUD-TX-025"
+      "AUD-TX-025",
+      "AUD-TX-029"
     ]
   },
   {
@@ -106,7 +112,8 @@
     "findings": [
       "AUD-ANTIRUG-002",
       "AUD-TX-008",
-      "AUD-TX-024"
+      "AUD-TX-024",
+      "AUD-TX-028"
     ]
   },
   {
@@ -126,6 +133,7 @@
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
       "AUD-BUY-018",
+      "AUD-BUY-039",
       "AUD-TX-002",
       "AUD-TX-003",
       "AUD-TX-010"

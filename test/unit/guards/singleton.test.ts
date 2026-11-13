@@ -170,6 +170,7 @@ describe.each(GUARDED_MODULES)('duplicate-load guard: $name', (mod) => {
         TEST_TIMEOUT_MS,
     );
 
+    // closes-finding: AUD-TX-004 (rail test, RED proof row 22 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-1-singleton-guard.txt)
     it(
         'plain Node: delete require.cache and reload is refused',
         () => {

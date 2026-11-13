@@ -53,7 +53,7 @@
     }
   ],
   "sibling_sites_checked": "V2 uses a reserve comparison against a hard-coded 1 native (tokenSafety.ts:417-421, threshold row TH-BUY-09) instead of the configured threshold; V3 uses the configured threshold through this quote-success test. No other V3 depth check exists in the slice.",
-  "status": "candidate",
+  "status": "confirmed",
   "origin": "independent",
   "rc": [],
   "research_suggested_severity": null,
@@ -74,5 +74,14 @@
     "codex"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Gate half reproduced on the real path (plan 23-05): a V3 pool holding 0.001 ETH (same price as the ordinary pool) passes the 0.5 ETH minimum-liquidity check because the check ignores the quoted amounts, and the bot buys. Whether the real QuoterV2 answers such a quote without reverting is flagged for the Phase 25 fork run. Status candidate -> confirmed.",
+    "test_id": "AUD-BUY-015",
+    "needs_fork": true,
+    "fork_question": "On a mainnet fork, does QuoterV2 quoteExactInputSingle(WETH to token, amountIn = the 0.5 ETH threshold, sqrtPriceLimitX96 0) on a V3 pool holding far less than 0.5 ETH of in-range liquidity answer without reverting, so checkMinLiquidity passes?",
+    "fork_ref": "UFV-07"
+  }
 }

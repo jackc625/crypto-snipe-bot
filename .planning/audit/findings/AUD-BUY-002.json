@@ -284,16 +284,18 @@
       "claim": "An earlier same-nonce attempt that mines is reported as landed-not-ours and the snipe path records nothing",
       "evidence": [
         "src/utils/mevStrategies/reconciliation.ts:476-497@23a64617dca167976adc4645fed0e2c69e384820",
-        "src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/utils/mevStrategies/reconciliation.ts:576-603@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/realpath/triage/AUD-BUY-002.test.ts (knownBug claim earlier-attempt-lands-no-trade-row, plan 23-05)"
       ],
-      "status": "candidate"
+      "status": "confirmed"
     },
     {
       "claim": "A Flashbots fanout error after the first send throws while the sent bundle can still land",
       "evidence": [
-        "src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820"
+        "src/utils/mevStrategies/flashbots.ts:303-309@23a64617dca167976adc4645fed0e2c69e384820",
+        "test/realpath/triage/AUD-BUY-002.test.ts (knownBug claim fanout-error-after-send-no-trade-row, plan 23-05)"
       ],
-      "status": "candidate"
+      "status": "confirmed"
     },
     {
       "claim": "The V3 catch can flip a concurrent same-token handler's live pending row to failed",
@@ -313,5 +315,11 @@
       ],
       "status": "candidate"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-05): one post-mine balanceOf error flips the landed buy's row to failed, starts no exit monitor, alerts TX failed, and a restart does not resume it; an earlier same-nonce attempt landing (attempt 1 reconciled only) and a fanout refusal after the first send each leave a landed buy with no trades row. Sub-claims 3 and 4 moved candidate -> confirmed; sub-claims 2, 5 and 6 not tested here.",
+    "test_id": "AUD-BUY-002"
+  }
 }

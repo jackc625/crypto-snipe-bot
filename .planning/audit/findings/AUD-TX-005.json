@@ -73,5 +73,12 @@
     "5378478"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 24, 25, 26 (22-13-1-lock-pin.txt, 22-13-2-lock-refusal.txt, 22-13-3-direct-entry-first-import.txt)",
-  "status_note": "The re-audit reviewed src/utils/processLock.ts, src/main.ts and src/guards/directEntry.ts in full. A second bot process on the same wallet is refused at boot. Out-of-process signing scripts honoring the lock stays with Phase 29 (HYG-03), and the lock folder follows the OS user (AUD-TX-026)."
+  "status_note": "The re-audit reviewed src/utils/processLock.ts, src/main.ts and src/guards/directEntry.ts in full. A second bot process on the same wallet is refused at boot. Out-of-process signing scripts honoring the lock stays with Phase 29 (HYG-03), and the lock folder follows the OS user (AUD-TX-026).",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "A second bot process on the same wallet is refused at boot: src/main.ts takes the per-wallet SQLite exclusive lock (src/utils/processLock.ts) before src/bot.ts loads, and a contender started while a real holder process lives is refused PROCESS_LOCK_HELD; the named rail test fails with the refusal removed; signing scripts that do not take the lock stay AUD-SCRIPTS-002 (Phase 29, card SCRIPTS-01) and the per-user lock folder stays AUD-TX-026",
+    "proof": "Rail test SAFE-04 single-instance process lock (real holder processes) > a second acquire for the same wallet is refused while the holder lives (AC-23a) (test/integration/processLock.test.ts, marker closes-finding: AUD-TX-005); RED proof rows 24, 25 and 26 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-13-1-lock-pin.txt, 22-13-2-lock-refusal.txt, 22-13-3-direct-entry-first-import.txt); row 25 re-run on 2026-11-11 by 23-14 because src/utils/processLock.ts changed after that proof (5378478, a comment only): .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-2-lock-refusal.txt, with SQLITE_BUSY swallowed the contender exits 0 instead of 1, and the file was restored byte for byte; the boot path that takes this lock before the bot loads is test/unit/mainEntry.test.ts SAFE-04 boot entry > (2) a held lock throws PROCESS_LOCK_HELD and never starts the bot, with or without the 0x prefix",
+    "rail_test": "SAFE-04 single-instance process lock (real holder processes) > a second acquire for the same wallet is refused while the holder lives (AC-23a)"
+  }
 }

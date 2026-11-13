@@ -85,5 +85,11 @@
     "claude (22-20 executor)"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-05): with the block base fee at 20 gwei, the entry gate (preflight deriveFeeWei) prices the exit at 40 gwei and refuses an affordable buy, and the Flashbots strategy's affordability reserve uses 40 gwei and refuses a buy affordable at 20 gwei before submitting. The thin-wallet private-sell half and passthrough.ts are not run here.",
+    "test_id": "AUD-TX-007"
+  }
 }

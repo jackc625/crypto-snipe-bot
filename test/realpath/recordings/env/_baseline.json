@@ -1,0 +1,700 @@
+{
+  "about": "Plan 23-23 env snapshot (CHAR-03). env: every variable the config module, the chain registry and the risk gate read, at its valid value. outcome: what each module parses from that; risk.value.probes are the real canSnipe under one state per risk setting. Each <VAR>.json varies only VAR and records only the fields that differ from this outcome, at the same path ({\"$absent\":true} = removed; arrays whole). Written only by npm run recordings:update; see test/realpath/env/envMatrix.test.ts.",
+  "env": {
+    "ALCHEMY_URL": "http://127.0.0.1:1",
+    "ARB_ANTIRUG_ALLOWLIST_EXTRA": "0x0000000000000000000000000000000000000a10",
+    "ARB_ANTIRUG_ALLOWLIST_EXTRA_V2": "0x0000000000000000000000000000000000000A12",
+    "ARB_ANTIRUG_ALLOWLIST_EXTRA_V3": "0x0000000000000000000000000000000000000A13",
+    "ARB_ANTIRUG_BACKFILL_CAP_BLOCKS": "500",
+    "ARB_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "3",
+    "ARB_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "1",
+    "ARB_ANTIRUG_CONFIRM_BLOCKS": "1",
+    "ARB_ANTIRUG_GAS_MULTIPLIER": "2.0",
+    "ARB_ANTIRUG_LIVE_EXECUTE": "false",
+    "ARB_ANTIRUG_LP_REMOVAL_PCT": "50",
+    "ARB_ANTIRUG_MAX_BACKFILL_BLOCKS": "7200",
+    "ARB_BLOCK_AGE_TOLERANCE_SEC": "30",
+    "ARB_GAS_BUFFER": "0.0005",
+    "ARB_HONEYPOT_CHECKER_ADDRESS": "0x00000000000000000000000000000000000000A1",
+    "ARB_MAX_BUY_TAX_BPS": "1000",
+    "ARB_MAX_CAPITAL": "0.5",
+    "ARB_MAX_SELL_TAX_BPS": "1000",
+    "ARB_MIN_LIQUIDITY": "0.2",
+    "ARB_RPC_URL": "http://127.0.0.1:1",
+    "ARB_SNIPE_AMOUNT": "0.005",
+    "ARB_WS_URL": "ws://127.0.0.1:1",
+    "BASE_ANTIRUG_ALLOWLIST_EXTRA": "0x0000000000000000000000000000000000000BA0",
+    "BASE_ANTIRUG_ALLOWLIST_EXTRA_V2": "0x0000000000000000000000000000000000000Ba2",
+    "BASE_ANTIRUG_ALLOWLIST_EXTRA_V3": "0x0000000000000000000000000000000000000bA3",
+    "BASE_ANTIRUG_BACKFILL_CAP_BLOCKS": "500",
+    "BASE_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "3",
+    "BASE_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "1",
+    "BASE_ANTIRUG_CONFIRM_BLOCKS": "1",
+    "BASE_ANTIRUG_GAS_MULTIPLIER": "2.0",
+    "BASE_ANTIRUG_LIVE_EXECUTE": "false",
+    "BASE_ANTIRUG_LP_REMOVAL_PCT": "50",
+    "BASE_ANTIRUG_MAX_BACKFILL_BLOCKS": "7200",
+    "BASE_BLOCK_AGE_TOLERANCE_SEC": "30",
+    "BASE_GAS_BUFFER": "0.0005",
+    "BASE_HONEYPOT_CHECKER_ADDRESS": "0x00000000000000000000000000000000000000BA",
+    "BASE_MAX_BUY_TAX_BPS": "1000",
+    "BASE_MAX_CAPITAL": "0.5",
+    "BASE_MAX_SELL_TAX_BPS": "1000",
+    "BASE_MIN_LIQUIDITY": "0.2",
+    "BASE_RPC_URL": "http://127.0.0.1:1",
+    "BASE_SNIPE_AMOUNT": "0.005",
+    "BASE_WS_URL": "ws://127.0.0.1:1",
+    "BLOXROUTE_AUTH_HEADER": "TEST-SENTINEL",
+    "BSC_ANTIRUG_ALLOWLIST_EXTRA": "0x0000000000000000000000000000000000000B10",
+    "BSC_ANTIRUG_ALLOWLIST_EXTRA_V2": "0x0000000000000000000000000000000000000B12",
+    "BSC_ANTIRUG_ALLOWLIST_EXTRA_V3": "0x0000000000000000000000000000000000000b13",
+    "BSC_ANTIRUG_BACKFILL_CAP_BLOCKS": "500",
+    "BSC_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "3",
+    "BSC_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "1",
+    "BSC_ANTIRUG_CONFIRM_BLOCKS": "1",
+    "BSC_ANTIRUG_GAS_MULTIPLIER": "2.0",
+    "BSC_ANTIRUG_LIVE_EXECUTE": "false",
+    "BSC_ANTIRUG_LP_REMOVAL_PCT": "50",
+    "BSC_ANTIRUG_MAX_BACKFILL_BLOCKS": "7200",
+    "BSC_BLOCK_AGE_TOLERANCE_SEC": "60",
+    "BSC_GAS_BUFFER": "0.003",
+    "BSC_HONEYPOT_CHECKER_ADDRESS": "0x00000000000000000000000000000000000000B1",
+    "BSC_MAX_BUY_TAX_BPS": "1000",
+    "BSC_MAX_CAPITAL": "5.0",
+    "BSC_MAX_SELL_TAX_BPS": "1000",
+    "BSC_MIN_LIQUIDITY": "1.5",
+    "BSC_RPC_URL": "http://127.0.0.1:1",
+    "BSC_SNIPE_AMOUNT": "0.05",
+    "BSC_WS_URL": "ws://127.0.0.1:1",
+    "DAILY_LOSS_PCT": "10",
+    "DASHBOARD_API_KEY": "TEST-SENTINEL",
+    "ENABLED_CHAINS": "eth,bsc,base,arb",
+    "ETH_ANTIRUG_ALLOWLIST_EXTRA": "0x0000000000000000000000000000000000000E10",
+    "ETH_ANTIRUG_ALLOWLIST_EXTRA_V2": "0x0000000000000000000000000000000000000e12",
+    "ETH_ANTIRUG_ALLOWLIST_EXTRA_V3": "0x0000000000000000000000000000000000000e13",
+    "ETH_ANTIRUG_BACKFILL_CAP_BLOCKS": "10",
+    "ETH_ANTIRUG_CIRCUIT_BREAKER_TRIGGERS": "3",
+    "ETH_ANTIRUG_CIRCUIT_BREAKER_WINDOW_HOURS": "1",
+    "ETH_ANTIRUG_CONFIRM_BLOCKS": "1",
+    "ETH_ANTIRUG_GAS_MULTIPLIER": "2.0",
+    "ETH_ANTIRUG_LIVE_EXECUTE": "false",
+    "ETH_ANTIRUG_LP_REMOVAL_PCT": "50",
+    "ETH_ANTIRUG_MAX_BACKFILL_BLOCKS": "7200",
+    "ETH_BLOCK_AGE_TOLERANCE_SEC": "300",
+    "ETH_GAS_BUFFER": "0.005",
+    "ETH_HONEYPOT_CHECKER_ADDRESS": "0x00000000000000000000000000000000000000e1",
+    "ETH_MAX_BUY_TAX_BPS": "1000",
+    "ETH_MAX_CAPITAL": "1.0",
+    "ETH_MAX_SELL_TAX_BPS": "1000",
+    "ETH_MIN_LIQUIDITY": "0.75",
+    "ETH_RPC_URL": "http://127.0.0.1:1",
+    "ETH_SNIPE_AMOUNT": "0.01",
+    "ETH_WS_URL": "ws://127.0.0.1:1",
+    "FLASHBOTS_AUTH_KEY": "0x0000000000000000000000000000000000000000000000000000000000000002",
+    "MAX_OPEN_POSITIONS": "10",
+    "MAX_POSITION_SIZE": "0.1",
+    "MAX_TOTAL_EXPOSURE": "10.0",
+    "NETWORK": "sepolia",
+    "PARTIAL_SELL_TARGETS": "2x:50,5x:25",
+    "PRIVATE_KEY": "0x0000000000000000000000000000000000000000000000000000000000000001",
+    "SNIPE_COOLDOWN_MS": "30000",
+    "STOP_LOSS_PCT": "25",
+    "TELEGRAM_API_HASH": "TEST-SENTINEL",
+    "TELEGRAM_API_ID": "1",
+    "TELEGRAM_BOT_TOKEN": "TEST-SENTINEL",
+    "TELEGRAM_CHAT_ID": "1",
+    "TELEGRAM_SESSION": "TEST-SENTINEL",
+    "TRAILING_MAX_PCT": "40",
+    "TRAILING_MIN_PCT": "5",
+    "TRAILING_STOP_PCT": "15",
+    "VITEST": "true"
+  },
+  "outcome": {
+    "config": {
+      "kind": "ok",
+      "logs": [],
+      "value": {
+        "CONFIG": {
+          "autoSellAfterMs": 300000,
+          "exitPollIntervalMs": 5000,
+          "factoryAddress": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+          "gasLimit": 300000,
+          "gasMultiplier": 1.2,
+          "honeypotCheckURL": "https://api.honeypot.is/v1/TokenInfo/",
+          "network": "sepolia",
+          "partialSellTargets": "2x:50,5x:25",
+          "routerAddress": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+          "rpc": {
+            "bsc": "http://127.0.0.1:1",
+            "mainnet": "http://127.0.0.1:1",
+            "sepolia": "http://127.0.0.1:1"
+          },
+          "slippage": 0.1,
+          "slippagePercent": 5,
+          "slippageTolerance": 0.1,
+          "snipeAmountETH": "0.01",
+          "stopLossCheckInterval": 15000,
+          "stopLossPercent": 25,
+          "takeProfitCheckInterval": 15000,
+          "takeProfitPercent": 50,
+          "trailingMaxPct": 40,
+          "trailingMinPct": 5,
+          "trailingStopPct": 15,
+          "urgencyWindowMs": 1800000,
+          "volatilityBaselineCV": 0.03,
+          "volatilityMaxSamples": 60,
+          "volatilityMinSamples": 12,
+          "walletPrivateKey": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "wethAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+        }
+      }
+    },
+    "registry": {
+      "kind": "ok",
+      "logs": [
+        {
+          "bindings": {
+            "module": "chainRegistry"
+          },
+          "fields": {
+            "chain": "eth",
+            "entryCount": 1,
+            "key": "ETH_ANTIRUG_ALLOWLIST_EXTRA",
+            "op": "antirug.allowlist.deprecated-unified-extra"
+          },
+          "level": "warn",
+          "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+        },
+        {
+          "bindings": {
+            "module": "chainRegistry"
+          },
+          "fields": {
+            "chain": "bsc",
+            "entryCount": 1,
+            "key": "BSC_ANTIRUG_ALLOWLIST_EXTRA",
+            "op": "antirug.allowlist.deprecated-unified-extra"
+          },
+          "level": "warn",
+          "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+        },
+        {
+          "bindings": {
+            "module": "chainRegistry"
+          },
+          "fields": {
+            "chain": "base",
+            "entryCount": 1,
+            "key": "BASE_ANTIRUG_ALLOWLIST_EXTRA",
+            "op": "antirug.allowlist.deprecated-unified-extra"
+          },
+          "level": "warn",
+          "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+        },
+        {
+          "bindings": {
+            "module": "chainRegistry"
+          },
+          "fields": {
+            "chain": "arb",
+            "entryCount": 1,
+            "key": "ARB_ANTIRUG_ALLOWLIST_EXTRA",
+            "op": "antirug.allowlist.deprecated-unified-extra"
+          },
+          "level": "warn",
+          "msg": "Anti-rug ALLOWLIST_EXTRA (unified V2+V3) is DEPRECATED — prefer per-pool-type ALLOWLIST_EXTRA_V2 / ALLOWLIST_EXTRA_V3 to avoid placing V2 lockers in the V3 allowlist (or vice versa)"
+        }
+      ],
+      "value": {
+        "arb": {
+          "antiRug": {
+            "allowlistV2": [
+              {
+                "address": "0x63F4B2C082B1E0bbA38874567E053800379bF8D7",
+                "lockerName": "UNCX UniLockerV2 Arbitrum (Uniswap V2)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x000000000000000000000000000000000000dEaD",
+                "lockerName": "0xdEaD burn address (universal)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000a10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000A12",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "allowlistV3": [
+              {
+                "address": "0x6b5360B419e0851b4b81644e0F63c1A9778f2506",
+                "lockerName": "UNCX V3 Locker Arbitrum",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0xCb8b00D4018AD6031E28a44BF74616014BFB62Ec",
+                "lockerName": "UNCX V3 \"Proof of Reserves 2\" Arbitrum (ANTIRUG-15)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000a10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000A13",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "backfillCapBlocks": 500,
+            "circuitBreakerTriggers": 3,
+            "circuitBreakerWindowHours": 1,
+            "confirmBlocks": 1,
+            "gasMultiplier": 2,
+            "liveExecute": false,
+            "lpRemovalPct": 50,
+            "maxBackfillBlocks": 7200
+          },
+          "blockAgeToleranceSec": 30,
+          "chainId": 42161,
+          "dexes": [
+            {
+              "dexType": "v2",
+              "factoryAddress": "0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9",
+              "name": "uniswap-v2",
+              "routerAddress": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
+            },
+            {
+              "dexType": "v2",
+              "factoryAddress": "0x6EcCab422D763aC031210895C81787E87B43A652",
+              "name": "camelot-v2",
+              "routerAddress": "0xc873fEcbd354f5A56E00E710B90EF4201db2448d"
+            },
+            {
+              "dexType": "v3",
+              "factoryAddress": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+              "name": "uniswap-v3",
+              "quoterAddress": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+              "swapRouterAddress": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+            }
+          ],
+          "displayName": "[ARB]",
+          "enabled": true,
+          "explorerUrl": "https://arbiscan.io",
+          "gas": {
+            "maxGasLimit": "1000000",
+            "multiplier": 1.1,
+            "type": "eip1559"
+          },
+          "gasBuffer": "0.0005",
+          "honeypotChecker": {
+            "deployedAddress": "0x00000000000000000000000000000000000000A1",
+            "maxBuyTaxBps": 1000,
+            "maxSellTaxBps": 1000,
+            "method": "on-chain-contract"
+          },
+          "httpRpcUrl": "http://127.0.0.1:1",
+          "maxCapital": "0.5",
+          "mevConfig": {},
+          "mevStrategy": "passthrough",
+          "minLiquidityThreshold": "0.2",
+          "name": "arb",
+          "nativeCurrency": "ETH",
+          "safetyApis": {
+            "honeypot": "goplus",
+            "liquidityLock": "goplus",
+            "tokenSecurity": "goplus"
+          },
+          "snipeAmount": "0.005",
+          "wethAddress": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+          "wsRpcUrl": "ws://127.0.0.1:1"
+        },
+        "base": {
+          "antiRug": {
+            "allowlistV2": [
+              {
+                "address": "0xED9180976c2a4742C7A57354FD39d8BEc6cbd8AB",
+                "lockerName": "UNCX UniLockerV2 Base (Uniswap V2)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x000000000000000000000000000000000000dEaD",
+                "lockerName": "0xdEaD burn address (universal)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000BA0",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000Ba2",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "allowlistV3": [
+              {
+                "address": "0x231278eDd38B00B07fBd52120CEf685B9BaEBCC1",
+                "lockerName": "UNCX V3 Locker Base",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000BA0",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000bA3",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "backfillCapBlocks": 500,
+            "circuitBreakerTriggers": 3,
+            "circuitBreakerWindowHours": 1,
+            "confirmBlocks": 1,
+            "gasMultiplier": 2,
+            "liveExecute": false,
+            "lpRemovalPct": 50,
+            "maxBackfillBlocks": 7200
+          },
+          "blockAgeToleranceSec": 30,
+          "chainId": 8453,
+          "dexes": [
+            {
+              "dexType": "v2",
+              "factoryAddress": "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6",
+              "name": "uniswap-v2",
+              "routerAddress": "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24"
+            },
+            {
+              "dexType": "v2",
+              "factoryAddress": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+              "name": "aerodrome",
+              "routerAddress": "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43"
+            },
+            {
+              "dexType": "v3",
+              "factoryAddress": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+              "name": "uniswap-v3",
+              "quoterAddress": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a",
+              "swapRouterAddress": "0x2626664c2603336E57B271c5C0b26F421741e481"
+            }
+          ],
+          "displayName": "[BASE]",
+          "enabled": true,
+          "explorerUrl": "https://basescan.org",
+          "gas": {
+            "maxGasLimit": "500000",
+            "multiplier": 1.1,
+            "type": "eip1559"
+          },
+          "gasBuffer": "0.0005",
+          "honeypotChecker": {
+            "deployedAddress": "0x00000000000000000000000000000000000000BA",
+            "maxBuyTaxBps": 1000,
+            "maxSellTaxBps": 1000,
+            "method": "on-chain-contract"
+          },
+          "httpRpcUrl": "http://127.0.0.1:1",
+          "maxCapital": "0.5",
+          "mevConfig": {},
+          "mevStrategy": "passthrough",
+          "minLiquidityThreshold": "0.2",
+          "name": "base",
+          "nativeCurrency": "ETH",
+          "safetyApis": {
+            "honeypot": "honeypot.is",
+            "liquidityLock": "goplus",
+            "tokenSecurity": "goplus"
+          },
+          "snipeAmount": "0.005",
+          "wethAddress": "0x4200000000000000000000000000000000000006",
+          "wsRpcUrl": "ws://127.0.0.1:1"
+        },
+        "bsc": {
+          "antiRug": {
+            "allowlistV2": [
+              {
+                "address": "0xC765bddB93b0D1c1A88282BA0fa6B2d00E3e0c83",
+                "lockerName": "UNCX UniLockerV2 BSC (PancakeSwap V2)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x407993575c91ce7643a4d4cCACc9A98c36eE1BBE",
+                "lockerName": "PinkLock V2 BSC",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x000000000000000000000000000000000000dEaD",
+                "lockerName": "0xdEaD burn address (universal)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000B10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000B12",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "allowlistV3": [
+              {
+                "address": "0xfe88DAB083964C56429baa01F37eC2265AbF1557",
+                "lockerName": "UNCX V3 Locker BSC",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000B10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000b13",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "backfillCapBlocks": 500,
+            "circuitBreakerTriggers": 3,
+            "circuitBreakerWindowHours": 1,
+            "confirmBlocks": 1,
+            "gasMultiplier": 2,
+            "liveExecute": false,
+            "lpRemovalPct": 50,
+            "maxBackfillBlocks": 7200
+          },
+          "blockAgeToleranceSec": 60,
+          "chainId": 56,
+          "dexes": [
+            {
+              "dexType": "v2",
+              "factoryAddress": "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+              "name": "pancakeswap-v2",
+              "routerAddress": "0x10ED43C718714eb63d5aA57B78B54704E256024E"
+            },
+            {
+              "dexType": "v2",
+              "factoryAddress": "0x858E3312ed3A876947EA49d572A7C42DE08af7EE",
+              "name": "biswap-v2",
+              "routerAddress": "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8"
+            },
+            {
+              "dexType": "v3",
+              "factoryAddress": "0xdB1d10011AD0Ff90774D0C6Bb92e5C5c8b4461F7",
+              "name": "uniswap-v3",
+              "quoterAddress": "0x78D78E420Da98ad378D7799bE8f4AF69033EB077",
+              "swapRouterAddress": "0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2"
+            },
+            {
+              "dexType": "v3",
+              "factoryAddress": "0x0BFbCF9fa4f9C56B0F40a671Ad40E0805A091865",
+              "name": "pancakeswap-v3",
+              "quoterAddress": "0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997",
+              "swapRouterAddress": "0x1b81D678ffb9C0263b24A97847620C99d213eB14"
+            }
+          ],
+          "displayName": "[BSC]",
+          "enabled": true,
+          "explorerUrl": "https://bscscan.com",
+          "gas": {
+            "maxGasLimit": "500000",
+            "multiplier": 1.1,
+            "type": "legacy"
+          },
+          "gasBuffer": "0.003",
+          "honeypotChecker": {
+            "deployedAddress": "0x00000000000000000000000000000000000000B1",
+            "maxBuyTaxBps": 1000,
+            "maxSellTaxBps": 1000,
+            "method": "on-chain-contract"
+          },
+          "httpRpcUrl": "http://127.0.0.1:1",
+          "maxCapital": "5.0",
+          "mevConfig": {
+            "authHeader": "TEST-SENTINEL",
+            "endpoint": "https://api.blxrbdn.com"
+          },
+          "mevStrategy": "bloxroute",
+          "minLiquidityThreshold": "1.5",
+          "name": "bsc",
+          "nativeCurrency": "BNB",
+          "safetyApis": {
+            "honeypot": "goplus",
+            "liquidityLock": "mudra",
+            "tokenSecurity": "goplus"
+          },
+          "snipeAmount": "0.05",
+          "wethAddress": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+          "wsRpcUrl": "ws://127.0.0.1:1"
+        },
+        "eth": {
+          "antiRug": {
+            "allowlistV2": [
+              {
+                "address": "0x59d7D55DdC58494FbBbca29904f108ece82Ac7FB",
+                "lockerName": "Unicrypt UniLockerV2 ETH",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0xE2fE530C047f2d85298b07D9333C05737f1435fB",
+                "lockerName": "TeamFinance / TrustSwap Lock ETH",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x71B5759d73262FBb223956913ecF4ecC51057641",
+                "lockerName": "PinkLock V2 ETH",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x000000000000000000000000000000000000dEaD",
+                "lockerName": "0xdEaD burn address (universal)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000E10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000e12",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "allowlistV3": [
+              {
+                "address": "0xFD235968e65B0990584585763f837A5b5330e6DE",
+                "lockerName": "UNCX V3 Locker ETH (NFT-holding)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0xE2fE530C047f2d85298b07D9333C05737f1435fB",
+                "lockerName": "TeamFinance / TrustSwap Lock ETH (V2 + V3 unified proxy)",
+                "provenance": "hardcoded"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000E10",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              },
+              {
+                "address": "0x0000000000000000000000000000000000000e13",
+                "lockerName": "Operator overlay",
+                "provenance": "env-overlay"
+              }
+            ],
+            "backfillCapBlocks": 10,
+            "circuitBreakerTriggers": 3,
+            "circuitBreakerWindowHours": 1,
+            "confirmBlocks": 1,
+            "gasMultiplier": 2,
+            "liveExecute": false,
+            "lpRemovalPct": 50,
+            "maxBackfillBlocks": 7200
+          },
+          "blockAgeToleranceSec": 300,
+          "chainId": 1,
+          "dexes": [
+            {
+              "dexType": "v2",
+              "factoryAddress": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+              "name": "uniswap-v2",
+              "routerAddress": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+            },
+            {
+              "dexType": "v2",
+              "factoryAddress": "0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac",
+              "name": "sushiswap-v2",
+              "routerAddress": "0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F"
+            },
+            {
+              "dexType": "v3",
+              "factoryAddress": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+              "name": "uniswap-v3",
+              "quoterAddress": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
+              "swapRouterAddress": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+            }
+          ],
+          "displayName": "[ETH]",
+          "enabled": true,
+          "explorerUrl": "https://etherscan.io",
+          "gas": {
+            "maxGasLimit": "300000",
+            "multiplier": 1.2,
+            "type": "eip1559"
+          },
+          "gasBuffer": "0.005",
+          "honeypotChecker": {
+            "deployedAddress": "0x00000000000000000000000000000000000000e1",
+            "maxBuyTaxBps": 1000,
+            "maxSellTaxBps": 1000,
+            "method": "on-chain-contract"
+          },
+          "httpRpcUrl": "http://127.0.0.1:1",
+          "maxCapital": "1.0",
+          "mevConfig": {
+            "authKey": "0x0000000000000000000000000000000000000000000000000000000000000002",
+            "network": "mainnet",
+            "relayUrl": "https://relay.flashbots.net"
+          },
+          "mevStrategy": "flashbots",
+          "minLiquidityThreshold": "0.75",
+          "name": "eth",
+          "nativeCurrency": "ETH",
+          "safetyApis": {
+            "honeypot": "honeypot.is",
+            "liquidityLock": "unicrypt",
+            "tokenSecurity": "goplus"
+          },
+          "snipeAmount": "0.01",
+          "wethAddress": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+          "wsRpcUrl": "ws://127.0.0.1:1"
+        }
+      }
+    },
+    "risk": {
+      "kind": "ok",
+      "logs": [],
+      "value": {
+        "probes": {
+          "DAILY_LOSS_PCT": {
+            "allowed": false,
+            "details": "Daily loss on probe-daily-loss: 0.5000 exceeds 10% of 1.0",
+            "reason": "daily_loss_limit"
+          },
+          "MAX_OPEN_POSITIONS": {
+            "allowed": false,
+            "details": "Open positions (10) at limit (10)",
+            "reason": "max_positions"
+          },
+          "MAX_POSITION_SIZE": {
+            "allowed": false,
+            "details": "Position size 0.5 exceeds max 0.1",
+            "reason": "position_size"
+          },
+          "MAX_TOTAL_EXPOSURE": {
+            "allowed": false,
+            "details": "Total exposure (9.9950 + 0.01) would exceed cap (10)",
+            "reason": "exposure_cap"
+          },
+          "SNIPE_COOLDOWN_MS": {
+            "allowed": false,
+            "details": "Cooldown active on probe-cooldown: 30s remaining",
+            "reason": "cooldown"
+          }
+        }
+      }
+    }
+  }
+}

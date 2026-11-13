@@ -1,0 +1,43 @@
+RED proof 23-14-2
+Plan 23-14 (AC-13). Recorded 2026-11-12T01:41:19Z at HEAD 09479ec469a4696bc8699a06366cd6870fc4fe3e, Node v22.16.0.
+Neutralised file (working tree only, never committed): src/utils/processLock.ts
+git blob before: 0ed2c5f4ec94e048c89f4f6bde2a2c0dec7ea0ad (equals HEAD:src/utils/processLock.ts)
+
+== Neutralising diff (git diff) ==
+medit: applied to src/utils/processLock.ts
+diff --git a/src/utils/processLock.ts b/src/utils/processLock.ts
+index 0ed2c5f..92a3eb7 100644
+--- a/src/utils/processLock.ts
++++ b/src/utils/processLock.ts
+@@ -187,7 +187,7 @@ export function acquireProcessLock(lockDir: string, address: string): ProcessLoc
+     try {
+         db = openExclusive(lockDir, lockFile);
+     } catch (err) {
+-        if (isBusy(err)) throw heldError(normalized, lockFile, err);
++        if (isBusy(err)) return { lockFile, address: normalized, acquiredAt: Date.now() }; // RED 23-14-2: SQLITE_BUSY swallowed
+         throw mechanismError(normalized, lockFile, err);
+     }
+     const info: ProcessLockInfo = { lockFile, address: normalized, acquiredAt: Date.now() };
+
+== RED command (only the named file) ==
+node node_modules/vitest/vitest.mjs run --project integration -t AC-23a test/integration/processLock.test.ts
+
+== RED result ==
+vitest exit 1
+     × a second acquire for the same wallet is refused while the holder lives (AC-23a) 2233ms
+ FAIL   integration  test/integration/processLock.test.ts > SAFE-04 single-instance process lock (real holder processes) > a second acquire for the same wallet is refused while the holder lives (AC-23a)
+AssertionError: expected +0 to be 1 // Object.is equality
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+
+== Restore ==
+git -c core.autocrlf=false checkout -- src/utils/processLock.ts
+git blob after restore: 0ed2c5f4ec94e048c89f4f6bde2a2c0dec7ea0ad (IDENTICAL to HEAD)
+git status --porcelain -- src test vitest.config.ts: ''
+
+== GREEN rerun ==
+ Test Files  1 passed (1)
+      Tests  1 passed | 6 skipped (7)
+vitest exit 0

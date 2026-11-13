@@ -1,0 +1,45 @@
+RED proof 23-14-6
+Plan 23-14 (AC-13). Recorded 2026-11-12T01:42:19Z at HEAD 09479ec469a4696bc8699a06366cd6870fc4fe3e, Node v22.16.0.
+Neutralised file (working tree only, never committed): test/integration/pauseCli.test.ts
+git blob before: d04783b24b5ecbe30079d1b22d022962376eb4c8 (equals HEAD:test/integration/pauseCli.test.ts)
+
+== Neutralising diff (git diff) ==
+medit: applied to test/integration/pauseCli.test.ts
+diff --git a/test/integration/pauseCli.test.ts b/test/integration/pauseCli.test.ts
+index d04783b..40ef197 100644
+--- a/test/integration/pauseCli.test.ts
++++ b/test/integration/pauseCli.test.ts
+@@ -369,3 +369,6 @@ describe('20-09: CLI default URL derives from DASHBOARD_HOST/DASHBOARD_PORT', ()
+         });
+     }
+ });
++
++import { spawnSync } from 'child_process';
++spawnSync('x', []); // RED 23-14-6: a direct spawn in a TESTI-011 file
+
+== RED command (only the named file) ==
+node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/spawnSites.test.ts
+
+== RED result ==
+vitest exit 1
+     × no script under test/ loads a spawner or spawns, outside the allowed files 1593ms
+ FAIL   unit  test/unit/rails/spawnSites.test.ts > spawn-site gate (SAFE-02 D-03) > no script under test/ loads a spawner or spawns, outside the allowed files
+AssertionError: expected [ …(2) ] to deeply equal []
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)
+
+The offences the gate reported (from the full output):
++   "test/integration/pauseCli.test.ts:373 import of child_process",
++   "test/integration/pauseCli.test.ts:374 call to spawnSync()",
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/integration/pauseCli.test.ts
+git blob after restore: d04783b24b5ecbe30079d1b22d022962376eb4c8 (IDENTICAL to HEAD)
+git status --porcelain -- src test vitest.config.ts: ''
+
+== GREEN rerun ==
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+vitest exit 0

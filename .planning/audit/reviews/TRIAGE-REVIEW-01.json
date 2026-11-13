@@ -1,0 +1,96 @@
+{
+  "id": "TRIAGE-REVIEW-01",
+  "date": "2026-11-12",
+  "summary": "Phase 23 triage batch review (plan 23-16, D-11). Every one of the 61 frozen triage population entries had an outcome (52 confirmed, 8 fixed by the Phase 22 rails, 1 unreproduced, 0 NOT-A-BUG), from three identical real-path runs (93 knownBug tuples from 56 files, 113 tests each) and one rail run (the 8 fixed entries' rail tests passed), recorded in inputs/triage-evidence.json and reported in plain language in 23-TRIAGE-REPORT.md. The operator was asked five numbered items: (1) acknowledge the 44 confirmed S0/S1 entries, each with its failing test (AC-18); (2) rule keep-open or not-a-bug on the one unreproduced entry, AUD-TX-006 (S3; AC-08); (3) whether the ESC-BUY-01 interim rule for AUD-BUY-001 (start the main bot right after any deliberate buy) should change now that AUD-ANTIRUG-025 shows a boot that resumes an open position drops its anti-rug watch; (4) a setup fact for AUD-ANTIRUG-018 (does any enabled chain run without a WebSocket address), not a ruling; (5) whether the four fork questions (AUD-ANTIRUG-003, AUD-BUY-015, AUD-BUY-033, AUD-EXIT-003) go to the Phase 25 fork run (AC-16). The reply addresses each item by number and name; no ruling was inferred from a general acknowledgement. Item 1 is recorded in acknowledged, item 2 in rulings, item 3 in decisions, item 4 in setup_answers and item 5 in fork_routing. No finding's escalation_ref changed and no escalation file was edited. No severity changed. Nothing was fixed; the bot stays off for all of v7.0.",
+  "presented_at": "2026-11-12 session (after commit 46e4706 at 2026-11-12T03:10:49Z UTC): the plan 23-16 Task 2 checkpoint (checkpoint:human-verify, gate blocking-human), the section \"What needs your reply\" of .planning/phases/23-test-safety-net-harness-triage-characterization/23-TRIAGE-REPORT.md, relayed to the operator by the execute-phase orchestrator",
+  "operator_response": "1. acknowledge all 44.\n2. TX-006: keep open\n3. ANTIRUG-025: option 1\n4. ANTIRUG-018: that command you sent me only output \"eth ETH_WS_URL set\"\n5. fork questions: all go to Phase 25",
+  "operator_response_recorded_at": "2026-11-12T03:26:25Z",
+  "operator_response_channel": "typed by the operator at the plan 23-16 Task 2 blocking checkpoint; relayed verbatim (line breaks and punctuation kept) by the execute-phase orchestrator to the 23-16 continuation executor, which recorded it at operator_response_recorded_at",
+  "acknowledgement_words": "1. acknowledge all 44.",
+  "acknowledged": [
+    "AUD-ANTIRUG-001",
+    "AUD-ANTIRUG-002",
+    "AUD-ANTIRUG-003",
+    "AUD-ANTIRUG-004",
+    "AUD-ANTIRUG-005",
+    "AUD-ANTIRUG-018",
+    "AUD-ANTIRUG-025",
+    "AUD-API-001",
+    "AUD-API-002",
+    "AUD-API-008",
+    "AUD-BUY-001",
+    "AUD-BUY-002",
+    "AUD-BUY-003",
+    "AUD-BUY-004",
+    "AUD-BUY-005",
+    "AUD-BUY-006",
+    "AUD-BUY-007",
+    "AUD-BUY-008",
+    "AUD-BUY-010",
+    "AUD-BUY-011",
+    "AUD-BUY-015",
+    "AUD-BUY-025",
+    "AUD-BUY-027",
+    "AUD-BUY-028",
+    "AUD-BUY-030",
+    "AUD-BUY-033",
+    "AUD-DB-001",
+    "AUD-DB-002",
+    "AUD-DB-003",
+    "AUD-DB-004",
+    "AUD-EXIT-001",
+    "AUD-EXIT-002",
+    "AUD-EXIT-003",
+    "AUD-EXIT-007",
+    "AUD-EXIT-008",
+    "AUD-EXIT-009",
+    "AUD-EXIT-013",
+    "AUD-EXIT-014",
+    "AUD-EXIT-015",
+    "AUD-SCRIPTS-002",
+    "AUD-TX-001",
+    "AUD-TX-002",
+    "AUD-TX-003",
+    "AUD-TX-009"
+  ],
+  "acknowledged_note": "The 44 IDs are exactly the table under item 1 of the report: every confirmed population entry that is S0 or S1 now or was at the freeze. AUD-ANTIRUG-025 (new S1 from plan 23-06, escalation ESC-ANTIRUG-04, which holds no operator words) is acknowledged here; ESC-ANTIRUG-04 itself is not edited.",
+  "rulings": {
+    "AUD-TX-006": {
+      "ruling": "keep-open",
+      "reason": "The operator chose keep open, the report's recommendation. The proven part (the Flashbots statistics call is made inside the wallet nonce lock, claim stats-call-inside-lock) is a real delay on the wallet; the open part (whether the relay still answers flashbots_getBundleStatsV2 for the bot's signer) could not be settled by the one approved request (HTTP 403, -32601 \"rpc method is not whitelisted\", inconclusive by the pre-fixed rule). The entry stays on the list (outcome unreproduced, status candidate, open claim endpoint-still-answers) and Phase 29 (card TX-03) removes or moves the call either way. No further Flashbots request is sent.",
+      "operator_words": "2. TX-006: keep open"
+    }
+  },
+  "decisions": [
+    {
+      "id": "TRIAGE-REVIEW-01-D1",
+      "subject": "Interim rule for AUD-BUY-001 (S0), weakened by AUD-ANTIRUG-025 (S1)",
+      "question": "Item 3 of the report: the ESC-BUY-01 interim rule (Phase 22, carried on card BUY-01, numbered OD-26: after any landed deliberate buy start or restart the main bot at once) brings back the exit monitor but not anti-rug, because AUD-ANTIRUG-025 drops the anti-rug watch on every boot that resumes an open position. Options: (1) change the rule to \"no deliberate buy until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025\"; (2) keep the rule, read as covering the exit monitor only; (3) another rule the operator names.",
+      "option_chosen": "1",
+      "rule": "No deliberate buy (scripts/deliberate-buy.ts or any other manual buy) until Phase 24 has fixed AUD-BUY-001 and AUD-ANTIRUG-025.",
+      "supersedes": "The ESC-BUY-01 interim rule \"start the main bot right after any manual buy\", recorded in escalations/ESC-BUY-01.json ruling_note and in decisions/OD-26.json interim_rule.",
+      "card_note": "No tool writes a decision card's interim_rule and check.ts reads no such field; card OD-26 renders into OPERATOR-DECISIONS.md, which still matches the Phase 22 seal's render_sha256.decisions (90946c7d...4e8a), and the plan forbids hand-editing escalation files. So card OD-26 (BUY-01) and ESC-BUY-01 were not edited and still show the old rule. This record supersedes them; Phase 24 must read this decision with card OD-26.",
+      "operator_words": "3. ANTIRUG-025: option 1"
+    }
+  ],
+  "setup_answers": [
+    {
+      "finding": "AUD-ANTIRUG-018",
+      "question": "Item 4 of the report (a setup fact, not a ruling; the grade does not depend on it): does any enabled chain run without a WebSocket address? The report gave a one-line command that prints, for each entry of ENABLED_CHAINS (default eth), the chain, its <CHAIN>_WS_URL key and only \"set\" or \"NOT set\", never the address.",
+      "operator_words": "4. ANTIRUG-018: that command you sent me only output \"eth ETH_WS_URL set\"",
+      "fact": "ENABLED_CHAINS is eth only (or unset, which defaults to eth) and ETH_WS_URL has a non-empty value. The executor did not read .env; the operator ran the check.",
+      "exposure_from_code": "On this setup the bot never starts the HTTP anti-rug poller that AUD-ANTIRUG-018 is about. chainRegistry.ts:644 parses ENABLED_CHAINS with the same default (eth) and trimming; chainRegistry.ts:662 sets wsRpcUrl to process.env.ETH_WS_URL || null, the same truthiness the command printed; createChainContext (chainRegistry.ts:1066) calls getWsProvider, which returns null only for an empty URL (provider.ts:33-40) and otherwise a WebSocketProvider. startChainAntiRugListener takes the HTTP branch (startHttpPollingAntiRug, detector.ts:1224) only when ctx.wsProvider is falsy (detector.ts:590-603). Every later reassignment of ctx.wsProvider stores a newly built WebSocketProvider, never null: the anti-rug reconnect (detector.ts:923-929), the two DEX reconnect loops (bot.ts:1563-1564, bot.ts:1605-1606) and the dashboard Start callback (bot.ts:1814-1818, which takes the getWsProvider branch because the URL is set). There is no path that falls back to HTTP polling after a WebSocket failure or refused reconnect. So AUD-ANTIRUG-018 is not reachable on the operator's current setup; it becomes reachable as soon as any chain without a WebSocket address is enabled. The same holds for its DEX-listener sibling AUD-BUY-036 (bot.ts:1530-1533 picks HTTP polling only when ctx.wsProvider is null). The WebSocket path has its own confirmed outage findings that do apply on this setup: AUD-ANTIRUG-005 (backfill does not replay a real outage after a long healthy session) and AUD-ANTIRUG-002 (a refused WebSocket reconnect kills the process). The grade of AUD-ANTIRUG-018 (S1, ESC-ANTIRUG-03) does not change."
+    }
+  ],
+  "fork_routing": {
+    "operator_words": "5. fork questions: all go to Phase 25",
+    "items": [
+      { "finding": "AUD-ANTIRUG-003", "ufv": "UFV-06" },
+      { "finding": "AUD-BUY-015", "ufv": "UFV-07" },
+      { "finding": "AUD-BUY-033", "ufv": "UFV-08" },
+      { "finding": "AUD-EXIT-003", "ufv": "UFV-09" }
+    ],
+    "note": "Each question is added to inputs/unrun-fork-verifications.json with owner_phase 25 (the number, like UFV-01..04) and its finding's triage.fork_ref is set with set-triage.ts (AC-16). ROADMAP Phase 25 success criterion 6 names only UFV-01..UFV-05; Phase 25 planning must include UFV-06..UFV-09."
+  },
+  "phase_continued": true
+}

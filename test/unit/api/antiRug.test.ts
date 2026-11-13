@@ -12,8 +12,9 @@
 //   Test 4: POST /api/anti-rug/circuit-breaker/eth/reset when resetCircuitBreaker
 //           throws returns 500 with `{error: 'Reset failed: ...'}`.
 //   Test 5: GET /api/anti-rug/events/eth returns the recent triggers (mocked).
-//   Test 6: src/api/server.ts mounts antiRugRoutes at /api/anti-rug AFTER the
-//           existing controls mount (inherits authMiddleware).
+//   Test 6: the real startApiServer serves antiRugRoutes at /api/anti-rug with
+//           the contexts it was given, behind authMiddleware (a request on the
+//           running server, plan 23-30; it no longer reads src/api/server.ts).
 //
 // Dashboard-types + useWebSocket source-text guards:
 //   Test 7: dashboard/src/types/api.ts Position interface includes
@@ -28,8 +29,11 @@
 //   Test 12: dashboard/src/hooks/useWebSocket.ts switch handles `cb_tripped`.
 //   Test 13: dashboard/src/hooks/useWebSocket.ts switch handles `cb_reset`.
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import express from 'express';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMockChainContext } from '../../fixtures/api.fixtures';
@@ -67,8 +71,70 @@ vi.mock('../../../src/utils/logger', () => ({
     },
 }));
 
+// Test 6 starts the real API server. Its other routers' data sources are
+// stubbed (the same shapes as test/integration/api/wsPush.test.ts) so the
+// server loads without a database or the exit engine; the anti-rug router,
+// the auth middleware and the server's own mounting stay real.
+vi.mock('../../../src/api/helpers/positions', () => ({
+    buildPositionsWithLivePrices: () => Promise.resolve([]),
+}));
+
+vi.mock('../../../src/api/routes/controls', () => ({
+    controlRoutes: () => {
+        const { Router } = require('express');
+        return Router();
+    },
+}));
+
+vi.mock('../../../src/utils/db', () => ({
+    getOpenPositionCount: { get: () => ({ count: 0 }) },
+    getTotalExposure: { get: () => ({ total: 0 }) },
+    getPnL: () => [],
+}));
+
+vi.mock('../../../src/riskManager', () => ({
+    getPortfolioExposure: () => ({ total: 0, byChain: {} }),
+}));
+
+vi.mock('../../../src/exitEngine', () => ({
+    exitConfig: {
+        urgencyWindowMs: 3600000,
+        trailingStopPct: 10,
+        stopLossPct: 15,
+        partialSellTiers: [],
+        pollIntervalMs: 5000,
+    },
+}));
+
 // Must import after mocks
 import { antiRugRoutes } from '../../../src/api/routes/antiRug';
+
+// Helper for Test 6: one request to a server already listening on `port`.
+async function requestPort(
+    port: number,
+    method: 'GET' | 'POST',
+    path: string,
+    headers: Record<string, string> = {},
+): Promise<{ status: number; body: any }> {
+    return new Promise((resolveReq, reject) => {
+        const req = http.request(
+            { hostname: '127.0.0.1', port, path, method, headers: { 'Content-Type': 'application/json', ...headers } },
+            (res) => {
+                let data = '';
+                res.on('data', (chunk: string) => (data += chunk));
+                res.on('end', () => {
+                    try {
+                        resolveReq({ status: res.statusCode ?? 0, body: JSON.parse(data) });
+                    } catch {
+                        resolveReq({ status: res.statusCode ?? 0, body: data });
+                    }
+                });
+            },
+        );
+        req.on('error', reject);
+        req.end();
+    });
+}
 
 // Helper: create supertest-like request function using raw http
 async function request(
@@ -189,21 +255,66 @@ describe('Phase 19 — /api/anti-rug routes', () => {
     });
 });
 
+// The describe title still names the file: .planning/audit/tools/test-identity.ts
+// honours a rename of a test's own title only, so renaming this describe would
+// report Test 6 as missing (deferred-items.md, plan 23-18). The test reads no
+// source file.
 describe('Phase 19 — src/api/server.ts mount', () => {
-    it('Test 6: mounts antiRugRoutes at /api/anti-rug after the /controls mount', () => {
-        const serverSrc = readFileSync(
-            resolve(__dirname, '../../../src/api/server.ts'),
-            'utf-8',
-        ).replace(/\r\n/g, '\n');
-        // The router is imported
-        expect(serverSrc).toMatch(/import\s+\{\s*antiRugRoutes\s*\}\s+from\s+['"]\.\/routes\/antiRug['"]/);
-        // The router is mounted at /anti-rug AFTER /controls
-        const controlsIdx = serverSrc.indexOf("apiRouter.use('/controls'");
-        const antiRugIdx = serverSrc.indexOf("apiRouter.use('/anti-rug'");
-        expect(controlsIdx).toBeGreaterThan(0);
-        expect(antiRugIdx).toBeGreaterThan(controlsIdx);
-        // The mount passes the contexts factory pattern
-        expect(serverSrc).toMatch(/apiRouter\.use\(['"]\/anti-rug['"],\s*antiRugRoutes\(contexts\)\)/);
+    const ethCtx = createMockChainContext({ name: 'eth' });
+    const sessionToken = 'csb-23-30-session-7d41b2';
+    const savedEnv = { host: process.env.DASHBOARD_HOST, port: process.env.DASHBOARD_PORT };
+    let handle: { close: () => void } | undefined;
+    let port = 0;
+    let sessions: Map<string, { createdAt: number }> | undefined;
+
+    beforeAll(async () => {
+        // The cold import of the server runs here, against hookTimeout.
+        process.env.DASHBOARD_HOST = '127.0.0.1';
+        process.env.DASHBOARD_PORT = '0';
+        const { startApiServer } = await import('../../../src/api/server');
+        ({ sessions } = await import('../../../src/api/middleware/auth'));
+        sessions.set(sessionToken, { createdAt: Date.now() });
+        // startApiServer returns only close(); its listening server is read
+        // from the one listen() call it makes.
+        const listen = vi.spyOn(http.Server.prototype, 'listen');
+        try {
+            handle = startApiServer([ethCtx]);
+            expect(listen).toHaveBeenCalledTimes(1);
+            const server = listen.mock.contexts[0] as http.Server;
+            if (!server.listening) await once(server, 'listening');
+            port = (server.address() as AddressInfo).port;
+        } finally {
+            listen.mockRestore();
+        }
+    });
+
+    afterAll(() => {
+        handle?.close();
+        sessions?.delete(sessionToken);
+        if (savedEnv.host === undefined) delete process.env.DASHBOARD_HOST;
+        else process.env.DASHBOARD_HOST = savedEnv.host;
+        if (savedEnv.port === undefined) delete process.env.DASHBOARD_PORT;
+        else process.env.DASHBOARD_PORT = savedEnv.port;
+    });
+
+    it('Test 6: startApiServer serves antiRugRoutes at /api/anti-rug with its contexts, behind authMiddleware', async () => {
+        resetCircuitBreakerMock.mockReset();
+        isCircuitBreakerTrippedMock.mockReset();
+        isCircuitBreakerTrippedMock.mockReturnValue(true);
+        const path = '/api/anti-rug/circuit-breaker/eth/reset';
+
+        // Without a session the request stops at authMiddleware.
+        const anonymous = await requestPort(port, 'POST', path);
+        expect(anonymous).toEqual({ status: 401, body: { error: 'Unauthorized' } });
+        expect(resetCircuitBreakerMock).not.toHaveBeenCalled();
+
+        // With a session it reaches antiRugRoutes, which finds 'eth' among the
+        // contexts startApiServer was given and resets that same context.
+        const signedIn = await requestPort(port, 'POST', path, { Cookie: `session=${sessionToken}` });
+        expect(signedIn.body).toEqual({ ok: true, chain: 'eth' });
+        expect(signedIn.status).toBe(200);
+        expect(resetCircuitBreakerMock).toHaveBeenCalledTimes(1);
+        expect(resetCircuitBreakerMock.mock.calls[0][0]).toBe(ethCtx);
     });
 });
 

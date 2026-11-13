@@ -85,5 +85,11 @@
     "codex"
   ],
   "found_date": "2026-11-07",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path: the real startApiServer on loopback, real login and the real POST /api/chains/eth/stop over node:http, GET /api/chains shows stopped; on a chain without a WS URL the HTTP poller still finds the PairCreated and a buy is submitted (claim http-poller-buys-after-stop); on a WS chain stop removes the factory listener, yet a Telegram alpha drop still routes to the stopped chain and a buy is submitted (claim telegram-routes-to-stopped-chain); a stoppedChains check in handleNewPairForChain reads looks fixed on both; start adding a second poller stays code-read (onRestart is private to startMultiChainBot)",
+    "test_id": "AUD-BUY-011"
+  }
 }

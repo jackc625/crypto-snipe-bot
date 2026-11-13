@@ -14,9 +14,9 @@
 
 - **method:** POST
 - **path:** /api/auth/login
-- **params:** 
+- **params:** apiKey
 - **file:** src/api/routes/auth.ts
-- **description:** Dashboard login (loginHandler, session cookie)
+- **description:** Dashboard login via loginHandler in src/api/middleware/auth.ts; unauthenticated; sets session cookie
 
 ## `GET /api/positions`
 
@@ -24,21 +24,21 @@
 - **path:** /api/positions
 - **params:** 
 - **file:** src/api/routes/positions.ts
-- **description:** Open positions (auth)
+- **description:** Open positions with live prices (auth)
 
 ## `GET /api/trades`
 
 - **method:** GET
 - **path:** /api/trades
-- **params:** query filters
+- **params:** chain, from, to, outcome, page, limit
 - **file:** src/api/routes/trades.ts
-- **description:** Trade history (auth)
+- **description:** Paginated trade history (auth)
 
 ## `GET /api/trades/export`
 
 - **method:** GET
 - **path:** /api/trades/export
-- **params:** 
+- **params:** chain, from, to, outcome
 - **file:** src/api/routes/trades.ts
 - **description:** Export trade history (auth)
 
@@ -48,15 +48,15 @@
 - **path:** /api/risk/exposure
 - **params:** 
 - **file:** src/api/routes/risk.ts
-- **description:** Portfolio exposure
+- **description:** Portfolio exposure (auth)
 
 ## `GET /api/risk/pnl`
 
 - **method:** GET
 - **path:** /api/risk/pnl
-- **params:** 
+- **params:** range
 - **file:** src/api/routes/risk.ts
-- **description:** PnL / chart data
+- **description:** PnL and chart data (auth)
 
 ## `GET /api/risk/limits`
 
@@ -64,7 +64,7 @@
 - **path:** /api/risk/limits
 - **params:** 
 - **file:** src/api/routes/risk.ts
-- **description:** Configured risk limits
+- **description:** Configured risk limits (auth)
 
 ## `GET /api/chains`
 
@@ -72,7 +72,7 @@
 - **path:** /api/chains
 - **params:** 
 - **file:** src/api/routes/chains.ts
-- **description:** List chain contexts and status
+- **description:** List chain contexts and status (auth)
 
 ## `POST /api/chains/:name/stop`
 
@@ -80,7 +80,7 @@
 - **path:** /api/chains/:name/stop
 - **params:** name
 - **file:** src/api/routes/chains.ts
-- **description:** Stop a chain
+- **description:** Stop a chain (auth)
 
 ## `POST /api/chains/:name/start`
 
@@ -88,7 +88,7 @@
 - **path:** /api/chains/:name/start
 - **params:** name
 - **file:** src/api/routes/chains.ts
-- **description:** Restart a chain
+- **description:** Restart a chain (auth)
 
 ## `POST /api/controls/force-sell/:tradeId`
 
@@ -96,7 +96,7 @@
 - **path:** /api/controls/force-sell/:tradeId
 - **params:** tradeId
 - **file:** src/api/routes/controls.ts
-- **description:** Force-sell one position
+- **description:** Force-sell one position (auth)
 
 ## `POST /api/controls/emergency-sell`
 
@@ -104,15 +104,15 @@
 - **path:** /api/controls/emergency-sell
 - **params:** 
 - **file:** src/api/routes/controls.ts
-- **description:** Sell all open positions
+- **description:** Sell all open positions (auth)
 
 ## `POST /api/controls/pause`
 
 - **method:** POST
 - **path:** /api/controls/pause
-- **params:** 
+- **params:** reason, pausedBy
 - **file:** src/api/routes/controls.ts
-- **description:** Pause new entries
+- **description:** Pause new entries (auth)
 
 ## `POST /api/controls/resume`
 
@@ -120,7 +120,7 @@
 - **path:** /api/controls/resume
 - **params:** 
 - **file:** src/api/routes/controls.ts
-- **description:** Resume entries
+- **description:** Resume entries (auth)
 
 ## `GET /api/controls/pause`
 
@@ -128,7 +128,7 @@
 - **path:** /api/controls/pause
 - **params:** 
 - **file:** src/api/routes/controls.ts
-- **description:** Pause state
+- **description:** Pause state (auth)
 
 ## `POST /api/anti-rug/circuit-breaker/:chain/reset`
 
@@ -136,7 +136,7 @@
 - **path:** /api/anti-rug/circuit-breaker/:chain/reset
 - **params:** chain
 - **file:** src/api/routes/antiRug.ts
-- **description:** Reset anti-rug circuit breaker
+- **description:** Reset anti-rug circuit breaker (auth)
 
 ## `GET /api/anti-rug/events/:chain`
 
@@ -144,7 +144,7 @@
 - **path:** /api/anti-rug/events/:chain
 - **params:** chain
 - **file:** src/api/routes/antiRug.ts
-- **description:** Recent anti-rug events
+- **description:** Recent anti-rug events (auth)
 
 ## `GET /{*path}`
 
@@ -152,20 +152,52 @@
 - **path:** /{*path}
 - **params:** 
 - **file:** src/api/server.ts
-- **description:** SPA fallback serving dashboard/dist
+- **description:** SPA fallback serving dashboard/dist/index.html; 404 JSON if the dashboard is not built
 
-## `WS`
+## `WS /ws`
 
 - **method:** WS
-- **path:** websocket
-- **params:** 
+- **path:** /ws
+- **params:** session cookie
 - **file:** src/api/ws/handler.ts
-- **description:** Live event broadcast via src/api/ws/broadcaster.ts
+- **description:** Session-validated upgrade; live events via src/api/ws/broadcaster.ts
 
-## `CLI npm run preflight|pause|resume`
+## `CLI npm start`
 
 - **method:** CLI
-- **path:** scripts/preflight.ts, scripts/pause.ts, scripts/resume.ts
+- **path:** src/main.ts
 - **params:** 
 - **file:** package.json
-- **description:** Operator scripts
+- **description:** Only bot start path: takes the per-wallet lock, then loads src/bot.ts
+
+## `CLI npm run preflight`
+
+- **method:** CLI
+- **path:** scripts/preflight.ts
+- **params:** 
+- **file:** package.json
+- **description:** Read-only cold-start checks; takes no process lock
+
+## `CLI npm run pause|resume`
+
+- **method:** CLI
+- **path:** scripts/pause.ts, scripts/resume.ts
+- **params:** 
+- **file:** package.json
+- **description:** Log in and call /api/controls/pause or /resume on the running bot; take no process lock
+
+## `CLI npm run db:init`
+
+- **method:** CLI
+- **path:** scripts/db-init.ts
+- **params:** --replace-empty
+- **file:** package.json
+- **description:** Only way to create the bot database; atomic build and rename
+
+## `CLI npm run check:vi-mock`
+
+- **method:** CLI
+- **path:** scripts/check-vi-mock-paths.ts
+- **params:** --root
+- **file:** package.json
+- **description:** CI gate: every vi.mock-family specifier must resolve to a real module

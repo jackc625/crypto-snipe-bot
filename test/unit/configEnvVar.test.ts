@@ -135,7 +135,10 @@ describe('STOP_LOSS_PCT integration with exitEngine', () => {
         // This proves the full chain: env var -> CONFIG -> exitConfig
     });
 
-    it('custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct', async () => {
+    // Own limit (orchestrator, phase 23 wave 13 gate, 2026-11-12): this test pays the cold import
+    // of src/exitEngine in its body. Measured 2.6 s in the full parallel run (53% of the 5 s unit
+    // testTimeout) and 0.8 s alone. Root fix is Phase 28 (deferred-items.md, cold-import class).
+    it('custom STOP_LOSS_PCT flows through to exitConfig.stopLossPct', { timeout: 20_000 }, async () => {
         setEnv('STOP_LOSS_PCT', '18');
         // Mock exitManager dependency needed by exitEngine
         vi.doMock('../../src/utils/exitManager', () => ({

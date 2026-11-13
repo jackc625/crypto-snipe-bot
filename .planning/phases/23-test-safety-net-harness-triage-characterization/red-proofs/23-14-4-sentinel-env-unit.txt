@@ -1,0 +1,48 @@
+RED proof 23-14-4
+Plan 23-14 (AC-13). Recorded 2026-11-12T01:41:54Z at HEAD 09479ec469a4696bc8699a06366cd6870fc4fe3e, Node v22.16.0.
+Neutralised file (working tree only, never committed): test/rails/core.cjs
+git blob before: 0d0c3cc630e26e481a46f0827973552638f6d40f (equals HEAD:test/rails/core.cjs)
+
+== Neutralising diff (git diff) ==
+medit: applied to test/rails/core.cjs
+diff --git a/test/rails/core.cjs b/test/rails/core.cjs
+index 0d0c3cc..5190beb 100644
+--- a/test/rails/core.cjs
++++ b/test/rails/core.cjs
+@@ -1245,7 +1245,7 @@ function applyEnv(st) {
+     }
+     for (const [k, v] of Object.entries(st.sentinels)) {
+         if (isEssentialKey(k)) throw new Error('SAFE-02 rails install failed: test/.env.test may not set ' + k);
+-        process.env[k] = v;
++        void v; // RED 23-14-4: sentinel values are NOT loaded into process.env (the scrub above still runs)
+     }
+     if (st.mode === 'fork') {
+         for (const k of FORK_SHELL_KEYS) {
+
+== RED command (only the named file) ==
+node node_modules/vitest/vitest.mjs run --project unit test/unit/rails/envSentinel.test.ts
+
+== RED result ==
+vitest exit 1
+     × module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel 5ms
+     × every .env.example key in process.env equals its test/.env.test value 5ms
+ FAIL   unit  test/unit/rails/envSentinel.test.ts > sentinel env (D-02, AC-13) > module-scope TELEGRAM_BOT_TOKEN equals the test/.env.test sentinel
+AssertionError: expected undefined to be 'TEST-SENTINEL' // Object.is equality
+- Expected:
++ Received:
+ FAIL   unit  test/unit/rails/envSentinel.test.ts > sentinel env (D-02, AC-13) > every .env.example key in process.env equals its test/.env.test value
+AssertionError: expected [ 'PRIVATE_KEY', …(145) ] to deeply equal []
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed (7)
+
+== Restore ==
+git -c core.autocrlf=false checkout -- test/rails/core.cjs
+git blob after restore: 0d0c3cc630e26e481a46f0827973552638f6d40f (IDENTICAL to HEAD)
+git status --porcelain -- src test vitest.config.ts: ''
+
+== GREEN rerun ==
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+vitest exit 0

@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { killProcessTree, readSentinels, REPO_ROOT, spawnRailedChild, spawnRailedChildAsync, type SpawnRailedOptions } from '../rails/spawnRailedChild';
 import { tryAcquireThenRelease } from '../../src/utils/processLock';
+import { loadRepoModules, modulesExporting, reachable } from '../helpers/sourceGraph';
 
 const TEST_TIMEOUT_MS = 120_000;
 const LONG_TEST_TIMEOUT_MS = 300_000;
@@ -110,6 +111,7 @@ afterEach(async () => {
 });
 
 describe('SAFE-04 single-instance process lock (real holder processes)', () => {
+    // closes-finding: AUD-TX-005 (rail test, RED proof row 25 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-2-lock-refusal.txt)
     it(
         'a second acquire for the same wallet is refused while the holder lives (AC-23a)',
         async () => {
@@ -234,13 +236,39 @@ describe('SAFE-04 single-instance process lock (real holder processes)', () => {
             expect(await after.exited).toBe(1);
             expect(after.find('REFUSED PROCESS_LOCK_HELD')).toBeDefined();
             expect(holder.alive).toBe(true);
-
-            const importRe = /(?:from\s+|require\(\s*)['"][^'"]*(?:processLock|\/main)['"]/;
-            for (const rel of ['scripts/preflight.ts', 'scripts/pause.ts', 'scripts/resume.ts', 'src/preflight.ts']) {
-                expect(importRe.test(fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8')), rel).toBe(false);
-            }
+            // Plan 23-31 (CHAR-06): this test also read four named files as text and matched their
+            // imports with a regex. That check is the next test, an import-graph check that names no
+            // file, kept separate so its RED proof does not start the lock children again.
         },
         LONG_TEST_TIMEOUT_MS,
+    );
+
+    // Plan 23-31 (CHAR-06): moved out of the AC-23d test above, where it read scripts/preflight.ts,
+    // pause.ts, resume.ts and src/preflight.ts as text. The commands are the files package.json's
+    // preflight, pause and resume scripts run, found in a directory walk of scripts/; the lock and
+    // the boot entry are the modules that export acquireProcessLock and runMain. Every module the
+    // commands reach through their imports, at any depth, is checked, src/preflight.ts included.
+    // ts.createProgram over the walk: 1.1 s alone; the 60 s limit the plan sets for a program.
+    it(
+        'preflight, pause and resume reach neither the process lock nor the boot entry through their imports (AC-23d)',
+        () => {
+            const mods = loadRepoModules(['src', 'scripts']);
+            const npmScripts = (JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as { scripts: Record<string, string> }).scripts;
+            const commands = ['preflight', 'pause', 'resume'].map((name) => {
+                const runs = [...mods.keys()].filter((file) => file.startsWith('scripts/') && (npmScripts[name] ?? '').split(/\s+/).includes(file));
+                expect(runs, `npm run ${name}: ${npmScripts[name]}`).toHaveLength(1);
+                return runs[0];
+            });
+            const forbidden = [...modulesExporting(mods, 'acquireProcessLock'), ...modulesExporting(mods, 'runMain')].map((m) => m.file);
+            expect(forbidden, 'the lock module and the boot entry are each found once').toHaveLength(2);
+
+            const reached = reachable(mods, commands);
+            // The walk resolves real imports: the preflight command reaches the preflight checks.
+            expect(modulesExporting(mods, 'preflightDryRun').every((m) => reached.has(m.file)), JSON.stringify([...reached.keys()])).toBe(true);
+            const hits = forbidden.filter((f) => reached.has(f)).map((f) => (reached.get(f) as string[]).join(' -> '));
+            expect(hits).toEqual([]);
+        },
+        60_000,
     );
 
     it(

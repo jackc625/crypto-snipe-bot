@@ -99,5 +99,11 @@
     "1d1991d"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 11, 12, 13 (22-09-2-version-probe.txt, 22-09-3-refuse-to-create.txt, 22-09-4-write-boundary.txt)",
-  "fix_scope": "Closes the newer-schema half only: a database at a higher version is refused with its bytes unchanged. The other half of the title, that every import of db.ts writes the database (the unconditional user_version write and the normalizeLegacyMainnetRows update), is not changed by the rail, so the status stays confirmed. Phase 24 decides whether import-time writes change."
+  "fix_scope": "Closes the newer-schema half only: a database at a higher version is refused with its bytes unchanged. The other half of the title, that every import of db.ts writes the database (the unconditional user_version write and the normalizeLegacyMainnetRows update), is not changed by the rail, so the status stays confirmed. Phase 24 decides whether import-time writes change.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Open half reproduced (AC-14, plan 23-13): every import of src/utils/db.ts writes the database. A railed child (VITEST unset, so the production branch runs; DB_PATH a temp file; a throwaway working folder) that only imports src/utils/db on an up-to-date WAL database built by the real migrations commits one write: PRAGMA data_version on the test's own held connection moves, a SHA-256 over the main file plus its -wal changes, and wal_checkpoint(PASSIVE) reports 1 WAL frame (claim import-writes-database, observed {committedWrite true, databaseBytesChanged true, walFrames 1}, correct {false, false, 0}). The write is the unconditional PRAGMA user_version = 7 at the end of migrateSchema (src/utils/dbSchema.ts); the normalizeLegacyMainnetRows UPDATE matches no row and commits nothing, and a pragmas-only control (the journal_mode, synchronous and busy_timeout pragmas db.ts issues, no migration) commits nothing. The main file alone does not change until a checkpoint (a child that exits without closeDb, beside a held connection, runs none), so a main-file hash would miss the write. The newer-schema half is closed by the 22-09 rail: 'AC-24 schema version guard > a v8 database (CURRENT+1) refuses and its bytes are unchanged' in test/integration/dbGuards.test.ts (RED proof row 11). Phase 24 reading: writing user_version only when it differs flips the claim to looks fixed (fix-shaped mutation of dbSchema.ts, src restored byte for byte).",
+    "test_id": "AUD-DB-006"
+  }
 }

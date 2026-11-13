@@ -317,7 +317,10 @@ describe('Phase 18 plan 18-10 — bot.ts V2 honeypot gate wiring (HONEY-07 + HON
         loggerErrorMock.mockReset();
     });
 
-    it('Test 1: V2 simulateHoneypotRoundtrip returns unsafe → *SKIP* alert sent + sendTxWithRetry NOT called', async () => {
+    // The first test in this file pays the cold import of the module under test inside its body,
+    // which runs against testTimeout, not hookTimeout. Measured on Node 22: 1.1 s alone, 10.6 s under the full parallel npm test (wave 6 gate),
+    // when several workers compile the same module graph at once. The explicit limit is headroom.
+    it('Test 1: V2 simulateHoneypotRoundtrip returns unsafe → *SKIP* alert sent + sendTxWithRetry NOT called', { timeout: 45_000 }, async () => {
         simulateHoneypotRoundtripMock.mockResolvedValue({
             verdict: 'unsafe',
             reason: 'BUY_BAL_ZERO',

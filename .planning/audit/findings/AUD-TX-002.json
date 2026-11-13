@@ -169,5 +169,11 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-09, AC-11, AC-12) with the real withNonceLock: a real base V3 snipe (route passthrough) sends its buy publicly and awaits tx.wait(3) with no timeout inside submitBuyTx's wallet lock; the node keeps the transaction out of every block (neverMine: the receipt is a valid null, the nonce never moves) while a block is mined every 12 s, and a later operation queued for the same wallet through the graph's own withNonceLock does not start within a 30-minute fake-time window of 150 blocks (claim passthrough-wait-holds-wallet-lock; a bounded observation, not forever). Control: mined with three confirmations, the lock is freed and the later operation starts. A bounded wait that settles the stuck nonce (a same-nonce cancel or replacement mined) before it releases the lock reads looks fixed; a timeout that only releases the lock reads the failure changed (tightened in the Phase 23 code-review fix run, CR-03). Sibling sites AUD-BUY-025 and AUD-EXIT-009 are asserted in the same file.",
+    "test_id": "AUD-TX-002"
+  }
 }

@@ -52,6 +52,10 @@ const ALLOWED_FILES = new Map<string, string>([
 // every spawn call in these files are still flagged.
 const COMPUTED_REQUIRE_FILES = new Map<string, string>([
     ['test/rails/probes/duplicateLoadProbe.cjs', 'the SAFE-03 probe has to load a guarded module through a casing or junction alias path computed at run time; it runs only as a railed child'],
+    [
+        'test/integration/fixtures/loadedModulesProbe.ts',
+        'plan 23-31 (CHAR-06): the load probe has to load the module a test found by the symbol it exports, a path computed at run time, to record which repo modules that load pulls in; it refuses any path outside src/ and scripts/ and runs only as a railed child',
+    ],
 ]);
 
 interface Offence {
@@ -164,6 +168,7 @@ function relPosix(file: string): string {
 }
 
 describe('spawn-site gate (SAFE-02 D-03)', () => {
+    // closes-finding: AUD-TESTI-011 (rail test, RED proof row 18 of red-proofs/INDEX.md; re-run by 23-14 as 23-14-6-spawn-gate.txt)
     it('no script under test/ loads a spawner or spawns, outside the allowed files', () => {
         const files = walkScripts(path.join(REPO_ROOT, 'test'));
         const scanned = files.map(relPosix);

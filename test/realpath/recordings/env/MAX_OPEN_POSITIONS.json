@@ -1,0 +1,71 @@
+{
+  "cases": {
+    "0": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_OPEN_POSITIONS": {
+                "details": "Open positions (10) at limit (0)"
+              },
+              "MAX_TOTAL_EXPOSURE": {
+                "details": "Open positions (1) at limit (0)",
+                "reason": "max_positions"
+              },
+              "SNIPE_COOLDOWN_MS": {
+                "details": "Open positions (0) at limit (0)",
+                "reason": "max_positions"
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_OPEN_POSITIONS": "0"
+      }
+    },
+    "abc": {
+      "changes": {
+        "risk": {
+          "value": {
+            "probes": {
+              "MAX_OPEN_POSITIONS": {
+                "allowed": true,
+                "details": {
+                  "$absent": true
+                },
+                "reason": {
+                  "$absent": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "env": {
+        "MAX_OPEN_POSITIONS": "abc"
+      }
+    },
+    "empty": {
+      "changes": {},
+      "env": {
+        "MAX_OPEN_POSITIONS": ""
+      }
+    },
+    "unset": {
+      "changes": {},
+      "env": {
+        "MAX_OPEN_POSITIONS": {
+          "$unset": true
+        }
+      }
+    },
+    "valid": {
+      "changes": {},
+      "env": {
+        "MAX_OPEN_POSITIONS": "10"
+      }
+    }
+  },
+  "variable": "MAX_OPEN_POSITIONS"
+}

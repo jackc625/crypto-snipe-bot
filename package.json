@@ -7,9 +7,10 @@
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/main.ts",
-    "test": "vitest run --project unit --project integration --reporter=verbose",
+    "test": "vitest run --project unit --project integration --project realpath --reporter=verbose",
     "test:unit": "vitest run --project unit --reporter=verbose",
     "test:integration": "vitest run --project integration --reporter=verbose",
+    "test:realpath": "vitest run --project realpath --reporter=verbose",
     "test:fork": "vitest run --project fork --reporter=verbose",
     "test:all": "vitest run --reporter=verbose",
     "test:coverage": "vitest run --coverage --project unit --project integration --reporter=verbose",
@@ -19,7 +20,12 @@
     "pause": "ts-node scripts/pause.ts",
     "resume": "ts-node scripts/resume.ts",
     "db:init": "ts-node scripts/db-init.ts",
-    "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts"
+    "check:vi-mock": "ts-node scripts/check-vi-mock-paths.ts",
+    "check:realpath-mocks": "ts-node scripts/check-realpath-mocks.ts",
+    "check:census": "ts-node scripts/check-signing-census.ts",
+    "check:commits": "ts-node scripts/check-commit-taxonomy.ts",
+    "check:recordings-compared": "ts-node scripts/check-recordings-compared.ts",
+    "recordings:update": "ts-node scripts/update-recordings.ts"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "1.0.0",

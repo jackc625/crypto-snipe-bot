@@ -1490,7 +1490,21 @@
       "hollow_assertions": "no",
       "can_reach_real_state": "no",
       "notes": "Helper smoke test; it also pins the helper schema at user_version 4 (AUD-TESTU-018)."
-    }
+    },
+    "re_audit": [
+      {
+        "from_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+        "to_sha": "b6c4de44594fb519f881e8c9dafb0262f651c2b3",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 23a6461 b6c4de4 -- test/unit/helpers.smoke.test.ts, the plan 23-03 AC-07 edit): createTestDb returns a working in-memory DB now expects user_version CURRENT_SCHEMA_VERSION (imported from src/utils/dbSchema) instead of 4, with its comment updated; title unchanged; RED proof 23-03-ac07-red.txt (expected 4 to be 7 against the old helper). No new finding."
+      },
+      {
+        "from_sha": "b6c4de44594fb519f881e8c9dafb0262f651c2b3",
+        "to_sha": "0ca1e011abc25785eaba3391ac169b2d479331fd",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff b6c4de4 0ca1e01 -- test/unit/helpers.smoke.test.ts): the closes-finding marker for AUD-TESTI-001 beside the AC-07 test (unchanged), and one new test, createMockExitStateRow has exactly the columns of the exit_state table the real migrations build (fixture keys equal PRAGMA table_info(exit_state) of a createTestDb database, and the row inserts and reads back equal), with its own marker; no existing test changed. RED proof 23-14-8. No new finding."
+      }
+    ]
   },
   {
     "path": "test/unit/honeypotDispatch.test.ts",
@@ -2206,6 +2220,12 @@
         "to_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
         "findings": "none",
         "note": "Reviewed: Each guarded module is refused on a second load through casing, junction and cache aliases, a whole-graph reset is allowed, and the normal boot shape loads once."
+      },
+      {
+        "from_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff f695363 3ee5205 -- test/unit/guards/singleton.test.ts): one comment line added, the closes-finding marker for AUD-TX-004; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2252,6 +2272,12 @@
         "to_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
         "findings": "none",
         "note": "Reviewed: runMain takes the real lock before starting the bot and refuses on lock failure, VITEST or a bad key without quoting it; readStartEnv reads into a private object; src/main.ts imports nothing stateful (AST)."
+      },
+      {
+        "from_sha": "53784789e2bd2b678afd124a20e2986c51eaee8b",
+        "to_sha": "fd154bd6488583331c02c80da51cfb4f9fd84dec",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 5378478 fd154bd -- test/unit/mainEntry.test.ts): tests (4), (5) and (6) no longer parse src files by name. The modules are found by the symbols they export in a directory walk of src/; (4) and the guard half of (6) load the module in a railed child (test/integration/fixtures/loadedModulesProbe.ts) and check which repo modules came with it; (5), the startBot placement of the bot require in (4) and the console half of (6) check the modules found by symbol. (4) renamed; its lock-before-start reading is carried by test (1) through the GUARD_MUTANTS row main-starts-before-lock. Tests (1), (2), (3) and the WR tests unchanged; 9 it() before and after. RED proof: group cli-entry (9 in-memory mutants)."
       }
     ]
   },
@@ -2274,6 +2300,12 @@
         "to_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
         "findings": "none",
         "note": "Reviewed: A railed child sees sentinels, full rails, VITEST and the denials; the fork entry keeps exactly the two shell keys; every spawn limit refuses before spawning."
+      },
+      {
+        "from_sha": "637c19cad549a53d491abb10ad88d03a636acac4",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 637c19c 53548e8 -- test/unit/rails/childRails.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2338,6 +2370,12 @@
           "AUD-TESTQ-036"
         ],
         "note": "Reviewed: the afterAll check now compares whether data/ exists with whether it existed when the file loaded, instead of requiring it to exist. No other case changed."
+      },
+      {
+        "from_sha": "ea193b8fb595ce3140c8cfd096b5fe921d96fde1",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff ea193b8 53548e8 -- test/unit/rails/dbTripwireSrc.test.ts): 2 comment lines added, the closes-finding markers for AUD-RAIL-002 and AUD-TESTU-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2360,6 +2398,12 @@
         "to_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
         "findings": "none",
         "note": "Reviewed: The five dotenv sites load no env file under VITEST, and without VITEST the read is attempted and blocked; the production path without VITEST still loads a fake .env and posts."
+      },
+      {
+        "from_sha": "be3c5725b64882bcf343e3b0dda89120c09b7eda",
+        "to_sha": "1018e793fd538ec344e613cf2b1e810dc2141d8c",
+        "findings": "none",
+        "note": "Reviewed by plan 23-19 (git diff be3c572 1018e79 -- test/unit/rails/dotenvSrcSkip.test.ts): case (e) only, the plan's authorized rail-test change. It no longer reads the five dotenv site files by name (CHAR-06); each site (src/config.ts and src/utils/notifier.ts through test/rails/probes/dotenvProbe.ts, scripts/pause.ts, scripts/resume.ts, scripts/preflight.ts) runs as a railed child with VITEST set and its own case ledger must show zero env-read-blocked entries after the child reached the site, at least one worker-start and no outside reach. Title renamed (rails-test-edits.json). Cases (a)-(d), (f), the ledgerRunId test, helpers and imports are unchanged; RED proofs group dotenv-gate (5 mutants, reach child)."
       }
     ]
   },
@@ -2404,6 +2448,12 @@
         "to_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
         "findings": "none",
         "note": "Reviewed: The rails install before the test file, the sentinel env is in force, a planted protected-root .env is unreadable through fs and dotenv, and the scrub list covers every env read in src/ and scripts/."
+      },
+      {
+        "from_sha": "069a30cfd29df9beedf5c2be86891c227cc6054b",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 069a30c 53548e8 -- test/unit/rails/envSentinel.test.ts): 2 comment lines added, the closes-finding markers for AUD-TESTU-001 and AUD-RAIL-002; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2474,6 +2524,12 @@
         "to_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
         "findings": "none",
         "note": "Reviewed: Fork files read only the shell and self-assigned values, and the main-process import closure of both Vitest configs loads no env file."
+      },
+      {
+        "from_sha": "2672559b27ecc172e43888ca744faf5fc3d4ead7",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff 2672559 3ee5205 -- test/unit/rails/forkShellOnly.test.ts): one comment line added, the closes-finding marker for AUD-RAIL-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2544,6 +2600,12 @@
         "to_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
         "findings": "none",
         "note": "Reviewed: A Telegram send under Vitest is a recorded refusal, axios is never called, the broadcast still runs, a refused send never rejects, and the missing-token path is unchanged."
+      },
+      {
+        "from_sha": "ccd1158eb71590b1835b46fff032dcbb6987f332",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff ccd1158 53548e8 -- test/unit/rails/notifierRefusal.test.ts): one comment line added, the closes-finding marker for AUD-TESTU-001; no test behavior, assertion or mock changed."
       }
     ]
   },
@@ -2570,6 +2632,18 @@
           "AUD-REAUDIT-003"
         ],
         "note": "Reviewed: No script under test/ loads a spawner or spawns outside the allowed files; the scanner flags planted forms; the computed-require allowance relaxes only a plain require."
+      },
+      {
+        "from_sha": "f69536366cd3fb92d0400a07c6a889ccbaf1154a",
+        "to_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff f695363 53548e8 -- test/unit/rails/spawnSites.test.ts): one comment line added, the closes-finding marker for AUD-TESTI-011; no test behavior, assertion or mock changed."
+      },
+      {
+        "from_sha": "53548e8d6c5db8ea453a191cf58b2570d62d0b19",
+        "to_sha": "bab91212a4b170a9533fe458a2f67d3bf3a63490",
+        "findings": "none",
+        "note": "Reviewed by plan 23-31 (git diff 53548e8 bab9121 -- test/unit/rails/spawnSites.test.ts): one entry added to COMPUTED_REQUIRE_FILES, test/integration/fixtures/loadedModulesProbe.ts with its reason, beside the SAFE-03 duplicate-load probe. Only a plain require of a computed path is relaxed for it; banned modules and spawn calls in it are still flagged, and the probe refuses any target that is not a .ts module under src/ or scripts/. No test, assertion or the AUD-TESTI-011 closes-finding marker changed."
       }
     ]
   },
@@ -2596,6 +2670,12 @@
           "AUD-REAUDIT-001"
         ],
         "note": "Reviewed: Real Vitest against a fake .env: no project of either real config exposes it, and a control without extends proves the fake file is readable."
+      },
+      {
+        "from_sha": "a08d65049696f32cd11e8c9a86360bcd962a4fe5",
+        "to_sha": "3ee5205384eba797ff99e3a118fb21415eca4ab7",
+        "findings": "none",
+        "note": "Reviewed by plan 23-14 (git diff a08d650 3ee5205 -- test/unit/rails/vitestEnvFile.test.ts): one comment line added, the closes-finding marker for AUD-RAIL-001; no test behavior, assertion or mock changed."
       }
     ]
   },

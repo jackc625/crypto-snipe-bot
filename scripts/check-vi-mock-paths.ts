@@ -35,6 +35,12 @@
 //
 // D-21: runs on Node 22.16.0 (ABI 127). The Phase 26 Node upgrade must update the assert below.
 // Zero new npm deps: Node built-ins plus the installed typescript package.
+//
+// Shared helpers (Phase 23 plan 23-02): collectViBindings, isViReceiver, mockMethodOf,
+// literalSpecifier, loadResolverOptions and resolveSpecifier are exported so the real-path
+// mock-list gate (scripts/check-realpath-mocks.ts) finds and resolves mocks exactly as this gate
+// does, and the two cannot drift apart. Importing this module runs no check: main() runs only
+// when the file is executed directly (require.main === module).
 
 if (process.versions.modules !== '127') {
     console.error(
@@ -75,12 +81,12 @@ const DECLARATION_TO_RUNTIME: ReadonlyArray<readonly [string, string]> = [
     ['.d.cts', '.cjs'],
 ];
 
-interface ResolverOptions {
+export interface ResolverOptions {
     project: ts.CompilerOptions;
     bundler: ts.CompilerOptions;
 }
 
-function loadResolverOptions(): ResolverOptions {
+export function loadResolverOptions(): ResolverOptions {
     const configPath = path.join(REPO_ROOT, 'tsconfig.json');
     const read = ts.readConfigFile(configPath, ts.sys.readFile);
     if (read.error !== undefined) {
@@ -116,31 +122,40 @@ function isRuntimeTarget(resolved: string): boolean {
     return true;
 }
 
-function resolves(specifier: string, containingFile: string, options: ResolverOptions): boolean {
-    if (isBuiltin(specifier)) return true;
+/**
+ * The file `specifier` loads from `containingFile` (absolute path as the resolver returned it), or
+ * `node:<name>` for a Node built-in, or undefined when nothing real would be loaded.
+ */
+export function resolveSpecifier(specifier: string, containingFile: string, options: ResolverOptions): string | undefined {
+    if (isBuiltin(specifier)) return specifier.startsWith('node:') ? specifier : `node:${specifier}`;
     for (const compilerOptions of [options.project, options.bundler]) {
         const found = ts.resolveModuleName(specifier, containingFile, compilerOptions, ts.sys).resolvedModule;
-        if (found !== undefined && isRuntimeTarget(found.resolvedFileName)) return true;
+        if (found !== undefined && isRuntimeTarget(found.resolvedFileName)) return found.resolvedFileName;
     }
     try {
-        return isRuntimeTarget(createRequire(containingFile).resolve(specifier));
+        const required = createRequire(containingFile).resolve(specifier);
+        return isRuntimeTarget(required) ? required : undefined;
     } catch {
-        return false;
+        return undefined;
     }
+}
+
+function resolves(specifier: string, containingFile: string, options: ResolverOptions): boolean {
+    return resolveSpecifier(specifier, containingFile, options) !== undefined;
 }
 
 function isRelativeSpecifier(specifier: string): boolean {
     return specifier.startsWith('.') || path.isAbsolute(specifier);
 }
 
-interface ViBindings {
+export interface ViBindings {
     /** Local names bound directly to the vi object. */
     direct: Set<string>;
     /** Local names bound to the whole vitest namespace. */
     namespaces: Set<string>;
 }
 
-function collectViBindings(sf: ts.SourceFile): ViBindings {
+export function collectViBindings(sf: ts.SourceFile): ViBindings {
     const direct = new Set<string>();
     const namespaces = new Set<string>();
     for (const statement of sf.statements) {
@@ -161,7 +176,7 @@ function collectViBindings(sf: ts.SourceFile): ViBindings {
     return { direct, namespaces };
 }
 
-function isViReceiver(node: ts.Expression, bindings: ViBindings): boolean {
+export function isViReceiver(node: ts.Expression, bindings: ViBindings): boolean {
     if (ts.isIdentifier(node)) return bindings.direct.has(node.text);
     if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
         return bindings.namespaces.has(node.expression.text) && VI_EXPORTS.has(node.name.text);
@@ -170,7 +185,7 @@ function isViReceiver(node: ts.Expression, bindings: ViBindings): boolean {
 }
 
 /** vi.mock and vi['mock'] both name the method; a computed name does not. */
-function mockMethodOf(callee: ts.Expression, bindings: ViBindings): string | undefined {
+export function mockMethodOf(callee: ts.Expression, bindings: ViBindings): string | undefined {
     if (ts.isPropertyAccessExpression(callee) && isViReceiver(callee.expression, bindings)) {
         return MOCK_METHODS.has(callee.name.text) ? callee.name.text : undefined;
     }
@@ -191,7 +206,7 @@ function unwrapParens(node: ts.Expression): ts.Expression {
 }
 
 /** The literal text of a mock's first argument, or undefined when it is not a literal. */
-function literalSpecifier(argument: ts.Expression | undefined): string | undefined {
+export function literalSpecifier(argument: ts.Expression | undefined): string | undefined {
     if (argument === undefined) return undefined;
     const node = unwrapParens(argument);
     if (ts.isStringLiteralLike(node)) return node.text;

@@ -17,16 +17,28 @@
 //   * Test 2 + Test 3 (unit-level exit-code semantics): static-import the
 //     scripts/preflight.ts code path via a mocked preflightDryRun and verify
 //     the exit-code branch logic — this is deterministic and fast.
-//   * Static-source assertion: scripts/preflight.ts must not contain any
-//     `import` of `bot` or call to `startMultiChainBot` (the structural
-//     OPS-LIVE-10 invariant).
+//   * Load invariant (plan 23-31, CHAR-06): a real run of the CLI in a railed child, whose
+//     require.cache is recorded at exit by test/integration/fixtures/loadedModulesProbe.ts,
+//     never contains the module that exports startMultiChainBot (the structural OPS-LIVE-10
+//     invariant). The module is found by the symbol it exports, not by its file name, and no
+//     source file is read as text.
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawnRailedChild, type CliResult } from '../rails/spawnRailedChild';
 
-const repoRoot = path.resolve(__dirname, '..', '..');
+const PROBE = 'test/integration/fixtures/loadedModulesProbe.ts';
+const tempDirs: string[] = [];
+
+afterEach(() => {
+    for (const d of tempDirs.splice(0)) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+});
+
+interface LoadRecord {
+    loaded: { file: string; exports: string[] }[];
+}
 
 function runPreflight(extraEnv: Record<string, string> = {}): CliResult {
     return spawnRailedChild('npx', ['ts-node', 'scripts/preflight.ts'], { envOverrides: extraEnv });
@@ -101,18 +113,25 @@ describe('npm run preflight CLI (OPS-LIVE-10)', { timeout: 150_000 }, () => {
         expect(failCombined).not.toMatch(/Starting multi-chain bot|Multi-chain bot fully started/);
     });
 
-    it('Static OPS-LIVE-10 invariant: scripts/preflight.ts does not import bot.ts / invoke startMultiChainBot', () => {
-        const src = fs.readFileSync(path.join(repoRoot, 'scripts', 'preflight.ts'), 'utf8');
+    // Plan 23-31 (CHAR-06): this test was "Static OPS-LIVE-10 invariant: scripts/preflight.ts does
+    // not import bot.ts / invoke startMultiChainBot", a read of the script's text. The bot can only
+    // start through startMultiChainBot, which exists only once its module is loaded, so a run that
+    // never loads that module can never start the bot, whichever file the module lives in.
+    it('OPS-LIVE-10 invariant: a real run of scripts/preflight.ts never loads the module that exports startMultiChainBot', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csb-preflight-load-'));
+        tempDirs.push(dir);
+        const out = path.join(dir, 'loaded.json');
+        const r = spawnRailedChild(process.execPath, ['-r', 'ts-node/register/transpile-only', PROBE, out, 'scripts/preflight.ts', '--run'], { timeoutMs: 110_000 });
+        const output = r.stdout + r.stderr;
 
-        // No import of bot module.
-        expect(src).not.toMatch(/from\s+['"]\.\.\/src\/bot['"]/);
-        expect(src).not.toMatch(/require\(\s*['"]\.\.\/src\/bot['"]\s*\)/);
-        // No invocation of startMultiChainBot (allow mentions in comments —
-        // strip them before grepping). Match only a call site or import.
-        const srcNoComments = src
-            .replace(/\/\/[^\n]*/g, '')        // line comments
-            .replace(/\/\*[\s\S]*?\*\//g, ''); // block comments
-        expect(srcNoComments).not.toMatch(/startMultiChainBot\s*\(/);
-        expect(srcNoComments).not.toMatch(/import[^;]*startMultiChainBot/);
+        // The CLI ran to its own end: 0 all-pass or 1 a FATAL check, never 2 (a crash) or null.
+        expect(r.status, output).not.toBeNull();
+        expect(r.status, output).toBeLessThan(2);
+        expect(fs.existsSync(out), `no load record was written: ${output}`).toBe(true);
+        const record = JSON.parse(fs.readFileSync(out, 'utf8')) as LoadRecord;
+        // The record covers the real run: the preflight checks themselves were loaded ...
+        expect(record.loaded.some((m) => m.exports.includes('preflightDryRun')), JSON.stringify(record.loaded.map((m) => m.file))).toBe(true);
+        // ... and nothing that can start the bot was.
+        expect(record.loaded.filter((m) => m.exports.includes('startMultiChainBot')).map((m) => m.file)).toEqual([]);
     });
 });

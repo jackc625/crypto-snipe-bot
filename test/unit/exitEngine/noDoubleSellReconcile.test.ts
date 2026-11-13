@@ -291,7 +291,10 @@ beforeEach(() => {
 // -----------------------------------------------------------------------------
 
 describe('Phase 21.2 / CR-02 — the no-double-sell guard reconciles the BROADCAST hash (REAL path)', () => {
-    it('the hash passed to reconcileInclusion EQUALS the strategy-broadcast hash H (not a throwaway pre-sign)', async () => {
+    // Own limit (orchestrator, phase 23 wave 13 gate, 2026-11-12): this first test pays the cold
+    // import of src/exitEngine in its body. Measured 3.1 s in the full parallel run (62% of the
+    // 5 s unit testTimeout) and 0.6 s alone. Root fix is Phase 28 (deferred-items.md, cold-import class).
+    it('the hash passed to reconcileInclusion EQUALS the strategy-broadcast hash H (not a throwaway pre-sign)', { timeout: 20_000 }, async () => {
         const { executeFullSell } = await import('../../../src/exitEngine');
 
         await executeFullSell(

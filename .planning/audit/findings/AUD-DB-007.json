@@ -54,7 +54,7 @@
     }
   ],
   "sibling_sites_checked": "Other cwd-relative state in the slice: migrateJsonState reads cwd/.bot-state.json (db.ts:242, AUD-DB-019). Any process importing db.ts from another cwd creates its own data/bot.db there (preflight, pause, resume scripts, the dashboard via bot.ts). The 22-09 rail anchors DB_PATH to the repo root (nearest package.json named crypto-snipe-bot) and refuses to create a database outside Vitest except through npm run db:init (D-08); 22-29 re-audits that diff.",
-  "status": "confirmed",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [],
   "research_suggested_severity": null,
@@ -69,5 +69,12 @@
     "mitigation-planned-22-09"
   ],
   "od_ref": null,
-  "recommendation": "Mitigated by the planned 22-09 rail (repo-root anchoring of DB_PATH, refuse-to-create outside Vitest, explicit npm run db:init). 22-29 re-audits the db.ts diff; also change the .env.example line to an absolute path or remove it (D-ENV-EXAMPLE)."
+  "recommendation": "Mitigated by the planned 22-09 rail (repo-root anchoring of DB_PATH, refuse-to-create outside Vitest, explicit npm run db:init). 22-29 re-audits the db.ts diff; also change the .env.example line to an absolute path or remove it (D-ENV-EXAMPLE).",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "Re-measured on the real src/utils/db.ts outside Vitest (railed children) from another working folder with a relative DB_PATH (AUD-DB-007.test.ts): it opens the repo-anchored operator database (paused, one open buy), refuses a missing one with DB_REFUSED_MISSING naming the anchored absolute path, creates nothing anywhere, and an unset or ./data/bot.db DB_PATH resolves to <repo root>/data/bot.db; nothing of the finding remains; the cwd .bot-state.json import stays its own finding AUD-DB-019",
+    "proof": "Rail test AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing (test/integration/dbGuards.test.ts, marker closes-finding: AUD-DB-007), RED proof row 12 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-09-3-refuse-to-create.txt: the refusal branches of src/utils/dbPath.ts removed); the working-directory half is the repo-root anchoring (findRepoRoot, rail test AC-25 repo-root anchoring from another directory); re-measured by test/realpath/triage/AUD-DB-007.test.ts, whose three tests fail with either half of the rail removed (a cwd-relative resolveDbPath; the missing and empty refusals plus fileMustExist removed), src restored byte for byte",
+    "rail_test": "AC-26 refuse-to-create outside Vitest > a missing path refuses, names the absolute path and creates nothing"
+  }
 }

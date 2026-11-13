@@ -73,5 +73,11 @@
   "sibling_sites_checked": "All probe sources: startExitMonitor via bot.ts:422 (buy amount) and :1483 (snipeAmount), resume via bot.ts:1948/:1955 (snipeAmount), re-arm via exitEngine.ts:731 (snipeAmount). For snipes the entry probe is the snipe amount at buy time, so only a changed <PREFIX>_SNIPE_AMOUNT between runs breaks them; for a deliberate buy any amount other than the snipe amount breaks the first resume or re-arm.",
   "status": "confirmed",
   "severity_rationale": "S1. Proven by the code: the probe that produced the stored baseline is not the probe used afterwards. Plausible condition: a deliberate buy of 0.05 on a chain whose snipe amount is 0.01, then a restart or one failed exit. The output then falls to about a fifth, priceMultiple about 0.2, and stop-loss fires at once: an unwanted market sell with no output floor on the private leg (AUD-EXIT-001). The other direction (larger probe) activates trailing at once, disables stop-loss and fires every partial tier. The re-arm path makes this reachable without a restart, right after a failed anti-rug exit.",
-  "recommendation": "Persist the probe definition with the entry price (or switch to a probe-independent price, card EXIT-02) and always re-quote with the persisted probe. Phase 24 together with RC-08."
+  "recommendation": "Persist the probe definition with the entry price (or switch to a probe-independent price, card EXIT-02) and always re-quote with the persisted probe. Phase 24 together with RC-08.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-07): a real ETH V2 snipe at ETH_SNIPE_AMOUNT 0.01 on a temp-file database, restartGraph with 0.002; the stored exit_state row is on the new connection and exit.monitor.resumed is logged, then the resumed monitor probes 0.002 (decoded from the getAmountsOut data) against the 0.01 entry and, with the pool unchanged, the stop-loss fires at 0.20x on the first tick and sells the whole position with no output floor. Reusing the stored buy amount reads looks fixed for both claims. The larger-probe direction, the deliberate buy and the failed-exit re-arm stay code-read.",
+    "test_id": "AUD-EXIT-015"
+  }
 }

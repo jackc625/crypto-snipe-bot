@@ -96,7 +96,7 @@
     }
   ],
   "sibling_sites_checked": "Every schema copy in the TESTI slice at the base SHA (grep CREATE TABLE, user_version, ALTER TABLE over the snapshot): test/helpers/testDb.ts (v4, two tables) and test/integration/pauseFlow.test.ts:31-136 (v6 replica) are the only two; no fork test builds a schema (the fork tests that touch the DB import src/utils/db with a temp DB_PATH, see Task 2 rows). Fixture rows shaped like DB rows: exitEngine.fixtures.ts createMockExitStateRow (pre-v7), api.fixtures.ts createMockTradeRow (trades subset, no status-failed or exit_state join). The unit-side copies (db.test.ts SQL copies, db/*Migration.test.ts replicas, the v4 pins) are TESTU scope and registered as AUD-TESTU-017/-018/-019.",
-  "status": "confirmed",
+  "status": "fixed",
   "origin": "research-candidate",
   "rc": [
     "RC-28"
@@ -164,5 +164,12 @@
       ],
       "status": "confirmed"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "Sub-claims 1 and 2 fixed by this phase's CHAR-05 helper swap (23-03, b6c4de4: createTestDb built by the real migrations, so a failed-held exit and a pause row can be expressed); sub-claims 3 and 4 fixed by 23-14 (0ca1e01) under the operator ruling Fix now (Recommended) on the 23-14 checkpoint: the pauseFlow hand-built v6 schema copy is deleted and its Tests 1-4 run the real pause statements on the real migrations, and createMockExitStateRow has the version 7 shape pinned to the migrated table; a revert of pauseFlow.test.ts to a hand-built copy is caught by no test (a test cannot guard its own text), only by review, since any later edit needs a reviewed re_audit row (check.ts --stage final); the unit-test migration replicas are the separate entry AUD-TESTU-019, left open for Phase 28 and not touched here; status confirmed -> fixed",
+    "proof": "Rail test helpers smoke test > createTestDb returns a working in-memory DB (test/unit/helpers.smoke.test.ts, marker closes-finding: AUD-TESTI-001; AC-07: createTestDb is built by the real migrateSchema and returns CURRENT_SCHEMA_VERSION), RED proof .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-03-ac07-red.txt (expected 4 to be 7 against the old hand-written helper, plan 23-03); sub-claim 3: pauseFlow Tests 1-4 (test/integration/pauseFlow.test.ts, marker beside the describe) run the real src/utils/db setPauseState, getPauseState and clearPauseState on a temp file the real module opens and migrates, RED proof .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-7-pauseflow-real-statements.txt (the entry's escaped regression, deleting the version 6 pause-row insert from src/utils/dbSchema.ts, fails Tests 1-4; a setPauseState aimed at id 2 fails Tests 1-3; the old hand-built file stays 9/9 green under both; src restored byte for byte); sub-claim 4: the marked test helpers smoke test > createMockExitStateRow has exactly the columns of the exit_state table the real migrations build, RED proof .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-8-exit-state-fixture-shape.txt (restoring the pre-v7 fixture shape fails it, and so does a migration that adds an exit_state column; exitEngine.test.ts passes 33/33 either way, so none of its tests read the new columns); the migrated shape itself (pause_state CHECK(id = 1) and its default row, the version 7 exit_state columns) is pinned by test/realpath/migrations/migrations.golden.test.ts AC-04, AC-05 and AC-06 against fixtures/schema-v7.json (plan 23-03)",
+    "rail_test": "helpers smoke test > createTestDb returns a working in-memory DB"
+  }
 }

@@ -150,5 +150,11 @@
       ],
       "outcome": "the same collision as above, with the script having reported that the bot was not running (check-then-act window); holding acquireProcessLock for the whole run closes it"
     }
-  ]
+  ],
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Proven statically (plan 23-13): the directory walk of scripts/ goes to ts.createProgram; signing points are identified as the census identifies them (its type predicates copied; the 12 script sites match signing-sites-head.json) plus calls into another program file that may reach a site (deliberate-buy signs through executeDeliberateBuy in src/bot.ts in its own process), and each signing script is classified by lock lifetime with the type checker: holds-lock only when acquireProcessLock is unconditionally reached before every signing point with no release between, status-query-only for tryAcquireThenRelease (it releases before returning, src/utils/processLock.ts:204), none otherwise, plus whether getPauseState.get() is read before signing. Observed: addLiquidity, deliberate-buy, deploySepoliaTest and recover-sell-ladys are all {lock none, pauseRead false} (claim signing-scripts-outside-process-lock; the legacy two are expected only while their files exist, so AUD-SCRIPTS-001's fix flips only its own test); correct: every signing script holds-lock with a pause read. The classifier is proven both ways on 14 temp-directory cases. Phase 29 reading (card SCRIPTS-01 with BUY-01, HYG-03; open, operator 'Acknowledge. Decide in phase 29'): the hold-lock fix (acquireProcessLock for the whole run, pause read while holding it, in every signing script) flips the claim to looks fixed; a tryAcquireThenRelease query alone reads the failure changed, never fixed (both shown by fix-shaped mutations of scripts/, restored from git). Feeds the census exception list in plan 23-17 (its 12 script sites); card SCRIPTS-01 stays open.",
+    "test_id": "AUD-SCRIPTS-002"
+  }
 }

@@ -3,6 +3,7 @@
     "path": "src/exitEngine.ts",
     "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
     "findings": [
+      "AUD-BUY-039",
       "AUD-EXIT-001",
       "AUD-EXIT-002",
       "AUD-EXIT-003",
@@ -27,7 +28,8 @@
       "AUD-EXIT-023",
       "AUD-EXIT-024",
       "AUD-EXIT-025",
-      "AUD-EXIT-026"
+      "AUD-EXIT-026",
+      "AUD-EXIT-027"
     ],
     "re_audit": [
       {

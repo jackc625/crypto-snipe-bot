@@ -76,5 +76,11 @@
     "claude (22-26 executor)"
   ],
   "found_date": "2026-11-06",
-  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820"
+  "audited_sha": "23a64617dca167976adc4645fed0e2c69e384820",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-13): the real simulateSell from the graph's own tokenSafety module, called on the fake ETH chain (CONFIG.routerAddress is the scenario's Uniswap V2 router) for a wallet that really holds the token (a real ERC-20 transfer from another holder, mined), signs and sends one public approve(router, the whole held balance) to the token, with the wallet's next nonce, while the test holds the wallet's own lock through the graph's real withNonceLock (claim simulate-sell-signs-approve-outside-nonce-lock, observed one signed approve and signedWhileNonceLockHeld 1, correct nothing signed and 0; bounded 60 s fake-time window). The router answers the swap's eth_call as the real router does while the approve is still pending (TransferHelper: TRANSFER_FROM_FAILED), so simulateSell logs 'Sell simulation failed' and returns false: even as a check it reports a sellable token unsellable. Nothing calls it today (still imported into src/bot.ts), so the harm is the re-wiring trap ESC-CENSUS-01 kept S1 for. Phase 24/29 reading: deleting simulateSell and its bot.ts import, the recommendation, flips the claim to looks fixed (the test records a module without the function as signing nothing); wrapping the approve in withNonceLock reads the failure changed, not fixed (both shown by fix-shaped src mutations, restored byte for byte). Feeds the census exception list in plan 23-17 (its one src exception, tokenSafety simulateSell contract.approve).",
+    "test_id": "AUD-BUY-007"
+  }
 }

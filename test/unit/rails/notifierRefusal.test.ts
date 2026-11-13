@@ -73,6 +73,7 @@ function refusalFromWarn(): { code?: unknown; message?: unknown } {
 }
 
 describe('notifier refusal under Vitest (SAFE-02 src layer, D-04 amended)', () => {
+    // closes-finding: AUD-TESTU-001 (rail test for its Telegram reach, RED proof row 14 of red-proofs/INDEX.md)
     it('sendTelegramAlert is refused through its catch path: no post, broadcast runs, ledger entry', async () => {
         const before = refusals();
 

@@ -91,5 +91,12 @@
     "b3617f6"
   ],
   "red_proof": ".planning/phases/22-safety-rails-audit/red-proofs/INDEX.md rows 22, 23 (22-12-1-singleton-guard.txt, 22-12-2-singleton-epoch.txt)",
-  "status_note": "The re-audit reviewed src/guards/singleton.ts and all four registrations in full: the guard throws before the guarded state exists, and casing, junction and cache aliases converge on one registry entry. Moved to fixed on that evidence; the Phase 26 ESM conversion must re-check it (AUD-REAUDIT-002)."
+  "status_note": "The re-audit reviewed src/guards/singleton.ts and all four registrations in full: the guard throws before the guarded state exists, and casing, junction and cache aliases converge on one registry entry. Moved to fixed on that evidence; the Phase 26 ESM conversion must re-check it (AUD-REAUDIT-002).",
+  "triage": {
+    "outcome": "fixed",
+    "phase": "23",
+    "note": "The duplicate-load guard (src/guards/singleton.ts, registered by nonceAuthority, exitManager, exitEngine and anti-rug/detector) throws SINGLETON_DUPLICATE before a second copy's state exists, so a require.cache reload, casing alias or junction alias of the nonce authority cannot give the wallet a second, independent lock; the named rail test proves it on the reload path, which every platform has, and fails with the guard removed; sub-claim 2 (a duplicate load in today's production import graph) stays a candidate the guard makes harmless; the Phase 26 ESM conversion must re-check the guard (AUD-REAUDIT-002)",
+    "proof": "Rail test duplicate-load guard: 'nonceAuthority' > plain Node: delete require.cache and reload is refused (test/unit/guards/singleton.test.ts, marker closes-finding: AUD-TX-004); RED proof rows 22 and 23 of .planning/phases/22-safety-rails-audit/red-proofs/INDEX.md (22-12-1-singleton-guard.txt, 22-12-2-singleton-epoch.txt); row 22 re-run on 2026-11-11 by 23-14 because the test file changed after that proof (f695363): .planning/phases/23-test-safety-net-harness-triage-characterization/red-proofs/23-14-1-singleton-guard.txt, with registerSingleton returning at once the same 16 of 29 tests fail as in 22-12-1, the named test among them, and src/guards/singleton.ts was restored byte for byte (git blob identical to HEAD)",
+    "rail_test": "duplicate-load guard: 'nonceAuthority' > plain Node: delete require.cache and reload is refused"
+  }
 }

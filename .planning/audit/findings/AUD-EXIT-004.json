@@ -89,5 +89,11 @@
   "sibling_sites_checked": "All five approve sites in the slice (:421 via :871/:874/:1509/:1512, and :544). The public fallback swap (:553-555) is also sent with ethers default fees and no ceiling or anti-rug gas multiplier (the multiplier at :862 is passed only to the private leg, :909). Because each approve is exactly the amount sold, a completed sell leaves allowance 0 and the next exit approves again. The buy-side dead simulateSell approve is AUD-BUY-007.",
   "status": "confirmed",
   "severity_rationale": "S2, equal to the research suggestion. Proven: approvals are public, uncapped and per-exit. The capital effect is indirect and bounded: a public approve signals an imminent sell (another holder can sell first), costs gas outside the ceiling, and adds a mined public tx before every first exit, including anti-rug exits, whose private sell cannot start until the approve is mined (the wait has no timeout, AUD-EXIT-009).",
-  "recommendation": "Decide on card EXIT-03: approve at buy time (bounded or max allowance to the one router used), or bundle the approve with the private sell, and apply the sell fee ceiling to approvals and the public fallback. Phase 24."
+  "recommendation": "Decide on card EXIT-03: approve at buy time (bounded or max allowance to the one router used), or bundle the approve with the private sell, and apply the sell fee ceiling to approvals and the public fallback. Phase 24.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Reproduced on the real path (plan 23-07), ETH V2 with PARTIAL_SELL_TARGETS 2x:25 and a 50 gwei node priority suggestion: before the private take-profit sell the bot sent an exact-amount approve to the router through the public mempool at ethers' default fees (50 gwei priority, 70 gwei max fee, above the 25 gwei sell ceiling) and waited for it to be mined; the later trailing-stop exit needed a second public approve for the rest. Claims approve-sent-public-before-private-sell, approve-fees-outside-sell-ceiling and second-exit-needs-new-public-approve each read looks fixed under their own fix shape (approve once at buy time, ceiling on the approve, one max approve).",
+    "test_id": "AUD-EXIT-004"
+  }
 }

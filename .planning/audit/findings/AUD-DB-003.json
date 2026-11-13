@@ -75,5 +75,11 @@
     "capital"
   ],
   "od_ref": "OD-58",
-  "recommendation": "Count a position as open from its exit lifecycle (pending buy, or exit_state row present, including exit_failed_held) rather than from trades.status, in every risk query; keep the operator-visible 'failed' label separately. Card DB-01. Phase 24; nothing is changed in Phase 22."
+  "recommendation": "Count a position as open from its exit lifecycle (pending buy, or exit_state row present, including exit_failed_held) rather than from trades.status, in every risk query; keep the operator-visible 'failed' label separately. Card DB-01. Phase 24; nothing is changed in Phase 22.",
+  "triage": {
+    "outcome": "confirmed",
+    "phase": "23",
+    "note": "Real path (AUD-DB-003.test.ts): a real ETH V2 position whose real stop-loss exit fails (private attempts miss, the public fallback swap refused at gas estimation with TRANSFER_FROM_FAILED) is marked trades.status failed and exit_status exit_failed_held with every token still held; after a reload on the same temp database the real canSnipe allows the next snipe under MAX_OPEN_POSITIONS 1 (failed-held-not-counted-open) and under a 0.015 ETH exposure cap (failed-held-not-counted-in-exposure), while getResumeExitMonitorTrades still counts it open; the unrealized daily-loss half stays code-read (card DB-01)",
+    "test_id": "AUD-DB-003"
+  }
 }
