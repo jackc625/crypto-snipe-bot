@@ -39,7 +39,7 @@ import { harnessState } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepUntilTrue } from '../harness/world';
-import { afterExitPoll, driveFor, exitFiredSince, liveGates, liveOverrides } from './fixtures/AUD-ANTIRUG-003-live';
+import { afterExitPoll, driveFor, exitFiredSince, liveGates, liveOverrides, noExitInFlight } from './fixtures/AUD-ANTIRUG-003-live';
 import { heldPosition, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
 import { buyRow, opEntries, opLogged } from './fixtures/AUD-EXIT-002-position';
 import { pullLiquidity } from './fixtures/AUD-EXIT-014-rug';
@@ -58,7 +58,7 @@ describe('AUD-ANTIRUG-004: a failed anti-rug escape is not retried', () => {
         const fromLog = recordedLogs().length;
         const fromBroadcast = harnessState().broadcasts.length;
         const fromSubmit = node.submitted.length;
-        node.failNext('eth_sendRawTransaction', {
+        const refusal = node.failNext('eth_sendRawTransaction', {
             after: () => opLogged('antirug.exit.dispatch', fromLog),
             error: { code: -32000, message: 'transaction underpriced' },
         });
@@ -69,8 +69,11 @@ describe('AUD-ANTIRUG-004: a failed anti-rug escape is not retried', () => {
         node.mine({ include: [] });
         await stepUntilTrue(() => opLogged('antirug.exit.dispatch', fromLog), { what: 'the anti-rug exit being dispatched', maxSteps: 2_000 });
         const firstDispatches = (): number => opEntries('antirug.exit.dispatch', fromLog).length;
-        // Every dispatch of this removal returns (the first after its refused approval).
-        await stepUntilTrue(() => firstDispatches() > 0 && exitFiredSince(fromBroadcast, pos.tradeId).length === firstDispatches(), { what: 'the anti-rug exits returning', maxSteps: 2_000 });
+        // The escape returned after its refused approval: the refusal fired, an exit-fired broadcast
+        // came, and no exit of the token is in flight. An outcome wait, never a count match of
+        // broadcasts to dispatch logs, so the AUD-ANTIRUG-003 fix (an in-flight duplicate returns
+        // early without a broadcast) does not stall this setup (review WR-09).
+        await stepUntilTrue(() => refusal.fired >= 1 && exitFiredSince(fromBroadcast, pos.tradeId).length >= 1 && noExitInFlight(sc), { what: 'the anti-rug escape returning after its refused approval', maxSteps: 2_000 });
         const dispatchesOfTheRug = firstDispatches();
         expect(exitFiredSince(fromBroadcast, pos.tradeId).every((f) => f.success === false)).toBe(true);
         // The escape failed on a still-held position (no sell was sent).

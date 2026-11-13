@@ -19,6 +19,11 @@
 // - afterExitPoll: step until the exit monitor sends its next exit quote, so a test acts right after
 //   a poll and the routine stop-loss cannot take part within the next poll interval (5 s).
 // - exitFiredSince: the antirug_state_update { state: 'exit-fired', success } broadcasts of a trade.
+// - noExitInFlight: no exit of the scenario token holds the token's real sell lock (src/utils/
+//   exitManager tryAcquireSellLock answers true, and the lock is released at once). An outcome every
+//   fix shape reaches once its exits have returned, so a wait on it never depends on how many
+//   dispatches were logged or broadcast (review WR-09: a dedupe that returns early for an in-flight
+//   duplicate logs a dispatch but broadcasts nothing).
 // - driveFor: drive the chain the way the network would, by the same rules as
 //   fixtures/AUD-API-001-dashboard-sell.ts driveChain (a public transaction of the wallet is mined
 //   in the next block; a bundle transaction lands one 12 s slot after it was first seen, at a block
@@ -72,6 +77,13 @@ export function exitFiredSince(from: number, tradeId: number): ExitFired[] {
         .filter((b) => b.type === 'antirug_state_update')
         .map((b) => b.data as ExitFired)
         .filter((d) => d.state === 'exit-fired' && d.tradeId === tradeId);
+}
+
+/** See the file header. Synchronous: the acquire and the release run with nothing in between. */
+export function noExitInFlight(sc: Scenario): boolean {
+    const free = sc.graph.exitManager.tryAcquireSellLock(sc.ctx.chain.name, sc.token);
+    if (free) sc.graph.exitManager.releaseSellLock(sc.ctx.chain.name, sc.token);
+    return free;
 }
 
 /** See the file header. Returns whether until() held before the window ended. */
