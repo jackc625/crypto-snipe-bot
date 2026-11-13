@@ -23,7 +23,12 @@
 // What is measured: how many buys of the token landed. Correct: one (card BUY-03: claim the token
 // synchronously before the first await and re-check inside the lock). Today: two. A fix-shaped
 // src mutation (an in-process claim set checked and set before the first await) reads "looks
-// fixed" (D-08), src restored byte for byte. After the marker: the two submitted transactions,
+// fixed" (D-08), src restored byte for byte. The drive ends when the second handler has returned
+// and at least one buy finished (review WR-12), not when every handler that logged "New pair
+// detected" finished a buy: a fix that refuses the second handler after that log (a re-check of the
+// token inside the wallet lock, a risk reservation at canSnipe, or a claim set placed after the
+// log) logs neither a submitted bundle nor a fail-clean, and must read "looks fixed" rather than
+// time out (in-memory mutant: a claim set after the log). After the marker: the two submitted transactions,
 // decoded with real ethers (the same swapExactETHForTokens of the same token at consecutive
 // nonces), and the token's two trades rows.
 //
@@ -91,9 +96,13 @@ describe('AUD-BUY-004: the already-sniped check is read once, long before the ro
 
         // Release the simulation; each bundle lands at a block it targets.
         sim.release();
-        const done = (): boolean => secondSettled && msgCount('MEV bundle submitted') + recordedLogs().filter((l) => l.obj?.op === 'buy.snipe.fail-clean').length >= passedCheck;
-        await driveChain(sc, { mode: 'land', until: done, what: 'both handlers finishing their buys' });
-        await settleAntiRugArming(sc, passedCheck);
+        // Finished: the second handler returned (it bought, failed clean, or was refused) and at least
+        // one buy finished. A handler still buying keeps the second one waiting on the wallet lock, so
+        // secondSettled also covers the first handler's buy when both buy.
+        const finishedBuys = (): number => msgCount('MEV bundle submitted') + recordedLogs().filter((l) => l.obj?.op === 'buy.snipe.fail-clean').length;
+        const done = (): boolean => secondSettled && finishedBuys() >= 1;
+        await driveChain(sc, { mode: 'land', until: done, what: 'the second handler returning and a buy finishing' });
+        await settleAntiRugArming(sc, msgCount('MEV bundle submitted'));
         const landed = buysOf(sc, dex.routerAddress, token).filter((b) => node.statusOf(b.sub.hash) === 'mined');
 
         knownBug(ctx, 'AUD-BUY-004', {
