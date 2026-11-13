@@ -7,9 +7,14 @@
 //
 // - reloadAndCheck: reload the graph under `env`, rebuild the in-memory state with `prepare` (the
 //   cooldown map lives in the riskManager module, so a reload empties it), then call the real
-//   canSnipe. A reload that fails (a fix that refuses to start on a bad limit) is returned as
-//   { loaded: false }, and the connection the failed load had opened is closed so teardown can
-//   remove the temp folder.
+//   canSnipe. Only a refusal of the one limit under test (`refusable`) is returned as
+//   { loaded: false }: a fix that refuses to start on that bad limit. Every other reload failure is
+//   rethrown (review CR-02), so it can never read as the limit being enforced: a stop step of the
+//   old graph (restartGraph applies the env only after every stop step passed, so the variable
+//   still holds its earlier value), a harness check after the load (its message starts with
+//   `restartGraph:` or `loadGraph:`), or an import-time error that does not name the variable. The
+//   connection a failed load had opened is closed either way, so teardown can remove the temp
+//   folder.
 // - limitPair: the same database and the same in-memory state, once under a valid limit and once
 //   with the variable set to `abc`. canSnipe stops at the first rule that fails, so the valid run
 //   names the rule that decided it (its own reason and details), and an abc run that is allowed
@@ -38,12 +43,32 @@ async function closeLeakedConnection(): Promise<void> {
     }
 }
 
-/** See the file header. */
-export async function reloadAndCheck(sc: Scenario, env: Record<string, string | undefined>, prepare?: () => Promise<void> | void): Promise<LoadOutcome> {
+/** True when `e`, thrown by restartGraph under `env`, is the new graph refusing `variable` itself. */
+function isRefusalOf(e: unknown, variable: string, env: Record<string, string | undefined>): boolean {
+    // A stop-step failure is raised before the env is applied, so the variable still holds its
+    // earlier value; a refusal of the new value can only come after it was applied.
+    if (process.env[variable] !== env[variable]) return false;
+    // Harness-raised failures (stop steps, the post-load chain, checker, DEX and wallet checks, the
+    // database-file check) are never a refusal by src/.
+    if (e instanceof AggregateError) return false;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/^(restartGraph|loadGraph): /.test(msg)) return false;
+    // The refusal names the variable it refused.
+    return new RegExp(`(^|[^A-Za-z0-9_])${variable}([^A-Za-z0-9_]|$)`).test(msg);
+}
+
+/** See the file header. `refusable` names the one variable whose refusal counts as a load result. */
+export async function reloadAndCheck(
+    sc: Scenario,
+    env: Record<string, string | undefined>,
+    prepare?: () => Promise<void> | void,
+    refusable?: string,
+): Promise<LoadOutcome> {
     try {
         await restartGraph(sc, { env });
     } catch (e) {
         await closeLeakedConnection();
+        if (refusable === undefined || !isRefusalOf(e, refusable, env)) throw e;
         return { loaded: false, error: e instanceof Error ? e.message : String(e) };
     }
     await prepare?.();
@@ -62,13 +87,14 @@ export async function limitPair<F = undefined>(
     sc: Scenario,
     opts: { variable: string; valid: string; extra?: Record<string, string | undefined>; prepare?: () => Promise<void> | void; facts?: (sc: Scenario) => F },
 ): Promise<LimitPair<F>> {
+    // The valid run must load: any failure there is rethrown.
     const valid = await reloadAndCheck(sc, { ...opts.extra, [opts.variable]: opts.valid }, opts.prepare);
     const facts = opts.facts ? opts.facts(sc) : (undefined as F);
-    const abc = await reloadAndCheck(sc, { ...opts.extra, [opts.variable]: 'abc' }, opts.prepare);
+    const abc = await reloadAndCheck(sc, { ...opts.extra, [opts.variable]: 'abc' }, opts.prepare, opts.variable);
     return { valid, abc, facts };
 }
 
-/** True when the limit was enforced: the graph refused to load, or canSnipe refused. */
+/** True when the limit was enforced: the graph refused to load naming the variable (reloadAndCheck), or canSnipe refused. */
 export function enforced(o: LoadOutcome): boolean {
     return !o.loaded || o.result.allowed === false;
 }
