@@ -34,19 +34,13 @@
 //   - mine() takes named hashes or the includable public pool; another transaction at a nonce it
 //     consumes is dropped; neverMine() and `exclude` keep hashes out. Every transition is in
 //     `history`, in order.
-//   - One revert source, opt-in (Phase 23 review WR-01): a contract read registered with setRead
-//     answers eth_call. Under enforceReverts(true) the same read also decides a mined transaction
-//     (status 0 on a revert: gas paid, no value sent, no receipt logs, nonce consumed),
-//     eth_estimateGas (the revert error) and eth_callBundle (a per-transaction error and revert
-//     entry). A target and selector with no registered read succeed.
-//     THE DEFAULT STAYS UNFAITHFUL: without enforceReverts every mined transaction succeeds,
-//     eth_estimateGas answers a constant and eth_callBundle reports success. Turning it on by
-//     default changed what Phase 23 proved (measured on the whole realpath project):
-//     AUD-TX-029 read "looks fixed" and AUD-TX-003 failed, because their private-attempt
-//     escalations simulate the buy after its 60 s deadline and a faithful relay answers
-//     "UniswapV2Router: EXPIRED"; and the bloxroute-full-sell golden master failed (its sell
-//     reverts on its own read at mine time). That is the operator's call, so a scenario that needs
-//     reverts asks for them.
+//   - One revert source (Phase 23 review WR-01, on by default by operator ruling): a contract
+//     read registered with setRead answers eth_call, and the same read decides a mined
+//     transaction (status 0 on a revert: gas paid, no value sent, no receipt logs, nonce
+//     consumed), eth_estimateGas (the revert error) and eth_callBundle (a per-transaction error
+//     and revert entry). A target and selector with no registered read succeed.
+//     enforceReverts(false) restores the old "every mined transaction succeeds" node; no test in
+//     the suite uses it.
 
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
@@ -830,7 +824,7 @@ export class FakeNode {
     /** onMined listeners, called per mined transaction in block order (WR-02). */
     readonly #minedListeners: Array<(tx: Transaction, executed: boolean) => void> = [];
     /** enforceReverts: the read table decides mining, estimateGas and callBundle too (WR-01). */
-    #enforceReverts = false;
+    #enforceReverts = true;
     /** hangSocketOpens: new sockets wait in CONNECTING while true (WR-03). */
     #hangOpens = false;
     readonly #heldOpens: FakeWebSocket[] = [];
@@ -988,12 +982,12 @@ export class FakeNode {
     }
 
     /**
-     * Opt in to one revert source (Phase 23 review WR-01): while on, the read registered for a
+     * One revert source (Phase 23 review WR-01), on by default: the read registered for a
      * transaction's target and selector decides whether a mined transaction executes (a revert
      * mines with receipt status 0, pays gas only, sends no value, leaves no logs and consumes its
      * nonce), whether eth_estimateGas answers or reverts, and whether eth_callBundle reports a
-     * per-transaction revert (the Flashbots library's firstRevert). Off by default; see the header
-     * for why the default stays unfaithful.
+     * per-transaction revert (the Flashbots library's firstRevert). enforceReverts(false) gives
+     * the old node where every mined transaction succeeds.
      */
     enforceReverts(on: boolean): void {
         if (typeof on !== 'boolean') throw new Error('enforceReverts: on must be a boolean');
