@@ -38,14 +38,14 @@
 import { describe, expect, it } from 'vitest';
 import { getAddress, parseEther } from 'ethers';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
-import { knownBug } from '../harness/knownBug';
+import { knownBug, type KnownBugContext } from '../harness/knownBug';
 import { createScenario, stepFor } from '../harness/world';
 import { GET_AMOUNTS_OUT, buyAndMine, buyRow, exitQuotes, exitStateRow, listen, msgLogged, opLogged, waitAntiRugArmed } from './fixtures/AUD-EXIT-002-position';
 
 /** An alert telling the operator a position has no exit monitoring (any wording a fix might use). */
 const UNPROTECTED = /unprotected|unmonitored|not monitored|no exit monitor|monitor (not started|failed)|exit monitor.*(fail|not)/i;
 
-type Ctx = Parameters<typeof knownBug>[0];
+type Ctx = KnownBugContext;
 
 /**
  * The shared proof of both claims. `persistent`: every matching getAmountsOut fails until the six
