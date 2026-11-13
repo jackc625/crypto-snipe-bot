@@ -20,6 +20,7 @@ const GATE_CASES = [
     'AC-36-no-files-fails',
     'AC-36-no-sites-fails',
     'CR-08-delegated-send-outside-lock-fails',
+    'CR-09-method-value-outside-lock-fails',
     'F3-unknown-lock-status-fails',
     'F3-stale-exclusion-fails',
     'AC-53-missing-decision-ref-fails',
@@ -36,7 +37,7 @@ const GATE_CASES = [
     'AC-34-deleting-the-exceptions-file-fails',
     'AC-34-shallow-clone-refused',
 ];
-const ANALYSIS_CASES = 35;
+const ANALYSIS_CASES = 43;
 
 // Limits (measured on Node 22.16.0, 2026-11-12): the self-test builds 11 census programs over the
 // ethers types plus 6 throwaway git repos. Alone: 23 s through Vitest (30 s run directly). Under

@@ -80,6 +80,14 @@
 //       sendPrivateTransaction on a Flashbots provider, and in-program
 //       functions named rawSendBundle / sendRawBundle (the relay eth_sendBundle
 //       fanout).
+//     - (Phase 23 review CR-09) a contract method reached as a value: a const
+//       holding `c.m`, `c.getFunction('m')` or a destructured method, called in
+//       place, is classified at the call as above; a method object handed on
+//       (callback, stored, returned) is a site where it is taken, lock unknown;
+//       a call of a method object not typed through a Contract is unresolved;
+//       and a call of an in-program interface signature (no body) that returns
+//       a TransactionResponse (`new Contract(...) as unknown as IRouter`) is a
+//       site whose lock is judged.
 //   message-signing (no nonce; listed separately, never a violation):
 //     signMessage / signTypedData on a Signer (Flashbots relay auth headers).
 //   unresolved: a receiver typed any/unknown calling a signing API name or a
@@ -211,6 +219,8 @@ const METHOD_OPS_EXCLUDED: Record<string, string> = {
     estimateGas: 'estimateGas: gas estimation only; no transaction, no nonce',
     populateTransaction: 'populateTransaction: builds an unsigned request; the site that signs it is counted separately',
 };
+/** Members of a contract method object that only read it (never sign, never hand the method on). */
+const METHOD_DATA_MEMBERS = ['fragment', 'name', 'getFragment', '_contract', '_key'];
 const ENTRY_REGISTRARS = ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener', 'get', 'post', 'put', 'patch', 'delete', 'use', 'all'];
 const ENTRY_FUNCTIONS = ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask', 'nextTick'];
 const MAX_DEPTH = 40;
@@ -332,11 +342,19 @@ class Census {
         return (this.checker.getNonNullableType(t).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0;
     }
 
+    private hasCache = new Map<ts.Type, Map<string, boolean>>();
     private has(t: ts.Type, names: string[]): boolean {
-        return this.members(t).some((m) => {
+        const k = names.join(',');
+        let byNames = this.hasCache.get(t);
+        if (!byNames) this.hasCache.set(t, (byNames = new Map()));
+        const hit = byNames.get(k);
+        if (hit !== undefined) return hit;
+        const v = this.members(t).some((m) => {
             const p = this.props(m);
             return names.every((n) => p.has(n));
         });
+        byNames.set(k, v);
+        return v;
     }
 
     isSigner(t: ts.Type): boolean {
@@ -356,6 +374,11 @@ class Census {
     }
     isBundler(t: ts.Type): boolean {
         return this.has(t, ['signBundle', 'sendBundle']);
+    }
+    /** A (promise of a) TransactionResponse / ContractTransactionResponse: what a signing send returns. */
+    isTxResponse(t: ts.Type): boolean {
+        const a = this.checker.getAwaitedType(t) ?? t;
+        return !this.isAnyish(a) && this.has(a, ['hash', 'nonce', 'wait', 'confirmations']);
     }
 
     typeAt(e: ts.Node): ts.Type {
@@ -682,7 +705,7 @@ class Census {
         return tagged;
     }
 
-    siteLock(site: ts.CallExpression): { status: LockStatus; evidence: 'lexical' | 'transitive' | null; chains: string[][]; reason: string | null } {
+    siteLock(site: ts.Node): { status: LockStatus; evidence: 'lexical' | 'transitive' | null; chains: string[][]; reason: string | null } {
         let r = this.lockOfPoint(site, new Set(), 0);
         if (r.status === 'cycle') r = this.res('unknown', r.chains, 'only recursive references reach this function');
         if (r.status === 'locked') {
@@ -693,6 +716,92 @@ class Census {
             return { status: 'locked', evidence: lexical ? 'lexical' : 'transitive', chains: r.chains, reason: null };
         }
         return { status: r.status as LockStatus, evidence: null, chains: r.chains, reason: r.reason ?? null };
+    }
+
+    // ------------------------------------------------- contract method values (CR-09)
+
+    /**
+     * The contract and ABI method an expression takes as a value: `c.m`, `c['m']` (or a computed
+     * key, method null) or `c.getFunction(...)`, on a receiver typed as a Contract, where the
+     * result is a contract method object. Null for anything else.
+     */
+    methodRef(e: ts.Expression): { recv: ts.Expression; method: string | null } | null {
+        const x = this.strip(e);
+        let recv: ts.Expression | undefined;
+        let method: string | null = null;
+        if (ts.isPropertyAccessExpression(x)) {
+            recv = x.expression;
+            method = x.name.text;
+        } else if (ts.isElementAccessExpression(x)) {
+            recv = x.expression;
+            method = ts.isStringLiteralLike(x.argumentExpression) ? x.argumentExpression.text : null;
+        } else if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression) && x.expression.name.text === 'getFunction') {
+            recv = x.expression.expression;
+            const a0 = x.arguments[0];
+            method = a0 && ts.isStringLiteralLike(a0) ? a0.text : null;
+        } else return null;
+        const rt = this.typeAt(recv);
+        if (this.isAnyish(rt) || !this.isContract(rt)) return null;
+        if (!ts.isCallExpression(x) && method !== null && this.isOwnContractMember(rt, method)) return null;
+        if (!this.isMethod(this.typeAt(x))) return null;
+        return { recv, method };
+    }
+
+    /**
+     * Where a name holds a contract method taken once and never reassigned: a const initialized
+     * with a method reference, or a const destructuring of a Contract (`const { approve } = token`).
+     */
+    holderOrigin(name: ts.Identifier): { recv: ts.Expression; method: string | null } | null {
+        let sym = this.checker.getSymbolAtLocation(name);
+        if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+        const decls = sym?.getDeclarations() ?? [];
+        if (decls.length !== 1) return null;
+        const d = decls[0];
+        const isConst = (v: ts.VariableDeclaration) => (ts.getCombinedNodeFlags(v) & ts.NodeFlags.Const) !== 0;
+        if (ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) && d.initializer && isConst(d)) return this.methodRef(d.initializer);
+        if (ts.isBindingElement(d) && ts.isIdentifier(d.name) && !d.dotDotDotToken && ts.isObjectBindingPattern(d.parent)) {
+            const v = d.parent.parent;
+            if (!ts.isVariableDeclaration(v) || !v.initializer || !isConst(v)) return null;
+            const rt = this.typeAt(v.initializer);
+            if (this.isAnyish(rt) || !this.isContract(rt)) return null;
+            const pn = d.propertyName;
+            const key = pn ? (ts.isIdentifier(pn) || ts.isStringLiteralLike(pn) ? pn.text : null) : d.name.text;
+            if (key !== null && this.isOwnContractMember(rt, key)) return null;
+            if (!this.isMethod(this.typeAt(d.name))) return null;
+            return { recv: v.initializer, method: key };
+        }
+        return null;
+    }
+
+    /** A use of a method object that does not hand it on: a call of it, a read of its data, or a called .send / a read-only op. */
+    private methodUseStays(n: ts.Node): boolean {
+        const u = this.up(n);
+        const p = u.parent;
+        if (!p) return false;
+        if (ts.isCallExpression(p) && p.expression === u) return true;
+        if (ts.isPropertyAccessExpression(p) && p.expression === u) {
+            const m = p.name.text;
+            if (METHOD_DATA_MEMBERS.includes(m) || m in METHOD_OPS_EXCLUDED) return true;
+            if (m === 'send') {
+                const pu = this.up(p);
+                return !!pu.parent && ts.isCallExpression(pu.parent) && pu.parent.expression === pu;
+            }
+        }
+        return false;
+    }
+
+    /** True when the method object at n (a method reference) can reach code the census cannot follow. */
+    methodEscapes(n: ts.Node): boolean {
+        if (this.methodUseStays(n)) return false;
+        const u = this.up(n);
+        const p = u.parent;
+        // const x = c.m: judged by every use of x (each call is classified through holderOrigin).
+        if (p && ts.isVariableDeclaration(p) && p.initializer === u && ts.isIdentifier(p.name) && this.holderOrigin(p.name)) return this.holderEscapes(p.name);
+        return true;
+    }
+
+    holderEscapes(name: ts.Identifier): boolean {
+        return this.refsOf(name).some((id) => !this.methodUseStays(id));
     }
 
     // ---------------------------------------------------------- contracts
@@ -830,6 +939,8 @@ class Census {
             if (diags.length) errFiles++;
             for (const dg of diags) if (dg.code === 2307) unresolvedModules.add(`${this.rel(sf.fileName)}: ${ts.flattenDiagnosticMessageText(dg.messageText, ' ').replace(/^Cannot find module '([^']+)'.*$/, '$1')}`);
             const visit = (n: ts.Node) => {
+                const v = this.classifyMethodValue(n);
+                if (v) sites.push(v);
                 if (ts.isCallExpression(n)) {
                     if (this.isLockCall(n)) lockCalls.push({ file: this.rel(sf.fileName), line: this.line(n), key: this.short(n.arguments[0]?.getText() ?? '', 60), enclosing: this.fnName(this.enclosingFn(n)) });
                     const s = this.classify(n);
@@ -855,7 +966,7 @@ class Census {
         };
     }
 
-    private mk(call: ts.CallExpression, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}): Site {
+    private mk(call: ts.Node, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}): Site {
         const sf = call.getSourceFile();
         const lc = sf.getLineAndCharacterOfPosition(call.getStart(sf));
         const file = this.rel(sf.fileName);
@@ -888,7 +999,7 @@ class Census {
                 const l = this.siteLock(call);
                 base.lock_status = 'unknown';
                 base.chains = l.chains;
-                base.reason = `receiver type unresolved (${recvType})` + (l.status !== 'unknown' ? `; the reference chain alone reads ${l.status}` : l.reason ? `; ${l.reason}` : '');
+                base.reason = (extra.reason ? `${extra.reason}; ` : '') + `receiver type unresolved (${recvType})` + (l.status !== 'unknown' ? `; the reference chain alone reads ${l.status}` : l.reason ? `; ${l.reason}` : '');
             } else {
                 const l = this.siteLock(call);
                 base.lock_status = l.status;
@@ -904,11 +1015,21 @@ class Census {
         const callee = this.strip(call.expression);
         // Identifier callee: in-program bundle-send functions.
         if (ts.isIdentifier(callee)) {
-            if (!BUNDLE_FNS.includes(callee.text)) return null;
-            let sym = this.checker.getSymbolAtLocation(callee);
-            if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-            if (!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return null;
-            return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' });
+            if (BUNDLE_FNS.includes(callee.text)) {
+                let sym = this.checker.getSymbolAtLocation(callee);
+                if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+                if (sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' });
+            }
+            // CR-09: calling a contract method object held in a name (`const approve = token.approve;
+            // await approve(...)`, a getFunction value, a destructured method). Traced to its
+            // contract when the name is a const taken from one; otherwise unresolved.
+            const ct = this.typeAt(callee);
+            if (!this.isAnyish(ct) && this.isMethod(ct)) {
+                const h = this.holderOrigin(callee);
+                if (h) return this.contractSite(call, h.recv, h.method, 'call', this.typeAt(h.recv));
+                return this.mk(call, `method-value.${callee.text}`, 'tx-signing', this.typeText(ct), { type_unresolved: true, reason: `a contract method object ${callee.text} is called; it cannot be traced to its contract` });
+            }
+            return null;
         }
         // contract.getFunction('m')(...)
         if (ts.isCallExpression(callee) && ts.isPropertyAccessExpression(callee.expression) && callee.expression.name.text === 'getFunction') {
@@ -945,7 +1066,17 @@ class Census {
                 cRecv = inner.expression.expression;
                 m = inner.arguments[0] && ts.isStringLiteralLike(inner.arguments[0]) ? inner.arguments[0].text : null;
             }
-            if (!cRecv || !this.isContract(this.typeAt(cRecv))) return null;
+            else if (ts.isIdentifier(inner)) {
+                // CR-09: `const m = token.approve; await m.send(...)`.
+                const h = this.holderOrigin(inner);
+                if (h) return this.contractSite(call, h.recv, h.method, name, this.typeAt(h.recv));
+                if (name === 'send') return this.mk(call, `method-value.${inner.text}.send`, 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: `${inner.text}.send is called on a contract method object that cannot be traced to its contract` });
+                return null;
+            }
+            if (!cRecv || !this.isContract(this.typeAt(cRecv))) {
+                if (name === 'send') return this.mk(call, 'method-value.send', 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: '.send is called on a contract method object that cannot be traced to its contract' });
+                return null;
+            }
             return this.contractSite(call, cRecv, m, name, this.typeAt(cRecv));
         }
         if (name === null) {
@@ -982,10 +1113,56 @@ class Census {
             return this.mk(call, 'ContractFactory.deploy', 'tx-signing', this.typeText(rt), { runner, mutability: 'deployment' });
         }
         if (this.isContract(rt) && !this.isOwnContractMember(rt, name)) return this.contractSite(call, recv, name, 'call', rt);
+        // CR-09: a contract method object reached through a receiver that is not typed as a
+        // Contract (Pick<Contract, 'approve'>, an object holding token.approve).
+        const ct = this.typeAt(callee);
+        if (!this.isAnyish(ct) && this.isMethod(ct)) return this.mk(call, `method.${name}`, 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: `${name} is a contract method object on a receiver that is not typed as a Contract` });
+        // CR-09: a narrow interface over a contract or signer (`new Contract(...) as unknown as
+        // IRouter`): a method declared only as a signature in the program, with no body the census
+        // could look into, that returns a TransactionResponse. It may sign, so it is a site and its
+        // lock is judged.
+        if (!this.isSigner(rt) && !this.isProvider(rt) && !this.isFactory(rt) && !this.isBundler(rt) && this.isTxResponse(this.typeAt(call)) && this.signatureOnlyInProgram(callee))
+            return this.mk(call, `interface.${name}`, 'tx-signing', this.typeText(rt));
         return null;
     }
 
-    private contractSite(call: ts.CallExpression, recv: ts.Expression, method: string | null, op: string, rt: ts.Type): Site | null {
+    /** Every declaration of the called member is an in-program signature with no body (an interface or type-literal member, or an abstract method). */
+    private signatureOnlyInProgram(callee: ts.Expression): boolean {
+        const n = ts.isPropertyAccessExpression(callee) ? callee.name : ts.isElementAccessExpression(callee) ? callee.argumentExpression : callee;
+        let sym = this.checker.getSymbolAtLocation(n);
+        if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+        const decls = sym?.getDeclarations() ?? [];
+        if (!decls.length) return false;
+        return decls.every((d) => {
+            const sf = d.getSourceFile();
+            const r = this.rel(sf.fileName);
+            if (sf.isDeclarationFile || !(r.startsWith('src/') || r.startsWith('scripts/'))) return false;
+            if (ts.isMethodSignature(d) || ts.isPropertySignature(d)) return true;
+            if ((ts.isMethodDeclaration(d) || ts.isPropertyDeclaration(d)) && (ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Abstract) !== 0) return true;
+            return false;
+        });
+    }
+
+    /**
+     * CR-09: a contract method object that is handed on (passed as a callback, stored, returned,
+     * or held in a name that is) is a site where it is taken: the census cannot follow where it is
+     * invoked, so its lock reads unknown. A method object taken and only called in place is
+     * classified at the call (classify / holderOrigin) instead.
+     */
+    classifyMethodValue(n: ts.Node): Site | null {
+        if (ts.isBindingElement(n) && ts.isIdentifier(n.name)) {
+            const h = this.holderOrigin(n.name);
+            if (!h || !this.holderEscapes(n.name)) return null;
+            return this.contractSite(n.name, h.recv, h.method, 'value', this.typeAt(h.recv));
+        }
+        if (!ts.isPropertyAccessExpression(n) && !ts.isElementAccessExpression(n) && !ts.isCallExpression(n)) return null;
+        if (ts.isCallExpression(n) && !(ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === 'getFunction')) return null;
+        const ref = this.methodRef(n);
+        if (!ref || !this.methodEscapes(n)) return null;
+        return this.contractSite(n, ref.recv, ref.method, 'value', this.typeAt(ref.recv));
+    }
+
+    private contractSite(call: ts.Node, recv: ts.Expression, method: string | null, op: string, rt: ts.Type): Site | null {
         const origins = this.originsOf(recv);
         const runners = new Set(origins.map((o) => o.runner));
         const canSign = runners.has('signer') || runners.has('unresolved');
@@ -993,6 +1170,12 @@ class Census {
         const runner = [...runners].sort().join('|');
         const traced = origins.map((o) => `${o.runner} @ ${o.at}`);
         const api = method === null ? `contract.computed${op === 'call' ? '' : '.' + op}` : `contract.${method}${op === 'call' ? '' : '.' + op}`;
+        if (op === 'value') {
+            // CR-09: the method object is handed on (a callback, a stored value); where it is
+            // called cannot be followed, so the lock reads unknown unless the method is a view.
+            if (method !== null && this.mutabilityOf(origins, method) === 'view') return this.mk(call, api, 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: `view/pure ABI fragment ${method} used as a value: a read-only eth_call; no transaction, no nonce`, runner, mutability: 'view', origins: traced });
+            return this.mk(call, api, 'tx-signing', this.typeText(rt), { type_unresolved: true, runner, origins: traced, reason: `contract method ${method ?? '(computed)'} used as a value at ${this.loc(call)}; where it is invoked cannot be followed` });
+        }
         if (method === null) return this.mk(call, api, 'tx-signing', this.typeText(rt), { type_unresolved: true, runner, origins: traced });
         if (op in METHOD_OPS_EXCLUDED) return this.mk(call, api, 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: METHOD_OPS_EXCLUDED[op], runner, origins: traced });
         const mut = this.mutabilityOf(origins, method);
@@ -1803,6 +1986,22 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// CR-09: the orchestrator's reproduction, a contract method called through a value.
+const GATE_METHOD_VALUE_SCRIPT = `import { Wallet, Contract, JsonRpcProvider, MaxUint256 } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+const ERC20_ABI = ['function approve(address spender, uint256 amount) returns (bool)'];
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    const token = new Contract('0x0000000000000000000000000000000000000005', ERC20_ABI, wallet);
+    const approve = token.approve;
+    await approve('0x0000000000000000000000000000000000000006', MaxUint256);
+}
+
+void main();
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
 import { withNonceLock } from './lock';
 
@@ -1904,6 +2103,7 @@ function gateCases(): CaseOutcome[] {
         ),
     );
     out.push(codeCase('CR-08-delegated-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/rescue.ts': GATE_DELEGATED_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('CR-09-method-value-outside-lock-fails', { ...baseGateFiles(20), 'scripts/approve.ts': GATE_METHOD_VALUE_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
     const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
     narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
@@ -2016,7 +2216,7 @@ const FIXTURE_LOCK = `export async function withNonceLock<T>(walletAddress: stri
 `;
 
 const FIXTURE_CASES = `import { Wallet, ContractFactory, Contract, JsonRpcProvider } from 'ethers';
-import type { ContractRunner, TransactionRequest } from 'ethers';
+import type { ContractRunner, TransactionRequest, ContractTransactionResponse } from 'ethers';
 import { withNonceLock } from './lock';
 
 declare const wallet: Wallet;
@@ -2256,6 +2456,54 @@ export async function caseDelegatedLocked(s: Pick<Wallet, 'sendTransaction' | 'a
         await s.sendTransaction(tx); // CASE:delegated-locked
     });
 }
+
+// CR-09: a contract method reached through a value, a getFunction value, destructuring, a
+// callback or a narrow interface cast is still a call through the contract's runner.
+const C9 = '0x0000000000000000000000000000000000000002';
+const TO9 = '0x0000000000000000000000000000000000000003';
+export async function caseMethodValueCall(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const transfer = c.transfer;
+    await transfer(TO9, 1n); // CASE:method-value-call
+}
+export async function caseMethodValueSend(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const m = c.transfer;
+    await m.send(TO9, 1n); // CASE:method-value-send
+}
+export async function caseGetFunctionValue(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const f = c.getFunction('transfer');
+    await f(TO9, 1n); // CASE:getfunction-value
+}
+export async function caseDestructured(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const { transfer } = c;
+    await transfer(TO9, 1n); // CASE:destructured
+}
+export async function caseMethodValueView(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const bal = c.balanceOf;
+    await bal(wallet.address); // CASE:method-value-view
+}
+async function retry9(f: (to: string, amount: bigint) => Promise<unknown>): Promise<void> {
+    await f(TO9, 1n);
+}
+export async function caseMethodCallback(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    await withNonceLock(wallet.address, () => retry9(c.transfer)); // CASE:method-callback
+}
+export async function caseMethodCallbackProvider(): Promise<void> {
+    const ro = new Contract(C9, ABI, provider);
+    await retry9(ro.transfer); // CASE:method-callback-provider
+}
+interface IRouterNarrow {
+    transfer(to: string, amount: bigint): Promise<ContractTransactionResponse>;
+}
+export async function caseNarrowCast(): Promise<void> {
+    const r = new Contract(C9, ABI, wallet) as unknown as IRouterNarrow;
+    await r.transfer(TO9, 1n); // CASE:narrow-cast
+}
 `;
 
 interface Expect {
@@ -2305,6 +2553,14 @@ const EXPECT: Record<string, Expect> = {
     'delegated-pick': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
     'delegated-local': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
     'delegated-locked': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'lexical', apiMatch: /^delegated\.sendTransaction$/ },
+    'method-value-call': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    'method-value-send': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer\.send$/ },
+    'getfunction-value': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    destructured: { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    'method-value-view': { found: true, kind: 'tx-signing', excluded: true },
+    'method-callback': { found: true, kind: 'tx-signing', lock: 'unknown', type_unresolved: true, apiMatch: /^contract\.transfer\.value$/ },
+    'method-callback-provider': { found: false },
+    'narrow-cast': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^interface\.transfer$/ },
 };
 
 /** The repo's node_modules (scripts/ is one level below the repo root; trap 2). */
