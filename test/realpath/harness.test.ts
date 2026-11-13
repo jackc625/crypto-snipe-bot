@@ -1344,3 +1344,94 @@ describe('FakeWebSocket matches ws 8.17.1 when the socket is not OPEN (Phase 23 
         await expectStillPending(ws.send('eth_blockNumber', []), 30_000, { what: 'a request written to the dropped socket' });
     });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-01: one revert source for every answer, opt-in (FakeNode.enforceReverts).
+// A mined transaction, eth_estimateGas and eth_callBundle consult the same scenario read the
+// eth_call path does, so a deadline or an output floor the scenario's router encodes reverts on
+// chain too. The default stays as before (every mined transaction succeeds); see chain.ts.
+// ---------------------------------------------------------------------------------------------
+
+const V2_SWAP = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
+
+/** A V2 buy signed by the scenario's bot wallet, for the scenario router, at the wallet's next nonce. */
+async function signedV2Buy(sc: Scenario<'v2'>, opts: { deadline: number; amountOutMin: bigint; value?: bigint }): Promise<string> {
+    const data = V2_SWAP.encodeFunctionData('swapExactETHForTokens', [opts.amountOutMin, [sc.weth, sc.token], sc.wallet.address, opts.deadline]);
+    return sc.wallet.signTransaction({ chainId: 1, nonce: sc.node.pendingCount(sc.wallet.address), to: sc.dex.routerAddress, data, value: opts.value ?? parseEther('0.01'), gasLimit: 300_000n, type: 2, maxFeePerGas: 40n * GWEI, maxPriorityFeePerGas: GWEI });
+}
+
+async function rpc(sc: Scenario, method: string, params: unknown[]): Promise<{ result?: unknown; error?: { code: number; message: string; data?: string } }> {
+    return (await sc.node.handle({ jsonrpc: '2.0', id: 1, method, params })) as never;
+}
+
+describe('simulated node: reverts on chain, in estimateGas and in bundle simulation (Phase 23 review WR-01)', () => {
+    it('a buy mined after its deadline reverts: receipt status 0, gas paid, no value sent, nonce consumed, no tokens; one mined in time succeeds', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const { node, wallet } = sc;
+        node.enforceReverts(true);
+        const tokenBalance = async (): Promise<bigint> => BigInt(((await rpc(sc, 'eth_call', [{ to: sc.token, data: ERC20.encodeFunctionData('balanceOf', [wallet.address]) }, 'latest'])).result as string));
+        const ethBalance = async (): Promise<bigint> => BigInt((await rpc(sc, 'eth_getBalance', [wallet.address, 'latest'])).result as string);
+
+        const late = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        const lateHash = (await rpc(sc, 'eth_sendRawTransaction', [late])).result as string;
+        await stepFor(61_000);
+        const before = await ethBalance();
+        node.mine({ include: [lateHash] });
+        const receipt = (await rpc(sc, 'eth_getTransactionReceipt', [lateHash])).result as { status: string; gasUsed: string; effectiveGasPrice: string; logs: unknown[] };
+        expect(receipt.status).toBe('0x0');
+        expect(receipt.logs).toEqual([]);
+        expect(before - (await ethBalance())).toBe(BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice));
+        expect(node.minedCount(wallet.address)).toBe(1);
+        expect(await tokenBalance()).toBe(0n);
+
+        const inTime = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        const okHash = (await rpc(sc, 'eth_sendRawTransaction', [inTime])).result as string;
+        node.mine({ include: [okHash] });
+        expect(((await rpc(sc, 'eth_getTransactionReceipt', [okHash])).result as { status: string }).status).toBe('0x1');
+        expect(await tokenBalance()).toBeGreaterThan(0n);
+    });
+
+    it('eth_estimateGas reverts with the read\'s revert data where the scenario router would revert, and still answers the estimate where it would not', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        sc.node.enforceReverts(true);
+        const call = (deadline: number) => ({ from: sc.wallet.address, to: sc.dex.routerAddress, value: toQuantity(parseEther('0.01')), data: V2_SWAP.encodeFunctionData('swapExactETHForTokens', [0n, [sc.weth, sc.token], sc.wallet.address, deadline]) });
+        const expired = await rpc(sc, 'eth_estimateGas', [call(Math.floor(Date.now() / 1000) - 1)]);
+        expect(expired.error?.code).toBe(3);
+        expect(expired.error?.message).toBe('execution reverted');
+        expect(new Interface(['function Error(string)']).decodeFunctionData('Error', expired.error!.data!)[0]).toBe('UniswapV2Router: EXPIRED');
+        const fine = await rpc(sc, 'eth_estimateGas', [call(Math.floor(Date.now() / 1000) + 60)]);
+        expect(fine.result).toBe(toQuantity(150_000n));
+    });
+
+    it('the bot\'s Flashbots simulate gate is reachable: a price move between its quote and its simulation makes eth_callBundle report the revert, and the bot does not send that bundle', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        sc.node.enforceReverts(true);
+        await listen(sc);
+        const held = sc.node.hold('eth_callBundle');
+        await sc.fireNewPair();
+        await stepUntilTrue(() => held.heldCount >= 1, { what: 'the bot simulating its buy bundle' });
+        // The price moves after the quote: the bundle's output floor is now above what the pool pays.
+        sc.reserves.token = sc.reserves.token / 4n;
+        const relayBefore = sc.node.relay.length;
+        held.release();
+        await stepUntilTrue(() => opLogged('flashbots.simulate.revert'), { what: 'the bot refusing a bundle whose simulation reverted' });
+        const firstSend = sc.node.relay.findIndex((r, i) => i >= relayBefore && r.method === 'eth_sendBundle');
+        const refusedAt = harnessState().logs.findIndex((l) => l.obj?.op === 'flashbots.simulate.revert');
+        expect(refusedAt).toBeGreaterThanOrEqual(0);
+        // Nothing from the refused attempt reached the relay as a bundle before the refusal.
+        expect(firstSend === -1 || sc.node.relay[firstSend].seq > harnessState().logs[refusedAt].seq).toBe(true);
+        sc.reserves.token = sc.reserves.token * 4n;
+    });
+
+    it('by default (enforceReverts off) nothing changes: the late buy mines with status 1 and eth_estimateGas answers the constant', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const late = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        const lateHash = (await rpc(sc, 'eth_sendRawTransaction', [late])).result as string;
+        await stepFor(61_000);
+        sc.node.mine({ include: [lateHash] });
+        expect(((await rpc(sc, 'eth_getTransactionReceipt', [lateHash])).result as { status: string }).status).toBe('0x1');
+        expect(sc.node.succeeded(lateHash)).toBe(true);
+        const expired = await rpc(sc, 'eth_estimateGas', [{ from: sc.wallet.address, to: sc.dex.routerAddress, value: toQuantity(parseEther('0.01')), data: V2_SWAP.encodeFunctionData('swapExactETHForTokens', [0n, [sc.weth, sc.token], sc.wallet.address, 1]) }]);
+        expect(expired.result).toBe(toQuantity(150_000n));
+    });
+});

@@ -857,10 +857,11 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         node.setRead(token, 'tradingEnabled()', encodeResult(['bool'], [true]));
         // A token with no wallet or transaction limit has none of these functions: a real node reverts.
         for (const sig of ['maxWalletAmount()', 'maxWallet()', 'maxTxAmount()', 'maxTransactionAmount()']) node.setRead(token, sig, REVERT_EMPTY);
-        // The bot's token balance: what each of its mined buys bought, at the scenario price.
+        // The bot's token balance: what each of its mined buys bought, at the scenario price. A buy
+        // that reverted on chain bought nothing (WR-01).
         const boughtBy = (who: string): bigint =>
             node.submitted
-                .filter((s) => s.status === 'mined' && s.tx.to?.toLowerCase() === swapTarget.toLowerCase() && s.tx.from?.toLowerCase() === who)
+                .filter((s) => s.status === 'mined' && node.succeeded(s.hash) && s.tx.to?.toLowerCase() === swapTarget.toLowerCase() && s.tx.from?.toLowerCase() === who)
                 .reduce((a, s) => a + (quoteOut(s.tx.value, weth, token) ?? 0n), 0n);
         node.setRead(token, 'balanceOf(address)', ({ args }) => {
             const who = String(args[0]).toLowerCase();

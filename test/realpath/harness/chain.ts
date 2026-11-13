@@ -34,6 +34,19 @@
 //   - mine() takes named hashes or the includable public pool; another transaction at a nonce it
 //     consumes is dropped; neverMine() and `exclude` keep hashes out. Every transition is in
 //     `history`, in order.
+//   - One revert source, opt-in (Phase 23 review WR-01): a contract read registered with setRead
+//     answers eth_call. Under enforceReverts(true) the same read also decides a mined transaction
+//     (status 0 on a revert: gas paid, no value sent, no receipt logs, nonce consumed),
+//     eth_estimateGas (the revert error) and eth_callBundle (a per-transaction error and revert
+//     entry). A target and selector with no registered read succeed.
+//     THE DEFAULT STAYS UNFAITHFUL: without enforceReverts every mined transaction succeeds,
+//     eth_estimateGas answers a constant and eth_callBundle reports success. Turning it on by
+//     default changed what Phase 23 proved (measured on the whole realpath project):
+//     AUD-TX-029 read "looks fixed" and AUD-TX-003 failed, because their private-attempt
+//     escalations simulate the buy after its 60 s deadline and a faithful relay answers
+//     "UniswapV2Router: EXPIRED"; and the bloxroute-full-sell golden master failed (its sell
+//     reverts on its own read at mine time). That is the operator's call, so a scenario that needs
+//     reverts asks for them.
 
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
@@ -814,6 +827,8 @@ export class FakeNode {
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
+    /** enforceReverts: the read table decides mining, estimateGas and callBundle too (WR-01). */
+    #enforceReverts = false;
     /** hangSocketOpens: new sockets wait in CONNECTING while true (WR-03). */
     #hangOpens = false;
     readonly #heldOpens: FakeWebSocket[] = [];
@@ -968,6 +983,24 @@ export class FakeNode {
     /** True once mine() has included `hash`. */
     isMined(hash: string): boolean {
         return this.#receipts.has(hash);
+    }
+
+    /**
+     * Opt in to one revert source (Phase 23 review WR-01): while on, the read registered for a
+     * transaction's target and selector decides whether a mined transaction executes (a revert
+     * mines with receipt status 0, pays gas only, sends no value, leaves no logs and consumes its
+     * nonce), whether eth_estimateGas answers or reverts, and whether eth_callBundle reports a
+     * per-transaction revert (the Flashbots library's firstRevert). Off by default; see the header
+     * for why the default stays unfaithful.
+     */
+    enforceReverts(on: boolean): void {
+        if (typeof on !== 'boolean') throw new Error('enforceReverts: on must be a boolean');
+        this.#enforceReverts = on;
+    }
+
+    /** True once mine() has included `hash` and it did not revert (receipt status 1). */
+    succeeded(hash: string): boolean {
+        return this.#receipts.get(hash)?.status === 1;
     }
 
     /** Where `hash` is now (undefined when this node never accepted it). */
@@ -1213,16 +1246,21 @@ export class FakeNode {
             return { ...l, transactionHash: txHash };
         });
         let gasUsed = 0n;
+        const reverted = new Set<string>();
         picked.forEach(({ t, used, effectiveGasPrice }, index) => {
             gasUsed += used;
+            // The same read that answers eth_call decides the transaction (WR-01), in block order,
+            // so a read that looks at what this block already mined sees it.
+            const ok = this.#enforceReverts ? this.#executes(t.tx) : true;
+            if (!ok) reverted.add(t.hash);
             this.#setStatus(t, 'mined');
             t.block = number;
             t.index = index;
             for (const sub of this.submitted) if (sub.hash === t.hash) sub.block = number;
-            this.#receipts.set(t.hash, { hash: t.hash, block: number, index, gasUsed: used, effectiveGasPrice, status: 1 });
-            // The sender pays for the gas it used and the value it sent.
+            this.#receipts.set(t.hash, { hash: t.hash, block: number, index, gasUsed: used, effectiveGasPrice, status: ok ? 1 : 0 });
+            // The sender pays for the gas it used, and for the value it sent only if it executed.
             const key = lc(t.from);
-            this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - t.tx.value);
+            this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - (ok ? t.tx.value : 0n));
             this.history.push({ seq: nextSeq(), event: 'mined', hash: t.hash, from: t.from, nonce: t.tx.nonce, route: t.route, block: number });
         });
         // Every other transaction at a nonce this block consumed is dropped, on every route.
@@ -1253,12 +1291,22 @@ export class FakeNode {
         // ordered by transaction index (a real block numbers its logs in transaction order).
         const queued: Array<LogInput & { transactionHash: string }> = [];
         for (const { t } of picked) {
+            // A reverted transaction leaves no logs.
+            if (reverted.has(t.hash)) continue;
             for (const rule of this.#receiptRules) {
                 if (!receiptRuleMatches(rule, t.tx)) continue;
                 for (const l of rule.make(t.tx)) queued.push({ address: l.address, topics: l.topics, data: l.data, transactionHash: t.hash });
             }
         }
-        queued.push(...explicit);
+        for (const l of explicit) {
+            if (!reverted.has(l.transactionHash)) {
+                queued.push(l);
+                continue;
+            }
+            // A log from a reverted transaction cannot exist: a scenario asking for one is a
+            // harness mistake, never a node answer.
+            this.strays.push({ seq: nextSeq(), kind: 'method', method: 'mine', detail: `harness error in mine: a log was given for ${l.transactionHash}, which reverted in block ${number} (a reverted transaction leaves no logs)` });
+        }
         const ordered = queued.map((l, i) => ({ l, i })).sort((a, b) => hashes.indexOf(a.l.transactionHash) - hashes.indexOf(b.l.transactionHash) || a.i - b.i);
         const stored = this.#storeLogs(block, ordered.map((x) => x.l));
         // A real node announces the head, then each matching log, in block order.
@@ -1584,8 +1632,14 @@ export class FakeNode {
                 // because a real node of that kind answers exactly this.
                 if (this.#legacy) return { error: { code: -32601, message: 'the method eth_maxPriorityFeePerGas does not exist/is not available' } };
                 return { result: toQuantity(this.priorityFeePerGas) };
-            case 'eth_estimateGas':
+            case 'eth_estimateGas': {
+                // A call the scenario's read reverts cannot be estimated (WR-01).
+                const tx = (p[0] ?? {}) as { to?: string; from?: string; data?: string; input?: string; value?: string };
+                if (!this.#enforceReverts) return { result: toQuantity(this.#estimateGas ?? DEFAULT_ESTIMATE) };
+                const outcome = this.#evaluate({ to: tx.to, from: tx.from, data: tx.data ?? tx.input ?? '0x', value: asBigInt(tx.value), blockTag: p[1] });
+                if (outcome !== undefined && typeof outcome !== 'string') return { error: revertError(outcome) };
                 return { result: toQuantity(this.#estimateGas ?? DEFAULT_ESTIMATE) };
+            }
             case 'eth_getBalance':
                 return { result: toQuantity(this.#balances.get(lc(p[0])) ?? 0n) };
             case 'eth_getCode':
@@ -1776,27 +1830,48 @@ export class FakeNode {
         };
     }
 
+    /**
+     * The registered read for this call's target and selector, evaluated: return data or a revert.
+     * Undefined when no read is registered. The one revert source (WR-01) for eth_call,
+     * eth_estimateGas, a mined transaction and eth_callBundle.
+     */
+    #evaluate(call: { to?: string | null; from?: string | null; data: string; value: bigint; blockTag?: unknown }): ReadResult | undefined {
+        const data = call.data.toLowerCase();
+        const to = call.to ? lc(call.to) : '';
+        const read = this.#reads.get(`${to}|${data.slice(0, 10)}`);
+        if (!read) return undefined;
+        if (typeof read.result !== 'function') return read.result;
+        const args = coder.decode(read.fragment.inputs, '0x' + data.slice(10));
+        return read.result({ to, from: call.from ?? undefined, data, value: call.value, blockTag: call.blockTag ?? 'latest', args });
+    }
+
+    /**
+     * Whether a mined transaction executes (false: it reverts). A read that cannot decode the
+     * calldata is a harness error (a stray, as on the eth_call path) and counts as a revert.
+     */
+    #executes(tx: Transaction): boolean {
+        let outcome: ReadResult | undefined;
+        try {
+            outcome = this.#evaluate({ to: tx.to, from: tx.from, data: tx.data, value: tx.value });
+        } catch (e) {
+            this.strays.push({ seq: nextSeq(), kind: 'method', method: 'mine', detail: `harness error deciding ${tx.hash} in mine: ${e instanceof Error ? e.message : String(e)}` });
+            return false;
+        }
+        return outcome === undefined || typeof outcome === 'string';
+    }
+
     #ethCall(p: unknown[], entry: CallLogEntry): Outcome {
         const tx = (p[0] ?? {}) as { to?: string; from?: string; data?: string; input?: string; value?: string };
         const data = (tx.data ?? tx.input ?? '0x').toLowerCase();
         const to = tx.to ? lc(tx.to) : '';
         const selector = data.slice(0, 10);
-        const read = this.#reads.get(`${to}|${selector}`);
-        if (!read) {
+        const result = this.#evaluate({ to: tx.to, from: tx.from, data, value: asBigInt(tx.value), blockTag: p[1] });
+        if (result === undefined) {
             this.strays.push({ seq: entry.seq, kind: 'read', method: 'eth_call', to, selector, detail: `unknown contract read ${selector} on ${to || '(no target)'}` });
             return { error: { code: -32000, message: 'execution reverted' } };
         }
-        let result: ReadResult;
-        if (typeof read.result === 'function') {
-            const args = coder.decode(read.fragment.inputs, '0x' + data.slice(10));
-            result = read.result({ to, from: tx.from, data, value: asBigInt(tx.value), blockTag: p[1], args });
-        } else {
-            result = read.result;
-        }
         if (typeof result === 'string') return { result };
-        // geth: code 3 with the revert data when there is any, -32000 when there is none.
-        if (result.revert === '0x' || result.revert === '') return { error: { code: -32000, message: 'execution reverted' } };
-        return { error: { code: 3, message: 'execution reverted', data: result.revert } };
+        return { error: revertError(result) };
     }
 
     /**
@@ -1899,6 +1974,10 @@ export class FakeNode {
         let totalFees = 0n;
         const results = txs.map((raw) => {
             const tx = Transaction.from(raw);
+            // The same read decides the simulation (WR-01): a revert is reported per transaction,
+            // as the relay does, which is what the Flashbots library's firstRevert reads.
+            const outcome = this.#enforceReverts ? this.#evaluate({ to: tx.to, from: tx.from, data: tx.data, value: tx.value }) : undefined;
+            const revert = outcome !== undefined && typeof outcome !== 'string' ? { error: 'execution reverted', revert: outcome.revert } : {};
             const gasUsed = Number(tx.gasLimit < DEFAULT_ESTIMATE ? tx.gasLimit : DEFAULT_ESTIMATE);
             const priority = tx.type === 2 ? tx.maxPriorityFeePerGas! : (tx.gasPrice ?? 0n) - baseFee;
             const gasPrice = tx.type === 2 ? baseFee + priority : (tx.gasPrice ?? 0n);
@@ -1915,6 +1994,7 @@ export class FakeNode {
                 toAddress: tx.to,
                 txHash: tx.hash,
                 value: '0x',
+                ...revert,
             };
         });
         return {
@@ -2140,6 +2220,12 @@ class Hold implements HoldHandle {
     describe(): string {
         return `hold(${this.#match.text}): held ${this.#held} call(s)${this.#released ? ', released' : ''}`;
     }
+}
+
+/** geth's answer for a reverted call: code 3 with the revert data when there is any, -32000 when there is none. */
+function revertError(r: ReadRevert): JsonRpcError {
+    if (r.revert === '0x' || r.revert === '') return { code: -32000, message: 'execution reverted' };
+    return { code: 3, message: 'execution reverted', data: r.revert };
 }
 
 function bundleHashOf(txHashes: string[]): string {
