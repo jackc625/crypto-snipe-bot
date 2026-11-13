@@ -22,6 +22,7 @@ const GATE_CASES = [
     'CR-08-delegated-send-outside-lock-fails',
     'CR-09-method-value-outside-lock-fails',
     'WR-23-unchecked-send-outside-lock-fails',
+    'WR-24-local-withNonceLock-is-not-the-lock-fails',
     'F3-unknown-lock-status-fails',
     'F3-stale-exclusion-fails',
     'AC-53-missing-decision-ref-fails',

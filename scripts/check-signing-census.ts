@@ -119,6 +119,9 @@
 //             awaited/returned inside the lock, no reference at all, or a chain
 //             deeper than the limit. unknown is never counted as locked or
 //             excluded.
+//   withNonceLock is the function declared in src/utils/nonceAuthority.ts and
+//   nowhere else (Phase 23 review WR-24): a local function of the same name
+//   serializes nothing, so a call of it is followed like any other callee.
 //   A callback passed to an in-program function G is followed only when G's
 //   parameter is invoked directly in G's own body and each invocation is
 //   awaited or returned; the callback then runs inside that call to G.
@@ -249,6 +252,8 @@ const METHOD_DATA_MEMBERS = ['fragment', 'name', 'getFragment', '_contract', '_k
 const ENTRY_REGISTRARS = ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener', 'get', 'post', 'put', 'patch', 'delete', 'use', 'all'];
 const ENTRY_FUNCTIONS = ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask', 'nextTick'];
 const MAX_DEPTH = 40;
+/** The one real lock (D-NONCE-AUTHORITY-ALL). A function of the same name declared anywhere else is not the lock (Phase 23 review WR-24). */
+const LOCK_MODULE_REL = 'src/utils/nonceAuthority.ts';
 
 function posix(p: string): string {
     return p.replace(/\\/g, '/');
@@ -549,7 +554,9 @@ class Census {
         if (!nameNode || nameNode.text !== 'withNonceLock') return false;
         let sym = this.checker.getSymbolAtLocation(nameNode);
         if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-        return !!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d) && d.name?.text === 'withNonceLock');
+        // WR-24: only the real lock counts. A function of the same name declared anywhere else (a
+        // script's local no-op withNonceLock) serializes nothing.
+        return !!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d) && d.name?.text === 'withNonceLock' && !!d.body && this.rel(d.getSourceFile().fileName) === LOCK_MODULE_REL);
     }
 
     hop(n: ts.Node): string {
@@ -1758,7 +1765,7 @@ function lockedSitesSource(n: number): string {
     });
 }`);
     return `import { Wallet } from 'ethers';
-import { withNonceLock } from './lock';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 ${GATE_TX}
@@ -1813,7 +1820,7 @@ function baseGateExceptions(): Record<string, unknown> {
 function baseGateFiles(locked: number): Record<string, string> {
     return {
         'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', moduleResolution: 'node', strict: true, esModuleInterop: true, skipLibCheck: true, types: [] }, include: ['src/**/*'] }, null, 2),
-        'src/lock.ts': FIXTURE_LOCK,
+        [LOCK_MODULE_REL]: FIXTURE_LOCK,
         'src/locked.ts': lockedSitesSource(locked),
         'src/legacy.ts': GATE_LEGACY_UNLOCKED,
         'scripts/tool.ts': GATE_TOOL_SCRIPT,
@@ -2139,8 +2146,27 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// WR-24: a script declares its own withNonceLock that serializes nothing.
+const GATE_FAKE_LOCK_SCRIPT = `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+async function withNonceLock<T>(_walletAddress: string, op: () => Promise<T>): Promise<T> {
+    return op();
+}
+
+async function main(): Promise<void> {
+    await withNonceLock(wallet.address, async () => {
+        await wallet.sendTransaction(tx);
+    });
+}
+
+void main();
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
-import { withNonceLock } from './lock';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 ${GATE_TX}
@@ -2228,20 +2254,21 @@ function gateCases(): CaseOutcome[] {
     out.push(
         codeCase(
             'AC-36-no-files-fails',
-            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': null, 'src/legacy.ts': null, 'scripts/tool.ts': null },
+            { ...baseGateFiles(20), [LOCK_MODULE_REL]: null, 'src/locked.ts': null, 'src/legacy.ts': null, 'scripts/tool.ts': null },
             ['no-files'],
         ),
     );
     out.push(
         codeCase(
             'AC-36-no-sites-fails',
-            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': 'export const nothingSigns = 1;\n', 'src/legacy.ts': null, 'scripts/tool.ts': 'export const nothingSignsHere = 2;\n' },
+            { ...baseGateFiles(20), [LOCK_MODULE_REL]: null, 'src/locked.ts': 'export const nothingSigns = 1;\n', 'src/legacy.ts': null, 'scripts/tool.ts': 'export const nothingSignsHere = 2;\n' },
             ['no-sites'],
         ),
     );
     out.push(codeCase('CR-08-delegated-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/rescue.ts': GATE_DELEGATED_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('CR-09-method-value-outside-lock-fails', { ...baseGateFiles(20), 'scripts/approve.ts': GATE_METHOD_VALUE_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('WR-23-unchecked-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/unchecked.ts': GATE_UNCHECKED_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('WR-24-local-withNonceLock-is-not-the-lock-fails', { ...baseGateFiles(20), 'scripts/fakelock.ts': GATE_FAKE_LOCK_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
     out.push(
         codeCase('WR-25-signing-cjs-and-mts-scripts-fail', { ...baseGateFiles(20), 'scripts/rescue.cjs': GATE_CJS_SCRIPT, 'scripts/rescue2.mts': GATE_MTS_SCRIPT }, ['surplus-unlocked'], (res) => {
@@ -2250,7 +2277,7 @@ function gateCases(): CaseOutcome[] {
         }),
     );
     const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
-    narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
+    narrowed.include = [LOCK_MODULE_REL, 'src/locked.ts', 'src/legacy.ts'];
     out.push(codeCase('file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.ts': GATE_NEW_UNLOCKED_SRC }, ['file-not-audited']));
     out.push(
         codeCase('WR-25-js-file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.mjs': 'export const x = 1;\n' }, ['file-not-audited'], (res) =>
@@ -2366,7 +2393,7 @@ const FIXTURE_LOCK = `export async function withNonceLock<T>(walletAddress: stri
 
 const FIXTURE_CASES = `import { Wallet, ContractFactory, Contract, JsonRpcProvider, JsonRpcSigner } from 'ethers';
 import type { ContractRunner, TransactionRequest, ContractTransactionResponse } from 'ethers';
-import { withNonceLock } from './lock';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 declare const provider: JsonRpcProvider;
@@ -2781,7 +2808,8 @@ function analysisSelfTest(): { failed: number; total: number } {
         fs.mkdirSync(path.join(dir, 'node_modules'));
         fs.symlinkSync(path.join(repoNm, 'ethers'), path.join(dir, 'node_modules', 'ethers'), process.platform === 'win32' ? 'junction' : 'dir');
         fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', moduleResolution: 'node', strict: true, esModuleInterop: true, skipLibCheck: true, types: [] }, include: ['src/**/*'] }, null, 2));
-        fs.writeFileSync(path.join(dir, 'src', 'lock.ts'), FIXTURE_LOCK);
+        fs.mkdirSync(path.join(dir, path.dirname(LOCK_MODULE_REL)), { recursive: true });
+        fs.writeFileSync(path.join(dir, LOCK_MODULE_REL), FIXTURE_LOCK);
         fs.writeFileSync(path.join(dir, 'src', 'cases.ts'), FIXTURE_CASES);
         const c = new Census(dir, '0'.repeat(40));
         const r = c.run();
