@@ -7,7 +7,7 @@ status: validated
 nyquist_compliant: true
 wave_0_complete: true
 created: "2026-11-09"
-validated: "2026-11-12"
+validated: "2026-11-13"
 ---
 
 # Phase 23 — Validation Strategy
@@ -24,7 +24,7 @@ validated: "2026-11-12"
 | **Config file** | `vitest.config.ts` (projects `unit`, `integration`, `realpath`, plus `fork`) |
 | **Quick run command** | `N22=/c/Users/jackc/AppData/Local/nvm/v22.16.0; PATH="$N22:$PATH"; npx vitest run --project realpath <folder>` |
 | **Full suite command** | `N22=/c/Users/jackc/AppData/Local/nvm/v22.16.0; PATH="$N22:$PATH"; npm test` |
-| **Measured runtime** | full railed suite 195 to 220 s (211 files, 1560 tests: unit 952, integration 264, realpath 344) at the waves 14-15 gate and in 23-26 |
+| **Measured runtime** | full railed suite 199 s at HEAD 9246cf7 after the code-review fixes (214 files, 1599 tests: unit 966, integration 264, realpath 369); earlier 195 to 220 s (211 files, 1560 tests: unit 952, integration 264, realpath 344) at the waves 14-15 gate and in 23-26 |
 
 Every command runs on Node 22.16.0 by absolute path, because the global Node 24 cannot load better-sqlite3.
 
@@ -43,14 +43,29 @@ Every command runs on Node 22.16.0 by absolute path, because the global Node 24 
 
 Evidence: the waves 14-15 gate at HEAD f69e754 (2026-11-12: 211 files, 1560/1560, recordings-compared 130/130, every gate PASS, no test at or over half its real limit) and plan 23-26's whole-phase proof (wrapped full suite at 597d6db: verdict untouched, 1560/1560; final gates at the sealed revision 912b915: `check.ts --stage triage`, `check:realpath-mocks`, `check:census`, `check:commits`, `npm run test:realpath` 344/344, recordings-compared 130/130).
 
+Re-validated 2026-11-13 at HEAD 9246cf7, after the 46 code-review fixes (77 commits after the first validation; `src/` still unchanged). Command: `orchestrator/wave-gate.sh` on Node 22.16.0. Results:
+- tsc x3 pass.
+- Full railed suite: 214 files, 1599/1599 (unit 966, integration 264, realpath 369), 0 skipped, 0 todo, 103 knownBug records.
+- Rail ledger: nonLoopbackAllowed 0, telegramAllowed 0. Every deny count is identical to the 2026-11-12 full runs.
+- Recordings compared: 130/130.
+- `check:realpath-mocks` and `check:vi-mock`: 0 violations.
+- `check:census`: 24 sites, unknown 0, floor 24, 0 problems. Floor history: 0 problems.
+- `--check-manifest`: MANIFEST-OK rows 36 files 11 guards 1. `--check-summaries`: SUMMARIES-OK red-ok 67.
+- `check.ts` partial, consolidation and triage: RESULT PASS, fail 0, pending 0.
+- `check:commits`: RESULT PASS, 122 commits judged, 0 violations.
+- `src/` and `scripts/` clean.
+
+The fixes added three test files, mapped below: `test/unit/updateRecordingsGate.test.ts` (WR-35/36), `test/unit/vitestProjectCoverage.test.ts` (WR-30) and `test/unit/ci/workflowLimits.test.ts` (WR-31).
+
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 23-01 T1-T2, 23-28, 23-27 | 23-01, 23-28, 23-27 | 1, 2, 4 | CHAR-01 (AC-01, AC-03) | — | Unknown methods, reads and URLs fail loudly; no real network (rail ledger nonLoopbackAllowed 0) | integration | `npx vitest run --project realpath test/realpath/harness.test.ts test/realpath/harnessCapture.test.ts test/realpath/harnessRestart.test.ts` | ✅ | ✅ green |
 | 23-02 | 23-02 | 3 | CHAR-01 (AC-02) | — | No mock of the mechanism under test in test/realpath | gate + self-test | `npm run check:realpath-mocks` and `test/unit/realpathMockGate.test.ts` (runs `--self-test`) | ✅ | ✅ green |
+| Review fixes WR-30, WR-31 | 23-REVIEW-FIX | post-execution | CHAR-01 (suite infrastructure) | — | Every test file under test/ runs in exactly one Vitest project, so none is silently skipped; every CI job has a time limit and the contract jobs' Python tools are pinned | unit | `npx vitest run --project unit test/unit/vitestProjectCoverage.test.ts test/unit/ci/workflowLimits.test.ts` | ✅ | ✅ green |
 | 23-03 | 23-03 | 2 | CHAR-05 (AC-04 to AC-06) | — | N/A | integration | `npx vitest run --project realpath test/realpath/migrations` | ✅ | ✅ green |
 | 23-03 | 23-03 | 2 | CHAR-05 (AC-07) | — | N/A | unit | `npx vitest run --project unit test/unit/helpers.smoke.test.ts test/unit/db.test.ts` | ✅ | ✅ green |
 | 23-04 to 23-16 | 23-04 to 23-16, 23-32 | 4 to 6, 14 | AUDIT-02 (AC-08 to AC-18) | — | Every population entry has one outcome; S0/S1 rulings recorded | register + tests | `node node_modules/ts-node/dist/bin.js .planning/audit/tools/check.ts --stage triage` and `npx vitest run --project realpath test/realpath/triage` (three identical runs, evidence byte-identical) | ✅ | ✅ green |
-| 23-20 to 23-22 | 23-20, 23-21, 23-22, 23-25, 23-33 | 12 to 14 | CHAR-02 (AC-19 to AC-26) | T-23-25, T-23-26 | Recordings hold only inert test values (AC-51 field-aware scan); only the update command writes; every committed recording is compared | integration | `npx vitest run --project realpath test/realpath/scenarios test/realpath/recordingsGuard.test.ts` (three runs for AC-24), then `npm run check:recordings-compared -- --run-log <log>` | ✅ | ✅ green |
+| 23-20 to 23-22 | 23-20, 23-21, 23-22, 23-25, 23-33 | 12 to 14 | CHAR-02 (AC-19 to AC-26) | T-23-25, T-23-26 | Recordings hold only inert test values (AC-51 field-aware scan); only the update command writes; every committed recording is compared | integration + unit | `npx vitest run --project realpath test/realpath/scenarios test/realpath/recordingsGuard.test.ts` (three runs for AC-24), then `npm run check:recordings-compared -- --run-log <log>`; `npx vitest run --project unit test/unit/updateRecordingsGate.test.ts` (the update command's `--self-test`: a re-record holding a planted key fails before commit, WR-35/36) | ✅ | ✅ green |
 | 23-23 | 23-23 | 13 | CHAR-03 (AC-27 to AC-29) | — | Snapshots hold only inert test values (AC-51) | integration | `npx vitest run --project realpath test/realpath/env` | ✅ | ✅ green |
 | 23-24 | 23-24 | 13 | CHAR-04 (AC-30, AC-31) | — | N/A | integration | `npx vitest run --project realpath test/realpath/ordering` | ✅ | ✅ green |
 | 23-17 | 23-17 | 7 | CHAR-04 (AC-32 to AC-36) | — | Every signing path holds the nonce lock or is a listed exception with a decision | gate + self-test | `npm run check:census` (and `-- --check-floor-history`), `test/unit/signingCensusGate.test.ts` (runs `--self-test`) | ✅ | ✅ green |
@@ -93,7 +108,7 @@ Phase 23 built its own test infrastructure in its early waves. No framework inst
 - [ ] Feedback latency < 60s — the full suite takes 195 to 220 s on this machine (single folders stay under 60 s); recorded, not a coverage gap
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** validated 2026-11-12 (validate-phase, during execute-phase 23 verification)
+**Approval:** validated 2026-11-12 (validate-phase, during execute-phase 23 verification); re-validated 2026-11-13 at HEAD 9246cf7 after the code-review fixes (no gaps; full suite and every gate green)
 
 ## Validation Audit 2026-11-12
 
