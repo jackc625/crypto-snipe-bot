@@ -1,7 +1,8 @@
 // test/realpath/triage/AUD-EXIT-008.test.ts
-// Phase 23 plan 23-08 Task 1 (AUDIT-02): AUD-EXIT-008, the dashboard's force-sell is sent as a
-// routine exit, so once a position's routine retries are paused the operator cannot sell it from
-// the dashboard, although the pause alert tells the operator to act manually.
+// Phase 23 plan 23-08 Task 1 (AUDIT-02): AUD-EXIT-008, the dashboard's force-sell and
+// emergency-sell are sent as a routine exit, so once a position's routine retries are paused the
+// operator cannot sell it from the dashboard, although the pause alert tells the operator to act
+// manually.
 //
 // The sites. src/api/routes/controls.ts force-sell calls executeFullSell with reason
 // 'urgency-market-sell' (emergency-sell does the same). src/exitEngine.ts executeFullSell returns
@@ -24,64 +25,81 @@
 // retries pause. Preconditions asserted before the request: trades.status 'pending', the real
 // exported isRoutinePaused is true, exit.failed.held.routine-paused is logged for the trade.
 //
-// Then the operator presses force-sell on the real dashboard (real login, real route behind the
-// real auth middleware, over node:http). Correct: the operator's sell runs (a new sell of the
-// position is submitted). Today: HTTP 409 "Sell already in progress for this position", the
-// exit.routine.paused-skip op for the operator's reason, and no new sell. Those three are asserted
-// after the marker. A fix that lets operator sells bypass the routine pause (the recommendation,
-// card EXIT-07) reads "looks fixed" (D-08): the sell runs and the drive lands it.
+// Then the operator presses a dashboard sell (real login, real route behind the real auth
+// middleware, over node:http), once per route, because both routes pass the routine reason and a
+// fix in one route leaves the other refused (review CR-05):
+//   - operator-sell-refused-while-routine-paused: force-sell (POST /api/controls/force-sell/:id).
+//   - operator-emergency-sell-refused-while-routine-paused: emergency-sell (POST
+//     /api/controls/emergency-sell, every open position; this one position is the only one).
+// Correct: the operator's sell runs (a new sell of the position is submitted). Today: force-sell
+// answers HTTP 409 "Sell already in progress for this position", emergency-sell answers ok false
+// with one failure, each logs exit.routine.paused-skip for the operator's reason, and no new sell is
+// sent. Those parts are asserted after each marker. A fix that lets operator sells bypass the
+// routine pause (the recommendation, card EXIT-07) reads "looks fixed" (D-08) in both claims: the
+// sell runs and the drive lands it. A fix that gives only force-sell an operator reason flips the
+// force-sell claim and leaves the emergency-sell claim recorded (in-memory mutants, review CR-05).
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
 import { describe, expect, it } from 'vitest';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
-import { createScenario, stepFor, stepUntilTrue } from '../harness/world';
+import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
 import { dashboardOverrides, exitStatusOf, heldPosition, incomingHolder, openDashboard, postDriven, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
 import { buyRow, opEntries } from './fixtures/AUD-EXIT-002-position';
 import { foreignTrade } from './fixtures/AUD-EXIT-001-sell-path';
 
+/**
+ * The shared setup of both claims (see the header): a held position whose routine retries are
+ * paused while its buy row stays 'pending'. Every precondition is asserted here, before any request.
+ */
+async function pausedPosition(): Promise<{ sc: Scenario; tradeId: number }> {
+    const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ...(await dashboardOverrides()), EXIT_ROUTINE_MAX_FAILURES: '1' } });
+    const { node } = sc;
+    const pos = await heldPosition(sc);
+    const holder = incomingHolder(sc, { bought: pos.bought, holding: pos.bought });
+    const received = pos.bought / 10n;
+
+    // The routine stop-loss exit, landed together with the incoming transfer.
+    const fromSubmit = node.submitted.length;
+    await foreignTrade(sc, { sellTokens: (sc.reserves.token * 3n) / 10n });
+    const sellOf = (): (typeof node.submitted)[number] | undefined => sellsSince(sc, fromSubmit)[0];
+    await stepUntilTrue(
+        () => {
+            const approves = node.submitted.slice(fromSubmit).filter((s) => s.route === 'public' && s.status === 'accepted').map((s) => s.hash);
+            if (approves.length > 0) node.mine({ include: approves });
+            return sellOf() !== undefined;
+        },
+        { what: 'the bot sending its stop-loss sell', maxSteps: 20_000 },
+    );
+    const sell = sellOf()!;
+    expect(sell.route).toBe('bundle');
+    const transfer = await holder.send(received);
+    await stepFor(12_000);
+    node.mine({ include: [sell.hash, transfer.hash], logs: [transfer.log] });
+    await stepUntilTrue(() => opEntries('exit.failed.held.routine-paused').length > 0, { what: 'the routine retries pausing', maxSteps: 20_000 });
+
+    // Preconditions, asserted before the request: the row is still 'pending' and the pause is on.
+    expect(opEntries('exit.trigger.stop-loss').length).toBeGreaterThanOrEqual(1);
+    expect(node.statusOf(sell.hash)).toBe('mined');
+    expect(buyRow(sc)?.status).toBe('pending');
+    expect(sc.graph.exitEngine.isRoutinePaused('eth', sc.token)).toBe(true);
+    expect(opEntries('exit.failed.held.routine-paused').map((o) => [o.tradeId, o.reason, o.failureCount])).toEqual([[pos.tradeId, 'stop-loss', 1]]);
+    expect(exitStatusOf(sc, pos.tradeId)).toEqual({ exit_status: 'exit_failed_held', exit_failure_count: 1 });
+    expect(recordedAlerts().some((a) => String(a.message).includes('[EXIT ROUTINE PAUSED]') && String(a.message).includes('resume manually'))).toBe(true);
+    return { sc, tradeId: pos.tradeId };
+}
+
 describe('AUD-EXIT-008: dashboard sells are refused once routine retries are paused', () => {
     it('operator-sell-refused-while-routine-paused: after the routine retries of a still-held position pause, the dashboard force-sell answers 409 and sends no sell', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ...(await dashboardOverrides()), EXIT_ROUTINE_MAX_FAILURES: '1' } });
+        const { sc, tradeId } = await pausedPosition();
         const { node } = sc;
-        const pos = await heldPosition(sc);
-        const holder = incomingHolder(sc, { bought: pos.bought, holding: pos.bought });
-        const received = pos.bought / 10n;
-
-        // The routine stop-loss exit, landed together with the incoming transfer.
-        const fromSubmit = node.submitted.length;
-        await foreignTrade(sc, { sellTokens: (sc.reserves.token * 3n) / 10n });
-        const sellOf = (): (typeof node.submitted)[number] | undefined => sellsSince(sc, fromSubmit)[0];
-        await stepUntilTrue(
-            () => {
-                const approves = node.submitted.slice(fromSubmit).filter((s) => s.route === 'public' && s.status === 'accepted').map((s) => s.hash);
-                if (approves.length > 0) node.mine({ include: approves });
-                return sellOf() !== undefined;
-            },
-            { what: 'the bot sending its stop-loss sell', maxSteps: 20_000 },
-        );
-        const sell = sellOf()!;
-        expect(sell.route).toBe('bundle');
-        const transfer = await holder.send(received);
-        await stepFor(12_000);
-        node.mine({ include: [sell.hash, transfer.hash], logs: [transfer.log] });
-        await stepUntilTrue(() => opEntries('exit.failed.held.routine-paused').length > 0, { what: 'the routine retries pausing', maxSteps: 20_000 });
-
-        // Preconditions, asserted before the request: the row is still 'pending' and the pause is on.
-        expect(opEntries('exit.trigger.stop-loss').length).toBeGreaterThanOrEqual(1);
-        expect(node.statusOf(sell.hash)).toBe('mined');
-        expect(buyRow(sc)?.status).toBe('pending');
-        expect(sc.graph.exitEngine.isRoutinePaused('eth', sc.token)).toBe(true);
-        expect(opEntries('exit.failed.held.routine-paused').map((o) => [o.tradeId, o.reason, o.failureCount])).toEqual([[pos.tradeId, 'stop-loss', 1]]);
-        expect(exitStatusOf(sc, pos.tradeId)).toEqual({ exit_status: 'exit_failed_held', exit_failure_count: 1 });
-        expect(recordedAlerts().some((a) => String(a.message).includes('[EXIT ROUTINE PAUSED]') && String(a.message).includes('resume manually'))).toBe(true);
 
         // The operator presses force-sell.
         const { dash, cookie } = await openDashboard(sc);
         const fromRequest = node.submitted.length;
         const fromLog = recordedLogs().length;
-        const reply = await postDriven(sc, dash, `/api/controls/force-sell/${pos.tradeId}`, cookie, 'land');
+        const reply = await postDriven(sc, dash, `/api/controls/force-sell/${tradeId}`, cookie, 'land');
         const newSells = sellsSince(sc, fromRequest);
 
         knownBug(ctx, 'AUD-EXIT-008', {
@@ -95,9 +113,38 @@ describe('AUD-EXIT-008: dashboard sells are refused once routine retries are pau
         // The three parts of today's refusal.
         expect(reply).toEqual({ status: 409, body: { error: 'Sell already in progress for this position' } });
         const operatorSkips = opEntries('exit.routine.paused-skip', fromLog).filter((o) => o.reason === 'urgency-market-sell');
-        expect(operatorSkips.map((o) => o.tradeId)).toEqual([pos.tradeId]);
+        expect(operatorSkips.map((o) => o.tradeId)).toEqual([tradeId]);
         expect(node.submitted.slice(fromRequest)).toEqual([]);
         // Nothing else holds the sell: the refusal is the pause, not a lock.
+        expect(recordedLogs().slice(fromLog).some((l) => l.msg === 'Another exit already handling token, skipping')).toBe(false);
+        expect(sc.graph.exitEngine.isRoutinePaused('eth', sc.token)).toBe(true);
+    });
+
+    it('operator-emergency-sell-refused-while-routine-paused: after the routine retries of a still-held position pause, the dashboard emergency-sell reports a failure and sends no sell', async (ctx) => {
+        const { sc, tradeId } = await pausedPosition();
+        const { node } = sc;
+
+        // The operator presses emergency-sell.
+        const { dash, cookie } = await openDashboard(sc);
+        const fromRequest = node.submitted.length;
+        const fromLog = recordedLogs().length;
+        const reply = await postDriven(sc, dash, '/api/controls/emergency-sell', cookie, 'land');
+        const newSells = sellsSince(sc, fromRequest);
+
+        knownBug(ctx, 'AUD-EXIT-008', {
+            claim: 'operator-emergency-sell-refused-while-routine-paused',
+            correct: { operatorSellRuns: true },
+            observed: { operatorSellRuns: false },
+            actual: { operatorSellRuns: newSells.length > 0 },
+            expectedPlain: 'After the bot pauses its routine exit retries and tells the operator to act manually, the dashboard emergency-sell still sells the position.',
+            actualPlain: 'With routine retries paused on a still-held position, the dashboard emergency-sell reported the position as failed ("Sell lock held by another operation") and sent no sell.',
+        });
+        // The parts of today's refusal.
+        expect(reply.status).toBe(200);
+        expect(reply.body).toEqual(expect.objectContaining({ ok: false, sold: 0, failed: 1, errors: [expect.objectContaining({ tradeId, error: 'Sell lock held by another operation' })] }));
+        const operatorSkips = opEntries('exit.routine.paused-skip', fromLog).filter((o) => o.reason === 'urgency-market-sell');
+        expect(operatorSkips.map((o) => o.tradeId)).toEqual([tradeId]);
+        expect(node.submitted.slice(fromRequest)).toEqual([]);
         expect(recordedLogs().slice(fromLog).some((l) => l.msg === 'Another exit already handling token, skipping')).toBe(false);
         expect(sc.graph.exitEngine.isRoutinePaused('eth', sc.token)).toBe(true);
     });
