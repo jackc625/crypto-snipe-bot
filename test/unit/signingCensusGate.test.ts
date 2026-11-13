@@ -31,6 +31,8 @@ const GATE_CASES = [
     'T-23-22-excluding-a-signing-site-fails',
     'exceptions-file-unsorted-fails',
     'file-outside-tsconfig-include-fails',
+    'WR-25-signing-cjs-and-mts-scripts-fail',
+    'WR-25-js-file-outside-tsconfig-include-fails',
     'flag7-never-opens-env-or-data',
     'AC-34-floor-drop-naming-its-finding-passes',
     'AC-34-floor-drop-without-a-finding-fails',

@@ -13,7 +13,7 @@
 //     UsageError and a small parser for this gate's three flags;
 //   - it runs on the working tree: the two refusals of a checkout (.git, .env, data/) are
 //     gone. The guarantee they gave is kept differently: the census builds a TypeScript
-//     program from tsconfig.json's root files plus scripts/**/*.ts and reads type
+//     program from tsconfig.json's root files plus every source file under scripts/ (allowJs) and reads type
 //     information only, so .env and data/ are never opened. The self-test proves it on a
 //     checkout-shaped fixture (case flag7-never-opens-env-or-data), and every real run
 //     refuses a program that holds a file named .env or a file under data/;
@@ -36,8 +36,9 @@
 //             call whose mutability the census could not read, and must cite a manual
 //             inventory entry that excludes the same file and call.
 // Also: no counted site may have lock status unknown (F3); a scan that finds no files in
-// src/ or scripts/, or no signing site, fails (AC-36); every .ts file under src/ and
-// scripts/ must be in the census program.
+// src/ or scripts/, or no signing site, fails (AC-36); every JavaScript or TypeScript source
+// file under src/ and scripts/ (.ts .tsx .mts .cts .js .jsx .mjs .cjs; Phase 23 review WR-25)
+// must be in the census program, which is built with allowJs so the JavaScript ones are typed.
 //
 // Usage (Node 22.16.0, D-21):
 //   npm run check:census                                              gate on the working tree
@@ -253,14 +254,21 @@ function posix(p: string): string {
     return p.replace(/\\/g, '/');
 }
 
-function walkTs(dir: string, out: string[]): void {
+/**
+ * Every JavaScript or TypeScript source extension Node or ts-node can run (Phase 23 review WR-25):
+ * a signing script written as .cjs, .mjs, .js, .mts or .cts must be audited like a .ts one.
+ */
+const SOURCE_EXT_RE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+const DECLARATION_RE = /\.d\.(ts|mts|cts)$/;
+
+function walkSources(dir: string, out: string[]): void {
     if (!fs.existsSync(dir)) return;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) {
             if (e.name === 'node_modules') continue;
-            walkTs(p, out);
-        } else if (e.isFile() && /\.tsx?$/.test(e.name) && !/\.d\.ts$/.test(e.name)) out.push(posix(p));
+            walkSources(p, out);
+        } else if (e.isFile() && SOURCE_EXT_RE.test(e.name) && !DECLARATION_RE.test(e.name)) out.push(posix(p));
     }
 }
 
@@ -282,13 +290,15 @@ class Census {
         if (!fs.existsSync(cfgPath)) throw new UsageError(`no tsconfig.json in ${this.root}`);
         const raw = ts.readConfigFile(cfgPath, ts.sys.readFile);
         if (raw.error) throw new Error(ts.flattenDiagnosticMessageText(raw.error.messageText, '\n'));
-        const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, this.root);
+        // allowJs (WR-25): the tsconfig include then also yields src/ JavaScript files, and the
+        // scripts/ walk adds every source extension, so .js/.cjs/.mjs files are typed and audited.
+        const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, this.root, { allowJs: true });
         const scripts: string[] = [];
-        walkTs(path.join(this.root, 'scripts'), scripts);
+        walkSources(path.join(this.root, 'scripts'), scripts);
         const names = new Set<string>(parsed.fileNames.map(posix));
         for (const s of scripts) names.add(s);
         this.rootNames = [...names].sort();
-        const options: ts.CompilerOptions = { ...parsed.options, noEmit: true };
+        const options: ts.CompilerOptions = { ...parsed.options, allowJs: true, checkJs: false, noEmit: true };
         // The census program: what is classified.
         this.program = ts.createProgram({ rootNames: this.rootNames, options });
         this.checker = this.program.getTypeChecker();
@@ -1662,11 +1672,12 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
         problems.push({ code: 'no-files', message: `the census program has ${prog.src_files} src/ files and ${prog.script_files} scripts/ files; a scan that finds no files checked nothing` });
         return { problems, summary, sites };
     }
-    // Every .ts file under src/ and scripts/ must be audited (a narrowed tsconfig include would hide one).
+    // Every JavaScript or TypeScript source file under src/ and scripts/ (.ts .tsx .mts .cts .js
+    // .jsx .mjs .cjs, WR-25) must be audited (a narrowed tsconfig include would hide one).
     const audited = new Set(census.auditedFiles().map((sf) => census.rel(sf.fileName)));
     const onDisk: string[] = [];
-    walkTs(path.join(census.root, 'src'), onDisk);
-    walkTs(path.join(census.root, 'scripts'), onDisk);
+    walkSources(path.join(census.root, 'src'), onDisk);
+    walkSources(path.join(census.root, 'scripts'), onDisk);
     for (const f of onDisk.map((x) => census.rel(x)).sort()) if (!audited.has(f)) problems.push({ code: 'file-not-audited', message: `${f} is not in the census program (tsconfig.json include does not cover it), so its signing sites are not checked` });
     const counted = sites.filter((s) => s.kind === 'tx-signing' && !s.excluded);
     summary.excluded_by_census = sites.filter((s) => s.excluded && s.excluded_by === 'census').length;
@@ -1899,12 +1910,12 @@ function caseFlag7(): CaseOutcome {
         const protectedHits = [...new Set(touched.filter((p) => isProtectedPath(dir, p)).map((p) => posix(path.relative(dir, path.resolve(dir, p)))))];
         const sawSources = ['src/locked.ts', 'scripts/tool.ts', EXCEPTIONS_REL].every((rel) => touched.some((p) => posix(path.resolve(dir, p)).toLowerCase() === posix(path.join(dir, rel)).toLowerCase()));
         const roots = res.run ? res.run.census.rootNames : [];
-        const nonTs = roots.filter((f) => !/\.tsx?$/.test(f));
+        const nonTs = roots.filter((f) => !SOURCE_EXT_RE.test(f));
         const base = expectCodes(name, res.problems, [], `${touched.length} reads/listings recorded, none of .env or data/`);
         const extra: string[] = [];
         if (protectedHits.length) extra.push(`opened or listed ${protectedHits.join(', ')}`);
         if (!sawSources) extra.push('the recorder did not see the fixture sources being read, so it proves nothing');
-        if (nonTs.length) extra.push(`non-TypeScript program roots: ${nonTs.join(', ')}`);
+        if (nonTs.length) extra.push(`program roots that are not JavaScript or TypeScript sources: ${nonTs.join(', ')}`);
         if (!res.run || res.summary?.tx_signing !== 23) extra.push(`expected the scan to run and count 23 sites, got ${res.summary?.tx_signing ?? 'no scan'}`);
         outcome = extra.length ? { name, ok: false, detail: `${extra.join('; ')}${base.ok ? '' : `; ${base.detail}`}` } : base;
     } finally {
@@ -2103,6 +2114,31 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// WR-25: signing scripts written as plain CommonJS and as an ES module TypeScript file.
+const GATE_CJS_SCRIPT = `'use strict';
+const { Wallet, JsonRpcProvider } = require('ethers');
+
+async function main() {
+    const provider = new JsonRpcProvider('http://127.0.0.1:1');
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    await wallet.sendTransaction({ to: '0x0000000000000000000000000000000000000001', value: 1n });
+}
+
+void main();
+`;
+
+const GATE_MTS_SCRIPT = `import { Wallet, JsonRpcProvider } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    await wallet.sendTransaction({ to: '0x0000000000000000000000000000000000000001', value: 1n });
+}
+
+void main();
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
 import { withNonceLock } from './lock';
 
@@ -2207,9 +2243,20 @@ function gateCases(): CaseOutcome[] {
     out.push(codeCase('CR-09-method-value-outside-lock-fails', { ...baseGateFiles(20), 'scripts/approve.ts': GATE_METHOD_VALUE_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('WR-23-unchecked-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/unchecked.ts': GATE_UNCHECKED_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
+    out.push(
+        codeCase('WR-25-signing-cjs-and-mts-scripts-fail', { ...baseGateFiles(20), 'scripts/rescue.cjs': GATE_CJS_SCRIPT, 'scripts/rescue2.mts': GATE_MTS_SCRIPT }, ['surplus-unlocked'], (res) => {
+            const named = ['scripts/rescue.cjs', 'scripts/rescue2.mts'].filter((f) => res.problems.some((p) => p.code === 'surplus-unlocked' && p.message.startsWith(`${f}:`)));
+            return named.length === 2 ? null : `expected a surplus problem for each of scripts/rescue.cjs and scripts/rescue2.mts, got ${res.problems.map((p) => p.message).join(' | ')}`;
+        }),
+    );
     const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
     narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
     out.push(codeCase('file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.ts': GATE_NEW_UNLOCKED_SRC }, ['file-not-audited']));
+    out.push(
+        codeCase('WR-25-js-file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.mjs': 'export const x = 1;\n' }, ['file-not-audited'], (res) =>
+            res.problems.some((p) => p.code === 'file-not-audited' && p.message.startsWith('src/hidden.mjs ')) ? null : `expected file-not-audited for src/hidden.mjs, got ${res.problems.map((p) => p.message).join(' | ')}`,
+        ),
+    );
     out.push(caseFlag7());
     return out;
 }
