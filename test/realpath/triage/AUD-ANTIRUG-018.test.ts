@@ -22,12 +22,17 @@
 // resumeAntiRugMonitoring (the anti-rug poller starts; its first tick with no positions moves the
 // cursor to the head). A real snipe is bought and armed, and its anti-rug poll is shown working:
 // the stored cursor follows the head. Then the bot goes down (restartGraph: the same file and node)
-// for 6 minutes of fake time, 30 blocks of 12 s, and boots again the same way. One minute later the
-// deployer pulls 95 percent of the liquidity through the real router (fixtures/AUD-EXIT-014-rug.ts).
-// Measured over a bounded window of 2 minutes of fake time after the pull (60 poll ticks): whether
-// the bot evaluated the pull (an unsafe verdict schedules op antirug.confirm-gate.scheduled),
-// whether the stored cursor reached the pull's block, and the WS-health state the dashboard was
-// last told. Anti-rug stays in dry-run (the default): the measure is detection, nothing is sold.
+// for 6 minutes of fake time, 30 blocks of 12 s, and boots again the same way. Inside that downtime
+// (the tenth block) an LP holder moves LP tokens of the pair to an allowlisted locker: a log the
+// evaluator judges with its cheapest verdict (op antirug.allowlist-hit), on whichever path reads it
+// (the live poll or a backfill), and which changes nothing for the later pull. One minute after the
+// second boot the deployer pulls 95 percent of the liquidity through the real router
+// (fixtures/AUD-EXIT-014-rug.ts). Measured over a bounded window of 2 minutes of fake time after the
+// pull (60 poll ticks): whether the bot evaluated the downtime log (the missed blocks were read,
+// review WR-08), whether it evaluated the pull (an unsafe verdict schedules op
+// antirug.confirm-gate.scheduled), whether the stored cursor reached the pull's block, and the
+// WS-health state the dashboard was last told. Anti-rug stays in dry-run (the default): the measure
+// is detection, nothing is sold.
 //
 // About 2 minutes of ETH downtime is enough (10 blocks); the 6 minutes here are an ordinary
 // restart. Whether the operator runs any chain without a WebSocket URL is unknown (ESC-ANTIRUG-03,
@@ -35,11 +40,15 @@
 //
 // Fix signal (D-08): a poller that reads its outstanding range through the chunked
 // getLogsForBackfill (the recommendation) reads "looks fixed" (fix-shaped src mutation, restored).
+// A poller that skips the gap (its cursor jumps to the head at start or on a wide range) evaluates
+// the later pull but never the downtime log, so it reads "the failure changed" (review WR-08): a
+// rug mined during the downtime would be lost for good on an HTTP-only chain.
 // The stacked pollers every registration starts are AUD-ANTIRUG-007's claim and are not counted.
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
 import { describe, expect, it } from 'vitest';
+import { Interface, Wallet, ethers, parseEther } from 'ethers';
 import { harnessState } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
@@ -50,6 +59,7 @@ import { buyRow, opEntries, opLogged } from './fixtures/AUD-EXIT-002-position';
 import { pullLiquidity } from './fixtures/AUD-EXIT-014-rug';
 
 const DEAD = '0x000000000000000000000000000000000000dead';
+const V2_PAIR = new Interface(['function transfer(address to, uint256 value) returns (bool)', 'event Transfer(address indexed from, address indexed to, uint256 value)']);
 /** Runtime code for an allowlisted locker: deployed contracts on mainnet, so getCode is non-empty. */
 const LOCKER_CODE = '0x608060405234801561001057600080fd5b50600436106100365760003560e01c8063';
 
@@ -65,6 +75,21 @@ async function boot(sc: Scenario<'v2'>): Promise<void> {
     sc.graph.bot.resumeMultiChainMonitoring([sc.ctx]);
     await stepUntil(sc.graph.bot.resumeAntiRugMonitoring([sc.ctx]));
     await stepUntilTrue(() => opLogged('antirug.http-polling.started', fromLog), { what: 'the anti-rug HTTP poller starting' });
+}
+
+/** An LP-token transfer of `pair` to `locker`, signed by an LP holder and mined with its Transfer log; returns its block. */
+async function lpTransferToLocker(sc: Scenario, pair: string, locker: string): Promise<number> {
+    const holder = new Wallet(ethers.id('realpath.aud-antirug-018.lp-holder'));
+    sc.node.setBalance(holder.address, parseEther('1'));
+    const raw = await holder.signTransaction({
+        chainId: 1, nonce: sc.node.minedCount(holder.address), to: pair, value: 0n, gasLimit: 80_000n, type: 2,
+        maxFeePerGas: 60_000_000_000n, maxPriorityFeePerGas: 1_000_000_000n,
+        data: V2_PAIR.encodeFunctionData('transfer', [locker, 1_000n]),
+    });
+    const hash = sc.node.addForeignTransaction(raw);
+    const log = V2_PAIR.encodeEventLog('Transfer', [holder.address, locker, 1_000n]);
+    sc.node.mine({ include: [hash], logs: [{ address: pair, topics: log.topics, data: log.data, transactionHash: hash }] });
+    return sc.node.head;
 }
 
 function healthShown(from: number): string | null {
@@ -104,12 +129,19 @@ describe('AUD-ANTIRUG-018: the HTTP anti-rug poller asks for its whole outstandi
         const storedBeforeRestart = cursor(sc)!;
         const refusedBeforeRestart = limit.fired;
 
-        // The bot is down for 6 minutes (30 blocks of 12 s), then boots again on the same file.
+        // The bot is down for 6 minutes (30 blocks of 12 s), then boots again on the same file. The
+        // tenth downtime block carries an LP transfer of the pair to an allowlisted locker.
         await restartGraph(sc);
+        const locker = sc.ctx.chain.antiRug.allowlistV2.map((e) => e.address).find((a) => a.toLowerCase() !== DEAD)!;
+        let gapLogBlock = -1;
         for (let i = 0; i < 30; i++) {
             await stepFor(12_000);
-            sc.node.mine();
+            if (i === 9) gapLogBlock = await lpTransferToLocker(sc, sc.pair, locker);
+            else sc.node.mine();
         }
+        // Setup fact, true under the bug and every fix: the downtime log sits inside the gap.
+        expect(gapLogBlock).toBeGreaterThan(storedBeforeRestart);
+        expect(gapLogBlock).toBeLessThan(sc.node.head);
         const fromRestartLog = recordedLogs().length;
         const fromRestartCall = sc.node.callLog.length;
         const fromBroadcast = harnessState().broadcasts.length;
@@ -122,14 +154,15 @@ describe('AUD-ANTIRUG-018: the HTTP anti-rug poller asks for its whole outstandi
         const pull = await pullLiquidity(sc, { removeBps: 9_500n });
         await stepFor(120_000);
         const evaluated = opEntries('antirug.confirm-gate.scheduled', fromPull).some((o) => o.tradeId === tradeId);
+        const gapLogEvaluated = opEntries('antirug.allowlist-hit', fromRestartLog).some((o) => o.tradeId === tradeId && String(o.destination).toLowerCase() === locker.toLowerCase());
 
         knownBug(ctx, 'AUD-ANTIRUG-018', {
             claim: 'restart-gap-blinds-http-poller',
-            correct: { rugEvaluated: true, cursorReachedRugBlock: true, healthShown: 'connected' },
-            observed: { rugEvaluated: false, cursorReachedRugBlock: false, healthShown: 'connected' },
-            actual: { rugEvaluated: evaluated, cursorReachedRugBlock: (cursor(sc) ?? -1) >= pull.block, healthShown: healthShown(fromBroadcast) },
-            expectedPlain: 'After a restart on a chain without a WebSocket URL, the anti-rug poller catches up the missed blocks in provider-sized requests and then evaluates a liquidity pull on a held position.',
-            actualPlain: 'After 6 minutes of downtime the poller asked for the whole 30-plus-block gap in one eth_getLogs every 2 seconds; the provider refused every request (10-block limit), the cursor never moved, a 95 percent liquidity pull was never evaluated, and the dashboard was told the chain was connected.',
+            correct: { gapLogEvaluated: true, rugEvaluated: true, cursorReachedRugBlock: true, healthShown: 'connected' },
+            observed: { gapLogEvaluated: false, rugEvaluated: false, cursorReachedRugBlock: false, healthShown: 'connected' },
+            actual: { gapLogEvaluated, rugEvaluated: evaluated, cursorReachedRugBlock: (cursor(sc) ?? -1) >= pull.block, healthShown: healthShown(fromBroadcast) },
+            expectedPlain: 'After a restart on a chain without a WebSocket URL, the anti-rug poller catches up the missed blocks in provider-sized requests, evaluating the logs mined during the downtime, and then evaluates a liquidity pull on a held position.',
+            actualPlain: 'After 6 minutes of downtime the poller asked for the whole 30-plus-block gap in one eth_getLogs every 2 seconds; the provider refused every request (10-block limit), the cursor never moved, neither an LP log mined during the downtime nor a 95 percent liquidity pull after it was ever evaluated, and the dashboard was told the chain was connected.',
         });
         // Bug details, after the marker. Every anti-rug query since the restart started at the
         // stored block + 1 and was wider than the limit; the provider refused each one and the bot

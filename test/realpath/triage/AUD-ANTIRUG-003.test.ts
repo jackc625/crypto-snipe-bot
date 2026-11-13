@@ -39,7 +39,7 @@ import { harnessState, type HoldHandle } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepUntilTrue } from '../harness/world';
-import { afterExitPoll, breaker, exitFiredSince, liveGates, liveOverrides } from './fixtures/AUD-ANTIRUG-003-live';
+import { afterExitPoll, breaker, exitFiredSince, liveGates, liveOverrides, noExitInFlight } from './fixtures/AUD-ANTIRUG-003-live';
 import { driveChain, heldPosition, stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 import { buyRow, opEntries, opLogged } from './fixtures/AUD-EXIT-002-position';
 import { pullLiquidity } from './fixtures/AUD-EXIT-014-rug';
@@ -77,10 +77,13 @@ describe('AUD-ANTIRUG-003: the anti-rug circuit breaker counts each dispatch of 
         // The first exit approves (mined as the network would) and is parked at its simulation.
         await driveChain(sc, { mode: 'land', until: () => sim!.parkedNow === 1, what: "the first anti-rug exit's simulation being held" });
 
-        // Released, the held exit's bundle lands and the position is sold.
+        // Released, the held exit's bundle lands and the position is sold. The wait is on the outcome
+        // (sold, and no exit of the token in flight), never on matching broadcasts to dispatch logs,
+        // so a fix that drops in-flight duplicates without a broadcast does not stall it (WR-09).
+        // Then one more second of fake time, so every count of a returned exit has landed.
         sim!.release();
-        const returned = (): boolean => exitFiredSince(fromBroadcast, pos.tradeId).length === opEntries('antirug.exit.dispatch', fromLog).length;
-        await driveChain(sc, { mode: 'land', until: () => buyRow(sc)!.status === 'sold' && returned(), what: 'the held anti-rug exit selling the position' });
+        await driveChain(sc, { mode: 'land', until: () => buyRow(sc)!.status === 'sold' && noExitInFlight(sc), what: 'the held anti-rug exit selling the position' });
+        await stepUntilOrFor(() => false, 1_000);
         expect(atConfirm.dispatches).toBeGreaterThanOrEqual(1);
 
         knownBug(ctx, 'AUD-ANTIRUG-003', {

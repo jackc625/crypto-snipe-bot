@@ -40,7 +40,10 @@
 //
 // Phase 24 reading: an 'error' listener on every socket with the failed connect kept inside the
 // backoff loop (card OD-11) flips each fault claim to "looks fixed" (the bot reconnects once the
-// port is back). A process-level handler installed when src/main or src/bot loads, on its own,
+// port is back). The boot claim is held to the same outcome (review WR-07): an 'error' listener on
+// the boot socket alone keeps the process up, but nothing retries the refused connect, so the
+// chain stays without a WebSocket; that reads survived-work-pending ("the failure changed"), not
+// fixed. A process-level handler installed when src/main or src/bot loads, on its own,
 // changes the failure to survived-work-pending, as the contained case shows, so a claim then fails
 // as "the failure changed" rather than reading fixed. A handler installed only inside runMain or
 // startMultiChainBot is out of reach (they must not run here) and the proof stays failing rather

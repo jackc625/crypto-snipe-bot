@@ -29,7 +29,10 @@
 //     abc.
 //
 // What is measured: whether the limit is enforced with the value abc. Correct: the bot refuses to
-// load the limit (the graph reload fails) or canSnipe refuses. A fix that refuses to start on an
+// load the limit (the new graph's load fails with an error naming the variable) or canSnipe
+// refuses. Any other reload failure (a stop step of the old graph, a harness check, an import error
+// that does not name the variable) is rethrown by the fixture and fails the test, so it can never
+// read as the limit being enforced (review CR-02). A fix that refuses to start on an
 // unparseable limit (the finding's recommendation) or one that refuses the snipe both read "looks
 // fixed" (D-08). After each marker the abc run is asserted to have been allowed outright.
 //

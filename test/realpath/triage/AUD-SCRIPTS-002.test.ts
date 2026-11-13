@@ -24,12 +24,18 @@
 // and, separately, whether a getPauseState.get() read is reached before every signing point.
 // Script names come only from the walk; no scripts/ file is named as a path the test reads (the
 // form plan 23-19's AC-37 gate accepts).
-//   Correct:  every signing script is { lock: 'holds-lock', pauseRead: true }.
+//   Correct:  a pinned script set (review WR-10), never one built from what the analysis found: the
+//             two live scripts, plus each legacy script while its file exists, each
+//             { lock: 'holds-lock', pauseRead: true }. A script whose signing the analysis stopped
+//             resolving can therefore never drop out of `correct` and read "looks fixed".
 //   Observed: the sorted rows below, each { lock: 'none', pauseRead: false }. The two legacy rows are
 //             expected only while those files exist: deleting them is AUD-SCRIPTS-001's fix, and it
 //             must flip only AUD-SCRIPTS-001's test (repairing their imports changes no row).
-// After the marker, the detail: the signing points found in the two live scripts, by enclosing
-// function and call (no line numbers).
+// Before the marker, a setup fact true under the bug and every fix: each live script is walked and
+// each expected script still has at least one signing point, so a lost detection (a signing call
+// reached through an any-typed require, or a wrapper the type checker cannot resolve) fails loudly
+// here instead of shrinking the rows. After the marker, the detail: the signing points found in the
+// two live scripts, by enclosing function and call (no line numbers).
 //
 // The classifier is proven both ways on temp-directory programs (a stub processLock and db module,
 // real ethers types): holds-lock (with and without the pause read, through a same-file helper, an
@@ -92,10 +98,15 @@ describe('AUD-SCRIPTS-002: the operator scripts that sign with the bot wallet ho
         expect(analysis.srcSiteCount(), 'the analysis finds signing sites at all').toBeGreaterThan(0);
 
         const walked = new Set(run.rootNames.map((f) => path.basename(f).replace(/\.ts$/, '')));
+        // The pinned script set: the live scripts always, each legacy script while its file exists.
+        const expectedScripts = [...LIVE_OBSERVED.map((r) => r.script), ...LEGACY_OBSERVED.filter((r) => walked.has(r.script)).map((r) => r.script)];
+        const points = analysis.scriptPoints();
+        for (const r of LIVE_OBSERVED) expect(walked.has(r.script), `the live script ${r.script} is walked`).toBe(true);
+        for (const name of expectedScripts) expect((points.get(name) ?? []).length, `${name} still has a detected signing point`).toBeGreaterThan(0);
         const actual = analysis.scriptRows();
         knownBug(ctx, 'AUD-SCRIPTS-002', {
             claim: 'signing-scripts-outside-process-lock',
-            correct: actual.map((r) => ({ script: r.script, lock: 'holds-lock' as const, pauseRead: true })),
+            correct: sortRows(expectedScripts.map((script) => ({ script, lock: 'holds-lock' as const, pauseRead: true }))),
             observed: sortRows([...LIVE_OBSERVED, ...LEGACY_OBSERVED.filter((r) => walked.has(r.script))]),
             actual,
             expectedPlain: 'Every operator script that signs with the bot wallet takes and holds the wallet process lock for its whole run and checks the pause switch before it signs, so it refuses while the bot runs.',
@@ -103,7 +114,6 @@ describe('AUD-SCRIPTS-002: the operator scripts that sign with the bot wallet ho
         });
 
         // Detail: what was identified as signing in the two live scripts (enclosing function and call).
-        const points = analysis.scriptPoints();
         const summary = (s: string): string[] => (points.get(s) ?? []).map((p) => `${p.fn}:${p.kind}:${p.api}`);
         expect(summary('deliberate-buy')).toEqual(['main:delegated:executeDeliberateBuy']);
         expect(summary('recover-sell-ladys')).toEqual(['main:site:contract.approve', 'main:site:contract.swapExactTokensForETHSupportingFeeOnTransferTokens']);
