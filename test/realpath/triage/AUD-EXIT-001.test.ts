@@ -19,11 +19,17 @@
 // is decoded with real ethers twice: from the transaction the node accepted (node.submitted) and
 // from the raw transaction inside the relay's eth_sendBundle body.
 //
-// What is measured: whether the private sell carries an output floor above zero. Correct: it does
-// (a bound from a fresh quote, as the public fallback already computes, or any positive floor).
-// Today: 0 in both decodes, on every path. A positive-floor fix reads "looks fixed" (D-08). Whether
-// 0 is deliberate for anti-rug exits is the open decision on card OD-14; this file proves the
-// routine exits (stop-loss and take-profit), which the card's options all bound.
+// What is measured: whether the private sell carries a real output floor. The floor is judged
+// against the router's own answer for the sold amount at the pool's reserves of the moment the sell
+// is built (v2AmountOut / v3AmountOut on the reserves right after the other wallet's trade, before
+// any sell of the bot), less the configured 5 percent exit slippage (src/config.ts hard-codes
+// slippagePercent 5, which computePublicMinOut uses for routine exits): minOut >= quote * 95 / 100.
+// Correct: it does (a bound from a fresh quote, as the public fallback already computes). Today: 0
+// in both decodes, on every path. A fresh-quote floor reads "looks fixed" (D-08). "Any floor above
+// zero" is not enough (review WR-13): a dust floor (minOut 1), a floor from the wrong decimals or
+// from the stale buy-time quote still accepts almost any output and reads as the bug. Whether 0 is
+// deliberate for anti-rug exits is the open decision on card OD-14; this file proves the routine
+// exits (stop-loss and take-profit), which the card's options all bound.
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
@@ -40,6 +46,8 @@ interface SellCase {
     relayBodyMinOut: bigint;
     bought: bigint;
     trigger: string;
+    /** The floor the sold amount must keep: the router's quote at the reserves of the moment, less 5 percent. */
+    floor: bigint;
 }
 
 /**
@@ -60,7 +68,11 @@ async function privateSell(sc: Scenario, move: 'dump' | 'pump'): Promise<SellCas
     const fromSubmit = node.submitted.length;
     if (move === 'dump') await foreignTrade(sc, { sellTokens: (sc.reserves.token * 3n) / 10n });
     else await foreignTrade(sc, { buyEth: sc.reserves.weth / 2n });
+    // The reserves the bot's sell is built against: after the other wallet's trade, before any sell.
+    const atSell = { weth: sc.reserves.weth, token: sc.reserves.token };
     const { sell } = await landNextSell(sc, { fromSubmit });
+    const quote = sc.dex.dexType === 'v2' ? v2AmountOut(sell.amountIn, atSell.token, atSell.weth) : v3AmountOut(sell.amountIn, atSell.token, atSell.weth, sc.feeTier!);
+    expect(quote).toBeGreaterThan(0n);
     expect(sell.route).toBe('bundle');
     // The same transaction, as the relay received it in eth_sendBundle.
     const bodies = node.relay
@@ -75,7 +87,7 @@ async function privateSell(sc: Scenario, move: 'dump' | 'pump'): Promise<SellCas
         .map((l) => String(l.obj?.op ?? ''))
         .filter((op) => op === 'exit.full.submitted' || op === 'exit.partial.submitted');
     expect(triggers.length).toBeGreaterThanOrEqual(1);
-    return { sell, relayBodyMinOut: fromBody.minOut, bought, trigger: triggers[0] };
+    return { sell, relayBodyMinOut: fromBody.minOut, bought, trigger: triggers[0], floor: (quote * 95n) / 100n };
 }
 
 describe('AUD-EXIT-001: private sells accept any output (RC-03)', () => {
@@ -88,10 +100,10 @@ describe('AUD-EXIT-001: private sells accept any output (RC-03)', () => {
 
         knownBug(ctx, 'AUD-EXIT-001', {
             claim: 'v2-full-private-sell-no-output-floor',
-            correct: { outputFloorAboveZero: { submitted: true, relayBody: true } },
-            observed: { outputFloorAboveZero: { submitted: false, relayBody: false } },
-            actual: { outputFloorAboveZero: { submitted: c.sell.minOut > 0n, relayBody: c.relayBodyMinOut > 0n } },
-            expectedPlain: 'A private full exit on V2 carries a minimum output above zero, so a price move before inclusion or a raised sell tax cannot take the sale for almost nothing.',
+            correct: { outputFloorAtLeastQuoteLessSlippage: { submitted: true, relayBody: true } },
+            observed: { outputFloorAtLeastQuoteLessSlippage: { submitted: false, relayBody: false } },
+            actual: { outputFloorAtLeastQuoteLessSlippage: { submitted: c.sell.minOut >= c.floor, relayBody: c.relayBodyMinOut >= c.floor } },
+            expectedPlain: 'A private full exit on V2 carries a minimum output of at least the pool\'s current quote less the configured slippage, so a price move before inclusion or a raised sell tax cannot take the sale for almost nothing.',
             actualPlain: 'The V2 stop-loss sell went out in the Flashbots bundle with amountOutMin 0: it would accept any output.',
         });
         expect([c.sell.minOut, c.relayBodyMinOut]).toEqual([0n, 0n]);
@@ -108,10 +120,10 @@ describe('AUD-EXIT-001: private sells accept any output (RC-03)', () => {
 
         knownBug(ctx, 'AUD-EXIT-001', {
             claim: 'v3-full-private-sell-no-output-floor',
-            correct: { outputFloorAboveZero: { submitted: true, relayBody: true } },
-            observed: { outputFloorAboveZero: { submitted: false, relayBody: false } },
-            actual: { outputFloorAboveZero: { submitted: c.sell.minOut > 0n, relayBody: c.relayBodyMinOut > 0n } },
-            expectedPlain: 'A private full exit on V3 carries a minimum output above zero.',
+            correct: { outputFloorAtLeastQuoteLessSlippage: { submitted: true, relayBody: true } },
+            observed: { outputFloorAtLeastQuoteLessSlippage: { submitted: false, relayBody: false } },
+            actual: { outputFloorAtLeastQuoteLessSlippage: { submitted: c.sell.minOut >= c.floor, relayBody: c.relayBodyMinOut >= c.floor } },
+            expectedPlain: 'A private full exit on V3 carries a minimum output of at least the pool\'s current quote less the configured slippage.',
             actualPlain: 'The V3 stop-loss sell went out in the Flashbots bundle as multicall(exactInputSingle) with amountOutMinimum 0: it would accept any output.',
         });
         expect([c.sell.minOut, c.relayBodyMinOut]).toEqual([0n, 0n]);
@@ -127,10 +139,10 @@ describe('AUD-EXIT-001: private sells accept any output (RC-03)', () => {
 
         knownBug(ctx, 'AUD-EXIT-001', {
             claim: 'v2-partial-private-sell-no-output-floor',
-            correct: { outputFloorAboveZero: { submitted: true, relayBody: true } },
-            observed: { outputFloorAboveZero: { submitted: false, relayBody: false } },
-            actual: { outputFloorAboveZero: { submitted: c.sell.minOut > 0n, relayBody: c.relayBodyMinOut > 0n } },
-            expectedPlain: 'A private partial take-profit sell on V2 carries a minimum output above zero.',
+            correct: { outputFloorAtLeastQuoteLessSlippage: { submitted: true, relayBody: true } },
+            observed: { outputFloorAtLeastQuoteLessSlippage: { submitted: false, relayBody: false } },
+            actual: { outputFloorAtLeastQuoteLessSlippage: { submitted: c.sell.minOut >= c.floor, relayBody: c.relayBodyMinOut >= c.floor } },
+            expectedPlain: 'A private partial take-profit sell on V2 carries a minimum output of at least the pool\'s current quote less the configured slippage.',
             actualPlain: 'The V2 2x take-profit sell of a quarter of the position went out in the Flashbots bundle with amountOutMin 0.',
         });
         expect([c.sell.minOut, c.relayBodyMinOut]).toEqual([0n, 0n]);
@@ -145,10 +157,10 @@ describe('AUD-EXIT-001: private sells accept any output (RC-03)', () => {
 
         knownBug(ctx, 'AUD-EXIT-001', {
             claim: 'v3-partial-private-sell-no-output-floor',
-            correct: { outputFloorAboveZero: { submitted: true, relayBody: true } },
-            observed: { outputFloorAboveZero: { submitted: false, relayBody: false } },
-            actual: { outputFloorAboveZero: { submitted: c.sell.minOut > 0n, relayBody: c.relayBodyMinOut > 0n } },
-            expectedPlain: 'A private partial take-profit sell on V3 carries a minimum output above zero.',
+            correct: { outputFloorAtLeastQuoteLessSlippage: { submitted: true, relayBody: true } },
+            observed: { outputFloorAtLeastQuoteLessSlippage: { submitted: false, relayBody: false } },
+            actual: { outputFloorAtLeastQuoteLessSlippage: { submitted: c.sell.minOut >= c.floor, relayBody: c.relayBodyMinOut >= c.floor } },
+            expectedPlain: 'A private partial take-profit sell on V3 carries a minimum output of at least the pool\'s current quote less the configured slippage.',
             actualPlain: 'The V3 2x take-profit sell of a quarter of the position went out in the Flashbots bundle as multicall(exactInputSingle) with amountOutMinimum 0.',
         });
         expect([c.sell.minOut, c.relayBodyMinOut]).toEqual([0n, 0n]);

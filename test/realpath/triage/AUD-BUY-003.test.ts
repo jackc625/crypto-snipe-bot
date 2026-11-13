@@ -17,10 +17,16 @@
 // mined, so the exit monitor's own quotes are answered. The submitted transaction is decoded with
 // real ethers (Transaction.from and the router ABI).
 //
-// What is measured: whether an unbounded swap (amountOutMin 0) was sent. Correct is that none was:
-// either the snipe is skipped (fail closed, like the deliberate public leg, src/bot.ts
-// buy.fallback.quote-failed) or it is sent with a bound above zero. Both fixes read as "looks
-// fixed" (D-08). The decoded amountOutMin is asserted right after the marker.
+// What is measured: whether a swap was sent without a real output floor. The floor is judged
+// against the router's own answer for the snipe amount at the pool's reserves of the moment
+// (v2AmountOut / v3AmountOut on the scenario's reserves, which nothing moves before the buy), less
+// the configured 5 percent slippage (src/config.ts hard-codes slippagePercent 5; the bot's own
+// formula keeps at least 95 percent of the quote): amountOutMin >= quote * 95 / 100. Correct is
+// that no swap below that floor was sent: either the snipe is skipped (fail closed, like the
+// deliberate public leg, src/bot.ts buy.fallback.quote-failed) or it is sent with that floor. Both
+// fixes read as "looks fixed" (D-08). "Any floor above zero" is not enough (review WR-13): a dust
+// floor (minOut 1), a floor from the wrong decimals or from a stale quote accepts almost any output
+// and reads as the bug. The decoded amountOutMin is asserted right after the marker.
 //
 // Not proven here: the fractional-slippage RangeError path (BigInt() of a fractional percent
 // thrown into the same catch). It is latent today because slippagePercent is hard-coded 5
@@ -32,7 +38,7 @@ import { describe, it, expect } from 'vitest';
 import { Interface, Transaction, getAddress, parseEther } from 'ethers';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
-import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
+import { createScenario, stepFor, stepUntilTrue, v2AmountOut, v3AmountOut, type Scenario } from '../harness/world';
 
 const V2_ROUTER = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
 const V3_ROUTER = new Interface([
@@ -45,6 +51,11 @@ const V3_QUOTER = new Interface([
     'function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
 ]);
 const V3_QUOTE_SELECTOR = V3_QUOTER.getFunction('quoteExactInputSingle')!.selector;
+
+/** The floor a swap of `quote` must keep: the quote less the configured 5 percent slippage. */
+function quoteFloor(quote: bigint): bigint {
+    return (quote * 95n) / 100n;
+}
 
 function opLogged(op: string): boolean {
     return recordedLogs().some((l) => l.obj?.op === op);
@@ -113,12 +124,14 @@ describe('AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-
             expect(call.name).toBe('swapExactETHForTokens');
             return { amountOutMin: call.args[0] as bigint, value: tx.value, hash: s.hash };
         });
+        // The router's own answer for the snipe at the reserves of the moment (nothing moved them).
+        const v2Quote = v2AmountOut(parseEther(sc.ctx.chain.snipeAmount), sc.reserves.weth, sc.reserves.token);
         knownBug(ctx, 'AUD-BUY-003', {
             claim: 'v2-quote-failure-sends-zero-amount-out-min',
-            correct: { unboundedSwapSent: false },
-            observed: { unboundedSwapSent: true },
-            actual: { unboundedSwapSent: decoded.some((d) => d.amountOutMin === 0n) },
-            expectedPlain: 'When the V2 price quote fails, the snipe is skipped or sent with a minimum-output limit above zero.',
+            correct: { swapSentBelowQuoteFloor: false },
+            observed: { swapSentBelowQuoteFloor: true },
+            actual: { swapSentBelowQuoteFloor: decoded.some((d) => d.amountOutMin < quoteFloor(v2Quote)) },
+            expectedPlain: 'When the V2 price quote fails, the snipe is skipped or sent with a minimum output of at least the pool\'s current quote less the configured slippage.',
             actualPlain: 'When the V2 price quote failed, the bot still sent the swap with a minimum output of 0, so it accepts any price.',
         });
         // The decoded swap: amountOutMin 0, the whole snipe amount as value.
@@ -163,12 +176,14 @@ describe('AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-
             const p = swap.args[0] as unknown as { amountIn: bigint; amountOutMinimum: bigint };
             return { amountOutMin: p.amountOutMinimum, amountIn: p.amountIn, value: tx.value, hash: s.hash };
         });
+        // The quoter's own answer for the snipe at the pool's reserves of the moment (nothing moved them).
+        const v3Quote = v3AmountOut(parseEther(sc.ctx.chain.snipeAmount), sc.reserves.weth, sc.reserves.token, sc.feeTier!);
         knownBug(ctx, 'AUD-BUY-003', {
             claim: 'v3-quote-failure-sends-zero-amount-out-minimum',
-            correct: { unboundedSwapSent: false },
-            observed: { unboundedSwapSent: true },
-            actual: { unboundedSwapSent: decoded.some((d) => d.amountOutMin === 0n) },
-            expectedPlain: 'When the V3 price quote fails, the snipe is skipped or sent with a minimum-output limit above zero.',
+            correct: { swapSentBelowQuoteFloor: false },
+            observed: { swapSentBelowQuoteFloor: true },
+            actual: { swapSentBelowQuoteFloor: decoded.some((d) => d.amountOutMin < quoteFloor(v3Quote)) },
+            expectedPlain: 'When the V3 price quote fails, the snipe is skipped or sent with a minimum output of at least the pool\'s current quote less the configured slippage.',
             actualPlain: 'When the V3 price quote failed, the bot still sent the swap with a minimum output of 0, so it accepts any price.',
         });
         expect(decoded).toHaveLength(1);
