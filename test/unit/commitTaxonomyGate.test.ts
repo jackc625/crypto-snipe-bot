@@ -31,7 +31,10 @@ const CASES = [
     'rename-fails-as-a-delete-plus-an-add',
     'AC-42-a-merge-is-not-judged-and-its-inner-commits-are',
     'AC-42-a-clean-merge-of-valid-commits-passes',
-    'AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0',
+    'WR-27-a-merge-whose-conflict-resolution-alone-changes-a-recording-fails',
+    'WR-27-a-no-conflict-merge-that-edits-a-recording-fails',
+    'WR-27-a-merge-resolution-as-behavior-citing-a-real-id-passes',
+    'WR-27-a-behavior-merge-citing-an-unknown-id-fails',
     'T-23-41-a-path-added-on-a-side-line-forked-before-the-recording-fails',
     'AC-40-the-same-new-scenario-added-on-two-lines-passes',
     'T-23-41-an-unrelated-root-commit-adding-an-existing-path-fails',
@@ -63,8 +66,9 @@ describe('check-commit-taxonomy.ts --self-test (AUDIT-06)', () => {
             for (const name of CASES) {
                 expect(result.stdout, `case ${name}\n${output}`).toMatch(new RegExp(`^ok   case:${escape(name)}: `, 'm'));
             }
-            // The merge-only conflict resolution prints its WARN line and still exits 0 (AC-42).
-            expect(result.stdout, output).toMatch(/^ok {3}case:AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0: exit 0; WARN merge [0-9a-f]{12} /m);
+            // WR-27: a merge whose own result changes a recording is judged; without behavior: it fails (exit 1).
+            expect(result.stdout, output).toMatch(/^ok {3}case:WR-27-a-merge-whose-conflict-resolution-alone-changes-a-recording-fails: exit 1; /m);
+            expect(result.stdout, output).toMatch(/^ok {3}case:WR-27-a-no-conflict-merge-that-edits-a-recording-fails: exit 1; /m);
             expect(output).not.toMatch(/^FAIL/m);
             expect(result.stdout, output).toMatch(new RegExp(`^SELF-TEST PASS ${CASES.length} of ${CASES.length} cases$`, 'm'));
         },

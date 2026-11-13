@@ -13,7 +13,7 @@
 //     UsageError and a small parser for this gate's three flags;
 //   - it runs on the working tree: the two refusals of a checkout (.git, .env, data/) are
 //     gone. The guarantee they gave is kept differently: the census builds a TypeScript
-//     program from tsconfig.json's root files plus scripts/**/*.ts and reads type
+//     program from tsconfig.json's root files plus every source file under scripts/ (allowJs) and reads type
 //     information only, so .env and data/ are never opened. The self-test proves it on a
 //     checkout-shaped fixture (case flag7-never-opens-env-or-data), and every real run
 //     refuses a program that holds a file named .env or a file under data/;
@@ -36,8 +36,9 @@
 //             call whose mutability the census could not read, and must cite a manual
 //             inventory entry that excludes the same file and call.
 // Also: no counted site may have lock status unknown (F3); a scan that finds no files in
-// src/ or scripts/, or no signing site, fails (AC-36); every .ts file under src/ and
-// scripts/ must be in the census program.
+// src/ or scripts/, or no signing site, fails (AC-36); every JavaScript or TypeScript source
+// file under src/ and scripts/ (.ts .tsx .mts .cts .js .jsx .mjs .cjs; Phase 23 review WR-25)
+// must be in the census program, which is built with allowJs so the JavaScript ones are typed.
 //
 // Usage (Node 22.16.0, D-21):
 //   npm run check:census                                              gate on the working tree
@@ -64,6 +65,10 @@
 //       signMessage, so Wallet, BaseWallet, AbstractSigner, NonceManager,
 //       JsonRpcSigner and the Signer interface all match; aliases such as
 //       `const w = wallet` are matched by type, not by name);
+//     - sendTransaction / signTransaction on any other receiver type (api
+//       delegated.<name>; Phase 23 review CR-08): a wrapper or a narrow
+//       interface such as ethers' ContractRunner may hold a Wallet whose code is
+//       outside the program, so the call is counted and its lock judged;
 //     - deploy on a ContractFactory (getDeployTransaction builds an unsigned
 //       tx and is listed as excluded; its sendTransaction is the counted site);
 //     - a contract method call, or its `.send(...)` form, on a Contract /
@@ -76,6 +81,22 @@
 //       sendPrivateTransaction on a Flashbots provider, and in-program
 //       functions named rawSendBundle / sendRawBundle (the relay eth_sendBundle
 //       fanout).
+//     - (Phase 23 review CR-09) a contract method reached as a value: a const
+//       holding `c.m`, `c.getFunction('m')` or a destructured method, called in
+//       place, is classified at the call as above; a method object handed on
+//       (callback, stored, returned) is a site where it is taken, lock unknown;
+//       a call of a method object not typed through a Contract is unresolved;
+//       and a call of an in-program interface signature (no body) that returns
+//       a TransactionResponse (`new Contract(...) as unknown as IRouter`) is a
+//       site whose lock is judged.
+//     - (Phase 23 review WR-23) sendUncheckedTransaction (as sendTransaction),
+//       authorize / authorizeSync on a Signer (EIP-7702, nonce-bearing),
+//       f.call(...) / f.apply(...) of a signing method (classified as f), a
+//       signing method taken as a value (.bind, a callback: lock unknown),
+//       SigningKey.sign and provider.send('eth_sendTransaction' |
+//       'eth_sendRawTransaction', ...) (lock unknown), and a call on an
+//       any-typed receiver traced to a `new Contract(...)` (an artifact ABI),
+//       whatever the method name.
 //   message-signing (no nonce; listed separately, never a violation):
 //     signMessage / signTypedData on a Signer (Flashbots relay auth headers).
 //   unresolved: a receiver typed any/unknown calling a signing API name or a
@@ -98,6 +119,9 @@
 //             awaited/returned inside the lock, no reference at all, or a chain
 //             deeper than the limit. unknown is never counted as locked or
 //             excluded.
+//   withNonceLock is the function declared in src/utils/nonceAuthority.ts and
+//   nowhere else (Phase 23 review WR-24): a local function of the same name
+//   serializes nothing, so a call of it is followed like any other callee.
 //   A callback passed to an in-program function G is followed only when G's
 //   parameter is invoked directly in G's own body and each invocation is
 //   awaited or returned; the callback then runs inside that call to G.
@@ -176,14 +200,16 @@ export interface Site {
     origins?: string[];
     manual_lock_status?: string;
     lock_disagreement?: boolean;
+    /** CR-08: a sendTransaction/signTransaction whose receiver type is not structurally a Signer (a wrapper or a narrow interface); counted and lock-judged like any site */
+    delegated?: boolean;
 }
 
-interface Delegation {
-    file: string;
-    line: number;
-    call: string;
-    receiver_type: string;
-    note: string;
+/** A traced construction of a contract or factory value; ctor is the `new Contract(...)` expression when one was found. */
+interface Origin {
+    runner: string;
+    abi: ts.Expression | undefined;
+    at: string;
+    ctor?: ts.Expression;
 }
 
 interface LockCall {
@@ -195,7 +221,6 @@ interface LockCall {
 
 interface CensusResult {
     sites: Site[];
-    delegations: Delegation[];
     lock_calls: LockCall[];
     program: { root_files: number; src_files: number; script_files: number; files_with_ts_errors: number; unresolved_modules: string[] };
 }
@@ -204,7 +229,15 @@ interface CensusResult {
 // Program + language service over a snapshot
 // ---------------------------------------------------------------------------
 
-const SIGN_TX = ['sendTransaction', 'signTransaction'];
+// sendUncheckedTransaction: JsonRpcSigner's send that skips the receipt lookup; it consumes a nonce
+// like sendTransaction (Phase 23 review WR-23).
+const SIGN_TX = ['sendTransaction', 'signTransaction', 'sendUncheckedTransaction'];
+// EIP-7702 authorizations carry and consume the account nonce; counted only on a Signer receiver,
+// because the names are common elsewhere (WR-23; ethers 6.16 has authorize/authorizeSync, not signAuthorization).
+const SIGNER_ONLY_TX = ['authorize', 'authorizeSync'];
+// JSON-RPC methods that send a transaction: a node-held key signs eth_sendTransaction, and
+// eth_sendRawTransaction broadcasts a transaction signed elsewhere (WR-23).
+const RPC_SEND_TX = ['eth_sendTransaction', 'eth_sendRawTransaction'];
 const SIGN_MSG = ['signMessage', 'signTypedData'];
 const BUNDLE = ['signBundle', 'sendBundle', 'sendRawBundle', 'sendPrivateTransaction'];
 const BUNDLE_FNS = ['rawSendBundle', 'sendRawBundle'];
@@ -214,22 +247,33 @@ const METHOD_OPS_EXCLUDED: Record<string, string> = {
     estimateGas: 'estimateGas: gas estimation only; no transaction, no nonce',
     populateTransaction: 'populateTransaction: builds an unsigned request; the site that signs it is counted separately',
 };
+/** Members of a contract method object that only read it (never sign, never hand the method on). */
+const METHOD_DATA_MEMBERS = ['fragment', 'name', 'getFragment', '_contract', '_key'];
 const ENTRY_REGISTRARS = ['on', 'once', 'addListener', 'prependListener', 'prependOnceListener', 'get', 'post', 'put', 'patch', 'delete', 'use', 'all'];
 const ENTRY_FUNCTIONS = ['setTimeout', 'setInterval', 'setImmediate', 'queueMicrotask', 'nextTick'];
 const MAX_DEPTH = 40;
+/** The one real lock (D-NONCE-AUTHORITY-ALL). A function of the same name declared anywhere else is not the lock (Phase 23 review WR-24). */
+const LOCK_MODULE_REL = 'src/utils/nonceAuthority.ts';
 
 function posix(p: string): string {
     return p.replace(/\\/g, '/');
 }
 
-function walkTs(dir: string, out: string[]): void {
+/**
+ * Every JavaScript or TypeScript source extension Node or ts-node can run (Phase 23 review WR-25):
+ * a signing script written as .cjs, .mjs, .js, .mts or .cts must be audited like a .ts one.
+ */
+const SOURCE_EXT_RE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
+const DECLARATION_RE = /\.d\.(ts|mts|cts)$/;
+
+function walkSources(dir: string, out: string[]): void {
     if (!fs.existsSync(dir)) return;
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, e.name);
         if (e.isDirectory()) {
             if (e.name === 'node_modules') continue;
-            walkTs(p, out);
-        } else if (e.isFile() && /\.tsx?$/.test(e.name) && !/\.d\.ts$/.test(e.name)) out.push(posix(p));
+            walkSources(p, out);
+        } else if (e.isFile() && SOURCE_EXT_RE.test(e.name) && !DECLARATION_RE.test(e.name)) out.push(posix(p));
     }
 }
 
@@ -251,13 +295,15 @@ class Census {
         if (!fs.existsSync(cfgPath)) throw new UsageError(`no tsconfig.json in ${this.root}`);
         const raw = ts.readConfigFile(cfgPath, ts.sys.readFile);
         if (raw.error) throw new Error(ts.flattenDiagnosticMessageText(raw.error.messageText, '\n'));
-        const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, this.root);
+        // allowJs (WR-25): the tsconfig include then also yields src/ JavaScript files, and the
+        // scripts/ walk adds every source extension, so .js/.cjs/.mjs files are typed and audited.
+        const parsed = ts.parseJsonConfigFileContent(raw.config, ts.sys, this.root, { allowJs: true });
         const scripts: string[] = [];
-        walkTs(path.join(this.root, 'scripts'), scripts);
+        walkSources(path.join(this.root, 'scripts'), scripts);
         const names = new Set<string>(parsed.fileNames.map(posix));
         for (const s of scripts) names.add(s);
         this.rootNames = [...names].sort();
-        const options: ts.CompilerOptions = { ...parsed.options, noEmit: true };
+        const options: ts.CompilerOptions = { ...parsed.options, allowJs: true, checkJs: false, noEmit: true };
         // The census program: what is classified.
         this.program = ts.createProgram({ rootNames: this.rootNames, options });
         this.checker = this.program.getTypeChecker();
@@ -335,11 +381,19 @@ class Census {
         return (this.checker.getNonNullableType(t).flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0;
     }
 
+    private hasCache = new Map<ts.Type, Map<string, boolean>>();
     private has(t: ts.Type, names: string[]): boolean {
-        return this.members(t).some((m) => {
+        const k = names.join(',');
+        let byNames = this.hasCache.get(t);
+        if (!byNames) this.hasCache.set(t, (byNames = new Map()));
+        const hit = byNames.get(k);
+        if (hit !== undefined) return hit;
+        const v = this.members(t).some((m) => {
             const p = this.props(m);
             return names.every((n) => p.has(n));
         });
+        byNames.set(k, v);
+        return v;
     }
 
     isSigner(t: ts.Type): boolean {
@@ -359,6 +413,14 @@ class Census {
     }
     isBundler(t: ts.Type): boolean {
         return this.has(t, ['signBundle', 'sendBundle']);
+    }
+    isSigningKey(t: ts.Type): boolean {
+        return this.has(t, ['sign', 'computeSharedSecret', 'privateKey', 'publicKey']);
+    }
+    /** A (promise of a) TransactionResponse / ContractTransactionResponse: what a signing send returns. */
+    isTxResponse(t: ts.Type): boolean {
+        const a = this.checker.getAwaitedType(t) ?? t;
+        return !this.isAnyish(a) && this.has(a, ['hash', 'nonce', 'wait', 'confirmations']);
     }
 
     typeAt(e: ts.Node): ts.Type {
@@ -492,7 +554,9 @@ class Census {
         if (!nameNode || nameNode.text !== 'withNonceLock') return false;
         let sym = this.checker.getSymbolAtLocation(nameNode);
         if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-        return !!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d) && d.name?.text === 'withNonceLock');
+        // WR-24: only the real lock counts. A function of the same name declared anywhere else (a
+        // script's local no-op withNonceLock) serializes nothing.
+        return !!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d) && d.name?.text === 'withNonceLock' && !!d.body && this.rel(d.getSourceFile().fileName) === LOCK_MODULE_REL);
     }
 
     hop(n: ts.Node): string {
@@ -685,7 +749,7 @@ class Census {
         return tagged;
     }
 
-    siteLock(site: ts.CallExpression): { status: LockStatus; evidence: 'lexical' | 'transitive' | null; chains: string[][]; reason: string | null } {
+    siteLock(site: ts.Node): { status: LockStatus; evidence: 'lexical' | 'transitive' | null; chains: string[][]; reason: string | null } {
         let r = this.lockOfPoint(site, new Set(), 0);
         if (r.status === 'cycle') r = this.res('unknown', r.chains, 'only recursive references reach this function');
         if (r.status === 'locked') {
@@ -697,6 +761,117 @@ class Census {
         }
         return { status: r.status as LockStatus, evidence: null, chains: r.chains, reason: r.reason ?? null };
     }
+
+    // ------------------------------------------------- contract method values (CR-09)
+
+    /**
+     * The contract and ABI method an expression takes as a value: `c.m`, `c['m']` (or a computed
+     * key, method null) or `c.getFunction(...)`, on a receiver typed as a Contract, where the
+     * result is a contract method object. Null for anything else.
+     */
+    methodRef(e: ts.Expression): { recv: ts.Expression; method: string | null } | null {
+        const x = this.strip(e);
+        let recv: ts.Expression | undefined;
+        let method: string | null = null;
+        if (ts.isPropertyAccessExpression(x)) {
+            recv = x.expression;
+            method = x.name.text;
+        } else if (ts.isElementAccessExpression(x)) {
+            recv = x.expression;
+            method = ts.isStringLiteralLike(x.argumentExpression) ? x.argumentExpression.text : null;
+        } else if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression) && x.expression.name.text === 'getFunction') {
+            recv = x.expression.expression;
+            const a0 = x.arguments[0];
+            method = a0 && ts.isStringLiteralLike(a0) ? a0.text : null;
+        } else return null;
+        const rt = this.typeAt(recv);
+        if (this.isAnyish(rt) || !this.isContract(rt)) return null;
+        if (!ts.isCallExpression(x) && method !== null && this.isOwnContractMember(rt, method)) return null;
+        if (!this.isMethod(this.typeAt(x))) return null;
+        return { recv, method };
+    }
+
+    /**
+     * Where a name holds a contract method taken once and never reassigned: a const initialized
+     * with a method reference, or a const destructuring of a Contract (`const { approve } = token`).
+     */
+    holderOrigin(name: ts.Identifier): { recv: ts.Expression; method: string | null } | null {
+        let sym = this.checker.getSymbolAtLocation(name);
+        if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+        const decls = sym?.getDeclarations() ?? [];
+        if (decls.length !== 1) return null;
+        const d = decls[0];
+        const isConst = (v: ts.VariableDeclaration) => (ts.getCombinedNodeFlags(v) & ts.NodeFlags.Const) !== 0;
+        if (ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) && d.initializer && isConst(d)) return this.methodRef(d.initializer);
+        if (ts.isBindingElement(d) && ts.isIdentifier(d.name) && !d.dotDotDotToken && ts.isObjectBindingPattern(d.parent)) {
+            const v = d.parent.parent;
+            if (!ts.isVariableDeclaration(v) || !v.initializer || !isConst(v)) return null;
+            const rt = this.typeAt(v.initializer);
+            if (this.isAnyish(rt) || !this.isContract(rt)) return null;
+            const pn = d.propertyName;
+            const key = pn ? (ts.isIdentifier(pn) || ts.isStringLiteralLike(pn) ? pn.text : null) : d.name.text;
+            if (key !== null && this.isOwnContractMember(rt, key)) return null;
+            if (!this.isMethod(this.typeAt(d.name))) return null;
+            return { recv: v.initializer, method: key };
+        }
+        return null;
+    }
+
+    /** A use of a method object that does not hand it on: a call of it, a read of its data, or a called .send / a read-only op. */
+    private methodUseStays(n: ts.Node): boolean {
+        const u = this.up(n);
+        const p = u.parent;
+        if (!p) return false;
+        if (ts.isCallExpression(p) && p.expression === u) return true;
+        if (ts.isPropertyAccessExpression(p) && p.expression === u) {
+            const m = p.name.text;
+            if (METHOD_DATA_MEMBERS.includes(m) || m in METHOD_OPS_EXCLUDED) return true;
+            if (m === 'send' || ((m === 'call' || m === 'apply') && this.isFunctionProtoMember(p))) {
+                const pu = this.up(p);
+                return !!pu.parent && ts.isCallExpression(pu.parent) && pu.parent.expression === pu;
+            }
+        }
+        return false;
+    }
+
+    /** True when the method object at n (a method reference) can reach code the census cannot follow. */
+    methodEscapes(n: ts.Node): boolean {
+        if (this.methodUseStays(n)) return false;
+        const u = this.up(n);
+        const p = u.parent;
+        // const x = c.m: judged by every use of x (each call is classified through holderOrigin).
+        if (p && ts.isVariableDeclaration(p) && p.initializer === u && ts.isIdentifier(p.name) && this.holderOrigin(p.name)) return this.holderEscapes(p.name);
+        return true;
+    }
+
+    holderEscapes(name: ts.Identifier): boolean {
+        return this.refsOf(name).some((id) => !this.methodUseStays(id));
+    }
+
+    /** `f.call` / `f.apply` / `f.bind` where the member is Function.prototype's (not a method named call, such as provider.call). */
+    isFunctionProtoMember(pa: ts.PropertyAccessExpression): boolean {
+        if (!['call', 'apply', 'bind'].includes(pa.name.text)) return false;
+        const sym = this.checker.getSymbolAtLocation(pa.name);
+        return !!sym?.getDeclarations()?.some((d) => {
+            const owner = d.parent;
+            return !!owner && ts.isInterfaceDeclaration(owner) && /^(Function|CallableFunction|NewableFunction)$/.test(owner.name.text) && d.getSourceFile().isDeclarationFile;
+        });
+    }
+
+    /** The signing API a member expression names on its receiver, for a value use (WR-23): `wallet.sendTransaction`, `fb.sendBundle`. */
+    signingMemberRef(e: ts.Expression): { recv: ts.Expression; name: string; api: string } | null {
+        const x = this.strip(e);
+        if (!ts.isPropertyAccessExpression(x)) return null;
+        const name = x.name.text;
+        const rt = this.typeAt(x.expression);
+        if (this.isAnyish(rt)) return null;
+        if (this.checker.getSignaturesOfType(this.checker.getNonNullableType(this.typeAt(x)), ts.SignatureKind.Call).length === 0) return null;
+        if (SIGN_TX.includes(name)) return { recv: x.expression, name, api: this.isSigner(rt) ? `signer.${name}` : `delegated.${name}` };
+        if (SIGNER_ONLY_TX.includes(name) && this.isSigner(rt)) return { recv: x.expression, name, api: `signer.${name}` };
+        if (BUNDLE.includes(name) && this.isBundler(rt)) return { recv: x.expression, name, api: `flashbots.${name}` };
+        return null;
+    }
+
 
     // ---------------------------------------------------------- contracts
 
@@ -753,7 +928,7 @@ class Census {
     }
 
     /** Trace a contract expression to its constructions: runner kind and ABI expression. */
-    originsOf(e: ts.Expression, depth = 0, seen = new Set<ts.Node>()): { runner: string; abi: ts.Expression | undefined; at: string }[] {
+    originsOf(e: ts.Expression, depth = 0, seen = new Set<ts.Node>()): Origin[] {
         const x = this.strip(e);
         // `seen` is the current trace PATH (cycle guard), not a global visited set: two
         // call sites passing the same variable are two independent branches.
@@ -766,10 +941,10 @@ class Census {
         }
     }
 
-    private originsBody(x: ts.Expression, depth: number, seen: Set<ts.Node>): { runner: string; abi: ts.Expression | undefined; at: string }[] {
+    private originsBody(x: ts.Expression, depth: number, seen: Set<ts.Node>): Origin[] {
         if (ts.isNewExpression(x)) {
             const t = this.typeAt(x);
-            if (this.isContract(t)) return [{ runner: this.runnerOf(x.arguments?.[2]), abi: x.arguments?.[1], at: this.loc(x) }];
+            if (this.isContract(t)) return [{ runner: this.runnerOf(x.arguments?.[2]), abi: x.arguments?.[1], at: this.loc(x), ctor: x }];
             if (this.isFactory(t)) return [{ runner: this.runnerOf(x.arguments?.[2]), abi: x.arguments?.[0], at: this.loc(x) }];
         }
         if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression)) {
@@ -783,7 +958,7 @@ class Census {
         if (ts.isIdentifier(x) || ts.isPropertyAccessExpression(x)) {
             let sym = this.checker.getSymbolAtLocation(ts.isPropertyAccessExpression(x) ? x.name : x);
             if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-            const out: { runner: string; abi: ts.Expression | undefined; at: string }[] = [];
+            const out: Origin[] = [];
             for (const d of sym?.getDeclarations() ?? []) {
                 if ((ts.isVariableDeclaration(d) || ts.isPropertyDeclaration(d) || ts.isPropertyAssignment(d)) && d.initializer) out.push(...this.originsOf(d.initializer, depth + 1, seen));
                 else if (ts.isParameter(d) && ts.isIdentifier(d.name)) {
@@ -825,7 +1000,6 @@ class Census {
 
     run(): CensusResult {
         const sites: Site[] = [];
-        const delegations: Delegation[] = [];
         const lockCalls: LockCall[] = [];
         let errFiles = 0;
         const unresolvedModules = new Set<string>();
@@ -834,11 +1008,12 @@ class Census {
             if (diags.length) errFiles++;
             for (const dg of diags) if (dg.code === 2307) unresolvedModules.add(`${this.rel(sf.fileName)}: ${ts.flattenDiagnosticMessageText(dg.messageText, ' ').replace(/^Cannot find module '([^']+)'.*$/, '$1')}`);
             const visit = (n: ts.Node) => {
+                const v = this.classifyMethodValue(n);
+                if (v) sites.push(v);
                 if (ts.isCallExpression(n)) {
                     if (this.isLockCall(n)) lockCalls.push({ file: this.rel(sf.fileName), line: this.line(n), key: this.short(n.arguments[0]?.getText() ?? '', 60), enclosing: this.fnName(this.enclosingFn(n)) });
                     const s = this.classify(n);
-                    if (s && 'delegation' in s) delegations.push(s.delegation);
-                    else if (s) sites.push(s);
+                    if (s) sites.push(s);
                 }
                 ts.forEachChild(n, visit);
             };
@@ -849,7 +1024,6 @@ class Census {
         const all = this.auditedFiles().map((sf) => this.rel(sf.fileName));
         return {
             sites,
-            delegations,
             lock_calls: lockCalls,
             program: {
                 root_files: this.rootNames.length,
@@ -861,7 +1035,7 @@ class Census {
         };
     }
 
-    private mk(call: ts.CallExpression, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}): Site {
+    private mk(call: ts.Node, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}): Site {
         const sf = call.getSourceFile();
         const lc = sf.getLineAndCharacterOfPosition(call.getStart(sf));
         const file = this.rel(sf.fileName);
@@ -894,7 +1068,7 @@ class Census {
                 const l = this.siteLock(call);
                 base.lock_status = 'unknown';
                 base.chains = l.chains;
-                base.reason = `receiver type unresolved (${recvType})` + (l.status !== 'unknown' ? `; the reference chain alone reads ${l.status}` : l.reason ? `; ${l.reason}` : '');
+                base.reason = (extra.reason ? `${extra.reason}; ` : '') + `receiver type unresolved (${recvType})` + (l.status !== 'unknown' ? `; the reference chain alone reads ${l.status}` : l.reason ? `; ${l.reason}` : '');
             } else {
                 const l = this.siteLock(call);
                 base.lock_status = l.status;
@@ -906,15 +1080,34 @@ class Census {
         return base;
     }
 
-    classify(call: ts.CallExpression): Site | { delegation: Delegation } | null {
-        const callee = this.strip(call.expression);
+    classify(call: ts.CallExpression): Site | null {
+        const c0 = this.strip(call.expression);
+        // WR-23: `f.call(thisArg, ...)` / `f.apply(thisArg, [...])` runs f: classify the call as f's.
+        if (ts.isPropertyAccessExpression(c0) && (c0.name.text === 'call' || c0.name.text === 'apply') && this.isFunctionProtoMember(c0)) {
+            const inner = this.classifyCallee(call, this.strip(c0.expression));
+            if (inner) return inner;
+        }
+        return this.classifyCallee(call, c0);
+    }
+
+    private classifyCallee(call: ts.CallExpression, callee: ts.Expression): Site | null {
         // Identifier callee: in-program bundle-send functions.
         if (ts.isIdentifier(callee)) {
-            if (!BUNDLE_FNS.includes(callee.text)) return null;
-            let sym = this.checker.getSymbolAtLocation(callee);
-            if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-            if (!sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return null;
-            return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' });
+            if (BUNDLE_FNS.includes(callee.text)) {
+                let sym = this.checker.getSymbolAtLocation(callee);
+                if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+                if (sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' });
+            }
+            // CR-09: calling a contract method object held in a name (`const approve = token.approve;
+            // await approve(...)`, a getFunction value, a destructured method). Traced to its
+            // contract when the name is a const taken from one; otherwise unresolved.
+            const ct = this.typeAt(callee);
+            if (!this.isAnyish(ct) && this.isMethod(ct)) {
+                const h = this.holderOrigin(callee);
+                if (h) return this.contractSite(call, h.recv, h.method, 'call', this.typeAt(h.recv));
+                return this.mk(call, `method-value.${callee.text}`, 'tx-signing', this.typeText(ct), { type_unresolved: true, reason: `a contract method object ${callee.text} is called; it cannot be traced to its contract` });
+            }
+            return null;
         }
         // contract.getFunction('m')(...)
         if (ts.isCallExpression(callee) && ts.isPropertyAccessExpression(callee.expression) && callee.expression.name.text === 'getFunction') {
@@ -936,6 +1129,15 @@ class Census {
         } else return null;
         const rt = this.typeAt(recv);
         const anyRecv = this.isAnyish(rt);
+        // WR-23: a raw JSON-RPC transaction send (provider.send('eth_sendRawTransaction', ...)).
+        if (name === 'send' && !this.isMethod(rt)) {
+            const a0 = call.arguments[0];
+            if (a0 && ts.isStringLiteralLike(a0) && RPC_SEND_TX.includes(a0.text))
+                return this.mk(call, `rpc.${a0.text}`, 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: `a raw JSON-RPC ${a0.text}: the signer and its nonce are outside the census's view` });
+        }
+        // WR-23: SigningKey.sign signs any digest, a transaction's unsignedHash included.
+        if (name === 'sign' && !anyRecv && this.isSigningKey(rt))
+            return this.mk(call, 'signingKey.sign', 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: 'SigningKey.sign signs an arbitrary digest (a transaction hash included); what it signs cannot be told statically' });
         // contract.m.send(...) / .staticCall(...) etc.
         if (name && !anyRecv && this.isMethod(rt) && (name === 'send' || name in METHOD_OPS_EXCLUDED)) {
             const inner = this.strip(recv);
@@ -951,7 +1153,17 @@ class Census {
                 cRecv = inner.expression.expression;
                 m = inner.arguments[0] && ts.isStringLiteralLike(inner.arguments[0]) ? inner.arguments[0].text : null;
             }
-            if (!cRecv || !this.isContract(this.typeAt(cRecv))) return null;
+            else if (ts.isIdentifier(inner)) {
+                // CR-09: `const m = token.approve; await m.send(...)`.
+                const h = this.holderOrigin(inner);
+                if (h) return this.contractSite(call, h.recv, h.method, name, this.typeAt(h.recv));
+                if (name === 'send') return this.mk(call, `method-value.${inner.text}.send`, 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: `${inner.text}.send is called on a contract method object that cannot be traced to its contract` });
+                return null;
+            }
+            if (!cRecv || !this.isContract(this.typeAt(cRecv))) {
+                if (name === 'send') return this.mk(call, 'method-value.send', 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: '.send is called on a contract method object that cannot be traced to its contract' });
+                return null;
+            }
             return this.contractSite(call, cRecv, m, name, this.typeAt(cRecv));
         }
         if (name === null) {
@@ -964,15 +1176,24 @@ class Census {
             return null;
         }
         if (anyRecv) {
+            // WR-23: an any-typed receiver traced to a `new Contract(...)` (an artifact ABI, or a
+            // contract annotated or cast to any) is a contract call whatever the method name: the
+            // runner and the ABI (when readable) are traced like a typed contract's.
+            const ctor = this.originsOf(recv).find((o) => o.ctor)?.ctor;
+            if (ctor && !this.isOwnContractMember(this.typeAt(ctor), name)) return this.contractSite(call, recv, name, 'call', this.typeAt(ctor));
             if (SIGN_MSG.includes(name)) return this.mk(call, `any.${name}`, 'message-signing', this.typeText(rt), { type_unresolved: true });
-            if (SIGN_TX.includes(name) || BUNDLE.includes(name) || name === 'deploy' || this.abiNames.has(name))
+            if (SIGN_TX.includes(name) || SIGNER_ONLY_TX.includes(name) || BUNDLE.includes(name) || name === 'deploy' || this.abiNames.has(name))
                 return this.mk(call, `any.${name}`, 'tx-signing', this.typeText(rt), { type_unresolved: true });
             return null;
         }
-        if (SIGN_TX.includes(name) || SIGN_MSG.includes(name)) {
+        if (SIGN_TX.includes(name) || SIGN_MSG.includes(name) || SIGNER_ONLY_TX.includes(name)) {
             if (this.isSigner(rt)) return this.mk(call, `signer.${name}`, SIGN_MSG.includes(name) ? 'message-signing' : 'tx-signing', this.typeText(rt));
-            if (SIGN_TX.includes(name))
-                return { delegation: { file: this.rel(call.getSourceFile().fileName), line: this.line(call), call: this.short(callee.getText(), 60), receiver_type: this.typeText(rt), note: 'receiver is not a Signer: a wrapper whose implementations hold the counted signing calls' } };
+            // CR-08: a receiver that is not structurally a Signer may still be one at run time
+            // (ethers' ContractRunner, Pick<Wallet, 'sendTransaction'>, a local interface over a
+            // Wallet), and its implementation may live outside the program (ethers' Wallet is never
+            // a census site). So the call itself is a counted site and its lock is judged like any
+            // other: an unlocked or unknown delegation fails the gate, a locked one passes.
+            if (SIGN_TX.includes(name)) return this.mk(call, `delegated.${name}`, 'tx-signing', this.typeText(rt), { delegated: true });
             return null;
         }
         if (BUNDLE.includes(name) && this.isBundler(rt)) return this.mk(call, `flashbots.${name}`, 'tx-signing', this.typeText(rt), { runner: 'bundle' });
@@ -984,10 +1205,68 @@ class Census {
             return this.mk(call, 'ContractFactory.deploy', 'tx-signing', this.typeText(rt), { runner, mutability: 'deployment' });
         }
         if (this.isContract(rt) && !this.isOwnContractMember(rt, name)) return this.contractSite(call, recv, name, 'call', rt);
+        // CR-09: a contract method object reached through a receiver that is not typed as a
+        // Contract (Pick<Contract, 'approve'>, an object holding token.approve).
+        const ct = this.typeAt(callee);
+        if (!this.isAnyish(ct) && this.isMethod(ct)) return this.mk(call, `method.${name}`, 'tx-signing', this.typeText(rt), { type_unresolved: true, reason: `${name} is a contract method object on a receiver that is not typed as a Contract` });
+        // CR-09: a narrow interface over a contract or signer (`new Contract(...) as unknown as
+        // IRouter`): a method declared only as a signature in the program, with no body the census
+        // could look into, that returns a TransactionResponse. It may sign, so it is a site and its
+        // lock is judged.
+        if (!this.isSigner(rt) && !this.isProvider(rt) && !this.isFactory(rt) && !this.isBundler(rt) && this.isTxResponse(this.typeAt(call)) && this.signatureOnlyInProgram(callee))
+            return this.mk(call, `interface.${name}`, 'tx-signing', this.typeText(rt));
         return null;
     }
 
-    private contractSite(call: ts.CallExpression, recv: ts.Expression, method: string | null, op: string, rt: ts.Type): Site | null {
+    /** Every declaration of the called member is an in-program signature with no body (an interface or type-literal member, or an abstract method). */
+    private signatureOnlyInProgram(callee: ts.Expression): boolean {
+        const n = ts.isPropertyAccessExpression(callee) ? callee.name : ts.isElementAccessExpression(callee) ? callee.argumentExpression : callee;
+        let sym = this.checker.getSymbolAtLocation(n);
+        if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
+        const decls = sym?.getDeclarations() ?? [];
+        if (!decls.length) return false;
+        return decls.every((d) => {
+            const sf = d.getSourceFile();
+            const r = this.rel(sf.fileName);
+            if (sf.isDeclarationFile || !(r.startsWith('src/') || r.startsWith('scripts/'))) return false;
+            if (ts.isMethodSignature(d) || ts.isPropertySignature(d)) return true;
+            if ((ts.isMethodDeclaration(d) || ts.isPropertyDeclaration(d)) && (ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Abstract) !== 0) return true;
+            return false;
+        });
+    }
+
+    /**
+     * CR-09: a contract method object that is handed on (passed as a callback, stored, returned,
+     * or held in a name that is) is a site where it is taken: the census cannot follow where it is
+     * invoked, so its lock reads unknown. A method object taken and only called in place is
+     * classified at the call (classify / holderOrigin) instead.
+     */
+    classifyMethodValue(n: ts.Node): Site | null {
+        if (ts.isBindingElement(n) && ts.isIdentifier(n.name)) {
+            const h = this.holderOrigin(n.name);
+            if (!h || !this.holderEscapes(n.name)) return null;
+            return this.contractSite(n.name, h.recv, h.method, 'value', this.typeAt(h.recv));
+        }
+        if (!ts.isPropertyAccessExpression(n) && !ts.isElementAccessExpression(n) && !ts.isCallExpression(n)) return null;
+        if (ts.isCallExpression(n) && !(ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === 'getFunction')) return null;
+        // WR-23: a signing method taken as a value (`wallet.sendTransaction.bind(wallet)`, passed
+        // as a callback, stored): where it runs cannot be followed. Its call and its .call/.apply
+        // forms are classified at the call.
+        const sm = ts.isPropertyAccessExpression(n) ? this.signingMemberRef(n) : null;
+        if (sm) {
+            const u = this.up(n);
+            const p = u.parent;
+            const calledHere = !!p && ts.isCallExpression(p) && p.expression === u;
+            const viaCallApply = !!p && ts.isPropertyAccessExpression(p) && p.expression === u && (p.name.text === 'call' || p.name.text === 'apply') && this.isFunctionProtoMember(p) && !!this.up(p).parent && ts.isCallExpression(this.up(p).parent!) && (this.up(p).parent as ts.CallExpression).expression === this.up(p);
+            if (calledHere || viaCallApply) return null;
+            return this.mk(n, `${sm.api}.value`, 'tx-signing', this.typeText(this.typeAt(sm.recv)), { type_unresolved: true, reason: `signing method ${sm.name} taken as a value at ${this.loc(n)}; where it is invoked cannot be followed` });
+        }
+        const ref = this.methodRef(n);
+        if (!ref || !this.methodEscapes(n)) return null;
+        return this.contractSite(n, ref.recv, ref.method, 'value', this.typeAt(ref.recv));
+    }
+
+    private contractSite(call: ts.Node, recv: ts.Expression, method: string | null, op: string, rt: ts.Type): Site | null {
         const origins = this.originsOf(recv);
         const runners = new Set(origins.map((o) => o.runner));
         const canSign = runners.has('signer') || runners.has('unresolved');
@@ -995,6 +1274,12 @@ class Census {
         const runner = [...runners].sort().join('|');
         const traced = origins.map((o) => `${o.runner} @ ${o.at}`);
         const api = method === null ? `contract.computed${op === 'call' ? '' : '.' + op}` : `contract.${method}${op === 'call' ? '' : '.' + op}`;
+        if (op === 'value') {
+            // CR-09: the method object is handed on (a callback, a stored value); where it is
+            // called cannot be followed, so the lock reads unknown unless the method is a view.
+            if (method !== null && this.mutabilityOf(origins, method) === 'view') return this.mk(call, api, 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: `view/pure ABI fragment ${method} used as a value: a read-only eth_call; no transaction, no nonce`, runner, mutability: 'view', origins: traced });
+            return this.mk(call, api, 'tx-signing', this.typeText(rt), { type_unresolved: true, runner, origins: traced, reason: `contract method ${method ?? '(computed)'} used as a value at ${this.loc(call)}; where it is invoked cannot be followed` });
+        }
         if (method === null) return this.mk(call, api, 'tx-signing', this.typeText(rt), { type_unresolved: true, runner, origins: traced });
         if (op in METHOD_OPS_EXCLUDED) return this.mk(call, api, 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: METHOD_OPS_EXCLUDED[op], runner, origins: traced });
         const mut = this.mutabilityOf(origins, method);
@@ -1132,7 +1417,7 @@ function assemble(c: Census, r: CensusResult, manual: any | null, manualPath: st
         method: {
             summary:
                 'TypeScript 5.8.3 type-checker census over a git archive snapshot of src/ and scripts/ at audited_sha (tsconfig.json root files plus scripts/**/*.ts; node_modules = per-entry junctions, type information only, nothing executed). Every CallExpression is classified by the TYPE of its receiver; contract runners and ABIs are traced to their constructions; lock status follows reference chains through the TypeScript language service (findReferences), cycle-safe, and requires every hop to be awaited or returned.',
-            tx_signing: 'sendTransaction/signTransaction on a Signer type; ContractFactory.deploy; state-changing contract method calls and .send on a Signer-runner Contract; Flashbots signBundle/sendBundle/sendRawBundle/sendPrivateTransaction; in-program rawSendBundle/sendRawBundle; unresolved receivers (type_unresolved, lock unknown)',
+            tx_signing: 'sendTransaction/signTransaction on a Signer type, and on any other receiver type (delegated.*, CR-08); ContractFactory.deploy; state-changing contract method calls and .send on a Signer-runner Contract; Flashbots signBundle/sendBundle/sendRawBundle/sendPrivateTransaction; in-program rawSendBundle/sendRawBundle; unresolved receivers (type_unresolved, lock unknown)',
             message_signing: 'signMessage/signTypedData on a Signer (no nonce; never a D-NONCE-AUTHORITY-ALL violation)',
             excluded: 'view/pure ABI fragments, .staticCall/.estimateGas/.populateTransaction, getDeployTransaction (census), and auditor exclusions with evidence (manual inventory)',
             lock: 'locked lexical = the site function is the op of withNonceLock; locked transitive = every reference chain ends in such an op with every hop awaited/returned; unlocked = a chain reaches module top level, an event/route callback or an exported function with no in-program caller; unknown = unresolved type, unfollowable callback/value use, un-awaited hop, no reference',
@@ -1145,7 +1430,6 @@ function assemble(c: Census, r: CensusResult, manual: any | null, manualPath: st
         by_file: byFile,
         by_lock_status: byLock,
         sites: r.sites,
-        delegations: r.delegations,
         lock_calls: r.lock_calls,
         reconciliation,
     };
@@ -1395,11 +1679,12 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
         problems.push({ code: 'no-files', message: `the census program has ${prog.src_files} src/ files and ${prog.script_files} scripts/ files; a scan that finds no files checked nothing` });
         return { problems, summary, sites };
     }
-    // Every .ts file under src/ and scripts/ must be audited (a narrowed tsconfig include would hide one).
+    // Every JavaScript or TypeScript source file under src/ and scripts/ (.ts .tsx .mts .cts .js
+    // .jsx .mjs .cjs, WR-25) must be audited (a narrowed tsconfig include would hide one).
     const audited = new Set(census.auditedFiles().map((sf) => census.rel(sf.fileName)));
     const onDisk: string[] = [];
-    walkTs(path.join(census.root, 'src'), onDisk);
-    walkTs(path.join(census.root, 'scripts'), onDisk);
+    walkSources(path.join(census.root, 'src'), onDisk);
+    walkSources(path.join(census.root, 'scripts'), onDisk);
     for (const f of onDisk.map((x) => census.rel(x)).sort()) if (!audited.has(f)) problems.push({ code: 'file-not-audited', message: `${f} is not in the census program (tsconfig.json include does not cover it), so its signing sites are not checked` });
     const counted = sites.filter((s) => s.kind === 'tx-signing' && !s.excluded);
     summary.excluded_by_census = sites.filter((s) => s.excluded && s.excluded_by === 'census').length;
@@ -1480,7 +1765,7 @@ function lockedSitesSource(n: number): string {
     });
 }`);
     return `import { Wallet } from 'ethers';
-import { withNonceLock } from './lock';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 ${GATE_TX}
@@ -1535,7 +1820,7 @@ function baseGateExceptions(): Record<string, unknown> {
 function baseGateFiles(locked: number): Record<string, string> {
     return {
         'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', moduleResolution: 'node', strict: true, esModuleInterop: true, skipLibCheck: true, types: [] }, include: ['src/**/*'] }, null, 2),
-        'src/lock.ts': FIXTURE_LOCK,
+        [LOCK_MODULE_REL]: FIXTURE_LOCK,
         'src/locked.ts': lockedSitesSource(locked),
         'src/legacy.ts': GATE_LEGACY_UNLOCKED,
         'scripts/tool.ts': GATE_TOOL_SCRIPT,
@@ -1632,12 +1917,12 @@ function caseFlag7(): CaseOutcome {
         const protectedHits = [...new Set(touched.filter((p) => isProtectedPath(dir, p)).map((p) => posix(path.relative(dir, path.resolve(dir, p)))))];
         const sawSources = ['src/locked.ts', 'scripts/tool.ts', EXCEPTIONS_REL].every((rel) => touched.some((p) => posix(path.resolve(dir, p)).toLowerCase() === posix(path.join(dir, rel)).toLowerCase()));
         const roots = res.run ? res.run.census.rootNames : [];
-        const nonTs = roots.filter((f) => !/\.tsx?$/.test(f));
+        const nonTs = roots.filter((f) => !SOURCE_EXT_RE.test(f));
         const base = expectCodes(name, res.problems, [], `${touched.length} reads/listings recorded, none of .env or data/`);
         const extra: string[] = [];
         if (protectedHits.length) extra.push(`opened or listed ${protectedHits.join(', ')}`);
         if (!sawSources) extra.push('the recorder did not see the fixture sources being read, so it proves nothing');
-        if (nonTs.length) extra.push(`non-TypeScript program roots: ${nonTs.join(', ')}`);
+        if (nonTs.length) extra.push(`program roots that are not JavaScript or TypeScript sources: ${nonTs.join(', ')}`);
         if (!res.run || res.summary?.tx_signing !== 23) extra.push(`expected the scan to run and count 23 sites, got ${res.summary?.tx_signing ?? 'no scan'}`);
         outcome = extra.length ? { name, ok: false, detail: `${extra.join('; ')}${base.ok ? '' : `; ${base.detail}`}` } : base;
     } finally {
@@ -1790,8 +2075,98 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// CR-08: a new script signs through ethers' own ContractRunner interface, outside any lock.
+const GATE_DELEGATED_SCRIPT = `import { Wallet, JsonRpcProvider } from 'ethers';
+import type { ContractRunner } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+${GATE_TX}
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    const runner: ContractRunner = wallet;
+    await runner.sendTransaction!(tx);
+}
+
+void main();
+`;
+
+// CR-09: the orchestrator's reproduction, a contract method called through a value.
+const GATE_METHOD_VALUE_SCRIPT = `import { Wallet, Contract, JsonRpcProvider, MaxUint256 } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+const ERC20_ABI = ['function approve(address spender, uint256 amount) returns (bool)'];
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    const token = new Contract('0x0000000000000000000000000000000000000005', ERC20_ABI, wallet);
+    const approve = token.approve;
+    await approve('0x0000000000000000000000000000000000000006', MaxUint256);
+}
+
+void main();
+`;
+
+// WR-23: a script signs with JsonRpcSigner.sendUncheckedTransaction outside any lock.
+const GATE_UNCHECKED_SCRIPT = `import { JsonRpcProvider } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+${GATE_TX}
+
+async function main(): Promise<void> {
+    const signer = await provider.getSigner();
+    await signer.sendUncheckedTransaction(tx);
+}
+
+void main();
+`;
+
+// WR-25: signing scripts written as plain CommonJS and as an ES module TypeScript file.
+const GATE_CJS_SCRIPT = `'use strict';
+const { Wallet, JsonRpcProvider } = require('ethers');
+
+async function main() {
+    const provider = new JsonRpcProvider('http://127.0.0.1:1');
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    await wallet.sendTransaction({ to: '0x0000000000000000000000000000000000000001', value: 1n });
+}
+
+void main();
+`;
+
+const GATE_MTS_SCRIPT = `import { Wallet, JsonRpcProvider } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    await wallet.sendTransaction({ to: '0x0000000000000000000000000000000000000001', value: 1n });
+}
+
+void main();
+`;
+
+// WR-24: a script declares its own withNonceLock that serializes nothing.
+const GATE_FAKE_LOCK_SCRIPT = `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+async function withNonceLock<T>(_walletAddress: string, op: () => Promise<T>): Promise<T> {
+    return op();
+}
+
+async function main(): Promise<void> {
+    await withNonceLock(wallet.address, async () => {
+        await wallet.sendTransaction(tx);
+    });
+}
+
+void main();
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
-import { withNonceLock } from './lock';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 ${GATE_TX}
@@ -1879,21 +2254,36 @@ function gateCases(): CaseOutcome[] {
     out.push(
         codeCase(
             'AC-36-no-files-fails',
-            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': null, 'src/legacy.ts': null, 'scripts/tool.ts': null },
+            { ...baseGateFiles(20), [LOCK_MODULE_REL]: null, 'src/locked.ts': null, 'src/legacy.ts': null, 'scripts/tool.ts': null },
             ['no-files'],
         ),
     );
     out.push(
         codeCase(
             'AC-36-no-sites-fails',
-            { ...baseGateFiles(20), 'src/lock.ts': null, 'src/locked.ts': 'export const nothingSigns = 1;\n', 'src/legacy.ts': null, 'scripts/tool.ts': 'export const nothingSignsHere = 2;\n' },
+            { ...baseGateFiles(20), [LOCK_MODULE_REL]: null, 'src/locked.ts': 'export const nothingSigns = 1;\n', 'src/legacy.ts': null, 'scripts/tool.ts': 'export const nothingSignsHere = 2;\n' },
             ['no-sites'],
         ),
     );
+    out.push(codeCase('CR-08-delegated-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/rescue.ts': GATE_DELEGATED_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('CR-09-method-value-outside-lock-fails', { ...baseGateFiles(20), 'scripts/approve.ts': GATE_METHOD_VALUE_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('WR-23-unchecked-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/unchecked.ts': GATE_UNCHECKED_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('WR-24-local-withNonceLock-is-not-the-lock-fails', { ...baseGateFiles(20), 'scripts/fakelock.ts': GATE_FAKE_LOCK_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
+    out.push(
+        codeCase('WR-25-signing-cjs-and-mts-scripts-fail', { ...baseGateFiles(20), 'scripts/rescue.cjs': GATE_CJS_SCRIPT, 'scripts/rescue2.mts': GATE_MTS_SCRIPT }, ['surplus-unlocked'], (res) => {
+            const named = ['scripts/rescue.cjs', 'scripts/rescue2.mts'].filter((f) => res.problems.some((p) => p.code === 'surplus-unlocked' && p.message.startsWith(`${f}:`)));
+            return named.length === 2 ? null : `expected a surplus problem for each of scripts/rescue.cjs and scripts/rescue2.mts, got ${res.problems.map((p) => p.message).join(' | ')}`;
+        }),
+    );
     const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
-    narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
+    narrowed.include = [LOCK_MODULE_REL, 'src/locked.ts', 'src/legacy.ts'];
     out.push(codeCase('file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.ts': GATE_NEW_UNLOCKED_SRC }, ['file-not-audited']));
+    out.push(
+        codeCase('WR-25-js-file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.mjs': 'export const x = 1;\n' }, ['file-not-audited'], (res) =>
+            res.problems.some((p) => p.code === 'file-not-audited' && p.message.startsWith('src/hidden.mjs ')) ? null : `expected file-not-audited for src/hidden.mjs, got ${res.problems.map((p) => p.message).join(' | ')}`,
+        ),
+    );
     out.push(caseFlag7());
     return out;
 }
@@ -2001,8 +2391,9 @@ const FIXTURE_LOCK = `export async function withNonceLock<T>(walletAddress: stri
 }
 `;
 
-const FIXTURE_CASES = `import { Wallet, ContractFactory, Contract, JsonRpcProvider } from 'ethers';
-import { withNonceLock } from './lock';
+const FIXTURE_CASES = `import { Wallet, ContractFactory, Contract, JsonRpcProvider, JsonRpcSigner } from 'ethers';
+import type { ContractRunner, TransactionRequest, ContractTransactionResponse } from 'ethers';
+import { withNonceLock } from './utils/nonceAuthority';
 
 declare const wallet: Wallet;
 declare const provider: JsonRpcProvider;
@@ -2221,6 +2612,118 @@ export async function memoLocked(): Promise<void> {
 export async function memoUnlocked(): Promise<void> {
     await memoB();
 }
+
+// CR-08: sendTransaction on a receiver whose type is not structurally a Signer. The
+// implementation may be ethers' own Wallet (outside the program), so the call is a site.
+export async function caseDelegatedRunner(runner: ContractRunner): Promise<void> {
+    await runner.sendTransaction!(tx); // CASE:delegated-runner
+}
+export async function caseDelegatedPick(s: Pick<Wallet, 'sendTransaction'>): Promise<void> {
+    await s.sendTransaction(tx); // CASE:delegated-pick
+}
+interface TxSender {
+    sendTransaction(t: TransactionRequest): Promise<unknown>;
+}
+export async function caseDelegatedLocal(s: TxSender): Promise<void> {
+    await s.sendTransaction(tx); // CASE:delegated-local
+}
+export async function caseDelegatedLocked(s: Pick<Wallet, 'sendTransaction' | 'address'>): Promise<void> {
+    await withNonceLock(s.address, async () => {
+        await s.sendTransaction(tx); // CASE:delegated-locked
+    });
+}
+
+// CR-09: a contract method reached through a value, a getFunction value, destructuring, a
+// callback or a narrow interface cast is still a call through the contract's runner.
+const C9 = '0x0000000000000000000000000000000000000002';
+const TO9 = '0x0000000000000000000000000000000000000003';
+export async function caseMethodValueCall(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const transfer = c.transfer;
+    await transfer(TO9, 1n); // CASE:method-value-call
+}
+export async function caseMethodValueSend(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const m = c.transfer;
+    await m.send(TO9, 1n); // CASE:method-value-send
+}
+export async function caseGetFunctionValue(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const f = c.getFunction('transfer');
+    await f(TO9, 1n); // CASE:getfunction-value
+}
+export async function caseDestructured(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const { transfer } = c;
+    await transfer(TO9, 1n); // CASE:destructured
+}
+export async function caseMethodValueView(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    const bal = c.balanceOf;
+    await bal(wallet.address); // CASE:method-value-view
+}
+async function retry9(f: (to: string, amount: bigint) => Promise<unknown>): Promise<void> {
+    await f(TO9, 1n);
+}
+export async function caseMethodCallback(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    await withNonceLock(wallet.address, () => retry9(c.transfer)); // CASE:method-callback
+}
+export async function caseMethodCallbackProvider(): Promise<void> {
+    const ro = new Contract(C9, ABI, provider);
+    await retry9(ro.transfer); // CASE:method-callback-provider
+}
+interface IRouterNarrow {
+    transfer(to: string, amount: bigint): Promise<ContractTransactionResponse>;
+}
+export async function caseNarrowCast(): Promise<void> {
+    const r = new Contract(C9, ABI, wallet) as unknown as IRouterNarrow;
+    await r.transfer(TO9, 1n); // CASE:narrow-cast
+}
+
+// WR-23: other ethers signing APIs and indirect calls.
+declare const jsigner: JsonRpcSigner;
+export async function caseUnchecked(): Promise<void> {
+    await jsigner.sendUncheckedTransaction(tx); // CASE:unchecked
+}
+export async function caseAuthorize(): Promise<void> {
+    await wallet.authorize({ address: TO9 }); // CASE:authorize
+}
+export async function caseFnCall(): Promise<void> {
+    await wallet.sendTransaction.call(wallet, tx); // CASE:fn-call
+}
+export async function caseFnApply(): Promise<void> {
+    await wallet.sendTransaction.apply(wallet, [tx]); // CASE:fn-apply
+}
+export async function caseFnBind(): Promise<void> {
+    const send = wallet.sendTransaction.bind(wallet); // CASE:fn-bind
+    await send(tx);
+}
+export async function caseMethodFnCall(): Promise<void> {
+    const c = new Contract(C9, ABI, wallet);
+    await c.transfer.call(c, TO9, 1n); // CASE:method-fn-call
+}
+export function caseSigningKey(digest: string): string {
+    return wallet.signingKey.sign(digest).serialized; // CASE:signing-key
+}
+export async function caseRpcSendRaw(raw: string): Promise<void> {
+    await provider.send('eth_sendRawTransaction', [raw]); // CASE:rpc-send-raw
+}
+export async function caseRpcSendRead(): Promise<void> {
+    await provider.send('eth_blockNumber', []); // CASE:rpc-send-read
+}
+declare function loadArtifactAbi(): any;
+export async function caseAnyArtifact(): Promise<void> {
+    const c: any = new Contract(C9, loadArtifactAbi(), wallet);
+    await c.someArtifactMethod(1n); // CASE:any-artifact
+    await c.getAddress();
+}
+async function viaAny(c: any): Promise<void> {
+    await c.anotherArtifactMethod(); // CASE:any-artifact-param
+}
+export async function caseAnyArtifactParam(): Promise<void> {
+    await withNonceLock(wallet.address, () => viaAny(new Contract(C9, loadArtifactAbi(), wallet) as any));
+}
 `;
 
 interface Expect {
@@ -2266,6 +2769,29 @@ const EXPECT: Record<string, Expect> = {
     'cycle-only': { found: true, kind: 'tx-signing', lock: 'unknown' },
     'memo-b': { found: true, kind: 'tx-signing', lock: 'unlocked' },
     'memo-a': { found: true, kind: 'tx-signing', lock: 'unlocked' },
+    'delegated-runner': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-pick': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-local': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-locked': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'lexical', apiMatch: /^delegated\.sendTransaction$/ },
+    'method-value-call': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    'method-value-send': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer\.send$/ },
+    'getfunction-value': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    destructured: { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    'method-value-view': { found: true, kind: 'tx-signing', excluded: true },
+    'method-callback': { found: true, kind: 'tx-signing', lock: 'unknown', type_unresolved: true, apiMatch: /^contract\.transfer\.value$/ },
+    'method-callback-provider': { found: false },
+    'narrow-cast': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^interface\.transfer$/ },
+    unchecked: { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^signer\.sendUncheckedTransaction$/ },
+    authorize: { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^signer\.authorize$/ },
+    'fn-call': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^signer\.sendTransaction$/ },
+    'fn-apply': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^signer\.sendTransaction$/ },
+    'fn-bind': { found: true, kind: 'tx-signing', lock: 'unknown', type_unresolved: true, apiMatch: /^signer\.sendTransaction\.value$/ },
+    'method-fn-call': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.transfer$/ },
+    'signing-key': { found: true, kind: 'tx-signing', lock: 'unknown', type_unresolved: true, apiMatch: /^signingKey\.sign$/ },
+    'rpc-send-raw': { found: true, kind: 'tx-signing', lock: 'unknown', type_unresolved: true, apiMatch: /^rpc\.eth_sendRawTransaction$/ },
+    'rpc-send-read': { found: false },
+    'any-artifact': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.someArtifactMethod$/ },
+    'any-artifact-param': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'transitive', apiMatch: /^contract\.anotherArtifactMethod$/ },
 };
 
 /** The repo's node_modules (scripts/ is one level below the repo root; trap 2). */
@@ -2282,7 +2808,8 @@ function analysisSelfTest(): { failed: number; total: number } {
         fs.mkdirSync(path.join(dir, 'node_modules'));
         fs.symlinkSync(path.join(repoNm, 'ethers'), path.join(dir, 'node_modules', 'ethers'), process.platform === 'win32' ? 'junction' : 'dir');
         fs.writeFileSync(path.join(dir, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'commonjs', moduleResolution: 'node', strict: true, esModuleInterop: true, skipLibCheck: true, types: [] }, include: ['src/**/*'] }, null, 2));
-        fs.writeFileSync(path.join(dir, 'src', 'lock.ts'), FIXTURE_LOCK);
+        fs.mkdirSync(path.join(dir, path.dirname(LOCK_MODULE_REL)), { recursive: true });
+        fs.writeFileSync(path.join(dir, LOCK_MODULE_REL), FIXTURE_LOCK);
         fs.writeFileSync(path.join(dir, 'src', 'cases.ts'), FIXTURE_CASES);
         const c = new Census(dir, '0'.repeat(40));
         const r = c.run();

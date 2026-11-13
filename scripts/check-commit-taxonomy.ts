@@ -19,8 +19,8 @@
 //     never HEAD's, so a register entry added later cannot legitimize an older commit.
 //
 // How git is read (RESEARCH Pattern 8, measured on a throwaway repo with core.autocrlf=true):
-//   - commits to judge: git rev-list --no-merges --reverse --topo-order <first>..HEAD. Merge
-//     commits are not judged and the commits inside them are (AC-42, a locked decision);
+//   - commits to judge: git rev-list --no-merges --reverse --topo-order <first>..HEAD. A merge
+//     commit is not judged for what it brings in; the commits inside it are (AC-42);
 //   - the first recording commit is found from history, never hard-coded: the topologically
 //     earliest non-merge commit whose diff adds a path under the folder (AC-44). The check
 //     prints which commit it found;
@@ -38,9 +38,12 @@
 //   - path identity is case-insensitive and the folder pathspec is :(icase): on the operator's
 //     Windows checkout test/realpath/RECORDINGS/x.jsonl is the same file as
 //     test/realpath/recordings/x.jsonl;
-//   - a merge commit whose result differs from every parent inside the folder
-//     (git diff-tree --cc) is reported on a WARN line. It is still not judged and the exit code
-//     does not change (AC-42 stands); the line makes the exemption's limit visible;
+//   - a merge commit whose own result differs from every parent inside the folder
+//     (git diff-tree --cc: a conflict resolution, or an edit made during git merge --no-commit)
+//     is judged like a non-merge commit for those paths (Phase 23 review WR-27): it fails unless
+//     its subject begins behavior: and every ID it cites is in its own tree. Otherwise a merge
+//     could re-record the golden master with no behavior: commit at all. A clean merge (every
+//     path equal to some parent) stays unjudged (AC-42);
 //   - a shallow clone exits 2: its "first recording commit" would be the fetched commit and the
 //     check would judge nothing (T-23-31). CI checks out with fetch-depth: 0.
 // Commit messages and paths are untrusted input (T-23-32): git always runs with an argument
@@ -215,10 +218,11 @@ export interface Judgement {
     firstSubject: string;
     judged: string[];
     merges: number;
+    /** Merge commits judged because their own result changes the folder (WR-27). */
+    judgedMerges: number;
     touching: number;
     added: number;
     changed: number;
-    warnings: string[];
     violations: Violation[];
 }
 
@@ -335,10 +339,18 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
     };
 
     const messages = readMessages(root, [first, ...judged, ...mergeShas], env);
+    // WR-27: a merge whose own result differs from every parent inside the folder is judged for
+    // those paths (git diff-tree --cc lists exactly them); a clean merge is not (AC-42).
+    const mergeOwn = new Map<string, string[]>();
+    for (const m of mergeShas) {
+        const paths = nulFields(gitText(root, ['diff-tree', '--cc', '--no-commit-id', '-r', '--name-only', '-z', m, '--', PROTECTED_SPEC], env)).filter(Boolean);
+        for (const p of paths) if (!p.toLowerCase().startsWith(PROTECTED_DIR)) throw new UsageError(`git diff-tree --cc printed ${quote(p)}, outside ${PROTECTED_DIR}`);
+        if (paths.length) mergeOwn.set(m, paths);
+    }
     // Every ID a behavior: commit cites, looked up in that commit's own tree in one call.
     const lookups = new Map<string, boolean>();
     const want: string[] = [];
-    for (const c of judged) {
+    for (const c of [...judged, ...mergeOwn.keys()]) {
         const msg = messages.get(c) ?? '';
         if (!BEHAVIOR_SUBJECT_RE.test(subjectOf(msg))) continue;
         for (const m of msg.matchAll(CITED_ID_RE)) want.push(`${c}:${idPath(m[1])}`);
@@ -357,6 +369,19 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
         });
     }
     const violations: Violation[] = [];
+    /** A behavior: commit must cite at least one ID, and each must be in its own tree (AC-41). */
+    const judgeIds = (c: string, subject: string, msg: string): void => {
+        const ids = [...new Set([...msg.matchAll(CITED_ID_RE)].map((m) => m[1]))];
+        if (!ids.length)
+            violations.push({ sha: c, subject, code: 'behavior-without-id', message: 'a behavior: commit must cite an OD-<n> or AUD-<AREA>-<NNN> ID; its message cites none (AC-41)' });
+        for (const id of ids) {
+            const rel = idPath(id);
+            const found = lookups.get(`${c}:${rel}`);
+            if (found === undefined) throw new UsageError(`internal: no tree lookup for ${id} in ${short(c)}`);
+            if (!found)
+                violations.push({ sha: c, subject, code: 'behavior-unknown-id', message: `cites ${id}, but ${rel} is not in this commit's own tree (AC-41; an ID registered later does not count)` });
+        }
+    };
     let touchingJudged = 0;
     let added = 0;
     let changed = 0;
@@ -393,29 +418,22 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
                 code: 'protected-change-not-behavior',
                 message: `${changes.map((k) => describeEntry(k.kind, k.path)).join('; ')}; only a behavior: commit citing a real ID may change the recording (AC-39, D-18)`,
             });
-        if (isBehavior) {
-            const ids = [...new Set([...msg.matchAll(CITED_ID_RE)].map((m) => m[1]))];
-            if (!ids.length)
-                violations.push({ sha: c, subject, code: 'behavior-without-id', message: 'a behavior: commit must cite an OD-<n> or AUD-<AREA>-<NNN> ID; its message cites none (AC-41)' });
-            for (const id of ids) {
-                const rel = idPath(id);
-                const found = lookups.get(`${c}:${rel}`);
-                if (found === undefined) throw new UsageError(`internal: no tree lookup for ${id} in ${short(c)}`);
-                if (!found)
-                    violations.push({ sha: c, subject, code: 'behavior-unknown-id', message: `cites ${id}, but ${rel} is not in this commit's own tree (AC-41; an ID registered later does not count)` });
-            }
-        }
+        if (isBehavior) judgeIds(c, subject, msg);
     }
 
-    // AC-42: merges are not judged. A merge whose result differs from every parent inside the
-    // folder is named, so the limit of the exemption is visible; the exit code does not change.
-    const warnings: string[] = [];
-    for (const m of mergeShas) {
-        const paths = nulFields(gitText(root, ['diff-tree', '--cc', '--no-commit-id', '-r', '--name-only', '-z', m, '--', PROTECTED_SPEC], env)).filter(Boolean);
-        if (paths.length)
-            warnings.push(
-                `WARN merge ${short(m)} ${quote(subjectOf(messages.get(m) ?? ''))}: its result differs from every parent in ${paths.map((p) => quote(p)).join(', ')}; merge commits are not judged (AC-42), so review this resolution by hand`,
-            );
+    // WR-27: a merge whose own result changes a recording is judged like a non-merge commit.
+    for (const [m, paths] of mergeOwn) {
+        const msg = messages.get(m) ?? '';
+        const subject = subjectOf(msg);
+        changed += paths.length;
+        if (!BEHAVIOR_SUBJECT_RE.test(subject))
+            violations.push({
+                sha: m,
+                subject,
+                code: 'protected-change-not-behavior',
+                message: `merge result differs from every parent in ${paths.map((p) => quote(p)).join(', ')} (a conflict resolution or an edit made during the merge); only a behavior: commit citing a real ID may change the recording (AC-39, WR-27)`,
+            });
+        else judgeIds(m, subject, msg);
     }
 
     return {
@@ -423,10 +441,10 @@ export function judgeHistory(root: string, env: NodeJS.ProcessEnv = readGitEnv()
         firstSubject: subjectOf(messages.get(first) ?? ''),
         judged,
         merges: mergeShas.length,
+        judgedMerges: mergeOwn.size,
         touching: touchingJudged,
         added,
         changed,
-        warnings,
         violations,
     };
 }
@@ -451,10 +469,9 @@ function gate(root: string, env: NodeJS.ProcessEnv, say: Say): { code: number; j
         return { code: 2, judgement: null };
     }
     for (const v of j.violations) say.error(`VIOLATION ${short(v.sha)} ${quote(v.subject)} [${v.code}] ${v.message}`);
-    for (const w of j.warnings) say.error(w);
     say.log(
         `check-commit-taxonomy: first recording commit ${short(j.first)} ${quote(j.firstSubject)}; judged ${j.judged.length} commit(s) after it ` +
-            `(${j.merges} merge commit(s) not judged, ${j.warnings.length} merge warning(s)); ${j.touching} of them touch ${PROTECTED_DIR}: ` +
+            `(${j.merges} merge commit(s), ${j.judgedMerges} of them judged because their own result changes ${PROTECTED_DIR}); ${j.touching} non-merge commit(s) touch it: ` +
             `${j.added} new path(s) added, ${j.changed} existing path(s) changed, removed or re-added; ${j.violations.length} violation(s)`,
     );
     say.log(j.violations.length ? `RESULT FAIL (${j.violations.length} violation(s))` : 'RESULT PASS');
@@ -548,20 +565,21 @@ interface Expect {
     shas?: string[];
     judged?: number;
     merges?: number;
-    warnings?: number;
+    /** Merge commits judged because their own result changes the folder (WR-27). */
+    judgedMerges?: number;
     first?: string;
     extra?: (j: Judgement) => string | null;
 }
 
 function checkJudgement(name: string, j: Judgement, x: Expect): CaseOutcome {
     const got = j.violations.map((v) => v.code);
-    const shown = `violations [${j.violations.map((v) => `${short(v.sha)} ${v.code}: ${v.message}`).join(' | ')}], judged ${j.judged.length}, merges ${j.merges}, warnings ${j.warnings.length}`;
+    const shown = `violations [${j.violations.map((v) => `${short(v.sha)} ${v.code}: ${v.message}`).join(' | ')}], judged ${j.judged.length}, merges ${j.merges} (${j.judgedMerges} judged)`;
     if (JSON.stringify(got) !== JSON.stringify(x.codes)) return { name, ok: false, detail: `expected codes [${x.codes.join(', ')}], got ${shown}` };
     if (x.shas && JSON.stringify(j.violations.map((v) => v.sha)) !== JSON.stringify(x.shas))
         return { name, ok: false, detail: `expected violations on [${x.shas.map(short).join(', ')}], got ${shown}` };
     if (x.judged !== undefined && j.judged.length !== x.judged) return { name, ok: false, detail: `expected ${x.judged} judged commit(s), got ${shown}` };
     if (x.merges !== undefined && j.merges !== x.merges) return { name, ok: false, detail: `expected ${x.merges} merge(s), got ${shown}` };
-    if (x.warnings !== undefined && j.warnings.length !== x.warnings) return { name, ok: false, detail: `expected ${x.warnings} warning(s), got ${shown}: ${j.warnings.join(' | ')}` };
+    if (x.judgedMerges !== undefined && j.judgedMerges !== x.judgedMerges) return { name, ok: false, detail: `expected ${x.judgedMerges} judged merge(s), got ${shown}` };
     if (x.first !== undefined && j.first !== x.first) return { name, ok: false, detail: `expected first recording commit ${short(x.first)}, got ${short(j.first)}` };
     const extra = x.extra ? x.extra(j) : null;
     if (extra) return { name, ok: false, detail: `${extra}; ${shown}` };
@@ -797,7 +815,7 @@ function selfTestCases(): CaseOutcome[] {
                 shas: [inner],
                 judged: 2,
                 merges: 1,
-                warnings: 0,
+                judgedMerges: 0,
                 extra: () => (base === first ? null : 'the case did not start at the first recording commit'),
             });
         });
@@ -811,10 +829,14 @@ function selfTestCases(): CaseOutcome[] {
             fx.put(`${REC}d.jsonl`, '{"scenario":"d","tag":"KEEP"}\n{"submitted":[]}\n');
             fx.commit('test: add scenario d');
             fx.git('merge', '-q', '--no-ff', '-m', 'Merge branch side', `side-${n}`);
-            return checkJudgement('AC-42-a-clean-merge-of-valid-commits-passes', judge(), { codes: [], judged: 2, merges: 1, warnings: 0 });
+            return checkJudgement('AC-42-a-clean-merge-of-valid-commits-passes', judge(), { codes: [], judged: 2, merges: 1, judgedMerges: 0 });
         });
 
-        caseRun('AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0', () => {
+        // Phase 23 review WR-27: a merge whose own result changes a recording (a conflict resolution,
+        // or an edit made during `git merge --no-commit`) is judged like a non-merge commit. A clean
+        // merge is still not judged and its inner commits are (AC-42).
+        /** Two behavior: re-records of a.jsonl on two lines, merged with a resolution that keeps neither. */
+        const conflictMerge = (name: string, subject: string): { merge: string } | CaseOutcome => {
             start();
             fx.git('checkout', '-q', '-b', `side-${n}`);
             fx.put(`${REC}a.jsonl`, '{"scenario":"a","tag":"KEEP"}\n{"side":true}\n');
@@ -823,17 +845,46 @@ function selfTestCases(): CaseOutcome[] {
             fx.put(`${REC}a.jsonl`, '{"scenario":"a","tag":"KEEP"}\n{"main":true}\n');
             fx.commit(`behavior: re-record a on the mainline (${OD_REAL})`);
             const m = fx.may(['merge', '-q', '--no-ff', `side-${n}`]);
-            if (m.status === 0) return { name: 'AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0', ok: false, detail: 'the merge was expected to conflict' };
+            if (m.status === 0) return { name, ok: false, detail: 'the merge was expected to conflict' };
             fx.put(`${REC}a.jsonl`, '{"scenario":"a","tag":"KEEP"}\n{"resolved":"neither"}\n');
             fx.git('add', '--', `${REC}a.jsonl`);
-            const merge = fx.commitStaged('Merge branch side');
+            return { merge: fx.commitStaged(subject) };
+        };
+        const gateCase = (name: string, made: { merge: string } | CaseOutcome, x: Expect, code: number): CaseOutcome => {
+            if (!('merge' in made)) return made;
             const r = runGate(fx.dir, fx.env);
-            const warn = r.out.filter((s) => s.startsWith('WARN merge '));
-            if (!r.judgement) return { name: 'AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0', ok: false, detail: `the gate could not judge: ${r.out.join(' | ')}` };
-            const outcome = checkJudgement('AC-42-a-merge-whose-conflict-resolution-alone-changes-a-recording-warns-and-exits-0', r.judgement, { codes: [], merges: 1, warnings: 1 });
+            if (!r.judgement) return { name, ok: false, detail: `the gate could not judge: ${r.out.join(' | ')}` };
+            const outcome = checkJudgement(name, r.judgement, x.shas ? x : { ...x, shas: x.codes.map(() => made.merge) });
             if (!outcome.ok) return outcome;
-            const ok = r.code === 0 && warn.length === 1 && warn[0].includes(short(merge)) && warn[0].includes(`${REC}a.jsonl`);
-            return { ...outcome, ok, detail: ok ? `exit 0; ${warn[0]}` : `expected exit 0 and one WARN line naming ${short(merge)} and a.jsonl, got exit ${r.code}: ${r.out.join(' | ')}` };
+            return r.code === code ? { ...outcome, detail: `exit ${code}; ${outcome.detail}` } : { name, ok: false, detail: `expected exit ${code}, got exit ${r.code}: ${r.out.join(' | ')}` };
+        };
+
+        caseRun('WR-27-a-merge-whose-conflict-resolution-alone-changes-a-recording-fails', () => {
+            const name = 'WR-27-a-merge-whose-conflict-resolution-alone-changes-a-recording-fails';
+            return gateCase(name, conflictMerge(name, 'Merge branch side'), { codes: ['protected-change-not-behavior'], merges: 1, judgedMerges: 1 }, 1);
+        });
+
+        caseRun('WR-27-a-no-conflict-merge-that-edits-a-recording-fails', () => {
+            const name = 'WR-27-a-no-conflict-merge-that-edits-a-recording-fails';
+            start();
+            fx.git('checkout', '-q', '-b', `side-${n}`);
+            fx.put('src/app.ts', 'export const a = 7;\n');
+            fx.commit('fix: unrelated side work');
+            fx.git('checkout', '-q', `case-${n}`);
+            fx.git('merge', '-q', '--no-commit', '--no-ff', `side-${n}`);
+            edit(`${REC}a.jsonl`, '{"laundered":true}');
+            fx.git('add', '--', `${REC}a.jsonl`);
+            return gateCase(name, { merge: fx.commitStaged('Merge branch side') }, { codes: ['protected-change-not-behavior'], merges: 1, judgedMerges: 1 }, 1);
+        });
+
+        caseRun('WR-27-a-merge-resolution-as-behavior-citing-a-real-id-passes', () => {
+            const name = 'WR-27-a-merge-resolution-as-behavior-citing-a-real-id-passes';
+            return gateCase(name, conflictMerge(name, `behavior: resolve the two re-records of a (${AUD_REAL})`), { codes: [], merges: 1, judgedMerges: 1 }, 0);
+        });
+
+        caseRun('WR-27-a-behavior-merge-citing-an-unknown-id-fails', () => {
+            const name = 'WR-27-a-behavior-merge-citing-an-unknown-id-fails';
+            return gateCase(name, conflictMerge(name, 'behavior: resolve the two re-records of a (AUD-NOPE-999)'), { codes: ['behavior-unknown-id'], merges: 1, judgedMerges: 1 }, 1);
         });
 
         caseRun('T-23-41-a-path-added-on-a-side-line-forked-before-the-recording-fails', () => {
@@ -851,7 +902,7 @@ function selfTestCases(): CaseOutcome[] {
                 codes: ['protected-change-not-behavior'],
                 shas: [side],
                 merges: 1,
-                warnings: 0,
+                judgedMerges: 0,
                 extra: (j) => (/another line of history/.test(j.violations[0].message) ? null : 'the violation should say another line adds the path'),
             });
         });
@@ -866,7 +917,7 @@ function selfTestCases(): CaseOutcome[] {
             fx.put(`${REC}e.jsonl`, text);
             fx.commit('test: add scenario e (cherry-picked)');
             fx.git('merge', '-q', '--no-ff', '-m', 'Merge branch side', `side-${n}`);
-            return checkJudgement('AC-40-the-same-new-scenario-added-on-two-lines-passes', judge(), { codes: [], judged: 2, merges: 1, warnings: 0, extra: (j) => (j.added === 2 ? null : `expected two new-path adds, got ${j.added}`) });
+            return checkJudgement('AC-40-the-same-new-scenario-added-on-two-lines-passes', judge(), { codes: [], judged: 2, merges: 1, judgedMerges: 0, extra: (j) => (j.added === 2 ? null : `expected two new-path adds, got ${j.added}`) });
         });
 
         caseRun('T-23-41-an-unrelated-root-commit-adding-an-existing-path-fails', () => {

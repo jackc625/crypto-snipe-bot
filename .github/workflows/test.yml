@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # WR-31: a hung self-test child or a git prompt must not hold the runner for GitHub's 6-hour
+    # default. Measured on the operator's machine (Node 22.16.0, 2026-11-12): npm run test:unit
+    # 71 s; the four railed self-test children allow 240 s each. 45 minutes covers the install,
+    # the three suites, the gates, the dashboard install and the three type checks with headroom.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -44,7 +49,9 @@ jobs:
         # library may be mocked, compared by resolved file; the clock is vi.useFakeTimers. A mock
         # of anything else (the database, ethers, a bot module), vi.stubGlobal, vi.importMock, a
         # vi.spyOn other than vi.spyOn(process, 'exit'), or an alias of vi fails the build. AST and
-        # binding-aware, with no exemption inside the folder.
+        # binding-aware, with no exemption inside the folder. The scan also covers every module
+        # those files and the realpath setupFiles import outside src/ (helpers, rails), and reads
+        # vitest.config.ts: the realpath project may carry only the ethers CommonJS alias (WR-26).
         run: npm run check:realpath-mocks
       - name: Signing census gate (CHAR-04)
         # CHAR-04 / D-NONCE-AUTHORITY-ALL: every transaction-signing site in src/ and scripts/ must
@@ -54,8 +61,9 @@ jobs:
         # on an empty scan; each listed exception must name its finding and an operator decision
         # record that covers it (scripts/signing-census-exceptions.json). The second command
         # refuses a commit that lowered the floor without naming the finding that removed the
-        # site, and refuses a shallow clone (hence fetch-depth: 0 above). TypeScript only; it
-        # does not load better-sqlite3 or any bot module.
+        # site, and refuses a shallow clone (hence fetch-depth: 0 above). It reads type information
+        # only (every .ts .tsx .mts .cts .js .jsx .mjs .cjs file under src/ and scripts/, WR-25);
+        # it does not load better-sqlite3 or any bot module.
         run: |
           npm run check:census
           npm run check:census -- --check-floor-history
@@ -66,9 +74,10 @@ jobs:
         # test/realpath/recordings/ (the scenario recordings and the env snapshot) fails unless
         # its subject is behavior: or behavior(<scope>): and every OD-<n> / AUD-<AREA>-<NNN> it
         # cites exists in that commit's own tree; adding a brand-new scenario or env variable
-        # passes. Merge commits are not judged (their inner commits are) and a merge that changes
-        # the folder on its own prints a WARN line. Needs the full history (fetch-depth: 0
-        # above): a shallow clone exits 2.
+        # passes. A clean merge is not judged (its inner commits are); a merge whose own result
+        # changes the folder (a conflict resolution, an edit during the merge) is judged like any
+        # commit for those paths (WR-27). Needs the full history (fetch-depth: 0 above): a
+        # shallow clone exits 2.
         run: npm run check:commits
       - name: Ban .todo test stubs
         run: |
@@ -125,6 +134,7 @@ jobs:
 
   detect-contract-changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       contracts: ${{ steps.filter.outputs.contracts }}
     steps:
@@ -167,9 +177,12 @@ jobs:
           python-version: '3.11'
       - run: npm ci --legacy-peer-deps
       - name: Install slither-analyzer + solc-select
+        # WR-31: exact versions (confirmed on PyPI 2026-11-12), so a re-run cannot pick up a newer
+        # analyzer that changes the --fail-medium result for the same commit. slither-analyzer
+        # 0.11.6 needs Python >= 3.10 (3.11 above); its crytic-compile needs solc-select >= 1.0.4.
         run: |
           pip install --upgrade pip
-          pip install slither-analyzer
+          pip install slither-analyzer==0.11.6 solc-select==1.2.0
           solc-select install 0.8.28
           solc-select use 0.8.28
       - name: Prepare reports directory
@@ -200,9 +213,11 @@ jobs:
           python-version: '3.11'
       - run: npm ci --legacy-peer-deps
       - name: Install mythril
+        # WR-31: an exact version (confirmed on PyPI 2026-11-12; the latest release, which the
+        # unpinned install resolved to).
         run: |
           pip install --upgrade pip
-          pip install mythril
+          pip install mythril==0.24.8
       - name: Prepare reports directory + solc-settings
         run: |
           mkdir -p reports

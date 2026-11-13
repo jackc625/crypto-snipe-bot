@@ -16,7 +16,7 @@
 // The fake chain is a transport seam (test/realpath/harness/chain.ts installSeams), not a mock.
 //
 // Usage:
-//   node node_modules/ts-node/dist/bin.js scripts/check-realpath-mocks.ts [--root <dir>]
+//   node node_modules/ts-node/dist/bin.js scripts/check-realpath-mocks.ts [--root <dir>] [--config <vitest config>]
 //   node node_modules/ts-node/dist/bin.js scripts/check-realpath-mocks.ts --self-test
 //   npm run check:realpath-mocks
 //
@@ -49,8 +49,27 @@
 //   What this gate does not see: code that patches a module without the vi API (for example
 //   assigning over an export). That is outside an AST mock-list check; review covers it.
 //
-// Scope: every .ts, .mts, .cts, .tsx, .js, .mjs and .cjs file under the root (default
-// test/realpath), with no exemption inside it.
+// Scope (Phase 23 review WR-26): every .ts, .mts, .cts, .tsx, .js, .mjs and .cjs file under the
+// root (default test/realpath), with no exemption inside it, PLUS every module those files and the
+// realpath project's setupFiles reach through imports (import / export from, import = require(),
+// require('literal'), import('literal')), transitively, outside node_modules and src/: a helper in
+// test/helpers or test/rails that calls vi.doMock before a real-path test's dynamic import, or a
+// vi.mock in a setup file, replaces a bot module for the real-path workers just as a mock in the
+// folder would. src/ is the code under test (it never loads vitest), so it is not scanned.
+//
+// The realpath project config (default vitest.config.ts; --config <file>) is read as an AST too,
+// because a resolve.alias entry swaps a bot module with no vi call at all:
+//   - config-alias      the realpath project's resolve.alias must be exactly the one entry that
+//                       selects ethers' CommonJS build ({ find: /^ethers$/, replacement:
+//                       path.resolve(__dirname, 'node_modules/ethers/lib.commonjs/index.js') });
+//                       any other entry, any other resolve key, a test.alias, or a resolve.alias /
+//                       test.alias at the root (inherited through extends: true) is a violation;
+//   - config-plugin     a plugins key at the root or on the realpath project (a plugin's resolveId
+//                       can swap any module);
+//   - config-unreadable the config cannot be read as literals (no default-exported object, a spread,
+//                       a non-literal setupFiles entry, a project defined in another file, a missing
+//                       setup file, no realpath project): fail closed.
+// With --root and no --config the config is not read (the self-test's temp folders).
 //
 // Behavior:
 //   - No violations                                 -> summary line, exit 0
@@ -95,7 +114,10 @@ export type RealpathViolationKind =
     | 'vi-escape'
     | 'vi-computed-member'
     | 'vitest-dynamic-load'
-    | 'vitest-reexport';
+    | 'vitest-reexport'
+    | 'config-alias'
+    | 'config-plugin'
+    | 'config-unreadable';
 
 export interface RealpathViolation {
     file: string;
@@ -117,6 +139,10 @@ export interface RealpathScan {
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_ROOT = path.join(REPO_ROOT, 'test', 'realpath');
+const DEFAULT_CONFIG = path.join(REPO_ROOT, 'vitest.config.ts');
+/** The one alias the realpath project may carry (it selects which build of the real ethers loads). */
+const ETHERS_ALIAS_FIND = '/^ethers$/';
+const ETHERS_ALIAS_REPLACEMENT = "path.resolve(__dirname,'node_modules/ethers/lib.commonjs/index.js')";
 const SOURCE_EXTENSIONS = new Set(['.ts', '.mts', '.cts', '.tsx', '.js', '.mjs', '.cjs']);
 const FREE_VI_NAMES = ['vi', 'vitest'];
 const VI_EXPORTS = new Set(['vi', 'vitest']);
@@ -132,8 +158,18 @@ const ALLOWED_MODULES: ReadonlyArray<readonly [label: string, specifier: string]
     ['Telegram client (telegram/events)', 'telegram/events'],
 ];
 
+/**
+ * One spelling per file: the real path (TypeScript's resolver follows a symlinked or junctioned
+ * node_modules to its target for a bare specifier, but not for an absolute one), lowercased on
+ * Windows. A path that does not exist on disk falls back to path.resolve.
+ */
 function canonical(file: string): string {
-    const resolved = path.resolve(file);
+    let resolved = path.resolve(file);
+    try {
+        resolved = fs.realpathSync.native(resolved);
+    } catch {
+        // not on disk (a node: built-in name): compare as resolved
+    }
     return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
@@ -365,6 +401,168 @@ export function checkRealpathMocks(files: string[], allow: AllowList = loadAllow
     return { violations, viUses, mockCalls, files: files.length };
 }
 
+/** Every module specifier a file names: import / export ... from, import = require(), require('literal'), import('literal'). */
+function importSpecifiers(sf: ts.SourceFile): string[] {
+    const out: string[] = [];
+    const visit = (node: ts.Node): void => {
+        if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) out.push(node.moduleSpecifier.text);
+        else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && ts.isStringLiteral(node.moduleReference.expression)) out.push(node.moduleReference.expression.text);
+        else if (ts.isCallExpression(node) && node.arguments.length >= 1 && ts.isStringLiteralLike(node.arguments[0])) {
+            const callee = node.expression;
+            if ((ts.isIdentifier(callee) && callee.text === 'require') || callee.kind === ts.SyntaxKind.ImportKeyword) out.push(node.arguments[0].text);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    return out;
+}
+
+/**
+ * The root files plus every source module they reach through imports, transitively (WR-26),
+ * skipping packages (any node_modules path), built-ins, declaration files and the bot's own src/.
+ * Sorted, one entry per real file.
+ */
+export function collectReachedFiles(roots: string[], options: ResolverOptions): string[] {
+    const srcDir = canonical(path.join(REPO_ROOT, 'src')) + (process.platform === 'win32' ? '\\' : path.sep);
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const queue = roots.map((f) => path.resolve(f));
+    while (queue.length > 0) {
+        const file = queue.shift() as string;
+        const key = canonical(file);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(file);
+        const sf = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(file));
+        for (const spec of importSpecifiers(sf)) {
+            const target = resolveSpecifier(spec, file, options);
+            if (target === undefined || target.startsWith('node:')) continue;
+            const abs = path.resolve(target);
+            if (/\.d\.[cm]?ts$/.test(abs) || !SOURCE_EXTENSIONS.has(path.extname(abs))) continue;
+            if (/[\\/]node_modules[\\/]/.test(abs) || /[\\/]node_modules[\\/]/.test(canonical(abs))) continue;
+            if (canonical(abs).startsWith(srcDir)) continue;
+            queue.push(abs);
+        }
+    }
+    return out.sort();
+}
+
+export interface ConfigCheck {
+    /** The realpath project's setup files (and any root setupFiles it inherits), absolute. */
+    setupFiles: string[];
+    problems: RealpathViolation[];
+}
+
+/** WR-26: read the realpath project out of a Vitest config as an AST (never by loading it). */
+export function checkVitestConfig(configFile: string): ConfigCheck {
+    const file = path.resolve(configFile);
+    const sf = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKindOf(file));
+    const dir = path.dirname(file);
+    const problems: RealpathViolation[] = [];
+    const setupFiles: string[] = [];
+    const add = (n: ts.Node, kind: RealpathViolationKind, detail: string): void => {
+        problems.push({ file, line: sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1, kind, code: n.getText(sf).replace(/\s+/g, ' ').slice(0, 160), detail });
+    };
+    /** The literal properties of an object, or null (with a problem) when one is a spread, a shorthand, a method or computed. */
+    const propsOf = (o: ts.Expression, what: string): Map<string, ts.Expression> | null => {
+        const x = ts.isParenthesizedExpression(o) ? o.expression : o;
+        if (!ts.isObjectLiteralExpression(x)) {
+            add(o, 'config-unreadable', `${what} is not an object literal`);
+            return null;
+        }
+        const m = new Map<string, ts.Expression>();
+        for (const p of x.properties) {
+            if (!ts.isPropertyAssignment(p) || !(ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))) {
+                add(p, 'config-unreadable', `${what} has a property that is not a plain key: value (a spread or computed key could hide an alias or a setup file)`);
+                return null;
+            }
+            m.set(p.name.text, p.initializer);
+        }
+        return m;
+    };
+    const readSetup = (e: ts.Expression, what: string): void => {
+        const list = ts.isArrayLiteralExpression(e) ? e.elements : ts.isStringLiteralLike(e) ? [e] : null;
+        if (!list) return add(e, 'config-unreadable', `${what} is not a literal list`);
+        for (const el of list) {
+            if (!ts.isStringLiteralLike(el)) {
+                add(el, 'config-unreadable', `${what} has an entry that is not a string literal`);
+                continue;
+            }
+            const abs = path.resolve(dir, el.text);
+            if (!fs.existsSync(abs)) add(el, 'config-unreadable', `${what} entry ${el.text} is not a file`);
+            else setupFiles.push(abs);
+        }
+    };
+    let rootObj: ts.Expression | undefined;
+    for (const st of sf.statements) {
+        if (!ts.isExportAssignment(st) || st.isExportEquals) continue;
+        const e = st.expression;
+        rootObj = ts.isCallExpression(e) && e.arguments.length === 1 ? e.arguments[0] : e;
+    }
+    if (!rootObj) {
+        add(sf, 'config-unreadable', 'no default-exported config object (export default defineConfig({ ... }))');
+        return { setupFiles, problems };
+    }
+    const root = propsOf(rootObj, 'the config');
+    if (!root) return { setupFiles, problems };
+    if (root.has('plugins')) add(root.get('plugins')!, 'config-plugin', 'a root plugins key applies to every project; a plugin can swap any module');
+    const rootResolve = root.get('resolve');
+    if (rootResolve) {
+        const r = propsOf(rootResolve, 'the root resolve');
+        if (r?.has('alias')) add(r.get('alias')!, 'config-alias', 'a root resolve.alias is inherited by the realpath project (extends: true) and can swap a bot module');
+    }
+    const rootTest = root.get('test');
+    const rt = rootTest ? propsOf(rootTest, 'the root test') : null;
+    if (rootTest && !rt) return { setupFiles, problems };
+    if (rt?.has('alias')) add(rt.get('alias')!, 'config-alias', 'a root test.alias is inherited by the realpath project and can swap a bot module');
+    if (rt?.has('setupFiles')) readSetup(rt.get('setupFiles')!, 'the root test.setupFiles');
+    const projects = rt?.get('projects');
+    if (!projects || !ts.isArrayLiteralExpression(projects)) {
+        add(projects ?? rootObj, 'config-unreadable', 'test.projects is not a literal list of project objects');
+        return { setupFiles, problems };
+    }
+    let found = 0;
+    for (const el of projects.elements) {
+        const p = propsOf(el, 'a project');
+        if (!p) continue;
+        const t = p.get('test');
+        const tp = t ? propsOf(t, 'a project test') : null;
+        const name = tp?.get('name');
+        if (!name || !ts.isStringLiteralLike(name)) {
+            add(el, 'config-unreadable', 'a project has no literal test.name');
+            continue;
+        }
+        if (name.text !== 'realpath') continue;
+        found += 1;
+        const ext = p.get('extends');
+        if (ext && ext.kind !== ts.SyntaxKind.TrueKeyword && ext.kind !== ts.SyntaxKind.FalseKeyword) add(ext, 'config-unreadable', 'the realpath project extends a config this check cannot read');
+        if (p.has('plugins')) add(p.get('plugins')!, 'config-plugin', 'a plugin on the realpath project can swap any module');
+        const res = p.get('resolve');
+        const rp = res ? propsOf(res, 'the realpath resolve') : null;
+        if (rp) {
+            for (const [k, v] of rp) if (k !== 'alias') add(v, 'config-alias', `resolve.${k} on the realpath project changes which file a specifier loads`);
+            const alias = rp.get('alias');
+            const only = alias && ts.isArrayLiteralExpression(alias) && alias.elements.length === 1 ? alias.elements[0] : undefined;
+            const entry = only ? propsOf(only, 'the realpath alias entry') : null;
+            const find = entry?.get('find');
+            const repl = entry?.get('replacement');
+            const ok =
+                !!entry &&
+                entry.size === 2 &&
+                !!find &&
+                ts.isRegularExpressionLiteral(find) &&
+                find.text === ETHERS_ALIAS_FIND &&
+                !!repl &&
+                repl.getText(sf).replace(/\s+/g, '').replace(/"/g, "'") === ETHERS_ALIAS_REPLACEMENT;
+            if (alias && !ok) add(alias, 'config-alias', `the realpath project's resolve.alias must be exactly [{ find: ${ETHERS_ALIAS_FIND}, replacement: ${ETHERS_ALIAS_REPLACEMENT} }] (it selects ethers' CommonJS build); any other entry can swap a bot module`);
+        }
+        if (tp?.has('alias')) add(tp.get('alias')!, 'config-alias', 'test.alias on the realpath project can swap a bot module');
+        if (tp?.has('setupFiles')) readSetup(tp.get('setupFiles')!, 'the realpath test.setupFiles');
+    }
+    if (found !== 1) add(projects, 'config-unreadable', `expected exactly one project named realpath, found ${found}`);
+    return { setupFiles, problems };
+}
+
 /** Every source file under root (sorted). */
 export function collectRealpathFiles(root: string): string[] {
     const absoluteRoot = path.resolve(root);
@@ -391,18 +589,25 @@ export interface Io {
 
 const defaultIo: Io = { out: (l) => console.log(l), err: (l) => console.error(l) };
 
-function scanRoot(root: string, io: Io): number {
+function scanRoot(root: string, io: Io, configFile?: string): number {
     if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error(`root ${root} is not a readable folder`);
-    const files = collectRealpathFiles(root);
-    if (files.length === 0) throw new Error(`no source files under ${root}; the scan checked nothing`);
-    const result = checkRealpathMocks(files);
+    const rootFiles = collectRealpathFiles(root);
+    if (rootFiles.length === 0) throw new Error(`no source files under ${root}; the scan checked nothing`);
+    if (configFile !== undefined && !fs.existsSync(configFile)) throw new Error(`config ${configFile} is not a file`);
+    const cfg: ConfigCheck = configFile !== undefined ? checkVitestConfig(configFile) : { setupFiles: [], problems: [] };
+    const allow = loadAllowList();
+    const files = collectReachedFiles([...rootFiles, ...cfg.setupFiles], allow.options);
+    const result = checkRealpathMocks(files, allow);
     if (result.viUses === 0) throw new Error(`no use of vi found under ${root}; the scan checked nothing`);
-    for (const v of result.violations) {
+    const violations = [...cfg.problems, ...result.violations];
+    for (const v of violations) {
         const rel = path.relative(REPO_ROOT, v.file).split(path.sep).join('/');
         io.out(`${rel}:${v.line} ${v.kind} ${v.code} -- ${v.detail}`);
     }
-    io.out(`check-realpath-mocks: ${result.viUses} vi uses (${result.mockCalls} mock calls) checked in ${result.files} files, ${result.violations.length} violations`);
-    return result.violations.length === 0 ? 0 : 1;
+    const reached = files.length - rootFiles.length;
+    const cfgNote = configFile !== undefined ? `, realpath config ${path.relative(REPO_ROOT, configFile).split(path.sep).join('/')} checked (${cfg.setupFiles.length} setup files)` : ', no config read';
+    io.out(`check-realpath-mocks: ${result.viUses} vi uses (${result.mockCalls} mock calls) checked in ${result.files} files (${reached} reached from outside the root)${cfgNote}, ${violations.length} violations`);
+    return violations.length === 0 ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -485,10 +690,18 @@ function runSelfTest(io: Io): number {
 /** CLI entry, in-process testable. Returns the exit code. */
 export function run(argv: string[], io: Io = defaultIo): number {
     try {
+        const usage = 'usage: check-realpath-mocks.ts [--root <dir>] [--config <vitest config>] | --self-test';
         if (argv.length === 1 && argv[0] === '--self-test') return runSelfTest(io);
-        if (argv.length === 0) return scanRoot(DEFAULT_ROOT, io);
-        if (argv.length === 2 && argv[0] === '--root' && argv[1] !== '') return scanRoot(argv[1], io);
-        throw new Error('usage: check-realpath-mocks.ts [--root <dir>] | --self-test');
+        if (argv.length === 0) return scanRoot(DEFAULT_ROOT, io, DEFAULT_CONFIG);
+        const opts = new Map<string, string>();
+        for (let i = 0; i < argv.length; i += 2) {
+            const k = argv[i];
+            const v = argv[i + 1];
+            if ((k !== '--root' && k !== '--config') || v === undefined || v === '' || opts.has(k)) throw new Error(usage);
+            opts.set(k, v);
+        }
+        // --root alone reads no config (a temp folder has none); --config alone scans the default root.
+        return scanRoot(opts.get('--root') ?? DEFAULT_ROOT, io, opts.get('--config') ?? (opts.has('--root') ? undefined : DEFAULT_CONFIG));
     } catch (e) {
         io.err(`check-realpath-mocks: ${e instanceof Error ? e.message : String(e)}`);
         return 2;

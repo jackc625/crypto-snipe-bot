@@ -19,6 +19,10 @@ const GATE_CASES = [
     'AC-35-listed-count-above-the-code-fails',
     'AC-36-no-files-fails',
     'AC-36-no-sites-fails',
+    'CR-08-delegated-send-outside-lock-fails',
+    'CR-09-method-value-outside-lock-fails',
+    'WR-23-unchecked-send-outside-lock-fails',
+    'WR-24-local-withNonceLock-is-not-the-lock-fails',
     'F3-unknown-lock-status-fails',
     'F3-stale-exclusion-fails',
     'AC-53-missing-decision-ref-fails',
@@ -28,6 +32,8 @@ const GATE_CASES = [
     'T-23-22-excluding-a-signing-site-fails',
     'exceptions-file-unsorted-fails',
     'file-outside-tsconfig-include-fails',
+    'WR-25-signing-cjs-and-mts-scripts-fail',
+    'WR-25-js-file-outside-tsconfig-include-fails',
     'flag7-never-opens-env-or-data',
     'AC-34-floor-drop-naming-its-finding-passes',
     'AC-34-floor-drop-without-a-finding-fails',
@@ -35,7 +41,7 @@ const GATE_CASES = [
     'AC-34-deleting-the-exceptions-file-fails',
     'AC-34-shallow-clone-refused',
 ];
-const ANALYSIS_CASES = 31;
+const ANALYSIS_CASES = 54;
 
 // Limits (measured on Node 22.16.0, 2026-11-12): the self-test builds 11 census programs over the
 // ethers types plus 6 throwaway git repos. Alone: 23 s through Vitest (30 s run directly). Under
