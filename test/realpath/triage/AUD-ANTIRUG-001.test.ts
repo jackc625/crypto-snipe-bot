@@ -80,21 +80,26 @@ async function armedPosition(sc: Scenario<'v2'>): Promise<number> {
 }
 
 /**
- * The fake node closes every socket from its side; step past the 1 s reconnect delays until every
- * loop has logged its reconnect (one anti-rug loop and one per DEX close handler).
+ * The fake node closes every socket from its side; step past the 1 s reconnect delays until the
+ * chain's WebSocket is attached again, then stay settled.
+ *
+ * The wait is on the outcome every reconnect shape must reach, never on per-loop log text (review
+ * CR-01): the dropped socket is gone, a new socket of the chain is open, the node holds a rug-log
+ * subscription covering the pair, and every DEX factory is subscribed again. Today four loops reach
+ * that state (the anti-rug loop and one per DEX close handler); the recommended fix (one reconnect
+ * owner per chain, card OD-11) reaches it with one loop and one reconnect line, and the same wait
+ * returns for both, so a correct fix reads "looks fixed" instead of stalling here.
  */
-async function dropAndReconnect(sc: Scenario, opts: { antiRugLoops: number; dexLoops: number }): Promise<void> {
-    const from = recordedLogs().length;
+async function dropAndReconnect(sc: Scenario): Promise<void> {
     expect(openSockets(sc)).toHaveLength(1);
+    const dropped = openSockets(sc)[0];
     sc.node.dropSocket();
-    const reconnected = (): { antiRug: number; dex: number } => {
-        const after = recordedLogs().slice(from);
-        return {
-            antiRug: after.filter((l) => l.obj?.op === 'antirug.ws.reconnected').length,
-            dex: after.filter((l) => l.msg === 'WebSocket reconnected, re-subscribed to PairCreated' || l.msg === 'WebSocket reconnected, re-subscribed to V3 PoolCreated').length,
-        };
-    };
-    await stepUntilTrue(() => reconnected().antiRug >= opts.antiRugLoops && reconnected().dex >= opts.dexLoops, { what: 'every reconnect loop reconnecting', maxSteps: 2_000 });
+    const reattached = (): boolean =>
+        dropped.readyState === FakeWebSocket.CLOSED
+        && FakeWebSocket.instances.some((w) => w !== dropped && w.url === sc.ctx.chain.wsRpcUrl && w.readyState === FakeWebSocket.OPEN)
+        && covering(sc, sc.pair).length >= 1
+        && sc.ctx.chain.dexes.every((d) => sc.node.subscriptions.some((s) => s.kind === 'logs' && JSON.stringify(s.filter).toLowerCase().includes(d.factoryAddress.toLowerCase())));
+    await stepUntilTrue(reattached, { what: 'the chain WebSocket re-attached after the drop (rug-log filter and every DEX factory)', maxSteps: 2_000 });
     // Let the re-subscriptions and the anti-rug backfill reach the node, then stay settled.
     await stepFor(5_000);
 }
@@ -125,7 +130,7 @@ describe('AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops ea
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         await armedPosition(sc);
         expect(covering(sc, sc.pair).map((s) => s.connection.socket)).toEqual([ctxSocket(sc)]);
-        await dropAndReconnect(sc, { antiRugLoops: 1, dexLoops: sc.ctx.chain.dexes.length });
+        await dropAndReconnect(sc);
         const subs = covering(sc, sc.pair);
 
         knownBug(ctx, 'AUD-ANTIRUG-001', {
@@ -149,7 +154,7 @@ describe('AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops ea
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         const tradeA = await armedPosition(sc);
         const b = secondLaunch(sc);
-        await dropAndReconnect(sc, { antiRugLoops: 1, dexLoops: sc.ctx.chain.dexes.length });
+        await dropAndReconnect(sc);
         expect(covering(sc, sc.pair)).toHaveLength(1);
 
         // Token B launches on sushiswap-v2 once the per-chain snipe cooldown (30 s) has passed; its
@@ -189,7 +194,7 @@ describe('AUD-ANTIRUG-001: the anti-rug reconnect and the DEX reconnect loops ea
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         await armedPosition(sc);
         const original = ctxSocket(sc);
-        await dropAndReconnect(sc, { antiRugLoops: 1, dexLoops: sc.ctx.chain.dexes.length });
+        await dropAndReconnect(sc);
         const replacedOpen = openSockets(sc).filter((w) => w !== ctxSocket(sc));
 
         knownBug(ctx, 'AUD-ANTIRUG-001', {
