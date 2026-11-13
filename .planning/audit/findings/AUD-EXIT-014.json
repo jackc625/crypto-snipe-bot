@@ -5,7 +5,8 @@
   "duplicate_of": null,
   "related": [
     "AUD-EXIT-009",
-    "AUD-EXIT-004"
+    "AUD-EXIT-004",
+    "AUD-ANTIRUG-003"
   ],
   "tags": [
     "capital"
@@ -80,16 +81,21 @@
       "type": "code",
       "ref": "src/anti-rug/exitTrigger.ts:240-262@23a64617dca167976adc4645fed0e2c69e384820",
       "note": "22-28: the escape clears the poll timers first, then returns false on a refused or timed-out sell; the comment \"retries on a later poll/anti-rug cycle\" is not implemented"
+    },
+    {
+      "type": "command",
+      "ref": "node node_modules/vitest/vitest.mjs run --project realpath test/realpath/triage/AUD-EXIT-014.test.ts (Node 22.16.0, 2026-11-12; measure reworked in 20896a1) and in-memory mutants through scripts/vitest.in-memory-mutant.config.ts (Phase 23 code-review fixer C, WR-17)",
+      "note": "the claim measures the outcome {antiRugExitSucceeded} (success true, or a sell submitted with reason anti-rug): false today. The routine exit's first private attempt misses and its second lands about 76 s after the rug, holding the sell lock and the nonce lock; antirug.cb-tripped appears in the same run. Mutants: queue-and-retry in triggerAntiRugExit reads looks fixed; a 3 s wait then a refusal records the bug; a plain wait for the sell lock inside executeFullSell and an anti-rug exit that skips the sell lock both end in antirug.exit.bounded-abort and record the bug"
     }
   ],
   "sibling_sites_checked": "Lock holders that can block an anti-rug exit: a routine full exit of the same token (sell lock :832, held through the whole ladder), a detached partial of the same token (:1483), and any private escalation on the wallet (nonce lock :788, plus approvals :871/:874/:1509/:1512 and the public fallback :543/:552). Whether a refused anti-rug exit is retried depends on the anti-rug detector firing again on a new pool event (ANTIRUG slice; the dispatch at detector.ts:1341-1392 runs per event), and whether a refused or timed-out exit counts against the anti-rug circuit breaker is for the ANTIRUG slice too.",
   "status": "confirmed",
   "severity_rationale": "S1 candidate. The refusals and the lock hold times are code facts. The plausible condition is a rug that starts while another exit is running: a price drop from early sell-offs triggers stop-loss first, and the liquidity pull arrives seconds later. The anti-rug exit is then dropped (same token) or delayed past its budget (another token). The in-flight routine exit keeps selling, but with routine parameters (two private attempts, 5% public slippage, no anti-rug gas multiplier), which is what makes it a loss case rather than a strand. Left candidate until the ANTIRUG slice confirms the retry and circuit-breaker behaviour. Confirmed at 22-28 against the code (see the last evidence entries and AUD-ANTIRUG-004 sub_claim 1): a refused or timed-out rug escape does not fire again; it recurs only on a new LP log or a backfill replay.",
-  "recommendation": "Decide on card EXIT-11 how an anti-rug exit takes precedence over an in-flight exit (pre-empt it, escalate the in-flight one to anti-rug parameters, or queue and retry) and whether the nonce lock may be held across a whole private escalation. Phase 24.",
+  "recommendation": "Decide on card EXIT-11 how an anti-rug exit takes precedence over an in-flight exit (pre-empt it, escalate the in-flight one to anti-rug parameters, or queue and retry) and whether the nonce lock may be held across a whole private escalation. A fix must outlast or pre-empt an in-flight exit that holds the nonce lock: in the Phase 23 test the routine exit's first private attempt misses and its second lands about 76 s after the rug, holding the sell lock and the wallet nonce lock throughout, which is longer than the 60 s anti-rug watchdog; so a plain wait for the sell lock inside executeFullSell, or an anti-rug exit that skips only the sell lock, still ends in antirug.exit.bounded-abort (success false) for each dispatch (in-memory mutants), while queue-and-retry outside the watchdog reads fixed (a same-nonce replacement is the other shape that can). Today the immediate refusals from one pull already trip the anti-rug circuit breaker (antirug.cb-tripped in the same run): see AUD-ANTIRUG-003. (Both points added 2026-11-12 by operator ruling, process note PN-002.) Phase 24.",
   "triage": {
     "outcome": "confirmed",
     "phase": "23",
-    "note": "Reproduced on the real path with the order forced (plan 23-08, AC-12): ETH anti-rug live; a real stop-loss exit takes the sell lock, approves and is parked at its Flashbots simulation (eth_callBundle held on the relay, so the HTTP provider stays free, AUD-TX-028); a real 95 percent router liquidity pull is evaluated unsafe, the one-block confirm gate passes and the anti-rug exit is dispatched; it logs 'Another exit already handling token, skipping' (plain logs, reason anti-rug, no op) and its exit-fired broadcast carries success false at once, with the lock still held and no sell sent (claim antirug-exit-refused-while-sell-lock-held); released, the routine exit sells with reason stop-loss. An anti-rug exit that waits for the lock reads looks fixed. The nonce-lock delay across tokens stays code-read.",
+    "note": "Reproduced on the real path with the order forced (plan 23-08, AC-12; measure reworked in the Phase 23 code-review fix run, WR-17): ETH anti-rug live; a real stop-loss exit takes the sell lock, approves and is parked at its Flashbots simulation (eth_callBundle held on the relay, so the HTTP provider stays free, AUD-TX-028); a real 95 percent router liquidity pull is evaluated unsafe, the one-block confirm gate passes and the anti-rug exit is dispatched; it logs 'Another exit already handling token, skipping' (plain logs, reason anti-rug, no op) and its exit-fired broadcast carries success false at once, with the lock still held and no sell sent; released, the routine exit sells with reason stop-loss and the anti-rug exit never succeeds (claim antirug-exit-refused-while-sell-lock-held, measured as the outcome {antiRugExitSucceeded}: success true or a sell submitted with reason anti-rug). Queue-and-retry in triggerAntiRugExit reads looks fixed; a 3 s wait then a refusal does not; a plain wait for the sell lock inside executeFullSell and an anti-rug exit that skips only the sell lock do not either, because the in-flight routine exit holds the sell lock and the nonce lock about 76 s, past the 60 s watchdog (antirug.exit.bounded-abort). The nonce-lock delay behind another token's routine exit stays code-read (the buy case is AUD-TX-003).",
     "test_id": "AUD-EXIT-014"
   }
 }

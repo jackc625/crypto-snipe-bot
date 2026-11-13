@@ -78,7 +78,7 @@
   "triage": {
     "outcome": "confirmed",
     "phase": "23",
-    "note": "Reproduced on the real path (plan 23-07): one failed getAmountsOut at exit-monitor start (fault on the router, armed after the buy mined, fired once) leaves the held ETH V2 position with no exit-monitor timer, no exit_state row and no alert; over six 5 s poll intervals nothing retries, re-arms or alerts, while anti-rug still registers the position. A retry or an unprotected alert both read looks fixed.",
+    "note": "Reproduced on the real path (plan 23-07; split into two claims in the Phase 23 code-review fix run, CR-07, the second registered by operator ruling 2026-11-12, PN-002): getAmountsOut on the router fails with a real node answer from exit-monitor start (the fault armed once the buy mined). Persistent case (claim first-quote-failure-leaves-position-unmonitored): every matching read fails for the whole six-poll observation. Transient case (claim first-quote-transient-failure-leaves-position-unmonitored): one read fails. In both, the held ETH V2 position gets no exit-monitor timer, no exit_state row and no alert naming it, and over six 5 s poll intervals nothing retries, re-arms or alerts, while anti-rug still registers the position. Only a live timer or an alert about this position counts as protected (an exit_state row alone, or an unrelated alert, does not). An alert naming the token as unprotected flips both claims; a retry of the first quote flips only the transient claim, as it should for a one-shot fault.",
     "test_id": "AUD-EXIT-002"
   }
 }

@@ -63,7 +63,7 @@
   "triage": {
     "outcome": "confirmed",
     "phase": "23",
-    "note": "Reproduced on the real path (plan 23-09, AC-11, AC-12) in the RC-10 file AUD-TX-002.test.ts: a real ETH V2 deliberate buy whose two private attempts are not included clears its guard and sends the public swap inside withNonceLock, then awaits stx.wait() with no timeout; the node never mines it (valid null receipt) while 150 blocks are mined, and a later operation for the same wallet through the real lock does not start within the 30-minute fake-time window (claim deliberate-public-wait-holds-wallet-lock; bounded observation). Control: mined with three confirmations, the lock is freed, the later operation starts and the buy completes. A wait with a timeout reads looks fixed.",
+    "note": "Reproduced on the real path (plan 23-09, AC-11, AC-12) in the RC-10 file AUD-TX-002.test.ts: a real ETH V2 deliberate buy whose two private attempts are not included clears its guard and sends the public swap inside withNonceLock, then awaits stx.wait() with no timeout; the node never mines it (valid null receipt) while 150 blocks are mined, and a later operation for the same wallet through the real lock does not start within the 30-minute fake-time window (claim deliberate-public-wait-holds-wallet-lock; bounded observation). Control: mined with three confirmations, the lock is freed, the later operation starts and the buy completes. A bounded wait that settles the stuck nonce (a same-nonce cancel or replacement mined) before it releases the lock reads looks fixed; a timeout that only releases the lock reads the failure changed (tightened in the Phase 23 code-review fix run, CR-03).",
     "test_id": "AUD-TX-002"
   }
 }
