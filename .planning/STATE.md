@@ -6,10 +6,10 @@ current_phase: 24
 current_phase_name: Capital-Safety Fixes
 status: planning
 stopped_at: Phase 23 complete, ready to plan Phase 24
-last_updated: "2026-11-12T23:44:17.144Z"
-last_activity: 2026-11-12
-last_activity_desc: Phase 23 complete, transitioned to Phase 24
-state_head: f922078bc64d5398cffe560336113127204351cd
+last_updated: "2026-11-13T07:28:46.255Z"
+last_activity: 2026-11-13
+last_activity_desc: Phase 23 shipped (PR opened against main)
+state_head: 260217901b99fe59fad947b65cebf9a341ce4bff
 progress:
   total_phases: 11
   completed_phases: 1
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-11-06 at v7.0 milestone start; deliberat
 Phase: 24 — Capital-Safety Fixes
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-11-12 — Phase 23 complete, transitioned to Phase 24
+Last activity: 2026-11-13 -- Phase 23 shipped (PR opened against main)
 Roadmap: .planning/ROADMAP.md — v7.0 Phases 22–32 (11 phases), 101/101 requirements mapped; risk isolation lives in waves/plans/commits; decimal phases reserved for D-STOP-THE-LINE insertions
 
 ## Milestone Baseline (measured 2026-11-06, cold start after 5 months)
