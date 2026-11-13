@@ -23,6 +23,7 @@ const GATE_CASES = [
     'CR-09-method-value-outside-lock-fails',
     'WR-23-unchecked-send-outside-lock-fails',
     'WR-24-local-withNonceLock-is-not-the-lock-fails',
+    'WR-24-lock-keyed-on-another-wallet-fails',
     'F3-unknown-lock-status-fails',
     'F3-stale-exclusion-fails',
     'AC-53-missing-decision-ref-fails',
@@ -34,6 +35,16 @@ const GATE_CASES = [
     'file-outside-tsconfig-include-fails',
     'WR-25-signing-cjs-and-mts-scripts-fail',
     'WR-25-js-file-outside-tsconfig-include-fails',
+    'WR-24-dead-site-without-an-entry-fails',
+    'WR-24-dead-entry-on-an-unreachable-function-passes',
+    'WR-24-dead-entry-on-an-exported-function-fails',
+    'WR-24-dead-entry-on-a-function-in-an-export-list-fails',
+    'WR-24-dead-entry-on-a-function-with-a-caller-fails',
+    'WR-24-dead-entry-whose-function-was-removed-fails',
+    'WR-24-dead-entry-assigned-to-module-exports-fails',
+    'WR-24-dead-entry-whose-count-differs-fails',
+    'WR-24-dead-entry-whose-finding-does-not-name-the-function-fails',
+    'WR-24-dead-entry-on-a-class-method-is-unprovable-and-fails',
     'flag7-never-opens-env-or-data',
     'AC-34-floor-drop-naming-its-finding-passes',
     'AC-34-floor-drop-without-a-finding-fails',
@@ -41,7 +52,7 @@ const GATE_CASES = [
     'AC-34-deleting-the-exceptions-file-fails',
     'AC-34-shallow-clone-refused',
 ];
-const ANALYSIS_CASES = 54;
+const ANALYSIS_CASES = 59;
 
 // Limits (measured on Node 22.16.0, 2026-11-12): the self-test builds 11 census programs over the
 // ethers types plus 6 throwaway git repos. Alone: 23 s through Vitest (30 s run directly). Under

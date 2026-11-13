@@ -35,6 +35,19 @@
 //             whose ABI the type analysis cannot read). An entry may match only a contract
 //             call whose mutability the census could not read, and must cite a manual
 //             inventory entry that excludes the same file and call.
+//   dead      (operator ruling on Phase 23 review WR-24) signing sites in a function nothing
+//             can reach, one row per file|function|call with a count. `function` is the
+//             outermost function holding the site. The census must prove it unreachable: a
+//             module-level function declaration or const function, with no export modifier and
+//             zero references anywhere in the program (findReferences, as the lock check uses;
+//             an export list, export default, module.exports or a call is a reference). The row
+//             names finding_id, whose record's recommendation must say delete/remove and name the
+//             function. A dead site is neither locked nor unlocked (its lock is not judged) but it
+//             still counts toward the floor: it is a signing call in the code, and deleting it
+//             must lower the floor in a commit naming the finding (AC-34). Problems: dead-reachable
+//             (a caller, a reference or an export), dead-unprovable (not a function shape the
+//             census can prove), stale-dead (the site or function is gone: remove the row),
+//             dead-count (the count differs), dead-finding-does-not-name.
 // Also: no counted site may have lock status unknown (F3); a scan that finds no files in
 // src/ or scripts/, or no signing site, fails (AC-36); every JavaScript or TypeScript source
 // file under src/ and scripts/ (.ts .tsx .mts .cts .js .jsx .mjs .cjs; Phase 23 review WR-25)
@@ -119,9 +132,15 @@
 //             awaited/returned inside the lock, no reference at all, or a chain
 //             deeper than the limit. unknown is never counted as locked or
 //             excluded.
-//   withNonceLock is the function declared in src/utils/nonceAuthority.ts and
-//   nowhere else (Phase 23 review WR-24): a local function of the same name
-//   serializes nothing, so a call of it is followed like any other callee.
+//   Lock key (Phase 23 review WR-24): withNonceLock is the function declared in
+//   src/utils/nonceAuthority.ts and nowhere else, and a locked site must show
+//   that the lock's key (argument 0) is its own signer's address: the signer
+//   (receiver, contract runner, Signer-typed argument of a wrapper, or a
+//   bundle's signer) is carried up the same reference chains, re-expressed in
+//   each caller's scope through parameters and const initializers, until it
+//   equals the key as <signer>.address (or await <signer>.getAddress()).
+//   Otherwise the site reads unknown. A send of transactions signed at another
+//   counted site (rawSendBundle, sendRawBundle) is not key-checked.
 //   A callback passed to an in-program function G is followed only when G's
 //   parameter is invoked directly in G's own body and each invocation is
 //   awaited or returned; the callback then runs inside that call to G.
@@ -198,10 +217,14 @@ export interface Site {
     review_note: string | null;
     /** contract sites: every traced construction of the receiver (runner @ where) */
     origins?: string[];
+    /** Operator ruling on WR-24: the finding of the dead entry that covers this site (a provably unreachable function) */
+    dead?: string;
     manual_lock_status?: string;
     lock_disagreement?: boolean;
     /** CR-08: a sendTransaction/signTransaction whose receiver type is not structurally a Signer (a wrapper or a narrow interface); counted and lock-judged like any site */
     delegated?: boolean;
+    /** WR-24: for a locked site, how its lock key was checked against its signer ('tied', or 'n/a: ...' for a send of transactions signed elsewhere) */
+    lock_key?: string;
 }
 
 /** A traced construction of a contract or factory value; ctor is the `new Contract(...)` expression when one was found. */
@@ -211,6 +234,28 @@ interface Origin {
     at: string;
     ctor?: ts.Expression;
 }
+
+/**
+ * A value as a root symbol plus a property path, in the scope of one function (WR-24):
+ * `ctx.wallet` is { root: ctx, path: ['wallet'] }; `this.router` has isThis and the class symbol.
+ * A contract's signer is its path plus 'runner'.
+ */
+interface Ref {
+    root: ts.Symbol;
+    isThis: boolean;
+    path: string[];
+}
+
+/** The signers of a site for the lock-key check: refs to tie to the lock key, or a send of transactions signed at another counted site. */
+type SignerSpec = { refs: (Ref | null)[] } | { presigned: string };
+
+/** One signer still to be tied: b the signer, k the lock key once a lock was reached, both in the current scope. */
+interface Pair {
+    b: Ref;
+    k: Ref | null;
+}
+
+type TieRes = { s: 'tied' } | { s: 'cycle' } | { s: 'untied'; why: string };
 
 interface LockCall {
     file: string;
@@ -762,6 +807,291 @@ class Census {
         return { status: r.status as LockStatus, evidence: null, chains: r.chains, reason: r.reason ?? null };
     }
 
+    // ------------------------------------------------------------ lock key (WR-24)
+
+    private symOf(n: ts.Node): ts.Symbol | undefined {
+        let s = this.checker.getSymbolAtLocation(n);
+        if (s && s.flags & ts.SymbolFlags.Alias) s = this.checker.getAliasedSymbol(s);
+        return s;
+    }
+
+    /**
+     * The value an expression denotes, as a root symbol and a property path, followed through const
+     * initializers, `x.getAddress()` (as x.address) and, for a 'runner' path, contract and factory
+     * constructions (`new Contract(a, abi, R)`, `.connect(R)`, `.attach`, `.deploy`). Null when the
+     * expression has no such form (a call result, a literal).
+     */
+    refOf(e: ts.Expression, path: string[] = [], depth = 0): Ref | null {
+        if (depth > 16) return null;
+        const x = this.strip(e);
+        if (ts.isPropertyAccessExpression(x)) return this.refOf(x.expression, [x.name.text, ...path], depth + 1);
+        if (ts.isElementAccessExpression(x) && ts.isStringLiteralLike(x.argumentExpression)) return this.refOf(x.expression, [x.argumentExpression.text, ...path], depth + 1);
+        if (x.kind === ts.SyntaxKind.ThisKeyword) {
+            let c: ts.Node | undefined = x.parent;
+            while (c && !ts.isClassLike(c)) c = c.parent;
+            const cs = c && (c as ts.ClassLikeDeclaration).name ? this.symOf((c as ts.ClassLikeDeclaration).name!) : undefined;
+            return cs ? { root: cs, isThis: true, path } : null;
+        }
+        if (path[0] === 'runner') {
+            if (ts.isNewExpression(x) && (this.isContract(this.typeAt(x)) || this.isFactory(this.typeAt(x)))) return x.arguments?.[2] ? this.refOf(x.arguments[2], path.slice(1), depth + 1) : null;
+            if (ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression)) {
+                const n = x.expression.name.text;
+                const rt = this.typeAt(x.expression.expression);
+                if (this.isContract(rt) || this.isFactory(rt)) {
+                    if (n === 'connect') return x.arguments[0] ? this.refOf(x.arguments[0], path.slice(1), depth + 1) : null;
+                    if (n === 'attach' || n === 'deploy' || n === 'waitForDeployment') return this.refOf(x.expression.expression, path, depth + 1);
+                }
+            }
+        }
+        if (path.length === 0 && ts.isCallExpression(x) && ts.isPropertyAccessExpression(x.expression) && x.expression.name.text === 'getAddress' && x.arguments.length === 0)
+            return this.refOf(x.expression.expression, ['address'], depth + 1);
+        if (ts.isIdentifier(x)) {
+            const s = this.symOf(x);
+            if (!s) return null;
+            const decls = s.getDeclarations() ?? [];
+            if (decls.length === 1) {
+                const d = decls[0];
+                if (ts.isVariableDeclaration(d) && ts.isIdentifier(d.name) && d.initializer && (ts.getCombinedNodeFlags(d) & ts.NodeFlags.Const) !== 0) {
+                    const r = this.refOf(d.initializer, path, depth + 1);
+                    if (r) return r;
+                }
+            }
+            return { root: s, isThis: false, path };
+        }
+        return null;
+    }
+
+    private sameRef(a: Ref, b: Ref): boolean {
+        return a.root === b.root && a.isThis === b.isThis && a.path.length === b.path.length && a.path.every((p, i) => p === b.path[i]);
+    }
+
+    refText(r: Ref): string {
+        return [r.isThis ? 'this' : r.root.getName(), ...r.path].join('.');
+    }
+
+    private pairText(ps: Pair[]): string {
+        return ps.map((p) => (p.k ? `signer ${this.refText(p.b)} vs lock key ${this.refText(p.k)}` : `signer ${this.refText(p.b)}`)).join('; ');
+    }
+
+    /** Where a symbol is declared relative to function f: one of f's parameters, inside f, or outside it. */
+    private declaredIn(sym: ts.Symbol, f: ts.Node): 'param' | 'local' | null {
+        for (const d of sym.getDeclarations() ?? []) {
+            if (ts.isParameter(d) && d.parent === f) return 'param';
+            for (let c: ts.Node | undefined = d.parent; c; c = c.parent) if (c === f) return 'local';
+        }
+        return null;
+    }
+
+    /** Re-express a ref from inside f in the scope of a call of f (parameters become the call's arguments). */
+    private mapRefThroughCall(r: Ref, f: ts.FunctionLikeDeclaration, call: ts.CallExpression | ts.NewExpression): Ref | string {
+        if (r.isThis) {
+            if (ts.isArrowFunction(f)) return r;
+            const callee = this.strip(call.expression);
+            if (ts.isCallExpression(call) && ts.isPropertyAccessExpression(callee)) return this.refOf(callee.expression, r.path) ?? `the receiver of ${this.loc(call)} has no traceable form`;
+            return `${this.refText(r)} cannot be followed out of ${this.fnName(f)} at ${this.loc(call)}`;
+        }
+        const where = this.declaredIn(r.root, f);
+        if (where === null) return r;
+        if (where === 'local') return `${this.refText(r)} is local to ${this.fnName(f)}`;
+        const decl = (r.root.getDeclarations() ?? []).find((d) => ts.isParameter(d) && d.parent === f) as ts.ParameterDeclaration;
+        const idx = f.parameters.indexOf(decl);
+        const arg = call.arguments?.[idx];
+        if (!arg || decl.dotDotDotToken) return `${this.loc(call)} passes no argument for parameter ${r.root.getName()} of ${this.fnName(f)}`;
+        return this.refOf(arg, r.path) ?? `${this.loc(call)} argument ${idx} (${this.short(arg.getText(), 40)}) has no traceable form`;
+    }
+
+    /** Leave function value f that runs as a callback where it is passed: its own parameters and locals cannot be followed out. */
+    private leaveCallback(pairs: Pair[], f: ts.FunctionLikeDeclaration): Pair[] | string {
+        for (const p of pairs)
+            for (const r of [p.b, p.k]) {
+                if (!r) continue;
+                if (r.isThis ? !ts.isArrowFunction(f) : this.declaredIn(r.root, f) !== null) return `${this.refText(r)} belongs to the callback ${this.fnName(f)} and cannot be followed out of it`;
+            }
+        return pairs;
+    }
+
+    private mapPairsThroughCall(pairs: Pair[], f: ts.FunctionLikeDeclaration, call: ts.CallExpression | ts.NewExpression): Pair[] | string {
+        const out: Pair[] = [];
+        for (const p of pairs) {
+            const b = this.mapRefThroughCall(p.b, f, call);
+            if (typeof b === 'string') return b;
+            let k: Ref | null = null;
+            if (p.k) {
+                const mk = this.mapRefThroughCall(p.k, f, call);
+                if (typeof mk === 'string') return mk;
+                k = mk;
+            }
+            out.push({ b, k });
+        }
+        return out;
+    }
+
+    /** At a withNonceLock call: drop every pair whose signer's address is this lock's key (or the key of an inner lock). */
+    private compareAtLock(pairs: Pair[], lock: ts.CallExpression): Pair[] | string {
+        const a0 = lock.arguments[0];
+        const key = a0 ? this.refOf(a0) : null;
+        if (!key && pairs.some((p) => !p.k)) return `the lock key at ${this.loc(lock)} (${this.short(a0?.getText() ?? '', 40)}) has no traceable form`;
+        const out: Pair[] = [];
+        for (const p of pairs) {
+            const want: Ref = { ...p.b, path: [...p.b.path, 'address'] };
+            if ((key && this.sameRef(key, want)) || (p.k && this.sameRef(p.k, want))) continue;
+            out.push({ b: p.b, k: p.k ?? key });
+        }
+        return out;
+    }
+
+    private combineTie(rs: TieRes[]): TieRes {
+        const un = rs.find((r) => r.s === 'untied');
+        if (un) return un;
+        if (rs.some((r) => r.s === 'tied')) return { s: 'tied' };
+        return { s: 'cycle' };
+    }
+
+    /**
+     * Walk the reference chains from execution point n (the same chains the lock status follows),
+     * carrying each signer, re-expressed in each caller's scope, until a withNonceLock call whose key
+     * is that signer's address. A pair whose key does not match yet is carried further out, so a
+     * signer and a key that are both a function's parameters are compared where its callers bind them.
+     */
+    private tieWalk(n: ts.Node, carried: Pair[], visiting: Set<ts.Node>, depth: number): TieRes {
+        // A key carried out of its lock is compared again once both sides are re-expressed here.
+        const pairs = carried.filter((p) => !(p.k && this.sameRef(p.k, { ...p.b, path: [...p.b.path, 'address'] })));
+        if (!pairs.length) return { s: 'tied' };
+        if (depth > MAX_DEPTH) return { s: 'untied', why: `reference chain deeper than ${MAX_DEPTH}` };
+        const f = this.enclosingFn(n);
+        if (!f) return { s: 'untied', why: `${this.loc(n)} reaches module top level with ${this.pairText(pairs)} unmatched` };
+        const pos = this.argPosition(f);
+        if (pos) return this.tieArg(pos.call, pos.index, f, pairs, visiting, depth + 1);
+        if (visiting.has(f)) return { s: 'cycle' };
+        const handle = this.handleOf(f);
+        if (!handle) return { s: 'untied', why: `${this.fnName(f)} is used as a value; ${this.pairText(pairs)} cannot be followed` };
+        visiting.add(f);
+        const uses = this.refsOf(handle).map((id) => this.useOf(id)).filter((u) => u.kind !== 'skip');
+        const rs: TieRes[] = [];
+        for (const u of uses) {
+            if (u.kind === 'call') {
+                const m = this.mapPairsThroughCall(pairs, f, u.call);
+                rs.push(typeof m === 'string' ? { s: 'untied', why: m } : this.tieWalk(u.call, m, visiting, depth + 1));
+            } else if (u.kind === 'arg') rs.push(this.tieArg(u.call, u.index, f, pairs, visiting, depth + 1));
+            else if (u.kind === 'other') rs.push({ s: 'untied', why: `${this.fnName(f)} is used as a value at ${this.loc(u.node)}` });
+        }
+        visiting.delete(f);
+        if (!uses.length) return { s: 'untied', why: `${this.fnName(f)} has no in-program caller, so ${this.pairText(pairs)} cannot be matched` };
+        return this.combineTie(rs);
+    }
+
+    private tieArg(call: ts.CallExpression, index: number, f: ts.FunctionLikeDeclaration, pairs: Pair[], visiting: Set<ts.Node>, depth: number): TieRes {
+        const left = this.leaveCallback(pairs, f);
+        if (typeof left === 'string') return { s: 'untied', why: left };
+        if (this.isLockCall(call)) {
+            if (index !== 1) return { s: 'untied', why: `passed to withNonceLock at ${this.loc(call)} other than as the op` };
+            const rem = this.compareAtLock(left, call);
+            if (typeof rem === 'string') return { s: 'untied', why: rem };
+            return this.tieWalk(call, rem, visiting, depth);
+        }
+        // A .then/.catch/.finally callback or a higher-order callee's parameter runs within `call`.
+        return this.tieWalk(call, left, visiting, depth);
+    }
+
+    /** WR-24: for a site the reference chains read as locked, check that every lock on them is keyed on the site's own signer. */
+    private lockKeyCheck(site: ts.Node, signers: SignerSpec | undefined): { note: string } | { why: string } {
+        if (!signers) return { why: 'no signer expression is known for this site' };
+        if ('presigned' in signers) return { note: `n/a: ${signers.presigned}` };
+        if (!signers.refs.length) return { why: 'no signer expression is known for this site' };
+        const bad = signers.refs.findIndex((r) => r === null);
+        if (bad >= 0) return { why: 'the signer expression has no traceable form' };
+        const r = this.tieWalk(site, (signers.refs as Ref[]).map((b) => ({ b, k: null })), new Set(), 0);
+        if (r.s === 'tied') return { note: `tied (${(signers.refs as Ref[]).map((x) => `${this.refText(x)}.address`).join(', ')})` };
+        if (r.s === 'cycle') return { why: 'only recursive references reach the site' };
+        return { why: r.why };
+    }
+
+    /** Signer-typed values among a call's arguments (a wrapper that takes its signer as an argument). */
+    private signerArgs(call: ts.CallExpression): (Ref | null)[] {
+        return call.arguments.filter((a) => !this.isAnyish(this.typeAt(a)) && this.isSigner(this.typeAt(a))).map((a) => this.refOf(a));
+    }
+
+    /** The `signer` of each bundle transaction written in place (`[{ signer: wallet, transaction }]`); presigned when the payload is signed strings. */
+    private bundleSigners(call: ts.CallExpression): SignerSpec {
+        const a0 = call.arguments[0];
+        if (!a0) return { refs: [] };
+        const stringy = (t: ts.Type | undefined) => !!t && !this.isAnyish(t) && (this.checker.getNonNullableType(t).flags & ts.TypeFlags.StringLike) !== 0;
+        const x = this.strip(a0);
+        // A payload of signed transaction strings (signBundle's output) was signed at another counted site.
+        if (!ts.isArrayLiteralExpression(x) && stringy(this.checker.getIndexTypeOfType(this.typeAt(x), ts.IndexKind.Number))) return { presigned: 'sends transactions signed at a counted signBundle/signTransaction site' };
+        const items = ts.isArrayLiteralExpression(x) ? x.elements.map((el) => this.strip(el as ts.Expression)) : [x];
+        const refs: (Ref | null)[] = [];
+        for (const it of items) {
+            if (stringy(this.typeAt(it))) continue;
+            if (ts.isObjectLiteralExpression(it)) {
+                const p = it.properties.find((pp) => ts.isPropertyAssignment(pp) && pp.name.getText() === 'signer') as ts.PropertyAssignment | undefined;
+                const sh = it.properties.find((pp) => ts.isShorthandPropertyAssignment(pp) && pp.name.text === 'signer') as ts.ShorthandPropertyAssignment | undefined;
+                if (p) refs.push(this.refOf(p.initializer));
+                else if (sh) refs.push(this.refOf(sh.name));
+                else if (!it.properties.some((pp) => !ts.isSpreadAssignment(pp) && pp.name !== undefined && pp.name.getText() === 'signedTransaction')) refs.push(null);
+            } else refs.push(null);
+        }
+        if (refs.length) return { refs };
+        return { presigned: 'sends transactions signed elsewhere (signed strings or signedTransaction entries)' };
+    }
+
+    // ------------------------------------------------- dead code (operator ruling on WR-24)
+
+    private siteNodes = new Map<string, ts.Node>();
+
+    /** The outermost function holding n: the only way n runs is a call of that function. */
+    outermostFn(n: ts.Node): ts.FunctionLikeDeclaration | undefined {
+        let out: ts.FunctionLikeDeclaration | undefined;
+        for (let f = this.enclosingFn(n); f; f = this.enclosingFn(f)) out = f;
+        return out;
+    }
+
+    /** The name of a module-level function (a function declaration, or a const holding an arrow or function expression, directly in the file), else null. */
+    moduleFnName(f: ts.FunctionLikeDeclaration): string | null {
+        if (ts.isFunctionDeclaration(f)) return f.name && ts.isSourceFile(f.parent) ? f.name.text : null;
+        if (ts.isArrowFunction(f) || ts.isFunctionExpression(f)) {
+            const u = this.up(f);
+            const p = u.parent;
+            if (p && ts.isVariableDeclaration(p) && p.initializer === u && ts.isIdentifier(p.name) && ts.isVariableDeclarationList(p.parent) && (p.parent.flags & ts.NodeFlags.Const) !== 0 && ts.isVariableStatement(p.parent.parent) && ts.isSourceFile(p.parent.parent.parent)) return p.name.text;
+        }
+        return null;
+    }
+
+    /** For a dead entry: a site's outermost function and the name an entry uses for it. */
+    deadFunctionOf(s: { file: string; line: number; column: number }): { name: string; fn: ts.FunctionLikeDeclaration } | null {
+        const n = this.siteNodes.get(`${s.file}:${s.line}:${s.column}`);
+        const f = n ? this.outermostFn(n) : undefined;
+        return f ? { name: this.moduleFnName(f) ?? this.fnName(f), fn: f } : null;
+    }
+
+    /** Whether file declares a module-level function of this name (for the stale-dead message). */
+    moduleFunctionExists(file: string, name: string): boolean {
+        const sf = this.auditedFiles().find((x) => this.rel(x.fileName) === file);
+        if (!sf) return false;
+        let found = false;
+        const visit = (n: ts.Node) => {
+            if (found) return;
+            if (this.isFnLike(n) && this.moduleFnName(n) === name) found = true;
+            else ts.forEachChild(n, visit);
+        };
+        visit(sf);
+        return found;
+    }
+
+    /** Prove a function unreachable: module-level, no export modifier, and no reference anywhere in the program. */
+    unreachableProof(f: ts.FunctionLikeDeclaration): { unprovable: string } | { reachable: string[] } {
+        const name = this.moduleFnName(f);
+        if (name === null) return { unprovable: `${this.fnName(f)} at ${this.loc(f)} is not a module-level function declaration or const function, the only shapes the census proves unreachable` };
+        const holder: ts.Node = ts.isFunctionDeclaration(f) ? f : this.up(f).parent!.parent!.parent!;
+        const mods = ts.canHaveModifiers(holder) ? ts.getModifiers(holder) ?? [] : [];
+        const reasons: string[] = [];
+        if (mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) reasons.push(`${name} is exported (export modifier at ${this.loc(holder)})`);
+        const handle = this.handleOf(f);
+        if (!handle) return { unprovable: `${name} has no name the census can look up` };
+        for (const id of this.refsOf(handle)) reasons.push(`${name} is referenced at ${this.loc(id)} (${this.short(id.parent.getText(), 50)})`);
+        return { reachable: reasons };
+    }
+
     // ------------------------------------------------- contract method values (CR-09)
 
     /**
@@ -1035,10 +1365,11 @@ class Census {
         };
     }
 
-    private mk(call: ts.Node, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}): Site {
+    private mk(call: ts.Node, api: string, kind: Kind, recvType: string, extra: Partial<Site> = {}, signers?: SignerSpec): Site {
         const sf = call.getSourceFile();
         const lc = sf.getLineAndCharacterOfPosition(call.getStart(sf));
         const file = this.rel(sf.fileName);
+        this.siteNodes.set(`${file}:${lc.line + 1}:${lc.character + 1}`, call);
         const base: Site = {
             id: '',
             file,
@@ -1075,6 +1406,15 @@ class Census {
                 base.lock_evidence = l.evidence;
                 base.chains = l.chains;
                 base.reason = l.reason;
+                if (l.status === 'locked') {
+                    // WR-24: a lock keyed on another wallet serializes nothing for this signer.
+                    const k = this.lockKeyCheck(call, signers);
+                    if ('why' in k) {
+                        base.lock_status = 'unknown';
+                        base.lock_evidence = null;
+                        base.reason = `the reference chains read locked, but the lock key is not shown to be the signer's address: ${k.why}`;
+                    } else base.lock_key = k.note;
+                }
             }
         }
         return base;
@@ -1096,7 +1436,7 @@ class Census {
             if (BUNDLE_FNS.includes(callee.text)) {
                 let sym = this.checker.getSymbolAtLocation(callee);
                 if (sym && sym.flags & ts.SymbolFlags.Alias) sym = this.checker.getAliasedSymbol(sym);
-                if (sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' });
+                if (sym?.getDeclarations()?.some((d) => ts.isFunctionDeclaration(d))) return this.mk(call, callee.text, 'tx-signing', 'function', { runner: 'relay' }, { presigned: 'a relay fanout of transactions signed at a counted signBundle/signTransaction site' });
             }
             // CR-09: calling a contract method object held in a name (`const approve = token.approve;
             // await approve(...)`, a getFunction value, a destructured method). Traced to its
@@ -1187,22 +1527,27 @@ class Census {
             return null;
         }
         if (SIGN_TX.includes(name) || SIGN_MSG.includes(name) || SIGNER_ONLY_TX.includes(name)) {
-            if (this.isSigner(rt)) return this.mk(call, `signer.${name}`, SIGN_MSG.includes(name) ? 'message-signing' : 'tx-signing', this.typeText(rt));
+            if (this.isSigner(rt)) return this.mk(call, `signer.${name}`, SIGN_MSG.includes(name) ? 'message-signing' : 'tx-signing', this.typeText(rt), {}, { refs: [this.refOf(recv)] });
             // CR-08: a receiver that is not structurally a Signer may still be one at run time
             // (ethers' ContractRunner, Pick<Wallet, 'sendTransaction'>, a local interface over a
             // Wallet), and its implementation may live outside the program (ethers' Wallet is never
             // a census site). So the call itself is a counted site and its lock is judged like any
             // other: an unlocked or unknown delegation fails the gate, a locked one passes.
-            if (SIGN_TX.includes(name)) return this.mk(call, `delegated.${name}`, 'tx-signing', this.typeText(rt), { delegated: true });
+            if (SIGN_TX.includes(name)) {
+                // The signer: the receiver when it carries an address, else the Signer-typed arguments
+                // (MevStrategy.sendTransaction(tx, ctx.wallet, ...)).
+                const signers: SignerSpec = this.props(this.checker.getNonNullableType(rt)).has('address') ? { refs: [this.refOf(recv)] } : { refs: this.signerArgs(call) };
+                return this.mk(call, `delegated.${name}`, 'tx-signing', this.typeText(rt), { delegated: true }, signers);
+            }
             return null;
         }
-        if (BUNDLE.includes(name) && this.isBundler(rt)) return this.mk(call, `flashbots.${name}`, 'tx-signing', this.typeText(rt), { runner: 'bundle' });
+        if (BUNDLE.includes(name) && this.isBundler(rt)) return this.mk(call, `flashbots.${name}`, 'tx-signing', this.typeText(rt), { runner: 'bundle' }, name === 'sendRawBundle' ? { presigned: 'sends a bundle of transactions signed elsewhere' } : this.bundleSigners(call));
         if (this.isFactory(rt) && (name === 'deploy' || name === 'getDeployTransaction')) {
             const origins = this.originsOf(recv);
             const runner = [...new Set(origins.map((o) => o.runner))].join('|');
             if (name === 'getDeployTransaction')
                 return this.mk(call, 'ContractFactory.getDeployTransaction', 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: 'getDeployTransaction builds an unsigned deployment request; the sendTransaction that signs it is counted separately', runner });
-            return this.mk(call, 'ContractFactory.deploy', 'tx-signing', this.typeText(rt), { runner, mutability: 'deployment' });
+            return this.mk(call, 'ContractFactory.deploy', 'tx-signing', this.typeText(rt), { runner, mutability: 'deployment' }, { refs: [this.refOf(recv, ['runner'])] });
         }
         if (this.isContract(rt) && !this.isOwnContractMember(rt, name)) return this.contractSite(call, recv, name, 'call', rt);
         // CR-09: a contract method object reached through a receiver that is not typed as a
@@ -1214,7 +1559,7 @@ class Census {
         // could look into, that returns a TransactionResponse. It may sign, so it is a site and its
         // lock is judged.
         if (!this.isSigner(rt) && !this.isProvider(rt) && !this.isFactory(rt) && !this.isBundler(rt) && this.isTxResponse(this.typeAt(call)) && this.signatureOnlyInProgram(callee))
-            return this.mk(call, `interface.${name}`, 'tx-signing', this.typeText(rt));
+            return this.mk(call, `interface.${name}`, 'tx-signing', this.typeText(rt), {}, { refs: this.props(this.checker.getNonNullableType(rt)).has('runner') ? [this.refOf(recv, ['runner'])] : [] });
         return null;
     }
 
@@ -1286,7 +1631,7 @@ class Census {
         if (mut === 'view') return this.mk(call, api, 'tx-signing', this.typeText(rt), { excluded: true, excluded_by: 'census', excluded_reason: `view/pure ABI fragment ${method}: a read-only eth_call through the contract runner; no transaction, no nonce`, runner, mutability: 'view', origins: traced });
         const extra: Partial<Site> = { runner, mutability: mut, origins: traced };
         if (!runners.has('signer')) extra.reason = `runner unresolved (${origins.map((o) => o.at).join('; ')})`;
-        const s = this.mk(call, api, 'tx-signing', this.typeText(rt), extra);
+        const s = this.mk(call, api, 'tx-signing', this.typeText(rt), extra, { refs: [this.refOf(recv, ['runner'])] });
         if (!runners.has('signer')) s.reason = [extra.reason, s.reason].filter(Boolean).join('; ');
         return s;
     }
@@ -1463,6 +1808,11 @@ type ProblemCode =
     | 'decision-does-not-cover'
     | 'finding-not-found'
     | 'floor-lowered-unnamed'
+    | 'dead-reachable'
+    | 'dead-unprovable'
+    | 'dead-finding-does-not-name'
+    | 'dead-count'
+    | 'stale-dead'
     | 'history-bad-version'
     | 'history-empty';
 
@@ -1491,10 +1841,31 @@ interface ExcludedEntry {
     note?: string;
 }
 
+interface DeadEntry {
+    file: string;
+    function: string;
+    call: string;
+    count: number;
+    finding_id: string;
+    reason: string;
+    note?: string;
+}
+
 interface Exceptions {
     floor: number;
     unlocked: UnlockedEntry[];
     excluded: ExcludedEntry[];
+    dead: DeadEntry[];
+}
+
+/** A dead entry's key: file, outermost function and call. */
+const deadEntryKey = (e: { file: string; function: string; call: string }): string => `${e.file}|${e.function}|${e.call}`;
+
+/** A finding recommendation that names `fn` for deletion: a delete/remove verb and the function name as a whole word. */
+function recommendsDeleting(recommendation: unknown, fn: string): boolean {
+    if (typeof recommendation !== 'string') return false;
+    const esc = fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return /\b(delete|deletes|deleted|deleting|remove|removes|removed|removing)\b/i.test(recommendation) && new RegExp(`(?<![A-Za-z0-9_$.])${esc}(?![A-Za-z0-9_$])`).test(recommendation);
 }
 
 interface GateRun {
@@ -1510,6 +1881,8 @@ interface GateSummary {
     excluded_by_auditor: number;
     excluded_by_census: number;
     message_signing: number;
+    /** Sites in a provably unreachable function listed under dead (operator ruling on WR-24): counted toward the floor, neither locked nor unlocked. */
+    dead: number;
     src_files: number;
     script_files: number;
     floor: number;
@@ -1530,7 +1903,8 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         bad('not a JSON object');
         return { ex: null, problems };
     }
-    for (const k of Object.keys(raw)) if (!['description', 'floor', 'unlocked', 'excluded'].includes(k)) bad(`unknown top-level key ${JSON.stringify(k)}`);
+    for (const k of Object.keys(raw)) if (!['description', 'floor', 'unlocked', 'excluded', 'dead'].includes(k)) bad(`unknown top-level key ${JSON.stringify(k)}`);
+    if (raw.dead !== undefined && !Array.isArray(raw.dead)) bad('dead must be an array');
     if (raw.description !== undefined && typeof raw.description !== 'string') bad('description must be a string');
     if (!posInt(raw.floor)) bad('floor must be a positive integer');
     if (!Array.isArray(raw.unlocked)) bad('unlocked must be an array');
@@ -1572,6 +1946,25 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         if (!ok) return;
         excluded.push({ file: e.file as string, enclosing: e.enclosing as string, call: e.call as string, count: e.count as number, reason: e.reason as string, evidence_ref: e.evidence_ref as string });
     });
+    const dead: DeadEntry[] = [];
+    ((raw.dead ?? []) as unknown[]).forEach((e, i) => {
+        const at = `dead[${i}]`;
+        if (!isObj(e)) return bad(`${at}: not an object`);
+        let ok = true;
+        for (const k of Object.keys(e)) if (!['file', 'function', 'call', 'count', 'finding_id', 'reason', 'note'].includes(k)) (bad(`${at}: unknown key ${JSON.stringify(k)}`), (ok = false));
+        for (const k of ['file', 'function', 'call', 'reason']) if (!nonEmpty(e[k])) (bad(`${at}: ${k} must be a non-empty string`), (ok = false));
+        if (nonEmpty(e.file) && !/^(src|scripts)\//.test(e.file)) (bad(`${at}: file must be under src/ or scripts/`), (ok = false));
+        if (!posInt(e.count)) (bad(`${at}: count must be a positive integer`), (ok = false));
+        if (!(typeof e.finding_id === 'string' && FINDING_ID_RE.test(e.finding_id))) (bad(`${at}: finding_id must be a finding ID (AUD-<AREA>-<NNN>)`), (ok = false));
+        if (e.note !== undefined && typeof e.note !== 'string') (bad(`${at}: note must be a string`), (ok = false));
+        if (!ok) return;
+        dead.push({ file: e.file as string, function: e.function as string, call: e.call as string, count: e.count as number, finding_id: e.finding_id as string, reason: e.reason as string });
+    });
+    const deadKeys = dead.map(deadEntryKey);
+    deadKeys.forEach((k, i) => {
+        if (deadKeys.indexOf(k) !== i) bad(`dead: key ${k} is listed twice`);
+        if (i > 0 && !(deadKeys[i - 1] < k)) bad(`dead: entries must be sorted by key (file|function|call); ${k} comes after ${deadKeys[i - 1]}`);
+    });
     const seen = new Set<string>();
     for (const [list, name] of [[unlocked, 'unlocked'], [excluded, 'excluded']] as const) {
         const keys = list.map(entryKey);
@@ -1582,7 +1975,7 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         });
     }
     if (problems.some((p) => p.code === 'bad-exceptions-file')) return { ex: null, problems };
-    return { ex: { floor: raw.floor as number, unlocked, excluded }, problems };
+    return { ex: { floor: raw.floor as number, unlocked, excluded, dead }, problems };
 }
 
 function loadExceptions(root: string): { ex: Exceptions | null; problems: Problem[] } {
@@ -1663,7 +2056,7 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
     const prog = result.program;
     // Work on copies: the census result is never changed, so one run can be evaluated against several lists.
     const sites = result.sites.map((s) => ({ ...s }));
-    const summary: GateSummary = { tx_signing: 0, locked: 0, unlocked: 0, unknown: 0, excluded_by_auditor: 0, excluded_by_census: 0, message_signing: 0, src_files: prog.src_files, script_files: prog.script_files, floor: ex.floor };
+    const summary: GateSummary = { tx_signing: 0, locked: 0, unlocked: 0, unknown: 0, dead: 0, excluded_by_auditor: 0, excluded_by_census: 0, message_signing: 0, src_files: prog.src_files, script_files: prog.script_files, floor: ex.floor };
     // AC-53: every listed unlocked site names a registered finding and decision records that cover it.
     for (const e of ex.unlocked) {
         const k = entryKey(e);
@@ -1715,21 +2108,62 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
             s.excluded_reason = `${e.reason} (evidence: ${e.evidence_ref})`;
         }
     }
+    // Operator ruling on WR-24: dead entries. The census proves each function unreachable, or the
+    // entry fails and its sites stay judged like any other.
+    for (const e of ex.dead) {
+        const k = deadEntryKey(e);
+        let ok = true;
+        const rec = readJsonOrNull(path.join(root, '.planning', 'audit', 'findings', `${e.finding_id}.json`));
+        if (!isObj(rec) || rec.id !== e.finding_id) {
+            problems.push({ code: 'finding-not-found', message: `dead ${k}: finding ${e.finding_id} has no record .planning/audit/findings/${e.finding_id}.json` });
+            ok = false;
+        } else if (!recommendsDeleting(rec.recommendation, e.function)) {
+            problems.push({ code: 'dead-finding-does-not-name', message: `dead ${k}: the recommendation of ${e.finding_id} does not name ${e.function} for deletion (it must say delete or remove and name the function): ${JSON.stringify(String(rec.recommendation ?? '').slice(0, 160))}` });
+            ok = false;
+        }
+        const matches = counted.filter((s) => !s.excluded && s.file === e.file && s.api === e.call && census.deadFunctionOf(s)?.name === e.function);
+        if (!matches.length) {
+            problems.push({ code: 'stale-dead', message: `dead ${k} (${e.finding_id}): the census finds no ${e.call} site in ${e.function} (${census.moduleFunctionExists(e.file, e.function) ? 'the function remains but the site is gone' : 'the function is gone'}); remove the entry, and lower the floor in a commit naming ${e.finding_id} (AC-34)` });
+            continue;
+        }
+        if (matches.length !== e.count) {
+            problems.push({ code: 'dead-count', message: `dead ${k} (${e.finding_id}): listed count ${e.count}, the census finds ${matches.length} site(s) (${matches.map((s) => `${s.file}:${s.line}`).join(', ')})` });
+            ok = false;
+        }
+        const fns = [...new Set(matches.map((s) => census.deadFunctionOf(s)!.fn))];
+        if (fns.length !== 1) {
+            problems.push({ code: 'dead-unprovable', message: `dead ${k}: ${fns.length} functions in ${e.file} go by the name ${e.function}; the entry cannot say which one is dead` });
+            ok = false;
+        } else {
+            const proof = census.unreachableProof(fns[0]);
+            if ('unprovable' in proof) {
+                problems.push({ code: 'dead-unprovable', message: `dead ${k}: ${proof.unprovable}` });
+                ok = false;
+            } else if (proof.reachable.length) {
+                problems.push({ code: 'dead-reachable', message: `dead ${k} (${e.finding_id}): ${e.function} is reachable: ${proof.reachable.join('; ')}; a reachable signing site must be locked, not listed as dead` });
+                ok = false;
+            }
+        }
+        if (ok) for (const s of matches) s.dead = e.finding_id;
+    }
     const remaining = counted.filter((s) => !s.excluded);
     summary.excluded_by_auditor = counted.length - remaining.length;
     summary.tx_signing = remaining.length;
-    for (const s of remaining) summary[s.lock_status === 'locked' ? 'locked' : s.lock_status === 'unlocked' ? 'unlocked' : 'unknown']++;
+    // A dead site counts toward the floor (remaining) but is neither locked nor unlocked (live).
+    const live = remaining.filter((s) => !s.dead);
+    summary.dead = remaining.length - live.length;
+    for (const s of live) summary[s.lock_status === 'locked' ? 'locked' : s.lock_status === 'unlocked' ? 'unlocked' : 'unknown']++;
     // F3: unknown is never counted as locked or excluded.
-    for (const s of remaining.filter((x) => x.lock_status !== 'locked' && x.lock_status !== 'unlocked'))
+    for (const s of live.filter((x) => x.lock_status !== 'locked' && x.lock_status !== 'unlocked'))
         problems.push({ code: 'unknown-lock', message: `${s.file}:${s.line} ${s.api} in ${s.enclosing}: lock status ${s.lock_status ?? 'none'}${s.reason ? ` (${s.reason})` : ''}; the census must prove a signing site locked or unlocked` });
     // AC-32 / AC-35: the unlocked set equals the list, by key and count.
     const byKey = new Map<string, Site[]>();
-    for (const s of remaining.filter((x) => x.lock_status === 'unlocked')) byKey.set(siteKey(s), [...(byKey.get(siteKey(s)) ?? []), s]);
+    for (const s of live.filter((x) => x.lock_status === 'unlocked')) byKey.set(siteKey(s), [...(byKey.get(siteKey(s)) ?? []), s]);
     const listed = new Set(ex.unlocked.map(entryKey));
     for (const e of ex.unlocked) {
         const k = entryKey(e);
         const got = byKey.get(k) ?? [];
-        const lockedNow = remaining.filter((s) => siteKey(s) === k && s.lock_status === 'locked').length;
+        const lockedNow = live.filter((s) => siteKey(s) === k && s.lock_status === 'locked').length;
         if (got.length < e.count)
             problems.push({ code: 'stale-unlocked', message: `unlocked ${k} (${e.finding_id}): listed count ${e.count}, the census finds ${got.length} unlocked site(s) at this key${lockedNow ? ` and ${lockedNow} now locked` : ''}; a fixed or removed site must come off the list (lower count or remove the entry)` });
         else if (got.length > e.count)
@@ -1746,7 +2180,7 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
 }
 
 function gateLine(s: GateSummary, problems: Problem[]): string {
-    return `check-signing-census: ${s.tx_signing} transaction-signing sites (locked ${s.locked}, unlocked ${s.unlocked}, unknown ${s.unknown}), floor ${s.floor}; excluded ${s.excluded_by_auditor} by auditor and ${s.excluded_by_census} by census; message-signing ${s.message_signing}; files src ${s.src_files}, scripts ${s.script_files}; ${problems.length} problem(s)`;
+    return `check-signing-census: ${s.tx_signing} transaction-signing sites (locked ${s.locked}, unlocked ${s.unlocked}, unknown ${s.unknown}, dead ${s.dead}), floor ${s.floor}; excluded ${s.excluded_by_auditor} by auditor and ${s.excluded_by_census} by census; message-signing ${s.message_signing}; files src ${s.src_files}, scripts ${s.script_files}; ${problems.length} problem(s)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2165,6 +2599,21 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// WR-24: the real lock, keyed on another wallet's address.
+const GATE_WRONG_KEY_SRC = `import { Wallet } from 'ethers';
+import { withNonceLock } from './utils/nonceAuthority';
+
+declare const wallet: Wallet;
+declare const otherWallet: Wallet;
+${GATE_TX}
+
+export async function wrongKey(): Promise<void> {
+    await withNonceLock(otherWallet.address, async () => {
+        await wallet.sendTransaction(tx);
+    });
+}
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
 import { withNonceLock } from './utils/nonceAuthority';
 
@@ -2192,6 +2641,38 @@ export function later(): void {
     });
 }
 `;
+
+// Operator ruling on WR-24 (dead code): a signing site in a function nothing can reach may be
+// listed under `dead`, citing a finding whose recommendation deletes the function. The census
+// proves the function unreachable (module-level, not exported, zero references) or the entry fails.
+const DEAD_FN = `async function deadApprove(): Promise<void> {
+    await wallet.sendTransaction(tx);
+}`;
+
+function deadSource(opts: { exported?: boolean; exportList?: boolean; caller?: boolean } = {}): string {
+    return `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+// A signing function nothing calls (the fixture's AUD-FIX-003, like bot.ts maybeApproveForChain).
+${opts.exported ? 'export ' : ''}${DEAD_FN}
+${opts.exportList ? '\nexport { deadApprove };\n' : ''}${opts.caller ? '\nexport async function callsIt(): Promise<void> {\n    await deadApprove();\n}\n' : ''}`;
+}
+
+const DEAD_FINDING_REL = '.planning/audit/findings/AUD-FIX-003.json';
+
+/** The base fixture plus src/dead.ts, its finding record and a dead entry (each part overridable; null leaves it out). */
+function deadFiles(opts: { src?: string | null; recommendation?: string; count?: number; entry?: boolean; fn?: string } = {}): Record<string, string | null> {
+    return {
+        ...baseGateFiles(20),
+        'src/dead.ts': opts.src === undefined ? deadSource() : opts.src,
+        [DEAD_FINDING_REL]: JSON.stringify({ id: 'AUD-FIX-003', recommendation: opts.recommendation ?? 'Delete deadApprove (no caller, so no behaviour change).' }),
+        [EXCEPTIONS_REL]: withExceptions((ex) => {
+            if (opts.entry !== false) ex.dead = [{ file: 'src/dead.ts', function: opts.fn ?? 'deadApprove', call: 'signer.sendTransaction', count: opts.count ?? 1, finding_id: 'AUD-FIX-003', reason: 'no caller; deleted by AUD-FIX-003' }];
+        }),
+    };
+}
 
 function withExceptions(mutate: (ex: Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] }) => void): string {
     const ex = baseGateExceptions() as Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] };
@@ -2269,6 +2750,7 @@ function gateCases(): CaseOutcome[] {
     out.push(codeCase('CR-09-method-value-outside-lock-fails', { ...baseGateFiles(20), 'scripts/approve.ts': GATE_METHOD_VALUE_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('WR-23-unchecked-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/unchecked.ts': GATE_UNCHECKED_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('WR-24-local-withNonceLock-is-not-the-lock-fails', { ...baseGateFiles(20), 'scripts/fakelock.ts': GATE_FAKE_LOCK_SCRIPT }, ['surplus-unlocked']));
+    out.push(codeCase('WR-24-lock-keyed-on-another-wallet-fails', { ...baseGateFiles(20), 'src/wrongkey.ts': GATE_WRONG_KEY_SRC }, ['unknown-lock']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
     out.push(
         codeCase('WR-25-signing-cjs-and-mts-scripts-fail', { ...baseGateFiles(20), 'scripts/rescue.cjs': GATE_CJS_SCRIPT, 'scripts/rescue2.mts': GATE_MTS_SCRIPT }, ['surplus-unlocked'], (res) => {
@@ -2282,6 +2764,41 @@ function gateCases(): CaseOutcome[] {
     out.push(
         codeCase('WR-25-js-file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.mjs': 'export const x = 1;\n' }, ['file-not-audited'], (res) =>
             res.problems.some((p) => p.code === 'file-not-audited' && p.message.startsWith('src/hidden.mjs ')) ? null : `expected file-not-audited for src/hidden.mjs, got ${res.problems.map((p) => p.message).join(' | ')}`,
+        ),
+    );
+    // Operator ruling on WR-24: the dead-code class.
+    out.push(codeCase('WR-24-dead-site-without-an-entry-fails', deadFiles({ entry: false }), ['unknown-lock']));
+    out.push(
+        codeCase('WR-24-dead-entry-on-an-unreachable-function-passes', deadFiles(), [], (res) =>
+            res.summary?.dead === 1 && res.summary.tx_signing === 24 && res.summary.unknown === 0 ? null : `expected 24 sites with 1 dead (counted toward the floor) and none unknown, got ${JSON.stringify(res.summary)}`,
+        ),
+    );
+    out.push(codeCase('WR-24-dead-entry-on-an-exported-function-fails', deadFiles({ src: deadSource({ exported: true }) }), ['dead-reachable', 'surplus-unlocked']));
+    out.push(codeCase('WR-24-dead-entry-on-a-function-in-an-export-list-fails', deadFiles({ src: deadSource({ exportList: true }) }), ['dead-reachable', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-on-a-function-with-a-caller-fails', deadFiles({ src: deadSource({ caller: true }) }), ['dead-reachable', 'surplus-unlocked']));
+    out.push(codeCase('WR-24-dead-entry-whose-function-was-removed-fails', deadFiles({ src: null }), ['stale-dead']));
+    out.push(codeCase('WR-24-dead-entry-assigned-to-module-exports-fails', deadFiles({ src: `${deadSource()}
+declare const module: { exports: Record<string, unknown> };
+module.exports.deadApprove = deadApprove;
+` }), ['dead-reachable', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-whose-count-differs-fails', deadFiles({ count: 2 }), ['dead-count', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-whose-finding-does-not-name-the-function-fails', deadFiles({ recommendation: 'Delete simulateSell and its import (no caller).' }), ['dead-finding-does-not-name', 'unknown-lock']));
+    out.push(
+        codeCase(
+            'WR-24-dead-entry-on-a-class-method-is-unprovable-and-fails',
+            deadFiles({ src: `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+class Holder {
+    async deadApprove(): Promise<void> {
+        await wallet.sendTransaction(tx);
+    }
+}
+void Holder;
+`, fn: 'Holder.deadApprove', recommendation: 'Delete Holder.deadApprove (no caller).' }),
+            ['dead-unprovable', 'unknown-lock'],
         ),
     );
     out.push(caseFlag7());
@@ -2724,6 +3241,41 @@ async function viaAny(c: any): Promise<void> {
 export async function caseAnyArtifactParam(): Promise<void> {
     await withNonceLock(wallet.address, () => viaAny(new Contract(C9, loadArtifactAbi(), wallet) as any));
 }
+
+// WR-24: the lock key must be the signer's address.
+declare const otherWallet: Wallet;
+export async function caseWrongKey(): Promise<void> {
+    await withNonceLock(otherWallet.address, async () => {
+        await wallet.sendTransaction(tx); // CASE:wrong-key
+    });
+}
+async function payFrom(w: Wallet): Promise<void> {
+    await w.sendTransaction(tx); // CASE:mapped-key-mismatch
+}
+export async function caseMappedMismatch(): Promise<void> {
+    await withNonceLock(wallet.address, () => payFrom(otherWallet));
+}
+async function payFrom2(w: Wallet): Promise<void> {
+    await w.sendTransaction(tx); // CASE:mapped-key-match
+}
+export async function caseMappedMatch(): Promise<void> {
+    await withNonceLock(otherWallet.address, () => payFrom2(otherWallet));
+}
+async function approveFor(owner: { wallet: Wallet }, token: Contract): Promise<void> {
+    await withNonceLock(owner.wallet.address, async () => {
+        await token.transfer(TO9, 1n); // CASE:contract-key-mapped
+    });
+}
+export async function caseContractKeyMapped(ctx: { wallet: Wallet }): Promise<void> {
+    const t = new Contract(C9, ABI, ctx.wallet);
+    await approveFor(ctx, t);
+}
+export async function caseContractKeyWrong(ctx: { wallet: Wallet }): Promise<void> {
+    const t = new Contract(C9, ABI, otherWallet);
+    await withNonceLock(ctx.wallet.address, async () => {
+        await t.transfer(TO9, 1n); // CASE:contract-key-wrong
+    });
+}
 `;
 
 interface Expect {
@@ -2792,6 +3344,11 @@ const EXPECT: Record<string, Expect> = {
     'rpc-send-read': { found: false },
     'any-artifact': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^contract\.someArtifactMethod$/ },
     'any-artifact-param': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'transitive', apiMatch: /^contract\.anotherArtifactMethod$/ },
+    'wrong-key': { found: true, kind: 'tx-signing', lock: 'unknown' },
+    'mapped-key-mismatch': { found: true, kind: 'tx-signing', lock: 'unknown' },
+    'mapped-key-match': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'transitive' },
+    'contract-key-mapped': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'lexical' },
+    'contract-key-wrong': { found: true, kind: 'tx-signing', lock: 'unknown' },
 };
 
 /** The repo's node_modules (scripts/ is one level below the repo root; trap 2). */
