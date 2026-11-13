@@ -1105,10 +1105,15 @@ export interface RestartOptions {
 
 /**
  * Restart the scenario's bot on the same database file and the same simulated chain, as a
- * process restart would. The running graph is stopped by the same steps dispose uses (held calls
- * answered with an error, the bot's timer registry cleared, every fake timer cleared, providers
- * destroyed, closeDb), and any socket of the old graph still open is closed, because a dead
- * process's timers and sockets die with it. The file, the FakeNode, the clock, the env snapshot
+ * process restart would. The running graph is fenced first (WR-06): its database is closed and,
+ * until it has stopped, every logger, notifier and broadcaster call is dropped, because a killed
+ * process writes, logs and alerts nothing. Then it is stopped by the same steps dispose uses (held
+ * calls answered with an error, the bot's timer registry cleared, every fake timer cleared,
+ * providers destroyed), any socket of the old graph still open is closed, and timers a catch path
+ * set while it stopped are cleared, because a dead process's timers and sockets die with it.
+ * The fence holds only while the graph stops: once the new graph loads, a call cannot be told
+ * apart by graph, so old-graph code still running then would record again (nothing of it is
+ * left to run: its timers are gone, its providers destroyed, its sockets closed). The file, the FakeNode, the clock, the env snapshot
  * and the scenario's alerts, logs and timeline stay: a restart is the same scenario continuing,
  * and a test reads what happened on both sides of it. Then `env` is applied and loadGraph opens
  * the whole graph again on the file, which reinstalls the DB capture and the SQL clock on the new
@@ -1134,17 +1139,39 @@ export async function restartGraph<D extends ScenarioDexType>(scenario: Scenario
             errors.push(new Error(`restartGraph: ${what} failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e }));
         }
     };
-    await stopGraphParts(built, step);
-    await step('drop the old graph Telegram client', () => {
-        // The old process's Telegram client and its handlers die with it; a delivery after the
-        // restart reaches only a handler the new graph registers.
-        st.telegram.handlers.length = 0;
-        st.telegram.clients.length = 0;
-    });
-    await step('close the old graph sockets', () => {
-        for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
-        FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));
-    });
+    // Fence the old graph before anything of it can run again (WR-06). Releasing a held call or
+    // destroying a provider resumes the old graph's awaits, and a killed process runs no catch
+    // path. Until the stop ends, nothing but the old graph runs (the test is awaiting this call
+    // and no new graph exists), so every logger, notifier and broadcaster call is the old graph's
+    // and is dropped; and its database closes first, so a write from such a catch path throws
+    // into that catch instead of landing. dispose keeps the original order, where the answer
+    // reaching its caller is the point.
+    st.stoppingGraph = true;
+    try {
+        await step('fence the old graph database', () => {
+            closeGraphDb(built.graph ?? null);
+            if (built.graph && currentGraph === built.graph) currentGraph = null;
+        });
+        await stopGraphParts(built, step);
+        await step('drop the old graph Telegram client', () => {
+            // The old process's Telegram client and its handlers die with it; a delivery after the
+            // restart reaches only a handler the new graph registers.
+            st.telegram.handlers.length = 0;
+            st.telegram.clients.length = 0;
+        });
+        await step('close the old graph sockets', () => {
+            for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
+            FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));
+        });
+        // A catch path that ran while the graph stopped may have set a timer (a retry); it dies
+        // with the process too.
+        await step('clear timers set while stopping', () => {
+            built.graph?.exitManager.clearAllTimers();
+            if (vi.isFakeTimers()) vi.clearAllTimers();
+        });
+    } finally {
+        st.stoppingGraph = false;
+    }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, `restartGraph: ${errors.length} stop steps failed`);
     built.graph = undefined;

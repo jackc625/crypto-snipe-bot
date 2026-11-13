@@ -14,6 +14,10 @@
 // carry `op` also goes on the ordered timeline (capture.ts). The notifier keeps every alert, with
 // its exact text, on the `alerts` list (read through capture.ts recordedAlerts); alerts never go
 // on the timeline.
+//
+// Phase 23 review WR-06: while world.ts restartGraph stops the old graph
+// (harnessState().stoppingGraph), the logger, the notifier and the broadcaster drop every call:
+// only the old graph runs then, and a killed process logs, alerts and broadcasts nothing.
 
 import { afterEach, vi } from 'vitest';
 import { harnessState } from './chain';
@@ -26,6 +30,7 @@ vi.mock('../../../src/utils/logger', () => {
     const KEY = Symbol.for('csb.realpath.harness');
     type Sink = {
         seq: number;
+        stoppingGraph: boolean;
         logs: Array<{ seq: number; level: string; bindings: Record<string, unknown>; obj: Record<string, unknown> | undefined; msg: string | undefined }>;
         timeline: { record(entry: { kind: 'op'; level: string; op: string; msg: string | undefined; fields: Record<string, unknown>; bindings: Record<string, unknown> }): unknown } | null;
     };
@@ -39,6 +44,7 @@ vi.mock('../../../src/utils/logger', () => {
             (level: string) =>
             (...args: unknown[]): void => {
                 const s = sink();
+                if (s.stoppingGraph) return;
                 s.seq += 1;
                 const first = args[0];
                 const isObj = typeof first === 'object' && first !== null;
@@ -74,8 +80,9 @@ vi.mock('../../../src/utils/notifier', () => {
     const KEY = Symbol.for('csb.realpath.harness');
     type Alert = { via: 'telegram' | 'chain' | 'ctx'; chain: string | null; message: unknown };
     const record = (via: Alert['via'], chain: string | null, message: unknown): Promise<void> => {
-        const s = (globalThis as unknown as Record<symbol, { alerts: Alert[] } | undefined>)[KEY];
+        const s = (globalThis as unknown as Record<symbol, { alerts: Alert[]; stoppingGraph: boolean } | undefined>)[KEY];
         if (!s) throw new Error('realpath harness: state missing when the notifier was called');
+        if (s.stoppingGraph) return Promise.resolve();
         s.alerts.push({ via, chain, message });
         return Promise.resolve();
     };
@@ -88,8 +95,9 @@ vi.mock('../../../src/utils/notifier', () => {
 
 vi.mock('../../../src/api/ws/broadcaster', () => {
     const KEY = Symbol.for('csb.realpath.harness');
-    const state = (): { seq: number; broadcasts: Array<{ seq: number; type: string; data: unknown }> } => {
-        const s = (globalThis as unknown as Record<symbol, { seq: number; broadcasts: Array<{ seq: number; type: string; data: unknown }> } | undefined>)[KEY];
+    type BroadcastState = { seq: number; broadcasts: Array<{ seq: number; type: string; data: unknown }>; stoppingGraph: boolean };
+    const state = (): BroadcastState => {
+        const s = (globalThis as unknown as Record<symbol, BroadcastState | undefined>)[KEY];
         if (!s) throw new Error('realpath harness: state missing when the broadcaster was called');
         return s;
     };
@@ -104,6 +112,7 @@ vi.mock('../../../src/api/ws/broadcaster', () => {
         getClientCount: (): number => clients,
         broadcast: (type: string, data: unknown): void => {
             const s = state();
+            if (s.stoppingGraph) return;
             s.seq += 1;
             s.broadcasts.push({ seq: s.seq, type, data });
         },

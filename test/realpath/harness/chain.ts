@@ -152,6 +152,12 @@ export interface HarnessState {
     violations: Violation[];
     /** Folders made by world.ts createTempDbFile, each removed by its disposer (plan 23-27). */
     tempDbDirs: string[];
+    /**
+     * True while world.ts restartGraph stops the old graph. Only the old graph runs then, so the
+     * setup.ts logger, notifier and broadcaster drop every call, as a killed process records
+     * nothing (Phase 23 review WR-06).
+     */
+    stoppingGraph: boolean;
 }
 
 export function harnessState(): HarnessState {
@@ -176,6 +182,7 @@ export function harnessState(): HarnessState {
             timeline: null,
             violations: [],
             tempDbDirs: [],
+            stoppingGraph: false,
         };
         g[HARNESS_KEY] = st;
     }
