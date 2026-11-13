@@ -17,6 +17,8 @@ import {
     ALLOWED_MODULES,
     REALPATH_ROOT,
     checkRealpathMocks,
+    checkVitestConfig,
+    collectReachedFiles,
     collectRealpathFiles,
     loadAllowList,
     run,
@@ -94,6 +96,69 @@ describe('AC-02 real-path mock-list gate', () => {
         },
         20_000,
     );
+
+    // Phase 23 review WR-26: real-path tests run code from outside test/realpath (helpers, rails,
+    // setup files), and vitest.config.ts can swap a bot module with no vi call at all.
+    describe('WR-26: modules a real-path test reaches, and the realpath project config', () => {
+        const db = posix(path.join(REPO_ROOT, 'src', 'utils', 'db'));
+        const quietRun = (argv: string[]): { code: number; lines: string[] } => {
+            const lines: string[] = [];
+            const code = run(argv, { out: (l) => lines.push(l), err: (l) => lines.push(l) });
+            return { code, lines };
+        };
+        /** A temp tree: rel path -> text. */
+        const tree = (files: Record<string, string>): string => {
+            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'realpath-mock-gate-wr26-'));
+            for (const [rel, text] of Object.entries(files)) {
+                fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+                fs.writeFileSync(path.join(dir, rel), text);
+            }
+            return dir;
+        };
+        const TEST_FILE = "import { vi } from 'vitest';\nimport { prep } from '../helpers/prep';\nvi.useFakeTimers();\nprep();\n";
+
+        it('a vi.doMock of src/utils/db in a helper a real-path test imports is refused', { timeout: 20_000 }, () => {
+            const dir = tree({
+                'test/realpath/x.test.ts': TEST_FILE,
+                'test/helpers/prep.ts': `import { vi } from 'vitest';\nexport function prep(): void {\n    vi.doMock('${db}', () => ({}));\n}\n`,
+            });
+            try {
+                const { code, lines } = quietRun(['--root', path.join(dir, 'test', 'realpath')]);
+                expect(code, lines.join('\n')).toBe(1);
+                expect(lines.some((l) => /prep\.ts:3 forbidden-mock /.test(l)), lines.join('\n')).toBe(true);
+            } finally {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
+        });
+
+        it('a mock in a realpath setup file outside the folder, and a second resolve.alias entry, are refused', { timeout: 20_000 }, () => {
+            const config = `import path from 'path';\nimport { defineConfig } from 'vitest/config';\nexport default defineConfig({\n    test: {\n        projects: [\n            {\n                extends: true,\n                resolve: {\n                    alias: [\n                        { find: /^ethers$/, replacement: path.resolve(__dirname, 'node_modules/ethers/lib.commonjs/index.js') },\n                        { find: /utils\\/db$/, replacement: path.resolve(__dirname, 'test/fakeDb.ts') },\n                    ],\n                },\n                test: { name: 'realpath', include: ['test/realpath/**/*.test.ts'], setupFiles: ['test/rails2/setup.ts'] },\n            },\n        ],\n    },\n});\n`;
+            const dir = tree({
+                'vitest.config.ts': config,
+                'test/realpath/x.test.ts': "import { vi } from 'vitest';\nvi.useFakeTimers();\n",
+                'test/rails2/setup.ts': `import { vi } from 'vitest';\nvi.mock('${db}');\n`,
+            });
+            try {
+                const { code, lines } = quietRun(['--root', path.join(dir, 'test', 'realpath'), '--config', path.join(dir, 'vitest.config.ts')]);
+                expect(code, lines.join('\n')).toBe(1);
+                expect(lines.some((l) => /setup\.ts:2 forbidden-mock /.test(l)), lines.join('\n')).toBe(true);
+                expect(lines.some((l) => / config-alias /.test(l)), lines.join('\n')).toBe(true);
+            } finally {
+                fs.rmSync(dir, { recursive: true, force: true });
+            }
+        });
+
+        it('the real config passes with exactly the ethers alias, and the scan reaches the rails, the setup files and the shared helpers', { timeout: 20_000 }, () => {
+            const cfg = checkVitestConfig(path.join(REPO_ROOT, 'vitest.config.ts'));
+            expect(cfg.problems).toEqual([]);
+            expect(cfg.setupFiles.map((f) => posix(path.relative(REPO_ROOT, f)))).toEqual(['test/rails/setup.cjs', 'test/realpath/harness/setup.ts']);
+            const reached = collectReachedFiles([...collectRealpathFiles(REALPATH_ROOT), ...cfg.setupFiles], loadAllowList().options).map((f) => posix(path.relative(REPO_ROOT, f)));
+            for (const f of ['test/rails/setup.cjs', 'test/rails/spawnRailedChild.ts', 'test/helpers/sourceGraph.ts']) expect(reached, f).toContain(f);
+            expect(reached.some((f) => f.startsWith('src/') || f.includes('node_modules/')), 'src/ and packages are not scanned').toBe(false);
+            const { code, lines } = quietRun([]);
+            expect(code, lines.join('\n')).toBe(0);
+        });
+    });
 
     it('exits 2 on bad arguments and on an empty folder, never 0', () => {
         const quiet = { out: (): void => {}, err: (): void => {} };
