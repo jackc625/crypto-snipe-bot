@@ -166,6 +166,7 @@ Measured on 2026-11-09 at `7d0b7b3`:
 - [ ] AC-40: A commit that only adds a brand-new scenario passes.
 - [ ] AC-41: A `behavior:` commit with no ID, or citing an ID absent from the register, fails, shown with deliberately violating commits.
 - [ ] AC-42: Merge commits are not judged, and the commits inside them are.
+  - Superseded 2026-11-12 by code-review finding WR-27 (23-REVIEW.md; operator ruling "Keep the stricter rule"): a merge commit whose own result changes `test/realpath/recordings/` is judged like any other commit (a `behavior:` subject citing IDs that exist in its tree). A merge that changes nothing there is still not judged, and the commits inside every merge still are.
 - [ ] AC-43: The violation demonstrations run on throwaway commits in a temporary repo and never enter real history.
 - [ ] AC-44: The check runs in CI and by a local command, and judges only commits made after the recording's first commit.
 

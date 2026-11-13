@@ -8,7 +8,7 @@
 // ...", whichever cause ended the loop. When the attempt budget runs out first, the ceiling was
 // not reached: the escalated fee is step x (attempt + 1), against a 25 gwei ceiling.
 //
-// Re-triaged on the realistic chain (Phase 23 review WR-01, operator ruling 2026-11-13). The relay
+// Re-triaged on the realistic chain (Phase 23 review WR-01, operator ruling 2026-11-12). The relay
 // now simulates as a real one does, so an attempt made after the swap's own deadline (fixed at
 // build time: src/bot.ts:1045 for a snipe, src/exitEngine.ts:364 for a V2 sell, both now + 60 s)
 // is refused by eth_callBundle ("UniswapV2Router: EXPIRED") and the escalation ends there with

@@ -4,7 +4,7 @@
 // wallet lock through every private attempt of a snipe buy (each a Flashbots bundle, its wait for
 // the first target block, the stats call and the 45 s confirm window), until the escalation ends.
 //
-// Re-triaged on the realistic chain (Phase 23 review WR-01, operator ruling 2026-11-13): the relay
+// Re-triaged on the realistic chain (Phase 23 review WR-01, operator ruling 2026-11-12): the relay
 // now simulates the buy as a real one does, so once the buy's own 60 s deadline (src/bot.ts:1045,
 // fixed when the swap is built) has passed, the next attempt's eth_callBundle answers
 // "UniswapV2Router: EXPIRED" and the escalation ends there with "Flashbots simulate: tx would
