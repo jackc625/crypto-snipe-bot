@@ -171,11 +171,13 @@
       "claim": "restart-gap-blinds-http-poller",
       "expected": {
         "cursorReachedRugBlock": true,
+        "gapLogEvaluated": true,
         "healthShown": "connected",
         "rugEvaluated": true
       },
       "actual": {
         "cursorReachedRugBlock": false,
+        "gapLogEvaluated": false,
         "healthShown": "connected",
         "rugEvaluated": false
       }
@@ -323,7 +325,7 @@
     {
       "finding": "AUD-BUY-002",
       "file": "test/realpath/triage/AUD-BUY-002.test.ts",
-      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: one balanceOf error after the buy mined flips the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: balanceOf errors after the buy mined (a lagging node, 30 s) flip the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
       "claim": "balanceof-error-flips-landed-buy-to-failed",
       "expected": {
         "alertText": null,
@@ -339,7 +341,7 @@
     {
       "finding": "AUD-BUY-002",
       "file": "test/realpath/triage/AUD-BUY-002.test.ts",
-      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: one balanceOf error after the buy mined flips the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
+      "title": "AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01) > balanceof-error-flips-landed-buy-to-failed: balanceOf errors after the buy mined (a lagging node, 30 s) flip the row to failed, starts no exit monitor, alerts \"TX failed\", and a restart does not resume the held position",
       "claim": "failed-row-not-resumed-after-restart",
       "expected": {
         "resumedAfterRestart": true
@@ -382,10 +384,10 @@
       "title": "AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-02) > v2-quote-failure-sends-zero-amount-out-min: a failed getAmountsOut leaves minOut 0 and the V2 swap is still sent with amountOutMin 0",
       "claim": "v2-quote-failure-sends-zero-amount-out-min",
       "expected": {
-        "unboundedSwapSent": false
+        "swapSentBelowQuoteFloor": false
       },
       "actual": {
-        "unboundedSwapSent": true
+        "swapSentBelowQuoteFloor": true
       }
     },
     {
@@ -394,10 +396,10 @@
       "title": "AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-02) > v3-quote-failure-sends-zero-amount-out-minimum: a failed quoteExactInputSingle leaves minOut 0 and the V3 multicall still carries amountOutMinimum 0",
       "claim": "v3-quote-failure-sends-zero-amount-out-minimum",
       "expected": {
-        "unboundedSwapSent": false
+        "swapSentBelowQuoteFloor": false
       },
       "actual": {
-        "unboundedSwapSent": true
+        "swapSentBelowQuoteFloor": true
       }
     },
     {
@@ -410,6 +412,24 @@
       },
       "actual": {
         "buysLanded": 2
+      }
+    },
+    {
+      "finding": "AUD-BUY-005",
+      "file": "test/realpath/triage/AUD-BUY-005.test.ts",
+      "title": "AUD-BUY-005: a rejection from the un-awaited V2 pair handler ends the whole process > v2-listener-unhandled-rejection-exits: a database read failing at the V2 handler's first statement rejects the un-awaited handler on the first pair and the process exits",
+      "claim": "v2-listener-unhandled-rejection-exits",
+      "expected": {
+        "code": 0,
+        "exited": false,
+        "outcome": "survived",
+        "stderrSignal": ""
+      },
+      "actual": {
+        "code": 1,
+        "exited": true,
+        "outcome": "process-exited",
+        "stderrSignal": "TypeError: The database connection is not open"
       }
     },
     {
@@ -486,10 +506,18 @@
       "title": "AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX on the same socket > restart-stacks-reconnect-loop: after a dashboard Stop and Start on a connected socket, one socket close runs two reconnect loops for the DEX",
       "claim": "restart-stacks-reconnect-loop",
       "expected": {
-        "reconnectLoopsForOneClose": 1
+        "reconnectLoopsForOneClose": {
+          "sushiswap-v2": 1,
+          "uniswap-v2": 1,
+          "uniswap-v3": 1
+        }
       },
       "actual": {
-        "reconnectLoopsForOneClose": 2
+        "reconnectLoopsForOneClose": {
+          "sushiswap-v2": 2,
+          "uniswap-v2": 2,
+          "uniswap-v3": 2
+        }
       }
     },
     {
@@ -526,9 +554,11 @@
       "title": "AUD-BUY-010: risk limits are checked long before the snipe is recorded, so concurrent handlers for different tokens all pass > max-open-positions-overspent: with room for exactly one more position, handlers for two different tokens both pass canSnipe and both buys land",
       "claim": "max-open-positions-overspent",
       "expected": {
+        "bRefusedBy": "max_positions",
         "buysLanded": 1
       },
       "actual": {
+        "bRefusedBy": null,
         "buysLanded": 2
       }
     },
@@ -578,10 +608,12 @@
       "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > deliberate-public-wait-holds-wallet-lock: a deliberate buy whose public transaction is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
       "claim": "deliberate-public-wait-holds-wallet-lock",
       "expected": {
-        "laterOperationStartedInWindow": true
+        "laterOperationStartedInWindow": true,
+        "stuckNonceSettledBeforeRelease": true
       },
       "actual": {
-        "laterOperationStartedInWindow": false
+        "laterOperationStartedInWindow": false,
+        "stuckNonceSettledBeforeRelease": false
       }
     },
     {
@@ -599,17 +631,35 @@
       }
     },
     {
+      "finding": "AUD-BUY-027",
+      "file": "test/realpath/triage/AUD-BUY-027.test.ts",
+      "title": "AUD-BUY-027: factory events are not filtered to wrapped-native pairs > non-native-v3-pool-processed: a PoolCreated for an A/B V3 pool reaches the real V3 listener and is processed as a snipe of A",
+      "claim": "non-native-v3-pool-processed",
+      "expected": {
+        "buySubmitted": false,
+        "processedAsSnipe": false
+      },
+      "actual": {
+        "buySubmitted": true,
+        "processedAsSnipe": true
+      }
+    },
+    {
       "finding": "AUD-BUY-028",
       "file": "test/realpath/triage/AUD-BUY-028.test.ts",
       "title": "AUD-BUY-028: the lock gate passes on any active lock, whatever share of the LP it covers > mudra-one-percent-lock-passes: on BSC, a Mudra lock of 1 percent of the LP supply passes the lock gate and the bot buys",
       "claim": "mudra-one-percent-lock-passes",
       "expected": {
         "buySubmitted": false,
-        "lockedShareOfLpPct": 1
+        "lockGatePassed": false,
+        "lockedShareOfLpPct": 1,
+        "otherGatesPassed": true
       },
       "actual": {
         "buySubmitted": true,
-        "lockedShareOfLpPct": 1
+        "lockGatePassed": true,
+        "lockedShareOfLpPct": 1,
+        "otherGatesPassed": true
       }
     },
     {
@@ -619,11 +669,15 @@
       "claim": "unicrypt-one-percent-lock-passes",
       "expected": {
         "buySubmitted": false,
-        "lockedShareOfLpPct": 1
+        "lockGatePassed": false,
+        "lockedShareOfLpPct": 1,
+        "otherGatesPassed": true
       },
       "actual": {
         "buySubmitted": true,
-        "lockedShareOfLpPct": 1
+        "lockGatePassed": true,
+        "lockedShareOfLpPct": 1,
+        "otherGatesPassed": true
       }
     },
     {
@@ -834,13 +888,13 @@
       "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v2-full-private-sell-no-output-floor: a V2 stop-loss sell is sent privately with amountOutMin 0",
       "claim": "v2-full-private-sell-no-output-floor",
       "expected": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": true,
           "submitted": true
         }
       },
       "actual": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": false,
           "submitted": false
         }
@@ -852,13 +906,13 @@
       "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v2-partial-private-sell-no-output-floor: a V2 take-profit partial sell is sent privately with amountOutMin 0",
       "claim": "v2-partial-private-sell-no-output-floor",
       "expected": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": true,
           "submitted": true
         }
       },
       "actual": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": false,
           "submitted": false
         }
@@ -870,13 +924,13 @@
       "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v3-full-private-sell-no-output-floor: a V3 stop-loss sell is sent privately with amountOutMinimum 0",
       "claim": "v3-full-private-sell-no-output-floor",
       "expected": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": true,
           "submitted": true
         }
       },
       "actual": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": false,
           "submitted": false
         }
@@ -888,13 +942,13 @@
       "title": "AUD-EXIT-001: private sells accept any output (RC-03) > v3-partial-private-sell-no-output-floor: a V3 take-profit partial sell is sent privately with amountOutMinimum 0",
       "claim": "v3-partial-private-sell-no-output-floor",
       "expected": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": true,
           "submitted": true
         }
       },
       "actual": {
-        "outputFloorAboveZero": {
+        "outputFloorAtLeastQuoteLessSlippage": {
           "relayBody": false,
           "submitted": false
         }
@@ -903,8 +957,20 @@
     {
       "finding": "AUD-EXIT-002",
       "file": "test/realpath/triage/AUD-EXIT-002.test.ts",
-      "title": "AUD-EXIT-002: a failed first quote leaves a held position with no exit monitor (RC-07) > first-quote-failure-leaves-position-unmonitored: one failed getAmountsOut at monitor start leaves no timer, no exit_state row and no alert, and nothing recovers over six poll intervals",
+      "title": "AUD-EXIT-002: a failed first quote leaves a held position with no exit monitor (RC-07) > first-quote-failure-leaves-position-unmonitored: with getAmountsOut failing from monitor start, the held position gets no timer, no exit_state row and no alert, and nothing recovers over six poll intervals",
       "claim": "first-quote-failure-leaves-position-unmonitored",
+      "expected": {
+        "protectedOrOperatorTold": true
+      },
+      "actual": {
+        "protectedOrOperatorTold": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-002",
+      "file": "test/realpath/triage/AUD-EXIT-002.test.ts",
+      "title": "AUD-EXIT-002: a failed first quote leaves a held position with no exit monitor (RC-07) > first-quote-transient-failure-leaves-position-unmonitored: one failed getAmountsOut at monitor start leaves no timer, no exit_state row and no alert, and nothing recovers over six poll intervals",
+      "claim": "first-quote-transient-failure-leaves-position-unmonitored",
       "expected": {
         "protectedOrOperatorTold": true
       },
@@ -930,10 +996,10 @@
       "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > probe-is-eth-buy-wei-as-token-amount: for a 9-decimal token every exit quote sells parseEther(snipe amount) raw token units",
       "claim": "probe-is-eth-buy-wei-as-token-amount",
       "expected": {
-        "probeIsEthBuyAmountInWei": false
+        "exitPriceFitsPosition": true
       },
       "actual": {
-        "probeIsEthBuyAmountInWei": true
+        "exitPriceFitsPosition": false
       }
     },
     {
@@ -942,12 +1008,14 @@
       "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > zero-entry-infinite-ratio-fires-every-partial-tier: a 0 first quote is kept as the entry, a 1 percent price rise reads Infinity and both partial tiers sell at once",
       "claim": "zero-entry-infinite-ratio-fires-every-partial-tier",
       "expected": {
-        "soldAtA1PercentRise": []
+        "soldAtA1PercentRise": [],
+        "stillProtected": true
       },
       "actual": {
         "soldAtA1PercentRise": [
           "50%"
-        ]
+        ],
+        "stillProtected": true
       }
     },
     {
@@ -956,10 +1024,12 @@
       "title": "AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote outputs, not a price (RC-08) > zero-entry-nan-ratio-fires-stop-loss: a 0 first quote and an unchanged pool read NaN, and the stop-loss sells the whole position on the first tick",
       "claim": "zero-entry-nan-ratio-fires-stop-loss",
       "expected": {
-        "exitTriggeredWithNoPriceMove": false
+        "exitTriggeredWithNoPriceMove": false,
+        "stillProtected": true
       },
       "actual": {
-        "exitTriggeredWithNoPriceMove": true
+        "exitTriggeredWithNoPriceMove": true,
+        "stillProtected": true
       }
     },
     {
@@ -1013,6 +1083,30 @@
     {
       "finding": "AUD-EXIT-007",
       "file": "test/realpath/triage/AUD-EXIT-007.test.ts",
+      "title": "AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer > antirug-v3-not-landed-leaves-no-poll: a live anti-rug exit of a rugged V3 position whose private sell does not land returns false and the position is never polled again",
+      "claim": "antirug-v3-not-landed-leaves-no-poll",
+      "expected": {
+        "stillPolled": true
+      },
+      "actual": {
+        "stillPolled": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-007",
+      "file": "test/realpath/triage/AUD-EXIT-007.test.ts",
+      "title": "AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer > emergency-sell-v3-not-landed-leaves-no-poll: a dashboard emergency-sell of a V3 position whose private sell does not land returns false and the position is never polled again",
+      "claim": "emergency-sell-v3-not-landed-leaves-no-poll",
+      "expected": {
+        "stillPolled": true
+      },
+      "actual": {
+        "stillPolled": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-007",
+      "file": "test/realpath/triage/AUD-EXIT-007.test.ts",
       "title": "AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer > unknown-dex-leaves-no-poll: a dashboard force-sell that reaches the unknown-dex return (a V3 row with no fee tier) returns false and the position is never polled again",
       "claim": "unknown-dex-leaves-no-poll",
       "expected": {
@@ -1037,6 +1131,18 @@
     {
       "finding": "AUD-EXIT-008",
       "file": "test/realpath/triage/AUD-EXIT-008.test.ts",
+      "title": "AUD-EXIT-008: dashboard sells are refused once routine retries are paused > operator-emergency-sell-refused-while-routine-paused: after the routine retries of a still-held position pause, the dashboard emergency-sell reports a failure and sends no sell",
+      "claim": "operator-emergency-sell-refused-while-routine-paused",
+      "expected": {
+        "operatorSellRuns": true
+      },
+      "actual": {
+        "operatorSellRuns": false
+      }
+    },
+    {
+      "finding": "AUD-EXIT-008",
+      "file": "test/realpath/triage/AUD-EXIT-008.test.ts",
       "title": "AUD-EXIT-008: dashboard sells are refused once routine retries are paused > operator-sell-refused-while-routine-paused: after the routine retries of a still-held position pause, the dashboard force-sell answers 409 and sends no sell",
       "claim": "operator-sell-refused-while-routine-paused",
       "expected": {
@@ -1052,10 +1158,12 @@
       "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > approval-wait-holds-wallet-lock: an exit whose approval is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
       "claim": "approval-wait-holds-wallet-lock",
       "expected": {
-        "laterOperationStartedInWindow": true
+        "laterOperationStartedInWindow": true,
+        "stuckNonceSettledBeforeRelease": true
       },
       "actual": {
-        "laterOperationStartedInWindow": false
+        "laterOperationStartedInWindow": false,
+        "stuckNonceSettledBeforeRelease": false
       }
     },
     {
@@ -1092,10 +1200,10 @@
       "title": "AUD-EXIT-014: an anti-rug exit is refused while another exit of the token holds the sell lock > antirug-exit-refused-while-sell-lock-held: a rug detected while a routine stop-loss exit holds the sell lock gets an anti-rug exit that returns false at once",
       "claim": "antirug-exit-refused-while-sell-lock-held",
       "expected": {
-        "antiRugExitRefusedAtOnce": false
+        "antiRugExitSucceeded": true
       },
       "actual": {
-        "antiRugExitRefusedAtOnce": true
+        "antiRugExitSucceeded": false
       }
     },
     {
@@ -1219,10 +1327,12 @@
       "title": "AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside the real withNonceLock (RC-10 never-settling wait) > passthrough-wait-holds-wallet-lock: a base V3 snipe whose transaction is never mined keeps the wallet lock, and a later operation for the wallet does not start within a 30-minute fake-time window (150 blocks)",
       "claim": "passthrough-wait-holds-wallet-lock",
       "expected": {
-        "laterOperationStartedInWindow": true
+        "laterOperationStartedInWindow": true,
+        "stuckNonceSettledBeforeRelease": true
       },
       "actual": {
-        "laterOperationStartedInWindow": false
+        "laterOperationStartedInWindow": false,
+        "stuckNonceSettledBeforeRelease": false
       }
     },
     {
@@ -1310,8 +1420,8 @@
     {
       "finding": "AUD-TX-029",
       "file": "test/realpath/triage/AUD-TX-029.test.ts",
-      "title": "AUD-TX-029: an escalation that ends on its attempt budget is reported as a priority-fee ceiling hit > attempt-budget-reported-as-ceiling-hit: a snipe whose four private attempts all miss at 1 to 4 gwei is reported as having reached the 25 gwei ceiling",
-      "claim": "attempt-budget-reported-as-ceiling-hit",
+      "title": "AUD-TX-029: an escalation that ends on its attempt budget is reported as a priority-fee ceiling hit > sell-attempt-budget-reported-as-ceiling-hit: a stop-loss whose two private sell attempts both miss inside the sell deadline, at 1 and 2 gwei, is reported as having reached the 25 gwei ceiling",
+      "claim": "sell-attempt-budget-reported-as-ceiling-hit",
       "expected": {
         "reportedCeilingReachedBelowCeiling": false
       },
