@@ -28,10 +28,16 @@
 // later operation for the same wallet is queued through the graph's own withNonceLock
 // (fixtures/AUD-TX-002-lock.ts) right after the bot's transaction reached the node, and the test
 // records whether that operation started within a stated window of 30 minutes of fake time (150
-// blocks). Correct: the wait is bounded and the lock is released, so the later operation starts
-// inside the window. Today: it does not start in the window. The result is never stated as
-// "forever". A fix that bounds the wait reads "looks fixed" (D-08; each claim was shown that way
-// under a fix-shaped src mutation, src restored byte for byte).
+// blocks), and whether the stuck nonce was settled when it started (the wallet's mined count on the
+// node, its `latest` nonce, was past the stuck transaction's nonce). Correct, as the finding's
+// recommendation states it: the wait is bounded, the stuck nonce is settled (a same-nonce
+// replacement or cancel is mined; pendingWindow mines every 12 s, so a replacement in the pool is
+// included) and only then is the lock released, so the later operation starts inside the window
+// on a settled nonce. Today: it does not start in the window. A fix that only bounds the wait and
+// releases the lock with the stuck transaction still pending reads "the failure changed", not
+// "looks fixed" (review CR-03): the next buy or sell would sign the same nonce. So does a lock
+// released for an unrelated reason (an RPC error during the wait) with the nonce unsettled. The
+// result is never stated as "forever".
 //
 // Controls (same file, one per site): the same path with the transaction mined and three
 // confirmations mined (the transaction's block and two more) settles, frees the lock, and the
@@ -49,7 +55,7 @@ import { createScenario, expectStillPending, stepUntil, stepUntilTrue, type Scen
 import { driveChain, heldPosition } from './fixtures/AUD-API-001-dashboard-sell';
 import { buyRow, listen, opEntries, opLogged, subscribedTo } from './fixtures/AUD-EXIT-002-position';
 import { approvalsSubmitted, sellsSubmitted } from './fixtures/AUD-EXIT-001-sell-path';
-import { missBundlesUntil, pendingWindow, probeWalletLock } from './fixtures/AUD-TX-002-lock';
+import { missBundlesUntil, pendingWindow, probeWalletLock, type LockProbe } from './fixtures/AUD-TX-002-lock';
 
 /** The stated window: 30 minutes of fake time, a block every 12 s (150 blocks). */
 const WINDOW_MS = 30 * 60_000;
@@ -96,6 +102,22 @@ async function deliberatePublicSent(sc: Scenario<'v2'>): Promise<{ buy: Promise<
     return { buy, publicSend: sends[0], settled: () => settled };
 }
 
+/** The nonce of the transaction the node accepted as `hash` (throws if the node never saw it). */
+function submittedNonce(sc: Scenario, hash: string): number {
+    const s = sc.node.submitted.find((x) => x.hash === hash);
+    if (!s) throw new Error(`submittedNonce: the node never accepted ${hash}`);
+    return s.tx.nonce;
+}
+
+/**
+ * True when the probe started with the stuck nonce settled: the wallet's mined count on the node
+ * (its `latest` nonce) was past `stuckNonce` when the probe's body ran inside the lock.
+ */
+function stuckNonceSettled(probe: LockProbe, stuckNonce: number): boolean {
+    const mined = probe.minedAtStart();
+    return mined !== null && mined > stuckNonce;
+}
+
 /** Mine the transaction and two more blocks: three confirmations. */
 function mineWithThreeConfirmations(sc: Scenario, hash: string): void {
     sc.node.mine({ include: [hash] });
@@ -109,15 +131,18 @@ describe('AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside
         expect(sc.ctx.chain.mevStrategy).toBe('passthrough');
         const buy = await baseSnipeSent(sc);
         sc.node.neverMine(buy.hash);
+        const stuckNonce = submittedNonce(sc, buy.hash);
+        // Setup fact, true under the bug and every fix: the stuck transaction holds the wallet's next nonce.
+        expect(sc.node.minedCount(sc.wallet.address)).toBe(stuckNonce);
         const probe = await probeWalletLock(sc);
         const result = await pendingWindow(sc, probe, { windowMs: WINDOW_MS, what: 'the later operation for the wallet (AUD-TX-002 site)' });
 
         knownBug(ctx, 'AUD-TX-002', {
             claim: 'passthrough-wait-holds-wallet-lock',
-            correct: { laterOperationStartedInWindow: true },
-            observed: { laterOperationStartedInWindow: false },
-            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null },
-            expectedPlain: 'On Base and Arbitrum a buy whose transaction is never mined gives up waiting after a bounded time and releases the wallet lock, so the wallet can buy and sell again.',
+            correct: { laterOperationStartedInWindow: true, stuckNonceSettledBeforeRelease: true },
+            observed: { laterOperationStartedInWindow: false, stuckNonceSettledBeforeRelease: false },
+            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null, stuckNonceSettledBeforeRelease: stuckNonceSettled(probe, stuckNonce) },
+            expectedPlain: 'On Base and Arbitrum a buy whose transaction is never mined gives up waiting after a bounded time, settles the stuck nonce (a same-nonce replacement or cancel is mined) and only then releases the wallet lock, so the wallet can buy and sell again without signing that nonce twice.',
             actualPlain: `The Base buy waited for 3 confirmations with no time limit while holding the wallet lock; the transaction was never mined and, over 30 minutes of fake time (150 new blocks), a later operation for the same wallet never started.`,
         });
 
@@ -154,15 +179,18 @@ describe('AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         const { buy, publicSend, settled } = await deliberatePublicSent(sc);
         sc.node.neverMine(publicSend.hash);
+        const stuckNonce = submittedNonce(sc, publicSend.hash);
+        // Setup fact, true under the bug and every fix: the stuck transaction holds the wallet's next nonce.
+        expect(sc.node.minedCount(sc.wallet.address)).toBe(stuckNonce);
         const probe = await probeWalletLock(sc);
         const result = await pendingWindow(sc, probe, { windowMs: WINDOW_MS, what: 'the later operation for the wallet (AUD-BUY-025 site)' });
 
         knownBug(ctx, 'AUD-BUY-025', {
             claim: 'deliberate-public-wait-holds-wallet-lock',
-            correct: { laterOperationStartedInWindow: true },
-            observed: { laterOperationStartedInWindow: false },
-            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null },
-            expectedPlain: 'A deliberate public buy whose transaction is never mined gives up waiting after a bounded time and releases the wallet lock.',
+            correct: { laterOperationStartedInWindow: true, stuckNonceSettledBeforeRelease: true },
+            observed: { laterOperationStartedInWindow: false, stuckNonceSettledBeforeRelease: false },
+            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null, stuckNonceSettledBeforeRelease: stuckNonceSettled(probe, stuckNonce) },
+            expectedPlain: 'A deliberate public buy whose transaction is never mined gives up waiting after a bounded time, settles the stuck nonce (a same-nonce replacement or cancel is mined) and only then releases the wallet lock.',
             actualPlain: 'The deliberate buy\'s public leg waited for its receipt with no time limit while holding the wallet lock; the transaction was never mined and, over 30 minutes of fake time (150 new blocks), a later operation for the same wallet never started.',
         });
 
@@ -202,15 +230,18 @@ describe('AUD-TX-002, AUD-BUY-025, AUD-EXIT-009: a wait() with no timeout inside
         await stepUntilTrue(() => walletPublicSends(sc, fromSubmit).length > 0 || exitSettled, { what: 'the exit sending its approval', maxSteps: 20_000 });
         const [approve] = approvalsSubmitted(sc).filter((a) => sc.node.submitted.findIndex((s) => s.hash === a.hash) >= fromSubmit);
         sc.node.neverMine(approve.hash);
+        const stuckNonce = submittedNonce(sc, approve.hash);
+        // Setup fact, true under the bug and every fix: the stuck transaction holds the wallet's next nonce.
+        expect(sc.node.minedCount(sc.wallet.address)).toBe(stuckNonce);
         const probe = await probeWalletLock(sc);
         const result = await pendingWindow(sc, probe, { windowMs: WINDOW_MS, what: 'the later operation for the wallet (AUD-EXIT-009 site)' });
 
         knownBug(ctx, 'AUD-EXIT-009', {
             claim: 'approval-wait-holds-wallet-lock',
-            correct: { laterOperationStartedInWindow: true },
-            observed: { laterOperationStartedInWindow: false },
-            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null },
-            expectedPlain: 'An exit whose approval transaction is never mined gives up waiting after a bounded time and releases the wallet lock and the token\'s sell lock.',
+            correct: { laterOperationStartedInWindow: true, stuckNonceSettledBeforeRelease: true },
+            observed: { laterOperationStartedInWindow: false, stuckNonceSettledBeforeRelease: false },
+            actual: { laterOperationStartedInWindow: result.settledAfterMs !== null, stuckNonceSettledBeforeRelease: stuckNonceSettled(probe, stuckNonce) },
+            expectedPlain: 'An exit whose approval transaction is never mined gives up waiting after a bounded time, settles the stuck nonce (a same-nonce replacement or cancel is mined) and only then releases the wallet lock and the token\'s sell lock.',
             actualPlain: 'The exit waited for its approval receipt with no time limit while holding the wallet lock; the approval was never mined and, over 30 minutes of fake time (150 new blocks), a later operation for the same wallet never started.',
         });
 

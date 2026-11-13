@@ -10,7 +10,9 @@
 //   AUD-TX-006 control proved the instance is shared, and every control test of this plan shows
 //   the probe below waiting on the bot's own hold).
 // - probeWalletLock: one later operation for the wallet through that real lock. It only records
-//   the fake-clock time it started at; it signs and sends nothing.
+//   the fake-clock time it started at and how many of the wallet's transactions the node had mined
+//   at that moment (its `latest` nonce), so a test can tell whether a stuck nonce was settled
+//   before the lock was released; it signs and sends nothing.
 // - pendingWindow: the bounded observation. Every `blockMs` of fake time the node mines a block
 //   (so ethers' receipt polls see the chain move past any deadline a wait could have had), and
 //   expectStillPending watches the probe through each block's slot. It returns when the window
@@ -45,18 +47,22 @@ export interface LockProbe {
     startedAt(): number | null;
     /** Fake-clock ms the probe was queued at. */
     queuedAt: number;
+    /** The wallet's mined transaction count (its `latest` nonce) on the node when the probe's body started, or null. */
+    minedAtStart(): number | null;
 }
 
 /** Queue one later operation for the scenario wallet through the real withNonceLock. */
 export async function probeWalletLock(sc: Scenario): Promise<LockProbe> {
     const withNonceLock = await graphWithNonceLock();
     let startedAt: number | null = null;
+    let minedAtStart: number | null = null;
     const queuedAt = Date.now();
     const promise = withNonceLock(sc.wallet.address, async () => {
         startedAt = Date.now();
+        minedAtStart = sc.node.minedCount(sc.wallet.address);
         return 'probe-ran';
     });
-    return { promise, started: () => startedAt !== null, startedAt: () => startedAt, queuedAt };
+    return { promise, started: () => startedAt !== null, startedAt: () => startedAt, queuedAt, minedAtStart: () => minedAtStart };
 }
 
 export interface PendingWindowResult {
