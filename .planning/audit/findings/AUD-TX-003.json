@@ -79,7 +79,7 @@
     {
       "type": "code",
       "ref": "src/bot.ts:1043@23a64617dca167976adc4645fed0e2c69e384820",
-      "note": "the snipe swap deadline is now + 60 s, set once when the swap is built; sendTxWithRetry calls the builder once (src/utils/txManager.ts:113) and every attempt re-signs the same calldata (src/utils/mevStrategies/flashbots.ts:192), so the escalation reaches attempts whose deadline has passed"
+      "note": "the snipe swap deadline is now + 60 s, set once when the swap is built; sendTxWithRetry calls the builder once (src/utils/txManager.ts:113) and every attempt re-signs the same calldata (src/utils/mevStrategies/flashbots.ts:192), so the escalation reaches attempts whose deadline has passed (AUD-BUY-039)"
     },
     {
       "type": "command",
@@ -102,14 +102,15 @@
     "AUD-TX-001",
     "AUD-TX-002",
     "AUD-TX-006",
-    "AUD-TX-008"
+    "AUD-TX-008",
+    "AUD-BUY-039"
   ],
   "tags": [
     "capital"
   ],
   "escalation_ref": "ESC-TX-01",
   "od_ref": "OD-17",
-  "recommendation": "Phase 24 (card OD-17, head-of-line part): decide how an emergency exit gets the wallet. Options on the card: a priority lane in the nonce authority for anti-rug exits, an abortable buy escalation that yields the lock between attempts, or releasing the lock between attempts with the nonce re-checked. Whatever is chosen, an abandoned (timed-out) exit must be cancelled or reconciled, not left queued to run minutes later. Prove the timing in Phase 23 with a held position, a non-landing private buy and a simulated rug on a local fork. Nothing is changed in Phase 22.",
+  "recommendation": "Phase 24 (card OD-17, head-of-line part): decide how an emergency exit gets the wallet. Options on the card: a priority lane in the nonce authority for anti-rug exits, an abortable buy escalation that yields the lock between attempts, or releasing the lock between attempts with the nonce re-checked. Whatever is chosen, an abandoned (timed-out) exit must be cancelled or reconciled, not left queued to run minutes later. Prove the timing in Phase 23 with a held position, a non-landing private buy and a simulated rug on a local fork. The lock-hold time depends on the swap deadline (AUD-BUY-039, about 105 s today); re-measure it with that fix. Nothing is changed in Phase 22.",
   "reported_by": [
     "claude (22-20 executor)"
   ],
