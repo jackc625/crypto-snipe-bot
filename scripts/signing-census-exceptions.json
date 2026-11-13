@@ -1,6 +1,6 @@
 {
   "description": "Signing census exceptions (Phase 23 plan 23-17, CHAR-04, D-NONCE-AUTHORITY-ALL). Read by scripts/check-signing-census.ts (npm run check:census). floor: the minimum number of transaction-signing sites in src/ and scripts/; lower it only in a commit whose message names the finding (AUD-...) whose fix removed the site (AC-34, checked by --check-floor-history). unlocked: the known transaction-signing sites outside withNonceLock, one row per file|enclosing|call key with a count; each row names its finding and the operator decision records that cover it (AC-53); a fixed or removed site fails the gate until its row is lowered or removed (AC-35). excluded: sites the census counts but an auditor proved are not signing (view calls whose ABI the type analysis cannot read), each citing the manual inventory entry that excludes it. Entries are sorted by key.",
-  "floor": 23,
+  "floor": 24,
   "unlocked": [
     {
       "file": "scripts/addLiquidity.ts",
@@ -81,7 +81,7 @@
       "count": 1,
       "finding_id": "AUD-BUY-007",
       "decision_ref": ["ESC-CENSUS-01"],
-      "note": "The dead tokenSafety.simulateSell sends a real approve outside withNonceLock (operator ruling keep-s1). Phase 24 removes it; then this row must come off the list and the floor drop to 22 in a commit naming AUD-BUY-007."
+      "note": "The dead tokenSafety.simulateSell sends a real approve outside withNonceLock (operator ruling keep-s1). Phase 24 removes it; then this row must come off the list and the floor drop by one (24 to 23 at the Phase 23 review-fix count) in a commit naming AUD-BUY-007."
     }
   ],
   "excluded": [

@@ -64,6 +64,10 @@
 //       signMessage, so Wallet, BaseWallet, AbstractSigner, NonceManager,
 //       JsonRpcSigner and the Signer interface all match; aliases such as
 //       `const w = wallet` are matched by type, not by name);
+//     - sendTransaction / signTransaction on any other receiver type (api
+//       delegated.<name>; Phase 23 review CR-08): a wrapper or a narrow
+//       interface such as ethers' ContractRunner may hold a Wallet whose code is
+//       outside the program, so the call is counted and its lock judged;
 //     - deploy on a ContractFactory (getDeployTransaction builds an unsigned
 //       tx and is listed as excluded; its sendTransaction is the counted site);
 //     - a contract method call, or its `.send(...)` form, on a Contract /
@@ -176,14 +180,8 @@ export interface Site {
     origins?: string[];
     manual_lock_status?: string;
     lock_disagreement?: boolean;
-}
-
-interface Delegation {
-    file: string;
-    line: number;
-    call: string;
-    receiver_type: string;
-    note: string;
+    /** CR-08: a sendTransaction/signTransaction whose receiver type is not structurally a Signer (a wrapper or a narrow interface); counted and lock-judged like any site */
+    delegated?: boolean;
 }
 
 interface LockCall {
@@ -195,7 +193,6 @@ interface LockCall {
 
 interface CensusResult {
     sites: Site[];
-    delegations: Delegation[];
     lock_calls: LockCall[];
     program: { root_files: number; src_files: number; script_files: number; files_with_ts_errors: number; unresolved_modules: string[] };
 }
@@ -825,7 +822,6 @@ class Census {
 
     run(): CensusResult {
         const sites: Site[] = [];
-        const delegations: Delegation[] = [];
         const lockCalls: LockCall[] = [];
         let errFiles = 0;
         const unresolvedModules = new Set<string>();
@@ -837,8 +833,7 @@ class Census {
                 if (ts.isCallExpression(n)) {
                     if (this.isLockCall(n)) lockCalls.push({ file: this.rel(sf.fileName), line: this.line(n), key: this.short(n.arguments[0]?.getText() ?? '', 60), enclosing: this.fnName(this.enclosingFn(n)) });
                     const s = this.classify(n);
-                    if (s && 'delegation' in s) delegations.push(s.delegation);
-                    else if (s) sites.push(s);
+                    if (s) sites.push(s);
                 }
                 ts.forEachChild(n, visit);
             };
@@ -849,7 +844,6 @@ class Census {
         const all = this.auditedFiles().map((sf) => this.rel(sf.fileName));
         return {
             sites,
-            delegations,
             lock_calls: lockCalls,
             program: {
                 root_files: this.rootNames.length,
@@ -906,7 +900,7 @@ class Census {
         return base;
     }
 
-    classify(call: ts.CallExpression): Site | { delegation: Delegation } | null {
+    classify(call: ts.CallExpression): Site | null {
         const callee = this.strip(call.expression);
         // Identifier callee: in-program bundle-send functions.
         if (ts.isIdentifier(callee)) {
@@ -971,8 +965,12 @@ class Census {
         }
         if (SIGN_TX.includes(name) || SIGN_MSG.includes(name)) {
             if (this.isSigner(rt)) return this.mk(call, `signer.${name}`, SIGN_MSG.includes(name) ? 'message-signing' : 'tx-signing', this.typeText(rt));
-            if (SIGN_TX.includes(name))
-                return { delegation: { file: this.rel(call.getSourceFile().fileName), line: this.line(call), call: this.short(callee.getText(), 60), receiver_type: this.typeText(rt), note: 'receiver is not a Signer: a wrapper whose implementations hold the counted signing calls' } };
+            // CR-08: a receiver that is not structurally a Signer may still be one at run time
+            // (ethers' ContractRunner, Pick<Wallet, 'sendTransaction'>, a local interface over a
+            // Wallet), and its implementation may live outside the program (ethers' Wallet is never
+            // a census site). So the call itself is a counted site and its lock is judged like any
+            // other: an unlocked or unknown delegation fails the gate, a locked one passes.
+            if (SIGN_TX.includes(name)) return this.mk(call, `delegated.${name}`, 'tx-signing', this.typeText(rt), { delegated: true });
             return null;
         }
         if (BUNDLE.includes(name) && this.isBundler(rt)) return this.mk(call, `flashbots.${name}`, 'tx-signing', this.typeText(rt), { runner: 'bundle' });
@@ -1132,7 +1130,7 @@ function assemble(c: Census, r: CensusResult, manual: any | null, manualPath: st
         method: {
             summary:
                 'TypeScript 5.8.3 type-checker census over a git archive snapshot of src/ and scripts/ at audited_sha (tsconfig.json root files plus scripts/**/*.ts; node_modules = per-entry junctions, type information only, nothing executed). Every CallExpression is classified by the TYPE of its receiver; contract runners and ABIs are traced to their constructions; lock status follows reference chains through the TypeScript language service (findReferences), cycle-safe, and requires every hop to be awaited or returned.',
-            tx_signing: 'sendTransaction/signTransaction on a Signer type; ContractFactory.deploy; state-changing contract method calls and .send on a Signer-runner Contract; Flashbots signBundle/sendBundle/sendRawBundle/sendPrivateTransaction; in-program rawSendBundle/sendRawBundle; unresolved receivers (type_unresolved, lock unknown)',
+            tx_signing: 'sendTransaction/signTransaction on a Signer type, and on any other receiver type (delegated.*, CR-08); ContractFactory.deploy; state-changing contract method calls and .send on a Signer-runner Contract; Flashbots signBundle/sendBundle/sendRawBundle/sendPrivateTransaction; in-program rawSendBundle/sendRawBundle; unresolved receivers (type_unresolved, lock unknown)',
             message_signing: 'signMessage/signTypedData on a Signer (no nonce; never a D-NONCE-AUTHORITY-ALL violation)',
             excluded: 'view/pure ABI fragments, .staticCall/.estimateGas/.populateTransaction, getDeployTransaction (census), and auditor exclusions with evidence (manual inventory)',
             lock: 'locked lexical = the site function is the op of withNonceLock; locked transitive = every reference chain ends in such an op with every hop awaited/returned; unlocked = a chain reaches module top level, an event/route callback or an exported function with no in-program caller; unknown = unresolved type, unfollowable callback/value use, un-awaited hop, no reference',
@@ -1145,7 +1143,6 @@ function assemble(c: Census, r: CensusResult, manual: any | null, manualPath: st
         by_file: byFile,
         by_lock_status: byLock,
         sites: r.sites,
-        delegations: r.delegations,
         lock_calls: r.lock_calls,
         reconciliation,
     };
@@ -1790,6 +1787,22 @@ async function main(): Promise<void> {
 void main();
 `;
 
+// CR-08: a new script signs through ethers' own ContractRunner interface, outside any lock.
+const GATE_DELEGATED_SCRIPT = `import { Wallet, JsonRpcProvider } from 'ethers';
+import type { ContractRunner } from 'ethers';
+
+declare const provider: JsonRpcProvider;
+${GATE_TX}
+
+async function main(): Promise<void> {
+    const wallet = new Wallet('0x' + '11'.repeat(32), provider);
+    const runner: ContractRunner = wallet;
+    await runner.sendTransaction!(tx);
+}
+
+void main();
+`;
+
 const GATE_LEGACY_FIXED = `import { Wallet } from 'ethers';
 import { withNonceLock } from './lock';
 
@@ -1890,6 +1903,7 @@ function gateCases(): CaseOutcome[] {
             ['no-sites'],
         ),
     );
+    out.push(codeCase('CR-08-delegated-send-outside-lock-fails', { ...baseGateFiles(20), 'scripts/rescue.ts': GATE_DELEGATED_SCRIPT }, ['surplus-unlocked']));
     out.push(codeCase('F3-unknown-lock-status-fails', { ...baseGateFiles(20), 'src/later.ts': GATE_UNKNOWN_SRC }, ['unknown-lock']));
     const narrowed = JSON.parse(baseGateFiles(20)['tsconfig.json']) as { include: string[] };
     narrowed.include = ['src/lock.ts', 'src/locked.ts', 'src/legacy.ts'];
@@ -2002,6 +2016,7 @@ const FIXTURE_LOCK = `export async function withNonceLock<T>(walletAddress: stri
 `;
 
 const FIXTURE_CASES = `import { Wallet, ContractFactory, Contract, JsonRpcProvider } from 'ethers';
+import type { ContractRunner, TransactionRequest } from 'ethers';
 import { withNonceLock } from './lock';
 
 declare const wallet: Wallet;
@@ -2221,6 +2236,26 @@ export async function memoLocked(): Promise<void> {
 export async function memoUnlocked(): Promise<void> {
     await memoB();
 }
+
+// CR-08: sendTransaction on a receiver whose type is not structurally a Signer. The
+// implementation may be ethers' own Wallet (outside the program), so the call is a site.
+export async function caseDelegatedRunner(runner: ContractRunner): Promise<void> {
+    await runner.sendTransaction!(tx); // CASE:delegated-runner
+}
+export async function caseDelegatedPick(s: Pick<Wallet, 'sendTransaction'>): Promise<void> {
+    await s.sendTransaction(tx); // CASE:delegated-pick
+}
+interface TxSender {
+    sendTransaction(t: TransactionRequest): Promise<unknown>;
+}
+export async function caseDelegatedLocal(s: TxSender): Promise<void> {
+    await s.sendTransaction(tx); // CASE:delegated-local
+}
+export async function caseDelegatedLocked(s: Pick<Wallet, 'sendTransaction' | 'address'>): Promise<void> {
+    await withNonceLock(s.address, async () => {
+        await s.sendTransaction(tx); // CASE:delegated-locked
+    });
+}
 `;
 
 interface Expect {
@@ -2266,6 +2301,10 @@ const EXPECT: Record<string, Expect> = {
     'cycle-only': { found: true, kind: 'tx-signing', lock: 'unknown' },
     'memo-b': { found: true, kind: 'tx-signing', lock: 'unlocked' },
     'memo-a': { found: true, kind: 'tx-signing', lock: 'unlocked' },
+    'delegated-runner': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-pick': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-local': { found: true, kind: 'tx-signing', lock: 'unlocked', apiMatch: /^delegated\.sendTransaction$/ },
+    'delegated-locked': { found: true, kind: 'tx-signing', lock: 'locked', evidence: 'lexical', apiMatch: /^delegated\.sendTransaction$/ },
 };
 
 /** The repo's node_modules (scripts/ is one level below the repo root; trap 2). */
