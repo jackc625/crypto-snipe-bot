@@ -418,6 +418,11 @@ function closed(sc: Scenario, held: Bought): boolean {
  * answers the amounts on the current reserves, and reverts as the router does when the path, the
  * deadline, the wallet's balance or allowance (replayed from its mined approves and sells) or the
  * minimum output does not hold. The V3 sell simulation is the harness's own multicall read.
+ * The node evaluates the same read when it mines a sell (Phase 23 review WR-01). Another
+ * trader's sell (fixtures/AUD-EXIT-001-sell-path.ts foreignTrade, which moves the reserves and
+ * writes its own Sync and Swap logs) is answered on the path, deadline and minimum output only:
+ * this scenario models the bot wallet's balance and allowance, not that trader's, so it never
+ * rejects a sell for a balance it does not track.
  */
 function installV2SellSimulation(sc: Scenario<'v2'>, bought: bigint): void {
     const { node, token, weth, reserves, wallet } = sc;
@@ -438,7 +443,8 @@ function installV2SellSimulation(sc: Scenario<'v2'>, bought: bigint): void {
                 held = held > spent ? held - spent : 0n;
             }
         }
-        if (from === undefined || getAddress(from) !== getAddress(wallet.address) || amountIn > held || amountIn > allowance) return revertReason('TransferHelper: TRANSFER_FROM_FAILED');
+        if (from === undefined) return revertReason('TransferHelper: TRANSFER_FROM_FAILED');
+        if (getAddress(from) === getAddress(wallet.address) && (amountIn > held || amountIn > allowance)) return revertReason('TransferHelper: TRANSFER_FROM_FAILED');
         const out = v2AmountOut(amountIn, reserves.token, reserves.weth);
         if (out < minOut) return revertReason('UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
         return encodeResult(['uint256[]'], [[amountIn, out]]);

@@ -189,6 +189,72 @@ describe('realpath harness: restart on a temp-file database (plan 23-27 Task 1)'
         expect(recordedLogs().length).toBeGreaterThan(logsBefore);
         expect(harnessState().timeline).toBe(sc.timeline);
     });
+
+    // WR-06 (Phase 23 review): restartGraph stands in for a process restart, and a killed process
+    // runs no catch path. The old graph is fenced before its held calls are answered: its
+    // database is closed first, so a write from its catch path throws into that catch, and while
+    // it stops the logger, notifier and broadcaster record nothing. (The mock factories run once
+    // per test file, not once per graph, so the fence is the stop window, not an instance.)
+    it('WR-06: a held call answered by restartGraph reaches an old-graph catch path that can no longer write, log, alert or broadcast; the new graph records normally', async () => {
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2', db: { file: createTempDbFile() } });
+        const old = sc.graph;
+        // The module instances the old graph's code calls.
+        const oldLogger = (await import('../../src/utils/logger')).logger;
+        const oldNotifier = await import('../../src/utils/notifier');
+        const oldBroadcaster = await import('../../src/api/ws/broadcaster');
+        const token = '0x00000000000000000000000000000000000a0e06';
+        const held = sc.node.hold('eth_blockNumber');
+        const fromOld = { ran: false, dbError: '', dbOpenWhenCaught: true, retryRan: false };
+        const inFlight = sc.ctx.httpProvider.getBlockNumber().then(
+            () => {
+                throw new Error('the held call must not be answered normally');
+            },
+            async () => {
+                // What a production catch would do: record the failure, log it, alert, broadcast.
+                fromOld.ran = true;
+                fromOld.dbOpenWhenCaught = old.db.open;
+                // A retry timer, as production catch paths schedule: it dies with the process.
+                setTimeout(() => {
+                    fromOld.retryRan = true;
+                }, 1_000);
+                try {
+                    old.dbModule.insertTrade.run({ token, chain: 'eth', action: 'buy', txHash: null, block: null, timestamp: Math.floor(Date.now() / 1000), amountIn: '1', amountOut: null, gasCost: null, priceAtAction: null, status: 'failed', poolType: 'v2', feeTier: null, dexName: 'uniswap-v2' });
+                } catch (e) {
+                    fromOld.dbError = e instanceof Error ? e.message : String(e);
+                }
+                oldLogger.warn({ op: 'harness.old-graph.catch' }, 'the old graph caught the teardown answer');
+                await oldNotifier.sendTelegramAlert('realpath restart: an alert from the old graph after the restart began');
+                oldBroadcaster.broadcast('harness-old-graph', { token });
+            },
+        );
+        await stepUntilTrue(() => held.heldCount >= 1, { what: 'the old graph parking eth_blockNumber' });
+        const broadcastsBefore = harnessState().broadcasts.length;
+
+        await restartGraph(sc);
+        await inFlight;
+
+        expect(fromOld.ran).toBe(true);
+        expect(fromOld.dbOpenWhenCaught).toBe(false);
+        expect(fromOld.dbError).toMatch(/not open/);
+        expect(sc.graph.db.prepare('SELECT COUNT(*) AS c FROM trades WHERE token = ?').get(token)).toEqual({ c: 0 });
+        expect(recordedLogs().some((l) => l.obj?.op === 'harness.old-graph.catch')).toBe(false);
+        expect(sc.timeline.entries.some((e) => e.kind === 'op' && e.op === 'harness.old-graph.catch')).toBe(false);
+        expect(recordedAlerts().some((a) => String(a.message).includes('an alert from the old graph'))).toBe(false);
+        expect(harnessState().broadcasts.slice(broadcastsBefore).some((b) => b.type === 'harness-old-graph')).toBe(false);
+        expect(recordedLogs().some((l) => l.msg === 'Database connection closed')).toBe(false);
+        await stepFor(2_000);
+        expect(fromOld.retryRan).toBe(false);
+
+        // The control: once the stop is over, logging, alerting and writing record again.
+        const newLogger = (await import('../../src/utils/logger')).logger;
+        newLogger.info({ op: 'harness.new-graph' }, 'the new graph logs');
+        expect(sc.timeline.entries.some((e) => e.kind === 'op' && e.op === 'harness.new-graph')).toBe(true);
+        await (await import('../../src/utils/notifier')).sendTelegramAlert('realpath restart: an alert from the new graph');
+        await sendTelegramAlert('realpath restart: an alert from the test itself');
+        expect(recordedAlerts().map((a) => a.message)).toEqual(['realpath restart: an alert from the new graph', 'realpath restart: an alert from the test itself']);
+        sc.graph.dbModule.insertTrade.run({ token, chain: 'eth', action: 'buy', txHash: null, block: null, timestamp: Math.floor(Date.now() / 1000), amountIn: '1', amountOut: null, gasCost: null, priceAtAction: null, status: 'pending', poolType: 'v2', feeTier: null, dexName: 'uniswap-v2' });
+        expect(sc.graph.db.prepare('SELECT status FROM trades WHERE token = ?').all(token)).toEqual([{ status: 'pending' }]);
+    });
 });
 
 // ---------------------------------------------------------------------------------------------

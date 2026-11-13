@@ -34,6 +34,13 @@
 //   - mine() takes named hashes or the includable public pool; another transaction at a nonce it
 //     consumes is dropped; neverMine() and `exclude` keep hashes out. Every transition is in
 //     `history`, in order.
+//   - One revert source (Phase 23 review WR-01, on by default by operator ruling): a contract
+//     read registered with setRead answers eth_call, and the same read decides a mined
+//     transaction (status 0 on a revert: gas paid, no value sent, no receipt logs, nonce
+//     consumed), eth_estimateGas (the revert error) and eth_callBundle (a per-transaction error
+//     and revert entry). A target and selector with no registered read succeed.
+//     enforceReverts(false) restores the old "every mined transaction succeeds" node; no test in
+//     the suite uses it.
 
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
@@ -77,7 +84,7 @@ export interface AlertEntry {
 
 /** A capture problem, kept out of band so production catches cannot hide it (capture.ts). */
 export type Violation =
-    | { kind: 'db-in-transaction'; table: string; op: 'insert' | 'update' | 'delete' }
+    | { kind: 'db-transaction-open'; table: string; op: 'insert' | 'update' | 'delete' }
     | { kind: 'unixepoch-argument'; args: unknown[] }
     | { kind: 'capture-error'; message: string };
 
@@ -152,6 +159,12 @@ export interface HarnessState {
     violations: Violation[];
     /** Folders made by world.ts createTempDbFile, each removed by its disposer (plan 23-27). */
     tempDbDirs: string[];
+    /**
+     * True while world.ts restartGraph stops the old graph. Only the old graph runs then, so the
+     * setup.ts logger, notifier and broadcaster drop every call, as a killed process records
+     * nothing (Phase 23 review WR-06).
+     */
+    stoppingGraph: boolean;
 }
 
 export function harnessState(): HarnessState {
@@ -176,6 +189,7 @@ export function harnessState(): HarnessState {
             timeline: null,
             violations: [],
             tempDbDirs: [],
+            stoppingGraph: false,
         };
         g[HARNESS_KEY] = st;
     }
@@ -270,6 +284,9 @@ export function installSeams(opts: InstallSeamsOptions = {}): void {
         const probe = new ethers.WebSocketProvider('ws://127.0.0.1:1', 1);
         probeSocket = probe.websocket;
         reached = probeSocket instanceof SeamProbe;
+        // The probe is destroyed while its socket is still CONNECTING, which emits 'error' as ws
+        // does (WR-03); the harness's own probe listens for it, so nothing is thrown.
+        if (probeSocket instanceof EventEmitter) probeSocket.on('error', () => undefined);
         void probe.destroy();
     } finally {
         FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => w !== probeSocket));
@@ -341,9 +358,24 @@ const CLOSED = 3;
 
 /**
  * Replaces ws.WebSocket inside ethers. Members are those ethers and src/ use: on, once, off,
- * send, ping, terminate, close, readyState, onopen, onmessage, onclose (src/ calls
+ * send, ping, terminate, close, readyState, onopen, onmessage, onclose, onerror (src/ calls
  * `.websocket.on('close' | 'pong')`, `ping()` and `terminate()` directly).
- * Events are delivered on the microtask queue, so ordering is exact and needs no timer.
+ *
+ * Off the OPEN path it follows ws 8.17.1 (node_modules/ethers/node_modules/ws/lib/websocket.js,
+ * the copy production loads; Phase 23 review WR-03):
+ *   - send(data, options?, cb?) and ping(data?, mask?, cb?) throw only while CONNECTING. On
+ *     CLOSING or CLOSED the frame is dropped and a callback, if given, gets "WebSocket is not
+ *     open: readyState N (NAME)" on the next tick (ws sendAfterClose). So a request ethers writes
+ *     to a dropped socket hangs, as in production, instead of rejecting.
+ *   - close() or terminate() while CONNECTING goes CLOSING at once, then on the next tick emits
+ *     'error' ("WebSocket was closed before the connection was established") and 'close' 1006
+ *     (ws abortHandshake). With no 'error' listener and no onerror, that 'error' throws, as an
+ *     EventEmitter does in ws: the uncaught exception behind AUD-ANTIRUG-002.
+ *   - FakeNode.hangSocketOpens(true) keeps new sockets CONNECTING (a stalled handshake).
+ * Timing: the handshake, a reply to send(), every push the node makes (subscription messages
+ * from mine() or emitLogs()) and a server close (dropSocket()) arrive on the microtask queue,
+ * never inside the call that caused them, as on ws, where they come from socket I/O. Until a
+ * server close arrives the socket still reads OPEN, as ws's does until its 'close' event.
  */
 export class FakeWebSocket extends EventEmitter {
     static readonly CONNECTING = CONNECTING;
@@ -363,6 +395,7 @@ export class FakeWebSocket extends EventEmitter {
     isAlive?: boolean;
     #state = CONNECTING;
     #node: FakeNode | null = null;
+    #openHeld = false;
 
     constructor(url: string | URL, _protocols?: unknown, _options?: unknown) {
         super();
@@ -370,7 +403,8 @@ export class FakeWebSocket extends EventEmitter {
         const self = this;
         this.connection = {
             send(text: string): void {
-                self.#deliver(text);
+                // A push reaches the client after the call that made it, as socket I/O does.
+                queueMicrotask(() => self.#deliver(text));
             },
             socket: this,
         };
@@ -394,6 +428,11 @@ export class FakeWebSocket extends EventEmitter {
             this.#closeNow(1006, '');
             return;
         }
+        // A stalled handshake (FakeNode.hangSocketOpens): stays CONNECTING until released.
+        if (!this.#openHeld && node.holdSocketOpen(this)) {
+            this.#openHeld = true;
+            return;
+        }
         this.#node = node;
         node.attachSocket(this);
         this.#state = OPEN;
@@ -401,22 +440,35 @@ export class FakeWebSocket extends EventEmitter {
         this.onopen?.({ type: 'open', target: this });
     }
 
-    send(data: unknown, cb?: (err?: Error) => void): void {
+    /** Called by FakeNode.hangSocketOpens(false): finish a held handshake (a no-op once closed). */
+    completeHeldOpen(): void {
+        this.#open();
+    }
+
+    #notOpenError(): Error {
+        const names = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+        return new Error(`WebSocket is not open: readyState ${this.#state} (${names[this.#state]})`);
+    }
+
+    /** ws sendAfterClose: the frame is dropped; a callback gets the error on the next tick. */
+    #afterClose(cb: ((err?: Error) => void) | undefined): void {
+        if (cb) process.nextTick(cb, this.#notOpenError());
+    }
+
+    send(data: unknown, options?: unknown, cb?: (err?: Error) => void): void {
+        if (this.#state === CONNECTING) throw this.#notOpenError();
+        if (typeof options === 'function') cb = options as (err?: Error) => void;
         if (this.#state !== OPEN) {
-            const names = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
-            const err = new Error(`WebSocket is not open: readyState ${this.#state} (${names[this.#state]})`);
-            if (cb) {
-                cb(err);
-                return;
-            }
-            throw err;
+            this.#afterClose(cb);
+            return;
         }
         const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString('utf8');
         const node = this.#node!;
         void node.handle(text, this.connection, { endpoint: 'ws', url: this.url }).then((reply) => {
             if (reply !== undefined) this.#deliver(JSON.stringify(reply));
         });
-        cb?.();
+        // ws calls back once the frame is written out, never inside the call.
+        if (cb) process.nextTick(cb);
     }
 
     #deliver(text: string): void {
@@ -425,33 +477,62 @@ export class FakeWebSocket extends EventEmitter {
         this.onmessage?.({ data: text, type: 'message', target: this });
     }
 
-    ping(_data?: unknown): void {
-        if (this.#state !== OPEN) return;
+    ping(data?: unknown, mask?: unknown, cb?: (err?: Error) => void): void {
+        if (this.#state === CONNECTING) throw this.#notOpenError();
+        if (typeof data === 'function') cb = data as (err?: Error) => void;
+        else if (typeof mask === 'function') cb = mask as (err?: Error) => void;
+        if (this.#state !== OPEN) {
+            this.#afterClose(cb);
+            return;
+        }
         // A real node answers a ping frame with a pong frame.
         queueMicrotask(() => {
             if (this.#state === OPEN) this.emit('pong', Buffer.alloc(0));
         });
+        if (cb) process.nextTick(cb);
+    }
+
+    /** ws abortHandshake: CLOSING now, then 'error' and 'close' 1006 on the next tick. */
+    #abortHandshake(): void {
+        this.#state = CLOSING;
+        const err = new Error('WebSocket was closed before the connection was established');
+        process.nextTick(() => {
+            this.#emitError(err);
+            this.#closeNow(1006, '');
+        });
+    }
+
+    /** An 'error' event: an onerror attribute is a listener too (ws registers it as one). */
+    #emitError(err: Error): void {
+        const attribute = this.onerror;
+        // With no listener at all, EventEmitter throws, as ws's emit does.
+        if (this.listenerCount('error') > 0 || !attribute) this.emit('error', err);
+        attribute?.({ error: err, message: err.message, type: 'error', target: this });
     }
 
     terminate(): void {
         if (this.#state === CLOSED) return;
+        if (this.#state === CONNECTING) {
+            this.#abortHandshake();
+            return;
+        }
         this.#closeNow(1006, '');
     }
 
     close(code = 1000, reason = ''): void {
         if (this.#state === CLOSED || this.#state === CLOSING) return;
         if (this.#state === CONNECTING) {
-            this.#closeNow(1006, '');
+            this.#abortHandshake();
             return;
         }
         this.#state = CLOSING;
         queueMicrotask(() => this.#closeNow(code, reason));
     }
 
-    /** Server-initiated close (FakeNode.dropSocket). */
+    /** Server-initiated close (FakeNode.dropSocket), delivered after the call, as socket I/O is. */
     serverClose(code = 1006, reason = ''): void {
         if (this.#state === CLOSED) return;
-        this.#closeNow(code, reason);
+        queueMicrotask(() => this.#closeNow(code, reason));
     }
 
     #closeNow(code: number, reason: string): void {
@@ -740,6 +821,13 @@ export class FakeNode {
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
+    /** onMined listeners, called per mined transaction in block order (WR-02). */
+    readonly #minedListeners: Array<(tx: Transaction, executed: boolean) => void> = [];
+    /** enforceReverts: the read table decides mining, estimateGas and callBundle too (WR-01). */
+    #enforceReverts = true;
+    /** hangSocketOpens: new sockets wait in CONNECTING while true (WR-03). */
+    #hangOpens = false;
+    readonly #heldOpens: FakeWebSocket[] = [];
     /** Waiters of waitForSubscriptions, resolved from the subscribe path (plan 23-27). */
     readonly #subscriptionWaiters: Array<{ n: number; resolve: () => void }> = [];
     /** autoMine: confirmations per accepted public transaction, or null when off (default). */
@@ -891,6 +979,33 @@ export class FakeNode {
     /** True once mine() has included `hash`. */
     isMined(hash: string): boolean {
         return this.#receipts.has(hash);
+    }
+
+    /**
+     * One revert source (Phase 23 review WR-01), on by default: the read registered for a
+     * transaction's target and selector decides whether a mined transaction executes (a revert
+     * mines with receipt status 0, pays gas only, sends no value, leaves no logs and consumes its
+     * nonce), whether eth_estimateGas answers or reverts, and whether eth_callBundle reports a
+     * per-transaction revert (the Flashbots library's firstRevert). enforceReverts(false) gives
+     * the old node where every mined transaction succeeds.
+     */
+    enforceReverts(on: boolean): void {
+        if (typeof on !== 'boolean') throw new Error('enforceReverts: on must be a boolean');
+        this.#enforceReverts = on;
+    }
+
+    /**
+     * Call `fn` for every transaction mine() includes, in block order, once its receipt is
+     * stored, with whether it executed (false: it reverted under enforceReverts). A scenario uses
+     * it to fix what a transaction did at the moment it was mined (WR-02).
+     */
+    onMined(fn: (tx: Transaction, executed: boolean) => void): void {
+        this.#minedListeners.push(fn);
+    }
+
+    /** True once mine() has included `hash` and it did not revert (receipt status 1). */
+    succeeded(hash: string): boolean {
+        return this.#receipts.get(hash)?.status === 1;
     }
 
     /** Where `hash` is now (undefined when this node never accepted it). */
@@ -1136,17 +1251,23 @@ export class FakeNode {
             return { ...l, transactionHash: txHash };
         });
         let gasUsed = 0n;
+        const reverted = new Set<string>();
         picked.forEach(({ t, used, effectiveGasPrice }, index) => {
             gasUsed += used;
+            // The same read that answers eth_call decides the transaction (WR-01), in block order,
+            // so a read that looks at what this block already mined sees it.
+            const ok = this.#enforceReverts ? this.#executes(t.tx) : true;
+            if (!ok) reverted.add(t.hash);
             this.#setStatus(t, 'mined');
             t.block = number;
             t.index = index;
             for (const sub of this.submitted) if (sub.hash === t.hash) sub.block = number;
-            this.#receipts.set(t.hash, { hash: t.hash, block: number, index, gasUsed: used, effectiveGasPrice, status: 1 });
-            // The sender pays for the gas it used and the value it sent.
+            this.#receipts.set(t.hash, { hash: t.hash, block: number, index, gasUsed: used, effectiveGasPrice, status: ok ? 1 : 0 });
+            // The sender pays for the gas it used, and for the value it sent only if it executed.
             const key = lc(t.from);
-            this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - t.tx.value);
+            this.#balances.set(key, (this.#balances.get(key) ?? 0n) - used * effectiveGasPrice - (ok ? t.tx.value : 0n));
             this.history.push({ seq: nextSeq(), event: 'mined', hash: t.hash, from: t.from, nonce: t.tx.nonce, route: t.route, block: number });
+            for (const fn of this.#minedListeners) fn(t.tx, ok);
         });
         // Every other transaction at a nonce this block consumed is dropped, on every route.
         const senders = new Set(picked.map((p) => lc(p.t.from)));
@@ -1176,12 +1297,22 @@ export class FakeNode {
         // ordered by transaction index (a real block numbers its logs in transaction order).
         const queued: Array<LogInput & { transactionHash: string }> = [];
         for (const { t } of picked) {
+            // A reverted transaction leaves no logs.
+            if (reverted.has(t.hash)) continue;
             for (const rule of this.#receiptRules) {
                 if (!receiptRuleMatches(rule, t.tx)) continue;
                 for (const l of rule.make(t.tx)) queued.push({ address: l.address, topics: l.topics, data: l.data, transactionHash: t.hash });
             }
         }
-        queued.push(...explicit);
+        for (const l of explicit) {
+            if (!reverted.has(l.transactionHash)) {
+                queued.push(l);
+                continue;
+            }
+            // A log from a reverted transaction cannot exist: a scenario asking for one is a
+            // harness mistake, never a node answer.
+            this.strays.push({ seq: nextSeq(), kind: 'method', method: 'mine', detail: `harness error in mine: a log was given for ${l.transactionHash}, which reverted in block ${number} (a reverted transaction leaves no logs)` });
+        }
         const ordered = queued.map((l, i) => ({ l, i })).sort((a, b) => hashes.indexOf(a.l.transactionHash) - hashes.indexOf(b.l.transactionHash) || a.i - b.i);
         const stored = this.#storeLogs(block, ordered.map((x) => x.l));
         // A real node announces the head, then each matching log, in block order.
@@ -1297,6 +1428,26 @@ export class FakeNode {
     /** Server-side close of every open socket on this node (default code 1006, abnormal). */
     dropSocket(code = 1006): void {
         for (const ws of [...this.#sockets]) ws.serverClose(code, '');
+    }
+
+    /**
+     * A stalled WebSocket handshake (Phase 23 review WR-03): while on, a new socket to this node
+     * stays CONNECTING, so a test can reach ws's CONNECTING paths (close or terminate during the
+     * handshake, a ping or send before open). Turning it off opens every socket still waiting,
+     * in the order they connected; one closed meanwhile never opens.
+     */
+    hangSocketOpens(on: boolean): void {
+        if (typeof on !== 'boolean') throw new Error('hangSocketOpens: on must be a boolean');
+        this.#hangOpens = on;
+        if (on) return;
+        for (const ws of this.#heldOpens.splice(0)) queueMicrotask(() => ws.completeHeldOpen());
+    }
+
+    /** FakeWebSocket asks before it opens: true (and kept) while hangSocketOpens is on. */
+    holdSocketOpen(ws: FakeWebSocket): boolean {
+        if (!this.#hangOpens) return false;
+        this.#heldOpens.push(ws);
+        return true;
     }
 
     attachSocket(ws: FakeWebSocket): void {
@@ -1487,8 +1638,14 @@ export class FakeNode {
                 // because a real node of that kind answers exactly this.
                 if (this.#legacy) return { error: { code: -32601, message: 'the method eth_maxPriorityFeePerGas does not exist/is not available' } };
                 return { result: toQuantity(this.priorityFeePerGas) };
-            case 'eth_estimateGas':
+            case 'eth_estimateGas': {
+                // A call the scenario's read reverts cannot be estimated (WR-01).
+                const tx = (p[0] ?? {}) as { to?: string; from?: string; data?: string; input?: string; value?: string };
+                if (!this.#enforceReverts) return { result: toQuantity(this.#estimateGas ?? DEFAULT_ESTIMATE) };
+                const outcome = this.#evaluate({ to: tx.to, from: tx.from, data: tx.data ?? tx.input ?? '0x', value: asBigInt(tx.value), blockTag: p[1] });
+                if (outcome !== undefined && typeof outcome !== 'string') return { error: revertError(outcome) };
                 return { result: toQuantity(this.#estimateGas ?? DEFAULT_ESTIMATE) };
+            }
             case 'eth_getBalance':
                 return { result: toQuantity(this.#balances.get(lc(p[0])) ?? 0n) };
             case 'eth_getCode':
@@ -1679,27 +1836,48 @@ export class FakeNode {
         };
     }
 
+    /**
+     * The registered read for this call's target and selector, evaluated: return data or a revert.
+     * Undefined when no read is registered. The one revert source (WR-01) for eth_call,
+     * eth_estimateGas, a mined transaction and eth_callBundle.
+     */
+    #evaluate(call: { to?: string | null; from?: string | null; data: string; value: bigint; blockTag?: unknown }): ReadResult | undefined {
+        const data = call.data.toLowerCase();
+        const to = call.to ? lc(call.to) : '';
+        const read = this.#reads.get(`${to}|${data.slice(0, 10)}`);
+        if (!read) return undefined;
+        if (typeof read.result !== 'function') return read.result;
+        const args = coder.decode(read.fragment.inputs, '0x' + data.slice(10));
+        return read.result({ to, from: call.from ?? undefined, data, value: call.value, blockTag: call.blockTag ?? 'latest', args });
+    }
+
+    /**
+     * Whether a mined transaction executes (false: it reverts). A read that cannot decode the
+     * calldata is a harness error (a stray, as on the eth_call path) and counts as a revert.
+     */
+    #executes(tx: Transaction): boolean {
+        let outcome: ReadResult | undefined;
+        try {
+            outcome = this.#evaluate({ to: tx.to, from: tx.from, data: tx.data, value: tx.value });
+        } catch (e) {
+            this.strays.push({ seq: nextSeq(), kind: 'method', method: 'mine', detail: `harness error deciding ${tx.hash} in mine: ${e instanceof Error ? e.message : String(e)}` });
+            return false;
+        }
+        return outcome === undefined || typeof outcome === 'string';
+    }
+
     #ethCall(p: unknown[], entry: CallLogEntry): Outcome {
         const tx = (p[0] ?? {}) as { to?: string; from?: string; data?: string; input?: string; value?: string };
         const data = (tx.data ?? tx.input ?? '0x').toLowerCase();
         const to = tx.to ? lc(tx.to) : '';
         const selector = data.slice(0, 10);
-        const read = this.#reads.get(`${to}|${selector}`);
-        if (!read) {
+        const result = this.#evaluate({ to: tx.to, from: tx.from, data, value: asBigInt(tx.value), blockTag: p[1] });
+        if (result === undefined) {
             this.strays.push({ seq: entry.seq, kind: 'read', method: 'eth_call', to, selector, detail: `unknown contract read ${selector} on ${to || '(no target)'}` });
             return { error: { code: -32000, message: 'execution reverted' } };
         }
-        let result: ReadResult;
-        if (typeof read.result === 'function') {
-            const args = coder.decode(read.fragment.inputs, '0x' + data.slice(10));
-            result = read.result({ to, from: tx.from, data, value: asBigInt(tx.value), blockTag: p[1], args });
-        } else {
-            result = read.result;
-        }
         if (typeof result === 'string') return { result };
-        // geth: code 3 with the revert data when there is any, -32000 when there is none.
-        if (result.revert === '0x' || result.revert === '') return { error: { code: -32000, message: 'execution reverted' } };
-        return { error: { code: 3, message: 'execution reverted', data: result.revert } };
+        return { error: revertError(result) };
     }
 
     /**
@@ -1802,6 +1980,10 @@ export class FakeNode {
         let totalFees = 0n;
         const results = txs.map((raw) => {
             const tx = Transaction.from(raw);
+            // The same read decides the simulation (WR-01): a revert is reported per transaction,
+            // as the relay does, which is what the Flashbots library's firstRevert reads.
+            const outcome = this.#enforceReverts ? this.#evaluate({ to: tx.to, from: tx.from, data: tx.data, value: tx.value }) : undefined;
+            const revert = outcome !== undefined && typeof outcome !== 'string' ? { error: 'execution reverted', revert: outcome.revert } : {};
             const gasUsed = Number(tx.gasLimit < DEFAULT_ESTIMATE ? tx.gasLimit : DEFAULT_ESTIMATE);
             const priority = tx.type === 2 ? tx.maxPriorityFeePerGas! : (tx.gasPrice ?? 0n) - baseFee;
             const gasPrice = tx.type === 2 ? baseFee + priority : (tx.gasPrice ?? 0n);
@@ -1818,6 +2000,7 @@ export class FakeNode {
                 toAddress: tx.to,
                 txHash: tx.hash,
                 value: '0x',
+                ...revert,
             };
         });
         return {
@@ -2043,6 +2226,12 @@ class Hold implements HoldHandle {
     describe(): string {
         return `hold(${this.#match.text}): held ${this.#held} call(s)${this.#released ? ', released' : ''}`;
     }
+}
+
+/** geth's answer for a reverted call: code 3 with the revert data when there is any, -32000 when there is none. */
+function revertError(r: ReadRevert): JsonRpcError {
+    if (r.revert === '0x' || r.revert === '') return { code: -32000, message: 'execution reverted' };
+    return { code: 3, message: 'execution reverted', data: r.revert };
 }
 
 function bundleHashOf(txHashes: string[]): string {

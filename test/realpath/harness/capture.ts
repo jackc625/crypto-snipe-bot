@@ -22,9 +22,20 @@
 //     the broad catch in src/bot.ts handleNewPairForChain, so the scenario would carry on down a
 //     failure path and record something misleading. A problem goes on the out-of-band
 //     `violations` list instead, and assertNoViolations() (afterEach, setup.ts) fails the test.
-//     Two problems are recorded: a write while db.inTransaction is true (RESEARCH Open Question 5:
-//     the harness does not handle rollback yet, so a rolled-back write would read as landed), and
-//     an argument passed to unixepoch() (it would read the real clock in production SQL).
+//   - Transactions (RESEARCH Open Question 5, Phase 23 review WR-05). A row written while
+//     db.inTransaction is true is held, not recorded, until SQLite decides its fate. The trigger
+//     that captured it also inserts a key into a TEMP table on the same connection; TEMP tables
+//     take part in the connection's transaction, so the key survives exactly when the write
+//     does: a COMMIT keeps it, a ROLLBACK (whole transaction, ROLLBACK TO a savepoint, or a
+//     failed statement's own undo) removes it. Whichever way the transaction was opened
+//     (db.transaction made before or after the capture, a nested one, raw BEGIN through db.exec),
+//     the outcome is read the same way. Reading `timeline.entries` settles every held row whose
+//     transaction has ended: a committed row joins the timeline at the position it was written
+//     (so the order is still the order things happened), a rolled-back row is dropped. Closing
+//     the connection settles it first. A row whose transaction is still open when the
+//     connection closes never landed and is a `db-transaction-open` violation.
+//     The other violation is an argument passed to unixepoch() (it would read the real clock in
+//     production SQL).
 //
 // The better-sqlite3 handle is named `db` because test/unit/rails/spawnSites.test.ts accepts
 // `.exec()` only on named receivers (RESEARCH Refinement 3).
@@ -83,7 +94,10 @@ export interface DbEntry {
     op: 'insert' | 'update' | 'delete';
     /** Column name to value, in schema order: NEW for insert and update, OLD for delete. INTEGER values are BigInt (safeIntegers). */
     row: Record<string, unknown>;
-    /** db.inTransaction when the trigger fired; true is also a violation (Open Question 5). */
+    /**
+     * db.inTransaction when the trigger fired. A true entry was written inside a transaction that
+     * then committed (a rolled-back one never reaches the timeline; see the header, WR-05).
+     */
     inTransaction: boolean;
 }
 
@@ -92,7 +106,11 @@ export type TimelineEntry = OpEntry | SubmitEntry | RelayBodyEntry | DbEntry;
 export type TimelineInput = TimelineEntry extends infer E ? (E extends TimelineEntry ? Omit<E, 'at'> : never) : never;
 
 export interface Timeline {
-    /** In the order recorded. Never sorted. */
+    /**
+     * In the order things happened. Never sorted. Reading it first settles DB rows held for a
+     * transaction that has since ended (WR-05), so read it again after a commit rather than
+     * keeping an older reference.
+     */
     readonly entries: TimelineEntry[];
     /** Append one entry, stamped with the fake clock's Date.now(). */
     record(entry: TimelineInput): TimelineEntry;
@@ -100,19 +118,85 @@ export interface Timeline {
 
 const TIMELINE_KINDS: ReadonlySet<string> = new Set<TimelineKind>(['op', 'submit', 'relay', 'db']);
 
+/** A DB row written inside a transaction, waiting for its transaction's outcome (WR-05). */
+interface HeldSlot {
+    /** Its place in the timeline's record order. */
+    ord: number;
+    entry: TimelineEntry;
+    state: 'pending' | 'committed' | 'dropped';
+}
+
+/** The capture's private hooks on a timeline (a registry symbol: vi.resetModules makes copies). */
+interface TimelineHolds {
+    /** Stamp `entry` now and keep its place, without showing it until it is settled. */
+    hold(entry: TimelineInput): HeldSlot;
+    /** Called before every read of `entries`, to decide pending slots. Added once per function. */
+    addSettler(settle: () => void): void;
+}
+
+const TIMELINE_HOLDS = Symbol.for('csb.realpath.timeline.holds');
+
+function holdsOf(timeline: Timeline): TimelineHolds {
+    const h = (timeline as unknown as Record<symbol, TimelineHolds | undefined>)[TIMELINE_HOLDS];
+    if (!h) throw new Error('installDbCapture: the timeline was not made by createTimeline');
+    return h;
+}
+
+function stampEntry(entry: TimelineInput): TimelineEntry {
+    if (!TIMELINE_KINDS.has((entry as { kind?: unknown }).kind as string)) {
+        throw new Error(`timeline: unknown entry kind ${JSON.stringify((entry as { kind?: unknown }).kind)}`);
+    }
+    return { ...entry, at: Date.now() } as TimelineEntry;
+}
+
 export function createTimeline(): Timeline {
-    const entries: TimelineEntry[] = [];
-    return {
-        entries,
-        record(entry: TimelineInput): TimelineEntry {
-            if (!TIMELINE_KINDS.has((entry as { kind?: unknown }).kind as string)) {
-                throw new Error(`timeline: unknown entry kind ${JSON.stringify((entry as { kind?: unknown }).kind)}`);
+    const list: TimelineEntry[] = [];
+    /** ords[i] is list[i]'s place in record order; a settled slot is spliced in by it. */
+    const ords: number[] = [];
+    const held: HeldSlot[] = [];
+    const settlers = new Set<() => void>();
+    let nextOrd = 0;
+    const settle = (): void => {
+        if (held.length === 0) return;
+        for (const s of settlers) s();
+        for (let i = 0; i < held.length; ) {
+            const slot = held[i];
+            if (slot.state === 'pending') {
+                i += 1;
+                continue;
             }
-            const stamped = { ...entry, at: Date.now() } as TimelineEntry;
-            entries.push(stamped);
+            held.splice(i, 1);
+            if (slot.state === 'dropped') continue;
+            let at = ords.length;
+            while (at > 0 && ords[at - 1] > slot.ord) at -= 1;
+            list.splice(at, 0, slot.entry);
+            ords.splice(at, 0, slot.ord);
+        }
+    };
+    const holds: TimelineHolds = {
+        hold(entry: TimelineInput): HeldSlot {
+            const slot: HeldSlot = { ord: nextOrd++, entry: stampEntry(entry), state: 'pending' };
+            held.push(slot);
+            return slot;
+        },
+        addSettler(fn: () => void): void {
+            settlers.add(fn);
+        },
+    };
+    const timeline: Timeline = {
+        get entries(): TimelineEntry[] {
+            settle();
+            return list;
+        },
+        record(entry: TimelineInput): TimelineEntry {
+            const stamped = stampEntry(entry);
+            list.push(stamped);
+            ords.push(nextOrd++);
             return stamped;
         },
     };
+    Object.defineProperty(timeline, TIMELINE_HOLDS, { value: holds, enumerable: false });
+    return timeline;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -133,6 +217,72 @@ function pushViolation(v: Violation): void {
     harnessState().violations.push(v);
 }
 
+/** One connection's rows held for an open transaction (WR-05), kept on the connection itself. */
+interface ConnectionHolds {
+    /** Key the trigger stores in the TEMP table for the row it just captured, or null. */
+    pendingKey: number | null;
+    nextKey: number;
+    slots: Array<{ key: number; slot: HeldSlot }>;
+    /** Decide every slot whose transaction has ended; a no-op while one is open. */
+    settle(): void;
+}
+
+const CONNECTION_HOLDS = Symbol.for('csb.realpath.capture.connectionHolds');
+/** The TEMP table holding the keys of rows written inside a transaction that is still undecided. */
+const HELD_TABLE = '__realpath_held';
+
+/**
+ * The connection's held-row state, created on first install: the TEMP table, the settle step and
+ * a close() that settles first and turns a row of a still-open transaction into a violation.
+ */
+function connectionHolds(db: Db): ConnectionHolds {
+    const own = db as unknown as Record<symbol, ConnectionHolds | undefined>;
+    const existing = own[CONNECTION_HOLDS];
+    if (existing) return existing;
+    db.exec(`CREATE TEMP TABLE IF NOT EXISTS ${sqlIdent(HELD_TABLE)} (k INTEGER)`);
+    const readKeys = db.prepare(`SELECT k FROM temp.${sqlIdent(HELD_TABLE)}`).pluck();
+    const clearKeys = db.prepare(`DELETE FROM temp.${sqlIdent(HELD_TABLE)}`);
+    const conn: ConnectionHolds = {
+        pendingKey: null,
+        nextKey: 1,
+        slots: [],
+        settle(): void {
+            if (conn.slots.length === 0 || !db.open || db.inTransaction) return;
+            let kept: Set<number>;
+            try {
+                kept = new Set((readKeys.all() as Array<number | bigint>).map((k) => Number(k)));
+                clearKeys.run();
+            } catch (e) {
+                // The connection is busy (a statement mid-iteration): decide on a later read.
+                if (e instanceof TypeError && /busy/i.test(e.message)) return;
+                pushViolation({ kind: 'capture-error', message: `settling held transaction rows failed: ${e instanceof Error ? e.message : String(e)}` });
+                return;
+            }
+            for (const { key, slot } of conn.slots) slot.state = kept.has(key) ? 'committed' : 'dropped';
+            conn.slots = [];
+        },
+    };
+    const close = db.close;
+    Object.defineProperty(db, 'close', {
+        configurable: true,
+        writable: true,
+        value: function closeSettlingHeldRows(this: Db): Db {
+            conn.settle();
+            const stillOpen = db.open && db.inTransaction;
+            const result = close.call(this);
+            // Closing rolls an open transaction back: its rows never landed.
+            for (const { slot } of conn.slots) {
+                slot.state = 'dropped';
+                if (stillOpen && slot.entry.kind === 'db') pushViolation({ kind: 'db-transaction-open', table: slot.entry.table, op: slot.entry.op });
+            }
+            conn.slots = [];
+            return result;
+        },
+    });
+    Object.defineProperty(db, CONNECTION_HOLDS, { value: conn, enumerable: false });
+    return conn;
+}
+
 /**
  * Capture every row written on `db` into `timeline`, and fix SQLite's clock to the fake one.
  * Safe to call again on the same connection: the triggers are rebuilt and the functions point at
@@ -140,6 +290,9 @@ function pushViolation(v: Violation): void {
  */
 export function installDbCapture(db: Db, timeline: Timeline): string[] {
     if (!db.open) throw new Error('installDbCapture: the connection is closed');
+    const holds = holdsOf(timeline);
+    const conn = connectionHolds(db);
+    holds.addSettler(conn.settle);
     // unixepoch() with no argument reads the fake clock, also through DEFAULT (unixepoch()) and
     // through statements prepared before this override (RESEARCH E4c). An argument is never
     // thrown into SQLite: it is a violation, answered with the fake second so nothing fails here.
@@ -169,13 +322,28 @@ export function installDbCapture(db: Db, timeline: Timeline): string[] {
                 row[c] = values[i];
             });
             const inTransaction = db.inTransaction;
-            timeline.record({ kind: 'db', table, op, row, inTransaction });
-            if (inTransaction) pushViolation({ kind: 'db-in-transaction', table, op });
+            if (inTransaction) {
+                // Held until the transaction's outcome is known; the trigger's next step stores
+                // this key in the TEMP table, inside the same transaction (WR-05).
+                const key = conn.nextKey++;
+                conn.slots.push({ key, slot: holds.hold({ kind: 'db', table, op, row, inTransaction }) });
+                conn.pendingKey = key;
+            } else {
+                timeline.record({ kind: 'db', table, op, row, inTransaction });
+            }
         } catch (e) {
             // Never into SQLite (see the header): a harness fault is a violation.
             pushViolation({ kind: 'capture-error', message: e instanceof Error ? e.message : String(e) });
         }
         return null;
+    });
+    // The trigger's second step: true while a held row's key is waiting to be stored...
+    db.function('__realpath_held_pending', { deterministic: false }, () => (conn.pendingKey === null ? 0 : 1));
+    // ...and the key itself, handed over once.
+    db.function('__realpath_held_take', { deterministic: false }, () => {
+        const key = conn.pendingKey;
+        conn.pendingKey = null;
+        return key;
     });
 
     for (const name of tables) {
@@ -189,7 +357,14 @@ export function installDbCapture(db: Db, timeline: Timeline): string[] {
         for (const [suffix, event, op, prefix] of ops) {
             const trigger = sqlIdent(`__realpath_rec_${name}_${suffix}`);
             db.exec(`DROP TRIGGER IF EXISTS temp.${trigger}`);
-            db.exec(`CREATE TEMP TRIGGER ${trigger} AFTER ${event} ON main.${sqlIdent(name)} BEGIN SELECT __realpath_rec(${sqlString(name)}, ${sqlString(op)}, ${args(prefix)}); END`);
+            // The TEMP table has no constraint, so an outer statement's OR clause can never turn
+            // the second step into a failure of the production statement.
+            db.exec(
+                `CREATE TEMP TRIGGER ${trigger} AFTER ${event} ON main.${sqlIdent(name)} BEGIN ` +
+                    `SELECT __realpath_rec(${sqlString(name)}, ${sqlString(op)}, ${args(prefix)}); ` +
+                    `INSERT INTO ${sqlIdent(HELD_TABLE)} (k) SELECT __realpath_held_take() WHERE __realpath_held_pending(); ` +
+                    `END`,
+            );
         }
     }
     return tables;
@@ -201,8 +376,8 @@ export function installDbCapture(db: Db, timeline: Timeline): string[] {
 
 function describeViolation(v: Violation): string {
     switch (v.kind) {
-        case 'db-in-transaction':
-            return `${v.op === 'insert' ? 'an' : 'a'} ${v.op} on table ${v.table} was captured inside a transaction (db.inTransaction true); the harness does not handle rollback yet, so this write may never have landed (RESEARCH Open Question 5)`;
+        case 'db-transaction-open':
+            return `${v.op === 'insert' ? 'an' : 'a'} ${v.op} on table ${v.table} was written inside a transaction that was still open when the connection closed, so it never landed (WR-05)`;
         case 'unixepoch-argument':
             return `unixepoch() was called with arguments ${JSON.stringify(v.args)}; only the no-argument form reads the fake clock`;
         case 'capture-error':

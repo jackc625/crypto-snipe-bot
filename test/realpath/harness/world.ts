@@ -404,7 +404,18 @@ async function routeAxios(method: string, url: string, data: unknown, config: un
         throw axiosError(`realpath harness: no route for ${method.toUpperCase()} ${url}`, config, undefined, 'ERR_REALPATH_NO_ROUTE');
     }
     const req: HttpRequestInfo = { method, url, data, config };
-    const reply = await route.handler(req);
+    let reply: Awaited<ReturnType<HttpHandler>>;
+    try {
+        reply = await route.handler(req);
+    } catch (e) {
+        // A harness bug must not look like a service answer (as on the JSON-RPC path, chain.ts):
+        // production catches every axios error, so the stray is what fails the test (WR-04).
+        const detail = `harness error answering axios ${method.toUpperCase()} ${url}: ${e instanceof Error ? e.message : String(e)}`;
+        const stray: Stray = { seq: nextSeq(), kind: 'url', url, detail };
+        if (st.node) st.node.strays.push(stray);
+        else st.orphanStrays.push(stray);
+        throw axiosError('realpath harness: internal error', config, { status: 500, data: { error: 'internal error' }, headers: { 'content-type': 'application/json' } }, 'ERR_REALPATH_HARNESS');
+    }
     const status = reply.status ?? 200;
     const headers = reply.headers ?? { 'content-type': 'application/json' };
     if (status >= 400) throw axiosError(`Request failed with status code ${status}`, config, { status, data: reply.data, headers }, 'ERR_BAD_RESPONSE');
@@ -520,6 +531,42 @@ function checkerInterface(): Interface {
     const file = path.join(REPO_ROOT, 'ignition', 'deployments', 'chain-1', 'artifacts', 'HoneypotCheckerModule#HoneypotChecker.json');
     const artifact = JSON.parse(fs.readFileSync(file, 'utf8')) as { abi: ethers.InterfaceAbi };
     return new Interface(artifact.abi);
+}
+
+/** The sell calls a router can receive, written here independently of src/utils/abis.ts. */
+const SELL_CALLS = new Interface([
+    'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+    'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)',
+    'function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96) params)',
+    'function multicall(uint256 deadline, bytes[] data)',
+    'function multicall(bytes[] data)',
+]);
+
+/** How many of `token` a router call sells (0 for anything that is not a sell of it). */
+function tokensSoldIn(data: string, token: string): bigint {
+    let call: ethers.TransactionDescription | null;
+    try {
+        call = SELL_CALLS.parseTransaction({ data });
+    } catch {
+        return 0n;
+    }
+    if (!call) return 0n;
+    const t = token.toLowerCase();
+    switch (call.name) {
+        case 'swapExactTokensForETH':
+        case 'swapExactTokensForETHSupportingFeeOnTransferTokens':
+            return String((call.args[2] as string[])[0]).toLowerCase() === t ? (call.args[0] as bigint) : 0n;
+        case 'exactInputSingle': {
+            const p = call.args[0] as unknown as { tokenIn: string; amountIn: bigint };
+            return String(p.tokenIn).toLowerCase() === t ? p.amountIn : 0n;
+        }
+        case 'multicall': {
+            const inner = call.args[call.args.length - 1] as string[];
+            return inner.reduce((a, d) => a + tokensSoldIn(d, token), 0n);
+        }
+        default:
+            return 0n;
+    }
 }
 
 /** Uniswap V2 getAmountOut with the 0.3% fee. */
@@ -655,7 +702,12 @@ async function stopGraphParts(built: BuiltParts, step: (what: string, fn: () => 
     });
     // 3. Providers: raw socket listeners first so a teardown close cannot start a reconnect.
     await step('detach socket listeners', () => {
-        for (const ws of FakeWebSocket.instances) ws.removeAllListeners();
+        // A socket still CONNECTING emits 'error' when the teardown closes it, as ws does (WR-03).
+        // That close is the harness's, not the bot's, so the teardown listens for it.
+        for (const ws of FakeWebSocket.instances) {
+            ws.removeAllListeners();
+            ws.on('error', () => undefined);
+        }
     });
     await step('destroy providers', async () => {
         // ethers' destroy() cancels pending requests, marks the provider destroyed, then
@@ -841,15 +893,21 @@ export async function createScenario<D extends ScenarioDexType>(opts: ScenarioOp
         node.setRead(token, 'tradingEnabled()', encodeResult(['bool'], [true]));
         // A token with no wallet or transaction limit has none of these functions: a real node reverts.
         for (const sig of ['maxWalletAmount()', 'maxWallet()', 'maxTxAmount()', 'maxTransactionAmount()']) node.setRead(token, sig, REVERT_EMPTY);
-        // The bot's token balance: what each of its mined buys bought, at the scenario price.
-        const boughtBy = (who: string): bigint =>
-            node.submitted
-                .filter((s) => s.status === 'mined' && s.tx.to?.toLowerCase() === swapTarget.toLowerCase() && s.tx.from?.toLowerCase() === who)
-                .reduce((a, s) => a + (quoteOut(s.tx.value, weth, token) ?? 0n), 0n);
+        // The bot's token balance (Phase 23 review WR-02): what each of its buys through the
+        // scenario's swap target bought, fixed at the price when that buy was mined, less the
+        // amountIn of each of its sells through the same target. A later price move does not
+        // re-price tokens already held, and a mined sell leaves only the rest. A transaction that
+        // reverted (under enforceReverts, WR-01) moves nothing.
+        const heldByWallet = { bought: 0n, sold: 0n };
+        node.onMined((tx, executed) => {
+            if (!executed || tx.from?.toLowerCase() !== wallet.address.toLowerCase() || tx.to?.toLowerCase() !== swapTarget.toLowerCase()) return;
+            if (tx.value > 0n) heldByWallet.bought += quoteOut(tx.value, weth, token) ?? 0n;
+            else heldByWallet.sold += tokensSoldIn(tx.data, token);
+        });
         node.setRead(token, 'balanceOf(address)', ({ args }) => {
             const who = String(args[0]).toLowerCase();
             if (who === pair.toLowerCase()) return encodeResult(['uint256'], [reserves.token]);
-            if (who === wallet.address.toLowerCase()) return encodeResult(['uint256'], [boughtBy(who)]);
+            if (who === wallet.address.toLowerCase()) return encodeResult(['uint256'], [heldByWallet.bought > heldByWallet.sold ? heldByWallet.bought - heldByWallet.sold : 0n]);
             return encodeResult(['uint256'], [0n]);
         });
 
@@ -1094,10 +1152,15 @@ export interface RestartOptions {
 
 /**
  * Restart the scenario's bot on the same database file and the same simulated chain, as a
- * process restart would. The running graph is stopped by the same steps dispose uses (held calls
- * answered with an error, the bot's timer registry cleared, every fake timer cleared, providers
- * destroyed, closeDb), and any socket of the old graph still open is closed, because a dead
- * process's timers and sockets die with it. The file, the FakeNode, the clock, the env snapshot
+ * process restart would. The running graph is fenced first (WR-06): its database is closed and,
+ * until it has stopped, every logger, notifier and broadcaster call is dropped, because a killed
+ * process writes, logs and alerts nothing. Then it is stopped by the same steps dispose uses (held
+ * calls answered with an error, the bot's timer registry cleared, every fake timer cleared,
+ * providers destroyed), any socket of the old graph still open is closed, and timers a catch path
+ * set while it stopped are cleared, because a dead process's timers and sockets die with it.
+ * The fence holds only while the graph stops: once the new graph loads, a call cannot be told
+ * apart by graph, so old-graph code still running then would record again (nothing of it is
+ * left to run: its timers are gone, its providers destroyed, its sockets closed). The file, the FakeNode, the clock, the env snapshot
  * and the scenario's alerts, logs and timeline stay: a restart is the same scenario continuing,
  * and a test reads what happened on both sides of it. Then `env` is applied and loadGraph opens
  * the whole graph again on the file, which reinstalls the DB capture and the SQL clock on the new
@@ -1123,17 +1186,39 @@ export async function restartGraph<D extends ScenarioDexType>(scenario: Scenario
             errors.push(new Error(`restartGraph: ${what} failed: ${e instanceof Error ? e.message : String(e)}`, { cause: e }));
         }
     };
-    await stopGraphParts(built, step);
-    await step('drop the old graph Telegram client', () => {
-        // The old process's Telegram client and its handlers die with it; a delivery after the
-        // restart reaches only a handler the new graph registers.
-        st.telegram.handlers.length = 0;
-        st.telegram.clients.length = 0;
-    });
-    await step('close the old graph sockets', () => {
-        for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
-        FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));
-    });
+    // Fence the old graph before anything of it can run again (WR-06). Releasing a held call or
+    // destroying a provider resumes the old graph's awaits, and a killed process runs no catch
+    // path. Until the stop ends, nothing but the old graph runs (the test is awaiting this call
+    // and no new graph exists), so every logger, notifier and broadcaster call is the old graph's
+    // and is dropped; and its database closes first, so a write from such a catch path throws
+    // into that catch instead of landing. dispose keeps the original order, where the answer
+    // reaching its caller is the point.
+    st.stoppingGraph = true;
+    try {
+        await step('fence the old graph database', () => {
+            closeGraphDb(built.graph ?? null);
+            if (built.graph && currentGraph === built.graph) currentGraph = null;
+        });
+        await stopGraphParts(built, step);
+        await step('drop the old graph Telegram client', () => {
+            // The old process's Telegram client and its handlers die with it; a delivery after the
+            // restart reaches only a handler the new graph registers.
+            st.telegram.handlers.length = 0;
+            st.telegram.clients.length = 0;
+        });
+        await step('close the old graph sockets', () => {
+            for (const ws of oldSockets) if (ws.readyState !== FakeWebSocket.CLOSED) ws.terminate();
+            FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => !oldSockets.includes(w)));
+        });
+        // A catch path that ran while the graph stopped may have set a timer (a retry); it dies
+        // with the process too.
+        await step('clear timers set while stopping', () => {
+            built.graph?.exitManager.clearAllTimers();
+            if (vi.isFakeTimers()) vi.clearAllTimers();
+        });
+    } finally {
+        st.stoppingGraph = false;
+    }
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, `restartGraph: ${errors.length} stop steps failed`);
     built.graph = undefined;

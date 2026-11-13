@@ -24,6 +24,7 @@ import {
     assertNoStrays,
     createScenario,
     expectStillPending,
+    routeHttp,
     stepFor,
     stepUntil,
     stepUntilTrue,
@@ -230,6 +231,39 @@ describe('realpath harness', () => {
         node.strays.length = 0;
     });
 
+    // WR-04 (Phase 23 review): a route handler that throws is a harness error, as on the JSON-RPC
+    // path. Production wraps every axios call in a catch (bloxroute.ts, goplus.ts), so without a
+    // stray the scenario would carry on down a relay-failure branch on a harness exception.
+    it('WR-04: an axios route handler that throws records a stray naming the URL and rejects as an axios error, even when the caller swallows it', async () => {
+        const { node } = bareNode();
+        routeHttp('https://api.throws.invalid/', () => {
+            throw new Error('handler blew up');
+        });
+        let swallowed: unknown;
+        await axios.get('https://api.throws.invalid/v1/x').catch((e: unknown) => (swallowed = e));
+        expect(axios.isAxiosError(swallowed)).toBe(true);
+        expect((swallowed as { code?: string }).code).toBe('ERR_REALPATH_HARNESS');
+        expect((swallowed as { response?: { status?: number } }).response?.status).toBe(500);
+        expect(() => assertNoStrays()).toThrow(/stray call: harness error answering axios GET https:\/\/api\.throws\.invalid\/v1\/x: handler blew up/);
+        node.strays.length = 0;
+    });
+
+    it("WR-04: the scenario's own bloXroute route throwing on an unsigned transaction is a stray, not a relay failure", async () => {
+        const sc = await createScenario({ chain: 'bsc', dexType: 'v2' });
+        const endpoint = (sc.ctx.chain.mevConfig as { endpoint: string }).endpoint;
+        const unsigned = Transaction.from({ chainId: 56n, nonce: 0, to: sc.dex.routerAddress, gasLimit: 21_000n, gasPrice: 1n, value: 0n, data: '0x' }).unsignedSerialized;
+        const err = await axios
+            .post(endpoint, { jsonrpc: '2.0', id: 1, method: 'bsc_private_tx', params: { transaction: unsigned } }, { headers: { Authorization: process.env.BLOXROUTE_AUTH_HEADER } })
+            .then(
+                () => null,
+                (e: unknown) => e,
+            );
+        expect(axios.isAxiosError(err)).toBe(true);
+        expect(sc.node.submitted).toHaveLength(0);
+        expect(() => assertNoStrays()).toThrow(new RegExp(`stray call: harness error answering axios POST ${endpoint.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: acceptRelayTransaction: the bloxroute transaction is not signed`));
+        sc.node.strays.length = 0;
+    });
+
     it('AC-03: a fault names its exact operation, does not fire before its stage, and an unfired fault or hold fails the test', async () => {
         const { node, provider } = bareNode();
         const token = labelAddress('ac03.fault.token');
@@ -382,6 +416,8 @@ describe('realpath harness', () => {
         st.nodes.push(node);
         const p = new WebSocketProvider(BARE_WS, 1);
         expect(p.websocket).toBeInstanceOf(FakeWebSocket);
+        // Destroyed while CONNECTING: ws emits 'error' then (WR-03), so this probe listens for it.
+        (p.websocket as unknown as FakeWebSocket).on('error', () => undefined);
         void p.destroy();
         FakeWebSocket.instances.length = 0;
     });
@@ -1185,5 +1221,259 @@ describe('simulated relay: an answer with its own HTTP status and raw body (plan
         expect(node.strays).toHaveLength(2);
         expect(node.strays.every((s) => /inside a JSON-RPC batch/.test(s.detail))).toBe(true);
         node.strays.length = 0;
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-03: FakeWebSocket against ws 8.17.1 (node_modules/ethers/node_modules/ws,
+// the copy production loads) on every path where the socket is not OPEN.
+// ---------------------------------------------------------------------------------------------
+
+/** Resolve after the current process.nextTick queue (ws reports these on the next tick). */
+function nextTick(): Promise<void> {
+    return new Promise((resolve) => process.nextTick(resolve));
+}
+
+describe('FakeWebSocket matches ws 8.17.1 when the socket is not OPEN (Phase 23 review WR-03)', () => {
+    it('send and ping throw only while CONNECTING; on CLOSED the frame is dropped and a callback gets the error on the next tick; send(data, options, cb) is accepted', async () => {
+        const { node } = bareNode();
+        // A new socket is CONNECTING until its handshake completes (a microtask here).
+        const ws = new FakeWebSocket(BARE_WS);
+        expect(ws.readyState).toBe(FakeWebSocket.CONNECTING);
+        expect(() => ws.send('{}')).toThrow(new Error('WebSocket is not open: readyState 0 (CONNECTING)'));
+        expect(() => ws.ping()).toThrow(new Error('WebSocket is not open: readyState 0 (CONNECTING)'));
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(ws.readyState).toBe(FakeWebSocket.OPEN);
+
+        // OPEN: the ws signature (data, options, cb); the callback runs once the frame is written.
+        const replies: string[] = [];
+        ws.on('message', (m: Buffer) => replies.push(m.toString('utf8')));
+        const written = new Promise<Error | null>((resolve) => ws.send(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }), {}, (err?: Error) => resolve(err ?? null)));
+        expect(await written).toBeNull();
+        for (let i = 0; i < 10 && replies.length === 0; i++) await Promise.resolve();
+        expect(replies.map((r) => JSON.parse(r) as { result: string })).toEqual([{ jsonrpc: '2.0', id: 1, result: '0x1' }]);
+
+        node.dropSocket();
+        // The server's close arrives after the call, as from socket I/O; until then it reads OPEN.
+        expect(ws.readyState).toBe(FakeWebSocket.OPEN);
+        for (let i = 0; i < 3; i++) await Promise.resolve();
+        expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+        const callsBefore = node.callLog.length;
+        // No callback: the frame is dropped silently.
+        expect(() => ws.send(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_chainId', params: [] }))).not.toThrow();
+        expect(() => ws.ping()).not.toThrow();
+        // With a callback: the error arrives on the next tick, never inside the call.
+        const errors: string[] = [];
+        ws.send('{}', (err?: Error) => errors.push(`send ${err?.message}`));
+        ws.ping((err?: Error) => errors.push(`ping ${err?.message}`));
+        expect(errors).toEqual([]);
+        await nextTick();
+        expect(errors).toEqual(['send WebSocket is not open: readyState 3 (CLOSED)', 'ping WebSocket is not open: readyState 3 (CLOSED)']);
+        expect(node.callLog.length).toBe(callsBefore);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('close and terminate while CONNECTING go CLOSING at once, then on the next tick emit error ("closed before the connection was established") and close 1006, as ws abortHandshake does; an onerror attribute counts as a listener', async () => {
+        const { node } = bareNode();
+        for (const how of ['close', 'terminate'] as const) {
+            const ws = new FakeWebSocket(BARE_WS);
+            expect(ws.readyState).toBe(FakeWebSocket.CONNECTING);
+            const events: string[] = [];
+            ws.on('error', (e: Error) => events.push(`error ${e.message}`));
+            ws.on('close', (code: number) => events.push(`close ${code}`));
+            ws[how]();
+            expect(ws.readyState).toBe(FakeWebSocket.CLOSING);
+            expect(events).toEqual([]);
+            await nextTick();
+            expect(events, how).toEqual(['error WebSocket was closed before the connection was established', 'close 1006']);
+            expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+        }
+        const withAttribute = new FakeWebSocket(BARE_WS);
+        let seen = '';
+        withAttribute.onerror = (ev) => {
+            seen = ev.message;
+        };
+        withAttribute.close();
+        await nextTick();
+        expect(seen).toBe('WebSocket was closed before the connection was established');
+        // A socket closed during its handshake never opens.
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(node.socketsOpened).toBe(0);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('a subscription push from mine() reaches the client after mine() returns, never inside it', async () => {
+        const { node } = bareNode();
+        const ws = new FakeWebSocket(BARE_WS);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        const messages: Array<{ id?: number; method?: string }> = [];
+        ws.on('message', (m: Buffer) => messages.push(JSON.parse(m.toString('utf8')) as { id?: number; method?: string }));
+        ws.send(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'eth_subscribe', params: ['newHeads'] }));
+        for (let i = 0; i < 10 && messages.length === 0; i++) await Promise.resolve();
+        expect(messages.map((m) => m.id)).toEqual([7]);
+        node.mine({ include: [] });
+        expect(messages).toHaveLength(1);
+        await Promise.resolve();
+        expect(messages.map((m) => m.method ?? m.id)).toEqual([7, 'eth_subscription']);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('hangSocketOpens keeps new sockets CONNECTING (a stalled handshake) until turned off, then opens the ones still waiting', async () => {
+        const { node } = bareNode();
+        node.hangSocketOpens(true);
+        const waiting = new FakeWebSocket(BARE_WS);
+        const abandoned = new FakeWebSocket(BARE_WS);
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        expect([waiting.readyState, abandoned.readyState]).toEqual([FakeWebSocket.CONNECTING, FakeWebSocket.CONNECTING]);
+        abandoned.on('error', () => undefined);
+        abandoned.terminate();
+        await nextTick();
+        node.hangSocketOpens(false);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect([waiting.readyState, abandoned.readyState]).toEqual([FakeWebSocket.OPEN, FakeWebSocket.CLOSED]);
+        expect(node.socketsOpened).toBe(1);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('a real ethers WebSocketProvider whose socket the node dropped hangs on its next request, as on ws, instead of rejecting at once', async () => {
+        const { node } = bareNode();
+        const ws = bareWs();
+        expect(await stepUntil(ws.getBlockNumber())).toBe(node.head);
+        node.dropSocket();
+        // ethers writes with no readyState guard: ws drops the frame, so no answer ever comes.
+        await expectStillPending(ws.send('eth_blockNumber', []), 30_000, { what: 'a request written to the dropped socket' });
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-01: one revert source for every answer, on by default (FakeNode.enforceReverts).
+// A mined transaction, eth_estimateGas and eth_callBundle consult the same scenario read the
+// eth_call path does, so a deadline or an output floor the scenario's router encodes reverts on
+// chain too.
+// ---------------------------------------------------------------------------------------------
+
+const V2_SWAP = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
+
+/** A V2 buy signed by the scenario's bot wallet, for the scenario router, at the wallet's next nonce. */
+async function signedV2Buy(sc: Scenario<'v2'>, opts: { deadline: number; amountOutMin: bigint; value?: bigint }): Promise<string> {
+    const data = V2_SWAP.encodeFunctionData('swapExactETHForTokens', [opts.amountOutMin, [sc.weth, sc.token], sc.wallet.address, opts.deadline]);
+    return sc.wallet.signTransaction({ chainId: 1, nonce: sc.node.pendingCount(sc.wallet.address), to: sc.dex.routerAddress, data, value: opts.value ?? parseEther('0.01'), gasLimit: 300_000n, type: 2, maxFeePerGas: 40n * GWEI, maxPriorityFeePerGas: GWEI });
+}
+
+async function rpc(sc: Scenario, method: string, params: unknown[]): Promise<{ result?: unknown; error?: { code: number; message: string; data?: string } }> {
+    return (await sc.node.handle({ jsonrpc: '2.0', id: 1, method, params })) as never;
+}
+
+describe('simulated node: reverts on chain, in estimateGas and in bundle simulation (Phase 23 review WR-01)', () => {
+    it('a buy mined after its deadline reverts: receipt status 0, gas paid, no value sent, nonce consumed, no tokens; one mined in time succeeds', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const { node, wallet } = sc;
+        const tokenBalance = async (): Promise<bigint> => BigInt(((await rpc(sc, 'eth_call', [{ to: sc.token, data: ERC20.encodeFunctionData('balanceOf', [wallet.address]) }, 'latest'])).result as string));
+        const ethBalance = async (): Promise<bigint> => BigInt((await rpc(sc, 'eth_getBalance', [wallet.address, 'latest'])).result as string);
+
+        const late = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        const lateHash = (await rpc(sc, 'eth_sendRawTransaction', [late])).result as string;
+        await stepFor(61_000);
+        const before = await ethBalance();
+        node.mine({ include: [lateHash] });
+        const receipt = (await rpc(sc, 'eth_getTransactionReceipt', [lateHash])).result as { status: string; gasUsed: string; effectiveGasPrice: string; logs: unknown[] };
+        expect(receipt.status).toBe('0x0');
+        expect(receipt.logs).toEqual([]);
+        expect(before - (await ethBalance())).toBe(BigInt(receipt.gasUsed) * BigInt(receipt.effectiveGasPrice));
+        expect(node.minedCount(wallet.address)).toBe(1);
+        expect(await tokenBalance()).toBe(0n);
+
+        const inTime = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        const okHash = (await rpc(sc, 'eth_sendRawTransaction', [inTime])).result as string;
+        node.mine({ include: [okHash] });
+        expect(((await rpc(sc, 'eth_getTransactionReceipt', [okHash])).result as { status: string }).status).toBe('0x1');
+        expect(await tokenBalance()).toBeGreaterThan(0n);
+    });
+
+    it('eth_estimateGas reverts with the read\'s revert data where the scenario router would revert, and still answers the estimate where it would not', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const call = (deadline: number) => ({ from: sc.wallet.address, to: sc.dex.routerAddress, value: toQuantity(parseEther('0.01')), data: V2_SWAP.encodeFunctionData('swapExactETHForTokens', [0n, [sc.weth, sc.token], sc.wallet.address, deadline]) });
+        const expired = await rpc(sc, 'eth_estimateGas', [call(Math.floor(Date.now() / 1000) - 1)]);
+        expect(expired.error?.code).toBe(3);
+        expect(expired.error?.message).toBe('execution reverted');
+        expect(new Interface(['function Error(string)']).decodeFunctionData('Error', expired.error!.data!)[0]).toBe('UniswapV2Router: EXPIRED');
+        const fine = await rpc(sc, 'eth_estimateGas', [call(Math.floor(Date.now() / 1000) + 60)]);
+        expect(fine.result).toBe(toQuantity(150_000n));
+    });
+
+    it('the bot\'s Flashbots simulate gate is reachable: a price move between its quote and its simulation makes eth_callBundle report the revert, and the bot does not send that bundle', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        await listen(sc);
+        const held = sc.node.hold('eth_callBundle');
+        await sc.fireNewPair();
+        await stepUntilTrue(() => held.heldCount >= 1, { what: 'the bot simulating its buy bundle' });
+        // The price moves after the quote: the bundle's output floor is now above what the pool pays.
+        sc.reserves.token = sc.reserves.token / 4n;
+        const relayBefore = sc.node.relay.length;
+        held.release();
+        await stepUntilTrue(() => opLogged('flashbots.simulate.revert'), { what: 'the bot refusing a bundle whose simulation reverted' });
+        const firstSend = sc.node.relay.findIndex((r, i) => i >= relayBefore && r.method === 'eth_sendBundle');
+        const refusedAt = harnessState().logs.findIndex((l) => l.obj?.op === 'flashbots.simulate.revert');
+        expect(refusedAt).toBeGreaterThanOrEqual(0);
+        // Nothing from the refused attempt reached the relay as a bundle before the refusal.
+        expect(firstSend === -1 || sc.node.relay[firstSend].seq > harnessState().logs[refusedAt].seq).toBe(true);
+        sc.reserves.token = sc.reserves.token * 4n;
+    });
+
+    it('the default node is the realistic one: with nothing configured, a late buy mines with status 0, eth_estimateGas reverts it and eth_callBundle reports its revert; enforceReverts(false) gives the old always-succeeds node', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const now = (): number => Math.floor(Date.now() / 1000);
+        const late = await signedV2Buy(sc, { deadline: now() + 60, amountOutMin: 0n });
+        const lateHash = (await rpc(sc, 'eth_sendRawTransaction', [late])).result as string;
+        await stepFor(61_000);
+        // The relay's simulation of the expired buy, as the Flashbots library sends it.
+        const relayUrl = (sc.ctx.chain.mevConfig as { relayUrl: string }).relayUrl;
+        const sim = (await sc.node.handle({ jsonrpc: '2.0', id: 9, method: 'eth_callBundle', params: [{ txs: [late], blockNumber: toQuantity(sc.node.head + 1), stateBlockNumber: 'latest' }] }, undefined, { endpoint: 'relay', url: relayUrl })) as { result: { results: Array<{ error?: string; revert?: string }> } };
+        expect(sim.result.results[0].error).toBe('execution reverted');
+        expect(new Interface(['function Error(string)']).decodeFunctionData('Error', sim.result.results[0].revert!)[0]).toBe('UniswapV2Router: EXPIRED');
+        const estimate = await rpc(sc, 'eth_estimateGas', [{ from: sc.wallet.address, to: sc.dex.routerAddress, value: toQuantity(parseEther('0.01')), data: V2_SWAP.encodeFunctionData('swapExactETHForTokens', [0n, [sc.weth, sc.token], sc.wallet.address, now() - 1]) }]);
+        expect(estimate.error?.code).toBe(3);
+        sc.node.mine({ include: [lateHash] });
+        expect(((await rpc(sc, 'eth_getTransactionReceipt', [lateHash])).result as { status: string }).status).toBe('0x0');
+        expect(sc.node.succeeded(lateHash)).toBe(false);
+
+        // The switch back, for a test that genuinely needs it (none in the suite does today).
+        sc.node.enforceReverts(false);
+        const late2 = await signedV2Buy(sc, { deadline: now() - 1, amountOutMin: 0n });
+        const late2Hash = (await rpc(sc, 'eth_sendRawTransaction', [late2])).result as string;
+        sc.node.mine({ include: [late2Hash] });
+        expect(sc.node.succeeded(late2Hash)).toBe(true);
+        expect((await rpc(sc, 'eth_estimateGas', [{ from: sc.wallet.address, to: sc.dex.routerAddress, value: toQuantity(parseEther('0.01')), data: V2_SWAP.encodeFunctionData('swapExactETHForTokens', [0n, [sc.weth, sc.token], sc.wallet.address, now() - 1]) }])).result).toBe(toQuantity(150_000n));
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-02: the scenario's default balanceOf for the bot wallet is what its mined
+// buys bought at the price when each was mined, less what its mined sells spent.
+// ---------------------------------------------------------------------------------------------
+
+const V2_SELL = new Interface(['function swapExactTokensForETHSupportingFeeOnTransferTokens(uint256 amountIn, uint256 amountOutMin, address[] path, address to, uint256 deadline)']);
+
+describe("scenario balanceOf: frozen at each buy's mining, less mined sells (Phase 23 review WR-02)", () => {
+    it('a later price move does not re-price tokens already bought, and a mined sell through the router subtracts its amountIn', async () => {
+        const sc = (await createScenario({ chain: 'eth', dexType: 'v2' })) as Scenario<'v2'>;
+        const { node, wallet } = sc;
+        const tokenBalance = async (): Promise<bigint> => BigInt(((await rpc(sc, 'eth_call', [{ to: sc.token, data: ERC20.encodeFunctionData('balanceOf', [wallet.address]) }, 'latest'])).result as string));
+        const buy = await signedV2Buy(sc, { deadline: Math.floor(Date.now() / 1000) + 60, amountOutMin: 0n });
+        node.mine({ include: [(await rpc(sc, 'eth_sendRawTransaction', [buy])).result as string] });
+        const bought = await tokenBalance();
+        expect(bought).toBeGreaterThan(0n);
+
+        // Liquidity is pulled: both reserves shrink to 5 percent. Tokens already held do not change.
+        sc.reserves.weth = sc.reserves.weth / 20n;
+        sc.reserves.token = sc.reserves.token / 20n;
+        expect(await tokenBalance()).toBe(bought);
+
+        // A sell of half the position, mined: the balance drops by exactly what it spent.
+        const half = bought / 2n;
+        const data = V2_SELL.encodeFunctionData('swapExactTokensForETHSupportingFeeOnTransferTokens', [half, 0n, [sc.token, sc.weth], wallet.address, Math.floor(Date.now() / 1000) + 60]);
+        const sell = await wallet.signTransaction({ chainId: 1, nonce: node.pendingCount(wallet.address), to: sc.dex.routerAddress, data, value: 0n, gasLimit: 300_000n, type: 2, maxFeePerGas: 40n * GWEI, maxPriorityFeePerGas: GWEI });
+        node.mine({ include: [(await rpc(sc, 'eth_sendRawTransaction', [sell])).result as string] });
+        expect(await tokenBalance()).toBe(bought - half);
     });
 });
