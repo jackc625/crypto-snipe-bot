@@ -1,15 +1,25 @@
 // test/realpath/triage/AUD-TX-003.test.ts
 // Phase 23 plan 23-09 Task 2 (AUDIT-02, AC-12, SPEC nonce constraint): RC-11 head-of-line
 // blocking. src/bot.ts submitBuyTx = withNonceLock(wallet, () => sendTxWithRetry(...)) holds the
-// wallet lock through every private attempt of a snipe buy (4 attempts at default settings, each a
-// Flashbots bundle, its wait for the first target block, the stats call and the 45 s confirm
-// window). The lock is strictly first-in first-out (src/utils/nonceAuthority.ts): no priority lane
+// wallet lock through every private attempt of a snipe buy (each a Flashbots bundle, its wait for
+// the first target block, the stats call and the 45 s confirm window), until the escalation ends.
+//
+// Re-triaged on the realistic chain (Phase 23 review WR-01, operator ruling 2026-11-13): the relay
+// now simulates the buy as a real one does, so once the buy's own 60 s deadline (src/bot.ts:1045,
+// fixed when the swap is built) has passed, the next attempt's eth_callBundle answers
+// "UniswapV2Router: EXPIRED" and the escalation ends there with "Flashbots simulate: tx would
+// revert". It does not run the 4 attempts the finding first assumed. Measured here: B's first
+// attempt is sent at once, its second about 52 s later, and the third attempt's simulation is
+// refused about 105 s after the first submission, which is when B fails clean and lets the lock
+// go. The anti-rug exit is dispatched about 8 s into B's escalation, so it still waits behind the
+// buy for longer than its 60 s budget. The bug still holds; its lock hold is about 1.75 minutes,
+// not about 4. The lock is strictly first-in first-out (src/utils/nonceAuthority.ts): no priority lane
 // and no abort. An anti-rug exit of ANOTHER position on the same wallet (src/anti-rug/exitTrigger.ts
 // triggerAntiRugExit -> executeFullSell(..., 'anti-rug') under withTimeout(WATCHDOG_BUDGET_MS,
 // default 60000)) needs that lock for its approval (src/exitEngine.ts executeFullSell,
 // withNonceLock(wallet, () => ensureApproval(...))), so it cannot start, the budget frees the
 // caller at 60 s (antirug.exit.bounded-abort), and the abandoned executeFullSell stays queued and
-// runs minutes later, when the buy lets go.
+// runs later, when the buy lets go.
 //
 // Proof on the real path, the order forced exactly (AC-12: every wait is a step of fake time, a
 // mined block or a stepUntilTrue; nothing is held, so the bot's HTTP provider never stalls,
@@ -33,15 +43,17 @@
 // within its budget (card OD-17: a priority lane for anti-rug exits, an abortable buy escalation,
 // or releasing the lock between attempts). Today: it does not; antirug.exit.bounded-abort is
 // logged exactly 60 000 fake ms after the dispatch, while B's escalation still holds the lock. A
-// fix-shaped src mutation that lets the anti-rug approval skip the queue reads "looks fixed"
-// (D-08), src restored byte for byte. After the marker: the abort's elapsed time, B still
-// escalating at the abort, then B's buy failing clean after its fourth attempt (lock held for
-// minutes) and only then A's abandoned exit sending its approval, and selling the remains.
+// fix-shaped in-memory mutant that lets the anti-rug approval skip the queue reads "looks fixed"
+// (D-08); a wrong fix that gives only the anti-rug private SELL a priority lane (the approval still
+// queues) records the bug unchanged. After the marker: the abort's elapsed time, B still
+// escalating at the abort, then B's buy failing clean once the relay refuses its expired third
+// attempt (lock held about 105 s) and only then A's abandoned exit sending its approval, and
+// selling the remains.
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
 import { describe, expect, it } from 'vitest';
-import { Transaction, getAddress } from 'ethers';
+import { Interface, Transaction, getAddress } from 'ethers';
 import type { OpEntry, SubmitEntry } from '../harness/capture';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
@@ -55,6 +67,7 @@ import { secondLaunch } from './fixtures/AUD-TX-003-second-launch';
 
 const BUDGET_MS = 60_000;
 const APPROVE = ERC20.getFunction('approve')!.selector;
+const B_SWAP = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
 
 function opsAt(sc: Scenario, op: string, from = 0): OpEntry[] {
     return sc.timeline.entries.slice(from).filter((e): e is OpEntry => e.kind === 'op' && e.op === op);
@@ -130,7 +143,7 @@ describe('AUD-TX-003: a snipe buy holds the wallet nonce lock through its privat
             observed: { emergencySellStartedWithinBudget: false },
             actual: { emergencySellStartedWithinBudget: startedInBudget },
             expectedPlain: 'An anti-rug emergency sell of one position starts within its time budget even while a snipe of another token is still trying to land on the same wallet.',
-            actualPlain: 'While a snipe of token B held the wallet lock through its private attempts, the anti-rug exit of position A could not send anything: it gave up after its 60 s budget and stayed queued behind the buy.',
+            actualPlain: 'While a snipe of token B held the wallet lock through its private attempts (about 105 s: two attempts, then the relay refused the third once the buy deadline had passed), the anti-rug exit of position A could not send anything: it gave up after its 60 s budget and stayed queued behind the buy.',
         });
 
         // The abort, from the timeline: exactly the budget after the dispatch, while B still escalates.
@@ -158,16 +171,29 @@ describe('AUD-TX-003: a snipe buy holds the wallet nonce lock through its privat
         if (lockFree) sc.graph.exitManager.releaseSellLock('eth', sc.token);
         expect(lockFree).toBe(false);
 
-        // B's buy keeps the lock through its fourth attempt, then fails clean; only then does A's
-        // abandoned exit send its approval.
+        // B's buy keeps the lock through its second attempt; the relay refuses the third, past the
+        // buy's own 60 s deadline, and B fails clean; only then does A's abandoned exit send its
+        // approval.
         await missBundlesUntil(sc, { until: () => opLogged('buy.snipe.fail-clean'), what: "B's buy failing clean", maxVirtualMs: 400_000 });
         const failClean = opsAt(sc, 'buy.snipe.fail-clean')[0];
         expect(new Set(bBuys().map((h) => node.submitted.find((s) => s.hash === h)!.tx.nonce)).size).toBe(1);
-        expect(bBuys()).toHaveLength(4);
-        expect(failClean.at - bFirstSubmit.at).toBeGreaterThan(3 * 60_000);
+        expect(bBuys()).toHaveLength(2);
+        const refused = opsAt(sc, 'flashbots.simulate.revert', fromEntry);
+        expect(refused.map((e) => e.fields.attempt)).toEqual([2]);
+        expect(refused[0].at).toBe(failClean.at);
+        expect(String(failClean.fields.reason)).toBe('Flashbots simulate: tx would revert (execution reverted)');
+        // The cause: the swap's own deadline, decoded from B's signed bundle transaction with real
+        // ethers, had passed when the relay simulated the third attempt.
+        const bDeadlines = bBuys().map((h) => B_SWAP.decodeFunctionData('swapExactETHForTokens', node.submitted.find((s) => s.hash === h)!.tx.data)[3] as bigint);
+        expect(new Set(bDeadlines.map(String)).size).toBe(1);
+        expect(bDeadlines[0]).toBeLessThan(BigInt(Math.floor(refused[0].at / 1000)));
+        expect(bDeadlines[0]).toBeGreaterThanOrEqual(BigInt(Math.floor(opsAt(sc, 'mev.reconcile.not-landed', fromEntry)[0].at / 1000)));
+        // The lock hold: from B's first submission to its fail-clean, past the 60 s deadline.
+        expect(failClean.at - bFirstSubmit.at).toBeGreaterThan(90_000);
+        expect(failClean.at - bFirstSubmit.at).toBeLessThan(120_000);
         await stepUntilTrue(() => aStarts().length > 0, { what: "A's abandoned exit sending its approval", maxSteps: 20_000 });
         expect(Math.min(...aStarts())).toBeGreaterThanOrEqual(failClean.at);
-        expect(Math.min(...aStarts()) - dispatch.at).toBeGreaterThan(2 * 60_000);
+        expect(Math.min(...aStarts()) - dispatch.at).toBeGreaterThan(BUDGET_MS + 30_000);
         // It then sells the remains of A (one quick private attempt), long after the rug.
         await driveChain(sc, { mode: 'land', until: () => buyRow(sc)!.status === 'sold', what: "A's abandoned exit selling" });
         expect(sellsSubmitted(sc).length).toBeGreaterThanOrEqual(1);
