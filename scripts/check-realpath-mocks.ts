@@ -132,8 +132,18 @@ const ALLOWED_MODULES: ReadonlyArray<readonly [label: string, specifier: string]
     ['Telegram client (telegram/events)', 'telegram/events'],
 ];
 
+/**
+ * One spelling per file: the real path (TypeScript's resolver follows a symlinked or junctioned
+ * node_modules to its target for a bare specifier, but not for an absolute one), lowercased on
+ * Windows. A path that does not exist on disk falls back to path.resolve.
+ */
 function canonical(file: string): string {
-    const resolved = path.resolve(file);
+    let resolved = path.resolve(file);
+    try {
+        resolved = fs.realpathSync.native(resolved);
+    } catch {
+        // not on disk (a node: built-in name): compare as resolved
+    }
     return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
