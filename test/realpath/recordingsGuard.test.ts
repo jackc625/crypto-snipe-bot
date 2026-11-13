@@ -1,71 +1,44 @@
 // test/realpath/recordingsGuard.test.ts
 // Phase 23 plan 23-20 (CHAR-02, AC-21, AC-22, AC-26, AC-51; T-23-25): the guards every golden-master
 // recording and env snapshot must pass before its first commit, here and in plans 23-21, 23-22 and
-// 23-23. It walks every .jsonl and .json file under test/realpath/recordings/**, parses each .jsonl
-// line and each .json file, and walks every value with its key name.
+// 23-23. The rules and the scan live in ./recordingsScan.ts (Phase 23 review WR-35: moved there so
+// that scripts/update-recordings.ts runs the same scan over every recording right after a re-record,
+// before anything is committed); its header lists every rule. This file runs that scan over every
+// .jsonl and .json file under test/realpath/recordings/**, and proves each rule both ways on
+// temp-directory cases.
 //
-// AC-26 (D-12): the raw file has no CR; a parsed string holds no backslash (the backslash of a JSON
-// escape such as \" is not in the parsed value, so it passes), no `file:line` fragment (a .ts, .js,
-// .cjs or .mjs name followed by a colon and digits) and no stack-frame line. In submit and relay
-// entries, value, gasLimit, gasPrice, maxFeePerGas, maxPriorityFeePerGas and any key beginning
-// `amount` are never JSON numbers (amounts are whole-number text), and no JSON number anywhere is an
-// integer above Number.MAX_SAFE_INTEGER. Settings such as gasMultiplier stay numbers.
-//
-// AC-51, field-aware (a recording's transaction and bundle hashes are 64-hex values, so a blanket
-// 64-hex rejection would reject every valid recording):
-//   - Sentinels: the values of test/.env.test under a key matching KEY, TOKEN, SESSION, HASH, SECRET
-//     or AUTH. A value equal to one is allowed only under walletPrivateKey (must equal PRIVATE_KEY's),
-//     authKey (FLASHBOTS_AUTH_KEY's), authHeader (BLOXROUTE_AUTH_HEADER's) or a key that is that
-//     variable's own name (how plan 23-23's _baseline.json records its input). The chain registry
-//     carries mevConfig.authKey / mevConfig.authHeader (src/chainRegistry.ts), inert sentinels. A
-//     string that CONTAINS a sentinel without being exactly that allowed value fails too.
-//   - Hashes: otherwise a 64-hex value is allowed only as the whole value (0x + 64 hex) of a named
-//     hash field (HASH_KEYS: the hash-carrying keys src/ uses in its logs and DB columns) or an entry
-//     of `topics`.
-//   - Builder keys: an entry of consideredByBuilders / sealedByBuilders may be a 48-byte BLS public
-//     key (0x + 96 hex). src/utils/mevStrategies/flashbots.ts logs these from the relay's
-//     flashbots_getBundleStatsV2 answer (stats.consideredByBuildersAt[].pubkey): public builder
-//     identities, not secrets. Added in plan 23-20 when the first real recording held them.
-//   - bloXroute's answer hash: in an op line whose op is bloxroute.relay.accepted, the txHash of the
-//     fields' relayHash object may be the bare 64 hex (no 0x) of that same line's signedTxHash.
-//     bloXroute answers bsc_private_tx with { txHash } as hex without 0x, and
-//     src/utils/mevStrategies/bloxroute.ts logs that answer whole as relayHash beside the hash it
-//     signed itself; it is the public transaction hash, not a secret. Only that one field of that
-//     one op, and only when it equals the line's own signedTxHash. Added in plan 23-22 when the
-//     first bloXroute recording held it.
-//   - Signed transactions: `raw`, each entry of `signedTransactions` and `txs`, and the bloXroute
-//     body's `transaction` must parse through real Transaction.from, and a `raw` whose hash differs
-//     from its entry's `hash` fails.
-//   - Calldata: `data` must be hex of a whole number of bytes (ABI words are not secrets).
-//   - Any other string, a free-text log message included, fails if it holds a 64-hex run (no log
-//     message in src/ interpolates a hash; only alert text does, and alerts are not recorded).
-//   - URLs: every http(s):// or ws(s):// URL has a loopback host or one of the public hosts src/
-//     itself names (PUBLIC_HOSTS; a test below proves each appears in src/ as a string or template
-//     literal, comments excluded). On a public host the URL is parsed with the real URL class and
-//     fails on a username or password, a query parameter named like a credential (key, token,
-//     secret, auth, password, session, signature) unless its value is a 20-byte 0x address, or a path
-//     segment or query value of 20 or more characters that is not a 20-byte 0x address.
-//   - Any string, or any line of one, starting as a .env-style KEY= fails.
-// AC-21: every ID a header's SUSPECT(...) cites exists as a finding JSON.
-// AC-22: serializeTimeline with no submit entry ends in the exact line {"submitted":[]}.
-//
-// Temp-directory cases prove each rule both ways. Only installed tooling is used. Nothing here
-// names a file under src/ or scripts/: src/ is walked as a directory (the AC-37 gate,
-// test/unit/sourceTextGate.test.ts). Nothing here mocks anything.
+// Only installed tooling is used. Nothing here names a file under src/ or scripts/: src/ is walked as
+// a directory (the AC-37 gate, test/unit/sourceTextGate.test.ts). Nothing here mocks anything.
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
 import { Transaction, Wallet, ethers } from 'ethers';
 import type { TimelineEntry } from './harness/capture';
 import {
+    EMPTY_SUBMITTED_LINE as SCAN_EMPTY_SUBMITTED_LINE,
+    PUBLIC_HOSTS,
+    TAG_RE as SCAN_TAG_RE,
+    type Sentinels,
+    guardPaths,
+    knownFindingIds as knownFindingIdsIn,
+    readSentinels as readSentinelsFrom,
+    recordingFiles,
+    scanRecordingText as scanRecordingTextWith,
+    scanRecordingsDir as scanRecordingsDirWith,
+    scanRepoRecordings,
+    tagIds as scanTagIds,
+} from './recordingsScan';
+import {
     EMPTY_SUBMITTED_LINE,
     RECORDINGS_DIR,
     TAG_RE,
     UPDATE_SWITCH,
+    UPDATE_TOKEN_PREFIX,
     compareRecording,
     normalizeForRecording,
     recordingLine,
@@ -80,281 +53,11 @@ const FINDINGS_DIR = path.join(REPO_ROOT, '.planning', 'audit', 'findings');
 const ENV_TEST_FILE = path.join(REPO_ROOT, 'test', '.env.test');
 const SRC_DIR = path.join(REPO_ROOT, 'src');
 
-/** The hash-carrying keys src/ uses in its logs and DB columns (plan 23-20, read 2026-11-09). */
-export const HASH_KEYS: ReadonlySet<string> = new Set([
-    'hash', 'txHash', 'tx_hash', 'signedTxHash', 'prevSignedTxHash', 'lastSignedHash', 'minedTxHash', 'landedHash',
-    'relayHash', 'realHash', 'bundleHash', 'blockHash', 'parentHash', 'transactionHash',
-]);
-/** Builder identities in the Flashbots stats log: 48-byte BLS public keys. */
-const BUILDER_KEY_ARRAYS: ReadonlySet<string> = new Set(['consideredByBuilders', 'sealedByBuilders']);
-/** The public hosts src/ itself names; anything else must be loopback. */
-export const PUBLIC_HOSTS: readonly string[] = [
-    'relay.flashbots.net', 'api.blxrbdn.com', 'etherscan.io', 'bscscan.com', 'basescan.org', 'arbiscan.io',
-    'bsc-dataseed.binance.org', 'api.honeypot.is', 'api.gopluslabs.io', 'api.unicrypt.network', 'api.mudra.website',
-];
-const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']);
-const AMOUNT_KEYS: ReadonlySet<string> = new Set(['value', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas']);
-const SIGNED_TX_ARRAYS: ReadonlySet<string> = new Set(['signedTransactions', 'txs']);
-
-const HEX64_RUN = /[0-9a-fA-F]{64}/;
-const HASH_VALUE = /^0x[0-9a-fA-F]{64}$/;
-const BLS_PUBKEY = /^0x[0-9a-fA-F]{96}$/;
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const WHOLE_BYTES_HEX = /^0x(?:[0-9a-fA-F]{2})*$/;
-const FILE_LINE = /\.(?:ts|js|cjs|mjs):\d/;
-const STACK_FRAME = /(?:^|\n)[ \t]*at [^\n]*(?:\(|:\d+:\d+)/;
-const ENV_LINE = /(?:^|\n)[A-Z][A-Z0-9_]*=/;
-const URL_RUN = /\b(?:https?|wss?):\/\/[^\s"'<>`]+/gi;
-const CREDENTIAL_PARAM = /key|token|secret|auth|password|session|signature/i;
-const SENTINEL_KEY = /KEY|TOKEN|SESSION|HASH|SECRET|AUTH/;
-
-// ---------------------------------------------------------------------------------------------
-// Sentinels (test/.env.test)
-// ---------------------------------------------------------------------------------------------
-
-export interface Sentinels {
-    /** Variable name -> value, for every secret-bearing key with a non-empty value. */
-    byName: Map<string, string>;
-    /** Every distinct secret-bearing value. */
-    values: Set<string>;
-}
-
-export function readSentinels(file: string = ENV_TEST_FILE): Sentinels {
-    const byName = new Map<string, string>();
-    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-        const m = line.trim().match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-        if (!m || !SENTINEL_KEY.test(m[1]) || m[2] === '') continue;
-        byName.set(m[1], m[2]);
-    }
-    return { byName, values: new Set(byName.values()) };
-}
-
-/** Where a sentinel value may appear: the three registry/config fields, or its own variable name. */
-function sentinelAllowed(key: string | null, value: string, s: Sentinels): boolean {
-    if (key === 'walletPrivateKey') return value === s.byName.get('PRIVATE_KEY');
-    if (key === 'authKey') return value === s.byName.get('FLASHBOTS_AUTH_KEY');
-    if (key === 'authHeader') return value === s.byName.get('BLOXROUTE_AUTH_HEADER');
-    return key !== null && s.byName.get(key) === value;
-}
-
-// ---------------------------------------------------------------------------------------------
-// The scan
-// ---------------------------------------------------------------------------------------------
-
-interface WalkCtx {
-    file: string;
-    where: string;
-    /** The timeline entry kind of a .jsonl line (op, submit, relay, db), else null. */
-    kind: string | null;
-    relay: string | null;
-    /**
-     * In a bloxroute.relay.accepted op line: the fields' relayHash object and the bare lower-case
-     * hex of the line's signedTxHash, the one value its txHash may hold (see the header). Else null.
-     */
-    relayAnswer: { obj: Record<string, unknown>; bare: string } | null;
-    sentinels: Sentinels;
-    out: string[];
-}
-
-const BARE_HASH = /^[0-9a-fA-F]{64}$/;
-
-/** The relayAnswer of one parsed .jsonl line (see WalkCtx.relayAnswer). */
-function relayAnswerOf(obj: Record<string, unknown>): WalkCtx['relayAnswer'] {
-    if (obj.kind !== 'op' || obj.op !== 'bloxroute.relay.accepted') return null;
-    const fields = obj.fields as Record<string, unknown> | undefined;
-    const relayHash = fields?.relayHash;
-    const signed = fields?.signedTxHash;
-    if (relayHash === null || typeof relayHash !== 'object' || Array.isArray(relayHash) || typeof signed !== 'string' || !HASH_VALUE.test(signed)) return null;
-    return { obj: relayHash as Record<string, unknown>, bare: signed.slice(2).toLowerCase() };
-}
-
-function parseSigned(raw: string): Transaction | null {
-    try {
-        return Transaction.from(raw.startsWith('0x') ? raw : `0x${raw}`);
-    } catch {
-        return null;
-    }
-}
-
-function checkUrl(url: string, c: WalkCtx, at: string): void {
-    let u: URL;
-    try {
-        u = new URL(url);
-    } catch {
-        c.out.push(`${at}: an unparseable URL ${JSON.stringify(url)}`);
-        return;
-    }
-    const host = u.hostname.toLowerCase();
-    if (LOOPBACK_HOSTS.has(host)) return;
-    if (!PUBLIC_HOSTS.includes(host)) {
-        c.out.push(`${at}: URL host ${host} is neither loopback nor a public host src/ names`);
-        return;
-    }
-    if (u.username !== '' || u.password !== '') c.out.push(`${at}: URL on ${host} carries a username or password`);
-    const longOk = (v: string): boolean => v.length < 20 || ADDRESS.test(v);
-    for (const seg of u.pathname.split('/')) {
-        const s = decodeURIComponent(seg);
-        if (!longOk(s)) c.out.push(`${at}: URL on ${host} has a path segment of ${s.length} characters that is not an address`);
-    }
-    for (const [name, value] of u.searchParams) {
-        if (CREDENTIAL_PARAM.test(name) && !ADDRESS.test(value)) c.out.push(`${at}: URL on ${host} has a credential-like query parameter ${name}`);
-        else if (!longOk(value)) c.out.push(`${at}: URL on ${host} has a query value of ${value.length} characters that is not an address`);
-    }
-}
-
-function checkString(value: string, key: string | null, parent: Record<string, unknown> | unknown[] | null, c: WalkCtx, inArrayOf: string | null): void {
-    const at = `${c.file} ${c.where}${key !== null ? ` [${key}]` : inArrayOf !== null ? ` [${inArrayOf}[]]` : ''}`;
-    // AC-26.
-    if (value.includes('\\')) c.out.push(`${at}: a backslash in a parsed value`);
-    if (FILE_LINE.test(value)) c.out.push(`${at}: a file:line fragment`);
-    if (STACK_FRAME.test(value)) c.out.push(`${at}: a stack-frame line`);
-    if (ENV_LINE.test(value)) c.out.push(`${at}: a .env-style KEY= line`);
-    // AC-51 sentinels: exact and allowed, or nowhere.
-    if (c.sentinels.values.has(value)) {
-        if (!sentinelAllowed(key, value, c.sentinels)) c.out.push(`${at}: a test/.env.test secret sentinel under a key that may not hold it`);
-        return;
-    }
-    for (const s of c.sentinels.values) {
-        if (s.length >= 8 && value.includes(s)) {
-            c.out.push(`${at}: a string containing a test/.env.test secret sentinel`);
-            break;
-        }
-    }
-    // URLs.
-    for (const m of value.match(URL_RUN) ?? []) checkUrl(m, c, at);
-    // Signed transactions.
-    const signedField = key === 'raw' || (inArrayOf !== null && SIGNED_TX_ARRAYS.has(inArrayOf)) || (key === 'transaction' && c.relay === 'bloxroute');
-    if (signedField) {
-        const tx = parseSigned(value);
-        if (!tx) {
-            c.out.push(`${at}: a signed transaction that does not parse`);
-            return;
-        }
-        if (key === 'raw' && parent && !Array.isArray(parent) && typeof parent.hash === 'string' && tx.hash !== parent.hash) {
-            c.out.push(`${at}: raw transaction hash ${tx.hash} differs from the entry's hash ${String(parent.hash)}`);
-        }
-        return;
-    }
-    // Calldata.
-    if (key === 'data') {
-        if (!WHOLE_BYTES_HEX.test(value)) c.out.push(`${at}: data is not hex of a whole number of bytes`);
-        return;
-    }
-    // Hashes and builder keys in their named fields only.
-    if (!HEX64_RUN.test(value)) return;
-    if (key !== null && HASH_KEYS.has(key) && HASH_VALUE.test(value)) return;
-    if (inArrayOf === 'topics' && HASH_VALUE.test(value)) return;
-    if (inArrayOf !== null && BUILDER_KEY_ARRAYS.has(inArrayOf) && BLS_PUBKEY.test(value)) return;
-    if (key === 'txHash' && c.relayAnswer !== null && parent === c.relayAnswer.obj && BARE_HASH.test(value) && value.toLowerCase() === c.relayAnswer.bare) return;
-    c.out.push(`${at}: a 64-hex run outside a named hash field`);
-}
-
-function walk(value: unknown, key: string | null, parent: Record<string, unknown> | unknown[] | null, c: WalkCtx, inArrayOf: string | null): void {
-    if (typeof value === 'string') {
-        checkString(value, key, parent, c, inArrayOf);
-        return;
-    }
-    if (typeof value === 'number') {
-        const at = `${c.file} ${c.where}${key !== null ? ` [${key}]` : ''}`;
-        if (Number.isInteger(value) && !Number.isSafeInteger(value)) c.out.push(`${at}: a JSON number above Number.MAX_SAFE_INTEGER`);
-        if ((c.kind === 'submit' || c.kind === 'relay') && key !== null && (AMOUNT_KEYS.has(key) || key.startsWith('amount'))) {
-            c.out.push(`${at}: an amount written as a JSON number`);
-        }
-        return;
-    }
-    if (Array.isArray(value)) {
-        for (const v of value) walk(v, null, value, c, key ?? inArrayOf);
-        return;
-    }
-    if (value !== null && typeof value === 'object') {
-        const obj = value as Record<string, unknown>;
-        for (const k of Object.keys(obj)) {
-            if (HEX64_RUN.test(k)) c.out.push(`${c.file} ${c.where}: a key holding a 64-hex run`);
-            walk(obj[k], k, obj, c, null);
-        }
-    }
-}
-
-function knownFindingIds(): Set<string> {
-    return new Set(fs.readdirSync(FINDINGS_DIR).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -'.json'.length)));
-}
-
-/** Every rule above over one file's raw bytes. Returns the violations (empty when clean). */
-export function scanRecordingText(rel: string, raw: Buffer, sentinels: Sentinels, findings: Set<string> = knownFindingIds()): string[] {
-    const out: string[] = [];
-    const text = raw.toString('utf8');
-    if (text.includes('\r')) out.push(`${rel}: a carriage return (AC-26: LF only)`);
-    const base: Omit<WalkCtx, 'where' | 'kind' | 'relay' | 'relayAnswer'> = { file: rel, sentinels, out };
-    if (rel.endsWith('.json')) {
-        let doc: unknown;
-        try {
-            doc = JSON.parse(text);
-        } catch (e) {
-            out.push(`${rel}: not valid JSON (${e instanceof Error ? e.message : String(e)})`);
-            return out;
-        }
-        walk(doc, null, null, { ...base, where: 'document', kind: null, relay: null, relayAnswer: null }, null);
-        return out;
-    }
-    if (!text.endsWith('\n') || text.endsWith('\n\n')) out.push(`${rel}: a recording ends in exactly one LF`);
-    const lines = text.split('\n');
-    if (lines[lines.length - 1] === '') lines.pop();
-    let submits = 0;
-    let emptyList = 0;
-    lines.forEach((line, i) => {
-        const where = `line ${i + 1}`;
-        if (line === '') {
-            out.push(`${rel} ${where}: a blank line`);
-            return;
-        }
-        let entry: unknown;
-        try {
-            entry = JSON.parse(line);
-        } catch (e) {
-            out.push(`${rel} ${where}: not valid JSON (${e instanceof Error ? e.message : String(e)})`);
-            return;
-        }
-        const obj = (entry ?? {}) as Record<string, unknown>;
-        if (i === 0) {
-            const keys = Object.keys(obj);
-            if (keys.length !== 2 || keys[0] !== 'scenario' || keys[1] !== 'tag') out.push(`${rel} ${where}: the header is not {"scenario","tag"}`);
-            const tag = String(obj.tag);
-            if (!TAG_RE.test(tag)) out.push(`${rel} ${where}: tag ${JSON.stringify(tag)} is not KEEP or SUSPECT(<AUD-ID>[,...])`);
-            else for (const id of tagIds(tag)) if (!findings.has(id)) out.push(`${rel} ${where}: tag cites ${id}, which is not a finding in the register (AC-21)`);
-            const name = path.posix.basename(rel, '.jsonl');
-            if (!rel.includes('/') && obj.scenario !== name) out.push(`${rel} ${where}: header scenario ${JSON.stringify(obj.scenario)} is not the file name ${name}`);
-        } else if (line === EMPTY_SUBMITTED_LINE) {
-            emptyList += 1;
-            if (i !== lines.length - 1) out.push(`${rel} ${where}: the empty submitted list is not the last line`);
-        } else {
-            if (!['op', 'submit', 'relay', 'db'].includes(String(obj.kind))) out.push(`${rel} ${where}: unknown entry kind ${JSON.stringify(obj.kind)}`);
-            if (obj.kind === 'submit') submits += 1;
-        }
-        walk(entry, null, null, { ...base, where, kind: i === 0 ? null : typeof obj.kind === 'string' ? obj.kind : null, relay: typeof obj.relay === 'string' ? obj.relay : null, relayAnswer: i === 0 ? null : relayAnswerOf(obj) }, null);
-    });
-    if (submits === 0 && emptyList !== 1) out.push(`${rel}: a recording with no submit entry must end in ${EMPTY_SUBMITTED_LINE} (AC-22)`);
-    if (submits > 0 && emptyList > 0) out.push(`${rel}: a recording with a submit entry holds ${EMPTY_SUBMITTED_LINE}`);
-    return out;
-}
-
-/** Every .jsonl and .json file under `dir`, recursively, as forward-slash paths relative to it. */
-export function recordingFiles(dir: string): string[] {
-    const out: string[] = [];
-    const visit = (d: string): void => {
-        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-            const full = path.join(d, e.name);
-            if (e.isDirectory()) visit(full);
-            else if (/\.(?:jsonl|json)$/.test(e.name)) out.push(path.relative(dir, full).split(path.sep).join('/'));
-        }
-    };
-    if (fs.existsSync(dir)) visit(dir);
-    return out.sort();
-}
-
-export function scanRecordingsDir(dir: string, sentinels: Sentinels = readSentinels()): string[] {
-    const findings = knownFindingIds();
-    return recordingFiles(dir).flatMap((rel) => scanRecordingText(rel, fs.readFileSync(path.join(dir, rel)), sentinels, findings));
-}
+// The guard's scan lives in ./recordingsScan (WR-35); here its inputs default to this repo's.
+const readSentinels = (file: string = ENV_TEST_FILE): Sentinels => readSentinelsFrom(file);
+const knownFindingIds = (): Set<string> => knownFindingIdsIn(FINDINGS_DIR);
+const scanRecordingText = (rel: string, raw: Buffer, sentinels: Sentinels, findings: Set<string> = knownFindingIds()): string[] => scanRecordingTextWith(rel, raw, sentinels, findings);
+const scanRecordingsDir = (dir: string, sentinels: Sentinels = readSentinels()): string[] => scanRecordingsDirWith(dir, sentinels, knownFindingIds());
 
 // ---------------------------------------------------------------------------------------------
 // Temp-directory cases
@@ -388,10 +91,41 @@ const SELF_TEST_WALLET = new Wallet(ethers.id('realpath.plan-23-20.recordings-gu
 const PLANTED_KEY = ethers.id('realpath.plan-23-20.planted-key');
 const ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
 
-async function signedTx(nonce = 0): Promise<Transaction> {
-    const raw = await SELF_TEST_WALLET.signTransaction({ chainId: 1, nonce, to: ADDR, value: 1n, gasLimit: 21_000n, type: 2, maxFeePerGas: 2n, maxPriorityFeePerGas: 1n, data: '0x' });
+async function signedTx(nonce = 0, data = '0x'): Promise<Transaction> {
+    const raw = await SELF_TEST_WALLET.signTransaction({ chainId: 1, nonce, to: ADDR, value: 1n, gasLimit: 21_000n, type: 2, maxFeePerGas: 2n, maxPriorityFeePerGas: 1n, data });
     return Transaction.from(raw);
 }
+
+/**
+ * WR-34 planted values, each built at run time from a hash so that no secret-shaped literal sits in
+ * this file (the phase secret scan reads source text): a Telegram bot token shape, a 32-hex API hash,
+ * a base64 session, an explorer-style API key, a Bearer credential, a URL fragment token, and
+ * credential URLs in another scheme and on a loopback host.
+ */
+const planted = (() => {
+    const bytes = (label: string, n = 32): Uint8Array => ethers.getBytes(ethers.id(`realpath.wr-34.${label}`)).slice(0, n);
+    const alphabet = (label: string, chars: string, n: number): string => Array.from(bytes(label), (b) => chars[b % chars.length]).join('').slice(0, n);
+    const word = alphabet('word', 'abcdefghijklmnopqrstuvwxyz', 24);
+    const userinfo = [alphabet('user', 'abcdefghijklmnopqrstuvwxyz', 6), alphabet('pass', 'abcdefghijklmnopqrstuvwxyz0123456789', 18)].join(':');
+    return {
+        word,
+        headerWord: `live-${word}`,
+        telegram: [String(100_000_000 + bytes('tg')[0]), `AA${alphabet('tg-secret', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', 33)}`].join(':'),
+        hex32: ethers.id('realpath.wr-34.hex32').slice(2, 34),
+        base64: Buffer.concat([Buffer.from(bytes('b64-a')), Buffer.from(bytes('b64-b'))]).toString('base64'),
+        explorerKey: alphabet('explorer', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 32) + alphabet('explorer-2', 'GHJKLMNPQRSTUVWXYZ', 2),
+        bearer: ['Bearer', alphabet('bearer', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 28)].join(' '),
+        fragmentUrl: `https://etherscan.io/address/${ADDR}#${['access', 'token'].join('_')}=${alphabet('frag', 'abcdefghijklmnopqrstuvwxyz0123456789', 24)}`,
+        otherSchemeUrl: ['redis:', '', `${userinfo}@cache.internal:6379`].join('/'),
+        loopbackUrl: ['http:', '', `${userinfo}@127.0.0.1:8545`].join('/'),
+    };
+})();
+
+/** A Flashbots bundle hash: keccak256 of the bundle's transaction hashes, concatenated (the relay's rule). */
+const bundleHashOf = (hashes: string[]): string => ethers.keccak256(`0x${hashes.map((h) => h.slice(2)).join('')}`);
+/** A submit line as the serializer writes it, request decoded from the raw transaction. */
+const submitOf = (tx: Transaction, at = 1, request: Record<string, unknown> = {}): string =>
+    JSON.stringify({ kind: 'submit', at, route: 'public', status: 'accepted', hash: tx.hash, from: tx.from, request: { value: '1', gasLimit: '21000', data: tx.data, ...request }, raw: tx.serialized });
 
 const header = (name: string, tag = 'KEEP'): string => JSON.stringify({ scenario: name, tag });
 const op = (fields: Record<string, unknown>, msg = 'message'): string => JSON.stringify({ kind: 'op', at: 1, level: 'info', op: 'x.y', msg, fields, bindings: {} });
@@ -406,6 +140,21 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
         const files = recordingFiles(RECORDINGS_DIR);
         expect(files.length).toBeGreaterThanOrEqual(1);
         expect(scanRecordingsDir(RECORDINGS_DIR)).toEqual([]);
+    });
+
+    it('WR-35: the scan the update command runs reads the same folder and passes it too, and the scan module keeps the serializer\'s tag rule and empty-list line', () => {
+        // scripts/update-recordings.ts calls scanRepoRecordings(<repo root>) after its Vitest run.
+        expect(guardPaths(REPO_ROOT)).toEqual({ recordingsDir: RECORDINGS_DIR, findingsDir: FINDINGS_DIR, envTestFile: ENV_TEST_FILE });
+        const r = scanRepoRecordings(REPO_ROOT);
+        expect(r.files).toBe(recordingFiles(RECORDINGS_DIR).length);
+        expect(r.violations).toEqual([]);
+        expect(SCAN_TAG_RE.source).toBe(TAG_RE.source);
+        expect(SCAN_EMPTY_SUBMITTED_LINE).toBe(EMPTY_SUBMITTED_LINE);
+        for (const t of ['KEEP', 'SUSPECT(AUD-DB-004)', 'SUSPECT(AUD-DB-004,AUD-EXIT-001)']) expect(scanTagIds(t)).toEqual(tagIds(t));
+        for (const bad of ['SUSPECT(AUD-DB-004, AUD-EXIT-001)', 'SUSPECT(AUD-DB-004,AUD-DB-004)', 'suspect']) {
+            expect(() => scanTagIds(bad)).toThrow();
+            expect(() => tagIds(bad)).toThrow();
+        }
     });
 
     it('the sentinels are read from test/.env.test: the four keys and the TEST-SENTINEL values', () => {
@@ -446,6 +195,8 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
         const s = readSentinels();
         const tx = await signedTx();
         const other = await signedTx(1);
+        // A transaction whose calldata carries the signer's own key as one ABI word (selector + word).
+        const keyInData = await signedTx(2, `0xa9059cbb${SELF_TEST_WALLET.privateKey.slice(2)}`);
         const cases: Record<string, { text: string; rule: RegExp }> = {
             'planted-key-field.jsonl': { text: recording('planted-key-field', op({ note: PLANTED_KEY })), rule: /64-hex run outside a named hash field/ },
             'planted-key-message.jsonl': { text: recording('planted-key-message', op({}, `signing with ${PLANTED_KEY} now`)), rule: /64-hex run outside a named hash field/ },
@@ -480,6 +231,32 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
             'relay-answer-other-op.jsonl': { text: recording('relay-answer-other-op', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!, 'x.y')), rule: /64-hex run outside a named hash field/ },
             'relay-answer-other-field.jsonl': { text: recording('relay-answer-other-field', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!, 'bloxroute.relay.accepted', { note: tx.hash!.slice(2) })), rule: /64-hex run outside a named hash field/ },
             'relay-answer-nested.jsonl': { text: recording('relay-answer-nested', relayAccepted({ txHash: tx.hash!.slice(2), inner: { txHash: tx.hash!.slice(2) } }, tx.hash!)), rule: /64-hex run outside a named hash field/ },
+            // WR-33: `data` is calldata only at a submit entry's request.data; a hash field holds a real hash.
+            'planted-key-data.jsonl': { text: recording('planted-key-data', op({ data: PLANTED_KEY })), rule: /64-hex run outside a named hash field/ },
+            'planted-key-data-blob.jsonl': { text: recording('planted-key-data-blob', op({ data: `0x${'ab'.repeat(4)}${PLANTED_KEY.slice(2)}${'cd'.repeat(4)}` })), rule: /64-hex run outside a named hash field/ },
+            'planted-key-data-db.jsonl': { text: recording('planted-key-data-db', JSON.stringify({ kind: 'db', at: 1, table: 'trades', op: 'insert', inTransaction: false, row: { data: PLANTED_KEY } })), rule: /64-hex run outside a named hash field/ },
+            'planted-key-hash.jsonl': { text: recording('planted-key-hash', op({ hash: PLANTED_KEY })), rule: /not the hash of a signed transaction in this recording/ },
+            'planted-key-txhash.jsonl': { text: `${[header('planted-key-txhash'), submitOf(tx), op({ txHash: PLANTED_KEY })].join('\n')}\n`, rule: /not the hash of a signed transaction in this recording/ },
+            'planted-key-bundlehash.jsonl': { text: recording('planted-key-bundlehash', op({ bundleHash: PLANTED_KEY })), rule: /not the bundle hash of a bundle body in this recording/ },
+            'wallet-key-in-topics.jsonl': { text: recording('wallet-key-in-topics', op({ wallet: SELF_TEST_WALLET.address, topics: [SELF_TEST_WALLET.privateKey] })), rule: /private key of an address in this recording/ },
+            'wallet-key-in-db-hash.jsonl': {
+                text: recording('wallet-key-in-db-hash', op({ wallet: SELF_TEST_WALLET.address }), JSON.stringify({ kind: 'db', at: 1, table: 'trades', op: 'insert', inTransaction: false, row: { tx_hash: SELF_TEST_WALLET.privateKey } })),
+                rule: /private key of an address in this recording/,
+            },
+            'submit-data-not-raw.jsonl': { text: `${[header('submit-data-not-raw'), submitOf(tx, 1, { data: `0x${'00'.repeat(4)}` })].join('\n')}\n`, rule: /request\.data is not the data of the entry's signed raw transaction/ },
+            'wallet-key-in-calldata.jsonl': { text: `${[header('wallet-key-in-calldata'), submitOf(keyInData)].join('\n')}\n`, rule: /private key of an address in this recording/ },
+            // WR-34: secret fields hold their sentinel or a case value only; secret shapes fail anywhere.
+            // Every planted value is built at run time, so no secret-shaped literal sits in this file.
+            'secret-field-not-sentinel.jsonl': { text: recording('secret-field-not-sentinel', op({ mevConfig: { authHeader: planted.headerWord } })), rule: /secret field holding a value that is neither its test\/\.env\.test sentinel nor a case value/ },
+            'env/SECRET_VAR_NOT_SENTINEL.json': { text: JSON.stringify({ cases: { valid: { env: { TELEGRAM_SESSION: planted.word } } } }), rule: /secret field holding a value that is neither its test\/\.env\.test sentinel nor a case value/ },
+            'telegram-token.jsonl': { text: recording('telegram-token', op({}, `bot ${planted.telegram} rejected`)), rule: /Telegram bot token shape/ },
+            'hex32.jsonl': { text: recording('hex32', op({ apiHash: planted.hex32 })), rule: /32-hex run/ },
+            'base64-session.jsonl': { text: recording('base64-session', op({ session: planted.base64 })), rule: /long token-shaped run/ },
+            'explorer-key-text.jsonl': { text: recording('explorer-key-text', op({}, `explorer key ${planted.explorerKey} refused`)), rule: /long token-shaped run/ },
+            'bearer.jsonl': { text: recording('bearer', op({ header: planted.bearer })), rule: /Bearer credential/ },
+            'url-fragment.jsonl': { text: recording('url-fragment', op({ url: planted.fragmentUrl })), rule: /URL on etherscan\.io has a credential-like fragment parameter/ },
+            'credential-uri-other-scheme.jsonl': { text: recording('credential-uri-other-scheme', op({ cache: planted.otherSchemeUrl })), rule: /URL with a user name or password/ },
+            'url-userinfo-loopback.jsonl': { text: recording('url-userinfo-loopback', op({ rpc: planted.loopbackUrl })), rule: /URL with a user name or password/ },
         };
         const dir = tempRecordings(Object.fromEntries(Object.entries(cases).map(([k, v]) => [k, v.text])));
         const findings = knownFindingIds();
@@ -509,16 +286,28 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
                 'good-sentinels',
                 op({ mevConfig: { relayUrl: 'https://relay.flashbots.net', network: 'mainnet', authKey: s.byName.get('FLASHBOTS_AUTH_KEY') } }),
                 op({ mevConfig: { endpoint: 'https://api.blxrbdn.com', authHeader: 'TEST-SENTINEL' }, walletPrivateKey: s.byName.get('PRIVATE_KEY') }),
+                // The env matrix's case values ('', '0', 'abc') under the secret fields (WR-34).
+                op({ mevConfig: { authKey: '0', authHeader: '' }, walletPrivateKey: 'abc' }),
             ),
+            'env/PRIVATE_KEY.json': JSON.stringify({ variable: 'PRIVATE_KEY', cases: { empty: { env: { PRIVATE_KEY: '' } }, '0': { env: { PRIVATE_KEY: '0' } }, abc: { env: { PRIVATE_KEY: 'abc' } }, valid: { env: { PRIVATE_KEY: s.byName.get('PRIVATE_KEY') } } } }),
             'good-bodies.jsonl': `${[
                 header('good-bodies'),
                 JSON.stringify({ kind: 'relay', at: 1, relay: 'bloxroute', url: 'https://api.blxrbdn.com', method: 'bsc_private_tx', params: { transaction: tx.serialized.slice(2) } }),
                 JSON.stringify({ kind: 'relay', at: 2, relay: 'flashbots', url: 'https://relay.flashbots.net', method: 'eth_sendBundle', params: [{ txs: [tx.serialized, tx2.serialized], blockNumber: '0x1' }] }),
                 JSON.stringify({ kind: 'submit', at: 3, route: 'bundle', status: 'accepted', hash: tx.hash, request: { value: '1', gasLimit: '21000', maxFeePerGas: '2', maxPriorityFeePerGas: '1', data: '0x' }, raw: tx.serialized }),
-                op({ txHash: tx.hash, bundleHash: tx2.hash, topics: [tx.hash], consideredByBuilders: [`0x${'ab'.repeat(48)}`], gasMultiplier: 1.2, amountOut: '5' }, 'Reconciled late inclusion — native confirm lied "not included"'),
+                op({ txHash: tx.hash, bundleHash: bundleHashOf([tx.hash!, tx2.hash!]), topics: [tx.hash], consideredByBuilders: [`0x${'ab'.repeat(48)}`], gasMultiplier: 1.2, amountOut: '5' }, 'Reconciled late inclusion — native confirm lied "not included"'),
+                // A seeded db row (the risk-gate scenario) holds a made-up hash of no signed transaction.
+                JSON.stringify({ kind: 'db', at: 4, table: 'trades', op: 'insert', inTransaction: false, row: { tx_hash: ethers.id('realpath.plan-23-20.seeded-row'), status: 'pending' } }),
             ].join('\n')}\n`,
-            // bloXroute's answer (hex without 0x) beside the hash the bot signed (the plan 23-22 rule).
-            'good-relay-answer.jsonl': recording('good-relay-answer', relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!), relayAccepted({ txHash: tx2.hash!.slice(2).toUpperCase() }, tx2.hash!)),
+            // bloXroute's answer (hex without 0x) beside the hash the bot signed (the plan 23-22 rule),
+            // each after the relay body that carried that signed transaction.
+            'good-relay-answer.jsonl': recording(
+                'good-relay-answer',
+                JSON.stringify({ kind: 'relay', at: 1, relay: 'bloxroute', url: 'https://api.blxrbdn.com', method: 'bsc_private_tx', params: { transaction: tx.serialized.slice(2) } }),
+                relayAccepted({ txHash: tx.hash!.slice(2) }, tx.hash!),
+                JSON.stringify({ kind: 'relay', at: 2, relay: 'bloxroute', url: 'https://api.blxrbdn.com', method: 'bsc_private_tx', params: { transaction: tx2.serialized.slice(2) } }),
+                relayAccepted({ txHash: tx2.hash!.slice(2).toUpperCase() }, tx2.hash!),
+            ),
             'env/_baseline.json': JSON.stringify({ PRIVATE_KEY: s.byName.get('PRIVATE_KEY'), FLASHBOTS_AUTH_KEY: s.byName.get('FLASHBOTS_AUTH_KEY'), ratio: { $nonFinite: 'Infinity' } }),
         };
         const dir = tempRecordings(files);
@@ -620,6 +409,50 @@ function withEnv<T>(env: { update: string | undefined; ci: string | undefined },
     }
 }
 
+/**
+ * WR-36: run `fn` with a live update token, as scripts/update-recordings.ts makes one for its single
+ * Vitest run: 32 random hex digits and the file <os.tmpdir()>/<UPDATE_TOKEN_PREFIX><token> naming the
+ * process (`pid`) that owns it. The file is removed after.
+ */
+function withLiveToken<T>(fn: (token: string) => T, pid: number = process.pid): T {
+    const token = randomBytes(16).toString('hex');
+    const tokenFile = path.join(os.tmpdir(), `${UPDATE_TOKEN_PREFIX}${token}`);
+    fs.writeFileSync(tokenFile, JSON.stringify({ pid, token }));
+    try {
+        return fn(token);
+    } finally {
+        fs.rmSync(tokenFile, { force: true });
+    }
+}
+
+/** A process id that names no running process (process.kill(pid, 0) fails with ESRCH). */
+function deadPid(): number {
+    for (let pid = 4_000_000 + (process.pid % 1000); pid < 4_100_000; pid += 7) {
+        try {
+            process.kill(pid, 0);
+        } catch (e) {
+            if ((e as NodeJS.ErrnoException).code === 'ESRCH') return pid;
+        }
+    }
+    throw new Error('no free process id found');
+}
+
+/** Run `fn` with process.stderr captured; returns the lines written. */
+function captureStderr(fn: () => void): string[] {
+    const chunks: string[] = [];
+    const orig = process.stderr.write;
+    process.stderr.write = ((chunk: unknown) => {
+        chunks.push(String(chunk));
+        return true;
+    }) as typeof process.stderr.write;
+    try {
+        fn();
+    } finally {
+        process.stderr.write = orig;
+    }
+    return chunks.join('').split('\n').filter(Boolean);
+}
+
 /** A recording's entry lines: the header and the empty-list line left out. */
 function bodyLines(text: string): string[] {
     return text.split('\n').filter((l, i) => i > 0 && l !== '' && l !== EMPTY_SUBMITTED_LINE);
@@ -644,26 +477,45 @@ describe('compare and write (AC-25), order (AC-23)', () => {
             // A carriage return is refused before anything is compared.
             expect(() => compareRecording('x.jsonl', original.replace('\n', '\r\n'), { dir })).toThrow(/carriage return/);
         });
-        // CI set: the switch alone never writes.
-        withEnv({ update: '1', ci: 'true' }, () => {
-            expect(updateAllowed()).toBe(false);
+        // WR-36: the switch writes only with a live update token, the one scripts/update-recordings.ts
+        // makes for its one Vitest run. Every other value, a lingering "1" included, only compares.
+        const unchanged = (): void => {
             expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
             expect(fs.readFileSync(file).equals(before)).toBe(true);
-        });
-        // A switch value other than "1" never writes either.
-        withEnv({ update: 'true', ci: undefined }, () => {
+        };
+        withLiveToken((token) => withEnv({ update: token, ci: 'true' }, () => {
             expect(updateAllowed()).toBe(false);
-            expect(() => compareRecording('x.jsonl', changed, { dir })).toThrow(/differs/);
-            expect(fs.readFileSync(file).equals(before)).toBe(true);
-        });
-        // Only "1" with CI unset writes: what scripts/update-recordings.ts sets up for its one run.
-        withEnv({ update: '1', ci: undefined }, () => {
-            expect(compareRecording('x.jsonl', changed, { dir })).toBe('written');
+            unchanged();
+        }));
+        for (const value of ['1', 'true', randomBytes(16).toString('hex'), 'A'.repeat(32)]) {
+            withEnv({ update: value, ci: undefined }, () => {
+                expect(updateAllowed(), `switch ${JSON.stringify(value)}`).toBe(false);
+                unchanged();
+            });
+        }
+        // A token whose file names a process that is not running (the wrapper was killed) never writes.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            expect(updateAllowed()).toBe(false);
+            unchanged();
+        }), deadPid());
+        // A token file that is not the wrapper's record never writes either.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            fs.writeFileSync(path.join(os.tmpdir(), `${UPDATE_TOKEN_PREFIX}${token}`), 'not a record');
+            expect(updateAllowed()).toBe(false);
+            unchanged();
+        }));
+        // A live token with CI unset writes, and says so on stderr for every write.
+        withLiveToken((token) => withEnv({ update: token, ci: undefined }, () => {
+            expect(updateAllowed()).toBe(true);
+            const stderr = captureStderr(() => {
+                expect(compareRecording('x.jsonl', changed, { dir })).toBe('written');
+                expect(compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir })).toBe('written');
+                expect(compareRecording('x.jsonl', changed, { dir })).toBe('match');
+            });
             expect(fs.readFileSync(file, 'utf8')).toBe(changed);
-            expect(compareRecording('env/SOME_VAR.json', '{"a":1}\n', { dir })).toBe('written');
             expect(fs.readFileSync(path.join(dir, 'env', 'SOME_VAR.json'), 'utf8')).toBe('{"a":1}\n');
-            expect(compareRecording('x.jsonl', changed, { dir })).toBe('match');
-        });
+            expect(stderr.filter((l) => /^\[recordings\] WROTE /.test(l))).toEqual(['[recordings] WROTE x.jsonl (update run)', '[recordings] WROTE env/SOME_VAR.json (update run)']);
+        }));
     });
 
     it('a recording path is relative to the recordings folder, carries .jsonl or .json, and cannot leave it', () => {
@@ -680,12 +532,19 @@ describe('compare and write (AC-25), order (AC-23)', () => {
         expect(name).toBe('VITEST_CSB_UPDATE_RECORDINGS');
         const textFile = /\.(?:ts|tsx|js|cjs|mjs|json|yml|yaml|sh)$/;
         const mentions: string[] = [];
+        const textOf = new Map<string, string>();
         const visit = (dir: string): void => {
             for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
                 if (e.name === 'node_modules' || e.name === '.git') continue;
                 const full = path.join(dir, e.name);
                 if (e.isDirectory()) visit(full);
-                else if (textFile.test(e.name) && fs.readFileSync(full, 'utf8').includes(name)) mentions.push(path.relative(REPO_ROOT, full).split(path.sep).join('/'));
+                else if (textFile.test(e.name)) {
+                    const text = fs.readFileSync(full, 'utf8');
+                    if (!text.includes(name)) continue;
+                    const rel = path.relative(REPO_ROOT, full).split(path.sep).join('/');
+                    mentions.push(rel);
+                    textOf.set(rel, text);
+                }
             }
         };
         for (const d of ['src', 'scripts', 'test', '.github', 'dashboard']) if (fs.existsSync(path.join(REPO_ROOT, d))) visit(path.join(REPO_ROOT, d));
@@ -698,6 +557,12 @@ describe('compare and write (AC-25), order (AC-23)', () => {
         const serializerText = fs.readFileSync(path.join(REPO_ROOT, 'test', 'realpath', 'harness', 'serializer.ts'), 'utf8');
         expect(serializerText).not.toMatch(/process\.env(?:\[[^\]]+\]|\.[A-Za-z_]+)\s*=(?!=)/);
         expect(serializerText).toContain(`'${name}'`);
+        // WR-36: the switch carries a one-run token, and the update command (the one file that sets
+        // the switch, found by the walk above) makes the token file under the serializer's own prefix.
+        expect(UPDATE_TOKEN_PREFIX).toBe('csb-recordings-update-');
+        const updater = [...textOf.entries()].find(([rel]) => rel.startsWith('scripts/'));
+        expect(updater?.[1]).toContain(`'${UPDATE_TOKEN_PREFIX}'`);
+        expect(updater?.[1]).not.toMatch(new RegExp(`\\[SWITCH\\]: '1'`));
     });
 
     it('AC-23: serializeTimeline keeps the order it was given (same-time entries included), and no committed recording is sorted by content', () => {
