@@ -19,6 +19,13 @@
 //     variable's own name (how plan 23-23's _baseline.json records its input). The chain registry
 //     carries mevConfig.authKey / mevConfig.authHeader (src/chainRegistry.ts), inert sentinels. A
 //     string that CONTAINS a sentinel without being exactly that allowed value fails too.
+//   - Secret fields (Phase 23 review WR-34): walletPrivateKey, authKey, authHeader, and any key named
+//     like a secret variable (upper-case, matching the sentinel key pattern) hold their sentinel or
+//     one of the env matrix's case values ('', '0', 'abc'), and nothing else.
+//   - Secret shapes (WR-34), in any string: a Telegram bot token (digits:30+ token characters), a
+//     32-hex run, a Bearer credential, a URL of any scheme with a user name or password, and a run of
+//     32 or more token characters (letters, digits, _ + / = -) that is not hex and mixes upper case,
+//     lower case and digits (a base64 session) or upper case and digits (an explorer API key).
 //   - Hashes: otherwise a 64-hex value is allowed only as the whole value (0x + 64 hex) of a named
 //     hash field (HASH_KEYS: the hash-carrying keys src/ uses in its logs and DB columns) or an entry
 //     of `topics`, and even there it must be a real hash (Phase 23 review WR-33): a transaction-hash
@@ -56,7 +63,8 @@
 //     literal, comments excluded). On a public host the URL is parsed with the real URL class and
 //     fails on a username or password, a query parameter named like a credential (key, token,
 //     secret, auth, password, session, signature) unless its value is a 20-byte 0x address, or a path
-//     segment or query value of 20 or more characters that is not a 20-byte 0x address.
+//     segment or query value of 20 or more characters that is not a 20-byte 0x address. The fragment
+//     gets the query rules (WR-34), and a username or password fails on a loopback host too.
 //   - Any string, or any line of one, starting as a .env-style KEY= fails.
 // AC-21: every ID a header's SUSPECT(...) cites exists as a finding JSON.
 // AC-22: serializeTimeline with no submit entry ends in the exact line {"submitted":[]}.
@@ -122,6 +130,20 @@ const URL_RUN = /\b(?:https?|wss?):\/\/[^\s"'<>`]+/gi;
 const CREDENTIAL_PARAM = /key|token|secret|auth|password|session|signature/i;
 const SENTINEL_KEY = /KEY|TOKEN|SESSION|HASH|SECRET|AUTH/;
 const ADDRESS_RUN = /(?<![0-9a-fA-Fx])0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/g;
+// WR-34: secret shapes that fail in any string, sentinel or not.
+const TELEGRAM_TOKEN = /(?<![0-9])\d{6,12}:[A-Za-z0-9_-]{30,}/;
+const HEX32_RUN = /(?<![0-9A-Za-z])[0-9a-fA-F]{32}(?![0-9A-Za-z])/;
+const BEARER = /\bBearer\s+\S{16,}/i;
+const USERINFO_URL = /\b[a-z][a-z0-9+.-]*:\/\/[^\s/?#@"'<>`]+@/i;
+const TOKEN_RUN = /[A-Za-z0-9_+/=-]{32,}/g;
+/** The env matrix's case values (test/realpath/env/envMatrix.test.ts CASES): the only non-sentinel values a secret field may hold. */
+const CASE_VALUES: ReadonlySet<string> = new Set(['', '0', 'abc']);
+/** The camel-case secret fields the registry and config carry, and the variable whose sentinel each holds. */
+const SECRET_FIELDS: ReadonlyMap<string, string> = new Map([
+    ['walletPrivateKey', 'PRIVATE_KEY'],
+    ['authKey', 'FLASHBOTS_AUTH_KEY'],
+    ['authHeader', 'BLOXROUTE_AUTH_HEADER'],
+]);
 const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 const KEY_FLOOR = 2n ** 160n;
 
@@ -270,12 +292,13 @@ function checkUrl(url: string, c: WalkCtx, at: string): void {
         return;
     }
     const host = u.hostname.toLowerCase();
+    // A user name or password fails on any host, loopback included (WR-34).
+    if (u.username !== '' || u.password !== '') c.out.push(`${at}: URL on ${host} carries a username or password`);
     if (LOOPBACK_HOSTS.has(host)) return;
     if (!PUBLIC_HOSTS.includes(host)) {
         c.out.push(`${at}: URL host ${host} is neither loopback nor a public host src/ names`);
         return;
     }
-    if (u.username !== '' || u.password !== '') c.out.push(`${at}: URL on ${host} carries a username or password`);
     const longOk = (v: string): boolean => v.length < 20 || ADDRESS.test(v);
     for (const seg of u.pathname.split('/')) {
         const s = decodeURIComponent(seg);
@@ -284,6 +307,16 @@ function checkUrl(url: string, c: WalkCtx, at: string): void {
     for (const [name, value] of u.searchParams) {
         if (CREDENTIAL_PARAM.test(name) && !ADDRESS.test(value)) c.out.push(`${at}: URL on ${host} has a credential-like query parameter ${name}`);
         else if (!longOk(value)) c.out.push(`${at}: URL on ${host} has a query value of ${value.length} characters that is not an address`);
+    }
+    // The fragment (WR-34): read as parameters when it holds one (#access_token=...), else as one value.
+    if (u.hash.length > 1) {
+        const frag = decodeURIComponent(u.hash.slice(1));
+        if (frag.includes('=')) {
+            for (const [name, value] of new URLSearchParams(frag)) {
+                if (CREDENTIAL_PARAM.test(name) && !ADDRESS.test(value)) c.out.push(`${at}: URL on ${host} has a credential-like fragment parameter ${name}`);
+                else if (!longOk(value)) c.out.push(`${at}: URL on ${host} has a fragment value of ${value.length} characters that is not an address`);
+            }
+        } else if (!longOk(frag)) c.out.push(`${at}: URL on ${host} has a fragment of ${frag.length} characters that is not an address`);
     }
 }
 
@@ -302,6 +335,28 @@ function checkString(value: string, key: string | null, parent: Record<string, u
     for (const s of c.sentinels.values) {
         if (s.length >= 8 && value.includes(s)) {
             c.out.push(`${at}: a string containing a test/.env.test secret sentinel`);
+            break;
+        }
+    }
+    // WR-34: a secret field (the three registry/config fields, or a key named like a secret variable)
+    // holds its sentinel (handled above) or one of the env matrix's case values, and nothing else.
+    const secretVar = key === null ? null : SECRET_FIELDS.get(key) ?? (/^[A-Z][A-Z0-9_]*$/.test(key) && SENTINEL_KEY.test(key) ? key : null);
+    if (secretVar !== null) {
+        if (CASE_VALUES.has(value)) return;
+        c.out.push(`${at}: a secret field holding a value that is neither its test/.env.test sentinel nor a case value ('', '0', 'abc')`);
+    }
+    // WR-34: secret shapes, anywhere.
+    if (TELEGRAM_TOKEN.test(value)) c.out.push(`${at}: a Telegram bot token shape`);
+    if (HEX32_RUN.test(value)) c.out.push(`${at}: a 32-hex run (an API hash or key shape)`);
+    if (BEARER.test(value)) c.out.push(`${at}: a Bearer credential`);
+    if (USERINFO_URL.test(value)) c.out.push(`${at}: a URL with a user name or password`);
+    // Addresses and hashes (0x + 40 or more hex, a checksummed address mixes case) are not tokens.
+    for (const run of value.replace(/0x[0-9a-fA-F]{40,}/g, ' ').match(TOKEN_RUN) ?? []) {
+        if (/^(?:0x)?[0-9a-fA-F]+$/.test(run)) continue;
+        const mixed = /[A-Z]/.test(run) && /[a-z]/.test(run) && /[0-9]/.test(run);
+        const upperKey = /^[A-Z0-9]+$/.test(run) && /[A-Z]/.test(run) && /[0-9]/.test(run);
+        if (mixed || upperKey) {
+            c.out.push(`${at}: a long token-shaped run (an API key, session or base64 secret shape)`);
             break;
         }
     }
@@ -513,6 +568,31 @@ async function signedTx(nonce = 0, data = '0x'): Promise<Transaction> {
     return Transaction.from(raw);
 }
 
+/**
+ * WR-34 planted values, each built at run time from a hash so that no secret-shaped literal sits in
+ * this file (the phase secret scan reads source text): a Telegram bot token shape, a 32-hex API hash,
+ * a base64 session, an explorer-style API key, a Bearer credential, a URL fragment token, and
+ * credential URLs in another scheme and on a loopback host.
+ */
+const planted = (() => {
+    const bytes = (label: string, n = 32): Uint8Array => ethers.getBytes(ethers.id(`realpath.wr-34.${label}`)).slice(0, n);
+    const alphabet = (label: string, chars: string, n: number): string => Array.from(bytes(label), (b) => chars[b % chars.length]).join('').slice(0, n);
+    const word = alphabet('word', 'abcdefghijklmnopqrstuvwxyz', 24);
+    const userinfo = [alphabet('user', 'abcdefghijklmnopqrstuvwxyz', 6), alphabet('pass', 'abcdefghijklmnopqrstuvwxyz0123456789', 18)].join(':');
+    return {
+        word,
+        headerWord: `live-${word}`,
+        telegram: [String(100_000_000 + bytes('tg')[0]), `AA${alphabet('tg-secret', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-', 33)}`].join(':'),
+        hex32: ethers.id('realpath.wr-34.hex32').slice(2, 34),
+        base64: Buffer.concat([Buffer.from(bytes('b64-a')), Buffer.from(bytes('b64-b'))]).toString('base64'),
+        explorerKey: alphabet('explorer', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 32) + alphabet('explorer-2', 'GHJKLMNPQRSTUVWXYZ', 2),
+        bearer: ['Bearer', alphabet('bearer', 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 28)].join(' '),
+        fragmentUrl: `https://etherscan.io/address/${ADDR}#${['access', 'token'].join('_')}=${alphabet('frag', 'abcdefghijklmnopqrstuvwxyz0123456789', 24)}`,
+        otherSchemeUrl: ['redis:', '', `${userinfo}@cache.internal:6379`].join('/'),
+        loopbackUrl: ['http:', '', `${userinfo}@127.0.0.1:8545`].join('/'),
+    };
+})();
+
 /** A Flashbots bundle hash: keccak256 of the bundle's transaction hashes, concatenated (the relay's rule). */
 const bundleHashOf = (hashes: string[]): string => ethers.keccak256(`0x${hashes.map((h) => h.slice(2)).join('')}`);
 /** A submit line as the serializer writes it, request decoded from the raw transaction. */
@@ -622,6 +702,18 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
             },
             'submit-data-not-raw.jsonl': { text: `${[header('submit-data-not-raw'), submitOf(tx, 1, { data: `0x${'00'.repeat(4)}` })].join('\n')}\n`, rule: /request\.data is not the data of the entry's signed raw transaction/ },
             'wallet-key-in-calldata.jsonl': { text: `${[header('wallet-key-in-calldata'), submitOf(keyInData)].join('\n')}\n`, rule: /private key of an address in this recording/ },
+            // WR-34: secret fields hold their sentinel or a case value only; secret shapes fail anywhere.
+            // Every planted value is built at run time, so no secret-shaped literal sits in this file.
+            'secret-field-not-sentinel.jsonl': { text: recording('secret-field-not-sentinel', op({ mevConfig: { authHeader: planted.headerWord } })), rule: /secret field holding a value that is neither its test\/\.env\.test sentinel nor a case value/ },
+            'env/SECRET_VAR_NOT_SENTINEL.json': { text: JSON.stringify({ cases: { valid: { env: { TELEGRAM_SESSION: planted.word } } } }), rule: /secret field holding a value that is neither its test\/\.env\.test sentinel nor a case value/ },
+            'telegram-token.jsonl': { text: recording('telegram-token', op({}, `bot ${planted.telegram} rejected`)), rule: /Telegram bot token shape/ },
+            'hex32.jsonl': { text: recording('hex32', op({ apiHash: planted.hex32 })), rule: /32-hex run/ },
+            'base64-session.jsonl': { text: recording('base64-session', op({ session: planted.base64 })), rule: /long token-shaped run/ },
+            'explorer-key-text.jsonl': { text: recording('explorer-key-text', op({}, `explorer key ${planted.explorerKey} refused`)), rule: /long token-shaped run/ },
+            'bearer.jsonl': { text: recording('bearer', op({ header: planted.bearer })), rule: /Bearer credential/ },
+            'url-fragment.jsonl': { text: recording('url-fragment', op({ url: planted.fragmentUrl })), rule: /URL on etherscan\.io has a credential-like fragment parameter/ },
+            'credential-uri-other-scheme.jsonl': { text: recording('credential-uri-other-scheme', op({ cache: planted.otherSchemeUrl })), rule: /URL with a user name or password/ },
+            'url-userinfo-loopback.jsonl': { text: recording('url-userinfo-loopback', op({ rpc: planted.loopbackUrl })), rule: /URL with a user name or password/ },
         };
         const dir = tempRecordings(Object.fromEntries(Object.entries(cases).map(([k, v]) => [k, v.text])));
         const findings = knownFindingIds();
@@ -651,7 +743,10 @@ describe('recordings guard (AC-21, AC-22, AC-26, AC-51)', () => {
                 'good-sentinels',
                 op({ mevConfig: { relayUrl: 'https://relay.flashbots.net', network: 'mainnet', authKey: s.byName.get('FLASHBOTS_AUTH_KEY') } }),
                 op({ mevConfig: { endpoint: 'https://api.blxrbdn.com', authHeader: 'TEST-SENTINEL' }, walletPrivateKey: s.byName.get('PRIVATE_KEY') }),
+                // The env matrix's case values ('', '0', 'abc') under the secret fields (WR-34).
+                op({ mevConfig: { authKey: '0', authHeader: '' }, walletPrivateKey: 'abc' }),
             ),
+            'env/PRIVATE_KEY.json': JSON.stringify({ variable: 'PRIVATE_KEY', cases: { empty: { env: { PRIVATE_KEY: '' } }, '0': { env: { PRIVATE_KEY: '0' } }, abc: { env: { PRIVATE_KEY: 'abc' } }, valid: { env: { PRIVATE_KEY: s.byName.get('PRIVATE_KEY') } } } }),
             'good-bodies.jsonl': `${[
                 header('good-bodies'),
                 JSON.stringify({ kind: 'relay', at: 1, relay: 'bloxroute', url: 'https://api.blxrbdn.com', method: 'bsc_private_tx', params: { transaction: tx.serialized.slice(2) } }),
