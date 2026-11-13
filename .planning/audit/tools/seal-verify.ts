@@ -9,6 +9,13 @@
 //   - SEAL.json's own numbers still match the files they point at
 //   - with --scan, every commit after sealed_sha is scanned for secrets
 //
+// The seal record is read from git, never from the working tree (Phase 23 review CR-10). The copy
+// judged is the one first committed after sealed_sha (the anchor): the record must be added exactly
+// once in sealed_sha..HEAD, and HEAD's copy must be byte-identical to the anchor's. A later edit to
+// the record (a widened exempt list, a moved sealed_sha), an uncommitted edit, a second add, or a
+// record committed before the revision it seals is INVALID; a re-seal is a new record. The scan
+// record is read at HEAD, and an uncommitted edit to it is INVALID too.
+//
 // Usage (Node 22.16.0 by absolute path, D-21):
 //   seal-verify.ts [--scan] [--seal <repo-relative seal record>] [--repo <repo root>]
 //       Prints `SEAL VALID` or `SEAL INVALID: <reasons>`. Exit 0 valid, 1 invalid.
@@ -667,21 +674,70 @@ export function underCovers(p: string, covers: string): boolean {
     return p.toLowerCase().startsWith(covers.toLowerCase());
 }
 
+/** A JSON object committed at `rev:rel`, or null (absent, not JSON, or not an object). */
+function jsonObjectAt(repo: string, rev: string, rel: string): Record<string, any> | null {
+    try {
+        const v: unknown = JSON.parse(gitText(repo, ['cat-file', '-p', `${rev}:${rel}`]));
+        return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, any>) : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The commits in `sealed..HEAD` that add `rel`, parents before children (CR-10). Every commit that
+ * adds the path counts, a side branch included (--full-history); a merge adds nothing of its own
+ * here (--diff-merges=off), so a pull-request merge of the branch that added the record does not
+ * count as a second add.
+ */
+export function recordAdds(repo: string, sealed: string, rel: string): string[] {
+    return gitText(repo, ['log', '--reverse', '--topo-order', '--format=%H', '--full-history', '--diff-merges=off', '--no-renames', '--diff-filter=A', `${sealed}..HEAD`, '--', rel])
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
 export function verifySeal(repo: string, opts: { scan: boolean; scan_fn?: (from: string, to: string) => Hit[]; seal_rel?: string }): SealResult {
     const reasons: string[] = [];
     const sealRel = opts.seal_rel ?? SEAL_REL;
     const fail = (why: string[]): SealResult => ({ valid: false, reasons: why, changed: [], outside_covers: 0 });
     if (!isPlainRel(sealRel)) return fail([`--seal must be a plain repo-relative path: ${sealRel}`]);
     const sealName = path.posix.basename(sealRel);
-    const sealPath = path.join(repo, ...sealRel.split('/'));
-    if (!fs.existsSync(sealPath)) return fail([`${sealRel} is missing`]);
-    const seal = JSON.parse(fs.readFileSync(sealPath, 'utf8'));
+
+    // CR-10: the record is read from git, never from the working tree, and judged as it was first
+    // committed after the revision it seals. The record is on its own exempt list (it is committed
+    // after sealed_sha), so without this a later edit to it (widening exempt_paths, moving
+    // sealed_sha) would turn tampering into SEAL VALID. A later edit is a reason, never a new reading.
+    if (!gitOk(repo, ['cat-file', '-e', `HEAD:${sealRel}`])) return fail([`${sealRel} is missing at HEAD (a seal record is judged as committed)`]);
+    const headSeal = jsonObjectAt(repo, 'HEAD', sealRel);
+    if (!headSeal) return fail([`${sealRel} at HEAD is not a JSON object`]);
+    if (!gitOk(repo, ['diff', '--quiet', 'HEAD', '--', sealRel])) reasons.push(`the working-tree copy of ${sealRel} differs from HEAD (an uncommitted edit); the record is judged as committed`);
+    const headSealed = String(headSeal.sealed_sha);
+    if (!SHA40.test(headSealed)) return fail([...reasons, 'sealed_sha is not 40 hex']);
+    if (!gitOk(repo, ['cat-file', '-e', `${headSealed}^{commit}`])) return fail([...reasons, 'sealed_sha names no commit']);
+    if (!gitOk(repo, ['merge-base', '--is-ancestor', headSealed, 'HEAD'])) return fail([...reasons, 'sealed_sha is not an ancestor of HEAD']);
+    const adds = recordAdds(repo, headSealed, sealRel);
+    if (adds.length === 0) {
+        return fail([...reasons, `${sealRel} was not added after sealed_sha ${headSealed.slice(0, 8)}: a seal record is committed once, after the revision it seals, and moving sealed_sha needs a new record`]);
+    }
+    if (adds.length > 1) reasons.push(`${sealRel} was added more than once after sealed_sha (${adds.map((a) => a.slice(0, 8)).join(', ')}); a seal record is committed once, and a re-seal needs a new record`);
+    const anchor = adds[0];
+    const seal = jsonObjectAt(repo, anchor, sealRel);
+    if (!seal) return fail([...reasons, `${sealRel} as first committed at ${anchor.slice(0, 8)} is not a JSON object`]);
+    if (gitText(repo, ['rev-parse', `${anchor}:${sealRel}`]).trim() !== gitText(repo, ['rev-parse', `HEAD:${sealRel}`]).trim()) {
+        const keys = [...new Set([...Object.keys(seal), ...Object.keys(headSeal)])].filter((k) => JSON.stringify(seal[k]) !== JSON.stringify(headSeal[k]));
+        reasons.push(
+            `${sealRel} changed after the record was first committed at ${anchor.slice(0, 8)} (${keys.length ? `fields: ${keys.join(', ')}` : 'formatting only'}); ` +
+                'it is judged as first committed, and a re-seal needs a new record',
+        );
+    }
+
     const sealed = String(seal.sealed_sha);
     const start = String(seal.phase_start_sha);
     const patterns: string[] = Array.isArray(seal.exempt_paths) ? seal.exempt_paths.map(String) : [];
-    if (!SHA40.test(sealed)) return fail(['sealed_sha is not 40 hex']);
-    if (!SHA40.test(start)) return fail(['phase_start_sha is not 40 hex']);
-    if (!gitOk(repo, ['cat-file', '-e', `${sealed}^{commit}`])) return fail(['sealed_sha names no commit']);
+    if (!SHA40.test(sealed)) return fail([...reasons, 'sealed_sha is not 40 hex']);
+    if (!SHA40.test(start)) return fail([...reasons, 'phase_start_sha is not 40 hex']);
+    if (!gitOk(repo, ['cat-file', '-e', `${sealed}^{commit}`])) return fail([...reasons, 'sealed_sha names no commit']);
 
     // A successor carries previous_seal; any one successor field makes the whole set required,
     // so a partial record can never fall back to the weaker reading.
@@ -705,11 +761,12 @@ export function verifySeal(repo: string, opts: { scan: boolean; scan_fn?: (from:
     if (seal.final_check !== 'pass') reasons.push(`${sealName} final_check is not "pass"`);
     if (!seal.scan || seal.scan.non_public !== 0) reasons.push(`${sealName} scan.non_public is not 0`);
 
-    const scanFile = path.join(repo, ...scanRel.split('/'));
+    // The scan record too is read as committed at HEAD (CR-10); its digest is pinned by the anchored record.
     let scanText: Buffer | null = null;
-    if (!fs.existsSync(scanFile)) reasons.push(`${scanRel} is missing`);
+    if (!gitOk(repo, ['cat-file', '-e', `HEAD:${scanRel}`])) reasons.push(`${scanRel} is missing at HEAD`);
     else {
-        scanText = fs.readFileSync(scanFile);
+        scanText = gitOut(repo, ['cat-file', '-p', `HEAD:${scanRel}`]);
+        if (!gitOk(repo, ['diff', '--quiet', 'HEAD', '--', scanRel])) reasons.push(`the working-tree copy of ${scanRel} differs from HEAD (an uncommitted edit); the scan record is judged as committed`);
         if (sha256(scanText) !== seal.scan?.phase_scan_sha256) reasons.push(`${scanRel} does not match ${sealName} phase_scan_sha256`);
     }
 
@@ -937,7 +994,7 @@ function selfTest(repoRoot: string): number {
         put(SEAL_REL, JSON.stringify(baseSeal(), null, 2) + '\n');
         commit('seal record');
         const base = g('rev-parse', 'HEAD');
-        const reset = () => g('checkout', '-q', '-B', 'case', base);
+        const reset = () => g('checkout', '-q', '-f', '-B', 'case', base);
 
         const sameList = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
         const run = (name: string, mutate: () => void, expectValid: boolean, reason?: string, o: { changed?: string[]; seal_rel?: string; from?: () => void } = {}) => {
@@ -982,18 +1039,50 @@ function selfTest(repoRoot: string): number {
             commit('c');
         }, false, 'ancestor');
         run('phase-scan.json altered', () => { put(SCAN_REL, '{"hit_counts":{"non-public":1}}\n'); commit('c'); }, false, 'phase_scan_sha256');
-        run('a render altered in SEAL.json', () => {
+        // The record's own checks, on a record whose FIRST committed copy is wrong (CR-10: a later
+        // edit is caught by the anchor before these checks could see it; the tamper cases below).
+        const firstAdd = { from: () => { g('checkout', '-q', '-f', '-B', 'case', sealed); put(SCAN_REL, scanText); } };
+        run('a render altered in SEAL.json (as first committed)', () => {
             put(SEAL_REL, JSON.stringify({ ...baseSeal(), render_sha256: { findings: '0'.repeat(64), decisions: sha256('decisions\n') } }, null, 2) + '\n');
             commit('c');
-        }, false, 'render_sha256.findings');
-        run('final_check not pass', () => {
+        }, false, 'render_sha256.findings', firstAdd);
+        run('final_check not pass (as first committed)', () => {
             put(SEAL_REL, JSON.stringify({ ...baseSeal(), final_check: 'fail' }, null, 2) + '\n');
             commit('c');
-        }, false, 'final_check');
-        run('scan not clean', () => {
+        }, false, 'final_check', firstAdd);
+        run('scan not clean (as first committed)', () => {
             put(SEAL_REL, JSON.stringify({ ...baseSeal(), scan: { ...baseSeal().scan, non_public: 2 } }, null, 2) + '\n');
             commit('c');
-        }, false, 'non_public');
+        }, false, 'non_public', firstAdd);
+        run('the same record after a later edit reports which fields changed (CR-10)', () => {
+            put(SEAL_REL, JSON.stringify({ ...baseSeal(), final_check: 'fail', render_sha256: { findings: '0'.repeat(64), decisions: sha256('decisions\n') } }, null, 2) + '\n');
+            commit('c');
+        }, false, 'fields: final_check, render_sha256');
+
+        // --- CR-10: the record is judged as first committed after sealed_sha, never as edited later ---
+        run('tamper (CR-10): a later commit widens exempt_paths in SEAL.json to cover its own source change', () => {
+            put('src/a.ts', 'export const a = 7;\n');
+            put(SEAL_REL, JSON.stringify({ ...baseSeal(), exempt_paths: [...REAL_EXEMPT, 'src/*'] }, null, 2) + '\n');
+            commit('c');
+        }, false, 'changed after the record was first committed');
+        run('tamper (CR-10): sealed_sha moved forward in SEAL.json past a later source change', () => {
+            put('src/a.ts', 'export const a = 7;\n');
+            commit('c1');
+            put(SEAL_REL, JSON.stringify({ ...baseSeal(), sealed_sha: g('rev-parse', 'HEAD') }, null, 2) + '\n');
+            commit('c2');
+        }, false, 'was not added after sealed_sha');
+        run('tamper (CR-10): SEAL.json deleted and re-added with a widened exempt list', () => {
+            g('rm', '-q', '--', SEAL_REL);
+            commit('c1');
+            put('src/a.ts', 'export const a = 7;\n');
+            put(SEAL_REL, JSON.stringify({ ...baseSeal(), exempt_paths: [...REAL_EXEMPT, 'src/a.ts'] }, null, 2) + '\n');
+            commit('c2');
+        }, false, 'added more than once after sealed_sha');
+        run('tamper (CR-10): an uncommitted edit to SEAL.json exempting a committed source change', () => {
+            put('src/a.ts', 'export const a = 8;\n');
+            commit('c');
+            put(SEAL_REL, JSON.stringify({ ...baseSeal(), exempt_paths: [...REAL_EXEMPT, 'src/a.ts'] }, null, 2) + '\n');
+        }, false, 'differs from HEAD');
 
         // --- D-19: merge commits ------------------------------------------------------------
         // A merge (no fast-forward) brings in commits; it must not add the whole merged branch.
@@ -1083,9 +1172,12 @@ function selfTest(repoRoot: string): number {
         writeSucc(scan23());
         commit('successor seal record');
         const base2 = g('rev-parse', 'HEAD');
-        const reset2 = () => g('checkout', '-q', '-B', 'case2', base2);
+        const reset2 = () => g('checkout', '-q', '-f', '-B', 'case2', base2);
         const S = { seal_rel: SUCC_REL, from: reset2 };
         const runS = (name: string, mutate: () => void, expectValid: boolean, reason?: string, changed?: string[]) => run(name, mutate, expectValid, reason, { ...S, changed });
+        // A successor record whose FIRST committed copy is wrong: built on sealed2, where it does not exist yet (CR-10).
+        const runS1 = (name: string, mutate: () => void, expectValid: boolean, reason?: string) =>
+            run(name, mutate, expectValid, reason, { seal_rel: SUCC_REL, from: () => g('checkout', '-q', '-f', '-B', 'case2', sealed2) });
 
         runS('successor: no later change (only the seal record and its scan are under the folder)', () => {}, true, undefined, [SCAN23_REL, SUCC_REL]);
         run('successor: the default seal (SEAL.json) still judges every path, so the same tree is INVALID for it', () => {}, false, 'findings/x.json', { from: reset2 });
@@ -1114,6 +1206,25 @@ function selfTest(repoRoot: string): number {
             g('update-index', '--add', '--cacheinfo', `100644,${blob},.PLANNING/Audit/evil.json`);
             g('commit', '-q', '-m', 'case variant');
         }, false, '.PLANNING/Audit/evil.json');
+        runS('successor tamper (CR-10): a later commit changes a register file and adds it to the record\'s exempt_paths', () => {
+            put('.planning/audit/findings/x.json', '{"phase":23,"severity":"changed"}\n');
+            put(SUCC_REL, JSON.stringify(succ(scan23(), { exempt_paths: [SUCC_REL, SCAN23_REL, '.planning/audit/findings/*'] }), null, 2) + '\n');
+            commit('c');
+        }, false, 'changed after the record was first committed');
+        runS('successor tamper (CR-10): the same edit to the record left uncommitted', () => {
+            put('.planning/audit/findings/x.json', '{"phase":23,"severity":"changed"}\n');
+            commit('c');
+            put(SUCC_REL, JSON.stringify(succ(scan23(), { exempt_paths: [SUCC_REL, SCAN23_REL, '.planning/audit/findings/*'] }), null, 2) + '\n');
+        }, false, 'differs from HEAD');
+        runS('successor tamper (CR-10): a second copy of the record added on a side branch and merged in', () => {
+            g('checkout', '-q', '-B', 'forged', sealed2);
+            put('.planning/audit/findings/x.json', '{"phase":23,"forged":true}\n');
+            writeSucc(scan23(), { exempt_paths: [SUCC_REL, SCAN23_REL, '.planning/audit/findings/*'] });
+            commit('forged record');
+            g('checkout', '-q', 'case2');
+            g('merge', '-q', '--no-ff', '--no-commit', '-X', 'theirs', 'forged');
+            g('commit', '-q', '-m', 'merge the forged record');
+        }, false, 'added more than once after sealed_sha');
         runS('successor: a pull-request style merge after the seal stays VALID (merge handling under covers)', () => {
             put('.planning/STATE.md', 'after successor\n');
             commit('exempt change after the successor');
@@ -1121,12 +1232,12 @@ function selfTest(repoRoot: string): number {
             g('checkout', '-q', '-B', 'mainline', startSha);
             mergeNoFf(tip, 'Merge pull request');
         }, true, undefined, [SCAN23_REL, SUCC_REL]);
-        runS('successor: predecessor linkage, a wrong previous_sealed_sha is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { previous_sealed_sha: startSha }), null, 2) + '\n');
+        runS1('successor: predecessor linkage, a wrong previous_sealed_sha is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { previous_sealed_sha: startSha });
             commit('c');
         }, false, 'previous_sealed_sha is not the sealed_sha');
-        runS('successor: predecessor linkage, previous_seal naming no record at sealed_sha is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { previous_seal: '.planning/audit/SEAL-21.json' }), null, 2) + '\n');
+        runS1('successor: predecessor linkage, previous_seal naming no record at sealed_sha is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { previous_seal: '.planning/audit/SEAL-21.json' });
             commit('c');
         }, false, 'previous_seal');
         runS('successor: predecessor linkage, a previous seal that is not an ancestor of sealed_sha is INVALID', () => {
@@ -1145,51 +1256,52 @@ function selfTest(repoRoot: string): number {
             put(SCAN23_REL, scan23({ note: 'substituted' }));
             commit('c');
         }, false, 'phase_scan_sha256');
-        runS('successor: scan substitution, a scan of another range (other start) re-digested in the record is INVALID', () => {
+        runS1('successor: scan substitution, a scan of another range (other start) re-digested in the record is INVALID (as first committed)', () => {
             writeSucc(scan23({ range: `${startSha}..${sealed2}`, phase_start_sha: startSha }));
             commit('c');
         }, false, 'phase_start_sha is not the record');
-        runS('successor: scan substitution, a scan of another revision (other end) re-digested in the record is INVALID', () => {
+        runS1('successor: scan substitution, a scan of another revision (other end) re-digested in the record is INVALID (as first committed)', () => {
             writeSucc(scan23({ range: `${base}..${sealed}`, sealed_sha: sealed }));
             commit('c');
         }, false, 'sealed_sha is not the record');
-        runS('successor: scan substitution, the record pointed at the Phase 22 scan file is INVALID', () => {
+        runS1('successor: scan substitution, the record pointed at the Phase 22 scan file is INVALID (as first committed)', () => {
             put(SUCC_REL, JSON.stringify(succ(scanText, { scan_record: SCAN_REL }), null, 2) + '\n');
             commit('c');
         }, false, `exempt_paths must list ${SCAN_REL}`);
-        runS('successor: scan substitution, a scan file reporting a non-public hit is INVALID', () => {
+        runS1('successor: scan substitution, a scan file reporting a non-public hit is INVALID (as first committed)', () => {
             writeSucc(scan23({ hit_counts: { 'non-public': 1 } }));
             commit('c');
         }, false, 'non-public is not 0');
-        runS('successor: a record whose scan.range is not scan_start_sha..sealed_sha is INVALID', () => {
+        runS1('successor: a record whose scan.range is not scan_start_sha..sealed_sha is INVALID (as first committed)', () => {
             const t = scan23();
-            put(SUCC_REL, JSON.stringify(succ(t, { scan: { ...succ(t).scan, range: `${startSha}..${sealed2}` } }), null, 2) + '\n');
+            writeSucc(t, { scan: { ...succ(t).scan, range: `${startSha}..${sealed2}` } });
             commit('c');
         }, false, 'scan.range is not');
-        runS('successor: changed_since_previous missing a path is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { changed_since_previous: CHANGED_SINCE.filter((p) => !p.endsWith('x.json')) }), null, 2) + '\n');
+        runS1('successor: changed_since_previous missing a path is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { changed_since_previous: CHANGED_SINCE.filter((p) => !p.endsWith('x.json')) });
             commit('c');
         }, false, 'changed_since_previous');
-        runS('successor: changed_since_previous naming a path outside the folder is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { changed_since_previous: [...CHANGED_SINCE, 'src/a.ts'] }), null, 2) + '\n');
+        runS1('successor: changed_since_previous naming a path outside the folder is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { changed_since_previous: [...CHANGED_SINCE, 'src/a.ts'] });
             commit('c');
         }, false, 'changed_since_previous');
-        runS('successor: a record missing covers is INVALID (no fallback to a weaker reading)', () => {
+        runS1('successor: a record missing covers is INVALID (no fallback to a weaker reading) (as first committed)', () => {
             const rec: Record<string, unknown> = succ(scan23());
             delete rec.covers;
+            put(SCAN23_REL, scan23());
             put(SUCC_REL, JSON.stringify(rec, null, 2) + '\n');
             commit('c');
         }, false, 'must carry covers');
-        runS('successor: a record not listing itself on exempt_paths is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { exempt_paths: [SCAN23_REL] }), null, 2) + '\n');
+        runS1('successor: a record not listing itself on exempt_paths is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { exempt_paths: [SCAN23_REL] });
             commit('c');
         }, false, `exempt_paths must list ${SUCC_REL}`);
-        runS('successor: final_check not pass is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { final_check: 'fail' }), null, 2) + '\n');
+        runS1('successor: final_check not pass is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { final_check: 'fail' });
             commit('c');
         }, false, 'final_check');
-        runS('successor: a render hash that does not match sealed_sha is INVALID', () => {
-            put(SUCC_REL, JSON.stringify(succ(scan23(), { render_sha256: { findings: sha256('findings\n'), decisions: sha256('decisions 23\n') } }), null, 2) + '\n');
+        runS1('successor: a render hash that does not match sealed_sha is INVALID (as first committed)', () => {
+            writeSucc(scan23(), { render_sha256: { findings: sha256('findings\n'), decisions: sha256('decisions 23\n') } });
             commit('c');
         }, false, 'render_sha256.findings');
 
@@ -1197,17 +1309,18 @@ function selfTest(repoRoot: string): number {
         // At sealed2 there is no ruling record, so a scan record labelling a listed hit reviewed-inert is INVALID there.
         const reviewedHits = REVIEWED_HITS.map((e) => asHit(e, REVIEWED_INERT));
         const withHits = (hits: Hit[], counts: Record<string, number> = {}) => ({ hits, hit_counts: { 'non-public': 0, [REVIEWED_INERT]: hits.filter((h) => h.classification === REVIEWED_INERT).length, ...counts } });
-        runS('successor: reviewed hits whose ruling record is not committed at sealed_sha are INVALID', () => {
+        runS1('successor: reviewed hits whose ruling record is not committed at sealed_sha are INVALID (as first committed)', () => {
             writeSucc(scan23(withHits(reviewedHits)));
             commit('c');
         }, false, 'ruling ESC-SECRET-03 is missing');
-        // sealed4 commits the ruling record; base4 adds a successor whose scan record holds both listed hits.
-        reset2();
+        // sealed4 commits the ruling record on sealed2 (no successor record yet); base4 adds a successor
+        // whose scan record holds both listed hits, as that record's first committed copy (CR-10).
+        g('checkout', '-q', '-f', '-B', 'case4', sealed2);
         const ESC_REL = `${ESCALATIONS_REL}/ESC-SECRET-03.json`;
         put(ESC_REL, JSON.stringify(rulingRec(), null, 2) + '\n');
         commit('the ruling record');
         const sealed4 = g('rev-parse', 'HEAD');
-        const CHANGED4 = [...CHANGED_SINCE, SCAN23_REL, SUCC_REL, ESC_REL].sort();
+        const CHANGED4 = [...CHANGED_SINCE, ESC_REL].sort();
         const scan4 = (o: Record<string, unknown> = {}) => scan23({ range: `${base}..${sealed4}`, sealed_sha: sealed4, ...o });
         const writeSucc4 = (t: string) => {
             put(SCAN23_REL, t);
@@ -1216,24 +1329,26 @@ function selfTest(repoRoot: string): number {
         writeSucc4(scan4(withHits([...reviewedHits, asHit({ ...REVIEWED_HITS[0], line: 7 }, PUBLIC_ADDRESS)], { 'public-address': 1 })));
         commit('successor with reviewed hits');
         const base4 = g('rev-parse', 'HEAD');
-        const R4 = { seal_rel: SUCC_REL, from: () => g('checkout', '-q', '-B', 'case4', base4) };
+        const R4 = { seal_rel: SUCC_REL, from: () => g('checkout', '-q', '-f', '-B', 'case4', base4) };
         run('successor: a scan record whose reviewed-inert hits are the listed locations, with the ruling at sealed_sha, is VALID', () => {}, true, undefined, { ...R4, changed: [SCAN23_REL, SUCC_REL] });
+        // The bad scan records below are each the record's first committed copy (built on sealed4).
+        const R4first = { seal_rel: SUCC_REL, from: () => g('checkout', '-q', '-f', '-B', 'case4', sealed4) };
         run('successor: a scan record labelling an unlisted location reviewed-inert (another line) is INVALID', () => {
             writeSucc4(scan4(withHits([reviewedHits[0], asHit({ ...REVIEWED_HITS[1], line: REVIEWED_HITS[1].line + 1 }, REVIEWED_INERT)])));
             commit('c');
-        }, false, 'no reviewed entry names', R4);
+        }, false, 'no reviewed entry names', R4first);
         run('successor: a scan record labelling the listed text in another file reviewed-inert is INVALID', () => {
             writeSucc4(scan4(withHits([reviewedHits[0], asHit({ ...REVIEWED_HITS[0], file: 'test/other.ts' }, REVIEWED_INERT)])));
             commit('c');
-        }, false, 'no reviewed entry names', R4);
+        }, false, 'no reviewed entry names', R4first);
         run('successor: a scan record whose reviewed-inert count differs from its hits is INVALID', () => {
             writeSucc4(scan4(withHits(reviewedHits, { [REVIEWED_INERT]: 1 })));
             commit('c');
-        }, false, `hit_counts ${REVIEWED_INERT} is not the number`, R4);
+        }, false, `hit_counts ${REVIEWED_INERT} is not the number`, R4first);
         run('successor: a scan record holding a non-public hit while its counts say 0 is INVALID', () => {
             writeSucc4(scan4(withHits([...reviewedHits, asHit({ ...REVIEWED_HITS[0], line: 5 })])));
             commit('c');
-        }, false, 'holds a non-public hit', R4);
+        }, false, 'holds a non-public hit', R4first);
         {
             reset2();
             const r = verifySeal(dir, { scan: false, seal_rel: '../SEAL-23.json' });
