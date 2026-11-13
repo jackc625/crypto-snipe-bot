@@ -77,7 +77,7 @@ export interface AlertEntry {
 
 /** A capture problem, kept out of band so production catches cannot hide it (capture.ts). */
 export type Violation =
-    | { kind: 'db-in-transaction'; table: string; op: 'insert' | 'update' | 'delete' }
+    | { kind: 'db-transaction-open'; table: string; op: 'insert' | 'update' | 'delete' }
     | { kind: 'unixepoch-argument'; args: unknown[] }
     | { kind: 'capture-error'; message: string };
 

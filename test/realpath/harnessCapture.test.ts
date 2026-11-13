@@ -216,10 +216,51 @@ describe('realpath harness: timeline and DB capture (plan 23-02 Task 1)', () => 
         expect(() => assertNoViolations()).not.toThrow();
     });
 
-    it('Open Question 5: a write inside db.transaction, even under a catch that swallows everything, still fails the test naming the table', async () => {
+    // WR-05 (Phase 23 review): an atomic write is the idiomatic better-sqlite3 fix for several
+    // Phase 24 findings (AUD-DB-004, AUD-BUY-004, AUD-BUY-010), so the capture must judge a
+    // transaction by its outcome: a committed write is on the timeline, a rolled-back one is not,
+    // and neither is a violation. Only a transaction still open when its connection closes is.
+    it('WR-05: writes inside a committed db.transaction (made before the capture, as a module-level one is) are captured once each, at their write position, with no violation', async () => {
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
+        const { db, dbModule } = sc.graph;
+        const token = '0x00000000000000000000000000000000000a0c03';
+        const row = { token, chain: 'eth', action: 'buy', txHash: '0x' + '0c'.repeat(32), block: 1, timestamp: Math.floor(Date.now() / 1000), amountIn: '1', amountOut: '2', gasCost: '0', priceAtAction: 0, status: 'pending', poolType: 'v2', feeTier: null, dexName: 'uniswap-v2' };
+        // Made before installDbCapture runs on this connection again, as src/utils/db.ts would make
+        // a module-level transaction at import (before loadGraph installs the capture).
+        const atomic = db.transaction(() => {
+            const info = dbModule.insertTrade.run(row);
+            logger.info({ op: 'harness.inside-transaction' }, 'between the two writes');
+            dbModule.upsertExitState.run({ tradeId: Number(info.lastInsertRowid), entryPrice: 1, highWaterMark: 1, trailingActivated: 0, partialTiersCompleted: '[]', originalTokenAmount: '2', urgencyStartTs: 0, volatilitySamples: '[]' });
+            return info;
+        });
+        installDbCapture(db, sc.timeline);
+        const before = sc.timeline.entries.length;
+        const info = atomic();
+        // The harness's own bookkeeping inside the trigger leaves the production RunResult alone.
+        const stored = db.prepare('SELECT id FROM trades WHERE token = ?').get(token) as { id: number };
+        expect(Number(info.lastInsertRowid)).toBe(stored.id);
+        expect(info.changes).toBe(1);
+        const added = sc.timeline.entries.slice(before);
+        expect(added.map((e) => (e.kind === 'db' ? `db ${e.op} ${e.table}` : e.kind === 'op' ? `op ${e.op}` : e.kind))).toEqual(['db insert trades', 'op harness.inside-transaction', 'db insert exit_state']);
+        const [tradeInsert, , exitInsert] = added as [DbEntry, TimelineEntry, DbEntry];
+        expect(tradeInsert.inTransaction).toBe(true);
+        expect(tradeInsert.row).toMatchObject({ id: BigInt(stored.id), token, status: 'pending' });
+        expect(exitInsert.inTransaction).toBe(true);
+        expect(exitInsert.row.trade_id).toBe(BigInt(stored.id));
+        // Read again: settled once, never duplicated.
+        expect(sc.timeline.entries.slice(before)).toHaveLength(3);
+        expect(harnessState().violations).toEqual([]);
+        expect(() => assertNoViolations()).not.toThrow();
+        // A later autocommit write still lands after them, as before.
+        dbModule.updateTradeStatus.run('failed', token, 'eth');
+        expect(dbEntries(sc.timeline.entries, 'trades').map((e) => [e.op, e.inTransaction])).toEqual([['insert', true], ['update', false]]);
+    });
+
+    it('WR-05: a db.transaction that rolls back, even under a catch that swallows everything, leaves no entry and no violation', async () => {
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         const db = sc.graph.db;
         const insert = db.prepare("INSERT INTO trades (token, chain, action) VALUES (?, 'eth', 'buy')");
+        const before = sc.timeline.entries.length;
         let caught: unknown;
         // A production-style catch: the capture must not depend on an error escaping it.
         try {
@@ -231,11 +272,61 @@ describe('realpath harness: timeline and DB capture (plan 23-02 Task 1)', () => 
             caught = e;
         }
         expect((caught as Error).message).toBe('roll back');
-        // The write was rolled back, yet the capture saw it: exactly why it is a violation.
         expect(db.prepare('SELECT COUNT(*) AS c FROM trades').get()).toEqual({ c: 0 });
-        expect(dbEntries(sc.timeline.entries, 'trades', 'insert').at(-1)!.inTransaction).toBe(true);
-        expect(() => assertNoViolations()).toThrow(/capture violation: an insert on table trades was captured inside a transaction/);
-        expect(takeViolations()).toEqual([{ kind: 'db-in-transaction', table: 'trades', op: 'insert' }]);
+        // The capture records what landed: nothing.
+        expect(dbEntries(sc.timeline.entries.slice(before), 'trades')).toEqual([]);
+        expect(harnessState().violations).toEqual([]);
+        expect(() => assertNoViolations()).not.toThrow();
+    });
+
+    it('WR-05: a nested transaction rolled back inside a committed one drops only its own writes; raw BEGIN/COMMIT and BEGIN/ROLLBACK through db.exec are judged the same way', async () => {
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
+        const db = sc.graph.db;
+        const insert = db.prepare("INSERT INTO trades (token, chain, action) VALUES (?, 'eth', 'buy')");
+        const tokens = (): string[] => dbEntries(sc.timeline.entries, 'trades', 'insert').map((e) => String(e.row.token));
+        const kept = '0x00000000000000000000000000000000000a0c10';
+        const undone = '0x00000000000000000000000000000000000a0c11';
+        const after = '0x00000000000000000000000000000000000a0c12';
+        db.transaction(() => {
+            insert.run(kept);
+            try {
+                db.transaction(() => {
+                    insert.run(undone);
+                    throw new Error('inner rolls back');
+                })();
+            } catch {
+                // swallowed, as a production catch would
+            }
+            insert.run(after);
+        })();
+        expect((db.prepare('SELECT token FROM trades ORDER BY id').all() as Array<{ token: string }>).map((r) => r.token)).toEqual([kept, after]);
+        expect(tokens()).toEqual([kept, after]);
+
+        const rawKept = '0x00000000000000000000000000000000000a0c13';
+        const rawUndone = '0x00000000000000000000000000000000000a0c14';
+        db.exec('BEGIN');
+        insert.run(rawKept);
+        // While the transaction is open the write has not landed, so it is not on the timeline yet.
+        expect(tokens()).toEqual([kept, after]);
+        db.exec('COMMIT');
+        expect(tokens()).toEqual([kept, after, rawKept]);
+        db.exec('BEGIN');
+        insert.run(rawUndone);
+        db.exec('ROLLBACK');
+        expect(tokens()).toEqual([kept, after, rawKept]);
+        expect(harnessState().violations).toEqual([]);
+    });
+
+    it('WR-05: a transaction still open when its connection closes is a violation naming the table, and its write is not on the timeline', async () => {
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
+        const db = sc.graph.db;
+        db.exec('BEGIN');
+        db.prepare("INSERT INTO trades (token, chain, action) VALUES (?, 'eth', 'buy')").run('0x00000000000000000000000000000000000a0c20');
+        sc.graph.dbModule.closeDb();
+        expect(db.open).toBe(false);
+        expect(dbEntries(sc.timeline.entries, 'trades')).toEqual([]);
+        expect(() => assertNoViolations()).toThrow(/capture violation: an insert on table trades was written inside a transaction that was still open when the connection closed/);
+        expect(takeViolations()).toEqual([{ kind: 'db-transaction-open', table: 'trades', op: 'insert' }]);
         expect(() => assertNoViolations()).not.toThrow();
     });
 
