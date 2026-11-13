@@ -27,8 +27,14 @@
 //     These are plain expects BEFORE any marker, so an arming failure in the child (a read the
 //     table lacks, antirug.baseline-snapshot-failed) is a real failure, never the finding.
 //   - Then, in the running bot: the row is visible through its own connection and in both
-//     resume queries, and after ten exit-poll intervals of its clock it still monitors nothing
-//     and holds no anti-rug registration for the pair. Each protection is its own claim.
+//     resume queries. Its clock is first moved past the child's (review WR-18): the child runs on
+//     the real clock and writes trades.timestamp and the exit-state urgency start in real time,
+//     while the parent's fixed clock starts at 2026-01-01, so a hand-off fix with an age guard
+//     (adopt only rows older than N s) would see the child's row as months in the future and never
+//     adopt it. Then it is observed for up to five minutes of its clock, ending early once it both
+//     monitors the position and holds its anti-rug registration (a re-scan on a 60 s cadence had
+//     not run in the old 51 s window). Under the bug it still monitors nothing and holds no
+//     anti-rug registration for the pair after the five minutes. Each protection is its own claim.
 //
 // Fix signal (D-08), measured with fix-shaped src mutations: a fix that hands the position to the
 // running bot (it re-scans pending buys it does not monitor, card OD-26 option a) reads "looks
@@ -48,7 +54,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Wallet, parseEther } from 'ethers';
 import { encodeResult, harnessState, type FakeNode } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
@@ -56,9 +62,14 @@ import { knownBug } from '../harness/knownBug';
 import { runRailedChildToEnd, serveLoopback, type ChildRun } from '../harness/loopback';
 import { createScenario, createTempDbFile, restartGraph, stepFor, stepUntil, stepUntilTrue, type Scenario } from '../harness/world';
 import { readSentinels } from '../../rails/spawnRailedChild';
+import { stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 
 const CHILD_TIMEOUT_MS = 110_000;
-const TEST_TIMEOUT_MS = 120_000;
+const TEST_TIMEOUT_MS = 150_000;
+/** The fixed drain after the restart's anti-rug re-subscribe (virtual time, review WR-19). */
+const RESUBSCRIBE_DRAIN_MS = 5_000;
+/** How long the running bot is observed after the script exits (virtual time, review WR-18). */
+const OBSERVE_MS = 5 * 60_000;
 const TS_NODE = ['-r', 'ts-node/register/transpile-only'];
 const LEDGER_ROOT = path.join(os.tmpdir(), 'crypto-snipe-bot-rail-ledger');
 const DEAD = '0x000000000000000000000000000000000000dead';
@@ -211,8 +222,16 @@ describe('AUD-BUY-001: a landed deliberate buy is armed only in the short-lived 
             expect(exitResume.map((t) => t.id)).toEqual([row!.id]);
             expect(antiRugResume.map((t) => [t.id, t.pair_or_pool_address.toLowerCase()])).toEqual([[row!.id, pair.toLowerCase()]]);
 
-            // The running bot keeps running: ten exit-poll intervals of its own clock.
-            await stepFor(10 * pollMs + 1_000);
+            // The two processes share one wall clock in production: move the running bot's clock past
+            // the child's latest log line (pino isoTime, the real clock), never backwards.
+            const childClockMs = Math.max(...lines.map((l) => Date.parse(String(l.time))).filter((t) => Number.isFinite(t)));
+            expect(Number.isFinite(childClockMs)).toBe(true);
+            vi.setSystemTime(Math.max(Date.now(), childClockMs) + 1_000);
+            // The running bot keeps running: up to five minutes of its own clock, ending early once it
+            // monitors the position and holds its anti-rug registration.
+            const heldByRunningProcess = (): boolean =>
+                graph.exitManager.hasExitMonitorTimer('base', token) && graph.detector.getRegisteredPositions('base').some((p) => p.pairOrPoolAddress === pair.toLowerCase());
+            await stepUntilOrFor(heldByRunningProcess, OBSERVE_MS, 250);
 
             const monitoredByRunningProcess = graph.exitManager.hasExitMonitorTimer('base', token);
             const rowVisibleToRunningProcess = (graph.dbModule.getResumeExitMonitorTrades.all() as Array<{ id: number }>).some((t) => t.id === row!.id);
@@ -244,17 +263,17 @@ describe('AUD-BUY-001: a landed deliberate buy is armed only in the short-lived 
             // Only a restart picks it up: the same bot, restarted on the same file, re-arms the exit
             // monitor and re-registers the pair. (Its anti-rug WebSocket subscription for the pair
             // does not survive that resume: AUD-ANTIRUG-025, proven in its own file. Here the
-            // restart's re-subscribe is only waited out, so teardown cancels nothing it queued.)
+            // restart's re-subscribe is only waited out, by a fixed drain that does not depend on how
+            // many times the listener re-subscribes, so teardown cancels nothing it queued and an
+            // AUD-ANTIRUG-025 fix leaves this test alone: review WR-19.)
             await restartGraph(sc);
             const fromLog = recordedLogs().length;
-            const fromCall = node.callLog.length;
             sc.graph.bot.resumeMultiChainMonitoring([sc.ctx]);
             await stepUntil(sc.graph.bot.resumeAntiRugMonitoring([sc.ctx]));
             await stepUntilTrue(() => opLogged('exit.monitor.resumed', fromLog) && sc.graph.exitManager.hasExitMonitorTimer('base', token), { what: 'the restarted bot resuming the exit monitor' });
             expect(sc.graph.detector.getRegisteredPositions('base').some((p) => p.pairOrPoolAddress === pair.toLowerCase() && p.tradeId === row!.id)).toBe(true);
-            const resubscribes = recordedLogs().slice(fromLog).filter((l) => l.obj?.op === 'antirug.listener.subscribed').length;
-            expect(resubscribes).toBe(2);
-            await stepUntilTrue(() => node.callLog.slice(fromCall).filter((c) => c.method === 'eth_unsubscribe').length === resubscribes - 1, { what: "the restarted bot's re-subscribe reaching the node" });
+            expect(recordedLogs().slice(fromLog).filter((l) => l.obj?.op === 'antirug.listener.subscribed').length).toBeGreaterThanOrEqual(1);
+            await stepFor(RESUBSCRIBE_DRAIN_MS);
 
             // The child ran railed: its own ledger shows the sentinel env, loopback-only network,
             // and the script's own dotenv.config() refused by the rails (the repo .env).

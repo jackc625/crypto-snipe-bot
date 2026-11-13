@@ -7,10 +7,14 @@
 // Proven here on the real path (a real PairCreated through the real listener, detection, safety
 // and buy; real ethers signs the Flashbots bundle; the simulated node and relay answer; the real
 // migrated SQLite database records it):
-//   A. sub_claim 1 (confirmed by Phase 22 reading, now proven): ONE balanceOf error after the buy
+//   A. sub_claim 1 (confirmed by Phase 22 reading, now proven): a balanceOf error after the buy
 //      mined flips the trades row to failed, no exit monitor starts, the operator is told
 //      "TX failed", and after a restart the position is not in the resume set (claims
-//      balanceof-error-flips-landed-buy-to-failed and failed-row-not-resumed-after-restart).
+//      balanceof-error-flips-landed-buy-to-failed and failed-row-not-resumed-after-restart). The
+//      read keeps failing for a 30 s decision window after the buy mined (review CR-07): a one-shot
+//      fault let a fix that retries the read once read "looks fixed" while two failed reads still
+//      marked a landed buy failed. A fix that keeps retrying until the node answers (after the
+//      window) and then arms the position reads "looks fixed".
 //   B. sub_claim 3 (a Phase 22 candidate, now proven): attempt 0 of the bundle is accepted by
 //      the relay and not included at its first target block, so `latest` does not move and
 //      attempt 1 signs the SAME nonce with a higher fee. Attempt 0 then lands at a later block it
@@ -45,6 +49,7 @@ import { harnessState, type Submitted } from '../harness/chain';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, createTempDbFile, restartGraph, stepFor, stepUntil, stepUntilTrue, type Scenario } from '../harness/world';
+import { stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 
 const V2_ROUTER = new Interface(['function swapExactETHForTokens(uint256 amountOutMin, address[] path, address to, uint256 deadline) payable returns (uint256[] amounts)']);
 const ERC20 = new Interface(['function balanceOf(address) view returns (uint256)']);
@@ -101,8 +106,11 @@ function decodeBuy(sub: Submitted): { nonce: number; maxPriorityFeePerGas: bigin
     return { nonce: tx.nonce, maxPriorityFeePerGas: tx.maxPriorityFeePerGas ?? 0n, amountOutMin: call.args[0] as bigint, to: getAddress(tx.to!) };
 }
 
+/** How long the post-mine balanceOf read keeps failing after it first failed (virtual time). */
+const BALANCE_FAULT_WINDOW_MS = 30_000;
+
 describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', () => {
-    it('balanceof-error-flips-landed-buy-to-failed: one balanceOf error after the buy mined flips the row to failed, starts no exit monitor, alerts "TX failed", and a restart does not resume the held position', async (ctx) => {
+    it('balanceof-error-flips-landed-buy-to-failed: balanceOf errors after the buy mined (a lagging node, 30 s) flip the row to failed, starts no exit monitor, alerts "TX failed", and a restart does not resume the held position', async (ctx) => {
         // A temp-file database, so the restart half reads the same file (plan 23-27).
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', db: { file: createTempDbFile() } });
         const { node } = sc;
@@ -113,29 +121,37 @@ describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', (
         expect(buy.route).toBe('bundle');
         expect(decodeBuy(buy).to).toBe(getAddress(sc.dex.routerAddress));
 
-        // The ONE post-mine balanceOf read of the token for the wallet fails (review concern
-        // 23-05 MEDIUM: the fault names the token and is armed only once the buy is mined, so it
-        // cannot hit an earlier safety or quote read).
-        // The error is geth's own answer from a load-balanced node that has not seen the block yet.
-        const balanceRead = node.failNext('eth_call', { selector: 'balanceOf(address)', to: sc.token, after: () => node.isMined(buy.hash), error: { code: -32000, message: 'header not found' } });
+        // Every post-mine balanceOf read of the token for the wallet fails for the decision window
+        // (review concern 23-05 MEDIUM: the fault names the token and is armed only once the buy is
+        // mined, so it cannot hit an earlier safety or quote read; review CR-07: it persists for the
+        // window, so a retry against the same lagging node fails too). The error is geth's own
+        // answer from a load-balanced node that has not seen the block yet.
+        let decisionWindow = true;
+        const balanceRead = node.failNext('eth_call', { selector: 'balanceOf(address)', to: sc.token, after: () => decisionWindow && node.isMined(buy.hash), times: 1_000, error: { code: -32000, message: 'header not found' } });
 
         await stepFor(12_000);
         expect(node.mine({ include: [buy.hash] })).toBe(launch.block + 1);
         expect(node.statusOf(buy.hash)).toBe('mined');
-        // The handler finishes either way: the catch sends its alert, or the monitor starts.
-        await stepUntilTrue(() => failAlertAfterBuySent() !== null || opLogged('exit.monitor.started'), { what: 'the snipe handler finishing after the mined buy', maxSteps: 20_000 });
+        await stepUntilTrue(() => balanceRead.fired >= 1, { what: 'the post-mine balanceOf read failing', maxSteps: 20_000 });
+        await stepFor(BALANCE_FAULT_WINDOW_MS);
+        decisionWindow = false;
+        // The handler finishes: the catch sends its alert, or the monitor starts. Bounded rather than
+        // required, so a fix that ends some other way (no alert, no monitor) is measured as the
+        // failure changing instead of stalling here.
+        await stepUntilOrFor(() => failAlertAfterBuySent() !== null || opLogged('exit.monitor.started'), 60_000);
         await stepFor(1_000);
 
-        // Setup facts, true whether or not the bug is fixed: the fault fired once, after the buy
-        // was recorded and announced, and the tokens are held (the bot's own provider reads them).
-        expect(balanceRead.fired).toBe(1);
+        // Setup facts, true whether or not the bug is fixed: the fault fired, after the buy was
+        // recorded and announced, and the tokens are held (the bot's own provider reads them).
+        expect(balanceRead.fired).toBeGreaterThanOrEqual(1);
         expect(recordedAlerts().some((a) => String(a.message).startsWith('*Buy TX sent via flashbots*'))).toBe(true);
         expect(await heldTokens(sc)).toBeGreaterThan(0n);
         const rows = tradeRows(sc);
         expect(rows).toHaveLength(1);
         expect(rows[0].tx_hash).toBe(buy.hash);
-        const exitStateRows = (sc.graph.db.prepare('SELECT count(*) AS n FROM exit_state WHERE trade_id = ?').get(rows[0].id) as { n: number }).n;
-        const actual = { status: rows[0].status, monitored: opLogged('exit.monitor.started') || exitStateRows > 0, alertText: failAlertAfterBuySent() };
+        // Monitored means a live exit-monitor timer in the bot's real registry (review WR-15): an
+        // exit_state row alone protects nothing in the running process.
+        const actual = { status: rows[0].status, monitored: sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token), alertText: failAlertAfterBuySent() };
 
         knownBug(ctx, 'AUD-BUY-002', {
             claim: 'balanceof-error-flips-landed-buy-to-failed',
@@ -165,17 +181,22 @@ describe('AUD-BUY-002: a landed buy recorded as failed or not at all (RC-01)', (
             .slice(fromLog)
             .filter((l) => l.msg === 'Resuming exit monitor for pending token' && l.obj?.tradeId === tradeId);
         await stepFor(5_000);
-        expect(opLogged('exit.monitor.resumed', fromLog)).toBe(false);
-        expect(opLogged('exit.monitor.started', fromLog)).toBe(false);
 
+        // The resume is read two ways, so a fix that resumes failed-but-held buys reads "looks fixed"
+        // whichever line it logs (review WR-11): the resume selection's line, or the exit monitor's
+        // own exit.monitor.resumed op.
         knownBug(ctx, 'AUD-BUY-002', {
             claim: 'failed-row-not-resumed-after-restart',
             correct: { resumedAfterRestart: true },
             observed: { resumedAfterRestart: false },
-            actual: { resumedAfterRestart: resumedAt.length > 0 },
+            actual: { resumedAfterRestart: resumedAt.length > 0 || opLogged('exit.monitor.resumed', fromLog) },
             expectedPlain: 'After a restart the bot resumes monitoring every position it still holds.',
             actualPlain: 'After a restart the held position whose trade was marked failed is not in the resume set, so it gets no exit monitor.',
         });
+        // Bug details, after the marker (review WR-11: they describe the bug, so before the marker
+        // they turned a resume fix into a plain failure instead of "looks fixed").
+        expect(opLogged('exit.monitor.resumed', fromLog)).toBe(false);
+        expect(opLogged('exit.monitor.started', fromLog)).toBe(false);
     });
 
     it('earlier-attempt-lands-no-trade-row: attempt 0 is not included at its first target block, attempt 1 signs the same nonce, attempt 0 then lands and the bot records no trade', async (ctx) => {

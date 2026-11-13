@@ -21,12 +21,23 @@
 //     ("All safety checks passed, buying" for B), the simulation is released and the chain lands
 //     each bundle at a block it targets.
 //
-// What is measured: how many buys landed. Correct: one; the other is refused by the limit (card
-// BUY-03: reserve the risk budget synchronously when a handler passes canSnipe). Today: both land.
-// A fix-shaped src mutation (an in-process reservation counted by canSnipe and taken when it
-// passes) reads "looks fixed" (D-08), src restored byte for byte. After the marker: the two
-// submitted transactions decoded with real ethers (A on the uniswap router, B on the sushiswap
-// router, consecutive nonces), and two open trades rows against a limit of one.
+// The per-chain snipe cooldown is switched off (SNIPE_COOLDOWN_MS=0), so the open-position limit is
+// the only gate that can refuse B (review CR-06): with the default 30 s cooldown on, a fix that
+// stamps only the cooldown when a handler passes canSnipe (no position reservation) refused B by
+// cooldown and read "looks fixed", while MAX_OPEN_POSITIONS was still overshot whenever two chains
+// snipe at once or the cooldown is 0. B's wait is bounded rather than required to end while A is
+// parked, so a fix that serializes the buy pipeline per chain (the recommendation's other shape: B
+// reaches canSnipe only after A's buy is recorded) is measured too instead of stalling the test.
+//
+// What is measured: how many buys landed, and which risk rule refused B. Correct: one buy, B
+// refused by the open-position limit (reason max_positions) (card BUY-03: reserve the risk budget
+// synchronously when a handler passes canSnipe). Today: both land, B is refused by nothing. An
+// in-process reservation counted by canSnipe and taken when it passes reads "looks fixed" (D-08);
+// a cooldown stamped when canSnipe passes, with no position reservation, refuses nothing with the
+// cooldown off, so both buys land and the bug stays recorded (in-memory mutants, review CR-06).
+// After the marker: the two submitted transactions
+// decoded with real ethers (A on the uniswap router, B on the sushiswap router, consecutive
+// nonces), and two open trades rows against a limit of one.
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
@@ -36,7 +47,7 @@ import type { Submitted } from '../harness/chain';
 import { recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepUntilTrue, type Scenario } from '../harness/world';
-import { driveChain } from './fixtures/AUD-API-001-dashboard-sell';
+import { driveChain, stepUntilOrFor } from './fixtures/AUD-API-001-dashboard-sell';
 import { listen, subscribedTo } from './fixtures/AUD-EXIT-002-position';
 import { settleAntiRugArming } from './fixtures/AUD-TX-002-lock';
 import { secondLaunch } from './fixtures/AUD-TX-003-second-launch';
@@ -68,7 +79,7 @@ function walletBuys(sc: Scenario): Array<{ sub: Submitted; nonce: number; router
 
 describe('AUD-BUY-010: risk limits are checked long before the snipe is recorded, so concurrent handlers for different tokens all pass', () => {
     it('max-open-positions-overspent: with room for exactly one more position, handlers for two different tokens both pass canSnipe and both buys land', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { MAX_OPEN_POSITIONS: '1' } });
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { MAX_OPEN_POSITIONS: '1', SNIPE_COOLDOWN_MS: '0' } });
         const { node, dex } = sc;
         const b = secondLaunch(sc);
         const openPositions = (): number => (sc.graph.db.prepare("SELECT COUNT(*) AS n FROM trades WHERE status = 'pending' AND action = 'buy'").get() as { n: number }).n;
@@ -86,33 +97,39 @@ describe('AUD-BUY-010: risk limits are checked long before the snipe is recorded
         // Token B, while A's buy is parked and A's row is not written.
         const rowsBeforeB = openPositions();
         await b.fire();
-        await stepUntilTrue(
-            () => tokenMsgCount('All safety checks passed, buying', b.token) === 1 || tokenMsgCount('Risk check failed, skipping snipe', b.token) === 1,
-            { what: "token B's handler passing (or failing) the risk gate and its checks", maxSteps: 20_000 },
-        );
-        const bPassed = tokenMsgCount('All safety checks passed, buying', b.token) === 1;
+        // B's handler decides at the risk gate while A is parked (today), or waits for A's buy (a
+        // per-chain serialized pipeline): a bounded wait of virtual time, then A is released either way.
+        const bPassed = (): boolean => tokenMsgCount('All safety checks passed, buying', b.token) === 1;
+        const bRefused = (): boolean => tokenMsgCount('Risk check failed, skipping snipe', b.token) === 1;
+        // 20 s: well inside A's 60 s swap deadline, so a serialized A still lands once released.
+        await stepUntilOrFor(() => bPassed() || bRefused(), 20_000);
+        const bPassedWhileParked = bPassed();
         expect(sim.parkedNow).toBe(1);
 
-        // Release the simulation; each bundle lands at a block it targets.
+        // Release the simulation; each bundle lands at a block it targets. Settled: B decided, and
+        // every handler that passed its checks has submitted its bundle or failed clean.
         sim.release();
-        const handlersBuying = 1 + (bPassed ? 1 : 0);
+        const handlersBuying = (): number => 1 + (bPassed() ? 1 : 0);
         const finished = (): number => recordedLogs().filter((l) => l.msg === 'MEV bundle submitted' || l.obj?.op === 'buy.snipe.fail-clean').length;
-        await driveChain(sc, { mode: 'land', until: () => finished() >= handlersBuying, what: 'the buys finishing' });
-        await stepUntilTrue(() => recordedLogs().filter((l) => l.obj?.op === 'exit.monitor.started').length >= handlersBuying, { what: 'each bought position being armed', maxSteps: 20_000 });
-        await settleAntiRugArming(sc, handlersBuying);
+        await driveChain(sc, { mode: 'land', until: () => (bPassed() || bRefused()) && finished() >= handlersBuying(), what: "token B's decision and the buys finishing" });
+        await stepUntilTrue(() => recordedLogs().filter((l) => l.obj?.op === 'exit.monitor.started').length >= handlersBuying(), { what: 'each bought position being armed', maxSteps: 20_000 });
+        await settleAntiRugArming(sc, handlersBuying());
         const landed = walletBuys(sc).filter((x) => node.statusOf(x.sub.hash) === 'mined');
+        // Which risk rule refused B, read from the bot's own refusal line (null: nothing refused it).
+        const bRefusal = recordedLogs().find((l) => l.msg === 'Risk check failed, skipping snipe' && String(l.obj?.token ?? '').toLowerCase() === b.token.toLowerCase());
+        const bRefusedBy = bRefusal === undefined ? null : String(bRefusal.obj?.reason);
 
         knownBug(ctx, 'AUD-BUY-010', {
             claim: 'max-open-positions-overspent',
-            correct: { buysLanded: 1 },
-            observed: { buysLanded: 2 },
-            actual: { buysLanded: landed.length },
+            correct: { buysLanded: 1, bRefusedBy: 'max_positions' },
+            observed: { buysLanded: 2, bRefusedBy: null },
+            actual: { buysLanded: landed.length, bRefusedBy },
             expectedPlain: 'With room for one more position, two new tokens arriving together get one buy; the second is refused by the open-position limit.',
-            actualPlain: 'With MAX_OPEN_POSITIONS at 1 and no open position, the handlers for two different new tokens both passed the risk check before either buy was recorded, and both buys landed: two open positions against a limit of one.',
+            actualPlain: 'With MAX_OPEN_POSITIONS at 1, no open position and the snipe cooldown off, the handlers for two different new tokens both passed the risk check before either buy was recorded, nothing refused the second, and both buys landed: two open positions against a limit of one.',
         });
 
         // The forced order: B passed the risk gate while A's buy was parked and unrecorded.
-        expect(bPassed).toBe(true);
+        expect(bPassedWhileParked).toBe(true);
         expect(rowsBeforeB).toBe(0);
         expect(sim.heldCount).toBe(1);
         expect(tokenMsgCount('Risk check failed, skipping snipe', b.token)).toBe(0);

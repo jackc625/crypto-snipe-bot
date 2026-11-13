@@ -18,8 +18,11 @@
 // dashboard (real login, real Stop and Start routes over loopback; Start runs the real onRestart,
 // the private closure inside startMultiChainBot); then the fake node closes the socket from its
 // side (node.dropSocket(), code 1006) and the fake clock runs 10 s, ten times the 1 s reconnect
-// delay. Measured: how many reconnect loops ran for the uniswap-v2 DEX (each logs "WebSocket
-// reconnected, re-subscribed to PairCreated" with its DEX name). The control boots the same way
+// delay. Measured: how many reconnect loops ran for each DEX of the chain (each logs "WebSocket
+// reconnected, re-subscribed to PairCreated", or "... to V3 PoolCreated", with its DEX name): the
+// two V2 DEXes (handleWsClose) and the V3 DEX (handleWsCloseV3), which are separate close
+// handlers. All three are in the marker, so a fix that makes only one handler's registration
+// idempotent reads "the failure changed", never "looks fixed" (review CR-04). The control boots the same way
 // and shows the same drop without a restart reconnecting each DEX once. Each test ends through
 // the real SIGINT listener the boot added (operator decision 1A, plan 23-24).
 //
@@ -33,9 +36,10 @@
 // double buy is AUD-BUY-004's file, and the anti-rug consumer of the same shared handle is
 // AUD-ANTIRUG-001's.
 //
-// Fix signal (D-08): a startDexListener that registers its close handler once per DEX and socket
-// (an idempotent registration, the finding's recommendation) reads "looks fixed" (fix-shaped src
-// mutation, restored).
+// Fix signal (D-08): a startDexListener that registers its close handler once per DEX and socket,
+// for the V2 and the V3 handler alike (an idempotent registration, the finding's recommendation),
+// reads "looks fixed" (in-memory mutant). The same registration made idempotent for V2 only leaves
+// uniswap-v3 at two loops and reads "the failure changed" (in-memory mutant, review CR-04).
 //
 // Only the harness mocks are in use (harness/setup.ts); nothing here mocks anything.
 
@@ -96,19 +100,21 @@ describe('AUD-BUY-008: a dashboard restart adds a second reconnect loop per DEX 
             const alertsBefore = recordedAlerts().length;
             const from = await dropAndWait(sc);
 
+            // Every DEX of the chain, V2 (handleWsClose) and V3 (handleWsCloseV3), is measured in the one
+            // marker: the ETH chain's three DEXes, named literally so `correct` never comes from `actual`.
+            expect(sc.ctx.chain.dexes.map((d) => `${d.name}:${d.dexType}`)).toEqual(['uniswap-v2:v2', 'sushiswap-v2:v2', 'uniswap-v3:v3']);
             knownBug(ctx, 'AUD-BUY-008', {
                 claim: 'restart-stacks-reconnect-loop',
-                correct: { reconnectLoopsForOneClose: 1 },
-                observed: { reconnectLoopsForOneClose: 2 },
-                actual: { reconnectLoopsForOneClose: reconnects(sc.dex.name, from) },
-                expectedPlain: 'After a dashboard Stop and Start, one WebSocket close reconnects each DEX listener once.',
-                actualPlain: 'After a dashboard Stop and Start, one WebSocket close ran two reconnect loops for the DEX, each building its own provider and re-subscribing the factory listener there.',
+                correct: { reconnectLoopsForOneClose: { 'uniswap-v2': 1, 'sushiswap-v2': 1, 'uniswap-v3': 1 } },
+                observed: { reconnectLoopsForOneClose: { 'uniswap-v2': 2, 'sushiswap-v2': 2, 'uniswap-v3': 2 } },
+                actual: { reconnectLoopsForOneClose: Object.fromEntries(sc.ctx.chain.dexes.map((d) => [d.name, reconnects(d.name, from)])) },
+                expectedPlain: 'After a dashboard Stop and Start, one WebSocket close reconnects each DEX listener once, V2 and V3 alike.',
+                actualPlain: 'After a dashboard Stop and Start, one WebSocket close ran two reconnect loops for every DEX of the chain (both V2 DEXes and the V3 DEX), each building its own provider and re-subscribing the factory listener there.',
             });
-            // Bug details, after the marker: every DEX of the chain got the second loop, and each loop
-            // sent its own disconnect alert. (Where the two loops put the listener is not asserted: today
-            // each builds its own provider, so the node holds two factory subscriptions; under the
-            // single-provider shape of AUD-ANTIRUG-001's fix both would sit on one provider, still twice.)
-            for (const dex of sc.ctx.chain.dexes) expect(reconnects(dex.name, from)).toBe(2);
+            // Bug details, after the marker: each loop sent its own disconnect alert. (Where the two
+            // loops put the listener is not asserted: today each builds its own provider, so the node
+            // holds two factory subscriptions; under the single-provider shape of AUD-ANTIRUG-001's fix
+            // both would sit on one provider, still twice.)
             const disconnectAlerts = recordedAlerts()
                 .slice(alertsBefore)
                 .filter((a) => a.message === `WebSocket disconnected for ${sc.dex.name}, reconnecting...`);
