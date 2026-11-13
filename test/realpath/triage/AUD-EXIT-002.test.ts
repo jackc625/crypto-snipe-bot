@@ -133,12 +133,15 @@ async function firstQuoteFailure(ctx: Ctx, persistent: boolean): Promise<void> {
     expect(recordedAlerts().slice(fromAlert)).toEqual([]);
     // The caller went on as if the monitor was armed: anti-rug registered the position.
     expect(sc.graph.detector.getRegisteredPositions('eth').some((p) => p.tradeId === row!.id)).toBe(true);
-    // The only error lines: this one, and the false first-start gap of a fresh database
-    // (AUD-ANTIRUG-024, registered by plan 23-01).
-    expect(recordedLogs().filter((l) => l.level === 'error').map((l) => l.msg)).toEqual([
-        'Cannot query initial price, exit monitor not started',
-        '[GAP DETECTED] backfill skipped — gap exceeds maxBackfillBlocks',
-    ]);
+    // The only error line is this one. The false first-start gap of a fresh database
+    // (AUD-ANTIRUG-024, registered by plan 23-01) is left out of the comparison: it is another
+    // finding's line, and its fix removes it, which must not fail this test (review WR-19).
+    expect(
+        recordedLogs()
+            .filter((l) => l.level === 'error')
+            .map((l) => l.msg)
+            .filter((m) => m !== '[GAP DETECTED] backfill skipped — gap exceeds maxBackfillBlocks'),
+    ).toEqual(['Cannot query initial price, exit monitor not started']);
 }
 
 describe('AUD-EXIT-002: a failed first quote leaves a held position with no exit monitor (RC-07)', () => {
