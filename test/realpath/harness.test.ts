@@ -416,6 +416,8 @@ describe('realpath harness', () => {
         st.nodes.push(node);
         const p = new WebSocketProvider(BARE_WS, 1);
         expect(p.websocket).toBeInstanceOf(FakeWebSocket);
+        // Destroyed while CONNECTING: ws emits 'error' then (WR-03), so this probe listens for it.
+        (p.websocket as unknown as FakeWebSocket).on('error', () => undefined);
         void p.destroy();
         FakeWebSocket.instances.length = 0;
     });
@@ -1219,5 +1221,107 @@ describe('simulated relay: an answer with its own HTTP status and raw body (plan
         expect(node.strays).toHaveLength(2);
         expect(node.strays.every((s) => /inside a JSON-RPC batch/.test(s.detail))).toBe(true);
         node.strays.length = 0;
+    });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Phase 23 review WR-03: FakeWebSocket against ws 8.17.1 (node_modules/ethers/node_modules/ws,
+// the copy production loads) on every path where the socket is not OPEN.
+// ---------------------------------------------------------------------------------------------
+
+/** Resolve after the current process.nextTick queue (ws reports these on the next tick). */
+function nextTick(): Promise<void> {
+    return new Promise((resolve) => process.nextTick(resolve));
+}
+
+describe('FakeWebSocket matches ws 8.17.1 when the socket is not OPEN (Phase 23 review WR-03)', () => {
+    it('send and ping throw only while CONNECTING; on CLOSED the frame is dropped and a callback gets the error on the next tick; send(data, options, cb) is accepted', async () => {
+        const { node } = bareNode();
+        // A new socket is CONNECTING until its handshake completes (a microtask here).
+        const ws = new FakeWebSocket(BARE_WS);
+        expect(ws.readyState).toBe(FakeWebSocket.CONNECTING);
+        expect(() => ws.send('{}')).toThrow(new Error('WebSocket is not open: readyState 0 (CONNECTING)'));
+        expect(() => ws.ping()).toThrow(new Error('WebSocket is not open: readyState 0 (CONNECTING)'));
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(ws.readyState).toBe(FakeWebSocket.OPEN);
+
+        // OPEN: the ws signature (data, options, cb); the callback runs once the frame is written.
+        const replies: string[] = [];
+        ws.on('message', (m: Buffer) => replies.push(m.toString('utf8')));
+        const written = new Promise<Error | null>((resolve) => ws.send(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }), {}, (err?: Error) => resolve(err ?? null)));
+        expect(await written).toBeNull();
+        for (let i = 0; i < 10 && replies.length === 0; i++) await Promise.resolve();
+        expect(replies.map((r) => JSON.parse(r) as { result: string })).toEqual([{ jsonrpc: '2.0', id: 1, result: '0x1' }]);
+
+        node.dropSocket();
+        expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+        const callsBefore = node.callLog.length;
+        // No callback: the frame is dropped silently.
+        expect(() => ws.send(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_chainId', params: [] }))).not.toThrow();
+        expect(() => ws.ping()).not.toThrow();
+        // With a callback: the error arrives on the next tick, never inside the call.
+        const errors: string[] = [];
+        ws.send('{}', (err?: Error) => errors.push(`send ${err?.message}`));
+        ws.ping((err?: Error) => errors.push(`ping ${err?.message}`));
+        expect(errors).toEqual([]);
+        await nextTick();
+        expect(errors).toEqual(['send WebSocket is not open: readyState 3 (CLOSED)', 'ping WebSocket is not open: readyState 3 (CLOSED)']);
+        expect(node.callLog.length).toBe(callsBefore);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('close and terminate while CONNECTING go CLOSING at once, then on the next tick emit error ("closed before the connection was established") and close 1006, as ws abortHandshake does; an onerror attribute counts as a listener', async () => {
+        const { node } = bareNode();
+        for (const how of ['close', 'terminate'] as const) {
+            const ws = new FakeWebSocket(BARE_WS);
+            expect(ws.readyState).toBe(FakeWebSocket.CONNECTING);
+            const events: string[] = [];
+            ws.on('error', (e: Error) => events.push(`error ${e.message}`));
+            ws.on('close', (code: number) => events.push(`close ${code}`));
+            ws[how]();
+            expect(ws.readyState).toBe(FakeWebSocket.CLOSING);
+            expect(events).toEqual([]);
+            await nextTick();
+            expect(events, how).toEqual(['error WebSocket was closed before the connection was established', 'close 1006']);
+            expect(ws.readyState).toBe(FakeWebSocket.CLOSED);
+        }
+        const withAttribute = new FakeWebSocket(BARE_WS);
+        let seen = '';
+        withAttribute.onerror = (ev) => {
+            seen = ev.message;
+        };
+        withAttribute.close();
+        await nextTick();
+        expect(seen).toBe('WebSocket was closed before the connection was established');
+        // A socket closed during its handshake never opens.
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(node.socketsOpened).toBe(0);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('hangSocketOpens keeps new sockets CONNECTING (a stalled handshake) until turned off, then opens the ones still waiting', async () => {
+        const { node } = bareNode();
+        node.hangSocketOpens(true);
+        const waiting = new FakeWebSocket(BARE_WS);
+        const abandoned = new FakeWebSocket(BARE_WS);
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        expect([waiting.readyState, abandoned.readyState]).toEqual([FakeWebSocket.CONNECTING, FakeWebSocket.CONNECTING]);
+        abandoned.on('error', () => undefined);
+        abandoned.terminate();
+        await nextTick();
+        node.hangSocketOpens(false);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect([waiting.readyState, abandoned.readyState]).toEqual([FakeWebSocket.OPEN, FakeWebSocket.CLOSED]);
+        expect(node.socketsOpened).toBe(1);
+        FakeWebSocket.instances.length = 0;
+    });
+
+    it('a real ethers WebSocketProvider whose socket the node dropped hangs on its next request, as on ws, instead of rejecting at once', async () => {
+        const { node } = bareNode();
+        const ws = bareWs();
+        expect(await stepUntil(ws.getBlockNumber())).toBe(node.head);
+        node.dropSocket();
+        // ethers writes with no readyState guard: ws drops the frame, so no answer ever comes.
+        await expectStillPending(ws.send('eth_blockNumber', []), 30_000, { what: 'a request written to the dropped socket' });
     });
 });

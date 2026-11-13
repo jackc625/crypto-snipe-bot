@@ -277,6 +277,9 @@ export function installSeams(opts: InstallSeamsOptions = {}): void {
         const probe = new ethers.WebSocketProvider('ws://127.0.0.1:1', 1);
         probeSocket = probe.websocket;
         reached = probeSocket instanceof SeamProbe;
+        // The probe is destroyed while its socket is still CONNECTING, which emits 'error' as ws
+        // does (WR-03); the harness's own probe listens for it, so nothing is thrown.
+        if (probeSocket instanceof EventEmitter) probeSocket.on('error', () => undefined);
         void probe.destroy();
     } finally {
         FakeWebSocket.instances.splice(0, FakeWebSocket.instances.length, ...FakeWebSocket.instances.filter((w) => w !== probeSocket));
@@ -348,9 +351,23 @@ const CLOSED = 3;
 
 /**
  * Replaces ws.WebSocket inside ethers. Members are those ethers and src/ use: on, once, off,
- * send, ping, terminate, close, readyState, onopen, onmessage, onclose (src/ calls
+ * send, ping, terminate, close, readyState, onopen, onmessage, onclose, onerror (src/ calls
  * `.websocket.on('close' | 'pong')`, `ping()` and `terminate()` directly).
- * Events are delivered on the microtask queue, so ordering is exact and needs no timer.
+ *
+ * Off the OPEN path it follows ws 8.17.1 (node_modules/ethers/node_modules/ws/lib/websocket.js,
+ * the copy production loads; Phase 23 review WR-03):
+ *   - send(data, options?, cb?) and ping(data?, mask?, cb?) throw only while CONNECTING. On
+ *     CLOSING or CLOSED the frame is dropped and a callback, if given, gets "WebSocket is not
+ *     open: readyState N (NAME)" on the next tick (ws sendAfterClose). So a request ethers writes
+ *     to a dropped socket hangs, as in production, instead of rejecting.
+ *   - close() or terminate() while CONNECTING goes CLOSING at once, then on the next tick emits
+ *     'error' ("WebSocket was closed before the connection was established") and 'close' 1006
+ *     (ws abortHandshake). With no 'error' listener and no onerror, that 'error' throws, as an
+ *     EventEmitter does in ws: the uncaught exception behind AUD-ANTIRUG-002.
+ *   - FakeNode.hangSocketOpens(true) keeps new sockets CONNECTING (a stalled handshake).
+ * Timing: the handshake completes, and a reply to send() arrives, on the microtask queue. Pushes
+ * the node makes (subscription messages from mine() or emitLogs(), dropSocket()'s close) are
+ * delivered synchronously, inside the call that made them; on ws they arrive from socket I/O.
  */
 export class FakeWebSocket extends EventEmitter {
     static readonly CONNECTING = CONNECTING;
@@ -370,6 +387,7 @@ export class FakeWebSocket extends EventEmitter {
     isAlive?: boolean;
     #state = CONNECTING;
     #node: FakeNode | null = null;
+    #openHeld = false;
 
     constructor(url: string | URL, _protocols?: unknown, _options?: unknown) {
         super();
@@ -401,6 +419,11 @@ export class FakeWebSocket extends EventEmitter {
             this.#closeNow(1006, '');
             return;
         }
+        // A stalled handshake (FakeNode.hangSocketOpens): stays CONNECTING until released.
+        if (!this.#openHeld && node.holdSocketOpen(this)) {
+            this.#openHeld = true;
+            return;
+        }
         this.#node = node;
         node.attachSocket(this);
         this.#state = OPEN;
@@ -408,22 +431,35 @@ export class FakeWebSocket extends EventEmitter {
         this.onopen?.({ type: 'open', target: this });
     }
 
-    send(data: unknown, cb?: (err?: Error) => void): void {
+    /** Called by FakeNode.hangSocketOpens(false): finish a held handshake (a no-op once closed). */
+    completeHeldOpen(): void {
+        this.#open();
+    }
+
+    #notOpenError(): Error {
+        const names = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+        return new Error(`WebSocket is not open: readyState ${this.#state} (${names[this.#state]})`);
+    }
+
+    /** ws sendAfterClose: the frame is dropped; a callback gets the error on the next tick. */
+    #afterClose(cb: ((err?: Error) => void) | undefined): void {
+        if (cb) process.nextTick(cb, this.#notOpenError());
+    }
+
+    send(data: unknown, options?: unknown, cb?: (err?: Error) => void): void {
+        if (this.#state === CONNECTING) throw this.#notOpenError();
+        if (typeof options === 'function') cb = options as (err?: Error) => void;
         if (this.#state !== OPEN) {
-            const names = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
-            const err = new Error(`WebSocket is not open: readyState ${this.#state} (${names[this.#state]})`);
-            if (cb) {
-                cb(err);
-                return;
-            }
-            throw err;
+            this.#afterClose(cb);
+            return;
         }
         const text = typeof data === 'string' ? data : Buffer.from(data as Uint8Array).toString('utf8');
         const node = this.#node!;
         void node.handle(text, this.connection, { endpoint: 'ws', url: this.url }).then((reply) => {
             if (reply !== undefined) this.#deliver(JSON.stringify(reply));
         });
-        cb?.();
+        // ws calls back once the frame is written out, never inside the call.
+        if (cb) process.nextTick(cb);
     }
 
     #deliver(text: string): void {
@@ -432,23 +468,52 @@ export class FakeWebSocket extends EventEmitter {
         this.onmessage?.({ data: text, type: 'message', target: this });
     }
 
-    ping(_data?: unknown): void {
-        if (this.#state !== OPEN) return;
+    ping(data?: unknown, mask?: unknown, cb?: (err?: Error) => void): void {
+        if (this.#state === CONNECTING) throw this.#notOpenError();
+        if (typeof data === 'function') cb = data as (err?: Error) => void;
+        else if (typeof mask === 'function') cb = mask as (err?: Error) => void;
+        if (this.#state !== OPEN) {
+            this.#afterClose(cb);
+            return;
+        }
         // A real node answers a ping frame with a pong frame.
         queueMicrotask(() => {
             if (this.#state === OPEN) this.emit('pong', Buffer.alloc(0));
         });
+        if (cb) process.nextTick(cb);
+    }
+
+    /** ws abortHandshake: CLOSING now, then 'error' and 'close' 1006 on the next tick. */
+    #abortHandshake(): void {
+        this.#state = CLOSING;
+        const err = new Error('WebSocket was closed before the connection was established');
+        process.nextTick(() => {
+            this.#emitError(err);
+            this.#closeNow(1006, '');
+        });
+    }
+
+    /** An 'error' event: an onerror attribute is a listener too (ws registers it as one). */
+    #emitError(err: Error): void {
+        const attribute = this.onerror;
+        // With no listener at all, EventEmitter throws, as ws's emit does.
+        if (this.listenerCount('error') > 0 || !attribute) this.emit('error', err);
+        attribute?.({ error: err, message: err.message, type: 'error', target: this });
     }
 
     terminate(): void {
         if (this.#state === CLOSED) return;
+        if (this.#state === CONNECTING) {
+            this.#abortHandshake();
+            return;
+        }
         this.#closeNow(1006, '');
     }
 
     close(code = 1000, reason = ''): void {
         if (this.#state === CLOSED || this.#state === CLOSING) return;
         if (this.#state === CONNECTING) {
-            this.#closeNow(1006, '');
+            this.#abortHandshake();
             return;
         }
         this.#state = CLOSING;
@@ -747,6 +812,9 @@ export class FakeNode {
     #head: BlockRecord;
     #subSeq = 0;
     #socketsOpened = 0;
+    /** hangSocketOpens: new sockets wait in CONNECTING while true (WR-03). */
+    #hangOpens = false;
+    readonly #heldOpens: FakeWebSocket[] = [];
     /** Waiters of waitForSubscriptions, resolved from the subscribe path (plan 23-27). */
     readonly #subscriptionWaiters: Array<{ n: number; resolve: () => void }> = [];
     /** autoMine: confirmations per accepted public transaction, or null when off (default). */
@@ -1304,6 +1372,26 @@ export class FakeNode {
     /** Server-side close of every open socket on this node (default code 1006, abnormal). */
     dropSocket(code = 1006): void {
         for (const ws of [...this.#sockets]) ws.serverClose(code, '');
+    }
+
+    /**
+     * A stalled WebSocket handshake (Phase 23 review WR-03): while on, a new socket to this node
+     * stays CONNECTING, so a test can reach ws's CONNECTING paths (close or terminate during the
+     * handshake, a ping or send before open). Turning it off opens every socket still waiting,
+     * in the order they connected; one closed meanwhile never opens.
+     */
+    hangSocketOpens(on: boolean): void {
+        if (typeof on !== 'boolean') throw new Error('hangSocketOpens: on must be a boolean');
+        this.#hangOpens = on;
+        if (on) return;
+        for (const ws of this.#heldOpens.splice(0)) queueMicrotask(() => ws.completeHeldOpen());
+    }
+
+    /** FakeWebSocket asks before it opens: true (and kept) while hangSocketOpens is on. */
+    holdSocketOpen(ws: FakeWebSocket): boolean {
+        if (!this.#hangOpens) return false;
+        this.#heldOpens.push(ws);
+        return true;
     }
 
     attachSocket(ws: FakeWebSocket): void {

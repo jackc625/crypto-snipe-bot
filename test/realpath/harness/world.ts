@@ -666,7 +666,12 @@ async function stopGraphParts(built: BuiltParts, step: (what: string, fn: () => 
     });
     // 3. Providers: raw socket listeners first so a teardown close cannot start a reconnect.
     await step('detach socket listeners', () => {
-        for (const ws of FakeWebSocket.instances) ws.removeAllListeners();
+        // A socket still CONNECTING emits 'error' when the teardown closes it, as ws does (WR-03).
+        // That close is the harness's, not the bot's, so the teardown listens for it.
+        for (const ws of FakeWebSocket.instances) {
+            ws.removeAllListeners();
+            ws.on('error', () => undefined);
+        }
     });
     await step('destroy providers', async () => {
         // ethers' destroy() cancels pending requests, marks the provider destroyed, then
