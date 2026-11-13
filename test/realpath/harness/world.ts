@@ -404,7 +404,18 @@ async function routeAxios(method: string, url: string, data: unknown, config: un
         throw axiosError(`realpath harness: no route for ${method.toUpperCase()} ${url}`, config, undefined, 'ERR_REALPATH_NO_ROUTE');
     }
     const req: HttpRequestInfo = { method, url, data, config };
-    const reply = await route.handler(req);
+    let reply: Awaited<ReturnType<HttpHandler>>;
+    try {
+        reply = await route.handler(req);
+    } catch (e) {
+        // A harness bug must not look like a service answer (as on the JSON-RPC path, chain.ts):
+        // production catches every axios error, so the stray is what fails the test (WR-04).
+        const detail = `harness error answering axios ${method.toUpperCase()} ${url}: ${e instanceof Error ? e.message : String(e)}`;
+        const stray: Stray = { seq: nextSeq(), kind: 'url', url, detail };
+        if (st.node) st.node.strays.push(stray);
+        else st.orphanStrays.push(stray);
+        throw axiosError('realpath harness: internal error', config, { status: 500, data: { error: 'internal error' }, headers: { 'content-type': 'application/json' } }, 'ERR_REALPATH_HARNESS');
+    }
     const status = reply.status ?? 200;
     const headers = reply.headers ?? { 'content-type': 'application/json' };
     if (status >= 400) throw axiosError(`Request failed with status code ${status}`, config, { status, data: reply.data, headers }, 'ERR_BAD_RESPONSE');

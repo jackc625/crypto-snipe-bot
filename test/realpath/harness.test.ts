@@ -24,6 +24,7 @@ import {
     assertNoStrays,
     createScenario,
     expectStillPending,
+    routeHttp,
     stepFor,
     stepUntil,
     stepUntilTrue,
@@ -228,6 +229,39 @@ describe('realpath harness', () => {
         expect(await closed).toBe(1006);
         expect(() => assertNoStrays()).toThrow(/unknown URL ws:\/\/unknown-ws\.invalid\/ \(WebSocket connect\)/);
         node.strays.length = 0;
+    });
+
+    // WR-04 (Phase 23 review): a route handler that throws is a harness error, as on the JSON-RPC
+    // path. Production wraps every axios call in a catch (bloxroute.ts, goplus.ts), so without a
+    // stray the scenario would carry on down a relay-failure branch on a harness exception.
+    it('WR-04: an axios route handler that throws records a stray naming the URL and rejects as an axios error, even when the caller swallows it', async () => {
+        const { node } = bareNode();
+        routeHttp('https://api.throws.invalid/', () => {
+            throw new Error('handler blew up');
+        });
+        let swallowed: unknown;
+        await axios.get('https://api.throws.invalid/v1/x').catch((e: unknown) => (swallowed = e));
+        expect(axios.isAxiosError(swallowed)).toBe(true);
+        expect((swallowed as { code?: string }).code).toBe('ERR_REALPATH_HARNESS');
+        expect((swallowed as { response?: { status?: number } }).response?.status).toBe(500);
+        expect(() => assertNoStrays()).toThrow(/stray call: harness error answering axios GET https:\/\/api\.throws\.invalid\/v1\/x: handler blew up/);
+        node.strays.length = 0;
+    });
+
+    it("WR-04: the scenario's own bloXroute route throwing on an unsigned transaction is a stray, not a relay failure", async () => {
+        const sc = await createScenario({ chain: 'bsc', dexType: 'v2' });
+        const endpoint = (sc.ctx.chain.mevConfig as { endpoint: string }).endpoint;
+        const unsigned = Transaction.from({ chainId: 56n, nonce: 0, to: sc.dex.routerAddress, gasLimit: 21_000n, gasPrice: 1n, value: 0n, data: '0x' }).unsignedSerialized;
+        const err = await axios
+            .post(endpoint, { jsonrpc: '2.0', id: 1, method: 'bsc_private_tx', params: { transaction: unsigned } }, { headers: { Authorization: process.env.BLOXROUTE_AUTH_HEADER } })
+            .then(
+                () => null,
+                (e: unknown) => e,
+            );
+        expect(axios.isAxiosError(err)).toBe(true);
+        expect(sc.node.submitted).toHaveLength(0);
+        expect(() => assertNoStrays()).toThrow(new RegExp(`stray call: harness error answering axios POST ${endpoint.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: acceptRelayTransaction: the bloxroute transaction is not signed`));
+        sc.node.strays.length = 0;
     });
 
     it('AC-03: a fault names its exact operation, does not fire before its stage, and an unfired fault or hold fails the test', async () => {
