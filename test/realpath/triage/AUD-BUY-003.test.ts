@@ -7,11 +7,15 @@
 // one test each (D-10, AC-11).
 //
 // Each test drives the real snipe from a real PairCreated or PoolCreated through the real
-// listener, detection and safety bank. The ONE quote read for the snipe amount fails with a real
-// node answer: the fault names the method's selector and its target, and is armed only after the
-// bot logged that every safety check passed, so it cannot hit a safety-bank or liquidity read
-// (the V3 liquidity gate calls the same quoter). The submitted transaction is decoded with real
-// ethers (Transaction.from and the router ABI).
+// listener, detection and safety bank. The quote read for the snipe amount fails with a real node
+// answer, and keeps failing for the whole decision window (every matching call from the moment the
+// bot logged that every safety check passed until the window closes, review CR-07): a one-shot
+// fault let a fix that retries the read once read "looks fixed" while a quote that fails twice
+// still sent an unbounded swap. The fault names the method's selector and its target, and is armed
+// only after the bot logged that every safety check passed, so it cannot hit a safety-bank or
+// liquidity read (the V3 liquidity gate calls the same quoter); it is closed before the buy is
+// mined, so the exit monitor's own quotes are answered. The submitted transaction is decoded with
+// real ethers (Transaction.from and the router ABI).
 //
 // What is measured: whether an unbounded swap (amountOutMin 0) was sent. Correct is that none was:
 // either the snipe is skipped (fail closed, like the deliberate public leg, src/bot.ts
@@ -70,7 +74,10 @@ async function mineAndArm(sc: Scenario, hash: string, block: number): Promise<vo
     );
 }
 
-/** How long the bot is given, after the quote fault fired, to submit (it takes well under a second of fake time). */
+/**
+ * The decision window: how long the bot is given, after the quote fault first fired, to submit (it
+ * takes well under a second of fake time). The quote read keeps failing for all of it.
+ */
 const SUBMIT_WINDOW_MS = 5_000;
 
 describe('AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-02)', () => {
@@ -78,16 +85,20 @@ describe('AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-
         const sc = await createScenario({ chain: 'eth', dexType: 'v2' });
         const { node, dex } = sc;
         await listen(sc);
-        // geth's answer from a load-balanced node that has not seen the launch block yet.
+        // geth's answer from a load-balanced node that has not seen the launch block yet, on every
+        // matching read during the decision window.
+        let decisionWindow = true;
         const quote = node.failNext('eth_call', {
             selector: 'getAmountsOut(uint256,address[])',
             to: dex.routerAddress,
-            after: () => msgLogged('All safety checks passed, buying'),
+            after: () => decisionWindow && msgLogged('All safety checks passed, buying'),
+            times: 1_000,
             error: { code: -32000, message: 'header not found' },
         });
         const launch = await sc.fireNewPair();
-        await stepUntilTrue(() => quote.fired === 1, { what: 'the snipe-size getAmountsOut read failing' });
+        await stepUntilTrue(() => quote.fired >= 1, { what: 'the snipe-size getAmountsOut read failing' });
         await stepFor(SUBMIT_WINDOW_MS);
+        decisionWindow = false;
 
         // Setup facts: the failed read was the snipe-size quote on [WETH, token].
         const failed = node.callLog.filter((c) => c.method === 'eth_call' && c.to === dex.routerAddress.toLowerCase() && c.selector === V2_QUOTE_SELECTOR).at(-1)!;
@@ -122,16 +133,20 @@ describe('AUD-BUY-003: the snipe buy minOut fails open when the quote fails (RC-
         const sc = await createScenario({ chain: 'eth', dexType: 'v3' });
         const { node, dex } = sc;
         await listen(sc);
-        // The quoter reverts with no data, as QuoterV2 does when the swap it simulates fails.
+        // The quoter reverts with no data, as QuoterV2 does when the swap it simulates fails, on
+        // every matching read during the decision window.
+        let decisionWindow = true;
         const quote = node.failNext('eth_call', {
             selector: 'quoteExactInputSingle((address,address,uint256,uint24,uint160))',
             to: dex.quoterAddress,
-            after: () => msgLogged('All V3 safety checks passed, buying'),
+            after: () => decisionWindow && msgLogged('All V3 safety checks passed, buying'),
+            times: 1_000,
             error: { code: -32000, message: 'execution reverted' },
         });
         const launch = await sc.fireNewPool();
-        await stepUntilTrue(() => quote.fired === 1, { what: 'the snipe-size quoteExactInputSingle read failing' });
+        await stepUntilTrue(() => quote.fired >= 1, { what: 'the snipe-size quoteExactInputSingle read failing' });
         await stepFor(SUBMIT_WINDOW_MS);
+        decisionWindow = false;
 
         // Setup facts: the failed read was the snipe-size quote of WETH for the token at the pool's fee.
         const failed = node.callLog.filter((c) => c.method === 'eth_call' && c.to === dex.quoterAddress.toLowerCase() && c.selector === V3_QUOTE_SELECTOR).at(-1)!;
