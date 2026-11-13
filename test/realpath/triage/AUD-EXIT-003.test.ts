@@ -26,8 +26,19 @@
 //     every check, including the 30-minute urgency exit"): every exit quote fails (the provider's
 //     rate-limit answer) for 31 minutes after the buy; the urgency exit never fires.
 // Each marker measures the harm (what was sold, or whether an exit fired, against what the real
-// price did), so every fix shape the recommendation names reads "looks fixed" (D-08). The sell side
-// of the chain comes from fixtures/AUD-EXIT-001-sell-path.ts, computed from mined transactions.
+// price did), so every fix shape the recommendation names reads "looks fixed" (D-08). Two wrong
+// fixes are kept from reading "looks fixed" (review WR-16):
+//   - sub-claim 1 measures that the exit price fits the position, not only that the probe changed:
+//     every exit quote's amountIn lies between 1 and 100 percent of the position (or, with no exit
+//     quote at all, the pool's reserves are read directly). A probe of parseUnits(buy amount,
+//     decimals) reads the decimals but still reuses the ETH amount as a token count (0.01 tokens of
+//     the 9-decimal token, a few-wei quote), and reads as the bug.
+//   - the zero-entry claims also measure that the position is still protected: a live exit-monitor
+//     timer, or an alert about this position saying it is unprotected. A fix that treats a 0 entry
+//     like null (log and return) sells nothing, but leaves the position unmonitored (AUD-EXIT-002's
+//     harm), and reads "the failure changed".
+// The sell side of the chain comes from fixtures/AUD-EXIT-001-sell-path.ts, computed from mined
+// transactions.
 //
 // Needs a fork (AC-16, recorded with --needs-fork): sub-claim 2 (the quote saturates and the ratio
 // tracks about the square root of the price when the probe is large against a thin pool's token
@@ -40,7 +51,7 @@
 import { describe, expect, it } from 'vitest';
 import { Interface, Wallet, ethers, getAddress, parseEther } from 'ethers';
 import { encodeResult } from '../harness/chain';
-import { recordedLogs } from '../harness/capture';
+import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, v2AmountOut, type Scenario } from '../harness/world';
 import { GET_AMOUNTS_OUT, V2_ROUTER, buyAndMine, buyRow, exitQuotes, exitStateRow, listen, opEntries, opLogged, waitAntiRugArmed } from './fixtures/AUD-EXIT-002-position';
@@ -51,6 +62,19 @@ const PAIR_EVENTS = new Interface([
     'event Swap(address indexed sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, address indexed to)',
 ]);
 const QUADRILLION = 10n ** 33n; // 1e15 whole tokens at 18 decimals
+/** An alert telling the operator a position has no exit monitoring (any wording a fix might use). */
+const UNPROTECTED = /unprotected|unmonitored|not monitored|no exit monitor|monitor (not started|failed)|exit monitor.*(fail|not)/i;
+
+/**
+ * The position is still protected: a live exit-monitor timer in the bot's real registry, or an
+ * alert since `fromAlert` that names this token (address or symbol) and says it is unprotected.
+ */
+function stillProtected(sc: Scenario, fromAlert: number): boolean {
+    if (sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token)) return true;
+    return recordedAlerts()
+        .slice(fromAlert)
+        .some((a) => UNPROTECTED.test(String(a.message)) && (String(a.message).toLowerCase().includes(sc.token.toLowerCase()) || String(a.message).includes('RPLT')));
+}
 
 /** A pool of 1 ETH and 1 quadrillion tokens (a common meme-coin shape), set before the launch. */
 function highSupplyPool(sc: Scenario): void {
@@ -120,25 +144,36 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         sc.node.setRead(sc.token, 'decimals()', encodeResult(['uint8'], [9]));
         const fromCall = sc.node.callLog.length;
         await listen(sc);
-        await buyAndMine(sc);
+        const { buy } = await buyAndMine(sc);
+        // The position in raw token units (the router's own math for the buy, as snipeAndArm computes it).
+        const bought = v2AmountOut(buy.tx.value, sc.reserves.weth, sc.reserves.token);
         // The arming wait first: it mines any public transaction of the wallet, so a fix that
         // approves at buy time does not stall the setup of this file.
         await waitAntiRugArmed(sc);
         expect(opLogged('exit.monitor.started')).toBe(true);
+        const fromWindow = sc.node.callLog.length;
         await stepFor(2 * pollMs, 50);
         const quotes = exitQuotes(sc, fromCall);
-        expect(quotes.length).toBeGreaterThanOrEqual(3);
         const ethBuyWei = parseEther(sc.ctx.chain.snipeAmount);
+        // The exit price fits the position: every exit quote sells 1 to 100 percent of it, or (no exit
+        // quote at all) the bot reads the pool's reserves directly during the poll window.
+        const fitsPosition = (amountIn: bigint): boolean => amountIn * 100n >= bought && amountIn <= bought;
+        const reservesRead = sc.node.callLog
+            .slice(fromWindow)
+            .some((c) => c.method === 'eth_call' && c.to === sc.pair.toLowerCase() && c.selector === '0x0902f1ac');
+        const exitPriceFitsPosition = quotes.length > 0 ? quotes.every((q) => fitsPosition(q.amountIn)) : reservesRead;
 
         knownBug(ctx, 'AUD-EXIT-003', {
             claim: 'probe-is-eth-buy-wei-as-token-amount',
-            correct: { probeIsEthBuyAmountInWei: false },
-            observed: { probeIsEthBuyAmountInWei: true },
-            actual: { probeIsEthBuyAmountInWei: quotes.every((q) => q.amountIn === ethBuyWei) },
+            correct: { exitPriceFitsPosition: true },
+            observed: { exitPriceFitsPosition: false },
+            actual: { exitPriceFitsPosition },
             expectedPlain: 'The exit price is measured with a token amount that fits the token (its decimals and the size of the position), or with the pool price itself.',
             actualPlain: 'For a token with 9 decimals the exit monitor quotes 1e16 raw units, the 0.01 ETH buy size in wei, which is 10,000,000 tokens, whatever the token or the position size.',
         });
         // Bug details: one probe for the entry and every tick, 1e16 raw = 10,000,000 whole tokens.
+        expect(quotes.length).toBeGreaterThanOrEqual(3);
+        expect(quotes.every((q) => q.amountIn === ethBuyWei)).toBe(true);
         expect(ethBuyWei).toBe(10n ** 16n);
         expect(ethBuyWei / 10n ** 9n).toBe(10_000_000n);
         expect(quotes.every((q) => q.to === getAddress(sc.dex.routerAddress) && q.tokenOut === getAddress(sc.weth))).toBe(true);
@@ -154,6 +189,7 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         expect(sc.graph.exitEngine.exitConfig.partialSellTiers).toEqual([{ multiple: 2, percent: 25 }, { multiple: 5, percent: 25 }]);
         highSupplyPool(sc);
         const probe = parseEther('0.001');
+        const fromAlert = recordedAlerts().length;
         const { bought, tradeId } = await snipeAndArm(sc);
         // The monitor's entry quote: the router's own math answers 0 for 1e15 raw tokens.
         expect(v2AmountOut(probe, sc.reserves.token, sc.reserves.weth)).toBe(0n);
@@ -176,9 +212,9 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
 
         knownBug(ctx, 'AUD-EXIT-003', {
             claim: 'zero-entry-infinite-ratio-fires-every-partial-tier',
-            correct: { soldAtA1PercentRise: [] as string[] },
-            observed: { soldAtA1PercentRise: ['50%'] },
-            actual: { soldAtA1PercentRise: sold.map((s) => share(s.amountIn)) },
+            correct: { soldAtA1PercentRise: [] as string[], stillProtected: true },
+            observed: { soldAtA1PercentRise: ['50%'], stillProtected: true },
+            actual: { soldAtA1PercentRise: sold.map((s) => share(s.amountIn)), stillProtected: stillProtected(sc, fromAlert) },
             expectedPlain: 'After a 1 percent price rise no partial take-profit tier (2x, 5x) sells.',
             actualPlain: 'The first quote of a high-supply token answered 0 and was kept as the entry price; after a 1 percent rise the ratio read Infinity, trailing activated and the 2x and 5x tiers sold half the position at once.',
         });
@@ -200,6 +236,7 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
         const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_SNIPE_AMOUNT: '0.001' } });
         const pollMs = sc.graph.exitEngine.exitConfig.pollIntervalMs;
         highSupplyPool(sc);
+        const fromAlert = recordedAlerts().length;
         const { bought, tradeId } = await snipeAndArm(sc);
         expect(v2AmountOut(parseEther('0.001'), sc.reserves.token, sc.reserves.weth)).toBe(0n);
         const fromLog = recordedLogs().length;
@@ -210,9 +247,9 @@ describe('AUD-EXIT-003: the exit price signal is a ratio of fixed-probe quote ou
 
         knownBug(ctx, 'AUD-EXIT-003', {
             claim: 'zero-entry-nan-ratio-fires-stop-loss',
-            correct: { exitTriggeredWithNoPriceMove: false },
-            observed: { exitTriggeredWithNoPriceMove: true },
-            actual: { exitTriggeredWithNoPriceMove: exitTriggers(fromLog).length > 0 },
+            correct: { exitTriggeredWithNoPriceMove: false, stillProtected: true },
+            observed: { exitTriggeredWithNoPriceMove: true, stillProtected: true },
+            actual: { exitTriggeredWithNoPriceMove: exitTriggers(fromLog).length > 0, stillProtected: stillProtected(sc, fromAlert) },
             expectedPlain: 'With the pool unchanged, no exit fires.',
             actualPlain: 'The first quote of a high-supply token answered 0 and was kept as the entry price; with the pool unchanged the next quote was 0 too, 0/0 gave NaN, and the stop-loss sold the whole position on the first tick.',
         });
