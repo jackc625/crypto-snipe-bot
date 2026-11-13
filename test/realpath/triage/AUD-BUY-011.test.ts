@@ -32,7 +32,7 @@ import { encodeResult } from '../harness/chain';
 import { knownBug } from '../harness/knownBug';
 import { deliverTelegramMessage } from '../harness/telegram';
 import { createScenario, stepFor, stepUntil, stepUntilTrue, type Scenario } from '../harness/world';
-import { freeLoopbackPort, startDashboard, type Dashboard } from './fixtures/AUD-BUY-011-dashboard';
+import { LOOPBACK_DASHBOARD_ENV, startDashboard, type Dashboard } from './fixtures/AUD-BUY-011-dashboard';
 
 function logged(msg: string): Array<Record<string, unknown> | undefined> {
     return recordedLogs()
@@ -79,8 +79,7 @@ async function finishBuy(sc: Scenario<'v2'>, armedWhen: () => boolean): Promise<
 
 describe('AUD-BUY-011: dashboard Stop does not stop buying on the chain', () => {
     it('http-poller-buys-after-stop: on a chain without a WebSocket URL, after the real stop route the HTTP poller still finds a new pair and the bot buys', async (ctx) => {
-        const port = await freeLoopbackPort();
-        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_WS_URL: '', DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(port) } });
+        const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ETH_WS_URL: '', ...LOOPBACK_DASHBOARD_ENV } });
         const { node, graph } = sc;
         expect(sc.ctx.wsProvider).toBeNull();
         await graph.bot.startDexListener(sc.ctx, sc.dex, sc.registry);
@@ -114,11 +113,10 @@ describe('AUD-BUY-011: dashboard Stop does not stop buying on the chain', () => 
     });
 
     it('telegram-routes-to-stopped-chain: on a WebSocket chain, the real stop route removes the factory listener, yet a Telegram alpha drop from an allowlisted sender still routes to the stopped chain and the bot buys', async (ctx) => {
-        const port = await freeLoopbackPort();
         const sc = await createScenario({
             chain: 'eth',
             dexType: 'v2',
-            overrides: { DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(port), TELEGRAM_ALLOWED_SENDERS: '111222333', TELEGRAM_ALLOWED_CHANNELS: '-1001112223334' },
+            overrides: { ...LOOPBACK_DASHBOARD_ENV, TELEGRAM_ALLOWED_SENDERS: '111222333', TELEGRAM_ALLOWED_CHANNELS: '-1001112223334' },
         });
         const { node, graph, dex, pair, token } = sc;
         await graph.bot.startDexListener(sc.ctx, dex, sc.registry);

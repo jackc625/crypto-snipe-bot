@@ -55,7 +55,8 @@ import { harnessState } from '../harness/chain';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepUntilTrue } from '../harness/world';
-import { dashboardOverrides, driveChain, exitStatusOf, heldPosition, openDashboard, postDriven, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
+import { driveChain, exitStatusOf, heldPosition, openDashboard, postDriven, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
+import { LOOPBACK_DASHBOARD_ENV } from './fixtures/AUD-BUY-011-dashboard';
 import { buyRow, opEntries, opLogged } from './fixtures/AUD-EXIT-002-position';
 import { pullV3Liquidity } from './fixtures/AUD-EXIT-014-rug';
 
@@ -70,7 +71,7 @@ function exitFiredSince(from: number, tradeId: number): Array<{ success?: boolea
 
 describe('AUD-EXIT-007: exits with nowhere to go leave a held position with no poll timer', () => {
     it('v3-private-not-landed-leaves-no-poll: a dashboard force-sell of a V3 position whose private sell does not land returns false and the position is never polled again', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: await dashboardOverrides() });
+        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: { ...LOOPBACK_DASHBOARD_ENV } });
         const pos = await heldPosition(sc);
         expect(sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token)).toBe(true);
         const { dash, cookie } = await openDashboard(sc);
@@ -102,7 +103,7 @@ describe('AUD-EXIT-007: exits with nowhere to go leave a held position with no p
     });
 
     it('unknown-dex-leaves-no-poll: a dashboard force-sell that reaches the unknown-dex return (a V3 row with no fee tier) returns false and the position is never polled again', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: await dashboardOverrides() });
+        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: { ...LOOPBACK_DASHBOARD_ENV } });
         const pos = await heldPosition(sc);
         expect(sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token)).toBe(true);
         sc.graph.db.prepare('UPDATE trades SET fee_tier = NULL WHERE id = ?').run(pos.tradeId);
@@ -132,7 +133,7 @@ describe('AUD-EXIT-007: exits with nowhere to go leave a held position with no p
     });
 
     it('emergency-sell-v3-not-landed-leaves-no-poll: a dashboard emergency-sell of a V3 position whose private sell does not land returns false and the position is never polled again', async (ctx) => {
-        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: await dashboardOverrides() });
+        const sc = await createScenario({ chain: 'eth', dexType: 'v3', overrides: { ...LOOPBACK_DASHBOARD_ENV } });
         const pos = await heldPosition(sc);
         expect(sc.graph.exitManager.hasExitMonitorTimer('eth', sc.token)).toBe(true);
         const { dash, cookie } = await openDashboard(sc);

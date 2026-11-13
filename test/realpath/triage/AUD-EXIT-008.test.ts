@@ -45,7 +45,8 @@ import { describe, expect, it } from 'vitest';
 import { recordedAlerts, recordedLogs } from '../harness/capture';
 import { knownBug } from '../harness/knownBug';
 import { createScenario, stepFor, stepUntilTrue, type Scenario } from '../harness/world';
-import { dashboardOverrides, exitStatusOf, heldPosition, incomingHolder, openDashboard, postDriven, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
+import { exitStatusOf, heldPosition, incomingHolder, openDashboard, postDriven, sellsSince } from './fixtures/AUD-API-001-dashboard-sell';
+import { LOOPBACK_DASHBOARD_ENV } from './fixtures/AUD-BUY-011-dashboard';
 import { buyRow, opEntries } from './fixtures/AUD-EXIT-002-position';
 import { foreignTrade } from './fixtures/AUD-EXIT-001-sell-path';
 
@@ -54,7 +55,7 @@ import { foreignTrade } from './fixtures/AUD-EXIT-001-sell-path';
  * paused while its buy row stays 'pending'. Every precondition is asserted here, before any request.
  */
 async function pausedPosition(): Promise<{ sc: Scenario; tradeId: number }> {
-    const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ...(await dashboardOverrides()), EXIT_ROUTINE_MAX_FAILURES: '1' } });
+    const sc = await createScenario({ chain: 'eth', dexType: 'v2', overrides: { ...LOOPBACK_DASHBOARD_ENV, EXIT_ROUTINE_MAX_FAILURES: '1' } });
     const { node } = sc;
     const pos = await heldPosition(sc);
     const holder = incomingHolder(sc, { bought: pos.bought, holding: pos.bought });
