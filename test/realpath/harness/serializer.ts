@@ -42,10 +42,12 @@
 //     small plan (Recommended)"): compareRecording also records, for the current run, which
 //     recording it compared, so scripts/check-recordings-compared.ts (npm run
 //     check:recordings-compared) can fail when a committed recording was never compared in a full
-//     run (a test pointed at a new recording name while the old file stays). After the path
-//     checks and before the compare, a call against the real recordings folder appends one line,
-//     the JSON-quoted path relative to that folder with forward slashes (`<name>.jsonl`,
-//     `env/<VAR>.json`), to <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<CSB_RAIL_RUN_ID>/
+//     run (a test pointed at a new recording name while the old file stays). Once the compare has
+//     decided (Phase 23 review WR-28: the outcome, not just the call, so a mismatch the caller
+//     catches still counts against the run), a call against the real recordings folder appends one
+//     line, {"path":<path relative to that folder with forward slashes (`<name>.jsonl`,
+//     `env/<VAR>.json`)>,"result":"match"|"written"|"differs"|"absent"|"error"}, to
+//     <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<CSB_RAIL_RUN_ID>/
 //     <pid>-<token>.txt (token: 8 random hex digits taken when this module loads, so two worker
 //     threads of one process, or two loaded copies of the module, never share a file),
 //     synchronously, so a worker that ends right after cannot lose it. It records in compare and
@@ -57,7 +59,8 @@
 //     one line says so on stderr (once per loaded module; Vitest loads it once per test file). A
 //     failed record write is reported once on stderr and never
 //     changes the compare (the check then fails naming the path). Nothing else here changed:
-//     compare and write results are byte-identical to 23-20's.
+//     compare and write results are byte-identical to 23-20's. The check counts a recording as
+//     compared only on a 'match', and fails on any other recorded outcome.
 
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -378,7 +381,14 @@ const RECORD_TOKEN = randomBytes(4).toString('hex');
 let warnedNoRunId = false;
 let warnedWriteFailed = false;
 
-function recordCompared(file: string, base: string): void {
+/**
+ * What one compareRecording call against the real folder ended in (WR-28): 'match' (the bytes are
+ * equal), 'written' (an update run wrote them), 'differs', 'absent' (no recording), or 'error' (a
+ * refusal, such as a carriage return, or a failed write).
+ */
+export type RecordedOutcome = 'match' | 'written' | 'differs' | 'absent' | 'error';
+
+function recordCompared(file: string, base: string, result: RecordedOutcome): void {
     // Only the real recordings folder (a `dir` override naming it counts as the real folder).
     if (path.relative(RECORDINGS_DIR, base) !== '') return;
     const runId = process.env.CSB_RAIL_RUN_ID;
@@ -396,7 +406,7 @@ function recordCompared(file: string, base: string): void {
     try {
         const dir = path.join(os.tmpdir(), COMPARED_RECORD_DIRNAME, runId);
         fs.mkdirSync(dir, { recursive: true });
-        fs.appendFileSync(path.join(dir, `${process.pid}-${RECORD_TOKEN}.txt`), `${JSON.stringify(rel)}\n`);
+        fs.appendFileSync(path.join(dir, `${process.pid}-${RECORD_TOKEN}.txt`), `${JSON.stringify({ path: rel, result })}\n`);
     } catch (e) {
         if (!warnedWriteFailed) {
             warnedWriteFailed = true;
@@ -409,29 +419,41 @@ function recordCompared(file: string, base: string): void {
  * Compare `text` with the recording at `relPath`, byte for byte. Throws on a difference or an
  * absent file, unless writing is allowed (updateAllowed), in which case it writes and returns
  * 'written'. Returns 'match' when the bytes are equal (nothing is written). A call against the
- * real recordings folder is recorded for the current run first (see the file header).
+ * real recordings folder is recorded for the current run with its outcome (see the file header).
  */
 export function compareRecording(relPath: string, text: string, opts: CompareOptions = {}): CompareResult {
     const file = resolveRecordingPath(relPath, opts.dir);
-    recordCompared(file, path.resolve(opts.dir ?? RECORDINGS_DIR));
-    if (text.includes('\r')) throw new Error(`compareRecording: the text for ${relPath} holds a carriage return (AC-26: LF only)`);
-    const now = Buffer.from(text, 'utf8');
-    const exists = fs.existsSync(file);
-    const recorded = exists ? fs.readFileSync(file) : null;
-    if (recorded !== null && recorded.equals(now)) return 'match';
-    if (updateAllowed()) {
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, now);
-        // WR-36: every write is said out loud, so a re-record is never silent.
-        process.stderr.write(`[recordings] WROTE ${relPath} (update run)\n`);
-        return 'written';
+    // WR-28: the outcome is recorded once the compare has decided, on every way out (a throw the
+    // caller catches is still a 'differs' or 'absent' in the run's record).
+    let outcome: RecordedOutcome = 'error';
+    try {
+        if (text.includes('\r')) throw new Error(`compareRecording: the text for ${relPath} holds a carriage return (AC-26: LF only)`);
+        const now = Buffer.from(text, 'utf8');
+        const exists = fs.existsSync(file);
+        const recorded = exists ? fs.readFileSync(file) : null;
+        if (recorded !== null && recorded.equals(now)) {
+            outcome = 'match';
+            return 'match';
+        }
+        if (updateAllowed()) {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, now);
+            outcome = 'written';
+            // WR-36: every write is said out loud, so a re-record is never silent.
+            process.stderr.write(`[recordings] WROTE ${relPath} (update run)\n`);
+            return 'written';
+        }
+        if (recorded === null) {
+            outcome = 'absent';
+            throw new Error(`compareRecording: no recording at ${relPath}. A normal run never writes one (AC-25); create it with: ${UPDATE_COMMAND}`);
+        }
+        outcome = 'differs';
+        throw new Error(
+            `compareRecording: ${relPath} differs from what the bot did now (the recording is not rewritten on a normal run). ` +
+                `${firstDifference(recorded.toString('utf8'), text)}\n` +
+                `If the change is intended, re-record with ${UPDATE_COMMAND} and commit it as a behavior: commit citing a register ID (D-18).`,
+        );
+    } finally {
+        recordCompared(file, path.resolve(opts.dir ?? RECORDINGS_DIR), outcome);
     }
-    if (recorded === null) {
-        throw new Error(`compareRecording: no recording at ${relPath}. A normal run never writes one (AC-25); create it with: ${UPDATE_COMMAND}`);
-    }
-    throw new Error(
-        `compareRecording: ${relPath} differs from what the bot did now (the recording is not rewritten on a normal run). ` +
-            `${firstDifference(recorded.toString('utf8'), text)}\n` +
-            `If the change is intended, re-record with ${UPDATE_COMMAND} and commit it as a behavior: commit citing a register ID (D-18).`,
-    );
 }

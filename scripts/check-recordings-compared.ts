@@ -17,7 +17,9 @@
 //     letter-case variant of the folder (test/realpath/RECORDINGS/...) is a violation: on the
 //     operator's Windows checkout it is the same folder, and the serializer could never name it;
 //   - the run's comparison record: compareRecording appends, for every call against the real
-//     recordings folder, the JSON-quoted path relative to that folder to
+//     recordings folder, once the compare has decided, one line
+//     {"path":<path relative to that folder>,"result":"match"|"written"|"differs"|"absent"|"error"}
+//     (Phase 23 review WR-28: the outcome, not just the call) to
 //     <os.tmpdir()>/crypto-snipe-bot-recordings-compared/<run id>/<pid>-<token>.txt (one file per
 //     loaded copy of the serializer, token 8 random hex digits). The run id
 //     is the rails' CSB_RAIL_RUN_ID: test/rails/ledgerRun.ts (the globalSetup of every project)
@@ -25,8 +27,11 @@
 //     Vitest main process before any worker starts, so all workers of ONE vitest invocation share
 //     one id and every invocation gets its own. The record is outside the rail ledger folder.
 //
-// The rule (exit 1, each path named): every recording was compared at least once in the judged
-// run, and every compared path is a tracked recording.
+// The rule (exit 1, each path named): every recording was compared with a 'match' at least once in
+// the judged run, no call in the run ended in any other outcome (a 'differs' or 'absent' the test
+// caught, a 'written' re-record, an 'error'), and every compared path is a tracked recording
+// (WR-28: a call is not a comparison; a scenario that "compares" the old recording and swallows the
+// mismatch fails here naming it).
 //
 // Which run it judges: exactly one, never guessed and never the newest folder.
 //   --run-id <id>     the run with that id;
@@ -86,6 +91,16 @@ const RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 /** <pid>-<token>.txt, as the serializer names a record file (token: 8 lower-case hex digits). */
 const RECORD_FILE_RE = /^[0-9]+-[0-9a-f]{8}\.txt$/;
 const RECORDING_EXT_RE = /\.(?:jsonl|json)$/;
+/** The outcomes compareRecording records (test/realpath/harness/serializer.ts RecordedOutcome, WR-28). */
+export const OUTCOMES = ['match', 'written', 'differs', 'absent', 'error'] as const;
+export type Outcome = (typeof OUTCOMES)[number];
+/** What each outcome other than 'match' means for the judged run (the violation line's tail). */
+const NOT_A_MATCH: Record<Exclude<Outcome, 'match'>, { label: string; why: string }> = {
+    written: { label: 'WRITTEN', why: 're-recorded in this run (an update run), so not compared' },
+    differs: { label: 'DIFFERS', why: 'the bytes differed (a mismatch the test caught still counts)' },
+    absent: { label: 'ABSENT', why: 'compared while no recording existed there' },
+    error: { label: 'ERROR', why: 'the compare refused or failed' },
+};
 
 const SCOPE_LINE =
     'scope: one run that executed every realpath test (CI npm run test:realpath, the wave gate full suite); ' +
@@ -95,7 +110,8 @@ const HELP = [
     'usage: check-recordings-compared.ts --run-id <id> | --run-log <file> | --sole-run | --self-test | --help',
     '',
     'Fails (exit 1) when a recording git tracks under test/realpath/recordings/ (a scenario <name>.jsonl',
-    'or an env snapshot env/<VAR>.json) was not compared by compareRecording in the judged run, or when',
+    'or an env snapshot env/<VAR>.json) was not compared with a match by compareRecording in the judged',
+    'run, when any call in the run ended in another outcome (differs, absent, written, error), or when',
     'the run compared a path git does not track there. Judges exactly one run:',
     '  --run-id <id>     the run with that CSB_RAIL_RUN_ID',
     '  --run-log <file>  the one run named by a vitest invocation\'s captured output (the realpath',
@@ -186,6 +202,8 @@ export interface RunRecord {
     calls: number;
     /** Compared path -> number of compareRecording calls. */
     paths: Map<string, number>;
+    /** Compared path -> outcome -> number of calls that ended in it (WR-28). */
+    outcomes: Map<string, Map<Outcome, number>>;
 }
 
 function validRunId(id: string, what: string): string {
@@ -217,6 +235,7 @@ export function readRunRecord(root: string, runId: string): RunRecord {
     }
     const names = fs.readdirSync(dir, { withFileTypes: true });
     const paths = new Map<string, number>();
+    const outcomes = new Map<string, Map<Outcome, number>>();
     let files = 0;
     let calls = 0;
     for (const e of names.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
@@ -233,13 +252,24 @@ export function readRunRecord(root: string, runId: string): RunRecord {
             } catch {
                 throw new UsageError(`record file ${e.name} of run ${runId}, line ${i + 1}: not JSON: ${JSON.stringify(line.slice(0, 120))}`);
             }
-            if (typeof v !== 'string' || !safeRecordedPath(v)) throw new UsageError(`record file ${e.name} of run ${runId}, line ${i + 1}: ${JSON.stringify(line.slice(0, 120))} is not a recording path relative to the folder`);
-            paths.set(v, (paths.get(v) ?? 0) + 1);
+            // WR-28: {"path","result"} exactly; a bare path (a serializer from before WR-28) cannot be judged.
+            const rec = v as { path?: unknown; result?: unknown } | null;
+            const keys = rec !== null && typeof rec === 'object' && !Array.isArray(rec) ? Object.keys(rec).sort().join(',') : '';
+            if (keys !== 'path,result' || typeof rec!.result !== 'string' || !(OUTCOMES as readonly string[]).includes(rec!.result)) {
+                throw new UsageError(`record file ${e.name} of run ${runId}, line ${i + 1}: ${JSON.stringify(line.slice(0, 120))} is not a {path, result} record (result one of ${OUTCOMES.join(', ')})`);
+            }
+            const p = rec!.path;
+            if (typeof p !== 'string' || !safeRecordedPath(p)) throw new UsageError(`record file ${e.name} of run ${runId}, line ${i + 1}: ${JSON.stringify(line.slice(0, 120))} is not a recording path relative to the folder`);
+            const result = rec!.result as Outcome;
+            paths.set(p, (paths.get(p) ?? 0) + 1);
+            const byResult = outcomes.get(p) ?? new Map<Outcome, number>();
+            byResult.set(result, (byResult.get(result) ?? 0) + 1);
+            outcomes.set(p, byResult);
             calls += 1;
         });
     }
     if (files === 0 || calls === 0) throw new UsageError(`the record of run ${runId} (${dir}) holds no comparison`);
-    return { runId, dir, files, calls, paths };
+    return { runId, dir, files, calls, paths, outcomes };
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +337,10 @@ export interface Judgement {
     tracked: Tracked;
     record: RunRecord;
     neverCompared: string[];
+    /** WR-28: every recorded outcome other than 'match', per path (tracked or not), with its call count. */
+    notMatched: { path: string; outcome: Exclude<Outcome, 'match'>; calls: number }[];
+    /** Tracked recordings with at least one 'match' in the run. */
+    matched: number;
     notTracked: string[];
     violations: number;
 }
@@ -318,9 +352,19 @@ export function judge(repoRoot: string, root: string, runId: string, gitEnv: Nod
     }
     const record = readRunRecord(root, runId);
     const trackedSet = new Set(tracked.recordings);
+    // Never called at all. A path that was called but never matched is named by its outcomes below.
     const neverCompared = tracked.recordings.filter((r) => !record.paths.has(r));
+    const notMatched: Judgement['notMatched'] = [];
+    for (const p of [...record.outcomes.keys()].sort()) {
+        for (const o of OUTCOMES) {
+            if (o === 'match') continue;
+            const n = record.outcomes.get(p)!.get(o) ?? 0;
+            if (n > 0) notMatched.push({ path: p, outcome: o, calls: n });
+        }
+    }
+    const matched = tracked.recordings.filter((r) => (record.outcomes.get(r)?.get('match') ?? 0) > 0).length;
     const notTracked = [...record.paths.keys()].filter((p) => !trackedSet.has(p)).sort();
-    return { tracked, record, neverCompared, notTracked, violations: neverCompared.length + notTracked.length + tracked.caseVariants.length };
+    return { tracked, record, neverCompared, notMatched, matched, notTracked, violations: neverCompared.length + notMatched.length + notTracked.length + tracked.caseVariants.length };
 }
 
 interface Say {
@@ -357,7 +401,10 @@ export function gate(argv: string[], io: GateIo): number {
     say.log(`tracked recordings: ${j.tracked.recordings.length} (${scen} scenario .jsonl, ${envFiles} env/*.json${other ? `, ${other} other` : ''})`);
     say.log(`not recordings (cannot be compared, not judged): ${j.tracked.others.length}${j.tracked.others.length ? ` (${j.tracked.others.map((o) => JSON.stringify(o)).join(', ')})` : ''}`);
     say.log(`compared paths: ${j.record.paths.size} distinct`);
+    const tally = OUTCOMES.map((o) => `${o} ${[...j.record.outcomes.values()].reduce((n, m) => n + (m.get(o) ?? 0), 0)}`).join(', ');
+    say.log(`outcomes: ${tally}; tracked recordings matched: ${j.matched} of ${j.tracked.recordings.length}`);
     for (const p of j.neverCompared) say.error(`NEVER COMPARED ${JSON.stringify(p)}: tracked under ${RECORDINGS_PREFIX} but no test compared it in run ${sel.runId}`);
+    for (const m of j.notMatched) say.error(`${NOT_A_MATCH[m.outcome].label} ${JSON.stringify(m.path)}: ${m.calls} call(s) in run ${sel.runId} ended in ${m.outcome}: ${NOT_A_MATCH[m.outcome].why}`);
     for (const p of j.notTracked) say.error(`NOT TRACKED ${JSON.stringify(p)}: compared in run ${sel.runId} (${j.record.paths.get(p)} call(s)) but git does not track ${RECORDINGS_PREFIX}${p}`);
     for (const p of j.tracked.caseVariants) say.error(`CASE VARIANT ${JSON.stringify(p)}: tracked under a letter-case variant of ${RECORDINGS_PREFIX}`);
     say.log(j.violations ? `RESULT FAIL (${j.violations} violation(s))` : `RESULT PASS (tracked ${j.tracked.recordings.length}, compared ${j.record.paths.size})`);
@@ -461,11 +508,16 @@ function standardRepo(prefix: string): Fixture {
 
 const ALL_STANDARD = ['a.jsonl', 'b.jsonl', 'env/_baseline.json', 'env/FOO.json'];
 
-/** A run's record in the serializer's format (case serializer-* proves the formats agree). */
-function writeRecord(root: string, runId: string, files: Record<string, string[]>): void {
+/**
+ * A run's record in the serializer's format (case serializer-* proves the formats agree): a plain
+ * path is a call that matched; [path, outcome] is a call with that outcome (WR-28).
+ */
+function writeRecord(root: string, runId: string, files: Record<string, (string | [string, Outcome])[]>): void {
     const dir = path.join(root, runId);
     fs.mkdirSync(dir, { recursive: true });
-    for (const [name, lines] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
+    for (const [name, lines] of Object.entries(files)) {
+        fs.writeFileSync(path.join(dir, name), lines.map((l) => `${JSON.stringify(typeof l === 'string' ? { path: l, result: 'match' } : { path: l[0], result: l[1] })}\n`).join(''));
+    }
 }
 
 function tempRoot(prefix: string): string {
@@ -656,13 +708,20 @@ function selfTestCases(): CaseOutcome[] {
             const expectFile = files.length === 1 && fileRe.test(files[0]) ? files[0] : '';
             if (!expectFile) problems.push(`record files ${JSON.stringify(files)}, expected one matching ${fileRe}`);
             const lines = files.length ? fs.readFileSync(path.join(root, runId, expectFile), 'utf8') : '';
-            const wantLines = ['a.jsonl', 'a.jsonl', 'env/_baseline.json', 'a.jsonl', 'c.jsonl', 'a.jsonl', 'env/NEW.json', 'a.jsonl'].map((l) => `${JSON.stringify(l)}\n`).join('');
+            // WR-28: each call's outcome, recorded after the compare decided (a throw included).
+            const wantRecords: [string, Outcome][] = [
+                ['a.jsonl', 'match'], ['a.jsonl', 'match'], ['env/_baseline.json', 'match'], ['a.jsonl', 'differs'],
+                ['c.jsonl', 'absent'], ['a.jsonl', 'match'], ['env/NEW.json', 'written'], ['a.jsonl', 'differs'],
+            ];
+            const wantLines = wantRecords.map(([p, result]) => `${JSON.stringify({ path: p, result })}\n`).join('');
             if (lines !== wantLines) problems.push(`record text ${JSON.stringify(lines)}, expected ${JSON.stringify(wantLines)}`);
             // The check reads the serializer's own record: the formats agree.
             const rec = readRunRecord(root, runId);
             const got = JSON.stringify([...rec.paths.entries()].sort());
             const wantPaths = JSON.stringify([['a.jsonl', 5], ['c.jsonl', 1], ['env/NEW.json', 1], ['env/_baseline.json', 1]]);
-            if (got !== wantPaths || rec.calls !== 8 || rec.files !== 1) problems.push(`check read ${got} (${rec.calls} calls, ${rec.files} files), expected ${wantPaths}`);
+            const gotOutcomes = JSON.stringify([...rec.outcomes.entries()].sort().map(([p, m]) => [p, [...m.entries()].sort()]));
+            const wantOutcomes = JSON.stringify([['a.jsonl', [['differs', 2], ['match', 3]]], ['c.jsonl', [['absent', 1]]], ['env/NEW.json', [['written', 1]]], ['env/_baseline.json', [['match', 1]]]]);
+            if (got !== wantPaths || gotOutcomes !== wantOutcomes || rec.calls !== 8 || rec.files !== 1) problems.push(`check read ${got} ${gotOutcomes} (${rec.calls} calls, ${rec.files} files), expected ${wantPaths} ${wantOutcomes}`);
             if (!realRunDirAbsent(runId)) problems.push('the real record folder got this run');
             return { name, ok: problems.length === 0, detail: problems.length ? problems.join('; ') : `8 calls recorded in order as ${expectFile}; results ${JSON.stringify(results)}; the check reads the same 4 paths` };
         } finally {
@@ -729,6 +788,36 @@ function selfTestCases(): CaseOutcome[] {
             return { name, ok: problems.length === 0, detail: problems.length ? problems.join('; ') : `${notes.join(', ')}; two calls each still match; no record folder` };
         } finally {
             fs.rmSync(m.base, { recursive: true, force: true });
+        }
+    });
+
+    caseRun('WR-28-a-mismatch-the-caller-catches-is-recorded-and-fails-here-naming-it', () => {
+        const name = 'WR-28-a-mismatch-the-caller-catches-is-recorded-and-fails-here-naming-it';
+        const fx = new Fixture('caught');
+        const tmp = tempRoot('caught-tmp');
+        try {
+            const a = '{"scenario":"a","tag":"KEEP"}\n{"submitted":[]}\n';
+            const b = '{"scenario":"b","tag":"KEEP"}\n{"submitted":[]}\n';
+            fx.put(`${REC}a.jsonl`, a);
+            fx.put(`${REC}b.jsonl`, b);
+            fx.commit('test: two recordings');
+            // The real serializer, its recordings folder inside this git fixture.
+            const ser = loadSerializer(fx.dir);
+            const runId = 'selftest-caught-mismatch';
+            withProcess(tmp, { CSB_RAIL_RUN_ID: runId, CI: undefined, [ser.UPDATE_SWITCH]: undefined }, () => {
+                ser.compareRecording('a.jsonl', a);
+                try {
+                    // The laundering route the review names: a test "compares" the old recording and swallows the mismatch.
+                    ser.compareRecording('b.jsonl', `${b}{"changed":true}\n`);
+                } catch {
+                    /* caught on purpose */
+                }
+            });
+            if (!realRunDirAbsent(runId)) return { name, ok: false, detail: 'the real record folder got this run' };
+            return expectRun(name, runCase(fx, path.join(tmp, RECORD_DIRNAME), ['--run-id', runId]), 1, [/^DIFFERS "b\.jsonl": /, /^RESULT FAIL \(1 violation\(s\)\)$/], [/"a\.jsonl"/, /NEVER COMPARED/]);
+        } finally {
+            fx.cleanup();
+            fs.rmSync(tmp, { recursive: true, force: true });
         }
     });
 
@@ -817,6 +906,44 @@ function selfTestCases(): CaseOutcome[] {
             writeRecord(root, 'run-after-swap', { '101-0000000a.txt': ['flashbots-v2-trailing-b.jsonl'] });
             const r = expectRun(name, runCase(fx, root, ['--run-id', 'run-after-swap']), 1, [/^NEVER COMPARED "flashbots-v2-trailing\.jsonl": /, /^RESULT FAIL \(1 violation\(s\)\)$/]);
             return r.ok ? { ...r, detail: `commit check passes ${swap.slice(0, 12)} (1 judged, 0 violations); here ${r.detail}` } : r;
+        } finally {
+            fx.cleanup();
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    caseRun('WR-28-a-differs-or-absent-outcome-fails-even-beside-a-match', () => {
+        const name = 'WR-28-a-differs-or-absent-outcome-fails-even-beside-a-match';
+        const fx = standardRepo('differs');
+        const root = tempRoot('differs-root');
+        try {
+            // Every tracked recording matched once, but one call on b.jsonl differed and one on a missing file was absent.
+            writeRecord(root, 'run-differs', { '101-0000000a.txt': [...ALL_STANDARD, ['b.jsonl', 'differs'], ['gone.jsonl', 'absent']] });
+            return expectRun(name, runCase(fx, root, ['--run-id', 'run-differs']), 1, [
+                /^outcomes: match 4, written 0, differs 1, absent 1, error 0; tracked recordings matched: 4 of 4$/,
+                /^DIFFERS "b\.jsonl": 1 call\(s\) in run run-differs ended in differs: /,
+                /^ABSENT "gone\.jsonl": 1 call\(s\) in run run-differs ended in absent: /,
+                /^NOT TRACKED "gone\.jsonl": /,
+                /^RESULT FAIL \(3 violation\(s\)\)$/,
+            ], [/NEVER COMPARED/]);
+        } finally {
+            fx.cleanup();
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    caseRun('WR-28-a-recording-only-written-or-errored-in-the-run-was-not-compared', () => {
+        const name = 'WR-28-a-recording-only-written-or-errored-in-the-run-was-not-compared';
+        const fx = standardRepo('written');
+        const root = tempRoot('written-root');
+        try {
+            writeRecord(root, 'run-written', { '101-0000000a.txt': ['a.jsonl', 'env/_baseline.json', 'env/FOO.json', ['b.jsonl', 'written'], ['b.jsonl', 'error']] });
+            return expectRun(name, runCase(fx, root, ['--run-id', 'run-written']), 1, [
+                /^outcomes: match 3, written 1, differs 0, absent 0, error 1; tracked recordings matched: 3 of 4$/,
+                /^WRITTEN "b\.jsonl": 1 call\(s\) in run run-written ended in written: re-recorded in this run/,
+                /^ERROR "b\.jsonl": 1 call\(s\) in run run-written ended in error: /,
+                /^RESULT FAIL \(2 violation\(s\)\)$/,
+            ], [/NEVER COMPARED/, /RESULT PASS/]);
         } finally {
             fx.cleanup();
             fs.rmSync(root, { recursive: true, force: true });
@@ -933,10 +1060,15 @@ function selfTestCases(): CaseOutcome[] {
                 ['empty file', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), ''), /record file 1-0000000d\.txt of run run-broken is empty/],
                 ['incomplete last line', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"a.jsonl"\n"b.js'), /ends in an incomplete line/],
                 ['not JSON', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), 'a.jsonl\n'), /line 1: not JSON/],
-                ['not a string', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"a.jsonl"}\n'), /is not a recording path/],
-                ['escaping path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"../a.jsonl"\n'), /is not a recording path/],
-                ['backslash path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"env\\\\FOO.json"\n'), /is not a recording path/],
-                ['wrong extension', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '".gitattributes"\n'), /is not a recording path/],
+                // WR-28: {path, result} exactly; a bare path (the format before WR-28) cannot be judged.
+                ['a bare path (no outcome)', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '"a.jsonl"\n'), /is not a \{path, result\} record/],
+                ['no result', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"a.jsonl"}\n'), /is not a \{path, result\} record/],
+                ['an unknown result', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"a.jsonl","result":"ok"}\n'), /is not a \{path, result\} record/],
+                ['an extra key', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"a.jsonl","result":"match","note":1}\n'), /is not a \{path, result\} record/],
+                ['a path that is not a string', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":1,"result":"match"}\n'), /is not a recording path/],
+                ['escaping path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"../a.jsonl","result":"match"}\n'), /is not a recording path/],
+                ['backslash path', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":"env\\\\FOO.json","result":"match"}\n'), /is not a recording path/],
+                ['wrong extension', (d) => fs.writeFileSync(path.join(d, '1-0000000d.txt'), '{"path":".gitattributes","result":"match"}\n'), /is not a recording path/],
                 ['stray file', (d) => fs.writeFileSync(path.join(d, 'notes.md'), 'x\n'), /unexpected entry "notes\.md"/],
                 ['file name not <pid>-<token>.txt', (d) => fs.writeFileSync(path.join(d, '1-0.txt'), '"a.jsonl"\n'), /unexpected entry "1-0\.txt"/],
             ];
