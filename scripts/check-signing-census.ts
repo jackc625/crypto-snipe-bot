@@ -35,6 +35,19 @@
 //             whose ABI the type analysis cannot read). An entry may match only a contract
 //             call whose mutability the census could not read, and must cite a manual
 //             inventory entry that excludes the same file and call.
+//   dead      (operator ruling on Phase 23 review WR-24) signing sites in a function nothing
+//             can reach, one row per file|function|call with a count. `function` is the
+//             outermost function holding the site. The census must prove it unreachable: a
+//             module-level function declaration or const function, with no export modifier and
+//             zero references anywhere in the program (findReferences, as the lock check uses;
+//             an export list, export default, module.exports or a call is a reference). The row
+//             names finding_id, whose record's recommendation must say delete/remove and name the
+//             function. A dead site is neither locked nor unlocked (its lock is not judged) but it
+//             still counts toward the floor: it is a signing call in the code, and deleting it
+//             must lower the floor in a commit naming the finding (AC-34). Problems: dead-reachable
+//             (a caller, a reference or an export), dead-unprovable (not a function shape the
+//             census can prove), stale-dead (the site or function is gone: remove the row),
+//             dead-count (the count differs), dead-finding-does-not-name.
 // Also: no counted site may have lock status unknown (F3); a scan that finds no files in
 // src/ or scripts/, or no signing site, fails (AC-36); every JavaScript or TypeScript source
 // file under src/ and scripts/ (.ts .tsx .mts .cts .js .jsx .mjs .cjs; Phase 23 review WR-25)
@@ -198,6 +211,8 @@ export interface Site {
     review_note: string | null;
     /** contract sites: every traced construction of the receiver (runner @ where) */
     origins?: string[];
+    /** Operator ruling on WR-24: the finding of the dead entry that covers this site (a provably unreachable function) */
+    dead?: string;
     manual_lock_status?: string;
     lock_disagreement?: boolean;
     /** CR-08: a sendTransaction/signTransaction whose receiver type is not structurally a Signer (a wrapper or a narrow interface); counted and lock-judged like any site */
@@ -762,6 +777,63 @@ class Census {
         return { status: r.status as LockStatus, evidence: null, chains: r.chains, reason: r.reason ?? null };
     }
 
+    // ------------------------------------------------- dead code (operator ruling on WR-24)
+
+    private siteNodes = new Map<string, ts.Node>();
+
+    /** The outermost function holding n: the only way n runs is a call of that function. */
+    outermostFn(n: ts.Node): ts.FunctionLikeDeclaration | undefined {
+        let out: ts.FunctionLikeDeclaration | undefined;
+        for (let f = this.enclosingFn(n); f; f = this.enclosingFn(f)) out = f;
+        return out;
+    }
+
+    /** The name of a module-level function (a function declaration, or a const holding an arrow or function expression, directly in the file), else null. */
+    moduleFnName(f: ts.FunctionLikeDeclaration): string | null {
+        if (ts.isFunctionDeclaration(f)) return f.name && ts.isSourceFile(f.parent) ? f.name.text : null;
+        if (ts.isArrowFunction(f) || ts.isFunctionExpression(f)) {
+            const u = this.up(f);
+            const p = u.parent;
+            if (p && ts.isVariableDeclaration(p) && p.initializer === u && ts.isIdentifier(p.name) && ts.isVariableDeclarationList(p.parent) && (p.parent.flags & ts.NodeFlags.Const) !== 0 && ts.isVariableStatement(p.parent.parent) && ts.isSourceFile(p.parent.parent.parent)) return p.name.text;
+        }
+        return null;
+    }
+
+    /** For a dead entry: a site's outermost function and the name an entry uses for it. */
+    deadFunctionOf(s: { file: string; line: number; column: number }): { name: string; fn: ts.FunctionLikeDeclaration } | null {
+        const n = this.siteNodes.get(`${s.file}:${s.line}:${s.column}`);
+        const f = n ? this.outermostFn(n) : undefined;
+        return f ? { name: this.moduleFnName(f) ?? this.fnName(f), fn: f } : null;
+    }
+
+    /** Whether file declares a module-level function of this name (for the stale-dead message). */
+    moduleFunctionExists(file: string, name: string): boolean {
+        const sf = this.auditedFiles().find((x) => this.rel(x.fileName) === file);
+        if (!sf) return false;
+        let found = false;
+        const visit = (n: ts.Node) => {
+            if (found) return;
+            if (this.isFnLike(n) && this.moduleFnName(n) === name) found = true;
+            else ts.forEachChild(n, visit);
+        };
+        visit(sf);
+        return found;
+    }
+
+    /** Prove a function unreachable: module-level, no export modifier, and no reference anywhere in the program. */
+    unreachableProof(f: ts.FunctionLikeDeclaration): { unprovable: string } | { reachable: string[] } {
+        const name = this.moduleFnName(f);
+        if (name === null) return { unprovable: `${this.fnName(f)} at ${this.loc(f)} is not a module-level function declaration or const function, the only shapes the census proves unreachable` };
+        const holder: ts.Node = ts.isFunctionDeclaration(f) ? f : this.up(f).parent!.parent!.parent!;
+        const mods = ts.canHaveModifiers(holder) ? ts.getModifiers(holder) ?? [] : [];
+        const reasons: string[] = [];
+        if (mods.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) reasons.push(`${name} is exported (export modifier at ${this.loc(holder)})`);
+        const handle = this.handleOf(f);
+        if (!handle) return { unprovable: `${name} has no name the census can look up` };
+        for (const id of this.refsOf(handle)) reasons.push(`${name} is referenced at ${this.loc(id)} (${this.short(id.parent.getText(), 50)})`);
+        return { reachable: reasons };
+    }
+
     // ------------------------------------------------- contract method values (CR-09)
 
     /**
@@ -1039,6 +1111,7 @@ class Census {
         const sf = call.getSourceFile();
         const lc = sf.getLineAndCharacterOfPosition(call.getStart(sf));
         const file = this.rel(sf.fileName);
+        this.siteNodes.set(`${file}:${lc.line + 1}:${lc.character + 1}`, call);
         const base: Site = {
             id: '',
             file,
@@ -1463,6 +1536,11 @@ type ProblemCode =
     | 'decision-does-not-cover'
     | 'finding-not-found'
     | 'floor-lowered-unnamed'
+    | 'dead-reachable'
+    | 'dead-unprovable'
+    | 'dead-finding-does-not-name'
+    | 'dead-count'
+    | 'stale-dead'
     | 'history-bad-version'
     | 'history-empty';
 
@@ -1491,10 +1569,31 @@ interface ExcludedEntry {
     note?: string;
 }
 
+interface DeadEntry {
+    file: string;
+    function: string;
+    call: string;
+    count: number;
+    finding_id: string;
+    reason: string;
+    note?: string;
+}
+
 interface Exceptions {
     floor: number;
     unlocked: UnlockedEntry[];
     excluded: ExcludedEntry[];
+    dead: DeadEntry[];
+}
+
+/** A dead entry's key: file, outermost function and call. */
+const deadEntryKey = (e: { file: string; function: string; call: string }): string => `${e.file}|${e.function}|${e.call}`;
+
+/** A finding recommendation that names `fn` for deletion: a delete/remove verb and the function name as a whole word. */
+function recommendsDeleting(recommendation: unknown, fn: string): boolean {
+    if (typeof recommendation !== 'string') return false;
+    const esc = fn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return /\b(delete|deletes|deleted|deleting|remove|removes|removed|removing)\b/i.test(recommendation) && new RegExp(`(?<![A-Za-z0-9_$.])${esc}(?![A-Za-z0-9_$])`).test(recommendation);
 }
 
 interface GateRun {
@@ -1510,6 +1609,8 @@ interface GateSummary {
     excluded_by_auditor: number;
     excluded_by_census: number;
     message_signing: number;
+    /** Sites in a provably unreachable function listed under dead (operator ruling on WR-24): counted toward the floor, neither locked nor unlocked. */
+    dead: number;
     src_files: number;
     script_files: number;
     floor: number;
@@ -1530,7 +1631,8 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         bad('not a JSON object');
         return { ex: null, problems };
     }
-    for (const k of Object.keys(raw)) if (!['description', 'floor', 'unlocked', 'excluded'].includes(k)) bad(`unknown top-level key ${JSON.stringify(k)}`);
+    for (const k of Object.keys(raw)) if (!['description', 'floor', 'unlocked', 'excluded', 'dead'].includes(k)) bad(`unknown top-level key ${JSON.stringify(k)}`);
+    if (raw.dead !== undefined && !Array.isArray(raw.dead)) bad('dead must be an array');
     if (raw.description !== undefined && typeof raw.description !== 'string') bad('description must be a string');
     if (!posInt(raw.floor)) bad('floor must be a positive integer');
     if (!Array.isArray(raw.unlocked)) bad('unlocked must be an array');
@@ -1572,6 +1674,25 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         if (!ok) return;
         excluded.push({ file: e.file as string, enclosing: e.enclosing as string, call: e.call as string, count: e.count as number, reason: e.reason as string, evidence_ref: e.evidence_ref as string });
     });
+    const dead: DeadEntry[] = [];
+    ((raw.dead ?? []) as unknown[]).forEach((e, i) => {
+        const at = `dead[${i}]`;
+        if (!isObj(e)) return bad(`${at}: not an object`);
+        let ok = true;
+        for (const k of Object.keys(e)) if (!['file', 'function', 'call', 'count', 'finding_id', 'reason', 'note'].includes(k)) (bad(`${at}: unknown key ${JSON.stringify(k)}`), (ok = false));
+        for (const k of ['file', 'function', 'call', 'reason']) if (!nonEmpty(e[k])) (bad(`${at}: ${k} must be a non-empty string`), (ok = false));
+        if (nonEmpty(e.file) && !/^(src|scripts)\//.test(e.file)) (bad(`${at}: file must be under src/ or scripts/`), (ok = false));
+        if (!posInt(e.count)) (bad(`${at}: count must be a positive integer`), (ok = false));
+        if (!(typeof e.finding_id === 'string' && FINDING_ID_RE.test(e.finding_id))) (bad(`${at}: finding_id must be a finding ID (AUD-<AREA>-<NNN>)`), (ok = false));
+        if (e.note !== undefined && typeof e.note !== 'string') (bad(`${at}: note must be a string`), (ok = false));
+        if (!ok) return;
+        dead.push({ file: e.file as string, function: e.function as string, call: e.call as string, count: e.count as number, finding_id: e.finding_id as string, reason: e.reason as string });
+    });
+    const deadKeys = dead.map(deadEntryKey);
+    deadKeys.forEach((k, i) => {
+        if (deadKeys.indexOf(k) !== i) bad(`dead: key ${k} is listed twice`);
+        if (i > 0 && !(deadKeys[i - 1] < k)) bad(`dead: entries must be sorted by key (file|function|call); ${k} comes after ${deadKeys[i - 1]}`);
+    });
     const seen = new Set<string>();
     for (const [list, name] of [[unlocked, 'unlocked'], [excluded, 'excluded']] as const) {
         const keys = list.map(entryKey);
@@ -1582,7 +1703,7 @@ function parseExceptions(raw: unknown, where: string): { ex: Exceptions | null; 
         });
     }
     if (problems.some((p) => p.code === 'bad-exceptions-file')) return { ex: null, problems };
-    return { ex: { floor: raw.floor as number, unlocked, excluded }, problems };
+    return { ex: { floor: raw.floor as number, unlocked, excluded, dead }, problems };
 }
 
 function loadExceptions(root: string): { ex: Exceptions | null; problems: Problem[] } {
@@ -1663,7 +1784,7 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
     const prog = result.program;
     // Work on copies: the census result is never changed, so one run can be evaluated against several lists.
     const sites = result.sites.map((s) => ({ ...s }));
-    const summary: GateSummary = { tx_signing: 0, locked: 0, unlocked: 0, unknown: 0, excluded_by_auditor: 0, excluded_by_census: 0, message_signing: 0, src_files: prog.src_files, script_files: prog.script_files, floor: ex.floor };
+    const summary: GateSummary = { tx_signing: 0, locked: 0, unlocked: 0, unknown: 0, dead: 0, excluded_by_auditor: 0, excluded_by_census: 0, message_signing: 0, src_files: prog.src_files, script_files: prog.script_files, floor: ex.floor };
     // AC-53: every listed unlocked site names a registered finding and decision records that cover it.
     for (const e of ex.unlocked) {
         const k = entryKey(e);
@@ -1715,21 +1836,62 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
             s.excluded_reason = `${e.reason} (evidence: ${e.evidence_ref})`;
         }
     }
+    // Operator ruling on WR-24: dead entries. The census proves each function unreachable, or the
+    // entry fails and its sites stay judged like any other.
+    for (const e of ex.dead) {
+        const k = deadEntryKey(e);
+        let ok = true;
+        const rec = readJsonOrNull(path.join(root, '.planning', 'audit', 'findings', `${e.finding_id}.json`));
+        if (!isObj(rec) || rec.id !== e.finding_id) {
+            problems.push({ code: 'finding-not-found', message: `dead ${k}: finding ${e.finding_id} has no record .planning/audit/findings/${e.finding_id}.json` });
+            ok = false;
+        } else if (!recommendsDeleting(rec.recommendation, e.function)) {
+            problems.push({ code: 'dead-finding-does-not-name', message: `dead ${k}: the recommendation of ${e.finding_id} does not name ${e.function} for deletion (it must say delete or remove and name the function): ${JSON.stringify(String(rec.recommendation ?? '').slice(0, 160))}` });
+            ok = false;
+        }
+        const matches = counted.filter((s) => !s.excluded && s.file === e.file && s.api === e.call && census.deadFunctionOf(s)?.name === e.function);
+        if (!matches.length) {
+            problems.push({ code: 'stale-dead', message: `dead ${k} (${e.finding_id}): the census finds no ${e.call} site in ${e.function} (${census.moduleFunctionExists(e.file, e.function) ? 'the function remains but the site is gone' : 'the function is gone'}); remove the entry, and lower the floor in a commit naming ${e.finding_id} (AC-34)` });
+            continue;
+        }
+        if (matches.length !== e.count) {
+            problems.push({ code: 'dead-count', message: `dead ${k} (${e.finding_id}): listed count ${e.count}, the census finds ${matches.length} site(s) (${matches.map((s) => `${s.file}:${s.line}`).join(', ')})` });
+            ok = false;
+        }
+        const fns = [...new Set(matches.map((s) => census.deadFunctionOf(s)!.fn))];
+        if (fns.length !== 1) {
+            problems.push({ code: 'dead-unprovable', message: `dead ${k}: ${fns.length} functions in ${e.file} go by the name ${e.function}; the entry cannot say which one is dead` });
+            ok = false;
+        } else {
+            const proof = census.unreachableProof(fns[0]);
+            if ('unprovable' in proof) {
+                problems.push({ code: 'dead-unprovable', message: `dead ${k}: ${proof.unprovable}` });
+                ok = false;
+            } else if (proof.reachable.length) {
+                problems.push({ code: 'dead-reachable', message: `dead ${k} (${e.finding_id}): ${e.function} is reachable: ${proof.reachable.join('; ')}; a reachable signing site must be locked, not listed as dead` });
+                ok = false;
+            }
+        }
+        if (ok) for (const s of matches) s.dead = e.finding_id;
+    }
     const remaining = counted.filter((s) => !s.excluded);
     summary.excluded_by_auditor = counted.length - remaining.length;
     summary.tx_signing = remaining.length;
-    for (const s of remaining) summary[s.lock_status === 'locked' ? 'locked' : s.lock_status === 'unlocked' ? 'unlocked' : 'unknown']++;
+    // A dead site counts toward the floor (remaining) but is neither locked nor unlocked (live).
+    const live = remaining.filter((s) => !s.dead);
+    summary.dead = remaining.length - live.length;
+    for (const s of live) summary[s.lock_status === 'locked' ? 'locked' : s.lock_status === 'unlocked' ? 'unlocked' : 'unknown']++;
     // F3: unknown is never counted as locked or excluded.
-    for (const s of remaining.filter((x) => x.lock_status !== 'locked' && x.lock_status !== 'unlocked'))
+    for (const s of live.filter((x) => x.lock_status !== 'locked' && x.lock_status !== 'unlocked'))
         problems.push({ code: 'unknown-lock', message: `${s.file}:${s.line} ${s.api} in ${s.enclosing}: lock status ${s.lock_status ?? 'none'}${s.reason ? ` (${s.reason})` : ''}; the census must prove a signing site locked or unlocked` });
     // AC-32 / AC-35: the unlocked set equals the list, by key and count.
     const byKey = new Map<string, Site[]>();
-    for (const s of remaining.filter((x) => x.lock_status === 'unlocked')) byKey.set(siteKey(s), [...(byKey.get(siteKey(s)) ?? []), s]);
+    for (const s of live.filter((x) => x.lock_status === 'unlocked')) byKey.set(siteKey(s), [...(byKey.get(siteKey(s)) ?? []), s]);
     const listed = new Set(ex.unlocked.map(entryKey));
     for (const e of ex.unlocked) {
         const k = entryKey(e);
         const got = byKey.get(k) ?? [];
-        const lockedNow = remaining.filter((s) => siteKey(s) === k && s.lock_status === 'locked').length;
+        const lockedNow = live.filter((s) => siteKey(s) === k && s.lock_status === 'locked').length;
         if (got.length < e.count)
             problems.push({ code: 'stale-unlocked', message: `unlocked ${k} (${e.finding_id}): listed count ${e.count}, the census finds ${got.length} unlocked site(s) at this key${lockedNow ? ` and ${lockedNow} now locked` : ''}; a fixed or removed site must come off the list (lower count or remove the entry)` });
         else if (got.length > e.count)
@@ -1746,7 +1908,7 @@ function evaluateGate(root: string, run: GateRun, ex: Exceptions): { problems: P
 }
 
 function gateLine(s: GateSummary, problems: Problem[]): string {
-    return `check-signing-census: ${s.tx_signing} transaction-signing sites (locked ${s.locked}, unlocked ${s.unlocked}, unknown ${s.unknown}), floor ${s.floor}; excluded ${s.excluded_by_auditor} by auditor and ${s.excluded_by_census} by census; message-signing ${s.message_signing}; files src ${s.src_files}, scripts ${s.script_files}; ${problems.length} problem(s)`;
+    return `check-signing-census: ${s.tx_signing} transaction-signing sites (locked ${s.locked}, unlocked ${s.unlocked}, unknown ${s.unknown}, dead ${s.dead}), floor ${s.floor}; excluded ${s.excluded_by_auditor} by auditor and ${s.excluded_by_census} by census; message-signing ${s.message_signing}; files src ${s.src_files}, scripts ${s.script_files}; ${problems.length} problem(s)`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2193,6 +2355,38 @@ export function later(): void {
 }
 `;
 
+// Operator ruling on WR-24 (dead code): a signing site in a function nothing can reach may be
+// listed under `dead`, citing a finding whose recommendation deletes the function. The census
+// proves the function unreachable (module-level, not exported, zero references) or the entry fails.
+const DEAD_FN = `async function deadApprove(): Promise<void> {
+    await wallet.sendTransaction(tx);
+}`;
+
+function deadSource(opts: { exported?: boolean; exportList?: boolean; caller?: boolean } = {}): string {
+    return `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+// A signing function nothing calls (the fixture's AUD-FIX-003, like bot.ts maybeApproveForChain).
+${opts.exported ? 'export ' : ''}${DEAD_FN}
+${opts.exportList ? '\nexport { deadApprove };\n' : ''}${opts.caller ? '\nexport async function callsIt(): Promise<void> {\n    await deadApprove();\n}\n' : ''}`;
+}
+
+const DEAD_FINDING_REL = '.planning/audit/findings/AUD-FIX-003.json';
+
+/** The base fixture plus src/dead.ts, its finding record and a dead entry (each part overridable; null leaves it out). */
+function deadFiles(opts: { src?: string | null; recommendation?: string; count?: number; entry?: boolean; fn?: string } = {}): Record<string, string | null> {
+    return {
+        ...baseGateFiles(20),
+        'src/dead.ts': opts.src === undefined ? deadSource() : opts.src,
+        [DEAD_FINDING_REL]: JSON.stringify({ id: 'AUD-FIX-003', recommendation: opts.recommendation ?? 'Delete deadApprove (no caller, so no behaviour change).' }),
+        [EXCEPTIONS_REL]: withExceptions((ex) => {
+            if (opts.entry !== false) ex.dead = [{ file: 'src/dead.ts', function: opts.fn ?? 'deadApprove', call: 'signer.sendTransaction', count: opts.count ?? 1, finding_id: 'AUD-FIX-003', reason: 'no caller; deleted by AUD-FIX-003' }];
+        }),
+    };
+}
+
 function withExceptions(mutate: (ex: Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] }) => void): string {
     const ex = baseGateExceptions() as Record<string, unknown> & { unlocked: Record<string, unknown>[]; excluded: Record<string, unknown>[] };
     mutate(ex);
@@ -2282,6 +2476,41 @@ function gateCases(): CaseOutcome[] {
     out.push(
         codeCase('WR-25-js-file-outside-tsconfig-include-fails', { ...baseGateFiles(20), 'tsconfig.json': JSON.stringify(narrowed), 'src/hidden.mjs': 'export const x = 1;\n' }, ['file-not-audited'], (res) =>
             res.problems.some((p) => p.code === 'file-not-audited' && p.message.startsWith('src/hidden.mjs ')) ? null : `expected file-not-audited for src/hidden.mjs, got ${res.problems.map((p) => p.message).join(' | ')}`,
+        ),
+    );
+    // Operator ruling on WR-24: the dead-code class.
+    out.push(codeCase('WR-24-dead-site-without-an-entry-fails', deadFiles({ entry: false }), ['unknown-lock']));
+    out.push(
+        codeCase('WR-24-dead-entry-on-an-unreachable-function-passes', deadFiles(), [], (res) =>
+            res.summary?.dead === 1 && res.summary.tx_signing === 24 && res.summary.unknown === 0 ? null : `expected 24 sites with 1 dead (counted toward the floor) and none unknown, got ${JSON.stringify(res.summary)}`,
+        ),
+    );
+    out.push(codeCase('WR-24-dead-entry-on-an-exported-function-fails', deadFiles({ src: deadSource({ exported: true }) }), ['dead-reachable', 'surplus-unlocked']));
+    out.push(codeCase('WR-24-dead-entry-on-a-function-in-an-export-list-fails', deadFiles({ src: deadSource({ exportList: true }) }), ['dead-reachable', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-on-a-function-with-a-caller-fails', deadFiles({ src: deadSource({ caller: true }) }), ['dead-reachable', 'surplus-unlocked']));
+    out.push(codeCase('WR-24-dead-entry-whose-function-was-removed-fails', deadFiles({ src: null }), ['stale-dead']));
+    out.push(codeCase('WR-24-dead-entry-assigned-to-module-exports-fails', deadFiles({ src: `${deadSource()}
+declare const module: { exports: Record<string, unknown> };
+module.exports.deadApprove = deadApprove;
+` }), ['dead-reachable', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-whose-count-differs-fails', deadFiles({ count: 2 }), ['dead-count', 'unknown-lock']));
+    out.push(codeCase('WR-24-dead-entry-whose-finding-does-not-name-the-function-fails', deadFiles({ recommendation: 'Delete simulateSell and its import (no caller).' }), ['dead-finding-does-not-name', 'unknown-lock']));
+    out.push(
+        codeCase(
+            'WR-24-dead-entry-on-a-class-method-is-unprovable-and-fails',
+            deadFiles({ src: `import { Wallet } from 'ethers';
+
+declare const wallet: Wallet;
+${GATE_TX}
+
+class Holder {
+    async deadApprove(): Promise<void> {
+        await wallet.sendTransaction(tx);
+    }
+}
+void Holder;
+`, fn: 'Holder.deadApprove', recommendation: 'Delete Holder.deadApprove (no caller).' }),
+            ['dead-unprovable', 'unknown-lock'],
         ),
     );
     out.push(caseFlag7());
