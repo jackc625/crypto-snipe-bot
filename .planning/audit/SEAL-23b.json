@@ -1,0 +1,60 @@
+{
+  "sealed_sha": "bd35d87909b942eb8bb015005ef59350d833ae50",
+  "sealed_at": "2026-11-12T23:47:30-05:00",
+  "phase_start_sha": "912b915f3da59c9596f44cdaa5e37caaa29a087c",
+  "scan": {
+    "range": "912b915f3da59c9596f44cdaa5e37caaa29a087c..bd35d87909b942eb8bb015005ef59350d833ae50",
+    "non_public": 0,
+    "known_public": 0,
+    "public_address": 0,
+    "reviewed_inert": 0,
+    "reviewed_ruling": "none applied: the scan found no non-public hit, so no reviewed location was labelled (seal-verify.ts REVIEWED_HITS entries matched 0 of 2; both sit in commits before this range)",
+    "phase_scan_sha256": "965fe9b2c3a3b854ef339c3f5698b05aab8e93853c4e8504732f146bb41ea5c5"
+  },
+  "final_check": "pass",
+  "final_check_source": ".planning/audit/tools/check.ts --stage triage at sealed_sha: RESULT PASS stage=triage fail=0 pending=0 warn=0",
+  "render_sha256": {
+    "findings": "738cebf6043c78c65b358aef7e3d83c9c1476ca9a830c82640620c47ec03e4b2",
+    "decisions": "90946c7db693f877c90e7384d44c4de68b710bdb6b7b8e8fb65fbb0eeefc4e8a"
+  },
+  "exempt_paths": [
+    ".planning/audit/SEAL-23b.json",
+    ".planning/audit/inputs/phase-scan-23b.json"
+  ],
+  "exempt_paths_note": "`*` matches any run of characters except `/`, whole path; proven by seal-verify.ts --self-test. Only paths under covers are judged; a change anywhere else is permitted by this seal (D-19). Exempt paths may change but are still scanned for secrets by seal-verify.ts --scan.",
+  "rule": "any later change under covers outside exempt_paths invalidates this seal; run seal-verify.ts --seal .planning/audit/SEAL-23b.json --scan",
+  "covers": ".planning/audit/",
+  "previous_seal": ".planning/audit/SEAL-23.json",
+  "previous_sealed_sha": "912b915f3da59c9596f44cdaa5e37caaa29a087c",
+  "changed_since_previous": [
+    ".planning/audit/AUDIT-FINDINGS.md",
+    ".planning/audit/SEAL-23.json",
+    ".planning/audit/findings/AUD-ANTIRUG-002.json",
+    ".planning/audit/findings/AUD-BUY-005.json",
+    ".planning/audit/findings/AUD-BUY-025.json",
+    ".planning/audit/findings/AUD-BUY-027.json",
+    ".planning/audit/findings/AUD-BUY-039.json",
+    ".planning/audit/findings/AUD-EXIT-001.json",
+    ".planning/audit/findings/AUD-EXIT-002.json",
+    ".planning/audit/findings/AUD-EXIT-007.json",
+    ".planning/audit/findings/AUD-EXIT-008.json",
+    ".planning/audit/findings/AUD-EXIT-009.json",
+    ".planning/audit/findings/AUD-EXIT-014.json",
+    ".planning/audit/findings/AUD-TX-002.json",
+    ".planning/audit/findings/AUD-TX-003.json",
+    ".planning/audit/findings/AUD-TX-029.json",
+    ".planning/audit/inputs/phase-scan-23.json",
+    ".planning/audit/inputs/triage-evidence.json",
+    ".planning/audit/ledger/BUY.json",
+    ".planning/audit/ledger/EXIT.json",
+    ".planning/audit/ledger/TX.json",
+    ".planning/audit/process-notes/PN-002.json",
+    ".planning/audit/sweep/contrib-PHASE23.json",
+    ".planning/audit/tools/seal-verify.ts"
+  ],
+  "scan_record": ".planning/audit/inputs/phase-scan-23b.json",
+  "scan_start_sha": "912b915f3da59c9596f44cdaa5e37caaa29a087c",
+  "phase": "23-test-safety-net-harness-triage-characterization",
+  "plan": "23-REVIEW-FIX",
+  "decision": "D-19 (successor seal): SEAL-23.json stays byte-unchanged as the record of 912b915; this record points back to it, lists what changed under the audit folder since it (the Phase 23 code-review fixes to tools/seal-verify.ts, the register rulings and AUD-BUY-039, process note PN-002, the regenerated inputs/triage-evidence.json), and covers only the audit folder"
+}
